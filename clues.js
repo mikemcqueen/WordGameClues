@@ -431,7 +431,7 @@ try {
     main();
 }
 catch(e) {
-    console.log(e.stack);
+    console.error(e.stack);
 }
 finally {
     if (!QUIET) {
