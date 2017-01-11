@@ -1,0 +1,7 @@
+[
+    { "name" : "georgia peach",          "src" : "ty,cobb" },
+    { "name" : "georgia",                "src" : "ty,cobb" },
+    { "name" : "peach",                  "src" : "ty,cobb" },
+
+    { "name" : "vermont",       "src" : "jackson,nelson,car", "note" : "duplicate:knotts; also horatio", "ignore" : true }
+]

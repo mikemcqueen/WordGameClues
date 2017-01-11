@@ -1,0 +1,15 @@
+[
+    { "name" : "george hudson",      "src" : "midland railroad,king" },
+    { "name" : "george",             "src" : "midland railroad,king" },
+    { "name" : "hudson",             "src" : "midland railroad,king" },
+    { "name" : "ale",                "src" : "new castle,brown" },
+    { "name" : "blue star",          "src" : "new castle,brown" },
+    { "name" : "weller",             "src" : "louis,rabbit" },
+    { "name" : "jackson pollock",    "src" : "jackson,pollock" },
+    { "name" : "chameleon",          "src" : "dwarf,jackson" },
+    { "name" : "cunningham",         "src" : "ace,duke,randolph", "note" : "ace pilot,senator?" },
+    { "name" : "sterling marlin",    "src" : "sterling,marlin" },
+    { "name" : "versailles",         "src" : "louis xiv,new castle" },
+
+    { "name" : "test",               "src" : "test,test", "ignore" : true }
+]

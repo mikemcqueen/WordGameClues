@@ -1,0 +1,145 @@
+need something:
+
+    // need SHIP
+    { "name" : "victory",               "src" : "portsmouth,nelson", "note" : "need: ship", "skip" : true },
+    { "name" : "victory",               "src" : "nelson,portsmouth,ship", "note" : "duplicate nelson", "ignore" : "true" }
+    { "name" : "trinidad",               "src" : "ferdinand,magellan,ship", "ignore" : "true" },
+    { "name" : "trinity",                "src" : "ferdinand,magellan,ship", "ignore" : "true" },
+    { "name" : "san antonio",            "src" : "ferdinand,magellan,ship", "ignore" : "true" },
+    { "name" : "anthony",                "src" : "ferdinand,magellan,ship", "ignore" : "true" },
+    { "name" : "santiago",               "src" : "ferdinand,magellan,ship", "ignore" : "true" },
+    { "name" : "victoria",               "src" : "ferdinand,magellan,ship", "ignore" : "true" },
+    { "name" : "forward",                "src" : "north pole,hatteras,ship", "note" : "Jules Verne" }
+    { "name" : "trinidad",               "src" : "magellan,ship" },
+    { "name" : "trinity",                "src" : "magellan,ship" },
+    { "name" : "san antonio",            "src" : "magellan,ship" },
+    { "name" : "anthony",                "src" : "magellan,ship" },
+    { "name" : "santiago",               "src" : "magellan,ship" },
+    { "name" : "victoria",               "src" : "magellan,ship" },
+
+
+duped primary:
+
+    { "name" : "vermont",       "src" : "jackson,nelson,car", "note" : "duplicate:knotts; also horatio", "ignore" : true }
+
+    { "clue" : ".victory",                         "src" : "nelson,portsmouth,ship" },
+
+9:
+    //relied on george in 6 below
+    { "name" : "elephant",         "src" : "southern,brown,seal" },
+
+
+8:
+//META:
+
+6:
+
+//META:
+    // "GEORGE is not a primary clue,  i thought it was "randolph white" 
+    // probably thought it was Randolph Wythe
+    { "name" : "custer",           "src" : "george,armstrong" },
+    { "name" : "harry",            "src" : "george,armstrong" },
+    { "name" : "edward",           "src" : "george,armstrong" },
+    { "name" : "chief",            "src" : "george,armstrong" },
+    { "name" : "seal",             "src" : "george,armstrong", "note" : "canadian mayor" },
+    { "name" : "robert",           "src" : "george,irwin" },
+
+//SYNTH:
+    // JOHN BRWON
+    { "name" : "katy",                 "src" : "sheriff,john brown,whipple,ship" },
+    { "name" : "providence",           "src" : "sheriff,john brown,whipple,ship" },
+
+5:
+    // ELEPHANT
+    { "name" : "williams",                      "src" : "james,howard,elephant" },
+    { "name" : "bill",                          "src" : "james,howard,elephant" },
+
+
+4:
+    //JOHN BROWN
+    { "name" : "abraham",                          "src" : "sheriff,john brown,whipple" },
+    { "name" : "calvin",                           "src" : "john brown,bourbon" },
+
+    // ELEPHANT
+    { "name" : "lafferty",                         "src" : "jumbo,elephant,james" },
+
+    // MUPPET (from ELEPHANT)
+    { "name" : "ernie",                 "src" : "orange,muppet" },
+    { "name" : "zoe",                   "src" : "orange,muppet" },
+    { "name" : "monster",               "src" : "grover,muppet" },
+
+
+3:
+    //JOHN BROWN
+    { "name" : "abraham",             "src" : "john brown,whipple" },
+
+
+    // ELEPHANT
+    { "name" : "lucy",                  "src" : "jumbo,elephant" },
+    { "name" : "colossus",              "src" : "jumbo,elephant" },
+    { "name" : "white",                 "src" : "jumbo,elephant" },
+    { "name" : "ziggy",                 "src" : "elephant,balboa" },
+
+
+
+// REJECT:
+
+
+2:
+    // JOHN BROWN is not a primary clue
+    { "name" : "stephen vincent benet", "src" : "john brown,body", "skip" : true },
+    { "name" : "stephen",               "src" : "john brown,body" },
+    { "name" : "vincent",               "src" : "john brown,body" },
+    { "name" : "benet",                 "src" : "john brown,body" },
+    { "name" : "poem",                  "src" : "john brown,body" },
+    { "name" : "song",                  "src" : "john brown,body" },
+    { "name" : "bob marley",            "src" : "sheriff,john brown", "note" : "eric clapton?" },
+    { "name" : "bob",                   "src" : "sheriff,john brown", "skip" : true },
+    { "name" : "marley",                "src" : "sheriff,john brown", "skip" : true },
+    { "name" : "mayo",                  "src" : "sheriff,john brown" },
+    { "name" : "bristol",               "src" : "sheriff,john brown" },
+    { "name" : "gasp",                  "src" : "sheriff,john brown" },
+
+    // ELEPHANT is not a primary clue
+    { "name" : "island",                "src" : "antarctic,elephant" },
+    { "name" : "howard williams",       "src" : "elephant,james", "note"  : "elephant bill", "skip" : true },
+    { "name" : "lafferty",              "src" : "elephant,james", "note" : "also 4 with jumbo", "skip" : true },
+    { "name" : "porsche",               "src" : "elephant,ferdinand" },
+    { "name" : "muppet",                "src" : "elephant,seymour" },
+    { "name" : "pith helmet",           "src" : "elephant,hat" },
+    { "name" : "sun helmet",            "src" : "elephant,hat" },
+    { "name" : "safari helmet",         "src" : "elephant,hat" },
+    { "name" : "tilley",                "src" : "elephant,hat" },
+    { "name" : "ship",                  "src" : "elephant,nelson" }
+
+    // ELEPHANT rejects
+    { "src" : "elephant,alexandria"  },
+    { "src" : "elephant,bodie"  },
+    { "src" : "elephant,roanoke"  },
+    { "src" : "elephant,knotts"  },
+    { "src" : "elephant,knot"  },
+    { "src" : "elephant,harkers"  },
+    { "src" : "elephant,ochre"  },
+    { "src" : "elephant,hatteras"  },
+    { "src" : "elephant,john brown"  },
+    { "src" : "elephant,panama"  },
+    { "src" : "elephant,the kid"  },
+    { "src" : "elephant,submarine", "lastchecked" : "28-Dec-2016" }
+
+
+
+need princess:
+
+    { "clue" : ".valentine",                       "src" : "princess,charlotte" }
+    { "clue" : ".valentine",                       "src" : "princess,charlotte" }
+    { "clue" : ".valentine",                       "src" : "princess,charlotte" }
+
+
+these should work:
+
+6:
+
+
+AFTER FLAGS FIX:
+
+reject3:

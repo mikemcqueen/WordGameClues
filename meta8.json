@@ -1,0 +1,19 @@
+[
+    { "name" : "#1",               "src" : "sterling marlin,bull's eye" },
+    { "name" : "houston oilers",   "src" : "columbia,blue" },
+    { "name" : "john brown",       "src" : "john,brown" },
+    { "name" : "islands",          "src" : "jackson,pollock,yellow" },
+    { "name" : "island",           "src" : "jackson,pollock,yellow" },
+    { "name" : "tiger",            "src" : "black,yellow,butterfly" },
+    { "name" : "swallowtail",      "src" : "black,yellow,butterfly" },
+    { "name" : "swallow",          "src" : "black,yellow,butterfly" },
+    { "name" : "john",             "src" : "polar,cunningham" },
+    { "name" : "john",             "src" : "arctic,cunningham" },
+    { "name" : "george",           "src" : "canada,cunningham" },
+    { "name" : "georgia",          "src" : "canada,cunningham" },
+    { "name" : "ainsworth",        "src" : "john,dunn", "note" : "early indian trader" },
+    { "name" : "peter falk",       "src" : "columbia,detective" },
+    { "name" : "falk",             "src" : "columbia,detective" },
+
+    { "name" : "test",             "src" : "test,test", "ignore" : true }
+]
