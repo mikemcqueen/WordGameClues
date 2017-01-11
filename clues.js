@@ -336,7 +336,7 @@ function showAlternates(args) {
 	displayAllAlternates(nc.name, ncListArray, count, args.output);
     }
     else {
-	console.log('showAlternates: ', number ? number : 'all');
+	console.log('showAlternates: all');
 
 	for (count = 2; count <= ClueManager.maxClues; ++count) {
 	    map = ClueManager.knownClueMapArray[count];
@@ -375,10 +375,22 @@ function displayAllAlternates(name, ncListArrayArray, count, output) {
 
 function displayAlternate(name, count, ncListArray) {
     var s;
+    var nameList;
+    var found = false;
 
     s = name + '[' + count + '] ';
     ncListArray.forEach((ncList, nclaIndex) => {
-	if (nclaIndex > 0) {
+	nameList = [];
+	ncList.forEach(nc => {
+	    nameList.push(nc.name);
+	});
+	nameList.sort();
+	if (ClueManager.knownSourceMapArray[count][nameList.toString()]) {
+	    //console.log('found: ' + nameList + ' in ' + count);
+	    return; // continue
+	}
+
+	if (found) {
 	    s += ', ';
 	}
 	ncList.forEach((nc, nclIndex) => {
@@ -387,8 +399,11 @@ function displayAlternate(name, count, ncListArray) {
 	    }
 	    s += nc;
 	});
+	found = true;
     });
-    console.log(s);
+    if (found) {
+	console.log(s);
+    }
 }
 
 //
