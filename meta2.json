@@ -110,7 +110,5 @@
     { "name" : "treasure",           "src" : "lemon,brown" },
     { "name" : "walter",             "src" : "lemon,brown" },
     { "name" : "dean",               "src" : "lemon,brown" },
-    { "name" : "meyers",             "src" : "lemon,brown" },
-
-    { "name" : "test",               "src" : "test,test", "ignore" : true }
+    { "name" : "meyers",             "src" : "lemon,brown" }
 ]

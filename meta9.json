@@ -95,6 +95,5 @@
 
     { "name" : "james",            "src" : "#1,brown" },
 
-    { "name" : "theodore rashid ibrahim xavier", "src" : "misadventure,rabbit", "note" : "trix" },
-    { "name" : "test",             "src" : "test,test", "ignore" : true }
+    { "name" : "theodore rashid ibrahim xavier", "src" : "misadventure,rabbit", "note" : "trix" }
 ]

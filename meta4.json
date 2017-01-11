@@ -50,9 +50,7 @@
     { "name" : "gill",               "src" : "blue,fish" },
     { "name" : "cat",                "src" : "blue,fish" },
     { "name" : "bronco",             "src" : "orange,blue" },
-    { "name" : "banana",             "src" : "mini,songbird" },
-
-    { "name" : "test",               "src" : "test,test", "ignore" : true }
+    { "name" : "banana",             "src" : "mini,songbird" }
 ]
 
 

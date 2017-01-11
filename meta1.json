@@ -89,15 +89,5 @@
     { "name" : "ray",                "src" : "9" },
     { "name" : "wiggins",            "src" : "9" },
     { "name" : "davis",              "src" : "9" },
-
-    { "name" : "so_many_more",       "src" : "9", "ignore" : true },
-    { "name" : "test"        ,       "src" : "91", "skip" : true },
-    { "name" : "test"        ,       "src" : "92", "skip" : true },
-    { "name" : "test"        ,       "src" : "93", "skip" : true },
-    { "name" : "test"        ,       "src" : "94", "skip" : true },
-    { "name" : "test"        ,       "src" : "95", "skip" : true },
-    { "name" : "test"        ,       "src" : "96", "skip" : true },
-    { "name" : "test"        ,       "src" : "97", "ignore" : true },
-    { "name" : "test"        ,       "src" : "98", "ignore" : true },
-    { "name" : "test"        ,       "src" : "99", "ignore" : true }
+    { "name" : "so_many_more",       "src" : "9", "ignore" : true }
 ]

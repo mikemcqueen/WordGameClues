@@ -30,6 +30,5 @@
     { "name" : "clyde",              "src" : "jackson,brown" },
     { "name" : "banana",             "src" : "mini,songbird" },
 
-    { "name" : "cunningham",         "src" : "duke,randolph", "note" : "ace pilot,senator?", "ignore" : false },
-    { "name" : "test",               "src" : "test,test", "ignore" : true }
+    { "name" : "cunningham",         "src" : "duke,randolph", "note" : "ace pilot,senator?", "ignore" : false }
 ]

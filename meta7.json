@@ -10,7 +10,5 @@
     { "name" : "john",              "src" : "arctic,cunningham" },
     { "name" : "george",            "src" : "canada,cunningham" },
     { "name" : "ranger",            "src" : "walker,texas" },
-    { "name" : "bailey",            "src" : "freckled,beetle" },
-    
-    { "name" : "test",              "src" : "test,test", "ignore" : true }
+    { "name" : "bailey",            "src" : "freckled,beetle" }
 ]

@@ -9,7 +9,5 @@
     { "name" : "chameleon",          "src" : "dwarf,jackson" },
     { "name" : "cunningham",         "src" : "ace,duke,randolph", "note" : "ace pilot,senator?" },
     { "name" : "sterling marlin",    "src" : "sterling,marlin" },
-    { "name" : "versailles",         "src" : "louis xiv,new castle" },
-
-    { "name" : "test",               "src" : "test,test", "ignore" : true }
+    { "name" : "versailles",         "src" : "louis xiv,new castle" }
 ]

@@ -13,7 +13,5 @@
     { "name" : "georgia",          "src" : "canada,cunningham" },
     { "name" : "ainsworth",        "src" : "john,dunn", "note" : "early indian trader" },
     { "name" : "peter falk",       "src" : "columbia,detective" },
-    { "name" : "falk",             "src" : "columbia,detective" },
-
-    { "name" : "test",             "src" : "test,test", "ignore" : true }
+    { "name" : "falk",             "src" : "columbia,detective" }
 ]
