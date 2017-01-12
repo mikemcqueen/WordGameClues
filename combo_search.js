@@ -109,7 +109,6 @@ ComboSearch.prototype.findAlternateSourcesForName = function(name, count) {
 
 	matchCountListArray.forEach((countListArray, claaIndex) => {
 	    var ncListArray = [];
-
 	    countListArray.forEach((countList, claIndex) => {
 		var ncList = [];
 		countList.forEach((count, clIndex) => {

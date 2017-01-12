@@ -9,6 +9,7 @@ var Validator   = require('./validator');
 var ClueList    = require('./clue_list');
 var NameCount   = require('./name_count');
 var Peco        = require('./peco');
+var Show        = require('./show');
 
 var QUIET = false;
 
@@ -21,13 +22,14 @@ var Opt = require('node-getopt')
 	['A' , 'show-all-alternates',         'show alternate sources for all clues' ],
 	['c' , 'count=ARG'          ,         '# of primary clues to combine' ], 
 	['d' , 'allow-dupe-source'  ,         'allow duplicate source, override default behavior of --meta' ],
+	['k' , 'show-known'         ,         'show compatible known clues; at least one -u <clue> required' ],
 	['m' , 'meta'               ,         'use metamorphosis clues' ],
-	['o' , 'output'         ,         'output: json -or- clues' ],
-	['r' , 'require=ARG+'       ,         'require compound clue(s) of specified count(s)' ],
-	['s' , 'show-sources=ARG'   ,         'show possible source combinations for the specified clue' ],
-	['t' , 'test=ARG'           ,         'test the specified source list, e.g. blue,fish' ],
-	['u' , 'use=ARG+'           ,         'use the specified clue[:count]' ],
-	['x' , 'max=ARG'            ,         'specify maximum # of components to combine'],
+	['o' , 'output'             ,         'output json -or- clues' ],
+	['q' , 'require=COUNT+',              'require clue(s) of specified count(s)' ],
+	['s' , 'show-sources=NAME[:COUNT]',   'show possible source combinations for the specified name[:count]' ],
+	['t' , 'test=NAME,NAME,...',          'test the specified source list, e.g. blue,fish' ],
+	['u' , 'use=NAME[:COUNT]+',           'use the specified name[:count]' ],
+	['x' , 'max=COUNT',                   'specify maximum # of components to combine'],
 	
 	['v' , 'verbose'            ,         'show debug output' ],
 	['h' , 'help'               ,         'this screen']
@@ -35,7 +37,6 @@ var Opt = require('node-getopt')
     .bindHelp().parseSystem();
 
 var LOGGING = false;
-
 
 var MAX_SYNTH_CLUE_COUNT  = 25;
 var REQ_SYNTH_CLUE_COUNT  = 11; // should make this 12 soon
@@ -59,6 +60,7 @@ function main() {
     var allowDupeSrcFlag;
     var needCount;
     var outputArg;
+    var showKnownArg;
 
 /*    if (Opt.argv.length) {
 	console.log('Usage: node clues.js [options]');
@@ -82,6 +84,14 @@ function main() {
     showAllAlternatesArg = Opt.options['show-all-alternates'];
     allowDupeSrcFlag = Opt.options['allow-dupe-source'];
     testSrcList = Opt.options['test'];
+    showKnownArg = Opt.options['show-known'];
+    if (showKnownArg) {
+	// TODO: require count if !metaFlag
+	if (!useClueList) {
+	    console.log('-u NAME:COUNT required with that option');
+	    return 1;
+	}
+    }
 
     if (!max) {
 	max = 2; // TODO: default values in opt
@@ -92,6 +102,7 @@ function main() {
 	if (showSourcesClueName ||
 	    showAlternatesArg ||
 	    showAllAlternatesArg ||
+	    showKnownArg ||
 	    testSrcList ||
 	    useClueList)
 	{
@@ -103,9 +114,9 @@ function main() {
 	}
 
     }
+
     if (outputArg) {
 	QUIET = true;
-	//console.log ('invalid --output option, ' + outputArg);
     }
 
     ClueManager.logging = verboseFlag;
@@ -126,9 +137,7 @@ function main() {
 
     //
 
-    if (LOGGING) {
-	log('count=' + count + ' max=' + max);
-    }
+    log('count=' + count + ' max=' + max);
 
     ClueManager.loadAllClues(metaFlag ? {
 	known:    'meta',
@@ -142,11 +151,13 @@ function main() {
 	required: REQ_SYNTH_CLUE_COUNT
     });
 
-    if (LOGGING) {
-	log('loaded...');
-    }
+    log('loaded...');
 
-    if (testSrcList) {
+    // TODO: add "show.js" with these exports
+    if (showKnownArg) {
+	Show.compatibleKnownClues(useClueList);
+    }
+    else if (testSrcList) {
 	showValidSrcListCounts(testSrcList);
     }
     else if (showSourcesClueName) {
@@ -224,32 +235,32 @@ function showValidSrcListCounts(srcList) {
 
     resultList = (new Peco({
 	max: ClueManager.maxClues,
-	listArray: countListArray
+ 	listArray: countListArray
     })).getCombinations();
 
-    if (resultList.length) {
-	resultList.forEach(clueCountList => {
-	    var sum = 0;
-	    var result;
-	    var msg;
-	    clueCountList.forEach(count => { sum += count });
-	    result = Validator.validateSources({
-		sum:      sum,
-		nameList: nameList,
-		count:    nameList.length,
-		showAll:  false
-	    });
-	    console.log('validate [' + nameList + ']: ' + result);
-	    msg = clueCountList.toString();
-	    if (!result) {
-		msg += ': INVALID';
-	    }
-	    console.log(msg);
-	});
-    }
-    else {
+    if (!resultList.length) {
 	console.log('No matches');
+	return;
     }
+
+    resultList.forEach(clueCountList => {
+	var sum = 0;
+	var result;
+	var msg;
+	clueCountList.forEach(count => { sum += count });
+	result = Validator.validateSources({
+	    sum:      sum,
+	    nameList: nameList,
+	    count:    nameList.length,
+	    showAll:  false
+	});
+	console.log('validate [' + nameList + ']: ' + result);
+	msg = clueCountList.toString();
+	if (!result) {
+	    msg += ': INVALID';
+	}
+	console.log(msg);
+    });
 }
 
 //
@@ -429,13 +440,11 @@ function displayModifiedClueList(name, count, ncListArray) {
 
     // no loop here because entries will always have the
     // same sources, so just add the first one
-    //ncListArray.forEach((ncList, nclaIndex) => {
     clue = { name: name, src: [] };
     ncListArray[0].forEach(nc => {
 	clue.src.push(nc.name);
     });
     clueList.push(clue);
-    //});
 
     console.log(clueList.toJSON())
 }
@@ -464,7 +473,7 @@ catch(e) {
     console.error(e.stack);
 }
 finally {
-    if (!QUIET) {
+    if (LOGGING && !QUIET) {
 	console.log('runtime: ' + (new Duration(appBegin, new Date())).seconds + ' seconds');
     }
 }

@@ -19,11 +19,11 @@ var Peco           = require('./peco');
 //
 
 function ClueManager() {
-    this.clueListArray = [];
-    this.rejectListArray = [];
+    this.clueListArray = [];         // the JSON clue files in an array
+    this.rejectListArray = [];       // the JSON reject files in an array
     this.knownClueMapArray = [];     // map clue name to clue src
-    this.knownSourceMapArray = [];   // map known source (incl. combo string) to true/false (currently)
-    this.rejectSourceMapArray = []; // may need to make this a MapArray eventually
+    this.knownSourceMapArray = [];   // map known source (incl. multi-source) to true/false (currently)
+    this.rejectSourceMapArray = [];  // map reject source to true/false (currently)
 
     this.rvsSuccessSeconds = 0;
     this.rvsFailDuration = 0;
@@ -374,8 +374,8 @@ ClueManager.prototype.makeSrcNameListArray = function(nc) {
 // A "clueSourceList" is a list (array) where each element is a
 // cluelist, such as [clues1,clues1,clues2].
 //
-// Given a count, such as 3, retrieve the array of lists of addends
-// that sum to that count, such as [1,2], and return an array of lists
+// Given a sum, such as 3, retrieve the array of lists of addends
+// that add up to that sum, such as [1,2], and return an array of lists
 // of clueLists of the specified clue counts, such as [clues1,clues2].
 
 ClueManager.prototype.getClueSourceListArray = function(args) {
