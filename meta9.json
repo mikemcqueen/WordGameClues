@@ -3,9 +3,6 @@
     { "name" : "prince",           "src" : "blue star,moon,louis" },
     { "name" : "prussia",          "src" : "blue star,moon,louis" },
 
-    { "name" : "oberon",          "src" : "blue star,moon,king" },
-    { "name" : "fairy",           "src" : "blue star,moon,king", "note" : "fairy king" },
-
     { "name" : "nelson",           "src" : "clyde,baker" },
 
     { "name" : "peter",            "src" : "misadventure,rabbit" },

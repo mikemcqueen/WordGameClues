@@ -62,8 +62,5 @@
 
     { "name" : "james",             "src" : 14, "note" : "#1 brown" },
 
-    { "name" : "oberon",            "src" : 15 },
-    { "name" : "fairy",             "src" : 15 },
-
     { "name" : "test",              "src" : 99, "ignore" : true }
 ]

@@ -91,8 +91,7 @@ Validator.prototype.validateSources = function(args, nameCountList) {
 	count:   args.count,
 	max:     args.max,
 	require: args.require
-    })).getCombinations().forEach(clueCountList => {
-//	       clueCountListArray.some((clueCountList, index) => {
+    })).getCombinations().some(clueCountList => {
 	if (this.recursiveValidateSources({
 	    clueNameList:  args.nameList,
 	    clueCountList: clueCountList,
@@ -102,10 +101,10 @@ Validator.prototype.validateSources = function(args, nameCountList) {
 	})) {
 	    found = true;
 	    if (!args.showAll) {
-		return true; // found a match
+		return true; // found a match; some.exit
 	    }
 	}
-	return false;
+	return false; // some.continue
     }, this);
     
     if (this.logging) {
@@ -127,9 +126,9 @@ Validator.prototype.validateSources = function(args, nameCountList) {
 Validator.prototype.recursiveValidateSources = function(args) {
     var nameIndex;
     var clueName;
-    var countIndex;
     var count;
     var args;
+    var result;
 
     this.logLevel++;
 
@@ -152,9 +151,8 @@ Validator.prototype.recursiveValidateSources = function(args) {
     // count is checked for a name, no need to check it again
     
     // using ordinary for loop so we can return directly out of function.
-    for (countIndex in args.clueCountList) {
-	count = args.clueCountList[countIndex];
-	
+    result = args.clueCountList.some(count => {
+
 	if (this.logging) {
 	    this.log('count: looking for ' + clueName + ' in ' + count);
 	}
@@ -163,7 +161,7 @@ Validator.prototype.recursiveValidateSources = function(args) {
 	    if (this.logging) {
 		this.log(' not found, ' + clueName + ':' + count);
 	    }
-	    continue;
+	    return false; // some.continue
 	}
 	
 	if (this.logging) {
@@ -187,33 +185,26 @@ Validator.prototype.recursiveValidateSources = function(args) {
 	    showAll:   args.showAll,
 	    vsCount:   args.vsCount      // aka "original count"
 	})) {
-	    continue;
-
-	    //////
-	    this.logLevel--;
-	    return false;
+	    return false; // some.continue;
 	}
 	
 	if (this.logging) {
-	    this.log('+++output(' + args.nameCountList.length + ')');
+	    this.log('++rvsWorker output(' + args.nameCountList.length + ')');
 	    args.nameCountList.forEach(nc => {
 		this.log('nc.name = ' + nc.name + ', nc.count = ' + nc.count)
 	    });
-	    this.log('---output(' + args.nameCountList.length + ')');
+	    this.log('--rvsWorker output(' + args.nameCountList.length + ')');
 	}
 	
 	if (!args.showAll && (args.nameCountList.length < 2)) {
 	    throw new Error('list should have at least two entries1');
 	}
 
-	this.logLevel--;
-	return true;
-	
-	break; // success
-    }
+	return true; // success: some.exit
+    });
 
     this.logLevel--;
-    return false;
+    return result;
 }
 
 // args:
@@ -285,14 +276,10 @@ Validator.prototype.rvsWorker = function(args) {
 	return false; // fail
     }
 
+    // does this achieve anything?
     args.ncList.length = 0;
     newNameCountList.forEach(nc => args.ncList.push(nc));
 
-    if (args.showAll) {
-//	console.log(newNameCountList.toString());
-    }
-
-//    newNameCountList.push(new NameCount(KEY_COMPLETE, 0));
     if (this.logging) {
 	    this.log('add2(' + args.ncList.length + ')' +
 		    ', newNc(' + newNameCountList.length + ')' +
@@ -333,7 +320,7 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 	primaryClueData.srcMap = {};
 	buildArgs.primaryClueData = primaryClueData;
 	
-	// should have findDupe check here, and after buidl()
+	// should have findDupe check here, and after build()
 	
 	for (;;) {
 
@@ -362,7 +349,7 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 		// if no duplicates, and all clues are primary, success!
 		
 		if (this.logging) {
-		    this.log('all primary');
+		    this.log('SUCCESS! all primary');
 		    nameCountList.forEach(nc => {
 			this.log('nc.name = ' + nc.name + ', nc.count = ' + nc.count)
 		    });
@@ -423,8 +410,12 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 	    }
 
 	    if (this.logging) {
-		this.log('[output] primary keys:');
+		this.log('[nameMap] primary keys:');
 		Object.keys(primaryClueData.nameMap).forEach(key => this.log('  ' + key));
+		this.log('[srcMap] primary keys:');
+		Object.keys(primaryClueData.srcMap).forEach(key => {
+		    this.log('  ' + primaryClueData.srcMap[key] + ':' + key);
+		});
 		this.log(' all_primary: ' + result.allPrimary);
 	    }
 
@@ -499,8 +490,8 @@ Validator.prototype.findDuplicatePrimaryClue = function(args) {
 	srcMap:         localSrcMap,
 	conflictSrcMap: conflictSrcMap
     });
-    duplicateSrcName = args.duplicateSrcName;
-    duplicateSrc = args.duplicateSrc;
+    duplicateSrcName = result.duplicateSrcName;
+    duplicateSrc = result.duplicateSrc;
 
     // add PRIMARY names and sources to their respective maps if all
     // sourcces are primary, or if onlyAddIfAllPrimary flag is NOT set
@@ -518,6 +509,12 @@ Validator.prototype.findDuplicatePrimaryClue = function(args) {
 	    args.clueData.srcMap[key] = localSrcMap[key];
 	}
     }
+
+    if (this.loggign) {
+	this.log('findDuplicatePrimaryClue, duplicateName: ' + duplicateName +
+		 ', duplicateSrc: ' + duplicateSrc);
+    }
+
     return {
 	duplicateName:    duplicateName,
 	duplicateSrcName: duplicateSrcName,
@@ -576,6 +573,12 @@ Validator.prototype.findDuplicatePrimarySource = function(args) {
 	}
     }, this);
 
+    if (this.logging) {
+	this.log('findDuplicatePrimarySource: ' + 
+		 (duplicateName ? duplicateName : 'none') +
+		 ', allPrimary: ' + allPrimary);
+    }
+
     return {
 	duplicateName: duplicateName,
 	allPrimary:    allPrimary
@@ -602,6 +605,11 @@ Validator.prototype.resolvePrimarySourceConflicts = function(args) {
 
     // resolve primary source conflicts
     for (conflictSrc in args.conflictSrcMap) {
+
+	if (this.logging) {
+	    this.log('Attempting to resolve conflict...');
+	}
+
 	srcList = conflictSrc.split(',');
 	conflictNameList = args.conflictSrcMap[conflictSrc].list;
 
@@ -624,6 +632,7 @@ Validator.prototype.resolvePrimarySourceConflicts = function(args) {
 	    candidateSrcList = ClueManager.knownClueMapArray[1][candidateName]; 
 	    if (candidateSrcList.some(candidateSrc => {
 		if (!args.srcMap[candidateSrc]) {
+		    this.log('resolved success!');
 		    // success! update srcMap
 		    args.srcMap[candidateSrc] = candidateName;
 		    args.srcMap[src] = conflictNameList.pop();
@@ -642,7 +651,7 @@ Validator.prototype.resolvePrimarySourceConflicts = function(args) {
 	    duplicateSrc = conflictSrc;
 	    
 	    if (this.logging) {
-		this.log('cant resolve conflict, ' + conflictNameList);
+		this.log('cannot resolve conflict, ' + conflictNameList);
 		this.log('used sources, ');
 		for (key in args.srcMap) {
 		    this.log('  ' + key + ':' + args.srcMap[key]);
@@ -652,6 +661,7 @@ Validator.prototype.resolvePrimarySourceConflicts = function(args) {
 	}
 	// TODO! get rid of, or comment purpose of, else clause
 	else { /* conflictNameList.length == 0 */
+	    this.log('looping!');
 	    //break;
 	    // keep trying
 	}
@@ -663,11 +673,6 @@ Validator.prototype.resolvePrimarySourceConflicts = function(args) {
 }
 
 //
-//
-
-Validator.prototype.addUniqueSource = function(args, name, srcList) {
-}
-
 //
 
 Validator.prototype.checkDuplicateSource = function(args, name, src) {
@@ -687,6 +692,13 @@ Validator.prototype.evalFindDuplicateResult = function(result, logPrefix) {
     var dupeType = '';
     var dupeValue = '';
     
+    if (this.logging) {
+	if (result.duplicateName || result.duplicateSrc) {
+	    this.log('duplicate name: ' + result.duplicateName +
+			', src: ' + result.duplicateSrc);
+	}
+    }
+
     if (!this.allowDupeName && result.duplicateName) {
 	dupeType = 'name';
 	dupeValue = result.duplicateName;
@@ -921,10 +933,12 @@ Validator.prototype.displayClueData = function(clueData) {
 //
 
 Validator.prototype.log = function(text) {
-    var pad = '';
-    var index;
-    for (var index=0; index<this.logLevel; ++index) {
-	pad += ' ';
+    if (this.logging) {
+	var pad = '';
+	var index;
+	for (var index=0; index<this.logLevel; ++index) {
+	    pad += ' ';
+	}
+	console.log(pad + text);
     }
-    console.log(pad + text);
 }

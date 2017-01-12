@@ -110,23 +110,13 @@ ComboSearch.prototype.findAlternateSourcesForName = function(name, count) {
 	matchCountListArray.forEach((countListArray, claaIndex) => {
 	    var ncListArray = [];
 
-	    //var s;
-	    //s = nc.name + '[' + claaIndex + '] ';
 	    countListArray.forEach((countList, claIndex) => {
 		var ncList = [];
-		if (claIndex > 0) {
-		    //s += ', ';
-		}
 		countList.forEach((count, clIndex) => {
-		    if (clIndex > 0) {
-			//s += ' ';
-		    }
-		    //s += srcNameList[clIndex] + ':' + count;
 		    ncList.push(new NameCount(srcNameList[clIndex], count));
 		});
 		ncListArray.push(ncList);
 	    });
-	    //console.log(s);
 	    resultNcListArray[claaIndex] = ncListArray;
 	});
     });

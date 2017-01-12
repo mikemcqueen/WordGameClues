@@ -91,7 +91,8 @@ function main() {
 	
 	if (showSourcesClueName ||
 	    showAlternatesArg ||
-	    showAllAlternatesFlag ||
+	    showAllAlternatesArg ||
+	    testSrcList ||
 	    useClueList)
 	{
 	    needCount = false;
@@ -146,8 +147,7 @@ function main() {
     }
 
     if (testSrcList) {
-	showValidSrcListCounts(testSrcList, metaFlag ? 
-			       MAX_META_CLUE_COUNT : MAX_SYTH_CLUE_COUNT);
+	showValidSrcListCounts(testSrcList);
     }
     else if (showSourcesClueName) {
 	showSources(showSourcesClueName);
@@ -174,7 +174,7 @@ function main() {
 //
 //
 
-function showValidSrcListCounts(srcList, max) {
+function showValidSrcListCounts(srcList) {
     var nameList;
     var countListArray;
     var count;
@@ -229,7 +229,22 @@ function showValidSrcListCounts(srcList, max) {
 
     if (resultList.length) {
 	resultList.forEach(clueCountList => {
-	    console.log(clueCountList);
+	    var sum = 0;
+	    var result;
+	    var msg;
+	    clueCountList.forEach(count => { sum += count });
+	    result = Validator.validateSources({
+		sum:      sum,
+		nameList: nameList,
+		count:    nameList.length,
+		showAll:  false
+	    });
+	    console.log('validate [' + nameList + ']: ' + result);
+	    msg = clueCountList.toString();
+	    if (!result) {
+		msg += ': INVALID';
+	    }
+	    console.log(msg);
 	});
     }
     else {

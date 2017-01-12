@@ -188,7 +188,9 @@ Peco.prototype.listFirst = function(listArray, combFlag) {
 	throw new Error('invalid countListArray, ' + listArray);
     }
     listArray.forEach(list => {
-	console.log('list: ' + list);
+	if (LOGGING) {
+	    console.log('list: ' + list);
+	}
     });
 
     srcCount = listArray.length;
