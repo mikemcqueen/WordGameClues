@@ -158,10 +158,10 @@ function isCompatibleClue(ncList, clue, sum) {
 	sum:      sum,
 	nameList: nameList,
 	count:    nameList.length
-	//,showAll:  true
     });
 
     log('isCompatible: ' + nameList + ', ' + valid);
+
     return valid;
 }
 

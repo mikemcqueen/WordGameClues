@@ -198,7 +198,7 @@ function showValidSrcListCounts(srcList) {
 
     nameList = srcList.split(',');
     if (nameList.length < 2) {
-	throw new Error('use grep or supply 2 source names, dumbass');
+//	throw new Error('use grep or supply 2 source names, dumbass');
     }
     nameList.sort();
     nameList.forEach(name => {
@@ -251,8 +251,7 @@ function showValidSrcListCounts(srcList) {
 	result = Validator.validateSources({
 	    sum:      sum,
 	    nameList: nameList,
-	    count:    nameList.length,
-	    showAll:  false
+	    count:    nameList.length
 	});
 	console.log('validate [' + nameList + ']: ' + result);
 	msg = clueCountList.toString();
@@ -302,6 +301,7 @@ function doCombos(args) {
 //
 
 function showSources(clueName) {
+    var result;
     var nc = new NameCount(clueName);
     nc.log();
 
@@ -311,12 +311,17 @@ function showSources(clueName) {
     
     log('++sources');
 
-    Validator.validateSources({
-	sum:      nc.count,
-	nameList: [ nc.name ],
-	count:    1, // nc.count, ???
-	showAll:  true
+    result = Validator.validateSources({
+	sum:          nc.count,
+	nameList:     [ nc.name ],
+	count:        1,
+	validateAll:  true
     });
+    if (result) {
+	result.forEach(ncList => {
+	    console.log('src: ' + ncList);
+	});
+    }
 }
 
 //
