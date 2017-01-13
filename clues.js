@@ -23,13 +23,14 @@ var Opt = require('node-getopt')
 	['c' , 'count=ARG'          ,         '# of primary clues to combine' ], 
 	['d' , 'allow-dupe-source'  ,         'allow duplicate source, override default behavior of --meta' ],
 	['k' , 'show-known'         ,         'show compatible known clues; at least one -u <clue> required' ],
-	['m' , 'meta'               ,         'use metamorphosis clues' ],
+	['m' , 'meta'               ,         'use metamorphosis clues (default)' ],
 	['o' , 'output'             ,         'output json -or- clues' ],
 	['q' , 'require=COUNT+',              'require clue(s) of specified count(s)' ],
 	['s' , 'show-sources=NAME[:COUNT]',   'show possible source combinations for the specified name[:count]' ],
 	['t' , 'test=NAME,NAME,...',          'test the specified source list, e.g. blue,fish' ],
 	['u' , 'use=NAME[:COUNT]+',           'use the specified name[:count]' ],
 	['x' , 'max=COUNT',                   'specify maximum # of components to combine'],
+	['y' , 'synthesis',                   'use synthesis clues' ],
 	
 	['v' , 'verbose'            ,         'show debug output' ],
 	['h' , 'help'               ,         'this screen']
@@ -51,6 +52,7 @@ function main() {
     var maxArg;
     var requiredSizes;
     var metaFlag;
+    var synthFlag;
     var verboseFlag;
     var showSourcesClueName;
     var showAlternatesArg;
@@ -85,6 +87,15 @@ function main() {
     allowDupeSrcFlag = Opt.options['allow-dupe-source'];
     testSrcList = Opt.options['test'];
     showKnownArg = Opt.options['show-known'];
+    synthFlag = Opt.options['synthesis'];
+
+    if ((synthFlag != undefined) && (metaFlag != undefined)) {
+	console.log('synth + meta not allowed');
+	return 1;
+    }
+    if (!synthFlag) {
+	metaFlag = true;
+    }
 
     if (!maxArg) {
 	maxArg = 2; // TODO: default values in opt
@@ -231,29 +242,34 @@ function showValidSrcListCounts(srcList) {
 		}
 	    });
 	}
+	else {
+	    console.log('missing cluemap: ' + count);
+	}
     }
 
     // verify that all names were found
     nameList.forEach((name, index) => {
 	if (!countListArray[index]) {
-	    throw new Error('Cannot find clue, ' + name);
+	    throw new Error('Cannot find clue, ' + name +
+			    ', array: ' + countListArray[index]);
 	}
     });
 
     resultList = (new Peco({
-	max: ClueManager.maxClues,
- 	listArray: countListArray
+ 	listArray: countListArray,
+	max:       ClueManager.maxClues
     })).getCombinations();
 
-    if (!resultList.length) {
+    if (!resultList) {
 	console.log('No matches');
 	return;
     }
 
     resultList.forEach(clueCountList => {
-	var sum = 0;
+	var sum;
 	var result;
 	var msg;
+	sum = 0;
 	clueCountList.forEach(count => { sum += count });
 	result = Validator.validateSources({
 	    sum:      sum,

@@ -6,9 +6,11 @@ var Peco        = require('./peco');
 
 var Opt = require('node-getopt')
     .create([
-	['c' , 'count=ARG'            , 'use metamorphosis clues'],
+	['c' , 'count=ARG'            , 'primary clue count'],
 	['e' , 'exclude=ARG+'         , 'exclude #s'],
+	['l',  'list=ARG+',             'test listArray, must specify at least tw' ],
 	['r' , 'require=ARG+'         , 'require #s'],
+	['v' , 'verbose'              , 'turn on peco logging'],
 	['x' , 'max=ARG'              , 'specify maximum # of components to combine'],
 	['p' , 'permutations'         , 'permutations flag' ],
     ])
@@ -22,6 +24,9 @@ function main() {
     var permFlag;
     var require;
     var exclude;
+    var list;
+    var listArray;
+    var verbose;
 
     if (Opt.argv.length < 1) {
 	console.log('Usage: node add.js SUM');
@@ -38,11 +43,27 @@ function main() {
     require = Opt.options['require'];
     exclude = Opt.options['exclude'];
     permFlag = Opt.options['permutations'];
+    list = Opt.options['list'];
+    verbose = Opt.options['verbose'];
+    
+    if (verbose) {
+	Peco.logging = true;
+    }
 
-    if (!count && !max) {
+    if (!list && !count && !max) {
 	console.log('need count or max');
 	return 1;
     }
+    if (list && !count) {
+	console.log('need count');
+	return 1;
+    }
+
+    if (list && (list.length < 2)) {
+	console.log('need to specify at least two -l lists');
+	return 1;
+    }
+
 
     console.log('sum: ' + sum + ', count: ' + count + 
 		', max: ' + max + ', perm: ' + permFlag +
@@ -56,17 +77,42 @@ function main() {
     if (exclude) {
 	exclude.forEach((num, index) => { exclude[index] = Number(num); });
     }
-
-    showAddends(sum, count, max, permFlag, require, exclude);
+    
+    if (list) {
+	console.log('list: ' + list);
+	listArray = makeListArray(list);
+//	listArray = list;
+	console.log('listArray: ' + listArray);
+    }
+    showAddends(listArray, sum, count, max, permFlag, require, exclude);
 }
 
 //
 
-function showAddends(sum, count, max, permFlag, require, exclude) {
-    var peco;
-    var list;
+function makeListArray(list) {
+    var listArray;
+    listArray = [];
+    list.forEach(str => {
+	console.log('list: ' + str);
+	var countList = str.split(',');
+	countList.forEach((count,index) => {
+	    countList[index] = Number(count);
+	});
+	listArray.push(countList);
+    });
+    return listArray;
+}
 
-    peco = new Peco({
+//
+
+function showAddends(listArray, sum, count, max, permFlag, require, exclude) {
+    var peco;
+    var result;
+
+    peco = new Peco(listArray ? {
+	listArray: listArray,
+	max:       count
+    } : {
 	sum:   sum,
 	count: count,
 	max:   max,
@@ -75,14 +121,19 @@ function showAddends(sum, count, max, permFlag, require, exclude) {
     });
 
     if (permFlag) {
-	list = peco.getPermutations();
+	resultt = peco.getPermutations();
     }
     else {
-	list = peco.getCombinations();
+	result = peco.getCombinations();
     }
-    list.forEach(elem => {
-	console.log(elem);
-    });
+    if (result) {
+	result.forEach(elem => {
+	    console.log(elem);
+	});
+    }
+    else {
+	console.log('no results');
+    }
 }
 
 

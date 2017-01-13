@@ -12,6 +12,7 @@ var LOGGING = false;
 
 // args:
 //  listArray
+//  max       
 //
 // -or-
 //
@@ -71,7 +72,12 @@ Peco.prototype.log = function(text) {
 //
 
 Peco.prototype.getPermutations = function() {
-    return this.getAllAddends(false);
+    if (this.listArray) {
+	throw new Error('permutations on lists not supported');
+    }
+    else {
+	return this.getAllAddends(false);
+    }
 }
 
 //
@@ -133,7 +139,7 @@ Peco.prototype.getListCombinations = function(listArray) {
 
     return this.buildResult({
 	listArray: listArray,
-	combFlag:       true
+	combFlag:  true
     });
 }
 
@@ -164,9 +170,8 @@ Peco.prototype.buildResult = function(args) {
     }
 
     if (!list) {
-	if (args.count) { //  && !args.quiet) {
-//	    throw new Error('no permutations/combinations');
-	    console.log('no permutations/combinations');
+	if (args.count) {
+	    throw new Error('no permutations/combinations');
 	}
 	return null;
     }

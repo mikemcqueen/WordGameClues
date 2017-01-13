@@ -76,6 +76,7 @@
     { "name" : "meditations #17",  "src" : "john,dunn", "note" : "that bell tolls book", "ignore" : true },
     { "name" : "meditations",      "src" : "john,dunn" },
     { "name" : "#17",              "src" : "john,dunn" },
+
     { "name" : "clarence parker",  "src" : "duke,ace,mckay", "note" : "Ace Parker, Duke coach" },
     { "name" : "clarence",         "src" : "duke,ace,mckay" },
     { "name" : "parker",           "src" : "duke,ace,mckay" },

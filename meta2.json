@@ -51,6 +51,8 @@
     { "name" : "freckled",          "src" : "fish,black hawk" },
     { "name" : "forster",           "src" : "fish,black hawk" },
     { "name" : "black friday",      "src" : "black,friday" },
+    { "name" : "friday 13th",       "src" : "black,friday" },
+    { "name" : "13th",              "src" : "black,friday" },
     { "name" : "kennedy",           "src" : "mayor,st. paul" },
     { "name" : "otis",              "src" : "mayor,st. paul" },
     { "name" : "rice",              "src" : "mayor,st. paul" },
@@ -110,5 +112,6 @@
     { "name" : "treasure",           "src" : "lemon,brown" },
     { "name" : "walter",             "src" : "lemon,brown" },
     { "name" : "dean",               "src" : "lemon,brown" },
-    { "name" : "meyers",             "src" : "lemon,brown" }
+    { "name" : "meyers",             "src" : "lemon,brown" },
+    { "name" : "day",                "src" : "daniela,lewis" }
 ]
