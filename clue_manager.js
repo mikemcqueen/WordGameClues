@@ -41,7 +41,7 @@ function ClueManager() {
 ClueManager.prototype.log = function(text) {
     var pad = '';
     var index;
-    for (var index=0; index<this.logLevel; ++index) { pad += ' '; }
+    for (index=0; index<this.logLevel; ++index) { pad += ' '; }
     console.log(pad + text);
 }
 

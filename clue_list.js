@@ -42,6 +42,7 @@ function makeFrom(args) {
 function objectFrom(args) {
     var clueList = [];
     var buffer;
+    var key;
 
     if (args.filename) {
 	try {
@@ -70,7 +71,7 @@ function objectFrom(args) {
     }
     else {
 	console.log('args:');
-	for (var key in args) { 
+	for (key in args) { 
 	    console.log('  ' + key + ' : ' + args[key]);
 	}
 	throw new Error('missing argument');
@@ -168,8 +169,6 @@ function format2(text, span)
     return result;
 }
 
-
-
 //
 //
 
@@ -189,3 +188,4 @@ function makeKey() {
 
     return keyArray.toString();
 }
+

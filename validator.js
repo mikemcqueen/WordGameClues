@@ -309,7 +309,6 @@ Validator.prototype.rvsWorker = function(args) {
 			 '---------------------------------------------------');
 	    }
 
-//	    args.ncList.push(new NameCount(args.name, args.count));
 	    args.ncList.push(NameCount.makeNew(args.name, args.count));
 
 	    if (this.logging) {
@@ -379,14 +378,15 @@ const KEY_COMPLETE            = '__key_complete';
 //   vsCount:       pass-through
 ///
 Validator.prototype.checkUniqueSources = function(nameCountList, args) {
-    // assert(nameCountList) && Array.isArray(nameCountList)
-
     var origNameCountList = nameCountList;
     var primaryClueData;
     var srcNcList;
     var buildArgs;
-    var result;
+    var findResult;
+    var buildResult;
     var anyFlag = false;
+
+    // assert(nameCountList) && Array.isArray(nameCountList)
 
     if (this.logging) {
 	this.log('CheckUniqueSouces, ncList.length = ' + nameCountList.length);
@@ -405,19 +405,17 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 	primaryClueData.nameMap = {};
 	primaryClueData.srcMap = {};
 	
-	//args.resultMap[this.STAGING_KEY] = {};
-
 	// should have findDupe check here, and after build()
 	
 	for (;;) {
 
 	    // first, check for duplicate primary clues, add all to primaryMap
-	    result = this.findDuplicatePrimaryClue({
+	    findResult = this.findDuplicatePrimaryClue({
 		ncList:              nameCountList, 
 		clueData:            primaryClueData,
 		onlyAddIfAllPrimary: false
 	    });
-	    if (!this.evalFindDuplicateResult(result, '1st')) {
+	    if (!this.evalFindDuplicateResult(findResult, '1st')) {
 		if (this.logging) {
 		    this.log('FAIL - duplicate primary');
 		    nameCountList.forEach(nc => {
@@ -431,7 +429,7 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 		}
 		break; // failure
 	    }
-	    else if (result.allPrimary) {
+	    else if (findResult.allPrimary) {
 		// no duplicates, and all clues are primary, success!
 		if (args.wantResults) {
 		    if ((args.vsCount == Object.keys(primaryClueData.srcMap).length)) {
@@ -465,19 +463,19 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 			this.log('nc.name = ' + nc.name + ', nc.count = ' + nc.count)
 		    });
 		}
+
 		return true; // success - exit function
 	    }
 	    
 	    // break down all compound clues into source components
 	    buildArgs.ncList = nameCountList;
-	    result = this.buildCompoundClueSourceNameList(buildArgs);
+	    buildResult = this.buildCompoundClueSourceNameList(buildArgs);
 
 	    // skip recursive call to validateSources if we have all primary clues
-	    if (result.allPrimary) {
+	    if (buildResult.allPrimary) {
 		// build an NC list of primary clues
 		nameCountList = [];
-		result.clueNameList.forEach(name => {
-//		    nameCountList.push(new NameCount(name, 1));
+		buildResult.clueNameList.forEach(name => {
 		    nameCountList.push(NameCount.makeNew(name, 1));
 		});
 	    }
@@ -491,9 +489,9 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 		// call validateSources recursively with compound clues
 		srcNcList = [];
 		if (!this.validateSources({
-		    sum:            result.count,
-		    nameList:       result.clueNameList,
-		    count:          result.clueNameList.length,
+		    sum:            buildResult.count,
+		    nameList:       buildResult.clueNameList,
+		    count:          buildResult.clueNameList.length,
 		    excludeSrcList: args.excludeSrcList,
 		    validateAll:    args.validateAll,
 		    wantResults:    args.wantResults,
@@ -516,12 +514,12 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 
 	    // here, we only add primary clues to the map if *all* clues in
 	    // nameCountList are primary
-	    result = this.findDuplicatePrimaryClue({
+	    findResult = this.findDuplicatePrimaryClue({
 		ncList:              nameCountList, 
 		clueData:            primaryClueData,
 		onlyAddIfAllPrimary: true
 	    });
-	    if (!this.evalFindDuplicateResult(result, '2nd')) {
+	    if (!this.evalFindDuplicateResult(findResult, '2nd')) {
 		break;
 	    }
 
@@ -532,12 +530,11 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 		Object.keys(primaryClueData.srcMap).forEach(key => {
 		    this.log('  ' + primaryClueData.srcMap[key] + ':' + key);
 		});
-		this.log(' all_primary: ' + result.allPrimary);
+		this.log(' all_primary: ' + findResult.allPrimary);
 	    }
 
-	    if (result.allPrimary) {
+	    if (findResult.allPrimary) {
 		// all the source clues we just validated are primary clues
-		anyFlag = true;
 		if (args.wantResults) {
 		    // TODO: why isn't nameMap the right length?! is it now?
 		    if ((args.vsCount == Object.keys(primaryClueData.srcMap).length)) {
@@ -556,19 +553,11 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 		    }
 		}
 		if (args.validateAll) {
-		    break; // success - tryAll - try other variations
+		    anyFlag = true; // success - tryAll - try other variations
+		    break; 
 		}
 		return true; // success - exit function
 	    }
-	    /*else if (args.validateAll) {
-		// build nc list whicha
-		this.addResultEntry({
-		    map:    args.resultMap,
-		    key:    this.STAGING_KEY,
-		    name:   args.name + ".after",
-		    ncList: this.getDiffNcList(origNameCountList, nameCountList)
-		});
-	    }*/
 	    
 	    if (this.logging) {
 		this.log('++innner looping');
@@ -898,8 +887,8 @@ Validator.prototype.buildCompoundClueSourceNameList = function(args) {
 
     clueNameList = [];
     if (!args.ncList.every((nc, ncIndex) => {
-	var srcList;       // e.g. [ 'src1,src2,src3', 'src2,src3,src4' ]
-	var slIndex;
+	var srcList;          // e.g. [ 'src1,src2,src3', 'src2,src3,src4' ]
+	var slIndex;          // srcListIndex
 	var srcNameList;      // e.g. [ 'src1', 'src2', 'src3' ]
 	var thisPrimary;
 	
@@ -1030,7 +1019,6 @@ Validator.prototype.copyAddNcList = function(ncList, name, count) {
     }
 
     newNcList = Array.from(ncList)
-//    newNcList.push(new NameCount(name, count));
     newNcList.push(NameCount.makeNew(name, count));
 
     return newNcList;
@@ -1059,7 +1047,6 @@ Validator.prototype.getClueDataNcList = function(clueData) {
     
     ncList = [];
     for (srcMapKey in clueData.srcMap) {
-//	ncList.push(new NameCount(clueData.srcMap[srcMapKey], srcMapKey));
 	ncList.push(NameCount.makeNew(clueData.srcMap[srcMapKey], srcMapKey));
     }
     return ncList;
@@ -1176,7 +1163,6 @@ Validator.prototype.getClueDataNcList = function(clueData) {
     
     ncList = [];
     for (srcMapKey in clueData.srcMap) {
-//	ncList.push(new NameCount(clueData.srcMap[srcMapKey], srcMapKey));
 	ncList.push(NameCount.makeNew(clueData.srcMap[srcMapKey], srcMapKey));
     }
     return ncList;
