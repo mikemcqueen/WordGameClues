@@ -40,7 +40,7 @@ ComboSearch.prototype.findAlternateSourcesForName = function(name, count) {
     var resultNcListArray = [];
     var peco;
 
-    nc = new NameCount(name);
+    nc = NameCount.makeNew(name);
     srcNameListArray = ClueManager.makeSrcNameListArray(nc);
     srcNameListArray.forEach(srcNameList => {
 	var curCount;
@@ -112,7 +112,7 @@ ComboSearch.prototype.findAlternateSourcesForName = function(name, count) {
 	    countListArray.forEach((countList, claIndex) => {
 		var ncList = [];
 		countList.forEach((count, clIndex) => {
-		    ncList.push(new NameCount(srcNameList[clIndex], count));
+		    ncList.push(NameCount.makeNew(srcNameList[clIndex], count));
 		});
 		ncListArray.push(ncList);
 	    });

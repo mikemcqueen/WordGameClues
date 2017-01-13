@@ -47,8 +47,8 @@ var REQ_META_CLUE_COUNT   = 9;
 //
 
 function main() {
-    var count;
-    var max;
+    var countArg;
+    var maxArg;
     var requiredSizes;
     var metaFlag;
     var verboseFlag;
@@ -72,8 +72,8 @@ function main() {
 
     // options
 
-    count = Opt.options['count'];
-    max = Opt.options['max'];
+    countArg = Opt.options['count'];
+    maxArg = Opt.options['max'];
     requiredSizes = Opt.options['require'];
     useClueList = Opt.options['use'];
     metaFlag = Opt.options['meta'];
@@ -85,18 +85,11 @@ function main() {
     allowDupeSrcFlag = Opt.options['allow-dupe-source'];
     testSrcList = Opt.options['test'];
     showKnownArg = Opt.options['show-known'];
-    if (showKnownArg) {
-	// TODO: require count if !metaFlag
-	if (!useClueList) {
-	    console.log('-u NAME:COUNT required with that option');
-	    return 1;
-	}
-    }
 
-    if (!max) {
-	max = 2; // TODO: default values in opt
+    if (!maxArg) {
+	maxArg = 2; // TODO: default values in opt
     }
-    if (!count) {
+    if (!countArg) {
 	needCount = true;
 	
 	if (showSourcesClueName ||
@@ -137,7 +130,7 @@ function main() {
 
     //
 
-    log('count=' + count + ' max=' + max);
+    log('count=' + countArg + ' max=' + maxArg);
 
     ClueManager.loadAllClues(metaFlag ? {
 	known:    'meta',
@@ -155,7 +148,24 @@ function main() {
 
     // TODO: add "show.js" with these exports
     if (showKnownArg) {
-	Show.compatibleKnownClues(useClueList);
+	if (!useClueList) {
+	    // TODO: require max if !metaFlag
+	    console.log('-u NAME:COUNT required with that option');
+	    return 1;
+	}
+	if (!countArg) {
+	    if (metaFlag) {
+		countArg = ClueManager.maxClues;
+	    }
+	    else {
+		console.log('-c COUNT required with -m');
+		return 1;
+	    }
+	}
+	Show.compatibleKnownClues({
+	    nameList: useClueList, 
+	    max:      countArg
+	});
     }
     else if (testSrcList) {
 	showValidSrcListCounts(testSrcList);
@@ -174,8 +184,8 @@ function main() {
     }
     else {
 	doCombos({
-	    sum:     count,
-	    max:     max,
+	    sum:     countArg,
+	    max:     maxArg,
             require: requiredSizes,
 	    use:     useClueList,
 	});
@@ -302,7 +312,7 @@ function doCombos(args) {
 
 function showSources(clueName) {
     var result;
-    var nc = new NameCount(clueName);
+    var nc = NameCount.makeNew(clueName);
     nc.log();
 
     if (!nc.count) {
@@ -384,7 +394,7 @@ function showAlternates(args) {
 	}
 
 	name = argList[0];
-	var nc = new NameCount(name);
+	var nc = NameCount.makeNew(name);
 	
 	if (!nc.count) {
 	    throw new Error('Need to supply a count as name:count (for now)');
@@ -402,7 +412,7 @@ function showAlternates(args) {
 	    map = ClueManager.knownClueMapArray[count];
 	    for (name in map) {
 		displayAllAlternates(name, ComboSearch.findAlternateSourcesForName(
-		    new NameCount(name, count).toString()));
+		    NameCount.makeNew(name, count).toString()));
 	    }
 	}
     }

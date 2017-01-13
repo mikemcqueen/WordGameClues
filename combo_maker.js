@@ -99,7 +99,7 @@ ComboMaker.prototype.makeCombos = function(args) {
 		clueNameList.push(clue.name);
 		// TODO: I'm not sure what I'm doing here, but I don't think it's working
 		if (useNcList) {
-		    ncMap[clue.name] = new NameCount(clue.name, clueSource.count);
+		    ncMap[clue.name] = NameCount.makeNew(clue.name, clueSource.count);
 		}
 	    });
 
@@ -164,7 +164,7 @@ ComboMaker.prototype.buildUseNcList = function(nameList, requireList) {
 
     ncList = [];
     nameList.forEach(name =>  {
-	var nc = new NameCount(name);
+	var nc = NameCount.makeNew(name);
 	if (nc.count) {
 	    if (!ClueManager.knownClueMapArray[nc.count][nc.name]) {
 		throw new Error('specified clue does not exist, ' + nc);
@@ -250,7 +250,6 @@ ComboMaker.prototype.next = function(clueSourceList, sourceIndexes) {
     var count;
     var name;
     var src;
-    var nc = new NameCount();
 
     for (;;) {
 	if (!this.nextIndex(clueSourceList, sourceIndexes)) {
@@ -277,7 +276,7 @@ ComboMaker.prototype.next = function(clueSourceList, sourceIndexes) {
 	    // check for duplicate clues
 	    clue = clueSource.list[sourceIndexes[index]];
 	    count = clueSource.count;
-	    name = nc.makeCanonicalName(clue.name, count);// really want static function here: NameCount.
+	    name = NameCount.makeCanonicalName(clue.name, count);
 	    if (name in hash) {
 		this.nextDupeClue++;
 		if (this.logging) {
@@ -288,7 +287,7 @@ ComboMaker.prototype.next = function(clueSourceList, sourceIndexes) {
 	    hash[name] = true;
 
 	    // questionable whether this is "correct", but it's probably OK.
-	    src =  nc.makeCanonicalName(clue.src, count);
+	    src =  NameCount.makeCanonicalName(clue.src, count);
 	    if (src in hash) {
 		this.nextDupeSrc++;
 		if (this.logging) {
