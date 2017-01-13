@@ -18,14 +18,18 @@ var Peco           = require('./peco');
 function Validator() {
 
     this.rvsSuccessSeconds = 0;
-    this.rvsFailDuration = 0;
+    this.rvsFailDuration  = 0;
 
     this.allowDupeNameSrc = false;
     this.allowDupeSrc     = false;
     this.allowDupeName    = true;
 
-    this.logging = true;
-    this.logLevel = 0;
+    this.logging          = true;
+    this.logLevel         = 0;
+
+    this.PRIMARY_KEY      = '__primary';
+    this.STAGING_KEY      = '__staging';
+    this.COMPOUND_KEY     = '__compound';
 }
 
 //
@@ -73,7 +77,7 @@ Validator.prototype.validateSources = function(args, nameCountList) {
     var found;
     var vsCount;
     var peco;
-    var resultNcListArray;
+    var resultMap;
     var result;
 
     if (this.logging) {
@@ -85,11 +89,11 @@ Validator.prototype.validateSources = function(args, nameCountList) {
 	this.log('  names: ' + args.nameList);
     }
 
-    if (!args.resultNcListArray) {
-	resultNcListArray = [];
+    if (!args.resultMap) {
+	resultMap = [];
     }
     else {
-	resultNcListArray = args.resultNcListArray;
+	resultMap = args.resultMap;
     }
 
     found = false;
@@ -101,12 +105,12 @@ Validator.prototype.validateSources = function(args, nameCountList) {
 	require: args.require
     })).getCombinations().some(clueCountList => {
 	if (this.recursiveValidateSources({
-	    clueNameList:      args.nameList,
-	    clueCountList:     clueCountList,
-	    nameCountList:     nameCountList,
-	    validateAll:           args.validateAll,
-	    vsCount:           vsCount,
-	    resultNcListArray: resultNcListArray
+	    clueNameList:  args.nameList,
+	    clueCountList: clueCountList,
+	    nameCountList: nameCountList,
+	    validateAll:   args.validateAll,
+	    vsCount:       vsCount,
+	    resultMap:     resultMap
 	})) {
 	    found = true;
 	    if (!args.validateAll) {
@@ -127,7 +131,7 @@ Validator.prototype.validateSources = function(args, nameCountList) {
     }
 
     if (args.validateAll) {
-	result = found ? resultNcListArray : null;
+	result = found ? resultMap : null;
     }
     else {
 	result = found;
@@ -201,16 +205,16 @@ Validator.prototype.recursiveValidateSources = function(args) {
 	    nameList:          args.clueNameList,
 	    countList:         args.clueCountList,
 	    ncList:            args.nameCountList,
-	    validateAll:           args.validateAll,
+	    validateAll:       args.validateAll,
 	    vsCount:           args.vsCount,      // aka "original count"
-	    resultNcListArray: args.resultNcListArray
+	    resultMap: args.resultMap
 
 	})) {
 	    return false; // some.continue;
 	}
 	
 	if (this.logging) {
-	    this.log('++rvsWorker output(' + args.nameCountList.length + ')');
+	    this.log('++rvsWorker output(' + args.nameCountList.length + ') for: ' + clueName);
 	    args.nameCountList.forEach(nc => {
 		this.log('nc.name = ' + nc.name + ', nc.count = ' + nc.count)
 	    });
@@ -222,6 +226,15 @@ Validator.prototype.recursiveValidateSources = function(args) {
 	    // can i check vs. clueNameList.length?
 //	    throw new Error('list should have at least two entries1');
 	}
+
+	/*if (args.validateAll) {
+	    this.addResultEntry({
+		map:    args.resultMap,
+		key:    this.STAGING_KEY,
+		name:   clueName + '.rvs',
+		ncList: Array.from(args.nameCountList)
+	    });
+	}*/
 
 	return true; // success: some.exit
     });
@@ -288,12 +301,12 @@ Validator.prototype.rvsWorker = function(args) {
     }
     // Otherwise, remove current name & count, and validate remaining
     if (!this.recursiveValidateSources({
-	clueNameList:      this.chop(args.nameList, args.name),
-	clueCountList:     this.chop(args.countList, args.count),
-	nameCountList:     newNameCountList,
-	validateAll:           args.validateAll,
-	vsCount:           args.vsCount,      // aka "original count"
-	resultNcListArray: args.resultNcListArray
+	clueNameList:  this.chop(args.nameList, args.name),
+	clueCountList: this.chop(args.countList, args.count),
+	nameCountList: newNameCountList,
+	validateAll:   args.validateAll,
+	vsCount:       args.vsCount,      // aka "original count"
+	resultMap:     args.resultMap
     })) {
 	return false; // fail
     }
@@ -301,6 +314,15 @@ Validator.prototype.rvsWorker = function(args) {
     // does this achieve anything?
     args.ncList.length = 0;
     newNameCountList.forEach(nc => args.ncList.push(nc));
+
+    /*if (args.validateAll) {
+	this.addResultEntry({
+	    map:    args.resultMap,
+	    key:    this.STAGING_KEY,
+	    name:   args.name + ".first",
+	    ncList: Array.from(newNameCountList)
+	});
+    }*/
 
     if (this.logging) {
 	    this.log('add2(' + args.ncList.length + ')' +
@@ -327,7 +349,7 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
     // assert(nameCountList) && Array.isArray(nameCountList)
 
     var origNameCountList = nameCountList;
-    var primaryClueData = {};
+    var primaryClueData;
     var srcNcList;
     var buildArgs;
     var result;
@@ -337,15 +359,19 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 	this.log('CheckUniqueSouces, ncList.length = ' + nameCountList.length);
     }
 
+    primaryClueData = {};
     buildArgs = {
-	validateAll: args.validateAll
+	validateAll:    args.validateAll,
+	resultMap:      args.resultMap
+	//,primaryClueData:primaryClueData
     };
     for(;;) {
 	nameCountList = origNameCountList;
 	primaryClueData.nameMap = {};
 	primaryClueData.srcMap = {};
-	buildArgs.primaryClueData = primaryClueData;
 	
+	//args.resultMap[this.STAGING_KEY] = {};
+
 	// should have findDupe check here, and after build()
 	
 	for (;;) {
@@ -371,7 +397,15 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 		break; // failure
 	    }
 	    else if (result.allPrimary) {
-		// if no duplicates, and all clues are primary, success!
+		// no duplicates, and all clues are primary, success!
+		if (args.validateAll) {
+		    this.addResultEntry({
+			map:    args.resultMap,
+			key:    this.STAGING_KEY,
+			name:   args.name,
+			ncList: this.getClueDataNcList(primaryClueData)
+		    });
+		}
 		
 		if (this.logging) {
 		    this.log('SUCCESS! all primary');
@@ -382,8 +416,9 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 		return true; // success - exit function
 	    }
 	    
-	    // next, break down all compound clues into source components
-	    result = this.buildCompoundClueSourceNameList(nameCountList, buildArgs);
+	    // break down all compound clues into source components
+	    buildArgs.ncList = nameCountList;
+	    result = this.buildCompoundClueSourceNameList(buildArgs);
 
 	    // skip recursive call to validateSources if we have all primary clues
 	    if (result.allPrimary) {
@@ -403,12 +438,12 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 		// call validateSources recursively with compound clues
 		srcNcList = [];
 		if (!this.validateSources({
-		    sum:               result.count,
-		    nameList:          result.clueNameList,
-		    count:             result.clueNameList.length,
-		    validateAll:       args.validateAll,
-		    vsCount:           args.vsCount,
-		    resultNcListArray: args.resultNcListArray
+		    sum:         result.count,
+		    nameList:    result.clueNameList,
+		    count:       result.clueNameList.length,
+		    validateAll: args.validateAll,
+		    vsCount:     args.vsCount,
+		    resultMap:   args.resultMap
 		}, srcNcList)) {
 		    // possible edge case here. we don't want to ignore invalid known
 		    // clue combinations, only invalid generated combos. so we may need
@@ -451,12 +486,30 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 		if (args.validateAll) {
 		    // TODO: why isn't nameMap the right length?!
 		    if ((args.vsCount == Object.keys(primaryClueData.srcMap).length)) {
-			args.resultNcListArray.push(this.getClueDataNcList(primaryClueData));
+			this.addResultEntry({
+			    map:    args.resultMap,
+			    key:    this.PRIMARY_KEY,
+			    name:   'final',
+			    ncList: this.getClueDataNcList(primaryClueData)
+			});
+			this.moveStagingToCompound({
+			    map:    args.resultMap,
+			    ncList: nameCountList
+			});
 		    }
 		    break; // success - tryAll - try other variations
 		}
 		return true; // success - exit function
 	    }
+	    /*else if (args.validateAll) {
+		// build nc list whicha
+		this.addResultEntry({
+		    map:    args.resultMap,
+		    key:    this.STAGING_KEY,
+		    name:   args.name + ".after",
+		    ncList: this.getDiffNcList(origNameCountList, nameCountList)
+		});
+	    }*/
 	    
 	    if (this.logging) {
 		this.log('++innner looping');
@@ -760,7 +813,7 @@ Validator.prototype.evalFindDuplicateResult = function(result, logPrefix) {
 // have multiples source combinations, we need to build all combinations of those
 // combinations. for the second case, punt until it happens.
 
-Validator.prototype.buildCompoundClueSourceNameList = function(ncList, args) {
+Validator.prototype.buildCompoundClueSourceNameList = function(args) {
     var allPrimary = true;
     var clueCount = 0;    // # of primary clues represented by component source clues
     var duplicateName;
@@ -768,7 +821,7 @@ Validator.prototype.buildCompoundClueSourceNameList = function(ncList, args) {
     var indexLengthMap;
 
     if (this.logging) {
-	this.log('buildCompoundCluesSourceNameList, ncList(' + ncList.length + ')');
+	this.log('buildCompoundCluesSourceNameList, ncList(' + args.ncList.length + ')');
     }
  
     if (args.indexLengthMap) {
@@ -785,10 +838,10 @@ Validator.prototype.buildCompoundClueSourceNameList = function(ncList, args) {
     }
 
     clueNameList = [];
-    if (!ncList.every((nc, ncIndex) => {
-	var srcStringList; // e.g. [ 'src1,src2,src3', 'src2,src3,src4' ]
-	var sslIndex;
-	var srcNameList;   // e.g. [ 'src1', 'src2', 'src3' ]
+    if (!args.ncList.every((nc, ncIndex) => {
+	var srcList;       // e.g. [ 'src1,src2,src3', 'src2,src3,src4' ]
+	var slIndex;
+	var srcNameList;      // e.g. [ 'src1', 'src2', 'src3' ]
 	var thisPrimary;
 	
 	// skip primary clues, we only care about compound clues here
@@ -802,40 +855,49 @@ Validator.prototype.buildCompoundClueSourceNameList = function(ncList, args) {
 	}
 	
 	clueCount += nc.count;
-	srcStringList = ClueManager.knownClueMapArray[nc.count][nc.name];
-	if (!srcStringList) {
+	srcList = ClueManager.knownClueMapArray[nc.count][nc.name];
+	if (!srcList) {
 	    throw new Error('kind of impossible but missing clue!');
 	}
 	
 	if (indexLengthMap[nc]) {
-	    sslIndex = indexLengthMap[nc].index;
+	    slIndex = indexLengthMap[nc].index;
 
 	    // sanity check
-	    if (indexLengthMap[nc].length != srcStringList.length) {
+	    if (indexLengthMap[nc].length != srcList.length) {
 		throw new Error('mismatched index lengths');
 	    }
 
 	    if (this.logging) {
-		this.log(nc.name + ': using preset index ' + sslIndex +
+		this.log(nc.name + ': using preset index ' + slIndex +
 			 ', length(' + indexLengthMap[nc].length + ')' +
-			 ', actual length(' + srcStringList.length + ')');
+			 ', actual length(' + srcList.length + ')');
 	    }
 	}
 	else {
-	    sslIndex = 0;
+	    slIndex = 0;
 	    if (this.logging) {
-		this.log(nc.name + ': using first index ' + sslIndex +
-			 ', actual length(' + srcStringList.length + ')');
+		this.log(nc.name + ': using first index ' + slIndex +
+			 ', actual length(' + srcList.length + ')');
 	    }
-	    indexLengthMap[nc] = { index: 0, length: srcStringList.length };
+	    indexLengthMap[nc] = { index: 0, length: srcList.length };
 	}
 
-	srcNameList = srcStringList[sslIndex].split(',');
+	srcNameList = srcList[slIndex].split(',');
 	thisPrimary = (srcNameList.length == nc.count);
 	if (!thisPrimary) {
 	    allPrimary = false;
 	}
 	srcNameList.forEach(name => clueNameList.push(name));
+
+	if (args.validateAll) {
+	    this.addResultEntry({
+		map:    args.resultMap,
+		key:    this.STAGING_KEY,
+		name:   nc.toString(),
+		ncList: Array.from(srcNameList)
+	    });
+	}
 
 	return true; // ncList.next
     }, this)) {
@@ -917,6 +979,34 @@ Validator.prototype.copyAddNcList = function(ncList, name, count) {
 //
 //
 
+Validator.prototype.getDiffNcList = function(origNameCountList, nameCountList) {
+    var ncList;
+    var index;
+    
+    ncList = [];
+    for (index = origNameCountList.length; index < nameCountList.length; ++index) {
+	ncList.push(nameCountList[index]);
+    }
+    return ncList;
+}
+
+//
+//
+
+Validator.prototype.getClueDataNcList = function(clueData) {
+    var srcMapKey;
+    var ncList;
+    
+    ncList = [];
+    for (srcMapKey in clueData.srcMap) {
+	ncList.push(new NameCount(clueData.srcMap[srcMapKey], srcMapKey));
+    }
+    return ncList;
+}
+
+//
+//
+
 Validator.prototype.chop = function(list, removeValue) {
     var copy = [];
 
@@ -930,6 +1020,65 @@ Validator.prototype.chop = function(list, removeValue) {
     });
 
     return copy;
+}
+
+// map:      args.resultMap,
+// key:      PRIMARY_KEY
+// name:     clue name
+// ncList:   ncList
+//
+Validator.prototype.addResultEntry = function(args) {
+    var map;
+
+    if (!args.map[args.key]) {
+	map = args.map[args.key] = {}
+    }
+    else {
+	map = args.map[args.key];
+    }
+    if (!map[args.name]) {
+	map[args.name] = [ args.ncList.toString() ];
+    }
+    else {
+	if (map[args.name].indexOf(args.ncList.toString()) == -1) {
+	    map[args.name].push(args.ncList.toString());
+	}
+    }
+}
+
+
+// args:
+//  map:        args.resultMap
+//  ncList:     ncList
+//
+
+Validator.prototype.moveStagingToCompound = function(args) {
+    var stagingMap;
+    var compoundMap;
+    var name;
+    var srcList;
+
+    if (!args.map[this.COMPOUND_KEY]) {
+	compoundMap = args.map[this.COMPOUND_KEY] = {};
+    }
+    else {
+	compoundMap = args.map[this.COMPOUND_KEY];
+    }
+
+    stagingMap = args.map[this.STAGING_KEY];
+    for (name in stagingMap) {
+	stagingMap[name].forEach(src => {
+	    if (!compoundMap[name]) {
+		compoundMap[name] = [ src ];
+	    }
+	    else {
+		if (compoundMap[name].indexOf(src) == -1) {
+		    compoundMap[name].push(src);
+		}
+	    }
+	});
+    }
+    args.map[this.STAGING_KEY] = {};
 }
 
 //

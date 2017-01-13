@@ -318,9 +318,38 @@ function showSources(clueName) {
 	validateAll:  true
     });
     if (result) {
-	result.forEach(ncList => {
-	    console.log('src: ' + ncList);
+	showValidateResult({
+	    title:  'staging',
+	    result: result,
+	    key:    Validator.STAGING_KEY
 	});
+	showValidateResult({
+	    title:  'compound',
+	    result: result,
+	    key:    Validator.COMPOUND_KEY
+	});
+	showValidateResult({
+	    title: 'primary',
+	    result: result,
+	    key:    Validator.PRIMARY_KEY
+	});
+    }
+}
+
+//
+
+function showValidateResult(args) {
+    var name;
+    var map;
+
+    if (args.result[args.key]) {
+	console.log(args.title);
+	map = args.result[args.key];
+	for (name in map) {
+	    map[name].forEach(ncList => {
+		console.log(name + ': ' + ncList);
+	    });
+	}
     }
 }
 
