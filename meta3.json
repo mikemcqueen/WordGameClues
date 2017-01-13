@@ -37,5 +37,6 @@
     { "name" : "columbia",           "src" : "brown,tarantula" },
     { "name" : "haitian",            "src" : "brown,tarantula" },
 
-    { "name" : "louistest",          "src" : "test,louis", "ignore" : true }
+    { "name" : "test1,3,6",               "src" : "star,black,sky", "ignore" : true },
+    { "name" : "test3,6,8",               "src" : "black,elmo,brown", "ignore" : true }
 ]

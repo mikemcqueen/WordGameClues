@@ -153,14 +153,11 @@ function main() {
 	    console.log('-u NAME:COUNT required with that option');
 	    return 1;
 	}
+	if (!metaFlag) {
+	    console.log('--meta required with that option');
+	}
 	if (!countArg) {
-	    if (metaFlag) {
-		countArg = ClueManager.maxClues;
-	    }
-	    else {
-		console.log('-c COUNT required with -m');
-		return 1;
-	    }
+	    countArg = ClueManager.maxClues;
 	}
 	Show.compatibleKnownClues({
 	    nameList: useClueList, 

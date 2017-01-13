@@ -35,6 +35,19 @@ function Validator() {
 
 //
 
+Validator.prototype.log = function(text) {
+    if (this.logging) {
+	var pad = '';
+	var index;
+	for (var index=0; index<this.logLevel; ++index) {
+	    pad += ' ';
+	}
+	console.log(pad + text);
+    }
+}
+
+//
+
 Validator.prototype.setAllowDupeFlags = function(args) {
     if (args.allowDupeNameSrc != undefined) {
 	this.allowDupeNameSrc = args.allowDupeNameSrc;
@@ -47,26 +60,17 @@ Validator.prototype.setAllowDupeFlags = function(args) {
     }
 }
 
-//
-
-Validator.prototype.log = function(text) {
-    var pad = '';
-    var index;
-    for (var index=0; index<this.logLevel; ++index) {
-	pad += ' ';
-    }
-    console.log(pad + text);
-}
-
 // args:
-//  nameList: list of clue names, e.g. ['bob','jim']
-//  sum:      primary clue count
-//  max:      max # of sources to combine (either this -or- count must be set)
-//  count:    exact # of sources to combine (either this -or- max must be set)
-//  require:  list of required clue counts, e.g. [2, 4]
-//  exclude:  list of excluded clue counts, e.g. [3, 5]
-//  validateAll:  flag; check all combinations, auto-sets wantResults
-//  wantResults:  flag; return resultMap
+//  nameList:       list of clue names, e.g. ['bob','jim']
+//  sum:            primary clue count
+//  max:            max # of sources to combine (either this -or- count must be set)
+//  count:          exact # of sources to combine (either this -or- max must be set)
+//  require:        list of required clue counts, e.g. [2, 4]
+//  exclude:        list of excluded clue counts, e.g. [3, 5]
+//  excludeSrcList: list of excluded primary sources
+//  validateAll:    flag; check all combinations, auto-sets wantResults
+//  wantResults:    flag; return resultMap
+//  quiet:          flag; quiet Peco
 //
 // All the primary clues which make up the clues in clueNameList should
 // be unique and their total count should add up to clueCount. Verify
@@ -93,13 +97,14 @@ Validator.prototype.validateSources = function(args, nameCountList) {
 		 ', count(' + args.count + ')' +
 		 ', require: ' + args.require +
 		 ', exclude: ' + args.exclude +
+		 ', excludeSrc: ' + args.excludeSrc +
 		 ', validateAll: ' + args.validateAll +
 		 ', wantResults: ' + args.wantResults);
 	this.log('  names: ' + args.nameList);
     }
 
     if (!args.resultMap) {
-	resultMap = [];
+	resultMap = {};
     }
     else {
 	resultMap = args.resultMap;
@@ -111,12 +116,15 @@ Validator.prototype.validateSources = function(args, nameCountList) {
 	sum:     args.sum,
 	count:   args.count,
 	max:     args.max,
-	require: args.require
+	require: args.require,
+	exclude: args.exclude,
+	quiet:   args.quiet
     })).getCombinations().some(clueCountList => {
 	if (this.recursiveValidateSources({
 	    clueNameList:  args.nameList,
 	    clueCountList: clueCountList,
 	    nameCountList: nameCountList,
+	    excludeSrcList:args.excludeSrcList,
 	    validateAll:   args.validateAll,
 	    wantResults:   args.wantResults,
 	    vsCount:       vsCount,
@@ -152,6 +160,7 @@ Validator.prototype.validateSources = function(args, nameCountList) {
 //  clueNameList:  
 //  clueCountList: 
 //  nameCountList: 
+//  excludeSrcList: list of excluded primary sources
 //  validateAll:       
 //  wantResults:
 //  vsCount:       pass-through
@@ -215,7 +224,8 @@ Validator.prototype.recursiveValidateSources = function(args) {
 	    count:       count,
 	    nameList:    args.clueNameList,
 	    countList:   args.clueCountList,
-	    ncList:      args.nameCountList,
+	    ncList:         args.nameCountList,
+	    excludeSrcList: args.excludeSrcList,
 	    validateAll: args.validateAll,
 	    wantResults: args.wantResults,
 	    vsCount:     args.vsCount,      // aka "original count"
@@ -261,6 +271,10 @@ Validator.prototype.recursiveValidateSources = function(args) {
 //   nameList : clueNameList,
 //   countList: clueCountList,
 //   ncList   : nameCountList,
+//   excludeSrcList: list of excluded primary sources
+//   validateAll:       
+//   wantResults:
+//   vsCount:       pass-through
 //
 Validator.prototype.rvsWorker = function(args) {
     var newNameCountList;
@@ -317,6 +331,7 @@ Validator.prototype.rvsWorker = function(args) {
 	clueNameList:  this.chop(args.nameList, args.name),
 	clueCountList: this.chop(args.countList, args.count),
 	nameCountList: newNameCountList,
+	excludeSrcList:args.excludeSrcList,
 	validateAll:   args.validateAll,
 	wantResults:   args.wantResults,
 	vsCount:       args.vsCount,      // aka "original count"
@@ -358,6 +373,10 @@ const KEY_COMPLETE            = '__key_complete';
 //   nameList : clueNameList,
 //   countList: clueCountList,
 //   ncList   : nameCountList,
+//   excludeSrcList: list of excluded primary sources
+//   validateAll:       
+//   wantResults:
+//   vsCount:       pass-through
 ///
 Validator.prototype.checkUniqueSources = function(nameCountList, args) {
     // assert(nameCountList) && Array.isArray(nameCountList)
@@ -375,9 +394,10 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 
     primaryClueData = {};
     buildArgs = {
-	validateAll: args.validateAll,
-	wantResults: args.wantResults,
-	resultMap:   args.resultMap
+	excludeSrcList: args.excludeSrcList,
+	validateAll:    args.validateAll,
+	wantResults:    args.wantResults,
+	resultMap:      args.resultMap
 	//,primaryClueData:primaryClueData
     };
     for(;;) {
@@ -414,12 +434,29 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 	    else if (result.allPrimary) {
 		// no duplicates, and all clues are primary, success!
 		if (args.wantResults) {
-		    this.addResultEntry({
-			map:    args.resultMap,
-			key:    this.STAGING_KEY,
-			name:   args.name,
-			ncList: this.getClueDataNcList(primaryClueData)
-		    });
+		    if ((args.vsCount == Object.keys(primaryClueData.srcMap).length)) {
+			if (this.addResultEntry({
+			    map:           args.resultMap,
+			    key:           this.PRIMARY_KEY,
+			    name:          this.FINAL_KEY,
+			    ncList:        this.getClueDataNcList(primaryClueData),
+			    excludeSrcList:args.excludeSrcList
+			})) {
+			    this.moveStagingToCompound({
+				map:    args.resultMap,
+				ncList: nameCountList
+			    });
+			}
+		    }
+		    else {
+			this.addResultEntry({
+			    map:    args.resultMap,
+			    key:    this.STAGING_KEY,
+			    name:   args.name,
+			    ncList: this.getClueDataNcList(primaryClueData),
+			    excludeSrcList:args.excludeSrcList
+			});
+		    }
 		}
 		
 		if (this.logging) {
@@ -454,13 +491,14 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 		// call validateSources recursively with compound clues
 		srcNcList = [];
 		if (!this.validateSources({
-		    sum:         result.count,
-		    nameList:    result.clueNameList,
-		    count:       result.clueNameList.length,
-		    validateAll: args.validateAll,
-		    wantResults: args.wantResults,
-		    vsCount:     args.vsCount,
-		    resultMap:   args.resultMap
+		    sum:            result.count,
+		    nameList:       result.clueNameList,
+		    count:          result.clueNameList.length,
+		    excludeSrcList: args.excludeSrcList,
+		    validateAll:    args.validateAll,
+		    wantResults:    args.wantResults,
+		    vsCount:        args.vsCount,
+		    resultMap:      args.resultMap
 		}, srcNcList)) {
 		    // possible edge case here. we don't want to ignore invalid known
 		    // clue combinations, only invalid generated combos. so we may need
@@ -503,16 +541,18 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 		if (args.wantResults) {
 		    // TODO: why isn't nameMap the right length?! is it now?
 		    if ((args.vsCount == Object.keys(primaryClueData.srcMap).length)) {
-			this.addResultEntry({
-			    map:    args.resultMap,
-			    key:    this.PRIMARY_KEY,
-			    name:   this.FINAL_KEY,
-			    ncList: this.getClueDataNcList(primaryClueData)
-			});
-			this.moveStagingToCompound({
-			    map:    args.resultMap,
-			    ncList: nameCountList
-			});
+			if (this.addResultEntry({
+			    map:           args.resultMap,
+			    key:           this.PRIMARY_KEY,
+			    name:          this.FINAL_KEY,
+			    ncList:        this.getClueDataNcList(primaryClueData),
+			    excludeSrcList:args.excludeSrcList
+			})) {
+			    this.moveStagingToCompound({
+				map:    args.resultMap,
+				ncList: nameCountList
+			    });
+			}
 		    }
 		}
 		if (args.validateAll) {
@@ -1044,12 +1084,22 @@ Validator.prototype.chop = function(list, removeValue) {
 }
 
 // map:      args.resultMap,
-// key:      PRIMARY_KEY
-// name:     clue name
-// ncList:   ncList
+//  key:      PRIMARY_KEY
+//  name:     clue name
+//  ncList:   ncList
+//  excludeSrcList: list of excluded primary sources
 //
 Validator.prototype.addResultEntry = function(args) {
     var map;
+    var srcList;
+
+    if (args.excludeSrcList) {
+	if (this.listContainsAny(args.excludeSrcList,
+				 NameCount.makeCountList(args.ncList)))
+	{
+	    return false;
+	}
+    }
 
     if (!args.map[args.key]) {
 	map = args.map[args.key] = {}
@@ -1065,6 +1115,14 @@ Validator.prototype.addResultEntry = function(args) {
 	    map[args.name].push(args.ncList.toString());
 	}
     }
+    return true;
+}
+
+// Array.prototype
+Validator.prototype.listContainsAny = function(list1, list2) {
+    return list1.some(elem => {
+	return list2.indexOf(elem) != -1;
+    });
 }
 
 
@@ -1125,15 +1183,69 @@ Validator.prototype.getClueDataNcList = function(clueData) {
 }
 
 //
-//
 
-Validator.prototype.log = function(text) {
-    if (this.logging) {
-	var pad = '';
-	var index;
-	for (var index=0; index<this.logLevel; ++index) {
-	    pad += ' ';
+Validator.prototype.getFinalResultList = function(result) {
+    var primaryMap;
+    var resultList;
+    
+    resultList = [];
+    primaryMap = result[this.PRIMARY_KEY];
+    if (primaryMap) {
+	if (primaryMap[this.FINAL_KEY]) {
+	    resultList = primaryMap[this.FINAL_KEY];
 	}
-	console.log(pad + text);
     }
+    return resultList;
 }
+
+// args:
+//  header:
+//  result:
+//  primary:  t/f
+//  compound: t/f
+//
+Validator.prototype.dumpResult = function(args) {
+    var name;
+    var map;
+    var header = 'Validate results';
+    var keyNameList;
+
+    if (args.header) {
+	header += ' for ' + args.header;
+    }
+    console.log(header);
+
+    keyNameList = [];
+    if (args.compound) {
+	keyNameList.push({
+	    key:  this.COMPOUND_KEY,
+	    name: 'compound'
+	});
+    }
+    if (args.primary) {
+	keyNameList.push({
+	    key:  this.PRIMARY_KEY,
+	    name: 'primary'
+	});
+    }
+
+    keyNameList.forEach(keyName => {
+	var header = keyName.name + ':';
+	if (!args.result[keyName.key]) {
+	    console.log(header + ' empty');
+	    return;
+	}
+	map = args.result[keyName.key];
+	if (Object.keys(map).length == 0) {
+	    console.log(header + ' empty');
+	    return;
+	}
+	console.log(header);
+	for (name in map) {
+	    map[name].forEach(ncList => {
+		console.log(name + ': ' + ncList);
+	    });
+	}
+    });
+}
+

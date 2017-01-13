@@ -13,7 +13,7 @@ var Validator              = require('./validator');
 var NameCount              = require('./name_count');
 
 var FIRST_COLUMN_WIDTH    = 15;
-var SECOND_COLUMN_WIDTH   = 35;
+var SECOND_COLUMN_WIDTH   = 25;
 
 //
 //
@@ -25,7 +25,6 @@ function log(text) {
 	console.log(text);
     }
 }
-
 
 // 1. 1st pass, require  name:count on all useNames, 
 //    later I can loop through all possible nc combos
@@ -51,10 +50,9 @@ function compatibleKnownClues(args) {
     var clueList;
     var result;
 
-    if (!args.nameList || !args.max) { // || !args.ncMap) {
+    if (!args.nameList || !args.max) { 
 	throw new Error('missing argument, nameList: ' + args.nameList +
-			', max: ' + args.max ); //+
-	//', ncMap: ' + args.ncMap);
+			', max: ' + args.max ); 
     }
 
     totalCount = 0;
@@ -67,9 +65,6 @@ function compatibleKnownClues(args) {
 	totalCount += nc.count;
 	ncList.push(nc);
     });
-    
-    console.log('Show.compatibleKnownClues, ' + args.nameList + 
-	', total = ' + totalCount);
 
     remain = args.max - totalCount;
     if (remain < 1) {
@@ -77,6 +72,10 @@ function compatibleKnownClues(args) {
 		    ' equals or exceeds the maximum clue count (' + args.max + ')');
 	return;
     }
+    
+    console.log('Show.compatibleKnownClues, ' + args.nameList + 
+		', total = ' + totalCount +
+		', remain = ' + remain);
 
     // first, make sure the supplied name list by itself
     // is a valid clue combination, and find out how many
@@ -94,13 +93,6 @@ function compatibleKnownClues(args) {
 	return;
     }
 
-    /*
-    // set all sources to primary
-    ncList.forEach(nc => {
-	nc.count = 1;
-    });
-    */
-
     // for each result from validateResults
     result[Validator.PRIMARY_KEY][Validator.FINAL_KEY].forEach(ncCsv => {
 	// ncCsv is actually a name:primary_source (not name:count)
@@ -108,25 +100,21 @@ function compatibleKnownClues(args) {
 	var primarySrcList = NameCount.makeCountList(ncList);
 	var result;
 
-	// make ncList a name:count
-	ncList.forEach(nc => {
-	    nc.count = 1;
-	});
-
 	matchNameMapArray = [];
 	for (count = 1; count <= remain; ++count) {
-	    if (totalCount + count > args.max) {
-		break;
-	    }
 	    clueList = ClueManager.clueListArray[count];
 	    clueList.forEach(clue => {
-		if (result = isCompatibleClue(ncList, clue, totalCount + count)) {
+		var resultList;
+		if (resultList = isCompatibleClue({
+		    sum:     count,
+		    name:    clue.name,
+		    exclude: primarySrcList
+		})) {
 		    addToCompatibleMap({
-			clue:     clue,
-			result:   result,
-			removeSrcList : primarySrcList,
-			mapArray: matchNameMapArray,
-			index:    count
+			clue:       clue,
+			resultList: resultList,
+			mapArray:   matchNameMapArray,
+			index:      count
 		    });
 		}
 	    });
@@ -140,90 +128,63 @@ function compatibleKnownClues(args) {
 }
 
 //
+//  sum:     count,
+//  name:    clue.name,
+//  exclude: primarySrcList
 //
-
-function dumpCompatibleClues(args) {
-    var count;
-    var map;
-    var list;
-    var key;
-    var countList = [ 1 ];
-
-    console.log(args.srcList + format2(args.srcList, FIRST_COLUMN_WIDTH) +
-		' ' + args.nameList);
-
-    for (count = 1; count < ClueManager.maxClues; ++count) {
-	map = args.nameMapArray[count];
-
-	// copy all map entries to array and sort by source length,
-	// source #s, alpha name
-
-	list = [];
-	for (key in map) {
-	    list.push({
-		countList: countList,
-		srcList:   map[key], // { srcListArray: [[x,y],[y,z]], countListArray[[1,2],[2,3]]
-		name:      key
-	    });
-	}
-
-	//list.sort(compatibleClueSort);
-
-	list.forEach(elem => {
-	    dumpCompatibleData(elem);
-	});
-    }
-}
-
-//
-
-function dumpCompatibleData(args) {
-    args.srcList.forEach((src, index) => {
-	console.log(args.countList + format2(args.countList, FIRST_COLUMN_WIDTH) +
-		    ' ' + src + format2(src, SECOND_COLUMN_WIDTH) + 
-		    ' ' + args.name);
-    });
-}
-
-//
-
-function format2(text, span) {
-    var result = "";
-    for (var len = text.toString().length; len < span; ++len) { result += " "; }
-    return result;
-}
-
-
-//
-//
-
-function isCompatibleClue(ncList, clue, sum) {
+function isCompatibleClue(args) {
     var result;
-    var nameList;
+    var resultList;
+    var primarySrc;
 
-    nameList = [];
+    //TODO: sort
+
+    /*
+    var nameList;
+    nameList = [ clue.name ];
     ncList.forEach(nc => {
 	nameList.push(nc.name);
     });
     nameList.push(clue.name);
     nameList.sort(); // necessary?
+    */
 
-    log('Validating ' + nameList + ' (' + sum + ')');
+    log('Validating ' + args.name + ' (' + args.sum + ')');
 
     result = Validator.validateSources({
-	sum:         sum,
-	nameList:    nameList,
-	count:       nameList.length,
-	wantResults: true
+	sum:            args.sum,
+	nameList:       [ args.name ],
+	count:          1,
+	excludeSrcList: args.exclude,
+	validateAll:    true,
+	wantResults:    true
+	//,quiet:          true
     });
 
-    log('isCompatible: ' + nameList + ', ' + Boolean(result));
+    log('isCompatible: ' + args.name + '(' + args.sum + '), ' + Boolean(result));
 
-    return result;
+    if (result) {
+	resultList = Validator.getFinalResultList(result);
+	if (!resultList) {
+	    if (sum == 1) {
+		primarySrc = ClueManager.clueNameMapArray[1][args.name];
+		if (!primarySrc) {
+		    resultList = [ ('missing: ' + args.name) ];
+		}
+		else {
+		    resultList = [ primarySrc ];
+		}
+	    }
+	    else {
+		console.log('Empty result list, name: ' + args.name + ', sum: ' + sum );
+	    }
+	}
+    }
+    return result ? resultList : false;
 }
 
 //clue,
-//result,
+//resultList,
 //mapArray
 //index
 //
@@ -243,10 +204,94 @@ function addToCompatibleMap(args) {
     name = args.clue.name;
     src = args.clue.src;
 
-    if (!map[name]) {
-	map[name] = [ src ];
-    }
-    else {
-	map[name].push(src);
-    }
+    args.resultList.forEach(ncCsv => {
+	var primarySrcList;
+	primarySrcList = NameCount.makeCountList(NameCount.makeListFromCsv(ncCsv));
+	if (!map[name]) {
+	    map[name] = [{
+		src:            src,
+		primarySrcList: primarySrcList
+	    }];
+	}
+	else {
+	    map[name].push([{
+		src:            src,
+		primarySrcList: primarySrcList
+	    }]);
+	}
+	log('adding: ' + primarySrcList + ' - ' + src);
+    });
 }
+
+// args:
+//  nameList:    
+//  srcList:     
+//  nameMapArray:
+//
+function dumpCompatibleClues(args) {
+    var count;
+    var map;
+    var list;
+    var dumpList;
+    var key;
+    var countList = [ 1 ];
+    var sources = '';
+    
+    args.nameList.forEach(name => {
+	var nc = NameCount.makeNew(name);
+	if (sources.length > 0) {
+	    sources += ', ';
+	}
+	sources += ClueManager.knownClueMapArray[nc.count][nc.name][0];
+    });
+
+    console.log(args.srcList + format2(args.srcList, FIRST_COLUMN_WIDTH) +
+		' ' + sources + format2(sources, SECOND_COLUMN_WIDTH) +
+		' ' + args.nameList +
+		'\n');
+
+    for (count = 1; count < ClueManager.maxClues; ++count) {
+	map = args.nameMapArray[count];
+
+	// copy all map entries to array and sort by source length,
+	// source #s, alpha name
+
+	dumpList = [];
+	for (key in map) {
+	    map[key].forEach(elem => {
+		elem.name = key;
+		dumpList.push(elem);
+	    });
+	}
+
+	// TODO:
+	// list.sort(compatibleClueSort);
+
+	if (dumpList.length) {
+	    dumpCompatibleClueList(dumpList);
+	}
+    }
+    console.log('');
+}
+
+//
+
+function dumpCompatibleClueList(list) {
+    list.forEach(elem => {
+	console.log(elem.primarySrcList + format2(elem.primarySrcList, FIRST_COLUMN_WIDTH) +
+		    ' ' + elem.src + format2(elem.src, SECOND_COLUMN_WIDTH) + 
+		    ' ' + elem.name);
+    });
+}
+
+//
+
+function format2(text, span) {
+    if (text == undefined) {
+	text = 'undefined'
+    }
+    var result = "";
+    for (var len = text.toString().length; len < span; ++len) { result += " "; }
+    return result;
+}
+

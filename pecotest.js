@@ -7,8 +7,10 @@ var Peco        = require('./peco');
 var Opt = require('node-getopt')
     .create([
 	['c' , 'count=ARG'            , 'use metamorphosis clues'],
+	['e' , 'exclude=ARG+'         , 'exclude #s'],
+	['r' , 'require=ARG+'         , 'require #s'],
 	['x' , 'max=ARG'              , 'specify maximum # of components to combine'],
-	['p' , 'permutations'         , 'specify maximum # of components to combine']
+	['p' , 'permutations'         , 'permutations flag' ],
     ])
     .bindHelp().parseSystem();
 
@@ -18,6 +20,8 @@ function main() {
     var count;
     var max;
     var permFlag;
+    var require;
+    var exclude;
 
     if (Opt.argv.length < 1) {
 	console.log('Usage: node add.js SUM');
@@ -31,6 +35,8 @@ function main() {
     sum = Number(Opt.argv[0]);
     count = Opt.options['count'];
     max = Opt.options['max'];
+    require = Opt.options['require'];
+    exclude = Opt.options['exclude'];
     permFlag = Opt.options['permutations'];
 
     if (!count && !max) {
@@ -39,22 +45,33 @@ function main() {
     }
 
     console.log('sum: ' + sum + ', count: ' + count + 
-		', max: ' + max + ', perm: ' + permFlag);
+		', max: ' + max + ', perm: ' + permFlag +
+		', require: ' + require +
+		', exclude: ' + exclude);
 
     
-    showAddends(sum, count, max, !permFlag);
+    if (require) {
+	require.forEach((num, index) => { require[index] = Number(num); });
+    }
+    if (exclude) {
+	exclude.forEach((num, index) => { exclude[index] = Number(num); });
+    }
+
+    showAddends(sum, count, max, permFlag, require, exclude);
 }
 
 //
 
-function showAddends(sum, count, max, permFlag) {
+function showAddends(sum, count, max, permFlag, require, exclude) {
     var peco;
     var list;
 
     peco = new Peco({
 	sum:   sum,
 	count: count,
-	max:   max
+	max:   max,
+	require: require,
+	exclude: exclude
     });
 
     if (permFlag) {

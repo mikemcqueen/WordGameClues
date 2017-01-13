@@ -18,14 +18,18 @@ var LOGGING = false;
 //  sum       
 //  count     
 //  max       
-//  required  
+//  require:  list of required numbers, e.g. [2, 4]
+//  exclude:  list of excluded numbers, e.g. [3, 5]
 
 function Peco(args) {
+    var dupe;
+
     this.listArray  = args.listArray;
     this.sum        = args.sum;
     this.count      = args.count;
     this.max        = args.max;
-    this.required   = args.required; // list of required numbers
+    this.require    = args.require; // list of required numbers
+    this.exclude    = args.exclude; // list of exluded numbers
 
     if (this.listArray) {
 	if (!this.max) {
@@ -45,6 +49,15 @@ function Peco(args) {
 	}
 	if ((this.count > this.sum) || (this.max > this.sum)) {
 	    throw new Error('Peco: count/max > sum');
+	}
+	if (this.require && this.exclude) {
+	    if (!this.require.every(requireNum => {
+		return this.exclude.every(excludeNum => {
+		    return requireNum != excludeNum;
+		});
+	    })) {
+		throw new Error('Peco: require and exclude contain same number, ' + dupe);
+	    }
 	}
     }
 }
@@ -88,17 +101,12 @@ Peco.prototype.getAllAddends = function(combFlag) {
 	    list = this.getAddendsForCount(count, combFlag, list);
 	}
     }
-
-    // sanity check
-    if (!list.length) {
-	throw new Error('Peco: empty list!');
-    }
-    return list;
+    return list ? list : [];
 }
 
 //
 
-Peco.prototype.getAddendsForCount = function(count, combFlag, pecoList) {
+Peco.prototype.getAddendsForCount = function(count, combFlag, pecoList, quiet) {
     var last = this.sum - (this.count - 1);
     
     if (count > this.sum) {
@@ -113,7 +121,8 @@ Peco.prototype.getAddendsForCount = function(count, combFlag, pecoList) {
     return this.buildResult({
 	count:    count,
 	combFlag: combFlag,
-	pecoList: pecoList
+	pecoList: pecoList,
+	quiet:    quiet
     });
 }
 
@@ -155,10 +164,10 @@ Peco.prototype.buildResult = function(args) {
     }
 
     if (!list) {
-	if (args.count) {
-	    throw new Error('no permutations/combinations');
+	if (args.count) { //  && !args.quiet) {
+//	    throw new Error('no permutations/combinations');
+	    console.log('no permutations/combinations');
 	}
-	console.log('no permutations/combinations');
 	return null;
     }
 
@@ -213,9 +222,6 @@ Peco.prototype.listFirst = function(listArray, combFlag) {
     }
     else {
 	list = this.next(combFlag);
-	if (!list) {
-	    return null;
-	}
     }
     return list;
 }
@@ -253,8 +259,8 @@ Peco.prototype.listNext = function(combFlag)
 	    continue;
 	}
 	/*
-	if (this.required) {
-	    if (!this.required.every(size => {
+	if (this.require) {
+	    if (!this.require.every(size => {
 		return list.indexOf(Number(size)) > -1;
 	    })) {
 		continue;
@@ -299,10 +305,6 @@ Peco.prototype.first = function(srcCount, combFlag) {
     }
     else {
 	list = this.next(combFlag);
-	if (!list) {
-	    throw new Error('Peco: no permutations/combinations');
-	    return null;
-	}
     }
     return list;
 }
@@ -340,17 +342,18 @@ Peco.prototype.next = function(combFlag)
 	    }
 	}
 	else {
-	    // IS this used? or was this a listNext integration hack?
+	    // TODO: IS this used? or was this a listNext integration hack?
 	    if (this.getIndexSum() > this.max) {
 		continue;
 	    }
 	}
-	if (this.required) {
-	    if (!this.required.every(size => {
-		return list.indexOf(Number(size)) > -1;
-	    })) {
-		continue;
-	    }
+	if (this.require &&
+	    !this.indexContainsAll(this.require)) {
+	    continue;
+	}
+	if (this.exclude &&
+	    this.indexContainsAny(this.exclude)) {
+	    continue;
 	}
 	break;
     }
@@ -371,6 +374,22 @@ Peco.prototype.getIndexSum = function() {
 	}
     });
     return sum;
+}
+
+//
+
+Peco.prototype.indexContainsAll = function(list) {
+    return this.indexList.every(indexObj => {
+	return list.indexOf(indexObj.index) != -1;
+    });
+}
+
+//
+
+Peco.prototype.indexContainsAny = function(list) {
+    return this.indexList.some(indexObj => {
+	return list.indexOf(indexObj.index) != -1;
+    });
 }
 
 //

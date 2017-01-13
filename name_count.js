@@ -66,7 +66,7 @@ function makeListFromNameList(nameList) {
 function makeCountList(ncList) {
     var countList;
     countList = [];
-    ncList.forEach(nc => countList.push(nc.count));
+    ncList.forEach(nc => countList.push(Number(nc.count)));
     return countList;
 }
 
