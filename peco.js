@@ -66,7 +66,9 @@ function Peco(args) {
 //
 
 Peco.prototype.log = function(text) {
-    console.log(text);
+    if (LOGGING) {
+	console.log(text);
+    }
 }
 
 //
@@ -203,7 +205,7 @@ Peco.prototype.listFirst = function(listArray, combFlag) {
     }
     listArray.forEach(list => {
 	if (LOGGING) {
-	    console.log('list: ' + list);
+	    this.log('list: ' + list);
 	}
     });
 

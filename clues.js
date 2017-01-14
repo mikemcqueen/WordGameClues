@@ -1,6 +1,7 @@
 'use strict';
 
 var Duration    = require('duration');
+var Np          = require('named-parameters');
 
 var ClueManager = require('./clue_manager');
 var ComboMaker  = require('./combo_maker');
@@ -124,13 +125,13 @@ function main() {
     ComboSearch.logging = verboseFlag;
     LOGGING = verboseFlag;
 
-    Validator.setAllowDupeFlags(metaFlag ? {
+    Validator.setAllowDupeFlags(synthFlag ? {
 	allowDupeNameSrc: false,
-	allowDupeSrc:     allowDupeSrcFlag ? true : false,
+	allowDupeSrc:     true,
 	allowDupeName:    true,
     } : {
 	allowDupeNameSrc: false,
-	allowDupeSrc:     true,
+	allowDupeSrc:     allowDupeSrcFlag ? true : false,
 	allowDupeName:    true,
     });
 

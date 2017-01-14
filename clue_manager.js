@@ -196,7 +196,6 @@ ClueManager.prototype.addKnownCompoundClues = function(clueList, clueCount) {
 				    ', count(' + clueCount + ') ' +
 				    clue.name + ' : ' + srcKey);
 		}
-		
 		srcMap[srcKey] = [ clue ];
 	    }
 	    else {

@@ -210,9 +210,6 @@ function addToCompatibleMap(args) {
 	var primarySrcList;
 	var key;
 	primarySrcList = NameCount.makeCountList(NameCount.makeListFromCsv(ncCsv));
-	if (name == 'louis') {
-	    console.log('list: ' + primarySrcList);
-	}
 	key = name + ':' + primarySrcList;
 	if (!map[key]) {
 	    map[key] = [{
