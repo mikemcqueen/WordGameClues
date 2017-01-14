@@ -29,6 +29,5 @@
     { "name" : "david scott",        "src" : "moon,walker,randolph" },
     { "name" : "clyde",              "src" : "jackson,brown" },
     { "name" : "banana",             "src" : "mini,songbird" },
-
-    { "name" : "cunningham",         "src" : "duke,randolph", "note" : "ace pilot,senator?", "ignore" : false }
+    { "name" : "cunningham",         "src" : "duke,randy", "note" : "ace pilot,senator?" }
 ]

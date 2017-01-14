@@ -1,6 +1,4 @@
 [
-    { "name" : "test.aceacelouislouis","src" : "test.acelouis,test.louisace", "skip" : true },
-
     { "name" : "tarantula",          "src" : "orange,black hawk,wasp" },
     { "name" : "nat",                "src" : "king,coleman" },
     { "name" : "sarah sally baker",  "src" : "black hawk,songbird",    "ignore" : true },
@@ -38,7 +36,6 @@
     { "name" : "cernan",             "src" : "moon,walker" },
     { "name" : "harrison",           "src" : "moon,walker" },
     { "name" : "schmitt",            "src" : "moon,walker" },
-    { "name" : "randolph",           "src" : "charles,pollock", "note" : "steamship captain, which ship?", "ignore" : true },
     { "name" : "drowning",           "src" : "brian jones,death" },
     { "name" : "misadventure",       "src" : "brian jones,death" },
     { "name" : "marlin",             "src" : "blue,fish" },

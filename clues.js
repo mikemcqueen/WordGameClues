@@ -18,19 +18,20 @@ var QUIET = false;
 
 var Opt = require('node-getopt')
     .create([
-	['a' , 'show-alternates=ARG',         'show alternate sources for the specified clue' ],
+	['a' , 'show-alternates=NAME',        'show alternate sources for the specified clue' ],
 	['A' , 'show-all-alternates',         'show alternate sources for all clues' ],
-	['c' , 'count=ARG'          ,         '# of primary clues to combine' ], 
+	['c' , 'count=COUNT',                 '# of primary clues to combine' ], 
 	['d' , 'allow-dupe-source'  ,         'allow duplicate source, override default behavior of --meta' ],
+	[''  , 'json=FILEBASE',               'specify base filename of clue files' ],
 	['k' , 'show-known'         ,         'show compatible known clues; at least one -u <clue> required' ],
-	['m' , 'meta'               ,         'use metamorphosis clues (default)' ],
+	['m' , 'meta'               ,         'use metamorphosis clues, same as --json meta (default)' ],
 	['o' , 'output'             ,         'output json -or- clues' ],
 	['q' , 'require=COUNT+',              'require clue(s) of specified count(s)' ],
 	['s' , 'show-sources=NAME[:COUNT]',   'show possible source combinations for the specified name[:count]' ],
 	['t' , 'test=NAME,NAME,...',          'test the specified source list, e.g. blue,fish' ],
-	['u' , 'use=NAME[:COUNT]+',           'use the specified name[:count]' ],
+	['u' , 'use=NAME[:COUNT]+',           'use the specified name[:count](s)' ],
 	['x' , 'max=COUNT',                   'specify maximum # of components to combine'],
-	['y' , 'synthesis',                   'use synthesis clues' ],
+	['y' , 'synthesis',                   'use synthesis clues, same as --json clues' ],
 	
 	['v' , 'verbose'            ,         'show debug output' ],
 	['h' , 'help'               ,         'this screen']
@@ -63,6 +64,7 @@ function main() {
     var needCount;
     var outputArg;
     var showKnownArg;
+    var jsonArg;
 
 /*    if (Opt.argv.length) {
 	console.log('Usage: node clues.js [options]');
@@ -88,14 +90,7 @@ function main() {
     testSrcList = Opt.options['test'];
     showKnownArg = Opt.options['show-known'];
     synthFlag = Opt.options['synthesis'];
-
-    if ((synthFlag != undefined) && (metaFlag != undefined)) {
-	console.log('synth + meta not allowed');
-	return 1;
-    }
-    if (!synthFlag) {
-	metaFlag = true;
-    }
+    jsonArg = Opt.options['json'];
 
     if (!maxArg) {
 	maxArg = 2; // TODO: default values in opt
@@ -140,22 +135,11 @@ function main() {
     });
 
     //
+    if (!loadClues(synthFlag, metaFlag, jsonArg)) {
+	return 1;
+    }
 
-    log('count=' + countArg + ' max=' + maxArg);
-
-    ClueManager.loadAllClues(metaFlag ? {
-	known:    'meta',
-	reject:   'metarejects',
-	max:      MAX_META_CLUE_COUNT,
-	required: REQ_META_CLUE_COUNT
-    } : {
-	known:    'clues',
-	reject:   'rejects',
-	max:      MAX_SYNTH_CLUE_COUNT,
-	required: REQ_SYNTH_CLUE_COUNT
-    });
-
-    log('loaded...');
+    log('count=' + countArg + ', max=' + maxArg);
 
     // TODO: add "show.js" with these exports
     if (showKnownArg) {
@@ -198,6 +182,52 @@ function main() {
 	    use:     useClueList,
 	});
     }
+}
+
+//
+
+function loadClues(synthFlag, metaFlag, jsonArg) {
+    var base;
+    var max;
+    var required;
+
+    if ((synthFlag  || metaFlag) && jsonArg) {
+	console.log('--json not allowed with --synth or --meta not allowed');
+	return false;
+    }
+    if ((synthFlag != undefined) && (metaFlag != undefined)) {
+	console.log('--synthesis and --meta not allowed');
+	return false;
+    }
+    
+    // default to meta sizes, unless --synthesis. good enough for now
+    max =      MAX_META_CLUE_COUNT;
+    required = REQ_META_CLUE_COUNT;
+
+    if (jsonArg) {
+	base = jsonArg;
+    }
+    else if (!synthFlag) {
+	base = 'meta';
+    }
+    else {
+	max =      MAX_SYNTH_CLUE_COUNT;
+	required = REQ_SYNTH_CLUE_COUNT;
+	base = 'clues';
+    }
+
+    log('loading all clues...');
+
+    ClueManager.loadAllClues({
+	known:    base,
+	reject:   base + 'rejects',
+	max:      max,
+	required: required
+    });
+
+    log('done.');
+
+    return true;
 }
 
 //

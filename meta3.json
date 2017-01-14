@@ -1,8 +1,4 @@
 [
-    { "name" : "test.aceacelouis",    "src" : "test.acelouis,ace", "skip" : true },
-    { "name" : "test.louisacelouis",  "src" : "test.acelouis,louis", "skip" : true },
-    { "name" : "test.blackacelouis",  "src" : "test.acelouis,black", "skip" : true },
- 
     { "name" : "222",                "src" : "sterling,goliath" },
     { "name" : "giants",             "src" : "sterling,goliath" },
     { "name" : "hoffman",            "src" : "sterling,goliath" },
@@ -39,8 +35,5 @@
     { "name" : "cameroon",           "src" : "brown,tarantula" },
     { "name" : "colombian",          "src" : "brown,tarantula" },
     { "name" : "columbia",           "src" : "brown,tarantula" },
-    { "name" : "haitian",            "src" : "brown,tarantula" },
-
-    { "name" : "test1,3,6",               "src" : "star,black,sky", "ignore" : true },
-    { "name" : "test3,6,8",               "src" : "black,elmo,brown", "ignore" : true }
+    { "name" : "haitian",            "src" : "brown,tarantula" }
 ]

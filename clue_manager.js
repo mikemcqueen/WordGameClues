@@ -180,21 +180,28 @@ ClueManager.prototype.addKnownCompoundClues = function(clueList, clueCount) {
 	srcNameList.sort();
 	srcKey = srcNameList.toString();
 
-	if ((clueCount > 1) && !srcMap[srcKey]) { // or .contains(clue);
-	    if (this.logging) {
-		this.log('############ validating Known Combo: ' + srcKey);
+	if (clueCount > 1) {
+	    // new sources need to be validated
+	    if (!srcMap[srcKey]) { // or .contains(clue);
+		if (this.logging) {
+		    this.log('############ validating Known Combo: ' + srcKey);
+		}
+		
+		if (!Validator.validateSources({
+		    sum:      clueCount,
+		    nameList: srcNameList,
+		    count:    srcNameList.length
+		})) {
+		    throw new Error('Known validate sources failed' +
+				    ', count(' + clueCount + ') ' +
+				    clue.name + ' : ' + srcKey);
+		}
+		
+		srcMap[srcKey] = [ clue ];
 	    }
-	    
-	    if (!Validator.validateSources({
-		sum:      clueCount,
-		nameList: srcNameList,
-		count:    srcNameList.length
-	    })) {
-		throw new Error('Known validate sources failed' +
-				', count(' + clueCount + ') ' +
-				clue.name + ' : ' + srcKey);
+	    else {
+		srcMap[srcKey].push(clue);
 	    }
-	    srcMap[srcKey] = true; // or .push(clue);
 	}
 	this.addKnownClue(clueCount, clue.name, srcKey);
     }, this);

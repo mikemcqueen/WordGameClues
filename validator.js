@@ -180,7 +180,7 @@ Validator.prototype.recursiveValidateSources = function(args) {
     this.logLevel++;
 
     if (!args.nameCountList) {
-	args.nameCountList = []; // new Array();
+	args.nameCountList = [];
     }
     if (this.logging) {
 	this.log('name: looking for [' + args.clueNameList + '] in [' + args.clueCountList + ']');
@@ -193,7 +193,7 @@ Validator.prototype.recursiveValidateSources = function(args) {
     nameIndex = 0;
     clueName = args.clueNameList[nameIndex];
     
-    // optimzation: could have a map of count:boolean entries here
+    // optimization: could have a map of count:boolean entries here
     // on a per-name basis (new map for each outer loop; once a
     // count is checked for a name, no need to check it again
     
@@ -224,16 +224,16 @@ Validator.prototype.recursiveValidateSources = function(args) {
 	}
 	
 	if (!this.rvsWorker({
-	    name:        clueName,
-	    count:       count,
-	    nameList:    args.clueNameList,
-	    countList:   args.clueCountList,
+	    name:           clueName,
+	    count:          count,
+	    nameList:       args.clueNameList,
+	    countList:      args.clueCountList,
 	    ncList:         args.nameCountList,
 	    excludeSrcList: args.excludeSrcList,
-	    validateAll: args.validateAll,
-	    wantResults: args.wantResults,
-	    vsCount:     args.vsCount,      // aka "original count"
-	    resultMap:   args.resultMap
+	    validateAll:    args.validateAll,
+	    wantResults:    args.wantResults,
+	    vsCount:        args.vsCount,      // aka "original count"
+	    resultMap:      args.resultMap
 	})) {
 	    return false; // some.continue;
 	}
@@ -1144,7 +1144,7 @@ Validator.prototype.copyAddNcList = function(ncList, name, count) {
 	return null;
     }
 
-    newNcList = Array.from(ncList)
+    newNcList = Array.from(ncList);
     newNcList.push(NameCount.makeNew(name, count));
 
     return newNcList;
