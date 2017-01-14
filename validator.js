@@ -367,6 +367,7 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
     var origNameCountList = nameCountList;
     var primaryClueData;
     var srcNcList;
+    var nameSrcList;
     var buildArgs;
     var findResult;
     var buildResult;
@@ -421,32 +422,34 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 		this.log('' + NameCount.listToJSON(nameCountList));
 	    }
 
-	    if (args.wantResults) {
-		this.addResult({
-		    ncList:        this.getNameSrcList(primaryClueData.srcMap),
-		    stagingNcList: nameCountList,
-		    map:           args.resultMap,
-		    excludeSrcList:args.excludeSrcList,
-		    vsCount:       args.vsCount,
-		    stagingName:   args.name
-		});
-	    }
-	    if (args.validateAll) {
-		this.cyclePrimaryClueSources({
-		    ncList:        this.getNameSrcList(primaryClueData.srcMap),
-		    resultMap:     args.resultMap,
-		    excludeSrcList:args.excludeSrcList,
-		    vsCount:       args.vsCount
-		});
-		anyFlag = true;
-	    }
-	    else {
-		return true; // success - exit function
+	    nameSrcList = this.getNameSrcList(primaryClueData.srcMap);
+	    if (args.vsCount == nameSrcList.length) {
+		if (args.wantResults) {
+		    this.addResult({
+			ncList:        nameSrcList,
+			stagingNcList: nameCountList,
+			map:           args.resultMap,
+			excludeSrcList:args.excludeSrcList,
+			vsCount:       args.vsCount,
+			stagingName:   args.name
+		    });
+		}
+		if (args.validateAll) {
+		    this.cyclePrimaryClueSources({
+			ncList:        nameSrcList,
+			resultMap:     args.resultMap,
+			excludeSrcList:args.excludeSrcList,
+			vsCount:       args.vsCount
+		    });
+		    anyFlag = true;
+		}
+		else {
+		    return true; // success - exit function
+		}
 	    }
 	}
-	    
-	for (;;) {
 
+	for (;;) {
 	    // break down all compound clues into source components
 	    buildArgs.ncList = nameCountList;
 	    buildResult = this.buildSourceNameList(buildArgs);
@@ -515,26 +518,39 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 
 	    if (findResult.allPrimary) {
 		// all the source clues we just validated are primary clues
-		if (args.wantResults) {
-		    this.addResult({
+		nameSrcList = this.getNameSrcList(primaryClueData.srcMap);
+		if (args.vsCount == nameSrcList.length) {
+		    if (args.wantResults) {
+			this.addResult({
+			    map:           args.resultMap,
+			    ncList:        nameSrcList,
+			    excludeSrcList:args.excludeSrcList,
+			    vsCount:       args.vsCount,
+			    stagingNcList: nameCountList
+			});
+		    }
+		    if (args.validateAll) {
+			this.cyclePrimaryClueSources({
+			    resultMap:     args.resultMap,
+			    ncList:        nameSrcList,
+			    excludeSrcList:args.excludeSrcList,
+			    vsCount:       args.vsCount
+			});
+			anyFlag = true;
+			break; // success - try other combos
+		    }
+		}
+		else {
+		    // not a complete primary clue solution, but it's an
+		    // intermediate solution that may end up working.
+		    this.addResultEntry({
 			map:           args.resultMap,
-			ncList:        this.getNameSrcList(primaryClueData.srcMap),
-			excludeSrcList:args.excludeSrcList,
-			vsCount:       args.vsCount,
-			stagingNcList: nameCountList
+			key:           this.STAGING_KEY,
+			name:          args.name,
+			ncList:        nameSrcList,
+			excludeSrcList:args.excludeSrcList
 		    });
 		}
-		if (args.validateAll) {
-		    this.cyclePrimaryClueSources({
-			resultMap:           args.resultMap,
-			ncList:        this.getNameSrcList(primaryClueData.srcMap),
-			excludeSrcList:args.excludeSrcList,
-			vsCount:       args.vsCount
-		    });
-		    anyFlag = true;
-		    break; // success - try other combos
-		}
-
 		return true; // success - exit function
 	    }
 	    
@@ -568,35 +584,37 @@ Validator.prototype.cyclePrimaryClueSources = function(args) {
     var buildArgs;
     var buildResult;
     var findResult;
-    var ncList;
+    var localNcList;
 
     this.log('cyclePrimaryClueSources');
 
-    ncList = Array.from(args.ncList);
+    // must copy the NameCount objects within the list
+    localNcList = [];
+    args.ncList.forEach(nc => {
+	localNcList.push(NameCount.makeCopy(nc));
+    });
     buildArgs = {
 	excludeSrcList: args.excludeSrcList,
-	ncList:         ncList,
+	ncList:         args.ncList,   // always pass same unmodified ncList
 	resultMap:      args.resultMap,
-	wantResults:    false,      // no need for staging results
+	wantResults:    false,         // no need for staging results
 	allPrimary:     true
     };
     do {
-	srcMap = {};
-
 	if (buildArgs.indexMap) {
 	}
 
 	// build src name list of any duplicate-sourced primary clues
 	buildResult = this.buildSourceNameList(buildArgs);
 
-	// set ncList sources to buildResult's sources
-	ncList.forEach((nc, index) => {
+	// change local copy of ncList sources to buildResult's sources
+	localNcList.forEach((nc, index) => {
 	    nc.count = buildResult.srcNameList[index];
 	});
 	
-	// nameCountList are primary
+	srcMap = {};
 	findResult = this.findDuplicatePrimarySource({
-	    ncList: ncList, 
+	    ncList: localNcList, 
 	    srcMap: srcMap
 	});
 	if (!this.evalFindDuplicateResult(findResult, 'cycle')) {
@@ -929,7 +947,7 @@ Validator.prototype.evalFindDuplicateResult = function(result, logPrefix) {
 // a separate clueNameList for each possible combination. if two or more clues
 // have multiples source combinations, we need to build all combinations of those
 // combinations. for the second case, punt until it happens.
-
+//
 Validator.prototype.buildSourceNameList = function(args) {
     var allPrimary = true;
     var clueCount = 0;    // # of primary clues represented by component source clues
@@ -938,6 +956,7 @@ Validator.prototype.buildSourceNameList = function(args) {
 
     if (this.logging) {
 	this.log('buildSourceNameList, ncList(' + args.ncList.length + ')');
+	this.log('ncList: ' + ncList); // NameCount.listToJSON(args.ncList));
     }
  
     if (args.indexMap) {
@@ -1081,7 +1100,26 @@ Validator.prototype.incrementIndexMap = function(indexMap) {
 		 ', length: ' + indexObj.length);
 
     }
+    this.log('Key: ' + this.indexMapToJSON(indexMap));
     return true;
+}
+
+//
+//
+
+Validator.prototype.indexMapToJSON = function(map) {
+    var key;
+    var s;
+    s = '';
+    for (key in map) {
+	if (map.hasOwnProperty(key)) {
+	    if (s.length > 0) {
+		s += ',';
+	    }
+	    s += map[key].index;
+	}
+    }
+    return '[' + s + ']';
 }
 
 //
@@ -1164,7 +1202,6 @@ Validator.prototype.chop = function(list, removeValue) {
 //  stagingName:   name
 //
 Validator.prototype.addResult = function(args) {
-    if (args.vsCount == args.ncList.length) {
 	if (this.addResultEntry({
 	    map:           args.map,
 	    key:           this.PRIMARY_KEY,
@@ -1182,16 +1219,6 @@ Validator.prototype.addResult = function(args) {
 		});
 	    }
 	}
-    }
-    else if (args.stagingName) {
-	this.addResultEntry({
-	    map:           args.map,
-	    key:           this.STAGING_KEY,
-	    name:          args.stagingName,
-	    ncList:        args.ncList,       // correct, *not* stagingNcList
-	    excludeSrcList:args.excludeSrcList
-	});
-    }
     return this;
 }
 

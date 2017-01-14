@@ -1,4 +1,8 @@
 [
+    { "name" : "test.aceacelouis",    "src" : "test.acelouis,ace", "skip" : true },
+    { "name" : "test.louisacelouis",  "src" : "test.acelouis,louis", "skip" : true },
+    { "name" : "test.blackacelouis",  "src" : "test.acelouis,black", "skip" : true },
+ 
     { "name" : "222",                "src" : "sterling,goliath" },
     { "name" : "giants",             "src" : "sterling,goliath" },
     { "name" : "hoffman",            "src" : "sterling,goliath" },

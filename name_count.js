@@ -2,6 +2,7 @@
 
 var nameCountExports = {
     makeNew              : makeNew,
+    makeCopy             : makeCopy,
     makeNameList         : makeNameList,
     makeCountList        : makeCountList,
     makeListFromNameList : makeListFromNameList,
@@ -21,6 +22,10 @@ module.exports = nameCountExports;
 
 function makeNew(name, count, index) {
     return new NameCount(name, count, index);
+}
+
+function makeCopy(nc) {
+    return new NameCount(nc.name, nc.count, nc.index);
 }
 
 function NameCount(name, count, index) {

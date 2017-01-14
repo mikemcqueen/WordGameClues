@@ -1,4 +1,6 @@
 [
+    { "name" : "test.aceacelouislouis","src" : "test.acelouis,test.louisace", "skip" : true },
+
     { "name" : "tarantula",          "src" : "orange,black hawk,wasp" },
     { "name" : "nat",                "src" : "king,coleman" },
     { "name" : "sarah sally baker",  "src" : "black hawk,songbird",    "ignore" : true },

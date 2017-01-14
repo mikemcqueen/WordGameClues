@@ -1,4 +1,7 @@
 [
+    { "name" : "test.acelouis",    "src" : "ace,louis", "skip" : true },
+    { "name" : "test.louisace",    "src" : "ace,louis", "skip" : true },
+
     { "name" : "yellow jacket",     "src" : "lucky star,gold mine" },
     { "name" : "yellow",            "src" : "lucky star,gold mine" },
     { "name" : "jacket",            "src" : "lucky star,gold mine" },
