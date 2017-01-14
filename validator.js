@@ -441,12 +441,9 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 			excludeSrcList:args.excludeSrcList,
 			vsCount:       args.vsCount
 		    });
-		    anyFlag = true;
-		}
-		else {
-		    return true; // success - exit function
 		}
 	    }
+	    return true; // success - exit function
 	}
 
 	for (;;) {
@@ -586,7 +583,7 @@ Validator.prototype.cyclePrimaryClueSources = function(args) {
     var findResult;
     var localNcList;
 
-    this.log('cyclePrimaryClueSources');
+    this.log('++cyclePrimaryClueSources');
 
     // must copy the NameCount objects within the list
     localNcList = [];
@@ -622,10 +619,10 @@ Validator.prototype.cyclePrimaryClueSources = function(args) {
 	}
 	
 	if (this.logging) {
-	    this.log('[srcMap] primary keys:');
-	    Object.keys(srcMap).forEach(key => {
-		this.log('  ' + srcMap[key] + ':' + key);
-	    });
+	    this.log('[srcMap] primary keys: ' + this.getNameSrcList(srcMap));
+//	    Object.keys(srcMap).forEach(key => {
+//		this.log('  ' + srcMap[key] + ':' + key);
+//	    });
 	}
 	
 	// all the source clues we just validated are primary clues
@@ -636,6 +633,7 @@ Validator.prototype.cyclePrimaryClueSources = function(args) {
 	    vsCount:       args.vsCount
 	});
     } while (this.incrementIndexMap(buildArgs.indexMap));
+    this.log('--cyclePrimaryClueSources');
 }
 
 // ncList:              nameCountList
@@ -956,7 +954,7 @@ Validator.prototype.buildSourceNameList = function(args) {
 
     if (this.logging) {
 	this.log('buildSourceNameList, ncList(' + args.ncList.length + ')');
-	this.log('ncList: ' + ncList); // NameCount.listToJSON(args.ncList));
+	this.log('ncList: ' + args.ncList); // NameCount.listToJSON(args.ncList));
     }
  
     if (args.indexMap) {
@@ -1068,11 +1066,12 @@ Validator.prototype.incrementIndexMap = function(indexMap) {
     var indexObj;
 
     if (!indexMap) {
+	this.log('NULL INDEX MAP');
 	return false;
     }
 
     if (this.logging) {
-	this.dumpIndexMap(indexMap);
+	this.log('++indexMap: ' + this.indexMapToJSON(indexMap));
     }
 
     // TODO: this is a bit flaky. assumes the order of keys isn't changing.
@@ -1100,7 +1099,7 @@ Validator.prototype.incrementIndexMap = function(indexMap) {
 		 ', length: ' + indexObj.length);
 
     }
-    this.log('Key: ' + this.indexMapToJSON(indexMap));
+    this.log('--indexMap: ' + this.indexMapToJSON(indexMap));
     return true;
 }
 

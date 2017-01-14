@@ -165,9 +165,6 @@ function isCompatibleClue(args) {
 
     if (result) {
 	resultList = Validator.getFinalResultList(result);
-	if (args.name == 'warren') {
-	    console.log(args.name + ' ' + resultList);
-	}
 	if (!resultList) {
 	    console.log('does this even happen anymore');
 	    if (sum == 1) {
