@@ -255,6 +255,8 @@ function showValidSrcListCounts(srcList) {
 	}
     });
 
+    console.log(countListArray);
+
     resultList = (new Peco({
  	listArray: countListArray,
 	max:       ClueManager.maxClues
@@ -264,7 +266,6 @@ function showValidSrcListCounts(srcList) {
 	console.log('No matches');
 	return;
     }
-
     resultList.forEach(clueCountList => {
 	var sum;
 	var result;

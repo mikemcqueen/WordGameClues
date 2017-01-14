@@ -8,7 +8,8 @@ var nameCountExports = {
     makeListFromCsv      : makeListFromCsv,
     makeCanonicalName    : makeCanonicalName,
     makeNameMap          : makeNameMap,
-    makeCountMap         : makeCountMap
+    makeCountMap         : makeCountMap,
+    listToJSON           : listToJSON
 };
 
 module.exports = nameCountExports;
@@ -123,6 +124,24 @@ function makeCountMap(ncList) {
     });
 }
 
+//
+
+function listToJSON(ncList) {
+    var s;
+
+    if (!ncList.length) { return '[]'; }
+
+    s = '[\n';
+    ncList.forEach((nc, index) => {
+	if (index > 0) {
+	    s += ',\n';
+	}
+	s += nc.toJSON();
+    });
+    s += ']';
+    return s;
+}
+
 //////////////////////////////////////////////////////////////////////////////
 
 NameCount.prototype.toString = function() {
@@ -140,6 +159,12 @@ NameCount.prototype.setIndex = function(index) {
 
 NameCount.prototype.log = function() {
     console.log('NameCount: ' + this);
+}
+
+//
+
+NameCount.prototype.toJSON = function() {
+    return '{ "name": ' + this.name + ', "count": ' + this.count + ' }';
 }
 
 //

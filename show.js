@@ -165,30 +165,35 @@ function isCompatibleClue(args) {
 
     if (result) {
 	resultList = Validator.getFinalResultList(result);
+	if (args.name == 'warren') {
+	    console.log(args.name + ' ' + resultList);
+	}
 	if (!resultList) {
+	    console.log('does this even happen anymore');
 	    if (sum == 1) {
 		primarySrc = ClueManager.clueNameMapArray[1][args.name];
 		if (!primarySrc) {
-		    resultList = [ ('missing: ' + args.name) ];
+		    throw new Error('missing primary clue: ' + args.name);
 		}
 		else {
+		    console.log('using primary clue lookup, ' + args.name);
 		    resultList = [ primarySrc ];
 		}
 	    }
 	    else {
-		console.log('Empty result list, name: ' + args.name + ', sum: ' + sum );
+		throw new Error('Empty result list, name: ' + args.name + ', sum: ' + sum );
 	    }
 	}
     }
     return result ? resultList : false;
 }
 
-//clue,
-//resultList,
-//mapArray
-//index
+// args:
+//  clue,
+//  resultList,
+//  mapArray
+//  index
 //
-
 function addToCompatibleMap(args) {
     var map;
     var name;
@@ -206,18 +211,23 @@ function addToCompatibleMap(args) {
 
     args.resultList.forEach(ncCsv => {
 	var primarySrcList;
+	var key;
 	primarySrcList = NameCount.makeCountList(NameCount.makeListFromCsv(ncCsv));
-	if (!map[name]) {
-	    map[name] = [{
+	if (name == 'louis') {
+	    console.log('list: ' + primarySrcList);
+	}
+	key = name + ':' + primarySrcList;
+	if (!map[key]) {
+	    map[key] = [{
 		src:            src,
 		primarySrcList: primarySrcList
 	    }];
 	}
 	else {
-	    map[name].push([{
+	    map[key].push({
 		src:            src,
 		primarySrcList: primarySrcList
-	    }]);
+	    });
 	}
 	log('adding: ' + primarySrcList + ' - ' + src);
     });
@@ -242,6 +252,7 @@ function dumpCompatibleClues(args) {
 	if (sources.length > 0) {
 	    sources += ', ';
 	}
+	// NOTE: [0] looks like a bug
 	sources += ClueManager.knownClueMapArray[nc.count][nc.name][0];
     });
 
@@ -287,7 +298,7 @@ function dumpCompatibleClueList(list) {
 //
 
 function format2(text, span) {
-    if (text == undefined) {
+    if (text === undefined) {
 	text = 'undefined'
     }
     var result = "";
