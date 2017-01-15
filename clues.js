@@ -140,6 +140,11 @@ function main() {
 	return 1;
     }
 
+    // hacky.  fix this
+    if (!synthFlag) {
+	metaFlag = true;
+    }
+
     log('count=' + countArg + ', max=' + maxArg);
 
     // TODO: add "show.js" with these exports

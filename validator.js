@@ -1235,8 +1235,7 @@ Validator.prototype.addFinalResult = function(args) {
 	ncList:        args.ncList,
 	excludeSrcList:args.excludeSrcList
     })) {
-	console.log('Added: ' + args.ncList.toString() + ', length=' + args.ncList.length);
-
+	//console.log('Added: ' + args.ncList.toString() + ', length=' + args.ncList.length);
 	// seems like we might want to do this even if addResultEntry fails.
 	// just because all primary name:src are duplicate doesn't mean
 	// it didn't derive from higher level clues that are unique

@@ -8,6 +8,11 @@ module.exports = showExports;
 
 //
 
+var Np          = require('named-parameters');
+var _           = require('lodash');
+
+//
+
 var ClueManager            = require('./clue_manager');
 var Validator              = require('./validator');
 var NameCount              = require('./name_count');
@@ -26,6 +31,10 @@ function log(text) {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////
+//
+// Show.compatibleKnownClues()
+//
 // 1. 1st pass, require  name:count on all useNames, 
 //    later I can loop through all possible nc combos
 // 2. start with total maxclues - total primary clue count,
@@ -50,11 +59,13 @@ function compatibleKnownClues(args) {
     var clueList;
     var result;
 
-    if (!args.nameList || !args.max) { 
-	throw new Error('missing argument, nameList: ' + args.nameList +
-			', max: ' + args.max ); 
+    if (!_.has(args, 'nameList') ||
+	!_.has(args, 'max'))
+    {
+	throw new Error('missing argument');
     }
 
+    // build ncList of supplied name:counts
     totalCount = 0;
     ncList = [];
     args.nameList.forEach(name => {
@@ -77,11 +88,9 @@ function compatibleKnownClues(args) {
 		', total = ' + totalCount +
 		', remain = ' + remain);
 
-    // first, make sure the supplied name list by itself
-    // is a valid clue combination, and find out how many
-    // primary-clue variations there are in which the clue
-    // names in useNameList can result.
-
+    // first, make sure the supplied nameList by itself is a valid clue
+    // combination, and find out how many primary-clue variations there
+    // are in which the clue names in useNameList can result.
     result = Validator.validateSources({
 	sum:         totalCount,
 	nameList:    NameCount.makeNameList(NameCount.makeListFromNameList(args.nameList)),
@@ -93,29 +102,38 @@ function compatibleKnownClues(args) {
 	return;
     }
 
-    // for each result from validateResults
-    result[Validator.PRIMARY_KEY][Validator.FINAL_KEY].forEach(ncCsv => {
+    // for each final result from validateResults
+    Validator.getFinalResultList(result).forEach(ncCsv => {
 	// ncCsv is actually a name:primary_source (not name:count)
 	var ncList = NameCount.makeListFromCsv(ncCsv);
 	var primarySrcList = NameCount.makeCountList(ncList);
 	var result;
 
+	// for each clue in each clueList[count] where count is
+	// less than or equal to the remaining count, add compatible
+	// clues to the compatible map.
 	matchNameMapArray = [];
 	for (count = 1; count <= remain; ++count) {
 	    clueList = ClueManager.clueListArray[count];
 	    clueList.forEach(clue => {
 		var resultList;
+		log('checking: ' + clue.name);
 		if (resultList = isCompatibleClue({
-		    sum:     count,
-		    name:    clue.name,
-		    exclude: primarySrcList
+		    sum:           count,
+		    clue:          clue,
+		    excludeSrcList:primarySrcList
 		})) {
+		    log('success, adding + ' + clue.name);
 		    addToCompatibleMap({
-			clue:       clue,
-			resultList: resultList,
-			mapArray:   matchNameMapArray,
-			index:      count
+			clue:          clue,
+			resultList:    resultList,
+			excludeSrcList:primarySrcList,
+			nameMapArray:  matchNameMapArray,
+			index:         count
 		    });
+		}
+		else {
+		    log('not compatible: ' + clue.name);
 		}
 	    });
 	}
@@ -128,14 +146,27 @@ function compatibleKnownClues(args) {
 }
 
 //
-//  sum:     count,
-//  name:    clue.name,
-//  exclude: primarySrcList
+//
+// args:
+//  sum:           count,
+//  clue:          clue
+//  excludeSrcList:
 //
 function isCompatibleClue(args) {
     var result;
     var resultList;
     var primarySrc;
+
+    if (!_.has(args, 'sum') ||
+	!_.has(args, 'clue') ||
+	!_.has(args, 'excludeSrcList'))
+    {
+	throw new Error('missing argument');
+    }
+
+    if (_.includes(args.excludeSrcList, _.toNumber(args.clue.src))) {
+	return false;
+    }
 
     //TODO: sort
 
@@ -153,33 +184,20 @@ function isCompatibleClue(args) {
 
     result = Validator.validateSources({
 	sum:            args.sum,
-	nameList:       [ args.name ],
+	nameList:       [ args.clue.name ],
 	count:          1,
-	excludeSrcList: args.exclude,
+	excludeSrcList: args.excludeSrcList,
 	validateAll:    true,
 	wantResults:    true
-	//,quiet:          true
     });
 
-    log('isCompatible: ' + args.name + '(' + args.sum + '), ' + Boolean(result));
+    log('isCompatible: ' + args.clue.name + ':' + args.clue.src +
+	'(' + args.sum + '), ' + Boolean(result));
 
     if (result) {
 	resultList = Validator.getFinalResultList(result);
 	if (!resultList) {
-	    console.log('does this even happen anymore');
-	    if (sum == 1) {
-		primarySrc = ClueManager.clueNameMapArray[1][args.name];
-		if (!primarySrc) {
-		    throw new Error('missing primary clue: ' + args.name);
-		}
-		else {
-		    console.log('using primary clue lookup, ' + args.name);
-		    resultList = [ primarySrc ];
-		}
-	    }
-	    else {
-		throw new Error('Empty result list, name: ' + args.name + ', sum: ' + sum );
-	    }
+	    throw new Error('I donut think this happens');
 	}
     }
     return result ? resultList : false;
@@ -188,6 +206,7 @@ function isCompatibleClue(args) {
 // args:
 //  clue,
 //  resultList,
+//  excludeSrcList:
 //  mapArray
 //  index
 //
@@ -195,21 +214,38 @@ function addToCompatibleMap(args) {
     var map;
     var name;
     var src;
-    
-    if (!args.mapArray[args.index]) {
-	map = args.mapArray[args.index] = {};
+    var verbose;
+
+    if (!_.has(args, 'resultList') ||
+	!_.has(args, 'excludeSrcList') ||
+	!_.has(args, 'nameMapArray'))
+    {
+	throw new Error('missing argument');
+    }
+
+    if (!args.nameMapArray[args.index]) {
+	map = args.nameMapArray[args.index] = {};
     }
     else {
-	map = args.mapArray[args.index];
+	map = args.nameMapArray[args.index];
     }
 	
     name = args.clue.name;
     src = args.clue.src;
 
+    verbose = false; // name == 'ace';
+
     args.resultList.forEach(ncCsv => {
 	var primarySrcList;
 	var key;
 	primarySrcList = NameCount.makeCountList(NameCount.makeListFromCsv(ncCsv));
+	if (verbose) {
+	    console.log('primary sources for ' + name + ': ' + primarySrcList);
+	}
+	primarySrcList = filterExcludedSources(primarySrcList, args.excludeSrcList, verbose);
+	if (!primarySrcList.length) {
+	    throw new Error('should not happen');
+	}
 	key = name + ':' + primarySrcList;
 	if (!map[key]) {
 	    map[key] = [{
@@ -223,8 +259,37 @@ function addToCompatibleMap(args) {
 		primarySrcList: primarySrcList
 	    });
 	}
+	if (verbose) {
+	    console.log('adding: ' + primarySrcList + ' - ' + src);
+	}
 	log('adding: ' + primarySrcList + ' - ' + src);
     });
+}
+
+//
+//
+
+function filterExcludedSources(srcList, excludeSrcList, verboseFlag) {
+    var resultList;
+    resultList = [];
+
+    srcList.forEach(src => {
+	if (verboseFlag) {
+	    console.log('looking for ' + src + ' in ' + excludeSrcList);
+	}
+	src = _.toNumber(src);
+	if (excludeSrcList.indexOf(src) === -1) {
+	    if (verboseFlag) {
+		console.log('not found');
+	    }
+
+	    resultList.push(src);
+	}
+	else if (verboseFlag) {
+	    console.log('found');
+	}
+    });
+    return resultList;
 }
 
 // args:
@@ -237,7 +302,7 @@ function dumpCompatibleClues(args) {
     var map;
     var list;
     var dumpList;
-    var key;
+    var name;
     var countList = [ 1 ];
     var sources = '';
     
@@ -246,7 +311,7 @@ function dumpCompatibleClues(args) {
 	if (sources.length > 0) {
 	    sources += ', ';
 	}
-	// NOTE: [0] looks like a bug
+	// TODO: [0] looks like a bug
 	sources += ClueManager.knownClueMapArray[nc.count][nc.name][0];
     });
 
@@ -262,9 +327,9 @@ function dumpCompatibleClues(args) {
 	// source #s, alpha name
 
 	dumpList = [];
-	for (key in map) {
-	    map[key].forEach(elem => {
-		elem.name = key;
+	for (name in map) {
+	    map[name].forEach(elem => {
+		elem.name = name;
 		dumpList.push(elem);
 	    });
 	}
