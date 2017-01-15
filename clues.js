@@ -22,7 +22,7 @@ var Opt = require('node-getopt')
     .create([
 	['a' , 'show-alternates=NAME',        'show alternate sources for the specified clue' ],
 	['A' , 'show-all-alternates',         'show alternate sources for all clues' ],
-	['c' , 'count=COUNT',                 '# of primary clues to combine' ], 
+	['c' , 'count=COUNT',                 '# of primary clues to combine' ],
 	['d' , 'allow-dupe-source'  ,         'allow duplicate source, override default behavior of --meta' ],
 	[''  , 'json=FILEBASE',               'specify base filename of clue files' ],
 	['k' , 'show-known'         ,         'show compatible known clues; -u <clue> required' ],
@@ -35,7 +35,7 @@ var Opt = require('node-getopt')
 	['u' , 'use=NAME[:COUNT]+',           'use the specified name[:count](s)' ],
 	['x' , 'max=COUNT',                   'specify maximum # of components to combine'],
 	['y' , 'synthesis',                   'use synthesis clues, same as --json clues' ],
-	
+
 	['v' , 'verbose'            ,         'show debug output' ],
 	['h' , 'help'               ,         'this screen']
     ])
@@ -102,7 +102,7 @@ function main() {
     }
     if (!countArg) {
 	needCount = true;
-	
+
 	if (showSourcesClueName ||
 	    showAlternatesArg ||
 	    showAllAlternatesArg ||
@@ -165,7 +165,7 @@ function main() {
 	    countArg = ClueManager.maxClues;
 	}
 	Show.compatibleKnownClues({
-	    nameList: useClueList, 
+	    nameList: useClueList,
 	    max:      countArg
 	});
     }
@@ -177,7 +177,9 @@ function main() {
     }
     else if (showAlternatesArg || showAllAlternatesArg) {
 	showAlternates(showAllAlternatesArg ? {
-	    all    : true
+	    all    : true,
+	    output : outputArg,
+	    count  : countArg
 	} : {
 	    all    : false,
 	    name   : showAlternatesArg,
@@ -188,7 +190,7 @@ function main() {
 	doCombos({
 	    sum:     countArg,
 	    max:     maxArg,
-            require: requiredSizes,
+	    require: requiredSizes,
 	    sources: primarySourcesArg,
 	    use:     useClueList
 	});
@@ -210,7 +212,7 @@ function loadClues(synthFlag, metaFlag, jsonArg) {
 	console.log('--synthesis and --meta not allowed');
 	return false;
     }
-    
+
     // default to meta sizes, unless --synthesis. good enough for now
     max =      MAX_META_CLUE_COUNT;
     required = REQ_META_CLUE_COUNT;
@@ -299,7 +301,7 @@ function showValidSrcListCounts(srcList) {
     console.log(countListArray);
 
     resultList = (new Peco({
- 	listArray: countListArray,
+	listArray: countListArray,
 	max:       ClueManager.maxClues
     })).getCombinations();
 
@@ -311,6 +313,7 @@ function showValidSrcListCounts(srcList) {
 	var sum;
 	var result;
 	var msg;
+	var clueList;
 	sum = 0;
 	clueCountList.forEach(count => { sum += count });
 	result = Validator.validateSources({
@@ -318,10 +321,23 @@ function showValidSrcListCounts(srcList) {
 	    nameList: nameList,
 	    count:    nameList.length
 	});
-	console.log('validate [' + nameList + ']: ' + result);
+	//console.log('validate [' + nameList + ']: ' + result);
 	msg = clueCountList.toString();
 	if (!result) {
 	    msg += ': INVALID';
+	}
+	else {
+	    clueList = ClueManager.knownSourceMapArray[sum][nameList];
+	    if (clueList) {
+		msg += ': PRESENT as ';
+		clueList.forEach((clue, index) => {
+		    if (index > 0) {
+			msg += ', ';
+		    }
+		    msg += clue.name;
+		});
+	    }
+
 	}
 	console.log(msg);
     });
@@ -342,7 +358,7 @@ function doCombos(args) {
     var result;
     var count;
     var sourcesList;
-    
+
     if (args.sources) {
 	args.sources = _.map(_.split(args.sources, ','), _.toNumber)
     }
@@ -350,7 +366,7 @@ function doCombos(args) {
 	args.require = _.map(_.split(args.require, ','), _.toNumber)
     }
 
-    console.log('++combos' + 
+    console.log('++combos' +
 		', sum: ' + args.sum +
 		', max: ' + args.max +
 		', require: ' + args.require +
@@ -371,7 +387,7 @@ function doCombos(args) {
 	++count;
     });
 
-    console.log('total: ' + result.array.length + 
+    console.log('total: ' + result.array.length +
 		' filtered: ' + count +
 		' known: ' + result.known +
 		' reject: ' + result.reject);
@@ -393,7 +409,7 @@ function showSources(clueName) {
     if (!nc.count) {
 	throw new Error('Need to supply a count as name:count (for now)');
     }
-    
+
     log('++sources');
 
     result = Validator.validateSources({
@@ -448,7 +464,10 @@ function showAlternates(args) {
     var count;
     var argList;
     var ncListArray;
-    
+    var max;
+    var results;
+    var allAlternates;
+
     /*
     if (!args.all) {
 	number = Number(args.name);
@@ -468,9 +487,9 @@ function showAlternates(args) {
 	    console.log('WARNING: output format ignored, no ",count" specified');
 	}
 
-	name = argList[0];
+	name = argList[0]; // name:count
 	var nc = NameCount.makeNew(name);
-	
+
 	if (!nc.count) {
 	    throw new Error('Need to supply a count as name:count (for now)');
 	}
@@ -481,37 +500,74 @@ function showAlternates(args) {
 	displayAllAlternates(nc.name, ncListArray, count, args.output);
     }
     else {
-	console.log('showAlternates: all');
+	if (args.output && !args.count) {
+	    console.log('WARNING: output format ignored, no -c COUNT specified');
+	}
+	if (!args.output) {
+	    console.log('showAlternates: all');
+	}
 
-	for (count = 2; count <= ClueManager.maxClues; ++count) {
+	count = 2;
+	max = ClueManager.maxClues;
+
+	allAlternates = [];
+	for (; count <= max; ++count) {
 	    map = ClueManager.knownClueMapArray[count];
 	    for (name in map) {
-		displayAllAlternates(name, ComboSearch.findAlternateSourcesForName(
-		    NameCount.makeNew(name, count).toString()));
+		//console.log(name +':' + count);
+		ncListArray = ComboSearch.findAlternateSourcesForName(NameCount.makeNew(name, count).toString());
+		displayAllAlternates(name, ncListArray, args.count, args.output, true, allAlternates);
 	    }
 	}
+	if (args.output && args.count) {
+	    console.log(ClueManager.clueListArray[args.count].toJSON());
+	    //displayModifiedClueListList(args.count, allAlternates);
+	}
+
     }
 }
 
 //
-
-function displayAllAlternates(name, ncListArrayArray, count, output) {
+// 
+function displayAllAlternates(name, ncListArrayArray, count, output, all, allAlternates) {
     var ncListArray;
+    var clue;
 
     if (!ncListArrayArray.length) {
 	return;
     }
 
-    if (output && count) {
-	displayModifiedClueList(name, count, ncListArrayArray[count])
-    }
-    else if (count) {
-	ncListArray = ncListArrayArray[count];
-	displayAlternate(name, count, ncListArray);
+//    console.log(name + ' : ' + count + ' : ' + output);
+
+    if (!all) {
+	if (output && count) {
+	    displayModifiedClueList(count, getAlternateClue(name, ncListArrayArray[count]))
+	}
+	else if (count) {
+	    ncListArray = ncListArrayArray[count];
+	    displayAlternate(name, count, ncListArray);
+	}
     }
     else {
 	ncListArrayArray.forEach((ncListArray, index) => {
-	    displayAlternate(name, index, ncListArray);
+	    if (!output || !count) {
+		if (count) {
+		    if ((count === index)) {
+			displayAlternate(name, index, ncListArray);
+		    }
+		}
+		else {
+		    displayAlternate(name, index, ncListArray);
+		}
+	    }
+	    else {
+		if (count === index) {
+		    clue = getAlternateClue(name, ncListArray);
+		    //console.log ('ADDING: name: ' + clue.name + ', src: ' + clue.src);
+		    //allAlternates.push(clue);
+		    ClueManager.addClue(count, clue);
+		}
+	    }
 	});
     }
 }
@@ -524,6 +580,7 @@ function displayAlternate(name, count, ncListArray) {
     var found = false;
 
     s = name + '[' + count + '] ';
+    s += format2(s, 20) + ' ';
     ncListArray.forEach((ncList, nclaIndex) => {
 	nameList = [];
 	ncList.forEach(nc => {
@@ -553,19 +610,46 @@ function displayAlternate(name, count, ncListArray) {
 
 //
 
-function displayModifiedClueList(name, count, ncListArray) {
-    var clueList = ClueManager.clueListArray[count];
-    var clue;
+function format2(text, span)
+{
+    var result = "";
+    for (var len = text.toString().length; len < span; ++len) { result += " "; }
+    return result;
+}
 
+//
+
+function displayModifiedClueList(count, clue) {
+    var clueList = ClueManager.clueListArray[count];
+    
+    clueList.push(clue);
+    
+    console.log(clueList.toJSON());
+}
+
+function displayModifiedClueListList(count, alternateClues) {
+    var clueList = ClueManager.clueListArray[count];
+    
+    alternateClues.forEach(clue => {
+	clueList.push(clue);
+    });
+    
+    console.log(clueList.toJSON());
+}
+
+
+//
+
+function getAlternateClue(name,  ncListArray) {
+    var clue;
     // no loop here because entries will always have the
     // same sources, so just add the first one
     clue = { name: name, src: [] };
     ncListArray[0].forEach(nc => {
 	clue.src.push(nc.name);
     });
-    clueList.push(clue);
-
-    console.log(clueList.toJSON())
+    clue.src = _.toString(clue.src);
+    return clue;
 }
 
 //

@@ -211,7 +211,16 @@ ClueManager.prototype.addKnownCompoundClues = function(clueList, clueCount) {
 //
 //
 
-ClueManager.prototype.addKnownClue = function(count, name, source) {
+ClueManager.prototype.addClue = function(count, clue) {
+    if (this.addKnownClue(count, clue.name, clue.src, true)) {
+	this.clueListArray[count].push(clue);
+    }
+}
+
+//
+//
+
+ClueManager.prototype.addKnownClue = function(count, name, source, noThrow) {
     var clueMap = this.knownClueMapArray[count];
 
     if (!count || !name || !source) {
@@ -232,12 +241,15 @@ ClueManager.prototype.addKnownClue = function(count, name, source) {
 
 	clueMap[name].push(source);
     }
-    else {
+    else if (!noThrow ) {
 	throw new Error('duplicate clue name/source' + 
 			'(' + count + ') ' +
 			name + ' : ' + source);
     }
-    return this;
+    else {
+	return false;
+    }
+    return true;
 }
 
 //
@@ -364,6 +376,8 @@ ClueManager.prototype.getSrcListMapForName = function(name) {
 ClueManager.prototype.makeSrcNameListArray = function(nc) {
     var srcNameListArray = [];
 
+//    console.log(nc.toJSON());
+//    console.log(this.getSrcListForNc(nc));
     this.getSrcListForNc(nc).forEach(src => {
 	srcNameListArray.push(src.split(','));
     });

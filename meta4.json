@@ -50,6 +50,7 @@
     { "name": "cat",                "src": "blue,fish" },
     { "name": "bronco",             "src": "orange,blue" },
     { "name": "banana",             "src": "mini,songbird" },
+    { "name": "baptist",            "src" : "saint,john" },
     { "name": "lone",               "src": "texas,star" }
 ]
 

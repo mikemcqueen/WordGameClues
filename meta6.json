@@ -10,6 +10,7 @@
     { "name": "jackson pollock",     "src": "jackson,pollock" },
     { "name": "chameleon",           "src": "dwarf,jackson" },
     { "name": "cunningham",          "src": "ace,duke,randy", "note" : "ace pilot,senator?" },
+    { "name": "cunningham",          "src": "senator,duke,randy" },
     { "name": "sterling marlin",     "src": "sterling,marlin" },
     { "name": "versailles",          "src": "louis xiv,new castle" },
     { "name": "belgian",             "src": "blue,moon,white" },

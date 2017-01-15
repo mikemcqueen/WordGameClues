@@ -113,5 +113,8 @@
     { "name": "walter",             "src": "lemon,brown" },
     { "name": "dean",               "src": "lemon,brown" },
     { "name": "meyers",             "src": "lemon,brown" },
-    { "name": "day",                "src" : "daniela,lewis" }
+    { "name": "day",                "src" : "daniela,lewis" },
+    { "name": "black cherry",       "src" : "black,cherry" },
+    { "name": "baptist",            "src" : "saint,john" },
+    { "name": "cherry hill",       "src" : "hill,cherry", "note":"NY gang, park" }
 ]

@@ -33,5 +33,6 @@
     { "name" : "sweet",              "src" : "yellow,corn" },
     { "name" : "maize",              "src" : "yellow,corn" },
     { "name" : "mays",               "src" : "yellow,corn" },
+    { "name": "baptist",            "src" : "saint,john" },
     { "name" : "dent",               "src" : "yellow,corn" }
 ]

@@ -14,5 +14,8 @@
   { "name": "ainsworth",                  "src": "john,dunn", "note" : "early indian trader" },
   { "name": "peter falk",                 "src": "columbia,detective" },
   { "name": "falk",                       "src": "columbia,detective" },
-  { "name": "harvey",                     "src": "george,king" }
+    { "name": "harvey",                     "src": "george,king" },
+    { "name": "baptist",            "src" : "saint,john" },
+    { "name": "kangaroo",                "src": "bill,cunningham", "note": "william john" },
+    { "name": "kid",                     "src": "bill,cunningham", "note": "william john" }
 ]

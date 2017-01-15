@@ -94,6 +94,8 @@
     { "name" : "swallow",          "src" : "freckled,yellow,butterfly", "ignore" : true },
 
     { "name" : "james",            "src" : "#1,brown" },
+    { "name" : "tom keene",        "src" : "dick,powers" },
+    { "name": "baptist",            "src" : "saint,john" },
 
     { "name" : "theodore rashid ibrahim xavier", "src" : "misadventure,rabbit", "note" : "trix" }
 ]

@@ -11,5 +11,9 @@
     { "name": "george",                  "src": "canada,cunningham" },
     { "name": "ranger",                  "src": "walker,texas" },
     { "name": "cunningham",              "src": "ace,senator,duke,randy" },
-    { "name": "bailey",                  "src": "freckled,beetle" }
+    { "name": "bailey",                  "src": "freckled,beetle" },
+    { "name": "captain",                 "src": "charles,pollock,randolph" },
+    { "name": "mary",                    "src": "louise,weller", "note": "actress, mandy pepperidge in animal house, others" },
+    { "name": "kangaroo",                "src": "bill,cunningham", "note": "william john" },
+    { "name": "kid",                     "src": "bill,cunningham", "note": "william john" }
 ]
