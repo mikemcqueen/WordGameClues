@@ -10,7 +10,7 @@ module.exports = exports = new Validator();
 
 //
 
-var Np            = require('named-parameters');
+var _             = require('lodash');
 
 var ClueManager   = require('./clue_manager');
 var ClueList      = require('./clue_list');
@@ -180,9 +180,9 @@ Validator.prototype.recursiveValidateSources = function(args) {
     var count;
     var result;
 
-    args = Np.parse(args).
-	require('vsCount', 'positive integer').
-	values();
+    if (!_.has(args, 'vsCount')) {
+	throw new Error ('missing args');
+    }
 
     this.logLevel++;
 
@@ -281,9 +281,9 @@ Validator.prototype.rvsWorker = function(args) {
     var newNameCountList;
     var result;
 
-    args = Np.parse(args).
-	require('vsCount', 'positive integer').
-	values();
+    if (!_.has(args, 'vsCount')) {
+	throw new Error ('missing args');
+    }
 
     newNameCountList = this.copyAddNcList(args.ncList, args.name, args.count);
     if (!newNameCountList) {
@@ -379,9 +379,9 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
     var buildResult;
     var anyFlag = false;
 
-    args = Np.parse(args).
-	require('vsCount', 'positive integer').
-	values();
+    if (!_.has(args, 'vsCount')) {
+	throw new Error ('missing args');
+    }
 
     // assert(nameCountList) && Array.isArray(nameCountList)
 
@@ -599,10 +599,9 @@ Validator.prototype.cyclePrimaryClueSources = function(args) {
     var findResult;
     var localNcList;
 
-    args = Np.parse(args).
-	require('ncList',   'non-empty array').
-	require('vsCount',  'positive integer').
-	values();
+    if (!_.has(args, 'vsCount')) {
+	throw new Error ('missing args');
+    }
 
     this.log('++cyclePrimaryClueSources');
 
@@ -1364,7 +1363,6 @@ Validator.prototype.dumpIndexMap = function(indexMap) {
     }
     this.log(s);
 }
-
 
 // args:
 //  header:

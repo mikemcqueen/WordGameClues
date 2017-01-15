@@ -282,7 +282,6 @@ function filterExcludedSources(srcList, excludeSrcList, verboseFlag) {
 	    if (verboseFlag) {
 		console.log('not found');
 	    }
-
 	    resultList.push(src);
 	}
 	else if (verboseFlag) {
@@ -329,7 +328,7 @@ function dumpCompatibleClues(args) {
 	dumpList = [];
 	for (name in map) {
 	    map[name].forEach(elem => {
-		elem.name = name;
+		elem.name = name.split(':')[0]; // isolate name from name:count
 		dumpList.push(elem);
 	    });
 	}

@@ -8,6 +8,9 @@
 
 module.exports = exports = new ComboMaker();
 
+//
+
+var _           = require('lodash');
 var Duration    = require('duration');
 
 //
@@ -28,29 +31,34 @@ function ComboMaker() {
 }
 
 //
-// count:   # of primary clues to combine
-// max:     max # of sources to use
-// require: required clue counts, e.g. [3,5,8]
-// use:     list of clue names, e.g. ['john:1','bob:5']
+// args:
+//  count:   # of primary clues to combine
+//  max:     max # of sources to use
+//  require: required clue counts, e.g. [3,5,8]
+//  sources: limit to these primary sources, e.g. [1,9,14]
+//  use:     list of clue names, e.g. ['john:1','bob:5']
 //
 // A "clueSourceList" is a list (array) where each element is a
-// cluelist, such as [clues1,clues1,clues2].
+// object that cointas a list (cluelist) and a count, such as
+// [ { list:clues1, count:1 },{ list:clues2, count:2 }].
 //
 
 ComboMaker.prototype.makeCombos = function(args) {
     var clueSourceListArray;
-//    var clueCount = args.count;
     var clueListArray = [];
     var successDuration = 0;
     var failDuration = 0;
     var nextDuration = 0;
     var useNcList;
     var require;
+    var validateAll;
 
     this.nextSort = 0;
     this.nextDupeClue = 0;
     this.nextDupeSrc = 0;
     this.nextDupeCombo = 0;
+
+    //console.log('CMaker: sum: '  + typeof args.sum + ', max: ' + typeof args.max);
 
     // TODO USE "validateArgs" 
 
@@ -58,22 +66,30 @@ ComboMaker.prototype.makeCombos = function(args) {
     this.log('CM: sum=' + args.sum + ' max=' + args.max);
     */
 
+    // if args.use specified, add counts from use clues to
+    // the require clue counts list
+    require = args.require ? args.require : [];
     if (args.use) {
-	require = args.require ? args.require : [];
 	useNcList = this.buildUseNcList(args.use, require);
     }
+    if (require.length === 0) {
+	require = null;
+    }
 
-    clueSourceListArray = ClueManager.getClueSourceListArray({
-	sum:       args.sum,
-	max:       args.max,
-	require:   require
-    });
+    if (args.sources) {
+	console.log('Valididating sources: ' + args.sources);
+	validateAll = true;
+    }
 
-    clueSourceListArray.forEach(clueSourceList => {
+    // for each sourceList in sourceListArray
+    ClueManager.getClueSourceListArray({
+	sum:     args.sum,
+	max:     args.max,
+	require: require,
+    }).forEach(clueSourceList => {
 	var sourceIndexes = [];
 	var clueNameList;
 	var clueList;
-//	var index;
 	var clue;
 	var result;
 	var validateResult;
@@ -86,6 +102,7 @@ ComboMaker.prototype.makeCombos = function(args) {
 	    throw new Error('no valid combos');
 	}
 
+	// this is effectively Peco.getCombinations().forEach()
 	for (; result; (function(thisArg) {
 	    start = new Date();
 	    result = thisArg.next(clueSourceList, sourceIndexes);
@@ -94,14 +111,17 @@ ComboMaker.prototype.makeCombos = function(args) {
 	})(this)) {
 	    ncMap = {}
 	    clueNameList = [];
-	    clueSourceList.forEach((clueSource, index) => {
+	    if (!clueSourceList.every((clueSource, index) => {
 		clue = clueSource.list[sourceIndexes[index]];
 		clueNameList.push(clue.name);
-		// TODO: I'm not sure what I'm doing here, but I don't think it's working
-		if (useNcList) {
-		    ncMap[clue.name] = NameCount.makeNew(clue.name, clueSource.count);
+		if (ncMap[clue.name]) {
+		    return false; // duplicate clue name
 		}
-	    });
+		ncMap[clue.name] = NameCount.makeNew(clue.name, clueSource.count);
+		return true;
+	    })) {
+		continue;
+	    }
 
 	    if (useNcList) {
 		// every name in useNcList must exist as a key in ncMap
@@ -114,25 +134,31 @@ ComboMaker.prototype.makeCombos = function(args) {
 
 	    start = new Date();
 	    validateResult = Validator.validateSources({
-		sum:       args.sum,
-		count:     clueNameList.length,
-		nameList:  clueNameList,
-		require:   require
+		sum:         args.sum,
+		nameList:    clueNameList,
+		count:       clueNameList.length,
+		require:     require,
+		validateAll: validateAll
 	    });
 	    duration = new Duration(start, new Date());
 
 	    if (validateResult) {
 		successDuration += duration.milliseconds;
 
+		if (validateAll) {
+		    if (!this.checkPrimarySources(validateResult, args.sources)) {
+			continue;
+		    }			
+		}
 		clueList = ClueList.makeNew();
 		clueSourceList.forEach((clueSource, index) => {
 		    clue = clueSource.list[sourceIndexes[index]];
-		    // this is a bid odd
-		    clue.count = clueSource.count;
-		    if (isNaN(clue.count)) {
-			throw new Error('bad clue count');
-		    }
-		    clueList.push(clue);
+		    clueList.push({
+			name:  clue.name,
+			src:   clue.src,
+			count: clueSource.count
+		    });
+
 		});
 		clueListArray.push(clueList);
 	    }
@@ -159,9 +185,18 @@ ComboMaker.prototype.makeCombos = function(args) {
 //
 //
 
-ComboMaker.prototype.buildUseNcList = function(nameList, requireList) {
-    var ncList;
+ComboMaker.prototype.checkPrimarySources = function(result, sources) {
+    return Validator.getFinalResultList(result).some(ncCsv => {
+	return _.pullAll(NameCount.makeCountList(NameCount.makeListFromCsv(ncCsv)),
+			sources).length == 0;
+    });
+}
 
+//
+//
+
+ComboMaker.prototype.buildUseNcList = function(nameList, countList) {
+    var ncList;
     ncList = [];
     nameList.forEach(name =>  {
 	var nc = NameCount.makeNew(name);
@@ -169,7 +204,7 @@ ComboMaker.prototype.buildUseNcList = function(nameList, requireList) {
 	    if (!ClueManager.knownClueMapArray[nc.count][nc.name]) {
 		throw new Error('specified clue does not exist, ' + nc);
 	    }
-	    if (requireList.indexOf(nc.count) == -1) {
+	    if (!_.includes(countList, nc.count)) {
 		requireList.push(nc.count);
 	    }
 	}

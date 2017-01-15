@@ -15,10 +15,11 @@ var nameCountExports = {
 
 module.exports = nameCountExports;
 
-//module.exports = NameCount;
+//
 
-// TODO: some way to export a constructor, and a "static" function
-// like makeCanonicalName?
+var _           = require('lodash');
+
+//
 
 function makeNew(name, count, index) {
     return new NameCount(name, count, index);
@@ -34,17 +35,17 @@ function NameCount(name, count, index) {
     if (!name) return;
 
     this.name  = name;
-    this.count = count;
-    this.index = index;
+    this.count = _.toNumber(count);
+    this.index = _.toNumber(index);
 
     if (!this.count) {
 	splitList = name.split(':');
 	if (splitList.length > 1) {
 	    this.name = splitList[0];
-	    this.count = Number(splitList[1]);
+	    this.count = _.toNumber(splitList[1]);
 	    splitList = splitList[1].split('.');
 	    if (splitList.length > 1) {
-		this.index = Number(splitList[1]);
+		this.index = _.toNumber(splitList[1]);
 	    }
 	}
     }
@@ -72,7 +73,7 @@ function makeListFromNameList(nameList) {
 function makeCountList(ncList) {
     var countList;
     countList = [];
-    ncList.forEach(nc => countList.push(Number(nc.count)));
+    ncList.forEach(nc => countList.push(_.toNumber(nc.count)));
     return countList;
 }
 
@@ -136,7 +137,7 @@ function listToJSON(ncList) {
 
     if (!ncList.length) { return '[]'; }
 
-    s = '[\n';
+    s = '[';
     ncList.forEach((nc, index) => {
 	if (index > 0) {
 	    s += ',\n';

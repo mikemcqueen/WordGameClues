@@ -1,5 +1,6 @@
 'use strict';
 
+var _           = require('lodash');
 var Duration    = require('duration');
 var Peco        = require('./peco');
 
@@ -37,9 +38,9 @@ function main() {
 
     // options
 
-    sum = Number(Opt.argv[0]);
-    count = Opt.options['count'];
-    max = Opt.options['max'];
+    sum = _.toNumber(Opt.argv[0]);
+    count = _.toNumber(Opt.options['count']);
+    max = _.toNumber(Opt.options['max']);
     require = Opt.options['require'];
     exclude = Opt.options['exclude'];
     permFlag = Opt.options['permutations'];

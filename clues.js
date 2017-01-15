@@ -1,5 +1,6 @@
 'use strict';
 
+var _           = require('lodash');
 var Duration    = require('duration');
 var Np          = require('named-parameters');
 
@@ -24,12 +25,13 @@ var Opt = require('node-getopt')
 	['c' , 'count=COUNT',                 '# of primary clues to combine' ], 
 	['d' , 'allow-dupe-source'  ,         'allow duplicate source, override default behavior of --meta' ],
 	[''  , 'json=FILEBASE',               'specify base filename of clue files' ],
-	['k' , 'show-known'         ,         'show compatible known clues; at least one -u <clue> required' ],
+	['k' , 'show-known'         ,         'show compatible known clues; -u <clue> required' ],
 	['m' , 'meta'               ,         'use metamorphosis clues, same as --json meta (default)' ],
 	['o' , 'output'             ,         'output json -or- clues' ],
-	['q' , 'require=COUNT+',              'require clue(s) of specified count(s)' ],
+	['p' , 'primary-sources=SOURCE[,SOURCE,...]', 'limit results to the specified primary source(s)' ],
+	['q' , 'require-counts=COUNT+',       'require clue(s) of specified count(s)' ],
 	['s' , 'show-sources=NAME[:COUNT]',   'show possible source combinations for the specified name[:count]' ],
-	['t' , 'test=NAME,NAME,...',          'test the specified source list, e.g. blue,fish' ],
+	['t' , 'test=NAME[,NAME,...]',        'test the specified source list, e.g. blue,fish' ],
 	['u' , 'use=NAME[:COUNT]+',           'use the specified name[:count](s)' ],
 	['x' , 'max=COUNT',                   'specify maximum # of components to combine'],
 	['y' , 'synthesis',                   'use synthesis clues, same as --json clues' ],
@@ -66,6 +68,7 @@ function main() {
     var outputArg;
     var showKnownArg;
     var jsonArg;
+    var primarySourcesArg;
 
 /*    if (Opt.argv.length) {
 	console.log('Usage: node clues.js [options]');
@@ -77,9 +80,9 @@ function main() {
 
     // options
 
-    countArg = Opt.options['count'];
-    maxArg = Opt.options['max'];
-    requiredSizes = Opt.options['require'];
+    countArg = _.toNumber(Opt.options['count']);
+    maxArg = _.toNumber(Opt.options['max']);
+    requiredSizes = Opt.options['require-counts'];
     useClueList = Opt.options['use'];
     metaFlag = Opt.options['meta'];
     verboseFlag = Opt.options['verbose'];
@@ -92,6 +95,7 @@ function main() {
     showKnownArg = Opt.options['show-known'];
     synthFlag = Opt.options['synthesis'];
     jsonArg = Opt.options['json'];
+    primarySourcesArg = Opt.options['primary-sources'];
 
     if (!maxArg) {
 	maxArg = 2; // TODO: default values in opt
@@ -185,7 +189,8 @@ function main() {
 	    sum:     countArg,
 	    max:     maxArg,
             require: requiredSizes,
-	    use:     useClueList,
+	    sources: primarySourcesArg,
+	    use:     useClueList
 	});
     }
 }
@@ -323,6 +328,12 @@ function showValidSrcListCounts(srcList) {
 }
 
 //
+// args:
+//  sum:     countArg,
+//  max:     maxArg,
+//  require: requiredSizes,
+//  sources: primarySourcesArg,
+//  use:     useClueList
 //
 
 function doCombos(args) {
@@ -330,10 +341,24 @@ function doCombos(args) {
     var beginDate;
     var result;
     var count;
+    var sourcesList;
+    
+    if (args.sources) {
+	args.sources = _.map(_.split(args.sources, ','), _.toNumber)
+    }
+    if (args.require) {
+	args.require = _.map(_.split(args.require, ','), _.toNumber)
+    }
 
-    log('++combos');
+    console.log('++combos' + 
+		', sum: ' + args.sum +
+		', max: ' + args.max +
+		', require: ' + args.require +
+		', sources: ' + args.sources +
+		', use: ' + args.use);
 
     beginDate = new Date();
+
     comboListArray = ComboMaker.makeCombos(args);
 
     log('--combos: ' + (new Duration(beginDate, new Date())).seconds + ' seconds');

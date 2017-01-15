@@ -8,6 +8,12 @@
 
 module.exports = Peco;
 
+//
+
+var _           = require('lodash');
+
+//
+
 var LOGGING = false;
 
 // args:
@@ -17,14 +23,22 @@ var LOGGING = false;
 // -or-
 //
 //  sum       
-//  count     
-//  max       
+//  count     create lists of this length
+//  max       create lists of max length
+//
+//
 //  require:  list of required numbers, e.g. [2, 4]
 //  exclude:  list of excluded numbers, e.g. [3, 5]
 
 function Peco(args) {
     var dupe;
 
+    if (LOGGING) {
+	this.log('Peco: sum: '+ args.sum +','  + typeof args.sum +
+		 ', max: ' + args.max+','+ typeof args.max + 
+		 ', count: ' + args.count +','+ typeof args.count);
+    }
+    
     this.listArray  = args.listArray;
     this.sum        = args.sum;
     this.count      = args.count;
@@ -48,17 +62,13 @@ function Peco(args) {
 	if (this.count && this.max) {
 	    throw new Error('Peco: cannot specify both count -and- max');
 	}
-	if ((this.count > this.sum) || (this.max > this.sum)) {
-	    throw new Error('Peco: count/max > sum');
+	if (this.count > this.sum) {
+	    throw new Error('Peco: count > sum');
 	}
-	if (this.require && this.exclude) {
-	    if (!this.require.every(requireNum => {
-		return this.exclude.every(excludeNum => {
-		    return requireNum != excludeNum;
-		});
-	    })) {
-		throw new Error('Peco: require and exclude contain same number, ' + dupe);
-	    }
+	if (this.require && this.exclude &&
+	    _.intersection(this.require, this.exclude).length > 0)
+	{
+	    throw new Error('Peco: require and exclude contain same number, ' + dupe);
 	}
     }
 }
@@ -115,7 +125,7 @@ Peco.prototype.getAllAddends = function(combFlag) {
 //
 
 Peco.prototype.getAddendsForCount = function(count, combFlag, pecoList, quiet) {
-    var last = this.sum - (this.count - 1);
+    var last = this.sum - (count - 1);
     
     if (count > this.sum) {
 	throw new Error('Peco: count > sum');
@@ -304,10 +314,14 @@ Peco.prototype.first = function(srcCount, combFlag) {
     }
   
     if (LOGGING) {
-	this.log ('srcCount: ' + srcCount + ' indexList.length: ' + this.indexList.length);
+	this.log('Index: ' + this.indexListToJSON());
+	this.log ('srcCount: ' + srcCount + 
+		  ', indexList.length: ' + this.indexList.length +
+		  ', this.getIndexSum(): ' + this.getIndexSum() +
+		  ', this.sum: ' + this.sum);
     }
 
-    if (this.getIndexSum() == this.sum) {
+    if (this.getIndexSum() === this.sum) {
 	list = this.getPecoList();
     }
     else {
@@ -343,16 +357,8 @@ Peco.prototype.next = function(combFlag)
 		return null;
 	    }
 	}
-	if (this.sum) {
-	    if (this.getIndexSum() != this.sum) {
-		continue;
-	    }
-	}
-	else {
-	    // TODO: IS this used? or was this a listNext integration hack?
-	    if (this.getIndexSum() > this.max) {
-		continue;
-	    }
+	if (this.getIndexSum() != this.sum) {
+	    continue;
 	}
 	if (this.require &&
 	    !this.indexContainsAll(this.require)) {
@@ -362,6 +368,7 @@ Peco.prototype.next = function(combFlag)
 	    this.indexContainsAny(this.exclude)) {
 	    continue;
 	}
+
 	break;
     }
     return this.getPecoList();
@@ -384,6 +391,26 @@ Peco.prototype.getIndexSum = function() {
 }
 
 //
+//
+
+Peco.prototype.indexListToJSON = function() {
+    var s;
+    s = '';
+    this.indexList.forEach((indexObj, index) => {
+	if (s.length > 0) {
+	    s += ',';
+	}
+	if (this.listArray) {
+	    s += this.listArray[index][indexObj.index];
+	}
+	else {
+	    s += indexObj.index;
+	}
+    });
+    return '[' + s + ']';
+}
+
+//
 
 Peco.prototype.indexContainsAll = function(list) {
     return this.indexList.every(indexObj => {
@@ -403,7 +430,6 @@ Peco.prototype.indexContainsAny = function(list) {
 
 Peco.prototype.getPecoList = function() {
     var list = [];
-
     this.indexList.forEach((indexObj, index) => {
 	if (this.listArray) {
 	    list.push(this.listArray[index][indexObj.index]);
