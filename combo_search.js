@@ -8,7 +8,11 @@
 
 module.exports = exports = new ComboSearch();
 
+
+var _              = require('lodash');
+
 var ClueManager    = require('./clue_manager');
+var Validator      = require('./validator');
 var ClueList       = require('./clue_list');
 var NameCount      = require('./name_count');
 var Peco           = require('./peco');
@@ -23,12 +27,15 @@ function ComboSearch() {
 //
 
 ComboSearch.prototype.log = function(text) {
-    var pad = '';
+    var pad;
     var index;
-    for (var index=0; index<this.logLevel; ++index) {
-	pad += ' ';
+    if (this.logging) {
+	pad = '';
+	for (var index=0; index<this.logLevel; ++index) {
+	    pad += ' ';
+	}
+	console.log(pad + text);
     }
-    console.log(pad + text);
 }
 
 //
@@ -111,10 +118,23 @@ ComboSearch.prototype.findAlternateSourcesForName = function(name, count) {
 	    var ncListArray = [];
 	    countListArray.forEach((countList, claIndex) => {
 		var ncList = [];
+		var sum = 0;
+		var result;
 		countList.forEach((count, clIndex) => {
+		    sum += count;
 		    ncList.push(NameCount.makeNew(srcNameList[clIndex], count));
 		});
-		ncListArray.push(ncList);
+		if (sum != claaIndex ) {
+		    throw new Error('something i dont understand here obviously');
+		}
+		result = Validator.validateSources({
+		    sum:      sum,
+		    nameList: srcNameList,
+		    count:    srcNameList.length
+		});
+		if (result) {
+		    ncListArray.push(ncList);
+		}
 	    });
 	    resultNcListArray[claaIndex] = ncListArray;
 	});

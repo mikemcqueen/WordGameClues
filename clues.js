@@ -562,10 +562,12 @@ function displayAllAlternates(name, ncListArrayArray, count, output, all, allAlt
 	    }
 	    else {
 		if (count === index) {
-		    clue = getAlternateClue(name, ncListArray);
-		    //console.log ('ADDING: name: ' + clue.name + ', src: ' + clue.src);
-		    //allAlternates.push(clue);
-		    ClueManager.addClue(count, clue);
+		    if (ncListArray.length > 0) {
+			clue = getAlternateClue(name, ncListArray);
+			//console.log ('ADDING: name: ' + clue.name + ', src: ' + clue.src);
+			//allAlternates.push(clue);
+			ClueManager.addClue(count, clue);
+		    }
 		}
 	    }
 	});
@@ -641,15 +643,17 @@ function displayModifiedClueListList(count, alternateClues) {
 //
 
 function getAlternateClue(name,  ncListArray) {
-    var clue;
+    var srcList;
+    srcList = [];
     // no loop here because entries will always have the
     // same sources, so just add the first one
-    clue = { name: name, src: [] };
     ncListArray[0].forEach(nc => {
-	clue.src.push(nc.name);
+	srcList.push(nc.name);
     });
-    clue.src = _.toString(clue.src);
-    return clue;
+    return {
+	name: name,
+	src:  _.toString(srcList)
+    };
 }
 
 //
