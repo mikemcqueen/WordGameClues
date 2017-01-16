@@ -6,6 +6,7 @@ var Np          = require('named-parameters');
 
 var ClueManager = require('./clue_manager');
 var ComboMaker  = require('./combo_maker');
+var AltSources  = require('./alt_sources');
 var ComboSearch = require('./combo_search');
 var Validator   = require('./validator');
 var ClueList    = require('./clue_list');
@@ -20,8 +21,8 @@ var QUIET = false;
 
 var Opt = require('node-getopt')
     .create([
-	['a' , 'show-alternates=NAME',        'show alternate sources for the specified clue' ],
-	['A' , 'show-all-alternates',         'show alternate sources for all clues' ],
+	['a' , 'alt-sources=NAME',            'show alternate sources for the specified clue' ],
+	['A' , 'all-alt-sources',             'show alternate sources for all clues' ],
 	['c' , 'count=COUNT',                 '# of primary clues to combine' ],
 	['d' , 'allow-dupe-source'  ,         'allow duplicate source, override default behavior of --meta' ],
 	[''  , 'json=FILEBASE',               'specify base filename of clue files' ],
@@ -59,8 +60,8 @@ function main() {
     var synthFlag;
     var verboseFlag;
     var showSourcesClueName;
-    var showAlternatesArg;
-    var showAllAlternatesArg;
+    var altSourcesArg;
+    var allAltSourcesFlag;
     var testSrcList;
     var useClueList;
     var allowDupeSrcFlag;
@@ -88,8 +89,8 @@ function main() {
     verboseFlag = Opt.options['verbose'];
     outputArg = Opt.options['output'];
     showSourcesClueName = Opt.options['show-sources'];
-    showAlternatesArg = Opt.options['show-alternates'];
-    showAllAlternatesArg = Opt.options['show-all-alternates'];
+    altSourcesArg = Opt.options['alt-sources'];
+    allAltSourcesFlag = Opt.options['all-alt-sources'];
     allowDupeSrcFlag = Opt.options['allow-dupe-source'];
     testSrcList = Opt.options['test'];
     showKnownArg = Opt.options['show-known'];
@@ -104,8 +105,8 @@ function main() {
 	needCount = true;
 
 	if (showSourcesClueName ||
-	    showAlternatesArg ||
-	    showAllAlternatesArg ||
+	    altSourcesArg ||
+	    allAltSourcesFlag ||
 	    showKnownArg ||
 	    testSrcList ||
 	    useClueList)
@@ -126,6 +127,7 @@ function main() {
     ClueManager.logging = verboseFlag;
     ComboMaker.logging  = verboseFlag;
     Validator.logging   = verboseFlag;
+    AltSources.logging  = verboseFlag;
     ComboSearch.logging = verboseFlag;
     LOGGING = verboseFlag;
 
@@ -175,14 +177,14 @@ function main() {
     else if (showSourcesClueName) {
 	showSources(showSourcesClueName);
     }
-    else if (showAlternatesArg || showAllAlternatesArg) {
-	showAlternates(showAllAlternatesArg ? {
+    else if (altSourcesArg || allAltSourcesFlag) {
+	AltSources.show(allAltSourcesFlag ? {
 	    all    : true,
 	    output : outputArg,
 	    count  : countArg
 	} : {
 	    all    : false,
-	    name   : showAlternatesArg,
+	    name   : altSourcesArg,
 	    output : outputArg
 	});
     }
@@ -457,214 +459,11 @@ function showValidateResult(args) {
 //
 //
 
-function showAlternates(args) {
-    var count;
-    var map;
-    var name;
-    var count;
-    var argList;
-    var ncListArray;
-    var max;
-    var results;
-    var allAlternates;
-
-    /*
-    if (!args.all) {
-	number = Number(args.name);
-	if ((number >= 2) && (number <= ClueManager.maxClues)) {
-	    // treat this as "show all" for count: number
-	    args.all = true;
-	}
-    }
-    */
-
-    if (!args.all) {
-	argList = args.name.split(',');
-	if (argList.length > 1) {
-	    count = argList[1];
-	}
-	if (args.output && !count) {
-	    console.log('WARNING: output format ignored, no ",count" specified');
-	}
-
-	name = argList[0]; // name:count
-	var nc = NameCount.makeNew(name);
-
-	if (!nc.count) {
-	    throw new Error('Need to supply a count as name:count (for now)');
-	}
-	if (!args.output) {
-	    console.log('showAlternates: ' + nc);
-	}
-	ncListArray = ComboSearch.findAlternateSourcesForName(name, count);
-	displayAllAlternates(nc.name, ncListArray, count, args.output);
-    }
-    else {
-	if (args.output && !args.count) {
-	    console.log('WARNING: output format ignored, no -c COUNT specified');
-	}
-	if (!args.output) {
-	    console.log('showAlternates: all');
-	}
-
-	count = 2;
-	max = ClueManager.maxClues;
-
-	allAlternates = [];
-	for (; count <= max; ++count) {
-	    map = ClueManager.knownClueMapArray[count];
-	    for (name in map) {
-		//console.log(name +':' + count);
-		ncListArray = ComboSearch.findAlternateSourcesForName(NameCount.makeNew(name, count).toString());
-		displayAllAlternates(name, ncListArray, args.count, args.output, true, allAlternates);
-	    }
-	}
-	if (args.output && args.count) {
-	    console.log(ClueManager.clueListArray[args.count].toJSON());
-	    //displayModifiedClueListList(args.count, allAlternates);
-	}
-
-    }
-}
-
-//
-// 
-function displayAllAlternates(name, ncListArrayArray, count, output, all, allAlternates) {
-    var ncListArray;
-    var clue;
-
-    if (!ncListArrayArray.length) {
-	return;
-    }
-
-//    console.log(name + ' : ' + count + ' : ' + output);
-
-    if (!all) {
-	if (output && count) {
-	    displayModifiedClueList(count, getAlternateClue(name, ncListArrayArray[count]))
-	}
-	else if (count) {
-	    ncListArray = ncListArrayArray[count];
-	    displayAlternate(name, count, ncListArray);
-	}
-    }
-    else {
-	ncListArrayArray.forEach((ncListArray, index) => {
-	    if (!output || !count) {
-		if (count) {
-		    if ((count === index)) {
-			displayAlternate(name, index, ncListArray);
-		    }
-		}
-		else {
-		    displayAlternate(name, index, ncListArray);
-		}
-	    }
-	    else {
-		if (count === index) {
-		    if (ncListArray.length > 0) {
-			clue = getAlternateClue(name, ncListArray);
-			//console.log ('ADDING: name: ' + clue.name + ', src: ' + clue.src);
-			//allAlternates.push(clue);
-			ClueManager.addClue(count, clue);
-		    }
-		}
-	    }
-	});
-    }
-}
-
-//
-
-function displayAlternate(name, count, ncListArray) {
-    var s;
-    var nameList;
-    var found = false;
-
-    s = name + '[' + count + '] ';
-    s += format2(s, 20) + ' ';
-    ncListArray.forEach((ncList, nclaIndex) => {
-	nameList = [];
-	ncList.forEach(nc => {
-	    nameList.push(nc.name);
-	});
-	nameList.sort();
-	if (ClueManager.knownSourceMapArray[count][nameList.toString()]) {
-	    //console.log('found: ' + nameList + ' in ' + count);
-	    return; // continue
-	}
-
-	if (found) {
-	    s += ', ';
-	}
-	ncList.forEach((nc, nclIndex) => {
-	    if (nclIndex > 0) {
-		s += ' ';
-	    }
-	    s += nc;
-	});
-	found = true;
-    });
-    if (found) {
-	console.log(s);
-    }
-}
-
-//
-
-function format2(text, span)
-{
-    var result = "";
-    for (var len = text.toString().length; len < span; ++len) { result += " "; }
-    return result;
-}
-
-//
-
-function displayModifiedClueList(count, clue) {
-    var clueList = ClueManager.clueListArray[count];
-    
-    clueList.push(clue);
-    
-    console.log(clueList.toJSON());
-}
-
-function displayModifiedClueListList(count, alternateClues) {
-    var clueList = ClueManager.clueListArray[count];
-    
-    alternateClues.forEach(clue => {
-	clueList.push(clue);
-    });
-    
-    console.log(clueList.toJSON());
-}
-
-
-//
-
-function getAlternateClue(name,  ncListArray) {
-    var srcList;
-    srcList = [];
-    // no loop here because entries will always have the
-    // same sources, so just add the first one
-    ncListArray[0].forEach(nc => {
-	srcList.push(nc.name);
-    });
-    return {
-	name: name,
-	src:  _.toString(srcList)
-    };
-}
-
-//
-//
-
 function log(text) {
     if (LOGGING) {
 	console.log(text);
     }
 }
-
 
 //
 //

@@ -31,6 +31,15 @@ function ComboMaker() {
 }
 
 //
+//
+
+ComboMaker.prototype.log = function(text) {
+    if (this.logging) {
+	console.log(text);
+    }
+}
+
+//
 // args:
 //  count:   # of primary clues to combine
 //  max:     max # of sources to use
@@ -409,9 +418,3 @@ ComboMaker.prototype.clueListToString = function(clueList) {
     return str;
 }
 
-//
-//
-
-ComboMaker.prototype.log = function(text) {
-    console.log(text);
-}

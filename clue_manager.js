@@ -214,7 +214,9 @@ ClueManager.prototype.addKnownCompoundClues = function(clueList, clueCount) {
 ClueManager.prototype.addClue = function(count, clue) {
     if (this.addKnownClue(count, clue.name, clue.src, true)) {
 	this.clueListArray[count].push(clue);
+	return true;
     }
+    return false;
 }
 
 //
