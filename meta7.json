@@ -33,5 +33,6 @@
   { "name": "hoffman",                    "src": "dick tracy,mumbles" },
   { "name": "bing crosby",                "src": "dick tracy,mumbles" },
   { "name": "bing",                       "src": "dick tracy,mumbles" },
-  { "name": "crosby",                     "src": "dick tracy,mumbles" }
+  { "name": "crosby",                     "src": "dick tracy,mumbles" },
+  { "name": "james",                      "src": "#1,brown" }
 ]
