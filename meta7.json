@@ -16,5 +16,6 @@
   { "name": "mary",                       "src": "louise,weller", "note" : "actress, mandy pepperidge in animal house, others" },
   { "name": "kangaroo",                   "src": "bill,cunningham", "note" : "william john" },
   { "name": "kid",                        "src": "bill,cunningham", "note" : "william john" },
-  { "name": "georgia",                    "src": "canada,cunningham" }
+  { "name": "georgia",                    "src": "canada,cunningham" },
+  { "name": "monarch",                    "src": "black,butterfly,king,orange" }
 ]

@@ -19,5 +19,11 @@
   { "name": "monarch",                    "src": "butterfly,king" },
   { "name": "houston oilers",             "src": "blue,columbia" },
   { "name": "harvey strait",              "src": "george,king" },
-  { "name": "strait",                     "src": "george,king" }
+  { "name": "strait",                     "src": "george,king" },
+  { "name": "tiger",                      "src": "black,butterfly,yellow" },
+  { "name": "swallowtail",                "src": "black,butterfly,yellow" },
+  { "name": "swallow",                    "src": "black,butterfly,yellow" },
+  { "name": "peter falk",                 "src": "columbia,detective" },
+  { "name": "falk",                       "src": "columbia,detective" },
+  { "name": "monarch",                    "src": "black,butterfly,king,orange" }
 ]

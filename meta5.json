@@ -44,5 +44,13 @@
   { "name": "gregory",                    "src": "dunn,john" },
   { "name": "william",                    "src": "dunn,john" },
   { "name": "meditations",                "src": "dunn,john" },
-  { "name": "#17",                        "src": "dunn,john" }
+  { "name": "#17",                        "src": "dunn,john" },
+  { "name": "monarch",                    "src": "butterfly,king" },
+  { "name": "dick tracy",                 "src": "detective,yellow jacket" },
+  { "name": "dick",                       "src": "detective,yellow jacket" },
+  { "name": "tracy",                      "src": "detective,yellow jacket" },
+  { "name": "monarch",                    "src": "black,butterfly,orange" },
+  { "name": "heath",                      "src": "butterfly,freckled" },
+  { "name": "viceroy",                    "src": "black,butterfly,orange" },
+  { "name": "bailey",                     "src": "beetle,freckled" }
 ]

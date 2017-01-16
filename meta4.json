@@ -62,5 +62,7 @@
   { "name": "william",                    "src": "dunn,john" },
   { "name": "meditations",                "src": "dunn,john" },
   { "name": "#17",                        "src": "dunn,john" },
-  { "name": "tom keene",                  "src": "dick,powers" }
+  { "name": "tom keene",                  "src": "dick,powers" },
+  { "name": "sterling marlin",            "src": "marlin,sterling" },
+  { "name": "monarch",                    "src": "butterfly,king" }
 ]

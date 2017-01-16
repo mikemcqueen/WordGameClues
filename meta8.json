@@ -25,5 +25,16 @@
   { "name": "gregory",                    "src": "dunn,john" },
   { "name": "william",                    "src": "dunn,john" },
   { "name": "meditations",                "src": "dunn,john" },
-  { "name": "#17",                        "src": "dunn,john" }
+  { "name": "#17",                        "src": "dunn,john" },
+  { "name": "elizabeth",                  "src": "freckled,monarch" },
+  { "name": "lady jane",                  "src": "freckled,monarch" },
+  { "name": "lady",                       "src": "freckled,monarch" },
+  { "name": "jane",                       "src": "freckled,monarch" },
+  { "name": "jane seymour",               "src": "freckled,monarch" },
+  { "name": "seymour",                    "src": "freckled,monarch" },
+  { "name": "sweet",                      "src": "brown,georgia" },
+  { "name": "kate",                       "src": "georgia,moonshine" },
+  { "name": "clarence parker",            "src": "ace,duke,mckay" },
+  { "name": "clarence",                   "src": "ace,duke,mckay" },
+  { "name": "parker",                     "src": "ace,duke,mckay" }
 ]
