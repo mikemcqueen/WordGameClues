@@ -124,13 +124,6 @@ function main() {
 	QUIET = true;
     }
 
-    ClueManager.logging = verboseFlag;
-    ComboMaker.logging  = verboseFlag;
-    Validator.logging   = verboseFlag;
-    AltSources.logging  = verboseFlag;
-    ComboSearch.logging = verboseFlag;
-    LOGGING = verboseFlag;
-
     Validator.setAllowDupeFlags(synthFlag ? {
 	allowDupeNameSrc: false,
 	allowDupeSrc:     true,
@@ -141,10 +134,14 @@ function main() {
 	allowDupeName:    true,
     });
 
+    setLogging(false);
+
     //
     if (!loadClues(synthFlag, metaFlag, jsonArg)) {
 	return 1;
     }
+
+    setLogging(verboseFlag);
 
     // hacky.  fix this
     if (!synthFlag) {
@@ -302,10 +299,10 @@ function showValidSrcListCounts(srcList) {
 
     console.log(countListArray);
 
-    resultList = (new Peco({
+    resultList = Peco.makeNew({
 	listArray: countListArray,
 	max:       ClueManager.maxClues
-    })).getCombinations();
+    }).getCombinations();
 
     if (!resultList) {
 	console.log('No matches');
@@ -457,6 +454,18 @@ function showValidateResult(args) {
 }
 
 //
+
+function setLogging(flag) {
+    ClueManager.logging = flag;
+    ComboMaker.logging  = flag;
+    Validator.logging   = flag;
+    AltSources.logging  = flag;
+    ComboSearch.logging = flag;
+    Peco.setLogging(flag);
+
+    LOGGING = flag;
+}
+
 //
 
 function log(text) {

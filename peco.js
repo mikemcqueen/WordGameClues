@@ -6,7 +6,14 @@
 
 'use strict';
 
-module.exports = Peco;
+var nameCountExports = {
+    makeNew              : makeNew,
+    logging              : LOGGING,
+    setLogging           : setLogging
+};
+
+module.exports = nameCountExports;
+//module.exports = Peco;
 
 //
 
@@ -15,6 +22,10 @@ var _           = require('lodash');
 //
 
 var LOGGING = false;
+
+function makeNew(args) {
+    return new Peco(args);
+}
 
 // args:
 //  listArray
@@ -36,7 +47,9 @@ function Peco(args) {
     if (LOGGING) {
 	this.log('Peco: sum: '+ args.sum +','  + typeof args.sum +
 		 ', max: ' + args.max+','+ typeof args.max + 
-		 ', count: ' + args.count +','+ typeof args.count);
+		 ', count: ' + args.count +','+ typeof args.count +
+		 ', require: ' + args.require +
+		 ', exclude: ' + args.exclude);
     }
     
     this.listArray  = args.listArray;
@@ -71,6 +84,12 @@ function Peco(args) {
 	    throw new Error('Peco: require and exclude contain same number, ' + dupe);
 	}
     }
+}
+
+//
+
+function setLogging(flag) {
+    LOGGING = flag;
 }
 
 //
@@ -314,14 +333,14 @@ Peco.prototype.first = function(srcCount, combFlag) {
     }
   
     if (LOGGING) {
-	this.log('Index: ' + this.indexListToJSON());
+	this.log('first: ' + this.indexListToJSON());
 	this.log ('srcCount: ' + srcCount + 
 		  ', indexList.length: ' + this.indexList.length +
 		  ', this.getIndexSum(): ' + this.getIndexSum() +
 		  ', this.sum: ' + this.sum);
     }
 
-    if (this.getIndexSum() === this.sum) {
+    if (this.isValidIndex()) {
 	list = this.getPecoList();
     }
     else {
@@ -357,21 +376,43 @@ Peco.prototype.next = function(combFlag)
 		return null;
 	    }
 	}
-	if (this.getIndexSum() != this.sum) {
-	    continue;
-	}
-	if (this.require &&
-	    !this.indexContainsAll(this.require)) {
-	    continue;
-	}
-	if (this.exclude &&
-	    this.indexContainsAny(this.exclude)) {
-	    continue;
+
+	if (LOGGING) {
+	    this.log('next: ' + this.indexListToJSON());
+	    this.log (//'srcCount: ' + srcCount + 
+		      'indexList.length: ' + this.indexList.length +
+		      ', this.getIndexSum(): ' + this.getIndexSum() +
+		      ', this.sum: ' + this.sum);
 	}
 
-	break;
+	if (this.isValidIndex()) {
+	    break;
+	}
     }
     return this.getPecoList();
+}
+
+//
+
+Peco.prototype.isValidIndex = function() {
+    if (this.getIndexSum() != this.sum) {
+	return false;
+    }
+    if (this.require &&
+	!this.indexContainsAll(this.require)) {
+	if (LOGGING) {
+	    this.log('Missing required number: ' + this.require);
+	}
+	return false;
+    }
+    if (this.exclude &&
+	this.indexContainsAny(this.exclude)) {
+	if (LOGGING) {
+	    this.log('Contains excluded number: ' + this.exclude);
+	}
+	return false;
+    }
+    return true;
 }
 
 // NOTE: this is basically getPecoList().getSum()
@@ -413,17 +454,13 @@ Peco.prototype.indexListToJSON = function() {
 //
 
 Peco.prototype.indexContainsAll = function(list) {
-    return this.indexList.every(indexObj => {
-	return list.indexOf(indexObj.index) != -1;
-    });
+    return _.intersection(this.getPecoList(), list).length == list.length;
 }
 
 //
 
 Peco.prototype.indexContainsAny = function(list) {
-    return this.indexList.some(indexObj => {
-	return list.indexOf(indexObj.index) != -1;
-    });
+    return _.intersection(this.getPecoList(), list).length > 0;
 }
 
 //

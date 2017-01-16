@@ -119,14 +119,14 @@ Validator.prototype.validateSources = function(args, nameCountList) {
     found = false;
     vsCount = args.vsCount ? args.vsCount : args.sum;
 
-    (new Peco({
+    Peco.makeNew({
 	sum:     args.sum,
 	count:   args.count,
 	max:     args.max,
 	require: args.require,
 	exclude: args.exclude,
 	quiet:   args.quiet
-    })).getCombinations().some(clueCountList => {
+    }).getCombinations().some(clueCountList => {
 	if (this.recursiveValidateSources({
 	    clueNameList:  args.nameList,
 	    clueCountList: clueCountList,

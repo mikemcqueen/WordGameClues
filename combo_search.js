@@ -87,10 +87,10 @@ ComboSearch.prototype.findAlternateSourcesForName = function(name, count) {
 		this.log('  for count ' + curCount);
 	    }
 
-	    (new Peco({
+	    Peco.makeNew({
 		sum:   curCount,
 		count: srcNameList.length
-	    })).getPermutations().forEach(countList => {
+	    }).getPermutations().forEach(countList => {
 		if (this.logging) {
 		    this.log('   in ' + countList);
 		}

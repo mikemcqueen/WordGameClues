@@ -403,11 +403,11 @@ ClueManager.prototype.makeSrcNameListArray = function(nc) {
 ClueManager.prototype.getClueSourceListArray = function(args) {
     var clueSourceListArray = [];
 
-    (new Peco({
+    Peco.makeNew({
 	sum:     args.sum,
 	max:     args.max,
 	require: args.require
-    })).getCombinations().forEach(clueCountList => {
+    }).getCombinations().forEach(clueCountList => {
 	var clueSourceList = [];
 
 	if (clueCountList.every(count => {

@@ -110,7 +110,7 @@ function showAddends(listArray, sum, count, max, permFlag, require, exclude) {
     var peco;
     var result;
 
-    peco = new Peco(listArray ? {
+    peco = Peco.makeNew(listArray ? {
 	listArray: listArray,
 	max:       count
     } : {
