@@ -17,5 +17,21 @@
   { "name": "kangaroo",                   "src": "bill,cunningham", "note" : "william john" },
   { "name": "kid",                        "src": "bill,cunningham", "note" : "william john" },
   { "name": "georgia",                    "src": "canada,cunningham" },
-  { "name": "monarch",                    "src": "black,butterfly,king,orange" }
+  { "name": "monarch",                    "src": "black,butterfly,king,orange" },
+  { "name": "tom keene",                  "src": "dick,powers" },
+  { "name": "elizabeth",                  "src": "freckled,monarch" },
+  { "name": "lady jane",                  "src": "freckled,monarch" },
+  { "name": "lady",                       "src": "freckled,monarch" },
+  { "name": "jane",                       "src": "freckled,monarch" },
+  { "name": "jane seymour",               "src": "freckled,monarch" },
+  { "name": "seymour",                    "src": "freckled,monarch" },
+  { "name": "shark",                      "src": "fish,tiger" },
+  { "name": "submarine",                  "src": "fish,tiger" },
+  { "name": "zebra",                      "src": "fish,tiger" },
+  { "name": "dustin hoffman",             "src": "dick tracy,mumbles" },
+  { "name": "dustin",                     "src": "dick tracy,mumbles" },
+  { "name": "hoffman",                    "src": "dick tracy,mumbles" },
+  { "name": "bing crosby",                "src": "dick tracy,mumbles" },
+  { "name": "bing",                       "src": "dick tracy,mumbles" },
+  { "name": "crosby",                     "src": "dick tracy,mumbles" }
 ]

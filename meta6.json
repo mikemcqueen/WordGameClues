@@ -25,5 +25,12 @@
   { "name": "swallow",                    "src": "black,butterfly,yellow" },
   { "name": "peter falk",                 "src": "columbia,detective" },
   { "name": "falk",                       "src": "columbia,detective" },
-  { "name": "monarch",                    "src": "black,butterfly,king,orange" }
+  { "name": "monarch",                    "src": "black,butterfly,king,orange" },
+  { "name": "#1",                         "src": "bull's eye,sterling marlin" },
+  { "name": "elizabeth",                  "src": "freckled,monarch" },
+  { "name": "lady jane",                  "src": "freckled,monarch" },
+  { "name": "lady",                       "src": "freckled,monarch" },
+  { "name": "jane",                       "src": "freckled,monarch" },
+  { "name": "jane seymour",               "src": "freckled,monarch" },
+  { "name": "seymour",                    "src": "freckled,monarch" }
 ]
