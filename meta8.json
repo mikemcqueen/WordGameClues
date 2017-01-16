@@ -14,8 +14,16 @@
   { "name": "ainsworth",                  "src": "john,dunn", "note" : "early indian trader" },
   { "name": "peter falk",                 "src": "columbia,detective" },
   { "name": "falk",                       "src": "columbia,detective" },
-    { "name": "harvey",                     "src": "george,king" },
-    { "name": "baptist",            "src" : "saint,john" },
-    { "name": "kangaroo",                "src": "bill,cunningham", "note": "william john" },
-    { "name": "kid",                     "src": "bill,cunningham", "note": "william john" }
+  { "name": "harvey",                     "src": "george,king" },
+  { "name": "baptist",                    "src": "saint,john" },
+  { "name": "kangaroo",                   "src": "bill,cunningham", "note" : "william john" },
+  { "name": "kid",                        "src": "bill,cunningham", "note" : "william john" },
+  { "name": "monarch",                    "src": "black,butterfly,king,orange" },
+  { "name": "harvey strait",              "src": "george,king" },
+  { "name": "strait",                     "src": "george,king" },
+  { "name": "jones",                      "src": "john,paul" },
+  { "name": "gregory",                    "src": "dunn,john" },
+  { "name": "william",                    "src": "dunn,john" },
+  { "name": "meditations",                "src": "dunn,john" },
+  { "name": "#17",                        "src": "dunn,john" }
 ]
