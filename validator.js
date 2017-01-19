@@ -573,13 +573,17 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 		// a successful recursive call to validateSources. The returned
 		// resultMap is our new resultMap.
 
-		// FALSE. Currently validateSources does not always return primary
+		// FALSE. This only occurs after a call to validateSources, but
+		// currently validateSources does not always return primary
 		// sources (it should). It just finds "counts" for a namelist,
 		// regardless of count size.
 		// break out of innerloop here
 
 		this.log('!allPrimary, pending: ' + pendingMap);
 
+		// kind of funky.  should go away once validateSources
+		// returns  a primaryNC list
+		buildResult = null;
 		// not so sure about this!
 		resultMap = pendingMap;
 		continue;
@@ -649,6 +653,7 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 		this.mergePending(resultMap, pendingMap);
 
 		if (args.validateAll) {
+		    anyNcList = nameCountList;
 		    anyFlag = true;
 		    break; // success - try other combos
 		}
@@ -656,17 +661,11 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 	    return this.uniqueResult(anyFlag, resultMap, anyNcList); // success - exit function
 	}
 
-	if (!this.incrementIndexMap(buildResult.indexMap)) {
+	if (buildResult && !this.incrementIndexMap(buildResult.indexMap)) {
 	    if (this.logging) {
 		this.log('done, success: ' + anyFlag);
 	    }
 	    return this.uniqueResult(anyFlag, resultMap, anyNcList);
-	    /*
-	    if (anyFlag) {
-		return resultMap;
-	    }
-	    return false;
-	    */
 	}
 
 	if (this.logging) {
@@ -783,7 +782,7 @@ Validator.prototype.addPendingResult = function(args) {
     this.addAllPendingPrimary(args.pendingMap, args.origNcList, primaryNcList, nameSrcList);
 
     if (args.rootKey) {
-	this.addPendingResultToRoot({
+	this.addPendingResultAtRoot({
 	    pendingMap:     args.pendingMap,
 	    origNcList:     args.origNcList,
 	    primaryNcList:  primaryNcList,
@@ -791,7 +790,7 @@ Validator.prototype.addPendingResult = function(args) {
 	});
     }
     else {
-	this.addPendingResultToNcList({
+	this.addPendingResultAtNcList({
 	    pendingMap:     args.pendingMap,
 	    origNcList:     args.origNcList,
 	    primaryNcList:  primaryNcList,
@@ -812,7 +811,7 @@ Validator.prototype.addPendingResult = function(args) {
 //primaryNcList:
 //nameSrcList:    nameSrcList
 //
-Validator.prototype.addPendingResultToNcList = function(args) {
+Validator.prototype.addPendingResultAtNcList = function(args) {
     var pathMap;
 
     pathMap = {};
@@ -834,6 +833,22 @@ Validator.prototype.addPendingResultToNcList = function(args) {
 	    });
 	}
 	this.addSourcesToPendingPathList(pathList, args.nameSrcList);
+
+	// ok they're in the list, now add the items at those paths
+	pathList.forEach(path => {
+	    var at = _.at(args.pendingMap, path.path); // + '.' + path.primaryNcCsv)
+	    var list;
+	    if (_.size(at) != 1) {
+		throw new Error('too much at');
+	    }
+	    at = at[0];
+	    if (this.logging) {
+		this.log('at: ' + at + '(' + _.size(at) + '), typeof ' + (typeof at));
+		this.log('at.keys: ' + _.keys(at));
+	    }
+	    list = at[path.primaryNcCsv];
+	    list.push(_.toString(path.nameSrcList));
+	});
     });
 }
 
@@ -841,6 +856,7 @@ Validator.prototype.addPendingResultToNcList = function(args) {
 //
 
 Validator.prototype.addSourcesToPendingPathList = function(pathList, nameSrcList) {
+    nameSrcList = _.clone(nameSrcList);
     pathList.forEach(path => {
 	var index;
 	path.nameSrcList = [];
@@ -854,6 +870,9 @@ Validator.prototype.addSourcesToPendingPathList = function(pathList, nameSrcList
 	    _.pullAt(nameSrcList, [ index ]);
 	});
     });
+    if (!_.isEmpty(nameSrcList)) {
+	throw new Error('items remain in nameSrcList, ' + nameSrcList);
+    }
 }
 
 //
@@ -884,7 +903,7 @@ Validator.prototype.recursiveGetPendingPrimaryPathList = function(path, map) {
 //primaryNcList:
 //nameSrcList:
 //
-Validator.prototype.addPendingResultToRoot = function(args) {
+Validator.prototype.addPendingResultAtRoot = function(args) {
     var map;
     var listKey;
     var list;
