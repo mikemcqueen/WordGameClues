@@ -36,5 +36,6 @@
   { "name": "kate",                       "src": "georgia,moonshine" },
   { "name": "clarence parker",            "src": "ace,duke,mckay" },
   { "name": "clarence",                   "src": "ace,duke,mckay" },
-  { "name": "parker",                     "src": "ace,duke,mckay" }
+    { "name": "parker",                     "src": "ace,duke,mckay" },
+    { "name": "lucy",                 "src": "sarah,cunningham" }
 ]

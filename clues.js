@@ -14,8 +14,6 @@ var NameCount   = require('./name_count');
 var Peco        = require('./peco');
 var Show        = require('./show');
 
-var QUIET = false;
-
 // initialize command line options.  do this before logger.
 //
 
@@ -37,17 +35,24 @@ var Opt = require('node-getopt')
 	['x' , 'max=COUNT',                   'specify maximum # of components to combine'],
 	['y' , 'synthesis',                   'use synthesis clues, same as --json clues' ],
 
-	['v' , 'verbose'            ,         'show debug output' ],
+	['v' , 'verbose=OPTION+',             'show logging. OPTIONS=load' ],
 	['h' , 'help'               ,         'this screen']
     ])
     .bindHelp().parseSystem();
 
-var LOGGING = false;
+//
 
-var MAX_SYNTH_CLUE_COUNT  = 25;
-var REQ_SYNTH_CLUE_COUNT  = 11; // should make this 12 soon
-var MAX_META_CLUE_COUNT   = 9;
-var REQ_META_CLUE_COUNT   = 9;
+var LOGGING = false;
+var QUIET = false;
+
+//
+
+const VERBOSE_FLAG_LOAD     = 'load';
+
+const MAX_SYNTH_CLUE_COUNT  = 25;
+const REQ_SYNTH_CLUE_COUNT  = 11; // should make this 12 soon
+const MAX_META_CLUE_COUNT   = 9;
+const REQ_META_CLUE_COUNT   = 9;
 
 //
 //
@@ -58,7 +63,7 @@ function main() {
     var requiredSizes;
     var metaFlag;
     var synthFlag;
-    var verboseFlag;
+    var verboseArg;
     var showSourcesClueName;
     var altSourcesArg;
     var allAltSourcesFlag;
@@ -86,7 +91,7 @@ function main() {
     requiredSizes = Opt.options['require-counts'];
     useClueList = Opt.options['use'];
     metaFlag = Opt.options['meta'];
-    verboseFlag = Opt.options['verbose'];
+    verboseArg = Opt.options['verbose'];
     outputArg = Opt.options['output'];
     showSourcesClueName = Opt.options['show-sources'];
     altSourcesArg = Opt.options['alt-sources'];
@@ -134,14 +139,14 @@ function main() {
 	allowDupeName:    true,
     });
 
-    setLogging(false);
+    setLogging(_.includes(verboseArg, VERBOSE_FLAG_LOAD));
 
     //
     if (!loadClues(synthFlag, metaFlag, jsonArg)) {
 	return 1;
     }
 
-    setLogging(verboseFlag);
+    setLogging(verboseArg);
 
     // hacky.  fix this
     if (!synthFlag) {
@@ -420,19 +425,20 @@ function showSources(clueName) {
     if (result) {
 	showValidateResult({
 	    title:  'staging',
-	    result: result,
+	    result: result.resultMap,
 	    key:    Validator.STAGING_KEY
 	});
 	showValidateResult({
 	    title:  'compound',
-	    result: result,
+	    result: result.resultMap,
 	    key:    Validator.COMPOUND_KEY
 	});
 	showValidateResult({
 	    title: 'primary',
-	    result: result,
+	    result: result.resultMap,
 	    key:    Validator.PRIMARY_KEY
 	});
+	Validator.dumpResultMap(result.vsResultMap);
     }
 }
 
@@ -455,7 +461,8 @@ function showValidateResult(args) {
 
 //
 
-function setLogging(flag) {
+function setLogging(verboseArg) {
+    var flag = Boolean(verboseArg);
     ClueManager.logging = flag;
     ComboMaker.logging  = flag;
     Validator.logging   = flag;

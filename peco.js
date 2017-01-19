@@ -6,14 +6,13 @@
 
 'use strict';
 
-var nameCountExports = {
+var PecoExports = {
     makeNew              : makeNew,
     logging              : LOGGING,
     setLogging           : setLogging
 };
 
-module.exports = nameCountExports;
-//module.exports = Peco;
+module.exports = PecoExports;
 
 //
 
@@ -21,6 +20,7 @@ var _           = require('lodash');
 
 //
 
+var FORCE_QUIET = true;
 var LOGGING = false;
 
 function makeNew(args) {
@@ -42,8 +42,6 @@ function makeNew(args) {
 //  exclude:  list of excluded numbers, e.g. [3, 5]
 
 function Peco(args) {
-    var dupe;
-
     if (LOGGING) {
 	this.log('Peco: sum: '+ args.sum +','  + typeof args.sum +
 		 ', max: ' + args.max+','+ typeof args.max + 
@@ -81,7 +79,8 @@ function Peco(args) {
 	if (this.require && this.exclude &&
 	    _.intersection(this.require, this.exclude).length > 0)
 	{
-	    throw new Error('Peco: require and exclude contain same number, ' + dupe);
+	    throw new Error('Peco: require and exclude contain same number(s), ' +
+			    _.intersection(this.require, this.exclude));
 	}
     }
 }
@@ -89,7 +88,9 @@ function Peco(args) {
 //
 
 function setLogging(flag) {
-    LOGGING = flag;
+    if (!flag || (flag && !FORCE_QUIET)) {
+	LOGGING = flag;
+    }
 }
 
 //
@@ -208,6 +209,9 @@ Peco.prototype.buildResult = function(args) {
     }
 
     do {
+	if (LOGGING) {
+	    this.log('Peco: adding: ' + list);
+	}
 	args.pecoList.push(list);
 	if (args.listArray) {
 	    list = this.listNext(args.listArray, args.combFlag);
@@ -378,7 +382,7 @@ Peco.prototype.next = function(combFlag)
 	}
 
 	if (LOGGING) {
-	    this.log('next: ' + this.indexListToJSON());
+	    this.log('-----\nnext: ' + this.indexListToJSON());
 	    this.log (//'srcCount: ' + srcCount + 
 		      'indexList.length: ' + this.indexList.length +
 		      ', this.getIndexSum(): ' + this.getIndexSum() +
@@ -396,6 +400,10 @@ Peco.prototype.next = function(combFlag)
 
 Peco.prototype.isValidIndex = function() {
     if (this.getIndexSum() != this.sum) {
+	if (LOGGING) {
+	    this.log('Mismatch sums, ' + this.getIndexSum() +
+		     ' != ' + this.sum);
+	}
 	return false;
     }
     if (this.require &&
