@@ -529,7 +529,7 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 		    excludeSrcList: args.excludeSrcList,
 		    validateAll:    args.validateAll,
 		    wantResults:    args.wantResults,
-		    //vsCount:        args.vsCount,
+		    vsCount:        args.vsCount,
 		    resultMap:      args.resultMap,
 		    recursive:      true
 		}, srcNcList);
@@ -675,7 +675,6 @@ Validator.prototype.uniqueResult = function(success, map, ncListArray) {
 //
 
 Validator.prototype.allUniquePrimary = function(args) {
-    var ncListCsv;
     var cycleList;
     var nameSrcCsvArray;
 
@@ -687,24 +686,17 @@ Validator.prototype.allUniquePrimary = function(args) {
 		 this.indentNewline() + '  nameSrcList: ' + args.nameSrcList);
     }
 
-    if (args.vsCount != _.size(args.ncList)) {
-	throw new Error('logic dictates this is impossible');
-    }
-
-    ncListCsv = _.toString(args.ncList);
     if (this.addFinalResult({
 	map:           args.map,
-	ncList:        args.ncList,
+	nameSrcList:   args.nameSrcList,
 	excludeSrcList:args.excludeSrcList,
 	vsCount:       args.vsCount,
-	stagingName:   'whatever', //args.name,
-	stagingNcList: args.ncList
     })) {
 	if (args.wantResults) {
 	    if (this.logging) {
 		this.log('aUP: adding primary result: ' +
 			 this.indentNewline() + '  ' +
-			 ncListCsv + ' = ' + args.nameSrcList);
+			 args.ncList + ' = ' + args.nameSrcList);
 	    }
 	    this.addPendingResult({
 		pendingMap:     args.pendingMap,
@@ -716,7 +708,7 @@ Validator.prototype.allUniquePrimary = function(args) {
 	}
     }
     else {
-	if (logging) {
+	if (this.logging) {
 	    this.log('isValidResult failed');
 	}
 	return { success: false };
@@ -1319,6 +1311,7 @@ Validator.prototype.ensureUniquePrimaryLists = function(map) {
 //  ncList:
 //  exclueSrcList:
 //  resultMap:      args.resultMap
+//  vsCount:       args.vsCount,
 //
 Validator.prototype.cyclePrimaryClueSources = function(args) {
     var srcMap;
@@ -1386,8 +1379,9 @@ Validator.prototype.cyclePrimaryClueSources = function(args) {
 	// all the source clues we just validated are primary clues
 	if (this.addFinalResult({
 	    map:           args.resultMap,
-	    ncList:        nameSrcList,
-	    excludeSrcList:args.excludeSrcList
+	    nameSrcList:   nameSrcList,
+	    excludeSrcList:args.excludeSrcList,
+	    vsCount:       args.vsCount
 	})) {
 	    if (this.logging) {
 		this.log('cycle: adding result: ' +
@@ -2066,20 +2060,27 @@ Validator.prototype.chop = function(list, removeValue) {
 }
 
 // args:
-//  ncList:        this.getNameSrcList(primaryClueData),
-//  stagingNcList: nameCountList,
+//  nameSrcList:   this.getNameSrcList(primaryClueData),
 //  map:           args.resultMap,
 //  excludeSrcList:args.excludeSrcList,
-//  stagingName:   name
 //
 Validator.prototype.addFinalResult = function(args) {
+    if (!args.vsCount || 
+	!args.nameSrcList || _.isEmpty(args.nameSrcList)) {
+	throw new Error ('missing args' +
+			 ', nameSrcList: ' + args.nameSrcList +
+			 ', vsCount: ' + args.vsCount);
+    }
+
     if (this.addResultEntry({
 	map:           args.map,
 	key:           this.PRIMARY_KEY,
 	name:          this.FINAL_KEY,
-	ncList:        args.ncList,
-	excludeSrcList:args.excludeSrcList
+	nameSrcList:   args.nameSrcList,
+	excludeSrcList:args.excludeSrcList,
+	vsCount:       args.vsCount
     })) {
+	/*
 	//console.log('Added: ' + args.ncList.toString() + ', length=' + args.ncList.length);
 	// seems like we might want to do this even if addResultEntry fails.
 	// just because all primary name:src are duplicate doesn't mean
@@ -2090,17 +2091,19 @@ Validator.prototype.addFinalResult = function(args) {
 		ncList: args.stagingNcList
 	    });
 	}
+	*/
 	return true;
     }
     return false;
 }
 
 // args:
-//  map:      args.resultMap,
-//  key:      PRIMARY_KEY
-//  name:     clue name
-//  ncList:   ncList
+//  map:      
+//  key:      
+//  name:     
+//  nameSrcList:
 //  excludeSrcList: list of excluded primary sources
+//  vsCount:
 //
 Validator.prototype.addResultEntry = function(args) {
     var map;
@@ -2110,26 +2113,28 @@ Validator.prototype.addResultEntry = function(args) {
     if (args.excludeSrcList) {
 	// TODO: this looks wrong
 	if (this.listContainsAny(args.excludeSrcList,
-				 NameCount.makeCountList(args.ncList)))
+				 NameCount.makeCountList(args.nameSrcList)))
 	{
 	    return false;
 	}
     }
 
-    if (!args.map[args.key]) {
-	map = args.map[args.key] = {};
+    if (args.vsCount === _.size(args.nameSrcList)) {
+	if (!args.map[args.key]) {
+	    map = args.map[args.key] = {};
+	}
+	else {
+	    map = args.map[args.key];
+	}
+	stringList = args.nameSrcList.toString();
+	if (!map[args.name]) {
+	    map[args.name] = [ stringList ];
+	}
+	else if (map[args.name].indexOf(stringList) === -1) {
+	    map[args.name].push(stringList);
+	}
     }
-    else {
-	map = args.map[args.key];
-    }
-    stringList = args.ncList.toString();
-    if (!map[args.name]) {
-	map[args.name] = [ stringList ];
-    }
-    else if (map[args.name].indexOf(stringList) === -1) {
-	map[args.name].push(stringList);
-    }
-
+	
     return true;
 }
 

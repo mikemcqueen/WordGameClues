@@ -97,16 +97,16 @@ function compatibleKnownClues(args) {
 	count:       args.nameList.length,
 	validateAll: true
     });
-    if (!result) {
+    if (!result.success) {
 	console.log('The nameList [ ' + args.nameList + ' ] is not a valid clue combination');
 	return;
     }
 
     // for each final result from validateResults
-    Validator.getFinalResultList(result).forEach(ncCsv => {
-	// ncCsv is actually a name:primary_source (not name:count)
-	var ncList = NameCount.makeListFromCsv(ncCsv);
-	var primarySrcList = NameCount.makeCountList(ncList);
+    Validator.getFinalResultList(result.resultMap).forEach(nameSrcCsv => {
+	log('final result: ' + nameSrcCsv);
+	var nameSrcList = NameCount.makeListFromCsv(nameSrcCsv);
+	var primarySrcList = NameCount.makeCountList(nameSrcList);
 	var result;
 
 	// for each clue in each clueList[count] where count is
@@ -123,7 +123,7 @@ function compatibleKnownClues(args) {
 		    clue:          clue,
 		    excludeSrcList:primarySrcList
 		})) {
-		    log('success, adding + ' + clue.name);
+		    log('success, adding ' + clue.name);
 		    addToCompatibleMap({
 			clue:          clue,
 			resultList:    resultList,
@@ -194,13 +194,13 @@ function isCompatibleClue(args) {
     log('isCompatible: ' + args.clue.name + ':' + args.clue.src +
 	'(' + args.sum + '), ' + Boolean(result));
 
-    if (result) {
-	resultList = Validator.getFinalResultList(result);
+    if (result.success) {
+	resultList = Validator.getFinalResultList(result.resultMap);
 	if (!resultList) {
 	    throw new Error('I donut think this happens');
 	}
     }
-    return result ? resultList : false;
+    return result.success ? resultList : false;
 }
 
 // args:
@@ -216,11 +216,17 @@ function addToCompatibleMap(args) {
     var src;
     var verbose;
 
-    if (!_.has(args, 'resultList') ||
+    if (LOGGING) {
+	log('++addToCompatibleMap' +
+	    ', clue: ' + args.clue +
+	    ', resultList: ' + args.resultList);
+    }
+
+    if (!args.resultList || _.isEmpty(args.resultList) ||
 	!_.has(args, 'excludeSrcList') ||
 	!_.has(args, 'nameMapArray'))
     {
-	throw new Error('missing argument');
+	throw new Error('missing or empty argument');
     }
 
     if (!args.nameMapArray[args.index]) {
