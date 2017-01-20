@@ -52,5 +52,8 @@
   { "name": "monarch",                    "src": "black,butterfly,orange" },
   { "name": "heath",                      "src": "butterfly,freckled" },
   { "name": "viceroy",                    "src": "black,butterfly,orange" },
-  { "name": "bailey",                     "src": "beetle,freckled" }
+  { "name": "bailey",                     "src": "beetle,freckled" },
+  { "name": "randolph",                   "src": "charles,pollock" },
+  { "name": "randy",                      "src": "charles,pollock" },
+  { "name": "captain",                    "src": "charles,pollock,randolph" }
 ]

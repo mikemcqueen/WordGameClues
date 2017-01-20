@@ -34,5 +34,18 @@
   { "name": "bing crosby",                "src": "dick tracy,mumbles" },
   { "name": "bing",                       "src": "dick tracy,mumbles" },
   { "name": "crosby",                     "src": "dick tracy,mumbles" },
-  { "name": "james",                      "src": "#1,brown" }
+  { "name": "james",                      "src": "#1,brown" },
+  { "name": "eugene",                     "src": "black,swallow" },
+  { "name": "bullard",                    "src": "black,swallow" },
+  { "name": "death",                      "src": "black,swallow" },
+  { "name": "george hudson",              "src": "king,midland railroad" },
+  { "name": "george",                     "src": "king,midland railroad" },
+  { "name": "hudson",                     "src": "king,midland railroad" },
+  { "name": "harvey",                     "src": "george,king" },
+  { "name": "harvey strait",              "src": "george,king" },
+  { "name": "strait",                     "src": "george,king" },
+  { "name": "charles",                    "src": "pollock,randolph" },
+  { "name": "cornstalk",                  "src": "chief,randolph" },
+  { "name": "corn",                       "src": "chief,randolph" },
+  { "name": "lindbergh",                  "src": "charles,lucky" }
 ]

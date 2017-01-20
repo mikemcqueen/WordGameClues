@@ -32,5 +32,9 @@
   { "name": "lady",                       "src": "freckled,monarch" },
   { "name": "jane",                       "src": "freckled,monarch" },
   { "name": "jane seymour",               "src": "freckled,monarch" },
-  { "name": "seymour",                    "src": "freckled,monarch" }
+  { "name": "seymour",                    "src": "freckled,monarch" },
+  { "name": "captain",                    "src": "charles,pollock,randolph" },
+  { "name": "charles",                    "src": "pollock,randolph" },
+  { "name": "cornstalk",                  "src": "chief,randolph" },
+  { "name": "corn",                       "src": "chief,randolph" }
 ]
