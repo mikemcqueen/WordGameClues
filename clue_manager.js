@@ -73,7 +73,7 @@ ClueManager.prototype.loadAllClues = function(args) {
 	    this.addKnownPrimaryClues(knownClueList);
 	}
 	else {
-	    this.addKnownCompoundClues(knownClueList, count);
+	    this.addKnownCompoundClues(knownClueList, count, args.validateAll);
 	    rejectClueList = null;
 	    try {
 		rejectClueList = ClueList.makeFrom({
@@ -148,7 +148,7 @@ ClueManager.prototype.addKnownPrimaryClues = function(clueList) {
 //
 //
 
-ClueManager.prototype.addKnownCompoundClues = function(clueList, clueCount) {
+ClueManager.prototype.addKnownCompoundClues = function(clueList, clueCount, validateAll) {
     var srcMap;
 
     if (!this.knownClueMapArray[clueCount]) {
@@ -188,9 +188,10 @@ ClueManager.prototype.addKnownCompoundClues = function(clueList, clueCount) {
 		}
 		
 		if (!Validator.validateSources({
-		    sum:      clueCount,
-		    nameList: srcNameList,
-		    count:    srcNameList.length
+		    sum:         clueCount,
+		    nameList:    srcNameList,
+		    count:       srcNameList.length,
+		    validateAll: validateAll
 		})) {
 		    throw new Error('Known validate sources failed' +
 				    ', count(' + clueCount + ') ' +

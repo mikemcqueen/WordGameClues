@@ -19,21 +19,22 @@ var Show        = require('./show');
 
 var Opt = require('node-getopt')
     .create([
-	['a' , 'alt-sources=NAME',            'show alternate sources for the specified clue' ],
-	['A' , 'all-alt-sources',             'show alternate sources for all clues' ],
-	['c' , 'count=COUNT',                 '# of primary clues to combine' ],
-	['d' , 'allow-dupe-source'  ,         'allow duplicate source, override default behavior of --meta' ],
-	[''  , 'json=FILEBASE',               'specify base filename of clue files' ],
-	['k' , 'show-known'         ,         'show compatible known clues; -u <clue> required' ],
-	['m' , 'meta'               ,         'use metamorphosis clues, same as --json meta (default)' ],
-	['o' , 'output'             ,         'output json -or- clues' ],
-	['p' , 'primary-sources=SOURCE[,SOURCE,...]', 'limit results to the specified primary source(s)' ],
-	['q' , 'require-counts=COUNT+',       'require clue(s) of specified count(s)' ],
-	['s' , 'show-sources=NAME[:COUNT]',   'show possible source combinations for the specified name[:count]' ],
-	['t' , 'test=NAME[,NAME,...]',        'test the specified source list, e.g. blue,fish' ],
-	['u' , 'use=NAME[:COUNT]+',           'use the specified name[:count](s)' ],
-	['x' , 'max=COUNT',                   'specify maximum # of components to combine'],
-	['y' , 'synthesis',                   'use synthesis clues, same as --json clues' ],
+	['a', 'alt-sources=NAME',            'show alternate sources for the specified clue' ],
+	['A', 'all-alt-sources',             'show alternate sources for all clues' ],
+	['c', 'count=COUNT',                 '# of primary clues to combine' ],
+	['d', 'allow-dupe-source'  ,         'allow duplicate source, override default behavior of --meta' ],
+	['' , 'json=FILEBASE',               'specify base filename of clue files' ],
+	['k', 'show-known'         ,         'show compatible known clues; -u <clue> required' ],
+	['m', 'meta'               ,         'use metamorphosis clues, same as --json meta (default)' ],
+	['o', 'output'             ,         'output json -or- clues' ],
+	['p', 'primary-sources=SOURCE[,SOURCE,...]', 'limit results to the specified primary source(s)' ],
+	['q', 'require-counts=COUNT+',       'require clue(s) of specified count(s)' ],
+	['s', 'show-sources=NAME[:COUNT]',   'show possible source combinations for the specified name[:count]' ],
+	['t', 'test=NAME[,NAME,...]',        'test the specified source list, e.g. blue,fish' ],
+	['u', 'use=NAME[:COUNT]+',           'use the specified name[:count](s)' ],
+	['x', 'max=COUNT',                   'specify maximum # of components to combine'],
+	['y', 'synthesis',                   'use synthesis clues, same as --json clues' ],
+	['z', 'flags=OPTION+',               'flags: 1=validateAllOnLoad' ],
 
 	['v' , 'verbose=OPTION+',             'show logging. OPTIONS=load' ],
 	['h' , 'help'               ,         'this screen']
@@ -75,6 +76,8 @@ function main() {
     var showKnownArg;
     var jsonArg;
     var primarySourcesArg;
+    var flagsArg;
+    var validateAllOnLoad;
 
 /*    if (Opt.argv.length) {
 	console.log('Usage: node clues.js [options]');
@@ -102,6 +105,11 @@ function main() {
     synthFlag = Opt.options['synthesis'];
     jsonArg = Opt.options['json'];
     primarySourcesArg = Opt.options['primary-sources'];
+    flagsArg = Opt.options.flags;
+    if (_.includes(flagsArg, '1')) {
+	validateAllOnLoad = true;
+    }
+
 
     if (!maxArg) {
 	maxArg = 2; // TODO: default values in opt
@@ -142,7 +150,7 @@ function main() {
     setLogging(_.includes(verboseArg, VERBOSE_FLAG_LOAD));
 
     //
-    if (!loadClues(synthFlag, metaFlag, jsonArg)) {
+    if (!loadClues(synthFlag, metaFlag, jsonArg, validateAllOnLoad)) {
 	return 1;
     }
 
@@ -203,7 +211,7 @@ function main() {
 
 //
 
-function loadClues(synthFlag, metaFlag, jsonArg) {
+function loadClues(synthFlag, metaFlag, jsonArg, validateAllOnLoad) {
     var base;
     var max;
     var required;
@@ -236,10 +244,11 @@ function loadClues(synthFlag, metaFlag, jsonArg) {
     log('loading all clues...');
 
     ClueManager.loadAllClues({
-	known:    base,
-	reject:   base + 'rejects',
-	max:      max,
-	required: required
+	known:       base,
+	reject:      base + 'rejects',
+	max:         max,
+	required:    required,
+	validateAll: validateAllOnLoad
     });
 
     log('done.');

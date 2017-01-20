@@ -181,11 +181,9 @@ Validator.prototype.validateSources = function(args, nameCountList) {
 		     ', ' + nameCountList);
 	}
     }
-
     if (!args.recursive) {
 	this.ensureUniquePrimaryLists(vsResultMap);
     }
-
     return {
 	resultMap:   resultMap,
 	vsResultMap: vsResultMap,
@@ -345,8 +343,7 @@ Validator.prototype.rvsWorker = function(args) {
 	if (uniqResult.success) {
 
 	    if (this.logging) {
-		this.log('checkUniqueSources --- success!' +
-			 this.indentNewline() + '---------------------------------------------------');
+		this.log('checkUniqueSources --- success!');
 	    }
 
 	    nc = NameCount.makeNew(args.name, args.count);
@@ -366,8 +363,7 @@ Validator.prototype.rvsWorker = function(args) {
 	}
 
 	if (this.logging) {
-	    this.log('checkUniqueSources --- failure' +
-		     this.indentNewline() + '---------------------------------------------------');
+	    this.log('checkUniqueSources --- failure');
 	}
 	return { success: false }; // fail
     }
@@ -467,16 +463,21 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 	return this.uniqueResult(false); // failure
     }
     else if (findResult.allPrimary) {
+	nameSrcList = this.getNameSrcList(findResult.srcMap),
+	pendingMap = {};
+	if (args.wantResults) {
+	    pendingMap = this.buildPrimaryPendingMap(nameCountList, nameSrcList);
+	}
 	uniqResult = this.allUniquePrimary({
 	    origNcList:     nameCountList, // [NameCount.makeNew(args.name,args.count)],//nameCountList,
 	    ncList:         nameCountList,
-	    nameSrcList:    this.getNameSrcList(findResult.srcMap),
+	    nameSrcList:    nameSrcList,
 	    map:            args.resultMap,
 	    excludeSrcList: args.excludeSrcList,
 	    vsCount:        args.vsCount,
 	    wantResults:    args.wantResults,
 	    validateAll:    args.validateAll,
-	    pendingMap:     {}
+	    pendingMap:     pendingMap
 	});
 	if (uniqResult.success) {
 	    if (args.wantResults) {
@@ -601,6 +602,7 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 		uniqResult = this.allUniquePrimary({
 		    origNcList:     buildArgs.ncList, //origNcList,
 		    ncList:         ncList,
+		    ncNameListPairs:buildResult.compoundNcNameListPairs,
 		    nameSrcList:    this.getNameSrcList(findResult.srcMap),
 		    map:            args.resultMap,
 		    excludeSrcList: args.excludeSrcList,
@@ -662,6 +664,8 @@ Validator.prototype.uniqueResult = function(success, map, ncListArray) {
 //  origNcList:
 //  ncList:
 //  nameSrcList:
+//  ncNameListPairs:
+//  ncName
 //  map:
 //  excludeSrcList:
 //  vsCount:      
@@ -706,7 +710,8 @@ Validator.prototype.allUniquePrimary = function(args) {
 		pendingMap:     args.pendingMap,
 		origNcList:     args.origNcList,
 		primaryNcList:  args.ncList,
-		nameSrcList:    args.nameSrcList
+		nameSrcList:    args.nameSrcList,
+		ncNameListPairs:args.ncNameListPairs
 	    });
 	}
     }
@@ -729,7 +734,8 @@ Validator.prototype.allUniquePrimary = function(args) {
 			pendingMap:     args.pendingMap,
 			origNcList:     args.origNcList,
 			primaryNcList:  args.ncList,
-			nameSrcList:    nameSrcList
+			nameSrcList:    nameSrcList,
+			ncNameListPairs:args.ncNameListPairs
 		    });
 		});
 	    }
@@ -746,6 +752,7 @@ Validator.prototype.allUniquePrimary = function(args) {
 //origNcList:
 //primaryNcList:
 //nameSrcList:    nameSrcList
+//ncNameListPairs:buildResult.ncNameListPairs
 //
 
 Validator.prototype.addPendingResult = function(args) {
@@ -772,6 +779,11 @@ Validator.prototype.addPendingResult = function(args) {
 
     this.addAllPendingPrimary(args.pendingMap, args.origNcList, primaryNcList, nameSrcList);
 
+    if (_.size(primaryNcList) != _.size(nameSrcList)) {
+	throw new Error('mismatched list sizes');
+    }
+
+    /*
     if (args.rootKey) {
 	this.addPendingResultAtRoot({
 	    pendingMap:     args.pendingMap,
@@ -780,12 +792,14 @@ Validator.prototype.addPendingResult = function(args) {
 	    nameSrcList:    nameSrcList
 	});
     }
-    else {
+    else */
+    if (!_.isEmpty(primaryNcList)) {
 	this.addPendingResultAtNcList({
 	    pendingMap:     args.pendingMap,
 	    ncList:         args.origNcList,
 	    primaryNcList:  primaryNcList,
-	    nameSrcList:    nameSrcList
+	    nameSrcList:    nameSrcList,
+	    ncNameListPairs:args.ncNameListPairs
 	});
     }
 
@@ -797,10 +811,11 @@ Validator.prototype.addPendingResult = function(args) {
 
 //
 //pendingMap:     pendingMap,
-//rootKey
+//rootKey // unused
 //ncList:
 //primaryNcList:
 //nameSrcList:    nameSrcList
+//ncNameListPairs:buildResult.ncNameListPairs
 //
 Validator.prototype.addPendingResultAtNcList = function(args) {
     var pathList;
@@ -808,11 +823,12 @@ Validator.prototype.addPendingResultAtNcList = function(args) {
     if (this.logging) {
 	this.log('++addPendingResultAtNcList' +
 		 ', ncList: ' + args.ncList +
+		 this.indentNewline() + '  ncNameListPairs: ' + args.ncNameListPairs +
 		 this.indentNewline() + '  primaryNcList: ' + args.primaryNcList +
 		 this.indentNewline() + '  nameSrcList: ' + args.nameSrcList);
     }
 
-    pathList = this.getPrimaryPathList(args.pendingMap, args.primaryNcList);
+    pathList = this.getPrimaryPathList(args.pendingMap, args.primaryNcList, args.ncNameListPairs);
 
     if (_.isEmpty(pathList)) {
 	throw new Error('empty pathList');
@@ -825,7 +841,7 @@ Validator.prototype.addPendingResultAtNcList = function(args) {
 	});
     }
 
-    this.addSourcesToPathList(pathList, args.nameSrcList);
+    this.addSourcesToPathList(pathList, args.nameSrcList, args.ncNameListPairs);
 
     if (this.logging) {
 	pathList.forEach(path => {
@@ -857,26 +873,48 @@ Validator.prototype.addPendingResultAtNcList = function(args) {
 //
 //
 
-Validator.prototype.addSourcesToPathList = function(pathList, nameSrcList) {
+Validator.prototype.addSourcesToPathList = function(pathList, nameSrcList, ncNameListPairs) {
+    var passTwo = false;
+
     nameSrcList = _.clone(nameSrcList);
 
-    pathList.forEach(path => {
-	var index;
-	path.nameSrcList = [];
-	NameCount.makeListFromCsv(path.primaryNcCsv).forEach(nc => {
-	    index = _.findIndex(nameSrcList, {name : nc.name});
-	    if (index === -1) {
-		throw new Error('primary clue not in nameSrcList, ' + nc.name +
-				', list: ' + nameSrcList);
+    for (;;) {
+	pathList.forEach(path => {
+	    var index;
+	    if ((path.processLast && !passTwo) ||
+		(!path.processLast && passTwo))
+	    {
+		return; // forEach
 	    }
-	    if (this.logging) {
-		this.log('addSources: adding ' + nameSrcList[index] +
-			 ' to ' + nc);
+	    path.nameSrcList = [];
+	    if (!NameCount.makeListFromCsv(path.primaryNcCsv).every(nc => {
+		index = _.findIndex(nameSrcList, { name: nc.name });
+		if (index === -1) {
+		    if (this.log ) {
+			this.log('reverting, primary clue not in nameSrcList, ' + nc.name +
+				 ', list: ' + nameSrcList);
+		    }
+		    return false;
+		}
+		if (this.logging) {
+		    this.log('addSources: adding ' + nameSrcList[index] +
+			     ' to ' + nc);
+		}
+		path.nameSrcList.push(nameSrcList[index]);
+		_.pullAt(nameSrcList, [ index ]);
+		return true;
+	    })) {
+		path.nameSrcList.forEach(nameSrc => {
+		    nameSrcList.push(nameSrc);
+		});
+		path.nameSrcList = null;
 	    }
-	    path.nameSrcList.push(nameSrcList[index]);
-	    _.pullAt(nameSrcList, [ index ]);
 	});
-    });
+	if (passTwo) {
+	    break;
+	}
+	passTwo = true;
+    }
     if (!_.isEmpty(nameSrcList)) {
 	throw new Error('items remain in nameSrcList, ' + nameSrcList);
     }
@@ -885,13 +923,26 @@ Validator.prototype.addSourcesToPathList = function(pathList, nameSrcList) {
 //
 //
 
-Validator.prototype.getPrimaryPathList = function(map, primaryNcList) {
+Validator.prototype.getPrimaryPathList = function(map, primaryNcList, ncNameListPairs) {
     var pathList;
     pathList = [];
     _.keys(map).forEach(key => {
 	var nc;
+	var valid = false;
 	if (_.isArray(map[key])) {
-	    if (!primaryNcList || NameCount.listContains(primaryNcList, NameCount.makeNew(key))) {
+	    // this does a better job at filtering valid lists
+	    if (ncNameListPairs) {
+		if (this.allInAnyNameList(
+		    _.map(_.split(key, ','), NameCount.makeNew), ncNameListPairs))
+		{
+		    valid = true;
+		}
+	    }
+	    else if (!primaryNcList ||
+		     NameCount.listContains(primaryNcList, NameCount.makeNew(key))) {
+		valid = true;
+	    }
+	    if (valid) {
 		pathList.push({
 		    path:         null,
 		    primaryNcCsv: key
@@ -909,22 +960,57 @@ Validator.prototype.getPrimaryPathList = function(map, primaryNcList) {
 //
 //
 
-Validator.prototype.recursiveGetPrimaryPathList = function(primaryNcList, path, map) {
-    var pathList;
-    pathList = [];
-    _.forOwn(map, (value, key) => {
-	var arrayFound = false;
+Validator.prototype.allInAnyNameList = function(ncList, ncNameListPairs) {
+    if (this.logging) {
+	this.log('++allInAnyNameList ncList: ' + ncList);
+    }
+    return ncNameListPairs.some(ncNameListPair => {
+	var nameList = ncNameListPair[1];
+	if (_.size(nameList) != _.size(ncList)) {
+	    return false;
+	}
+	return ncList.every(nc => {
+	    return _.includes(nameList, nc.name);
+	});
+    });
+}
 
+//
+//
+
+Validator.prototype.recursiveGetPrimaryPathList = function(primaryNcList, path, map) {
+    var arrayFound = false;
+    var pathList = [];
+    var processLast = false;
+
+    // first pass, check for multiple array keys that match primaryNcList
+    if (primaryNcList) {
+	_.forOwn(map, (value, key) => {
+	    if (_.isArray(value)) { // array means primary 
+		if (NameCount.listContainsAll(primaryNcList, NameCount.makeListFromCsv(key))) {
+		    if (arrayFound) {
+			processLast = true;
+		    }
+		    arrayFound = true;
+		}
+	    }
+	});
+    }
+
+    _.forOwn(map, (value, key) => {
 	if (_.isArray(value)) { // array means primary 
 	    if (!primaryNcList ||
 		NameCount.listContainsAll(primaryNcList, NameCount.makeListFromCsv(key)))
 	    {
+		/*
 		if (primaryNcList && arrayFound) {
 		    throw new Error('two potential primary list matches in ' + path);
 		}
+		*/
 		pathList.push({
 		    path:         path,
-		    primaryNcCsv: key
+		    primaryNcCsv: key,
+		    processLast:  processLast
 		});
 		arrayFound = true;
 	    }
@@ -938,6 +1024,7 @@ Validator.prototype.recursiveGetPrimaryPathList = function(primaryNcList, path, 
 }
 
 
+/*
 //
 //pendingMap:
 //rootKey
@@ -970,6 +1057,7 @@ Validator.prototype.addPendingResultAtRoot = function(args) {
     }
     list.push(_.toString(args.nameSrcList));
 }
+*/
 
 //
 //
@@ -1256,6 +1344,7 @@ Validator.prototype.cyclePrimaryClueSources = function(args) {
 //    args.ncList.forEach(nc => {
 //	localNcList.push(NameCount.makeCopy(nc));
 //    });
+    resultList = [];
     buildArgs = {
 	excludeSrcList: args.excludeSrcList,
 	ncList:         args.ncList,   // always pass same unmodified ncList
@@ -1305,9 +1394,6 @@ Validator.prototype.cyclePrimaryClueSources = function(args) {
 			 this.indentNewline() + '  ' + 
 			 args.ncList + ' = ' + nameSrcList);
 	    }
-	    if (!resultList) {
-		resultList = [];
-	    }
 	    resultList.push(nameSrcList);
 	}
     } while (this.incrementIndexMap(buildResult.indexMap));
@@ -1352,6 +1438,8 @@ Validator.prototype.findDuplicatePrimaryClue = function(args) {
 	duplicateSrcName = resolveResult.duplicateSrcName;
 	duplicateSrc = resolveResult.duplicateSrc;
     }
+
+    // log before possible exception, to provide more info
     if (this.logging) {
 	this.log('--findDuplicatePrimaryClue, duplicateName: ' + duplicateName +
 		 ', duplicateSrc: ' + duplicateSrc +
@@ -1360,7 +1448,8 @@ Validator.prototype.findDuplicatePrimaryClue = function(args) {
     }
 
     if (allPrimary && !duplicateSrc &&
-	(_.size(findResult.srcMap) != _.size(args.ncList))) {
+	(_.size(findResult.srcMap) != _.size(args.ncList)))
+    {
 	console.log('ncList: ' + args.ncList + 
 		    '\nsrcMap.keys: ' + _.keys(findResult.srcMap));
 	throw new Error('srcMap.size != ncList.size');
@@ -1628,10 +1717,11 @@ Validator.prototype.buildSrcNameList = function(args) {
     var indexMap;
     var compoundSrcNameList;
     var compoundNcList;
+    var compoundNcNameListPairs;
     var primaryNcList;
     var primarySrcNameList;
     var srcMap;
-    var primaryPathList;
+    var primaryPathList; // TODO: i had half an idea here
 
     if (this.logging) {
 	this.log('++buildSrcNameList, ncList(' + args.ncList.length + ')' +
@@ -1645,6 +1735,7 @@ Validator.prototype.buildSrcNameList = function(args) {
     clueCount = 0;
     compoundNcList = [];
     compoundSrcNameList = [];
+    compoundNcNameListPairs = [];
     primaryNcList = [];
     primarySrcNameList = [];
     primaryPathList = [];
@@ -1705,6 +1796,8 @@ Validator.prototype.buildSrcNameList = function(args) {
 	    return; // forEach.next;
 	}
 
+	compoundNcNameListPairs.push([nc, _.clone(srcNameList)]);
+
 	// nc is a compound clue
 	map = srcMap[nc] = {};
 	// if sources for this nc are all primary clues
@@ -1742,6 +1835,7 @@ Validator.prototype.buildSrcNameList = function(args) {
 		 ', compoundSrcNameList: ' + compoundSrcNameList +
 		 ', compoundNcList: ' + compoundNcList +
 		 ', count: ' + clueCount + 
+		 this.indentNewline() + '  compoundNcNameListPairs: ' + compoundNcNameListPairs +
 		 this.indentNewline() + '  primarySrcNameList: ' + primarySrcNameList +
 		 this.indentNewline() + '  primaryNcList: ' + primaryNcList);
 	
@@ -1756,15 +1850,40 @@ Validator.prototype.buildSrcNameList = function(args) {
     }
 
     return {
-	compoundSrcNameList:   compoundSrcNameList,
-	compoundNcList:        compoundNcList,
-	primaryNcList:         primaryNcList,
-	primarySrcNameList:    primarySrcNameList,
-	srcMap:                srcMap,
-	count:                 clueCount,
-	allPrimary:            allPrimary,
-	indexMap:              indexMap
+	compoundNcNameListPairs:compoundNcNameListPairs, 
+	compoundSrcNameList:    compoundSrcNameList,
+	compoundNcList:         compoundNcList,
+	primaryNcList:          primaryNcList,
+	primarySrcNameList:     primarySrcNameList,
+	srcMap:                 srcMap,
+	count:                  clueCount,
+	allPrimary:             allPrimary,
+	indexMap:               indexMap
     };
+}
+
+//
+//
+
+Validator.prototype.buildPrimaryPendingMap = function(ncList, nameSrcList) {
+    var pendingMap = {};
+
+    nameSrcList = _.clone(nameSrcList);
+    ncList.forEach(nc => {
+	var index;
+    
+	index = _.findIndex(nameSrcList, { name: nc.name });
+	if (index === -1) {
+	    throw new Error('no ' + nc.name + ' in ' + nameSrcList);
+	}
+	pendingMap[nc] = [ nameSrcList[index] ];
+	_.pullAt(nameSrcList, [ index ]);
+    });
+    if (!_.isEmpty(nameSrcList)) {
+	throw new Error('nameSrcList has items remaining, ' + nameSrcList);
+    }
+
+    return pendingMap;
 }
 
 //
