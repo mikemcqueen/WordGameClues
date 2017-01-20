@@ -422,7 +422,7 @@ function showSources(clueName) {
 	count:        1,
 	validateAll:  true
     });
-    if (result) {
+    if (result.success) {
 	showValidateResult({
 	    title:  'staging',
 	    result: result.resultMap,
@@ -439,6 +439,12 @@ function showSources(clueName) {
 	    key:    Validator.PRIMARY_KEY
 	});
 	Validator.dumpResultMap(result.vsResultMap);
+	result.ncListArray.forEach(ncList => {
+	    console.log('list: ' + ncList);
+	});
+    }
+    else {
+	console.log('validate failed.');
     }
 }
 

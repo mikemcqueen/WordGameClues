@@ -10,7 +10,9 @@ var nameCountExports = {
     makeCanonicalName    : makeCanonicalName,
     makeNameMap          : makeNameMap,
     makeCountMap         : makeCountMap,
-    listToJSON           : listToJSON
+    listToJSON           : listToJSON,
+    listContains         : listContains,
+    listContainsAll      : listContainsAll
 };
 
 module.exports = nameCountExports;
@@ -148,6 +150,27 @@ function listToJSON(ncList) {
     return s;
 }
 
+//
+
+function listContains(ncListContains, nc) {
+    return _.find(ncListContains, ['name', nc.name, 'count', nc.count]);
+}
+
+//
+    
+function listContainsAll(ncListContains, ncList) {
+    return ncList.every(nc => {
+	return _.find(ncListContains, ['name', nc.name, 'count', nc.count]);
+    });
+
+    /*
+    console.log('listContainsAll, contains: ' + ncListContains + 
+		', list: ' + ncList +
+		', result: ' + ret);
+    return ret;
+    */
+}
+
 //////////////////////////////////////////////////////////////////////////////
 
 NameCount.prototype.toString = function() {
@@ -159,6 +182,12 @@ NameCount.prototype.toString = function() {
 
 NameCount.prototype.setIndex = function(index) {
     this.index = index;
+}
+
+//
+
+NameCount.prototype.equals = function(nc) {
+    return (nc.count == this.count) && (nc.name == this.name);
 }
 
 //
