@@ -109,5 +109,6 @@
   { "name": "sweet",                      "src": "corn,yellow" },
   { "name": "maize",                      "src": "corn,yellow" },
   { "name": "mays",                       "src": "corn,yellow" },
-  { "name": "dent",                       "src": "corn,yellow" }
+    { "name": "dent",                       "src": "corn,yellow" },
+  { "name": "broadus",                       "src": "lewis,cunningham,old soldier" }
 ]

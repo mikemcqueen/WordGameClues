@@ -14,6 +14,7 @@ var _             = require('lodash');
 
 var ClueManager   = require('./clue_manager');
 var ClueList      = require('./clue_list');
+var ResultMap     = require('./resultmap');
 var NameCount     = require('./name_count');
 var Peco          = require('./peco');
 
@@ -31,6 +32,7 @@ function Validator() {
     this.logging          = true;
     this.logLevel         = 0;
 
+    // TODO: these are duplicated in ResultMap
     this.PRIMARY_KEY      = '__primary';
     this.SOURCES_KEY      = '__sources';
 
@@ -112,7 +114,7 @@ Validator.prototype.validateSources = function(args, nameCountList) {
     // to pass both
 
     if (!args.resultMap) {
-	resultMap = {};
+	resultMap = ResultMap.makeNew();
     }
     else {
 	resultMap = args.resultMap;
@@ -129,7 +131,6 @@ Validator.prototype.validateSources = function(args, nameCountList) {
 	quiet:   args.quiet
     }).getCombinations().some(clueCountList => {
 	var rvsResult;
-
 	rvsResult = this.recursiveValidateSources({
 	    clueNameList:  args.nameList,
 	    clueCountList: clueCountList,
@@ -181,8 +182,8 @@ Validator.prototype.validateSources = function(args, nameCountList) {
 		     ', ' + nameCountList);
 	}
     }
-    if (!args.recursive) {
-	this.ensureUniquePrimaryLists(vsResultMap);
+    if (!args.recursive && vsResultMap) {
+	vsResultMap.ensureUniquePrimaryLists();
     }
     return {
 	resultMap:   resultMap,
@@ -451,7 +452,8 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
     }
 
     // TODO: or just pass in as arg, like a sane person
-    resultMap = {};
+    pendingMap = ResultMap.makeNew();
+    resultMap = ResultMap.makeNew();
 
     // first, check for duplicate primary clues, add all to primaryMap
     findResult = this.findDuplicatePrimaryClue({ ncList: nameCountList });
@@ -463,10 +465,9 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 	return this.uniqueResult(false); // failure
     }
     else if (findResult.allPrimary) {
-	nameSrcList = this.getNameSrcList(findResult.srcMap),
-	pendingMap = {};
+	nameSrcList = this.getNameSrcList(findResult.srcMap);
 	if (args.wantResults) {
-	    pendingMap = this.buildPrimaryPendingMap(nameCountList, nameSrcList);
+	    pendingMap.addPrimaryLists(nameCountList, nameSrcList);
 	}
 	uniqResult = this.allUniquePrimary({
 	    origNcList:     nameCountList, // [NameCount.makeNew(args.name,args.count)],//nameCountList,
@@ -481,7 +482,7 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 	});
 	if (uniqResult.success) {
 	    if (args.wantResults) {
-		this.mergePending(resultMap, uniqResult.pendingMap);
+		resultMap.merge(uniqResult.pendingMap);
 	    }
 	    return this.uniqueResult(true, resultMap, [nameCountList]);
 	}
@@ -489,7 +490,6 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
     }
     
     ncListArray = [];
-    pendingMap = {};
     buildArgs = {
 	excludeSrcList: args.excludeSrcList,
 	wantResults:    args.wantResults,
@@ -507,7 +507,7 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 	    // break down all compound clues into source components
 	    buildArgs.ncList = nameCountList;
 	    buildResult = this.buildSrcNameList(buildArgs);
-	    pendingMap = buildResult.srcMap;
+	    pendingMap = buildResult.resultMap;
 
 	    // skip recursive call to validateSources if we have all primary clues
 	    if (buildResult.allPrimary) {
@@ -552,13 +552,14 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 		    vsResult.ncListArray.forEach(ncList => {
 			this.log('  ncList: ' + ncList);
 		    });
-		    this.dumpResultMap(vsResult.vsResultMap);
+		    vsResult.vsResultMap.dump();
 		}
 		
 		saveNcList = nameCountList; // of highly questionable value
 		
 		if (args.wantResults) {
-		    this.mergePending(pendingMap, vsResult.vsResultMap, buildResult.compoundNcList);
+		    // looks backwards, but correct.
+		    pendingMap.merge(vsResult.vsResultMap, buildResult.compoundNcList);
 		}
 		
 		// we only sent compound clues to validateSources, so add the
@@ -622,7 +623,7 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 	    }
 
 	    if (args.wantResults) {
-		this.mergePending(resultMap, pendingMap);
+		resultMap.merge(pendingMap);
 	    }
 					 
 	    if (args.validateAll) {
@@ -698,8 +699,7 @@ Validator.prototype.allUniquePrimary = function(args) {
 			 this.indentNewline() + '  ' +
 			 args.ncList + ' = ' + args.nameSrcList);
 	    }
-	    this.addPendingResult({
-		pendingMap:     args.pendingMap,
+	    args.pendingMap.addResult({
 		origNcList:     args.origNcList,
 		primaryNcList:  args.ncList,
 		nameSrcList:    args.nameSrcList,
@@ -722,8 +722,7 @@ Validator.prototype.allUniquePrimary = function(args) {
 	})) {
 	    if (args.wantResults) {	    
 		cycleList.forEach(nameSrcList => {
-		    this.addPendingResult({
-			pendingMap:     args.pendingMap,
+		    args.pendingMap.addResult({
 			origNcList:     args.origNcList,
 			primaryNcList:  args.ncList,
 			nameSrcList:    nameSrcList,
@@ -737,572 +736,6 @@ Validator.prototype.allUniquePrimary = function(args) {
 	success:    true,
 	pendingMap: args.pendingMap
     };
-}
-
-//pendingMap:     pendingMap,
-//rootKey
-//origNcList:
-//primaryNcList:
-//nameSrcList:    nameSrcList
-//ncNameListPairs:buildResult.ncNameListPairs
-//
-
-Validator.prototype.addPendingResult = function(args) {
-    var primaryNcList;
-    var nameSrcList;
-    var result;
-    
-    primaryNcList = _.clone(args.primaryNcList);
-    nameSrcList = _.clone(args.nameSrcList);
-
-    if (this.logging) {
-	this.log('++addPendingResult' +
-		 ', pendingMap.size: ' + _.size(args.pendingMap) +		 
-		 ', rootKey: ' + args.rootKey +
-		 ', origNcList: ' + args.origNcList +
-		 this.indentNewline() + '  primaryNcList: ' + primaryNcList +
-		 this.indentNewline() + '  nameSrcList: ' + nameSrcList);
-	this.dumpResultMap(args.pendingMap);
-    }
-
-    if (_.size(primaryNcList) != _.size(nameSrcList)) {
-	throw new Error('mismatched list sizes');
-    }
-
-    this.addAllPendingPrimary(args.pendingMap, args.origNcList, primaryNcList, nameSrcList);
-
-    if (_.size(primaryNcList) != _.size(nameSrcList)) {
-	throw new Error('mismatched list sizes');
-    }
-
-    /*
-    if (args.rootKey) {
-	this.addPendingResultAtRoot({
-	    pendingMap:     args.pendingMap,
-	    origNcList:     args.origNcList,
-	    primaryNcList:  primaryNcList,
-	    nameSrcList:    nameSrcList
-	});
-    }
-    else */
-    if (!_.isEmpty(primaryNcList)) {
-	this.addPendingResultAtNcList({
-	    pendingMap:     args.pendingMap,
-	    ncList:         args.origNcList,
-	    primaryNcList:  primaryNcList,
-	    nameSrcList:    nameSrcList,
-	    ncNameListPairs:args.ncNameListPairs
-	});
-    }
-
-    if (this.logging) {
-	this.log('--addPendingResult');
-	this.dumpResultMap(args.pendingMap);
-    }
-}
-
-//
-//pendingMap:     pendingMap,
-//rootKey // unused
-//ncList:
-//primaryNcList:
-//nameSrcList:    nameSrcList
-//ncNameListPairs:buildResult.ncNameListPairs
-//
-Validator.prototype.addPendingResultAtNcList = function(args) {
-    var pathList;
-
-    if (this.logging) {
-	this.log('++addPendingResultAtNcList' +
-		 ', ncList: ' + args.ncList +
-		 this.indentNewline() + '  ncNameListPairs: ' + args.ncNameListPairs +
-		 this.indentNewline() + '  primaryNcList: ' + args.primaryNcList +
-		 this.indentNewline() + '  nameSrcList: ' + args.nameSrcList);
-    }
-
-    pathList = this.getPrimaryPathList(args.pendingMap, args.primaryNcList, args.ncNameListPairs);
-
-    if (_.isEmpty(pathList)) {
-	throw new Error('empty pathList');
-    }
-
-    if (this.logging) {
-	pathList.forEach(path => {
-	    this.log('path: ' + path.path +
-		     ', primary: ' + path.primaryNcCsv);
-	});
-    }
-
-    this.addSourcesToPathList(pathList, args.nameSrcList, args.ncNameListPairs);
-
-    if (this.logging) {
-	pathList.forEach(path => {
-	    this.log('path: ' + path.path +
-		     ', primary: ' + path.primaryNcCsv +
-		     ', nameSrcList: ' + path.nameSrcList);
-	});
-    }
-
-    // sources are in the pathLst, now add the items at those paths
-    pathList.forEach(path => {
-	var at = path.path ? 
-	    _.at(args.pendingMap, path.path) :
-	    [ args.pendingMap ];
-	var list;
-	if (_.size(at) != 1) {
-	    throw new Error('too much at');
-	}
-	at = at[0];
-	if (this.logging) {
-	    this.log('at: ' + at + '(' + _.size(at) + '), typeof ' + (typeof at));
-	    this.log('at.keys: ' + _.keys(at));
-	}
-	list = at[path.primaryNcCsv];
-	list.push(_.toString(path.nameSrcList));
-    });
-}
-
-//
-//
-
-Validator.prototype.addSourcesToPathList = function(pathList, nameSrcList, ncNameListPairs) {
-    var passTwo = false;
-
-    nameSrcList = _.clone(nameSrcList);
-
-    for (;;) {
-	pathList.forEach(path => {
-	    var index;
-	    if ((path.processLast && !passTwo) ||
-		(!path.processLast && passTwo))
-	    {
-		return; // forEach
-	    }
-	    path.nameSrcList = [];
-	    if (!NameCount.makeListFromCsv(path.primaryNcCsv).every(nc => {
-		index = _.findIndex(nameSrcList, { name: nc.name });
-		if (index === -1) {
-		    if (this.log ) {
-			this.log('reverting, primary clue not in nameSrcList, ' + nc.name +
-				 ', list: ' + nameSrcList);
-		    }
-		    return false;
-		}
-		if (this.logging) {
-		    this.log('addSources: adding ' + nameSrcList[index] +
-			     ' to ' + nc);
-		}
-		path.nameSrcList.push(nameSrcList[index]);
-		_.pullAt(nameSrcList, [ index ]);
-		return true;
-	    })) {
-		path.nameSrcList.forEach(nameSrc => {
-		    nameSrcList.push(nameSrc);
-		});
-		path.nameSrcList = null;
-	    }
-	});
-	if (passTwo) {
-	    break;
-	}
-	passTwo = true;
-    }
-    if (!_.isEmpty(nameSrcList)) {
-	throw new Error('items remain in nameSrcList, ' + nameSrcList);
-    }
-}
-
-//
-//
-
-Validator.prototype.getPrimaryPathList = function(map, primaryNcList, ncNameListPairs) {
-    var pathList;
-    pathList = [];
-    _.keys(map).forEach(key => {
-	var nc;
-	var valid = false;
-	if (_.isArray(map[key])) {
-	    // this does a better job at filtering valid lists
-	    if (ncNameListPairs) {
-		if (this.allInAnyNameList(
-		    _.map(_.split(key, ','), NameCount.makeNew), ncNameListPairs))
-		{
-		    valid = true;
-		}
-	    }
-	    else if (!primaryNcList ||
-		     NameCount.listContains(primaryNcList, NameCount.makeNew(key))) {
-		valid = true;
-	    }
-	    if (valid) {
-		pathList.push({
-		    path:         null,
-		    primaryNcCsv: key
-		});
-	    }
-	}
-	else {
-	    pathList = _.concat(pathList, this.recursiveGetPrimaryPathList(
-		primaryNcList, key, map[key]));
-	}
-    });
-    return pathList;
-}
-
-//
-//
-
-Validator.prototype.allInAnyNameList = function(ncList, ncNameListPairs) {
-    if (this.logging) {
-	this.log('++allInAnyNameList ncList: ' + ncList);
-    }
-    return ncNameListPairs.some(ncNameListPair => {
-	var nameList = ncNameListPair[1];
-	if (_.size(nameList) != _.size(ncList)) {
-	    return false;
-	}
-	return ncList.every(nc => {
-	    return _.includes(nameList, nc.name);
-	});
-    });
-}
-
-//
-//
-
-Validator.prototype.recursiveGetPrimaryPathList = function(primaryNcList, path, map) {
-    var arrayFound = false;
-    var pathList = [];
-    var processLast = false;
-
-    // first pass, check for multiple array keys that match primaryNcList
-    if (primaryNcList) {
-	_.forOwn(map, (value, key) => {
-	    if (_.isArray(value)) { // array means primary 
-		if (NameCount.listContainsAll(primaryNcList, NameCount.makeListFromCsv(key))) {
-		    if (arrayFound) {
-			processLast = true;
-		    }
-		    arrayFound = true;
-		}
-	    }
-	});
-    }
-
-    _.forOwn(map, (value, key) => {
-	if (_.isArray(value)) { // array means primary 
-	    if (!primaryNcList ||
-		NameCount.listContainsAll(primaryNcList, NameCount.makeListFromCsv(key)))
-	    {
-		/*
-		if (primaryNcList && arrayFound) {
-		    throw new Error('two potential primary list matches in ' + path);
-		}
-		*/
-		pathList.push({
-		    path:         path,
-		    primaryNcCsv: key,
-		    processLast:  processLast
-		});
-		arrayFound = true;
-	    }
-	}
-	else {
-	    pathList = _.concat(pathList, this.recursiveGetPrimaryPathList(
-		primaryNcList, path + '.' + key, map[key]));
-	}
-    });
-    return pathList;
-}
-
-
-/*
-//
-//pendingMap:
-//rootKey
-//origNcList:
-//primaryNcList:
-//nameSrcList:
-//
-Validator.prototype.addPendingResultAtRoot = function(args) {
-    var map;
-    var listKey;
-    var list;
-
-    // ensure root key exists
-    if (!args.pendingMap[args.rootKey]) {
-	throw new Error('pendingMap missing rootKey, ' + args.rootKey);
-    }
-    map = args.pendingMap[args.rootKey];
-    listKey = _.toString(args.primaryNcList);
-
-    if (!map[listKey]) {
-	throw new Error('pendingMap rootKey: ' + args.rootKey +
-			', missing list: ' + listKey);
-    }
-
-    list = map[listKey];
-    if (!_.isArray(list)) {
-	throw new Error('pendingMap rootKey: ' + args.rootKey +
-			' list: ' + listKey +
-			' is not an array, type: ' + (typeof list));
-    }
-    list.push(_.toString(args.nameSrcList));
-}
-*/
-
-//
-//
-
-Validator.prototype.addAllPendingPrimary = function(map, origNcList, mutatingPrimaryNcList, mutatingNameSrcList) {
-    if (this.logging) {
-	this.log('++addAllPendingPrimary' +
-		 ', origNcList: ' + origNcList +
-		 this.indentNewline() + '  mutatingPrimaryNcList: ' + mutatingPrimaryNcList +
-		 this.indentNewline() + '  mutatingNameSrcList: ' + mutatingNameSrcList);
-    }
-
-    // find primary NCs in the orignal NC list
-    origNcList.forEach((nc, ncIndex) => {
-	var primaryIndex;
-	var nameSrc;
-
-	if (nc.count > 1) {
-	    return; // forEach.continue
-	}
-	// is original primary NC in supplied mutatingPrimaryNcList?
-	if (!_.includes(mutatingPrimaryNcList, nc)) {
-	    return; // forEach.continue
-	}
-
-	nameSrc = _.find(mutatingNameSrcList, ['name', nc.name]);
-	if (!nameSrc) {
-	    throw new Error('no ' + nc.name + ' in ' + mutatingNameSrcList);
-	}
-
-	// add the primary NC to pendingMap
-	this.addPendingPrimary(map, _.toString(nc), _.toString(nameSrc));
-	primaryIndex = _.indexOf(mutatingPrimaryNcList, nc);
-	if (primaryIndex === -1) {
-	    throw new Error('alternate universe, nc: ' + nc +
-			    ', mutatingPrimaryNcList: ' + mutatingPrimaryNcList);
-	}
-
-	// remove the primary NC and it's corresponding name:src from
-	// the supplied lists
-	_.pullAt(mutatingPrimaryNcList, [primaryIndex]);
-	_.pullAt(mutatingNameSrcList, _.indexOf(mutatingNameSrcList, nameSrc));
-    });
-
-    if (this.logging) {
-	this.log('--addAllPendingPrimary' +
-		 this.indentNewline() + '  primaryNcList: ' + mutatingPrimaryNcList +
-		 this.indentNewline() + '  nameSrcList: ' + mutatingNameSrcList);
-	this.dumpResultMap(map);
-    }
-}
-
-//
-//
-
-Validator.prototype.addPendingPrimary = function(map, ncPrimaryStr, nameSrcStr) {
-    var list;
-
-    if (!map[ncPrimaryStr]) {
-	if (!this.resolvePendingPrimary(map, ncPrimaryStr)) {
-	    throw new Error('failure to resolve pending primary, ' + ncPrimaryStr +
-			    ', for: ' + nameSrcStr);
-	}
-    }
-    list = map[ncPrimaryStr] = [];
-    if (!_.isArray(list)) {
-	throw new Error('pending primary list, ' + list +
-			' is not an array, type: ' + (typeof list));
-    }
-    if (this.logging) {
-	this.log('addPendingPrimary: adding ' + nameSrcStr +
-		 ' to ' + ncPrimaryStr);
-    }
-    list.push(nameSrcStr);
-}
-
-//
-//
-
-Validator.prototype.resolvePendingPrimary = function(map, ncPrimaryStr) {
-    var primaryNcStrList;
-    var index;
-
-    primaryNcStrList = map[this.PRIMARY_KEY];
-    if (!primaryNcStrList || _.isEmpty(primaryNcStrList)) {
-	if (this.logging) {
-	    this.log('missing or empty unresolved primary list, ' + primaryNcStrList +
-		     ', for nc: ' + ncPrimaryStr);
-	    this.log('map.keys: ' + _.keys(map));
-	}
-	return false;
-    }
-
-    index = _.indexOf(primaryNcStrList, ncPrimaryStr);
-    if (index === -1) {
-	if (this.logging) {
-	    this.log('nc not in unresolved list, ' + ncPrimaryStr +
-		     ', list: ' + primaryNcStrList);
-	}
-	return false;
-    }
-
-    if (this.logging) {
-	this.log('found unresolved pending primary nc: ' + ncPrimaryStr +
-		 ', at index: ' + index);
-    }
-
-    _.pullAt(primaryNcStrList, [ index ]);
-    if (_.isEmpty(primaryNcStrList)) {
-	delete map[this.PRIMARY_KEY];
-    }
-    return true;
-}
-
-//
-//
-
-Validator.prototype.mergePending = function(resultMap, pendingMap, ncList) {
-    var rootKey;
-    var subKey;
-    var key;
-    var map;
-    var list;
-
-    if (this.logging) {
-	this.log('++mergePending' + ', ncList: ' + ncList);
-	this.log('before resultMap:');
-	this.dumpResultMap(resultMap);
-	this.log('before pendingMap:');
-	this.dumpResultMap(pendingMap);
-    }
-
-    if (ncList) {
-	this.mergePendingNcList(resultMap, pendingMap, ncList);
-    }
-    else {
-	this.recursiveMergePending(resultMap, pendingMap);
-    }
-
-    if (this.logging) {
-	this.log('--mergePending');
-	this.log('  after resultMap:');
-	this.dumpResultMap(resultMap);
-    }
-}
-
-//
-//
-
-Validator.prototype.mergePendingNcList = function(resultMap, pendingMap, ncList) {
-    if (this.logging) {
-	this.log('++mergePendingNcList' +
-		    ', resultMap.keys: ' + _.keys(resultMap) +
-		    ', pendingMap.keys: ' + _.keys(pendingMap) +
-		    ', ncList: ' + ncList);
-    }
-
-    ncList.forEach(nc => {
-	var map;
-	var srcNameList;
-	var keys;
-
-	map = resultMap[nc];
-	if (!map) {
-	    throw new Error('resultMap missing nc, ' + nc);
-	}
-	srcNameList = map[this.SOURCES_KEY];
-	if (!srcNameList || _.isEmpty(srcNameList)) {
-	    throw new Error('missing or empty srcNameList, ' + srcNameList);
-	}
-	keys = _.keys(pendingMap);
-	if (_.isEmpty(keys)) {
-	    throw new Error('empty keys');
-	}
-	keys.forEach(ncStr => {
-	    var keyNc = NameCount.makeNew(ncStr);
-	    var index;
-	    index = _.indexOf(srcNameList, keyNc.name);
-	    if (index > -1) {
-		// copy sub-map from pendingMap to resultMap
-		map[ncStr] = pendingMap[ncStr];
-		// delete sub-map in pendingMap;
-		delete pendingMap[ncStr];
-		// delete key from srcNameList
-		_.pullAt(srcNameList, [index]);
-	    }
-	});
-
-	if (!_.isEmpty(srcNameList)) {
-	    throw new Error('srcNameList has remaining items' +
-			    ', size: ' + _.size(srcNameList) + 
-			    ', length: ' + srcNameList.length +
-			    ', list: ' + srcNameList);
-	}
-	// delete sources key from resultMap
-	delete map[this.SOURCES_KEY];
-    });
-    if (!_.isEmpty(pendingMap)) {
-	throw new Error('pendingMap has remaining keys, ' + _.keys(pendingMap));
-    }
-}
-
-//
-//
-
-Validator.prototype.recursiveMergePending = function(resultSeq, pendingSeq) {
-    // empty resultSeq, add everything from pendingSeq
-    if (_.isEmpty(resultSeq)) {
-	_.forEach(pendingSeq, (value, key) => {
-	    resultSeq[key] = value;
-	});
-	return;
-    }
-
-    if (_.isArray(pendingSeq) != _.isArray(resultSeq)) {
-	throw new Error('array/object type mismatch');
-    }
-
-    if (_.isArray(resultSeq)) {
-	// ???
-    }
-    else {
-	_.forOwn(pendingSeq, (value, key) => {
-	    if (_.has(resultSeq, key)) {
-		this.recursiveMergePending(resultSeq[key], pendingSeq[key]);
-	    }
-	    else {
-		resultSeq[key] = value;
-	    }
-	});
-    }
-}
-
-//
-//
-
-Validator.prototype.ensureUniquePrimaryLists = function(map) {
-    var pathList;
-    pathList = this.getPrimaryPathList(map);
-    pathList.forEach(path => {
-	var at = path.path ? _.at(map, path.path) : [ map ];
-	var list;
-	if (_.size(at) != 1) {
-	    throw new Error('too much at');
-	}
-	at = at[0];
-	if (this.logging) {
-	    this.log('at: ' + at + '(' + _.size(at) + '), typeof ' + (typeof at));
-	    this.log('at.keys: ' + _.keys(at));
-	}
-	list = at[path.primaryNcCsv];
-	at[path.primaryNcCsv] = _.uniq(list);
-    });
 }
 
 // Simplified version of checkUniqueSources, for all-primary clues.
@@ -1714,7 +1147,7 @@ Validator.prototype.buildSrcNameList = function(args) {
     var compoundNcNameListPairs;
     var primaryNcList;
     var primarySrcNameList;
-    var srcMap;
+    var resultMap;
     var primaryPathList; // TODO: i had half an idea here
 
     if (this.logging) {
@@ -1733,7 +1166,7 @@ Validator.prototype.buildSrcNameList = function(args) {
     primaryNcList = [];
     primarySrcNameList = [];
     primaryPathList = [];
-    srcMap = {};
+    resultMap = ResultMap.makeNew();
 
     args.ncList.forEach((nc, ncIndex) => {
 	var srcList;          // e.g. [ 'src1,src2,src3', 'src2,src3,src4' ]
@@ -1776,24 +1209,24 @@ Validator.prototype.buildSrcNameList = function(args) {
 	    }
 	}
 
-	if (srcMap[nc]) {
+	if (resultMap.map()[nc]) {
 	    throw new Error('already in map, ' + nc);
 	}
 
 	// if nc is a primary clue
 	if (nc.count == 1) {
 	    // add map entry for list of primary name:sources
-	    if (!srcMap[this.PRIMARY_KEY]) {
-		srcMap[this.PRIMARY_KEY] = [];
+	    if (!resultMap.map()[this.PRIMARY_KEY]) {
+		resultMap.map()[this.PRIMARY_KEY] = [];
 	    }
-	    srcMap[this.PRIMARY_KEY].push(_.toString(nc)); // consider nc.name here instead
+	    resultMap.map()[this.PRIMARY_KEY].push(_.toString(nc)); // consider nc.name here instead
 	    return; // forEach.next;
 	}
 
 	compoundNcNameListPairs.push([nc, _.clone(srcNameList)]);
 
 	// nc is a compound clue
-	map = srcMap[nc] = {};
+	map = resultMap.map()[nc] = {};
 	// if sources for this nc are all primary clues
 	if (_.size(srcNameList) === nc.count) {
 	    // build component primary NC list
@@ -1833,13 +1266,13 @@ Validator.prototype.buildSrcNameList = function(args) {
 		 this.indentNewline() + '  primarySrcNameList: ' + primarySrcNameList +
 		 this.indentNewline() + '  primaryNcList: ' + primaryNcList);
 	
-	if (!_.isEmpty(srcMap)) {
-	    this.log('srcMap:');
-	    this.dumpResultMap(srcMap);
+	if (!_.isEmpty(resultMap.map())) {
+	    this.log('resultMap:');
+	    resultMap.dump();
 	    //this.log(_(srcMap).toJSON());
 	}
 	else {
-	    this.log('srcMap: empty');
+	    this.log('resultMap: empty');
 	}
     }
 
@@ -1849,35 +1282,11 @@ Validator.prototype.buildSrcNameList = function(args) {
 	compoundNcList:         compoundNcList,
 	primaryNcList:          primaryNcList,
 	primarySrcNameList:     primarySrcNameList,
-	srcMap:                 srcMap,
+	resultMap:              resultMap,
 	count:                  clueCount,
 	allPrimary:             allPrimary,
 	indexMap:               indexMap
     };
-}
-
-//
-//
-
-Validator.prototype.buildPrimaryPendingMap = function(ncList, nameSrcList) {
-    var pendingMap = {};
-
-    nameSrcList = _.clone(nameSrcList);
-    ncList.forEach(nc => {
-	var index;
-    
-	index = _.findIndex(nameSrcList, { name: nc.name });
-	if (index === -1) {
-	    throw new Error('no ' + nc.name + ' in ' + nameSrcList);
-	}
-	pendingMap[nc] = [ nameSrcList[index] ];
-	_.pullAt(nameSrcList, [ index ]);
-    });
-    if (!_.isEmpty(nameSrcList)) {
-	throw new Error('nameSrcList has items remaining, ' + nameSrcList);
-    }
-
-    return pendingMap;
 }
 
 //
@@ -2060,12 +1469,13 @@ Validator.prototype.chop = function(list, removeValue) {
 }
 
 // args:
-//  nameSrcList:   this.getNameSrcList(primaryClueData),
-//  map:           args.resultMap,
-//  excludeSrcList:args.excludeSrcList,
+//  nameSrcList:   
+//  map:           
+//  excludeSrcList:
+//  vsCount:
 //
 Validator.prototype.addFinalResult = function(args) {
-    if (!args.vsCount || 
+    if (!args.vsCount || !args.map ||
 	!args.nameSrcList || _.isEmpty(args.nameSrcList)) {
 	throw new Error ('missing args' +
 			 ', nameSrcList: ' + args.nameSrcList +

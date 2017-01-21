@@ -1,3 +1,7 @@
+//
+// CLUES.JS
+//
+
 'use strict';
 
 var _           = require('lodash');
@@ -13,6 +17,7 @@ var ClueList    = require('./clue_list');
 var NameCount   = require('./name_count');
 var Peco        = require('./peco');
 var Show        = require('./show');
+var ResultMap   = require('./resultmap');
 
 // initialize command line options.  do this before logger.
 //
@@ -447,7 +452,7 @@ function showSources(clueName) {
 	    result: result.resultMap,
 	    key:    Validator.PRIMARY_KEY
 	});
-	Validator.dumpResultMap(result.vsResultMap);
+	result.vsResultMap.dump();
 	result.ncListArray.forEach(ncList => {
 	    console.log('list: ' + ncList);
 	});
@@ -483,6 +488,7 @@ function setLogging(verboseArg) {
     Validator.logging   = flag;
     AltSources.logging  = flag;
     ComboSearch.logging = flag;
+    ResultMap.setLogging = flag;
     Peco.setLogging(flag);
 
     LOGGING = flag;
