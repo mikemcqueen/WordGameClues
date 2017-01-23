@@ -129,5 +129,7 @@
   { "name": "gregory",                    "src": "dunn,john" },
   { "name": "william",                    "src": "dunn,john" },
   { "name": "meditations",                "src": "dunn,john" },
-  { "name": "#17",                        "src": "dunn,john" }
+    { "name": "#17",                        "src": "dunn,john" },
+    { "name" : "homer boots",          "src" : "louis,randolph" },
+    { "name" : "meriwether",          "src" : "lewis,randolph" }
 ]

@@ -477,9 +477,11 @@ ClueManager.prototype.filter = function(clueListArray, clueCount) {
     var source;
     var known = 0;
     var reject = 0;
+    var map = {};
 
     for (index = 0; index < clueListArray.length; ++index) {
 	source = clueListArray[index].makeKey();
+	map[source] = true;
 	if (this.isKnownSource(source, clueCount)) {
 	    if (this.logging) {
 		this.log('isKnownSource(' + clueCount + ') ' + source);
@@ -496,9 +498,10 @@ ClueManager.prototype.filter = function(clueListArray, clueCount) {
 	}
     }
     return {
-	'array' : clueListArray,
-	'known' : known,
-	'reject': reject
+	array:  clueListArray,
+	set:    map,
+	known:  known,
+	reject: reject
     };
 }
 

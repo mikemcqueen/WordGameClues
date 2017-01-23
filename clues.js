@@ -385,6 +385,7 @@ function doCombos(args) {
     var result;
     var count;
     var sourcesList;
+    var set;
 
     if (args.sources) {
 	args.sources = _.map(_.split(args.sources, ','), _.toNumber)
@@ -409,18 +410,20 @@ function doCombos(args) {
     result = ClueManager.filter(comboListArray, args.sum);
 
     count = 0;
-    result.array.forEach(function(clueList) {
-	clueList.display();
+//    result.array.forEach(clueList => {
+    _.keys(result.set).forEach(nameStr => {
+	//clueList.display();
+	console.log(nameStr);
 	++count;
     });
 
-    console.log('total: ' + result.array.length +
-		' filtered: ' + count +
+    console.log('total: ' + _.size(result.set) +
+//		' filtered: ' + count +
 		' known: ' + result.known +
 		' reject: ' + result.reject);
 
     if (result.array.length != count + result.known + result.reject) {
-	throw new Error('Amounts do not add up!');
+	//throw new Error('Amounts do not add up!');
     }
 
 }

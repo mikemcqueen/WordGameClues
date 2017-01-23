@@ -105,20 +105,26 @@ ComboMaker.prototype.makeCombos = function(args) {
 	var start;
 	var duration;
 	var ncMap;
+	var first;
 
 	result = this.first(clueSourceList, sourceIndexes);
 	if (!result) {
 	    throw new Error('no valid combos');
 	}
 
+	first = true;
 	// this is effectively Peco.getCombinations().forEach()
-	for (; result; (function(thisArg) {
-	    start = new Date();
-	    result = thisArg.next(clueSourceList, sourceIndexes);
-	    duration = new Duration(start, new Date());
-	    nextDuration += duration.milliseconds;
-	})(this)) {
-	    ncMap = {}
+	while (result) {
+	    if (!first) {
+		start = new Date();
+		result = this.next(clueSourceList, sourceIndexes);
+		duration = new Duration(start, new Date());
+		nextDuration += duration.milliseconds;
+	    }
+	    else {
+		first = false;
+	    }
+	    ncMap = {};
 	    clueNameList = [];
 	    if (!clueSourceList.every((clueSource, index) => {
 		clue = clueSource.list[sourceIndexes[index]];
