@@ -35,7 +35,6 @@
   { "name": "mays",                       "src": "yellow,corn" },
   { "name": "baptist",                    "src": "saint,john" },
   { "name": "dent",                       "src": "yellow,corn" },
-  { "name": "blonde",                     "src": "goliath,tarantula" },
   { "name": "lindbergh",                  "src": "charles,lucky" },
   { "name": "ranger",                     "src": "texas,walker" },
   { "name": "john brown",                 "src": "brown,john" },
@@ -51,9 +50,5 @@
   { "name": "tracy",                      "src": "detective,yellow jacket" },
   { "name": "monarch",                    "src": "black,butterfly,orange" },
   { "name": "heath",                      "src": "butterfly,freckled" },
-  { "name": "viceroy",                    "src": "black,butterfly,orange" },
-  { "name": "bailey",                     "src": "beetle,freckled" },
-  { "name": "randolph",                   "src": "charles,pollock" },
-  { "name": "randy",                      "src": "charles,pollock" },
-  { "name": "captain",                    "src": "charles,pollock,randolph" }
+  { "name": "viceroy",                    "src": "black,butterfly,orange" }
 ]

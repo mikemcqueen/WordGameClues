@@ -26,5 +26,11 @@
   { "name": "bing crosby",                "src": "dick tracy,mumbles" },
   { "name": "bing",                       "src": "dick tracy,mumbles" },
   { "name": "crosby",                     "src": "dick tracy,mumbles" },
-  { "name": "james",                      "src": "#1,brown" }
+  { "name": "james",                      "src": "#1,brown" },
+  { "name": "elizabeth",                  "src": "freckled,monarch" },
+  { "name": "lady jane",                  "src": "freckled,monarch" },
+  { "name": "lady",                       "src": "freckled,monarch" },
+  { "name": "jane",                       "src": "freckled,monarch" },
+  { "name": "jane seymour",               "src": "freckled,monarch" },
+  { "name": "seymour",                    "src": "freckled,monarch" }
 ]

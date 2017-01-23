@@ -37,22 +37,5 @@
   { "name": "clarence parker",            "src": "ace,duke,mckay" },
   { "name": "clarence",                   "src": "ace,duke,mckay" },
   { "name": "parker",                     "src": "ace,duke,mckay" },
-  { "name": "lucy",                       "src": "sarah,cunningham" },
-  { "name": "charles",                    "src": "pollock,randolph" },
-  { "name": "cornstalk",                  "src": "chief,randolph" },
-  { "name": "corn",                       "src": "chief,randolph" },
-  { "name": "trevor",                     "src": "ace,hoffman" },
-  { "name": "captain",                    "src": "charles,pollock,randolph" },
-  { "name": "nelson",                     "src": "baker,clyde" },
-  { "name": "lindbergh",                  "src": "charles,lucky" },
-  { "name": "cunningham",                 "src": "duke,randy" },
-  { "name": "randolph",                   "src": "charles,pollock" },
-  { "name": "randy",                      "src": "charles,pollock" },
-  { "name": "george",                     "src": "randolph,scott" },
-  { "name": "dave",                       "src": "randolph,scott" },
-  { "name": "david scott",                "src": "moon,randolph,walker" },
-  { "name": "sweet",                      "src": "corn,yellow" },
-  { "name": "maize",                      "src": "corn,yellow" },
-  { "name": "mays",                       "src": "corn,yellow" },
-  { "name": "dent",                       "src": "corn,yellow" }
+  { "name": "lucy",                       "src": "sarah,cunningham" }
 ]

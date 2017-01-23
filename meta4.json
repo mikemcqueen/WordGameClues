@@ -67,7 +67,5 @@
   { "name": "sal maglie",                 "src": "giants,ace" },
   { "name": "the barber",                 "src": "giants,ace" },
   { "name": "trevor",                     "src": "hoffman,ace" },
-  { "name": "monarch",                    "src": "butterfly,king" },
-  { "name": "randolph",                   "src": "charles,pollock" },
-  { "name": "randy",                      "src": "charles,pollock" }
+  { "name": "monarch",                    "src": "butterfly,king" }
 ]

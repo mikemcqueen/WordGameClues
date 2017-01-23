@@ -50,5 +50,5 @@
   { "name": "oriole",                     "src": "orange,songbird" },
   { "name": "detective",                  "src": "blue,moon" },
   { "name": "butterfly",                  "src": "blue,moon" },
-  { "name": "beetle",                     "src": "blue,moon" }
+    { "name": "beetle",                     "src": "blue,moon", "ignore" : true }
 ]

@@ -151,11 +151,11 @@ ComboMaker.prototype.makeCombos = function(args) {
 	    });
 	    duration = new Duration(start, new Date());
 
-	    if (validateResult) {
+	    if (validateResult.success) {
 		successDuration += duration.milliseconds;
 
 		if (validateAll) {
-		    if (!this.checkPrimarySources(validateResult, args.sources)) {
+		    if (!this.checkPrimarySources(validateResult.resultMap, args.sources)) {
 			continue;
 		    }			
 		}
@@ -196,8 +196,22 @@ ComboMaker.prototype.makeCombos = function(args) {
 
 ComboMaker.prototype.checkPrimarySources = function(result, sources) {
     return Validator.getFinalResultList(result).some(ncCsv => {
-	return _.pullAll(NameCount.makeCountList(NameCount.makeListFromCsv(ncCsv)),
-			sources).length == 0;
+	var ncList = NameCount.makeListFromCsv(ncCsv);
+	var countList;
+	var remain;
+	countList = NameCount.makeCountList(ncList);
+	remain =  _.pullAll(countList, sources);
+
+	if (_.find(ncList, ['name', 'wiggins']) && _.find(ncList, ['name', 'cat'])) {
+	    console.log('test, ncCsv: ' + ncCsv +
+			', countList ' + countList + 
+			', remain: ' + remain +
+			', size(all): ' + _.size(remain));
+	}
+	return _.size(remain) === 0;
+	
+//	return _.pullAll(NameCount.makeCountList(NameCount.makeListFromCsv(ncCsv)),
+//			sources).length == 0;
     });
 }
 
@@ -214,7 +228,7 @@ ComboMaker.prototype.buildUseNcList = function(nameList, countList) {
 		throw new Error('specified clue does not exist, ' + nc);
 	    }
 	    if (!_.includes(countList, nc.count)) {
-		requireList.push(nc.count);
+		countList.push(nc.count);
 	    }
 	}
 	ncList.push(nc);

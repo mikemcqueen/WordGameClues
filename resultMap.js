@@ -6,7 +6,6 @@
 
 var ResultMapExports = {
     makeNew                : makeNew,
-    makeFrom               : makeFrom,
     dumpMap                : dumpMap,
     setLogging             : setLogging
 };
@@ -25,46 +24,14 @@ const PRIMARY_KEY   = '__primary';
 const SOURCES_KEY   = '__sources';
 const FINAL_KEY     = '__final';
 
-var LOGGING = true;
+//
+
+var LOGGING = false;
 
 //
 
 function makeNew() {
     return new ResultMap(); //assignMethods(Object({}));
-}
-
-// makeFrom()
-//
-// args:
-//   object:    Javascript object
-//
-
-function makeFrom(args) {
-    return assignMethods(Object(objectFrom(args)));
-}
-
-// args: see makeFrom()
-//
-function objectFrom(args) {
-    var obj;
-    
-    /*
-    if (args.filename) {
-	clueList = JSON.parse(Fs.readFileSync(args.filename, 'utf8'));
-    }
-    else
-    */
-    if (args.object) {
-	obj = args.object;
-    }
-    else {
-	log('args:');
-	for (var key in args) { 
-	    log('  ' + key + ' : ' + args[key]);
-	}
-	throw new Error('missing argument');
-    }
-    return obj;
 }
 
 //

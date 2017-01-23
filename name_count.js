@@ -192,9 +192,11 @@ NameCount.prototype.equals = function(nc) {
 
 //
 
+/*
 NameCount.prototype.log = function() {
     console.log('NameCount: ' + this);
 }
+*/
 
 //
 

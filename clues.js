@@ -39,7 +39,7 @@ var Opt = require('node-getopt')
 	['u', 'use=NAME[:COUNT]+',           'use the specified name[:count](s)' ],
 	['x', 'max=COUNT',                   'specify maximum # of components to combine'],
 	['y', 'synthesis',                   'use synthesis clues, same as --json clues' ],
-	['z', 'flags=OPTION+',               'flags: 1=validateAllOnLoad' ],
+	['z', 'flags=OPTION+',               'flags: 1=validateAllOnLoad,2=ignoreLoadErrors' ],
 
 	['v' , 'verbose=OPTION+',             'show logging. OPTIONS=load' ],
 	['h' , 'help'               ,         'this screen']
@@ -83,6 +83,7 @@ function main() {
     var primarySourcesArg;
     var flagsArg;
     var validateAllOnLoad;
+    var ignoreLoadErrors;
 
 /*    if (Opt.argv.length) {
 	console.log('Usage: node clues.js [options]');
@@ -111,10 +112,6 @@ function main() {
     jsonArg = Opt.options['json'];
     primarySourcesArg = Opt.options['primary-sources'];
     flagsArg = Opt.options.flags;
-    if (_.includes(flagsArg, '1')) {
-	validateAllOnLoad = true;
-    }
-
 
     if (!maxArg) {
 	maxArg = 2; // TODO: default values in opt
@@ -148,14 +145,24 @@ function main() {
 	allowDupeName:    true,
     } : {
 	allowDupeNameSrc: false,
-	allowDupeSrc:     allowDupeSrcFlag ? true : false,
+	allowDupeSrc:     (allowDupeSrcFlag ? true : false),
 	allowDupeName:    true,
     });
+
+    if (_.includes(flagsArg, '1')) {
+	validateAllOnLoad = true;
+	console.log('validateAllOnLoad=true');
+    }
+    if (_.includes(flagsArg, '2')) {
+	ignoreLoadErrors = true;
+	console.log('ignoreLoadErrors=true');
+    }
+
 
     setLogging(_.includes(verboseArg, VERBOSE_FLAG_LOAD));
 
     //
-    if (!loadClues(synthFlag, metaFlag, jsonArg, validateAllOnLoad)) {
+    if (!loadClues(synthFlag, metaFlag, jsonArg, validateAllOnLoad, ignoreLoadErrors)) {
 	return 1;
     }
 
@@ -216,7 +223,7 @@ function main() {
 
 //
 
-function loadClues(synthFlag, metaFlag, jsonArg, validateAllOnLoad) {
+function loadClues(synthFlag, metaFlag, jsonArg, validateAllOnLoad, ignoreLoadErrors) {
     var base;
     var max;
     var required;
@@ -253,7 +260,8 @@ function loadClues(synthFlag, metaFlag, jsonArg, validateAllOnLoad) {
 	reject:      base + 'rejects',
 	max:         max,
 	required:    required,
-	validateAll: validateAllOnLoad
+	validateAll: validateAllOnLoad,
+	ignoreErrors:ignoreLoadErrors
     });
 
     log('done.');
@@ -337,11 +345,12 @@ function showValidSrcListCounts(srcList) {
 	result = Validator.validateSources({
 	    sum:      sum,
 	    nameList: nameList,
-	    count:    nameList.length
+	    count:    nameList.length,
+	    validateAll: true
 	});
 	//console.log('validate [' + nameList + ']: ' + result);
 	msg = clueCountList.toString();
-	if (!result) {
+	if (!result.success) {
 	    msg += ': INVALID';
 	}
 	else {
@@ -422,7 +431,6 @@ function doCombos(args) {
 function showSources(clueName) {
     var result;
     var nc = NameCount.makeNew(clueName);
-    nc.log();
 
     if (!nc.count) {
 	throw new Error('Need to supply a count as name:count (for now)');

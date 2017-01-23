@@ -20,8 +20,8 @@ var _           = require('lodash');
 
 //
 
-var FORCE_QUIET = true;
-var LOGGING = false;
+var FORCE_QUIET = false;
+var LOGGING = true;
 
 function makeNew(args) {
     return new Peco(args);
@@ -200,14 +200,12 @@ Peco.prototype.buildResult = function(args) {
 	throw new Error('missing arg, count: ' + args.count +
 			', listArray: ' + args.listArray);
     }
-
     if (!list) {
-	if (args.count) {
-	    throw new Error('no permutations/combinations');
+	if (LOGGING) {
+	    this.log('Peco: no ' + args.count + ' in ' +  list);
 	}
 	return null;
     }
-
     do {
 	if (LOGGING) {
 	    this.log('Peco: adding: ' + list);

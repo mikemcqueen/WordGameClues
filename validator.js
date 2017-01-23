@@ -65,7 +65,7 @@ Validator.prototype.setAllowDupeFlags = function(args) {
 
 // args:
 //  nameList:       list of clue names, e.g. ['bob','jim']
-//  sum:            primary clue count
+//  sum:            # of primary clues represented by names in nameList
 //  max:            max # of sources to combine (either this -or- count must be set)
 //  count:          exact # of sources to combine (either this -or- max must be set)
 //  require:        list of required clue counts, e.g. [2, 4]
@@ -89,7 +89,7 @@ Validator.prototype.validateSources = function(args, nameCountList) {
     var peco;
     var resultMap;
     var vsResultMap;
-    var vsNcListArray;
+    var ncListArray = [];
     var result;
 
     if (args.validateAll) {
@@ -98,7 +98,7 @@ Validator.prototype.validateSources = function(args, nameCountList) {
 
     if (this.logging) {
 	this.log('++validateSources' +
-		 ', nameList(' + args.nameList.length + 
+		 ', nameList(' + args.nameList.length +
 		 '): ' + args.nameList +
 		 ', nameCountList: ' + args.nameCountList +
 		 ', count(' + args.count + ')' +
@@ -139,6 +139,7 @@ Validator.prototype.validateSources = function(args, nameCountList) {
 	    validateAll:   args.validateAll,
 	    wantResults:   args.wantResults,
 	    vsCount:       vsCount,
+	    recursive:     args.recursive,
 	    resultMap:     resultMap
 	});
 	if (rvsResult.success) {
@@ -146,7 +147,7 @@ Validator.prototype.validateSources = function(args, nameCountList) {
 		this.log('recursiveValidateSources: VALIDATE SUCCESS!');
 	    }
 	    vsResultMap = rvsResult.resultMap;
-	    vsNcListArray = rvsResult.ncListArray;
+	    ncListArray = _.concat(ncListArray, rvsResult.ncListArray);
 
 	    // this is a non-recursive success that meets all constraints
 	    found = true;
@@ -159,7 +160,7 @@ Validator.prototype.validateSources = function(args, nameCountList) {
 		// combinations for the names in nameList. We're skipping
 		// them which is bad.
 
-		return true; // some.exit, return to checkUniqueSources()
+		///return true; // some.exit, return to checkUniqueSources()
 	    }
 
 	    // we may not care about all possible combinations
@@ -188,7 +189,7 @@ Validator.prototype.validateSources = function(args, nameCountList) {
     return {
 	resultMap:   resultMap,
 	vsResultMap: vsResultMap,
-	ncListArray: vsNcListArray,
+	ncListArray: ncListArray,
 	success:     found
     }
 }
@@ -203,6 +204,8 @@ Validator.prototype.validateSources = function(args, nameCountList) {
 //  resultMap:      args.resultMap
 //  vsCount:        pass-through
 //
+// TODO: ForNameList
+
 Validator.prototype.recursiveValidateSources = function(args) {
     var nameIndex;
     var clueName;
@@ -210,8 +213,11 @@ Validator.prototype.recursiveValidateSources = function(args) {
     var someResult;
     var rvsResult;
 
-    if (!_.has(args, 'vsCount')) {
-	throw new Error ('missing args');
+    if (!args.vsCount || !args.clueNameList || !args.clueCountList) {
+	throw new Error ('missing args' +
+			 ', clueNameList: ' + args.clueNameList +
+			 ', clueCountList: ' + args.clueCountList +
+			 ', vsCount: ' + args.vsCount);
     }
 
     this.logLevel++;
@@ -267,6 +273,7 @@ Validator.prototype.recursiveValidateSources = function(args) {
 	    validateAll:    args.validateAll,
 	    wantResults:    args.wantResults,
 	    vsCount:        args.vsCount,      // aka "original count"
+	    recursive:      args.recursive,
 	    resultMap:      args.resultMap
 	});
 	if (!rvsResult.success) {
@@ -302,20 +309,31 @@ Validator.prototype.recursiveValidateSources = function(args) {
 //   count    : count,
 //   nameList : clueNameList,
 //   countList: clueCountList,
-//   ncList   : nameCountList,
+//   ncList
 //   excludeSrcList: list of excluded primary sources
 //   validateAll:
 //   wantResults:
 //   resultMap:
 //   vsCount:       pass-through
 //
+// TODO: ForName
 Validator.prototype.rvsWorker = function(args) {
     var newNameCountList;
     var uniqResult;
     var rvsResult;
     var nc;
 
-    if (!args.vsCount) {
+    if (this.logging) {
+	this.log('++rvsWorker' +
+		 ', name: ' + args.name +
+		 ', count: ' + args.count +
+		 ', validateAll: ' + args.validateAll +
+		 ', ncList: ' + args.ncList +
+		 ', nameList: ' + args.nameList);
+    }
+
+    if (!args.vsCount || !args.name || !args.count || 
+	!args.ncList || !args.nameList) {
 	throw new Error ('missing args');
     }
 
@@ -326,7 +344,7 @@ Validator.prototype.rvsWorker = function(args) {
 	// in the clueList[count]. (at least as many entries as there are
 	// copies of name in ncList)
 	if (this.logging) {
-	    this.log('duplicate name:count, ' + args.name + ':' + args.count);
+	    this.log('--rvsWorker, duplicate name:count, ' + args.name + ':' + args.count);
 	}
 	return { success: false }; // fail
     }
@@ -379,11 +397,12 @@ Validator.prototype.rvsWorker = function(args) {
 	validateAll:   args.validateAll,
 	wantResults:   args.wantResults,
 	vsCount:       args.vsCount,      // aka "original count"
+	recursive:     args.recursive,
 	resultMap:     args.resultMap
     });
     if (!rvsResult.success) {
 	if (this.logging) {
-	    this.log('recursiveValidateSources failed');
+	    this.log('--rvsWorker, recursiveValidateSources failed');
 	}
 	return { success: false }; // fail
     }
@@ -394,7 +413,7 @@ Validator.prototype.rvsWorker = function(args) {
     newNameCountList.forEach(nc => args.ncList.push(nc));
 
     if (this.logging) {
-	this.log('add2, ' + args.name + ':' + args.count +
+	this.log('--rvsWorker, add ' + args.name + ':' + args.count +
 		 ', newNc(' + newNameCountList.length + ')' +
 		 ', ' + newNameCountList);
     }
@@ -430,12 +449,12 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
     var ncListCsv;
     var pendingMap;
     var resultMap;
-
-    var anyFlag;
-    var saveNcList;
+    var anyCandidate;
     var candidateNcListArray;
     var ncListArray;
     var uniqResult;
+    var anyFlag = false;
+
 
     if (!args.vsCount) {
 	throw new Error ('missing args');
@@ -448,7 +467,9 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 		 ', name: ' + args.name +
 		 ', count: ' + args.count +
 		 ', nameList: ' + args.nameList +
-		 ', ncList: ' + nameCountList);
+		 ', validateAll: ' + args.validateAll +
+		 ', recursive: ' + args.recursive +
+		 ', ncList: ' + args.nameCountList);
     }
 
     // TODO: or just pass in as arg, like a sane person
@@ -488,7 +509,7 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 	}
 	return this.uniqueResult(false);
     }
-    
+
     ncListArray = [];
     buildArgs = {
 	excludeSrcList: args.excludeSrcList,
@@ -515,7 +536,6 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 		    this.log('cUS: adding all_primary result: ' +
 			     nameCountList + ' = ' + buildResult.primaryNcList);
 		}
-		saveNcList = nameCountList;
 		nameCountList = buildResult.primaryNcList;
 		candidateNcListArray = [ buildResult.primaryNcList ];
 	    }
@@ -543,25 +563,21 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 		if (_.isEmpty(vsResult.ncListArray)) {
 		    throw new Error('empty nc list array');
 		}
-		
+
 		if (this.logging) {
 		    this.log('from validateSources(' + buildResult.count + ')' +
 			     this.indentNewline() + '  compoundSrcNameList: ' + buildResult.compoundSrcNameList +
 			     this.indentNewline() + '  srcNcList: ' + srcNcList);
-		    this.log('ncListArray.size: ' + _.size(vsResult.ncListArray));
+		    this.log('  ncListArray.size: ' + _.size(vsResult.ncListArray));
 		    vsResult.ncListArray.forEach(ncList => {
 			this.log('  ncList: ' + ncList);
 		    });
 		    vsResult.vsResultMap.dump();
 		}
-		
-		saveNcList = nameCountList; // of highly questionable value
-		
 		if (args.wantResults) {
 		    // looks backwards, but correct.
 		    pendingMap.merge(vsResult.vsResultMap, buildResult.compoundNcList);
 		}
-		
 		// we only sent compound clues to validateSources, so add the
 		// primary clues that build filtered out to make a complete list
 		candidateNcListArray = [];
@@ -569,8 +585,8 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 		    candidateNcListArray.push(_.concat(ncList, buildResult.primaryNcList));
 		});
 	    }
-		
-	    anyFlag = false;
+	    
+	    anyCandidate = false;
 	    candidateNcListArray.some(ncList => {
 		var findResult;
 		var uniqResult;
@@ -581,24 +597,6 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 		}
 		if (!findResult.allPrimary) {
 		    throw new Error ('shit happens, ' + ncList);
-		    // I think the only way this can happen is if we are unwinding
-		    // a successful recursive call to validateSources. The returned
-		    // resultMap is our new resultMap.
-		    
-		    // FALSE. This only occurs after a call to validateSources, but
-		    // currently validateSources does not always return primary
-		    // sources (it should). It just finds "counts" for a namelist,
-		    // regardless of count size.
-		    // break out of innerloop here
-		    
-		    this.log('!allPrimary, pending: ' + pendingMap);
-		    
-		    // kind of funky.  should go away once validateSources
-		    // returns  a primaryNC list
-		    buildResult = null;
-		    // not so sure about this!
-		    resultMap = pendingMap;
-		    return false; // then break; // continue;
 		}
 		uniqResult = this.allUniquePrimary({
 		    origNcList:     buildArgs.ncList, //origNcList,
@@ -613,30 +611,33 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 		    pendingMap:     pendingMap
 		});
 		if (uniqResult.success) {
-		    anyFlag = true;
+		    anyCandidate = true;
 		    ncListArray.push(ncList);
-		    return !args.validateAll; // some.continue, false if we're validating all
+		    // TODO: args.recursive
+		    //if (_.size(ncList) !== args.vsCount) {
+		    if (args.recursive) {
+			return false; // some.continue if we're in a recursive call
+		    }
+		    return !args.validateAll; // some.continue if we're validating all, else exit
 		}
 	    });
-	    if (!anyFlag ) {
+	    if (!anyCandidate) {
 		break; // none of those results were good, try other combos
 	    }
-
+	    anyFlag = true;
+	    // found a good result
 	    if (args.wantResults) {
 		resultMap.merge(pendingMap);
 	    }
-					 
-	    if (args.validateAll) {
-		break; // success - try other combos
+	    if (args.validateAll || args.recursive) {
+		break; // success - but keep searching for other combos
 	    }
 	    return this.uniqueResult(anyFlag, resultMap, ncListArray); // success - exit function
 	}
-
 	// sanity check
 	if (!buildResult) {
 	    throw new Error('!buildResult');
 	}
-
 	if (buildResult && !this.incrementIndexMap(buildResult.indexMap)) {
 	    if (this.logging) {
 		this.log('done, success: ' + anyFlag);
@@ -669,10 +670,10 @@ Validator.prototype.uniqueResult = function(success, map, ncListArray) {
 //  ncName
 //  map:
 //  excludeSrcList:
-//  vsCount:      
-//  wantResults: 
-//  pendingMap: 
-//  validateAll: 
+//  vsCount:
+//  wantResults:
+//  pendingMap:
+//  validateAll:
 //
 
 Validator.prototype.allUniquePrimary = function(args) {
@@ -720,7 +721,7 @@ Validator.prototype.allUniquePrimary = function(args) {
 	    vsCount:       args.vsCount,
 	    excludeSrcList:args.excludeSrcList
 	})) {
-	    if (args.wantResults) {	    
+	    if (args.wantResults) {
 		cycleList.forEach(nameSrcList => {
 		    args.pendingMap.addResult({
 			origNcList:     args.origNcList,
@@ -818,7 +819,7 @@ Validator.prototype.cyclePrimaryClueSources = function(args) {
 	})) {
 	    if (this.logging) {
 		this.log('cycle: adding result: ' +
-			 this.indentNewline() + '  ' + 
+			 this.indentNewline() + '  ' +
 			 args.ncList + ' = ' + nameSrcList);
 	    }
 	    resultList.push(nameSrcList);
@@ -877,7 +878,7 @@ Validator.prototype.findDuplicatePrimaryClue = function(args) {
     if (allPrimary && !duplicateSrc &&
 	(_.size(findResult.srcMap) != _.size(args.ncList)))
     {
-	console.log('ncList: ' + args.ncList + 
+	console.log('ncList: ' + args.ncList +
 		    '\nsrcMap.keys: ' + _.keys(findResult.srcMap));
 	throw new Error('srcMap.size != ncList.size');
     }
@@ -1261,11 +1262,11 @@ Validator.prototype.buildSrcNameList = function(args) {
 	this.log('--buildSrcNameList' +
 		 ', compoundSrcNameList: ' + compoundSrcNameList +
 		 ', compoundNcList: ' + compoundNcList +
-		 ', count: ' + clueCount + 
+		 ', count: ' + clueCount +
 		 this.indentNewline() + '  compoundNcNameListPairs: ' + compoundNcNameListPairs +
 		 this.indentNewline() + '  primarySrcNameList: ' + primarySrcNameList +
 		 this.indentNewline() + '  primaryNcList: ' + primaryNcList);
-	
+
 	if (!_.isEmpty(resultMap.map())) {
 	    this.log('resultMap:');
 	    resultMap.dump();
@@ -1277,7 +1278,7 @@ Validator.prototype.buildSrcNameList = function(args) {
     }
 
     return {
-	compoundNcNameListPairs:compoundNcNameListPairs, 
+	compoundNcNameListPairs:compoundNcNameListPairs,
 	compoundSrcNameList:    compoundSrcNameList,
 	compoundNcList:         compoundNcList,
 	primaryNcList:          primaryNcList,
@@ -1469,8 +1470,8 @@ Validator.prototype.chop = function(list, removeValue) {
 }
 
 // args:
-//  nameSrcList:   
-//  map:           
+//  nameSrcList:
+//  map:
 //  excludeSrcList:
 //  vsCount:
 //
@@ -1508,9 +1509,9 @@ Validator.prototype.addFinalResult = function(args) {
 }
 
 // args:
-//  map:      
-//  key:      
-//  name:     
+//  map:
+//  key:
+//  name:
 //  nameSrcList:
 //  excludeSrcList: list of excluded primary sources
 //  vsCount:
@@ -1544,7 +1545,7 @@ Validator.prototype.addResultEntry = function(args) {
 	    map[args.name].push(stringList);
 	}
     }
-	
+
     return true;
 }
 

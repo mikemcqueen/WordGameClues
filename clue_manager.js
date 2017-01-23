@@ -58,6 +58,10 @@ ClueManager.prototype.loadAllClues = function(args) {
     var knownClueList;
     var rejectClueList;
 
+    if (args.ignoreErrors) {
+	this.ignoreLoadErrors = true;
+    }
+
     for (count = 1; count <= args.max; ++count) {
 	optional = count > args.required;
 	knownClueList = ClueList.makeFrom(
@@ -192,10 +196,12 @@ ClueManager.prototype.addKnownCompoundClues = function(clueList, clueCount, vali
 		    nameList:    srcNameList,
 		    count:       srcNameList.length,
 		    validateAll: validateAll
-		})) {
-		    throw new Error('Known validate sources failed' +
-				    ', count(' + clueCount + ') ' +
-				    clue.name + ' : ' + srcKey);
+		}).success) {
+		    if (!this.ignoreLoadErrors) {
+			throw new Error('Known validate sources failed' +
+					', count(' + clueCount + ') ' +
+					clue.name + ' : ' + srcKey);
+		    }
 		}
 		srcMap[srcKey] = [ clue ];
 	    }
@@ -282,9 +288,11 @@ ClueManager.prototype.addRejectCombos = function(clueList, clueCount) {
 		sum:      clueCount,
 		nameList: srcNameList,
 		count:    srcNameList.length
-	    })) {
-		throw new Error('Reject validate sources failed, count(' + clueCount + ')' +
-				' srcNames: ' + srcNameList);
+	    }).success) {
+		if (!this.ignoreLoadErrors) {
+		    throw new Error('Reject validate sources failed, count(' + clueCount + ')' +
+				    ' srcNames: ' + srcNameList);
+		}
 	    }
 	}
 
@@ -404,6 +412,12 @@ ClueManager.prototype.makeSrcNameListArray = function(nc) {
 ClueManager.prototype.getClueSourceListArray = function(args) {
     var clueSourceListArray = [];
 
+    if (this.logging) {
+	this.log('++clueSrcListArray' +
+		 ', sum: ' + args.sum +
+		 ', max: ' + args.max +
+		 ', require: ' + args.require);
+    }
     Peco.makeNew({
 	sum:     args.sum,
 	max:     args.max,
@@ -425,9 +439,15 @@ ClueManager.prototype.getClueSourceListArray = function(args) {
 	    clueSourceListArray.push(clueSourceList);
 	}
     }, this);
-    
     if (!clueSourceListArray.length) {
 	throw new Error('clueSourceListArray empty!');
+	// this happens, for example, with -c 3 -x 3 -q 1 -q 2 -q 3
+	// we require sources 1,2,3, and search for combos with
+	// -max 1,2,3 of which both -max 1,2 will hit here because
+	// we can't match 3 numbers
+	if (this.logging) {
+	    this.log('--clueSrcListArray empty!');
+	}
     }
 
     return clueSourceListArray;

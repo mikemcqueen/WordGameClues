@@ -132,7 +132,7 @@ ComboSearch.prototype.findAlternateSourcesForName = function(name, count) {
 		    nameList: srcNameList,
 		    count:    srcNameList.length
 		});
-		if (result) {
+		if (result.success) {
 		    ncListArray.push(ncList);
 		}
 	    });
