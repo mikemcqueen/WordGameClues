@@ -50,5 +50,10 @@
   { "name": "oriole",                     "src": "orange,songbird" },
   { "name": "detective",                  "src": "blue,moon" },
   { "name": "butterfly",                  "src": "blue,moon" },
-    { "name": "beetle",                     "src": "blue,moon", "ignore" : true }
+    { "name": "archibald mitford stuart",    "src": "ace,tom,lewis", "note" : "WWI ace" },
+    { "name": "lieutenant",               "src": "ace,tom,lewis", "note" : "WWI ace" },
+    { "name": "archibald",                "src": "ace,tom,lewis", "note" : "WWI ace" },
+    { "name": "mitford",                  "src": "ace,tom,lewis", "note" : "WWI ace" },
+    { "name": "stuart",                   "src": "ace,tom,lewis", "note" : "WWI ace" },
+    { "name": "beetle",                   "src": "blue,moon", "ignore" : true }
 ]
