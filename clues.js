@@ -34,7 +34,7 @@ var Opt = require('node-getopt')
 	['o', 'output'             ,         'output json -or- clues' ],
 	['p', 'primary-sources=SOURCE[,SOURCE,...]', 'limit results to the specified primary source(s)' ],
 	['q', 'require-counts=COUNT+',       'require clue(s) of specified count(s)' ],
-	['s', 'show-sources=NAME[:COUNT]',   'show possible source combinations for the specified name[:count]' ],
+	['s', 'show-sources=NAME[:COUNT][,v]', 'show possible source combinations for the specified name[:count]' ],
 	['t', 'test=NAME[,NAME,...]',        'test the specified source list, e.g. blue,fish' ],
 	['u', 'use=NAME[:COUNT]+',           'use the specified name[:count](s)' ],
 	['x', 'max=COUNT',                   'specify maximum # of components to combine'],
@@ -433,8 +433,15 @@ function doCombos(args) {
 
 function showSources(clueName) {
     var result;
-    var nc = NameCount.makeNew(clueName);
+    var nc;
+    var verbose;
+    var clueSplitList = clueName.split(',');
 
+    clueName = clueSplitList[0];
+    nc = NameCount.makeNew(clueName);
+    if (_.size(clueSplitList) > 1) {
+	verbose = clueSplitList[1] == 'v';
+    }
     if (!nc.count) {
 	throw new Error('Need to supply a count as name:count (for now)');
     }
@@ -448,24 +455,12 @@ function showSources(clueName) {
 	validateAll:  true
     });
     if (result.success) {
-	showValidateResult({
-	    title:  'staging',
-	    result: result.resultMap,
-	    key:    Validator.STAGING_KEY
-	});
-	showValidateResult({
-	    title:  'compound',
-	    result: result.resultMap,
-	    key:    Validator.COMPOUND_KEY
-	});
-	showValidateResult({
-	    title: 'primary',
-	    result: result.resultMap,
-	    key:    Validator.PRIMARY_KEY
-	});
-	result.vsResultMap.dump();
-	result.ncListArray.forEach(ncList => {
-	    console.log('list: ' + ncList);
+	result.ncListArray.forEach(result => {
+	    console.log('nameSrcList: ' + result.nameSrcList);
+	    if (verbose) {
+		console.log('ncList:      ' + result.ncList);
+		result.resultMap.dump();
+	    }
 	});
     }
     else {

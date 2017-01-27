@@ -187,7 +187,7 @@ NameCount.prototype.setIndex = function(index) {
 //
 
 NameCount.prototype.equals = function(nc) {
-    return (nc.count == this.count) && (nc.name == this.name);
+    return (nc.count === this.count) && (nc.name == this.name);
 }
 
 //

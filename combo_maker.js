@@ -153,11 +153,12 @@ ComboMaker.prototype.makeCombos = function(args) {
 	    if (validateResult.success) {
 		successDuration += duration.milliseconds;
 
-		if (validateAll) {
-		    if (!this.checkPrimarySources(validateResult.resultMap, args.sources)) {
-			continue;
-		    }			
-		}
+		if (validateAll &&
+		    !this.checkPrimarySources(validateResult.ncListArray,
+					      args.sources))
+		{
+		    continue;
+		}			
 		clueList = ClueList.makeNew();
 		clueSourceList.forEach((clueSource, index) => {
 		    clue = clueSource.list[sourceIndexes[index]];
@@ -190,12 +191,12 @@ ComboMaker.prototype.makeCombos = function(args) {
     return clueListArray;
 }
 
-// As long as one final result has only primary sources from 'sources' array
-// we're good.
+// As long as one final result has only primary sources from 'sources'
+// array, we're good.
 //
-ComboMaker.prototype.checkPrimarySources = function(result, sources) {
-    return Validator.getFinalResultList(result).some(ncCsv => {
-	return NameCount.makeCountList(NameCount.makeListFromCsv(ncCsv)).
+ComboMaker.prototype.checkPrimarySources = function(resultList, sources) {
+    return resultList.some(result => {
+	return NameCount.makeCountList(result.nameSrcList).
 	    every(source => {
 		return _.includes(sources, source);
 	    });

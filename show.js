@@ -57,7 +57,7 @@ function compatibleKnownClues(args) {
     var count;
     var matchNameMapArray; // should probably be SrcMap[src] = [ { name: name, srcCounts: [1,2,3] }, ... ]
     var clueList;
-    var result;
+    var vsResult;
 
     if (!_.has(args, 'nameList') ||
 	!_.has(args, 'max'))
@@ -91,22 +91,21 @@ function compatibleKnownClues(args) {
     // first, make sure the supplied nameList by itself is a valid clue
     // combination, and find out how many primary-clue variations there
     // are in which the clue names in useNameList can result.
-    result = Validator.validateSources({
+    vsResult = Validator.validateSources({
 	sum:         totalCount,
 	nameList:    NameCount.makeNameList(NameCount.makeListFromNameList(args.nameList)),
 	count:       args.nameList.length,
 	validateAll: true
     });
-    if (!result.success) {
+    if (!vsResult.success) {
 	console.log('The nameList [ ' + args.nameList + ' ] is not a valid clue combination');
 	return;
     }
 
     // for each final result from validateResults
-    Validator.getFinalResultList(result.resultMap).forEach(nameSrcCsv => {
-	log('final result: ' + nameSrcCsv);
-	var nameSrcList = NameCount.makeListFromCsv(nameSrcCsv);
-	var primarySrcList = NameCount.makeCountList(nameSrcList);
+    vsResult.ncListArray.forEach(result => {
+	log('final result: ' + result.nameSrcList);
+	var primarySrcList = NameCount.makeCountList(result.nameSrcList);
 	var result;
 
 	// for each clue in each clueList[count] where count is
@@ -194,13 +193,7 @@ function isCompatibleClue(args) {
     log('isCompatible: ' + args.clue.name + ':' + args.clue.src +
 	'(' + args.sum + '), ' + Boolean(result));
 
-    if (result.success) {
-	resultList = Validator.getFinalResultList(result.resultMap);
-	if (!resultList) {
-	    throw new Error('I donut think this happens');
-	}
-    }
-    return result.success ? resultList : false;
+    return result.success ? result.ncListArray : false;
 }
 
 // args:
@@ -241,10 +234,10 @@ function addToCompatibleMap(args) {
 
     verbose = false; // name == 'ace';
 
-    args.resultList.forEach(ncCsv => {
+    args.resultList.forEach(result => {
 	var primarySrcList;
 	var key;
-	primarySrcList = NameCount.makeCountList(NameCount.makeListFromCsv(ncCsv));
+	primarySrcList = NameCount.makeCountList(result.nameSrcList);
 	if (verbose) {
 	    console.log('primary sources for ' + name + ': ' + primarySrcList);
 	}
