@@ -1,6 +1,6 @@
 [
-  { "name": "randolph",                   "src": "charles,pollock", "note" : "steamship captain, which ship?" },
-  { "name": "randy",                      "src": "charles,pollock" },
+    { "name": "randolph",                   "src": "charles,pollock", "note" : "steamship captain, which ship?, cannot find info now", "ignore" : true },
+    { "name": "randy",                      "src": "charles,pollock", "note" : "steamship captain i thought, but cannot find now" , "ignore" : true },
   { "name": "george hudson",              "src": "midland railroad,king" },
   { "name": "george",                     "src": "midland railroad,king" },
   { "name": "hudson",                     "src": "midland railroad,king" },
@@ -38,5 +38,13 @@
   { "name": "lady",                       "src": "freckled,monarch" },
   { "name": "jane",                       "src": "freckled,monarch" },
   { "name": "jane seymour",               "src": "freckled,monarch" },
-  { "name": "seymour",                    "src": "freckled,monarch" }
+    { "name": "seymour",                    "src": "freckled,monarch" },
+    { "name": "sweet orange",              "src": "sweet,orange" },
+    { "name": "hamlin",              "src": "sweet,orange" },
+    { "name": "valencia",              "src": "sweet,orange" },
+    { "name": "malta",              "src": "sweet,orange" },
+    { "name": "kona",              "src": "sweet,orange" },
+    { "name": "hart's tardiff",              "src": "sweet,orange" },
+    { "name": "parson brown",              "src": "sweet,orange" },
+    { "name": "monster",                  "src": "john,mckay,moonshine" }
 ]

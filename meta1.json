@@ -37,6 +37,10 @@
     { "name": "cher",               "src": "4" },
 
     { "name": "carlisle",           "src": "5" },
+    { "name": "purple martin",            "src": "5" },
+    { "name": "purple",            "src": "5" },
+    { "name": "martin",            "src": "5" },
+    { "name": "bird",            "src": "5" },
     { "name": "swallow",            "src": "5" },
 
     { "name": "st. elmo",           "src": "6" },

@@ -45,7 +45,7 @@ ComboMaker.prototype.log = function(text) {
 //  max:     max # of sources to use
 //  require: required clue counts, e.g. [3,5,8]
 //  sources: limit to these primary sources, e.g. [1,9,14]
-//  use:     list of clue names, e.g. ['john:1','bob:5']
+//  use:     list of clue name-counts, e.g. ['john:1','bob:5']
 //
 // A "clueSourceList" is a list (array) where each element is a
 // object that cointas a list (cluelist) and a count, such as
@@ -77,13 +77,15 @@ ComboMaker.prototype.makeCombos = function(args) {
 
     // if args.use specified, add counts from use clues to
     // the require clue counts list
-    require = args.require ? args.require : [];
+    //require = args.require ? args.require : [];
     if (args.use) {
-	useNcList = this.buildUseNcList(args.use, require);
+	useNcList = this.buildUseNcList(args.use); // , require);
     }
+    /*
     if (require.length === 0) {
 	require = null;
     }
+    */
 
     if (args.sources) {
 	console.log('Valididating sources: ' + args.sources);
@@ -197,27 +199,15 @@ ComboMaker.prototype.makeCombos = function(args) {
     return clueListArray;
 }
 
+// As long as one final result has only primary sources from 'sources' array
+// we're good.
 //
-//
-
 ComboMaker.prototype.checkPrimarySources = function(result, sources) {
     return Validator.getFinalResultList(result).some(ncCsv => {
-	var ncList = NameCount.makeListFromCsv(ncCsv);
-	var countList;
-	var remain;
-	countList = NameCount.makeCountList(ncList);
-	remain =  _.pullAll(countList, sources);
-
-	if (_.find(ncList, ['name', 'wiggins']) && _.find(ncList, ['name', 'cat'])) {
-	    console.log('test, ncCsv: ' + ncCsv +
-			', countList ' + countList + 
-			', remain: ' + remain +
-			', size(all): ' + _.size(remain));
-	}
-	return _.size(remain) === 0;
-	
-//	return _.pullAll(NameCount.makeCountList(NameCount.makeListFromCsv(ncCsv)),
-//			sources).length == 0;
+	return NameCount.makeCountList(NameCount.makeListFromCsv(ncCsv)).
+	    every(source => {
+		return _.includes(sources, source);
+	    });
     });
 }
 
@@ -233,9 +223,11 @@ ComboMaker.prototype.buildUseNcList = function(nameList, countList) {
 	    if (!ClueManager.knownClueMapArray[nc.count][nc.name]) {
 		throw new Error('specified clue does not exist, ' + nc);
 	    }
+	    /*
 	    if (!_.includes(countList, nc.count)) {
 		countList.push(nc.count);
 	    }
+	    */
 	}
 	ncList.push(nc);
     });

@@ -40,6 +40,7 @@
   { "name": "misadventure",               "src": "brian jones,death" },
   { "name": "marlin",                     "src": "blue,fish" },
   { "name": "tailor",                     "src": "blue,fish" },
+  { "name": "taylor",                     "src": "blue,fish" },
   { "name": "shad",                       "src": "blue,fish" },
   { "name": "elf",                        "src": "blue,fish" },
   { "name": "candle",                     "src": "blue,fish" },
@@ -63,9 +64,13 @@
   { "name": "meditations",                "src": "dunn,john" },
   { "name": "#17",                        "src": "dunn,john" },
   { "name": "tom keene",                  "src": "dick,powers" },
+  { "name": "tom",                  "src": "dick,powers" },
+  { "name": "keene",                  "src": "dick,powers" },
   { "name": "sterling marlin",            "src": "marlin,sterling" },
   { "name": "sal maglie",                 "src": "giants,ace" },
   { "name": "the barber",                 "src": "giants,ace" },
   { "name": "trevor",                     "src": "hoffman,ace" },
+    { "name": "lockwood",                    "src": "sarah,pardee" },
+    { "name": "winchester",                  "src": "sarah,pardee" },
   { "name": "monarch",                    "src": "butterfly,king" }
 ]

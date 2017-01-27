@@ -16,6 +16,7 @@
   { "name": "neon",                       "src": "dwarf,fish" },
   { "name": "rainbow",                    "src": "dwarf,fish" },
   { "name": "pygmy",                      "src": "dwarf,fish" },
+  { "name": "pig",                      "src": "dwarf,fish" },
   { "name": "lion",                       "src": "dwarf,fish" },
   { "name": "hawk",                       "src": "dwarf,fish" },
   { "name": "baldwin",                    "src": "elias,lucky" },
@@ -55,5 +56,10 @@
     { "name": "archibald",                "src": "ace,tom,lewis", "note" : "WWI ace" },
     { "name": "mitford",                  "src": "ace,tom,lewis", "note" : "WWI ace" },
     { "name": "stuart",                   "src": "ace,tom,lewis", "note" : "WWI ace" },
+    { "name": "johnny leonard roosevelt", "src": "pepper,martin" },
+    { "name": "johnny", "src": "pepper,martin" },
+    { "name": "leonard", "src": "pepper,martin" },
+    { "name": "roosevelt", "src": "pepper,martin" },
+    { "name": "howard", "src": "pepper,martin", "note" : "actor" },
     { "name": "beetle",                   "src": "blue,moon", "ignore" : true }
 ]

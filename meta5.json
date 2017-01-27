@@ -9,7 +9,8 @@
   { "name": "new castle",                 "src": "222,colorado city" },
   { "name": "midland railroad",           "src": "222,colorado city" },
   { "name": "rabbit",                     "src": "sailor,moon" },
-  { "name": "george",                     "src": "scott,randolph", "note" : "actor, under virginia moon, stranger wore a gun" },
+  { "name": "george",           "src": "scott,randolph", "note" : "actor, under virginia moon, stranger wore a gun" },
+  { "name": "georgia",          "src": "scott,randolph", "note" : "actor, under virginia moon, stranger wore a gun" },
   { "name": "dave",                       "src": "scott,randolph", "note" : "astronaut/moon walker" },
   { "name": "neville",                    "src": "ace,duke", "note" : "RAF ace, wingman to Sailor" },
   { "name": "randall cunningham",         "src": "ace,duke" },
@@ -50,5 +51,8 @@
   { "name": "tracy",                      "src": "detective,yellow jacket" },
   { "name": "monarch",                    "src": "black,butterfly,orange" },
   { "name": "heath",                      "src": "butterfly,freckled" },
+    { "name": "lockwood",                    "src": "sarah,pardee" },
+    { "name": "winchester",                  "src": "sarah,pardee" },
+    { "name": "monster",                  "src": "john,mckay,moonshine" },
   { "name": "viceroy",                    "src": "black,butterfly,orange" }
 ]

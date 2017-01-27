@@ -80,5 +80,18 @@
   { "name": "john",                       "src": "polar,cunningham" },
   { "name": "theodore rashid ibrahim xavier",  "src": "misadventure,rabbit", "note" : "trix" },
   { "name": "lucy",                       "src": "sarah,cunningham" },
-  { "name": "john brown",                 "src": "brown,john" }
+    { "name": "john brown",                 "src": "brown,john" },
+    { "name": "monster",                  "src": "john,mckay,moonshine" },
+    { "name": "sweet orange",              "src": "sweet,orange" },
+    { "name": "hamlin",              "src": "sweet,orange" },
+    { "name": "valencia",              "src": "sweet,orange" },
+    { "name": "malta",              "src": "sweet,orange" },
+    { "name": "kona",              "src": "sweet,orange" },
+    { "name": "hart's tardiff",              "src": "sweet,orange" },
+    { "name": "parson brown",              "src": "sweet,orange" },
+  { "name": "john henry hardin",          "src": "georgia,moonshine,king" },
+  { "name": "john henry",          "src": "georgia,moonshine,king" },
+  { "name": "john",          "src": "georgia,moonshine,king" },
+  { "name": "henry",          "src": "georgia,moonshine,king" },
+  { "name": "hardin",          "src": "georgia,moonshine,king" }
 ]

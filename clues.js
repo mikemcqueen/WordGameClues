@@ -410,15 +410,12 @@ function doCombos(args) {
     result = ClueManager.filter(comboListArray, args.sum);
 
     count = 0;
-//    result.array.forEach(clueList => {
     _.keys(result.set).forEach(nameStr => {
-	//clueList.display();
 	console.log(nameStr);
 	++count;
     });
 
     console.log('total: ' + _.size(result.set) +
-//		' filtered: ' + count +
 		' known: ' + result.known +
 		' reject: ' + result.reject);
 
