@@ -200,7 +200,8 @@ function addResultAtNcList(args) {
     if (LOGGING) {
 	pathList.forEach(path => {
 	    this.log('path: ' + path.path +
-		     ', primary: ' + path.primaryNcCsv);
+		     ', primary: ' + path.primaryNcCsv + 
+		     ', processLast: ' + path.processLast);
 	});
     }
 
@@ -249,7 +250,7 @@ function addSourcesToPathList(pathList, nameSrcList, ncNameListPairs) {
 	    if ((path.processLast && !passTwo) ||
 		(!path.processLast && passTwo))
 	    {
-		return; // forEach
+		return; // forEach.continue
 	    }
 	    path.nameSrcList = [];
 	    if (!NameCount.makeListFromCsv(path.primaryNcCsv).every(nc => {
@@ -259,7 +260,7 @@ function addSourcesToPathList(pathList, nameSrcList, ncNameListPairs) {
 			this.log('reverting, primary clue not in nameSrcList, ' + nc.name +
 				 ', list: ' + nameSrcList);
 		    }
-		    return false;
+		    return false; // every.exit
 		}
 		if (LOGGING) {
 		    this.log('addSources: adding ' + nameSrcList[index] +
@@ -267,7 +268,7 @@ function addSourcesToPathList(pathList, nameSrcList, ncNameListPairs) {
 		}
 		path.nameSrcList.push(nameSrcList[index]);
 		_.pullAt(nameSrcList, [ index ]);
-		return true;
+		return true;  // every.continue
 	    })) {
 		path.nameSrcList.forEach(nameSrc => {
 		    nameSrcList.push(nameSrc);

@@ -75,18 +75,9 @@ ComboMaker.prototype.makeCombos = function(args) {
     this.log('CM: sum=' + args.sum + ' max=' + args.max);
     */
 
-    // if args.use specified, add counts from use clues to
-    // the require clue counts list
-    //require = args.require ? args.require : [];
     if (args.use) {
 	useNcList = this.buildUseNcList(args.use); // , require);
     }
-    /*
-    if (require.length === 0) {
-	require = null;
-    }
-    */
-
     if (args.sources) {
 	console.log('Valididating sources: ' + args.sources);
 	validateAll = true;
@@ -96,7 +87,7 @@ ComboMaker.prototype.makeCombos = function(args) {
     ClueManager.getClueSourceListArray({
 	sum:     args.sum,
 	max:     args.max,
-	require: require,
+	require: args.require,
     }).forEach(clueSourceList => {
 	var sourceIndexes = [];
 	var clueNameList;

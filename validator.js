@@ -114,7 +114,7 @@ Validator.prototype.validateSources = function(args, nameCountList) {
     // to pass both
 
     if (!args.resultMap) {
-	resultMap = ResultMap.makeNew();
+	resultMap = {}; // ResultMap.makeNew();
     }
     else {
 	resultMap = args.resultMap;
@@ -149,7 +149,6 @@ Validator.prototype.validateSources = function(args, nameCountList) {
 	    vsResultMap = rvsResult.resultMap;
 	    ncListArray = _.concat(ncListArray, rvsResult.ncListArray);
 
-	    // this is a non-recursive success that meets all constraints
 	    found = true;
 
 	    // We may have been called recursively. Don't set 'found' flag
@@ -301,7 +300,7 @@ Validator.prototype.recursiveValidateSources = function(args) {
 	ncListArray: rvsResult.ncListArray
     } : {
 	success: false
-    }
+    };
 }
 
 // args:
@@ -598,11 +597,12 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 		if (!findResult.allPrimary) {
 		    throw new Error ('shit happens, ' + ncList);
 		}
+		nameSrcList = this.getNameSrcList(findResult.srcMap),
 		uniqResult = this.allUniquePrimary({
 		    origNcList:     buildArgs.ncList, //origNcList,
 		    ncList:         ncList,
 		    ncNameListPairs:buildResult.compoundNcNameListPairs,
-		    nameSrcList:    this.getNameSrcList(findResult.srcMap),
+		    nameSrcList:    nameSrcList,
 		    map:            args.resultMap,
 		    excludeSrcList: args.excludeSrcList,
 		    vsCount:        args.vsCount,
@@ -613,8 +613,6 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 		if (uniqResult.success) {
 		    anyCandidate = true;
 		    ncListArray.push(ncList);
-		    // TODO: args.recursive
-		    //if (_.size(ncList) !== args.vsCount) {
 		    if (args.recursive) {
 			return false; // some.continue if we're in a recursive call
 		    }
@@ -675,7 +673,6 @@ Validator.prototype.uniqueResult = function(success, map, ncListArray) {
 //  pendingMap:
 //  validateAll:
 //
-
 Validator.prototype.allUniquePrimary = function(args) {
     var cycleList;
     var nameSrcCsvArray;
@@ -1482,27 +1479,12 @@ Validator.prototype.addFinalResult = function(args) {
 			 ', nameSrcList: ' + args.nameSrcList +
 			 ', vsCount: ' + args.vsCount);
     }
-
     if (this.addResultEntry({
 	map:           args.map,
-	key:           this.PRIMARY_KEY,
-	name:          this.FINAL_KEY,
 	nameSrcList:   args.nameSrcList,
 	excludeSrcList:args.excludeSrcList,
 	vsCount:       args.vsCount
     })) {
-	/*
-	//console.log('Added: ' + args.ncList.toString() + ', length=' + args.ncList.length);
-	// seems like we might want to do this even if addResultEntry fails.
-	// just because all primary name:src are duplicate doesn't mean
-	// it didn't derive from higher level clues that are unique
-	if (args.stagingNcList) {
-	    this.moveStagingToCompound({
-		map:    args.map,
-		ncList: args.stagingNcList
-	    });
-	}
-	*/
 	return true;
     }
     return false;
@@ -1510,8 +1492,6 @@ Validator.prototype.addFinalResult = function(args) {
 
 // args:
 //  map:
-//  key:
-//  name:
 //  nameSrcList:
 //  excludeSrcList: list of excluded primary sources
 //  vsCount:
@@ -1519,7 +1499,10 @@ Validator.prototype.addFinalResult = function(args) {
 Validator.prototype.addResultEntry = function(args) {
     var map;
     var srcList;
-    var stringList;
+    var nameSrcCsv;
+
+    var key = this.PRIMARY_KEY;
+    var name = this.FINAL_KEY;
 
     if (args.excludeSrcList) {
 	// TODO: this looks wrong
@@ -1530,19 +1513,20 @@ Validator.prototype.addResultEntry = function(args) {
 	}
     }
 
+    // using vsCount is bogus
     if (args.vsCount === _.size(args.nameSrcList)) {
-	if (!args.map[args.key]) {
-	    map = args.map[args.key] = {};
+	if (!args.map[key]) {
+	    map = args.map[key] = {};
 	}
 	else {
-	    map = args.map[args.key];
+	    map = args.map[key];
 	}
-	stringList = args.nameSrcList.toString();
-	if (!map[args.name]) {
-	    map[args.name] = [ stringList ];
+	nameSrcCsv = args.nameSrcList.toString();
+	if (!map[name]) {
+	    map[name] = [ nameSrcCsv ];
 	}
-	else if (map[args.name].indexOf(stringList) === -1) {
-	    map[args.name].push(stringList);
+	else if (map[name].indexOf(nameSrcCsv) === -1) {
+	    map[name].push(nameSrcCsv);
 	}
     }
 

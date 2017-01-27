@@ -364,6 +364,9 @@ function showValidSrcListCounts(srcList) {
 		    msg += clue.name;
 		});
 	    }
+	    else if (ClueManager.rejectSourceMapArray[sum][nameList]) {
+		msg += ': REJECTED';
+	    }
 
 	}
 	console.log(msg);
@@ -496,7 +499,7 @@ function setLogging(verboseArg) {
     Validator.logging   = flag;
     AltSources.logging  = flag;
     ComboSearch.logging = flag;
-    ResultMap.setLogging = flag;
+    ResultMap.setLogging(flag);
     Peco.setLogging(flag);
 
     LOGGING = flag;

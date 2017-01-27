@@ -481,7 +481,6 @@ ClueManager.prototype.filter = function(clueListArray, clueCount) {
 
     for (index = 0; index < clueListArray.length; ++index) {
 	source = clueListArray[index].makeKey();
-	map[source] = true;
 	if (this.isKnownSource(source, clueCount)) {
 	    if (this.logging) {
 		this.log('isKnownSource(' + clueCount + ') ' + source);
@@ -495,6 +494,9 @@ ClueManager.prototype.filter = function(clueListArray, clueCount) {
 	    }
 	    ++reject;
 	    delete clueListArray[index];
+	}
+	else {
+	    map[source] = true;
 	}
     }
     return {

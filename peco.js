@@ -363,7 +363,7 @@ Peco.prototype.next = function(combFlag)
     var inner;
 
     // if last index is maxed reset to zero, increment next-to-last index, etc.
-    for (;;) {
+    do {
 	index = lastIndex;
 	while (++this.indexList[index].index > this.indexList[index].last) {
 	    if (combFlag) { // combinations
@@ -386,11 +386,8 @@ Peco.prototype.next = function(combFlag)
 		      ', this.getIndexSum(): ' + this.getIndexSum() +
 		      ', this.sum: ' + this.sum);
 	}
+    } while (!this.isValidIndex());
 
-	if (this.isValidIndex()) {
-	    break;
-	}
-    }
     return this.getPecoList();
 }
 
@@ -460,13 +457,14 @@ Peco.prototype.indexListToJSON = function() {
 //
 
 Peco.prototype.indexContainsAll = function(list) {
-    return _.intersection(this.getPecoList(), list).length == list.length;
+    // NOTE: requires list to have unique numbers
+    return _.size(_.intersection(this.getPecoList(), list)) === _.size(list);
 }
 
 //
 
 Peco.prototype.indexContainsAny = function(list) {
-    return _.intersection(this.getPecoList(), list).length > 0;
+    return _.size(_.intersection(this.getPecoList(), list)) > 0;
 }
 
 //
