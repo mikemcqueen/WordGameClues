@@ -8,6 +8,7 @@
 
 module.exports = exports = new ClueManager();
 
+var _              = require('lodash');
 var Fs             = require('fs');
 
 var ClueList       = require('./clue_list');
@@ -23,7 +24,7 @@ function ClueManager() {
     this.rejectListArray = [];       // the JSON reject files in an array
     this.knownClueMapArray = [];     // map clue name to clue src
     this.knownSourceMapArray = [];   // map known source (incl. multi-source) to true/false (currently)
-    this.rejectSourceMapArray = [];  // map reject source to true/false (currently)
+    this.rejectSourceMap = {};       // map reject source to true/false (currently)
 
     this.rvsSuccessSeconds = 0;
     this.rvsFailDuration = 0;
@@ -41,13 +42,14 @@ function ClueManager() {
 ClueManager.prototype.log = function(text) {
     var pad = '';
     var index;
-    for (index=0; index<this.logLevel; ++index) { pad += ' '; }
-    console.log(pad + text);
+    if (this.logging) {
+	for (index=0; index<this.logLevel; ++index) { pad += ' '; }
+	console.log(pad + text);
+    }
 }
 
 // args:
-//  known:    known filename base
-//  reject:   reject filename base
+//  baseDir:  base directory (meta, synth)
 //  max:      max clue file# to load
 //  required: required clue file# to load
 //
@@ -65,7 +67,7 @@ ClueManager.prototype.loadAllClues = function(args) {
     for (count = 1; count <= args.max; ++count) {
 	optional = count > args.required;
 	knownClueList = ClueList.makeFrom(
-	    { 'filename' : args.known + count + '.json',
+	    { 'filename' : args.baseDir + '/clues' + count + '.json',
 	      'optional' : optional
 	    }
 	);
@@ -78,49 +80,31 @@ ClueManager.prototype.loadAllClues = function(args) {
 	}
 	else {
 	    this.addKnownCompoundClues(knownClueList, count, args.validateAll);
-	    rejectClueList = null;
-	    try {
-		rejectClueList = ClueList.makeFrom({
-		    'filename' : args.reject + count + '.json',
-		    'optional' : optional
-		});
+	}
+    }
+
+    for (count = 2; count <= args.max; ++count) {
+	rejectClueList = null;
+	try {
+	    rejectClueList = ClueList.makeFrom({
+		'filename' : args.baseDir + '/rejects' + count + '.json',
+		'optional' : optional
+	    });
+	}
+	catch (e) {
+	    if (this.logging) {
+		this.log('missing reject file: ' + 
+			 args.baseDir + '/rejects' + count + '.json');
 	    }
-	    catch (e) {
-		if (this.logging) {
-		    this.log('missing reject file: ' + 
-			     args.reject + count + '.json');
-		}
-	    }
-	    this.rejectSourceMapArray[count] = {};
-	    if (rejectClueList ) {
-		this.rejectListArray[count] = rejectClueList;
-		this.addRejectCombos(rejectClueList, count);
-	    }
+	}
+	if (rejectClueList ) {
+	    this.rejectListArray[count] = rejectClueList;
+	    this.addRejectCombos(rejectClueList, count);
 	}
     }
 
     this.loaded = true;
     this.maxClues = args.max;
-
-    return this;
-}
-
-//
-//
-
-ClueManager.prototype.loadIgnoredClues = function() {
-    var ignoredList;
-
-    try {
-	ignoredList = JSON.parse(Fs.readFileSync("ignored.json", 'utf8'));
-    }
-    catch (e) {
-	return;
-    }
-
-    ignoredList.forEach(function(clue) {
-	this.ignoredClueMap[clue] = true;
-    }, this);
 
     return this;
 }
@@ -273,26 +257,24 @@ ClueManager.prototype.addRejectCombos = function(clueList, clueCount) {
 	}
 
 	srcNameList = clue.src.split(',');
+
+	if (_.size(srcNameList) !== clueCount) {
+	    if (this.logging) {
+		this.log('WARNING: word count mismatch' +
+			 ', expected ' + clueCount +
+			 ', actual ' + _.size(srcNameList) +
+			 ', ' + srcNameList);
+	    }
+	}
+
+
 	srcNameList.sort();
 
-	if (this.isRejectSource(srcNameList.toString(), clueCount)) {
-	    throw new Error('Duplicate reject source, count(' + clueCount + ')' +
-			    ' srcNames: ' + srcNameList);
-	}
-	else {
+	if (this.isRejectSource(srcNameList.toString())) {
 	    if (this.logging) {
-		this.log('############ validating Reject Combo : ' + srcNameList);
-	    }
-
-	    if (!Validator.validateSources({
-		sum:      clueCount,
-		nameList: srcNameList,
-		count:    srcNameList.length
-	    }).success) {
-		if (!this.ignoreLoadErrors) {
-		    throw new Error('Reject validate sources failed, count(' + clueCount + ')' +
-				    ' srcNames: ' + srcNameList);
-		}
+		this.log('WARNING: Duplicate reject source' +
+			 ', count ' + clueCount +
+	    		 ', ' + srcNameList);
 	    }
 	}
 
@@ -300,7 +282,7 @@ ClueManager.prototype.addRejectCombos = function(clueList, clueCount) {
 	    this.log('addRejectCombo: ' + srcNameList);
 	}
 
-	this.rejectSourceMapArray[clueCount][srcNameList] = true;
+	this.rejectSourceMap[srcNameList.toString()] = true;
     }, this);
 
     return this;
@@ -318,23 +300,14 @@ ClueManager.prototype.isKnownSource = function(source, count) {
 }
 
 // source is string containing sorted, comma-separated clues
-//
+// NOTE: works with string or array of strings
 
-ClueManager.prototype.isRejectSource = function(source, count) {
-    if (!source || !count) {
-	throw new Error('missing args, source: ' + source +
-			', count: ' + count);
+ClueManager.prototype.isRejectSource = function(source) {
+    if (!source) {
+	throw new Error('missing args, source: ' + source);
     }
-    return this.rejectSourceMapArray[count][source];
+    return this.rejectSourceMap[source];
 }
-
-//
-//
-
-ClueManager.prototype.isIgnoredClue = function(clue) {
-    return this.ignoredClueMap[clue];
-}
-
 
 //
 //
@@ -488,7 +461,7 @@ ClueManager.prototype.filter = function(clueListArray, clueCount) {
 	    ++known;
 	    delete clueListArray[index];
 	}
-	else if (this.isRejectSource(source, clueCount)) {
+	else if (this.isRejectSource(source)) {
 	    if (this.logging) {
 		this.log('isRejectSource(' + clueCount + ') ' + source);
 	    }
