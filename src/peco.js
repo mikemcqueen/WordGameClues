@@ -21,7 +21,7 @@ var _           = require('lodash');
 //
 
 var FORCE_QUIET = false;
-var LOGGING = true;
+var LOGGING = false;
 
 function makeNew(args) {
     return new Peco(args);

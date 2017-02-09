@@ -8,13 +8,22 @@
 
 module.exports = exports = new ClueManager();
 
-var _              = require('lodash');
-var Fs             = require('fs');
+const _              = require('lodash');
+const Path           = require('path');
 
-var ClueList       = require('./clue_list');
-var Validator      = require('./validator');
-var NameCount      = require('./name_count');
-var Peco           = require('./peco');
+const ClueList       = require('./clue_list');
+const Validator      = require('./validator');
+const NameCount      = require('./name_count');
+const Peco           = require('./peco');
+
+//
+
+const DATA_DIR              =  Path.dirname(module.filename) + '/../data/';
+
+const MAX_SYNTH_CLUE_COUNT  = 25;
+const REQ_SYNTH_CLUE_COUNT  = 11; // should make this 12 soon
+const MAX_META_CLUE_COUNT   = 9;
+const REQ_META_CLUE_COUNT   = 9;
 
 //
 //
@@ -32,7 +41,7 @@ function ClueManager() {
     this.loaded = false;
     this.maxClues = 0;
 
-    this.logging = true;
+    this.logging = false;
     this.logLevel = 0;
 }
 
@@ -50,31 +59,38 @@ ClueManager.prototype.log = function(text) {
 
 // args:
 //  baseDir:  base directory (meta, synth)
-//  max:      max clue file# to load
-//  required: required clue file# to load
+//  ignoreErrors:
+//  validateAll:
 //
-
 ClueManager.prototype.loadAllClues = function(args) {
     var count;
     var optional = false;
     var knownClueList;
     var rejectClueList;
+    var dir = DATA_DIR + args.baseDir;
+    var max;
+    var required;
+    var result;
 
     if (args.ignoreErrors) {
 	this.ignoreLoadErrors = true;
     }
+    //console.log('module.filename: ' + Path.dirname(module.filename));
 
-    for (count = 1; count <= args.max; ++count) {
-	optional = count > args.required;
+    result = this.getMaxRequired(args.baseDir);
+    max = result.max;
+    required = result.required;
+
+    for (count = 1; count <= max; ++count) {
+	optional = count > required;
 	knownClueList = ClueList.makeFrom(
-	    { 'filename' : args.baseDir + '/clues' + count + '.json',
+	    { 'filename' : dir + '/clues' + count + '.json',
 	      'optional' : optional
 	    }
 	);
 	knownClueList.clueCount = count;
 	this.clueListArray[count] = knownClueList;
 
-	// this is stupid.
 	if (count === 1) {
 	    this.addKnownPrimaryClues(knownClueList);
 	}
@@ -87,14 +103,14 @@ ClueManager.prototype.loadAllClues = function(args) {
 	rejectClueList = null;
 	try {
 	    rejectClueList = ClueList.makeFrom({
-		'filename' : args.baseDir + '/rejects' + count + '.json',
+		'filename' : dir + '/rejects' + count + '.json',
 		'optional' : optional
 	    });
 	}
 	catch (e) {
 	    if (this.logging) {
 		this.log('missing reject file: ' + 
-			 args.baseDir + '/rejects' + count + '.json');
+			 dir + '/rejects' + count + '.json');
 	    }
 	}
 	if (rejectClueList ) {
@@ -104,14 +120,37 @@ ClueManager.prototype.loadAllClues = function(args) {
     }
 
     this.loaded = true;
-    this.maxClues = args.max;
+    this.maxClues = max;
 
     return this;
 }
 
 //
 //
+ClueManager.prototype.getMaxRequired = function(baseDir) {
+    var max =      MAX_META_CLUE_COUNT;
+    var required = REQ_META_CLUE_COUNT;
+    
+    switch (baseDir) {
+    case 'synth':
+	max =      MAX_SYNTH_CLUE_COUNT;
+	required = REQ_SYNTH_CLUE_COUNT;
+	break;
+    case 'meta':
+	break;
+    default:
+	// default to meta
+	this.log('defaulting to --meta clue counts for baseDir ' + baseDir);
+	break;
+    }
+    return {
+	max : max,
+	required: required
+    };
+}
 
+//
+//
 ClueManager.prototype.addKnownPrimaryClues = function(clueList) {
     var clueCount = 1;
     var clueMap;

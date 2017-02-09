@@ -29,7 +29,7 @@ function Validator() {
     this.allowDupeSrc     = false;
     this.allowDupeName    = true;
 
-    this.logging          = true;
+    this.logging          = false;
     this.logLevel         = 0;
 
     // TODO: these are duplicated in ResultMap

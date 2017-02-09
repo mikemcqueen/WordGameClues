@@ -5,25 +5,28 @@
 'use strict';
 
 var _            = require('lodash');
-var Q            = require('q');
-var fs           = require('fs');
-var parse        = require('csv-parse');
+var Promise      = require('bluebird');
+var fs           = Promise.promisifyAll(require('fs'));
+var csvParse     = Promise.promisifyAll(require('csv-parse'));
 
 var Delay        = require('../util/delay');
 var googleResult = require('./googleResult');
 
 var RESULTS_DIR = '../../data/results/';
 
-
 var Opt = require('node-getopt')
     .create([
-	['h' , 'help'               ,         'this screen']
+	['h' , 'help',         'this screen']
     ])
     .bindHelp().parseSystem();
 
+//
+//
+//
+
 function main() {
-    var fileLoadDefer;
     var filename;
+//fileLoadDefer,
 
     if (Opt.argv.length < 1) {
 	console.log('Usage: node crawl pairs-file');
@@ -35,26 +38,22 @@ function main() {
     filename = Opt.argv[0];
     console.log('filename: ' + filename);
 
-    fileLoadDefer = Q.defer();
-    fs.readFile(filename, 'utf8', function(err, data) {
+//    fileLoadDefer = Q.defer();
+    fs.readFile(filename, 'utf8').then(err, csvData) { //, (err, data) => {
 	if (err) throw err;
-	fileLoadDefer.resolve(data);
-    });
-    
-    fileLoadDefer.promise.then(data => {
-	parse(data, null, (err, output) => {
+	csvParse(csvData, null).then(err, wordListArray) { //, (err, wordListArray) => {
 	    if (err) throw err;
-	    getResults(output);
+	    getAllResults(wordListArray);
 	});
     });
 }
 
 //
 
-function getResults(wordListArray) {
-    var wordList = wordListArray.pop();
-    var filename;
-    var path;
+function getAllResults(wordListArray) {
+    var wordList = wordListArray.pop(),
+	filename,
+	path;
 
     if (wordList === undefined) {
 	return;
@@ -62,10 +61,8 @@ function getResults(wordListArray) {
     filename = makeFilename(wordList);
     path = RESULTS_DIR + _.size(wordList) + '/' + filename;
     
-    if (1) {
-	console.log('list: ' + wordList);
-	console.log('file: ' + filename);
-    }
+    console.log('list: ' + wordList);
+    console.log('file: ' + filename);
     
     checkIfFile(path, (err, isFile) => {
 	if (err) throw err;
@@ -95,9 +92,7 @@ function getOneResult(wordList, cb) {
     var term = makeSearchTerm(wordList, { wikipedia: true });
 
     console.log('term: ' + term);
-    googleResult.get(term, function(err, res) {
-	cb(err, res);
-    });
+    googleResult.get(term, cb);
 }
 
 //

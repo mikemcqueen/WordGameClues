@@ -53,14 +53,7 @@ var QUIET = false;
 
 //
 
-const DATA_DIR              = '../data/';
-
 const VERBOSE_FLAG_LOAD     = 'load';
-
-const MAX_SYNTH_CLUE_COUNT  = 25;
-const REQ_SYNTH_CLUE_COUNT  = 11; // should make this 12 soon
-const MAX_META_CLUE_COUNT   = 9;
-const REQ_META_CLUE_COUNT   = 9;
 
 //
 //
@@ -134,7 +127,6 @@ function main() {
 	    console.log('-c COUNT required with those options');
 	    return 1;
 	}
-
     }
 
     if (outputArg) {
@@ -159,7 +151,6 @@ function main() {
 	ignoreLoadErrors = true;
 	console.log('ignoreLoadErrors=true');
     }
-
 
     setLogging(_.includes(verboseArg, VERBOSE_FLAG_LOAD));
 
@@ -225,10 +216,9 @@ function main() {
 
 //
 
-function loadClues(synthFlag, metaFlag, jsonArg, validateAllOnLoad, ignoreLoadErrors) {
+function loadClues(synthFlag, metaFlag, jsonArg,
+		   validateAllOnLoad, ignoreLoadErrors) {
     var base;
-    var max;
-    var required;
 
     if ((synthFlag  || metaFlag) && jsonArg) {
 	console.log('--json not allowed with --synth or --meta');
@@ -239,10 +229,6 @@ function loadClues(synthFlag, metaFlag, jsonArg, validateAllOnLoad, ignoreLoadEr
 	return false;
     }
 
-    // default to meta sizes, unless --synthesis. good enough for now
-    max =      MAX_META_CLUE_COUNT;
-    required = REQ_META_CLUE_COUNT;
-
     if (jsonArg) {
 	base = jsonArg;
     }
@@ -250,17 +236,13 @@ function loadClues(synthFlag, metaFlag, jsonArg, validateAllOnLoad, ignoreLoadEr
 	base = 'meta';
     }
     else {
-	max =      MAX_SYNTH_CLUE_COUNT;
-	required = REQ_SYNTH_CLUE_COUNT;
 	base = 'synth';
     }
 
     log('loading all clues...');
 
     ClueManager.loadAllClues({
-	baseDir:      DATA_DIR + base,
-	max:          max,
-	required:     required,
+	baseDir:      base,
 	validateAll:  validateAllOnLoad,
 	ignoreErrors: ignoreLoadErrors
     });
