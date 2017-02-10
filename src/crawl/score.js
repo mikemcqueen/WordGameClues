@@ -5,16 +5,13 @@
 'use strict';
 
 var _            = require('lodash');
-//var Q            = require('q');
 var Promise      = require('bluebird');
-var fs           = require('fs');
-var bbWriteFile  = Promise.promisify(fs.writeFile);
+var FS           = require('fs');
+var bbWriteFile  = Promise.promisify(FS.writeFile);
 var Dir          = require('node-dir');
 var Path         = require('path');
 
-var ClueManager  = require('../clue_manager.js');
 var Delay        = require('../util/delay');
-var googleResult = require('./googleResult');
 
 var Opt          = require('node-getopt')
     .create([
@@ -33,11 +30,12 @@ var RESULTS_DIR = '../../data/results/';
 //
 
 function main() {
+    /*
     var base = 'meta';
-
     ClueManager.loadAllClues({
 	baseDir:  base,
     });
+    */
 
     if (Opt.options.force) {
 	console.log('force: ' + Opt.options.force);
