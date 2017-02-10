@@ -7,7 +7,8 @@
 var _            = require('lodash');
 //var Q            = require('q');
 var Promise      = require('bluebird');
-var fs           = Promise.promisifyAll(require('fs'));
+var fs           = require('fs');
+var bbWriteFile  = Promise.promisify(fs.writeFile);
 var Dir          = require('node-dir');
 var Path         = require('path');
 
@@ -15,14 +16,17 @@ var ClueManager  = require('../clue_manager.js');
 var Delay        = require('../util/delay');
 var googleResult = require('./googleResult');
 
-var RESULTS_DIR = '../../data/results/';
-
-var Opt = require('node-getopt')
+var Opt          = require('node-getopt')
     .create([
-	['s' , '--synthesis',         'use synth clues'],
-	['h' , 'help',                'this screen']
+	['f', 'force',               'force re-score'],
+	['s', 'synthesis',           'use synth clues'],
+	['h', 'help',                'this screen']
     ])
     .bindHelp().parseSystem();
+
+//
+
+var RESULTS_DIR = '../../data/results/';
 
 //
 //
@@ -31,20 +35,13 @@ var Opt = require('node-getopt')
 function main() {
     var base = 'meta';
 
-    /*
-    if (Opt.argv.length < 1) {
-	console.log('Usage: node score [--synthesis]');
-	console.log('');
-	return 1;
-    }
-
-    filename = Opt.argv[0];
-    console.log('filename: ' + filename);
-    */
-
     ClueManager.loadAllClues({
 	baseDir:  base,
     });
+
+    if (Opt.options.force) {
+	console.log('force: ' + Opt.options.force);
+    }
 
     Dir.readFiles(RESULTS_DIR + 2, {
 	match:   /\.json$/,
@@ -53,16 +50,16 @@ function main() {
     }, function(err, content, filepath, next) {
 	if (err) throw err;
 	console.log('filename: ' + filepath);
-	processResultFile(filepath, content).catch(
-	    console.err
-	).catch(err => {
-	    console.log('caught error in main()');
-	}).then((list) => {
-	    if (list === null) {
+	processResultFile(filepath, content, {
+	    force: Opt.options.force
+	}).catch(err => {
+	    console.error('error: ' + err.message);
+	}).then(list => {
+	    if (_.isEmpty(list)) {
 		return next();
 	    }
-	    fs.writeFile(filepath, JSON.stringify(list), (err) => {
-		if (err) throw err;
+	    bbWriteFile(filepath, JSON.stringify(list)).then(() => {
+		console.log('updated');
 		return next();
 	    });
 	});
@@ -73,25 +70,35 @@ function main() {
 
 //
 
-function processResultFile(filepath, content) {
+function processResultFile(filepath, content, options) {
     return new Promise((resolve, reject) => {
 	var basename = Path.basename(filepath, '.json');
-	var wordList = _.split(basename, '-');
+	var splitList = _.split(basename, '-');
 	var resultList = JSON.parse(content);
+	var wordList = [];
 	var any = false;
 	
+	splitList.forEach(splitStr => {
+	    splitStr.split(' ').forEach(word => {
+		wordList.push(word);
+	    });
+	});
 	console.log('wordList: ' + wordList);
 	Promise.map(resultList, result => {
 	    // don't need to get score if it's already present
-	    if (result.score) return null;
+	    if (result.score && !options.force) {
+		return {};
+	    }
 	    return getScore(wordList, result);
 	}).each((score, index) => {
-	    if (score !== null) {
+	    if (!_.isEmpty(score)) {
+		// TODO: really want to do "replace own properties" here,
+		// then no empty check is necessary.
 		resultList[index].score = score;
 		any = true;
 	    }
 	}).then(scoreList => {
-	    resolve(any ? resultList : null);
+	    resolve(any ? resultList : []);
 	});
     });
 }

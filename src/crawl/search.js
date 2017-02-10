@@ -1,5 +1,5 @@
 //
-// CRAWL.JS
+// SEARCH.JS
 //
 
 'use strict';
@@ -29,7 +29,7 @@ function main() {
 //fileLoadDefer,
 
     if (Opt.argv.length < 1) {
-	console.log('Usage: node crawl pairs-file');
+	console.log('Usage: node search pairs-file');
 	console.log('');
 	console.log(Opt);
 	return 1;
