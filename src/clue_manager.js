@@ -32,7 +32,7 @@ function ClueManager() {
     this.clueListArray = [];         // the JSON clue files in an array
     this.rejectListArray = [];       // the JSON reject files in an array
     this.knownClueMapArray = [];     // map clue name to clue src
-    this.knownSourceMapArray = [];   // map known source (incl. multi-source) to true/false (currently)
+    this.knownSourceMapArray = [];   // map known source to list of clues
     this.rejectSourceMap = {};       // map reject source to true/false (currently)
 
     this.rvsSuccessSeconds = 0;
@@ -491,6 +491,7 @@ ClueManager.prototype.filter = function(clueListArray, clueCount) {
     var reject = 0;
     var map = {};
 
+    // TODO: rather than deleting in array, build a new one?
     for (index = 0; index < clueListArray.length; ++index) {
 	source = clueListArray[index].makeKey();
 	if (this.isKnownSource(source, clueCount)) {
@@ -517,5 +518,29 @@ ClueManager.prototype.filter = function(clueListArray, clueCount) {
 	known:  known,
 	reject: reject
     };
+}
+
+//
+//
+
+ClueManager.prototype.getKnownClues = function(wordList) {
+    var resultList = [];
+
+    if (_.isArray(wordList)) {
+	wordList = _.toString(wordList);
+    }
+    else if (!_.isString(wordList)) {
+	throw new Error('invalid wordlist type, ' + (typeof wordList));
+    }
+    this.knownSourceMapArray.forEach(srcMap => {
+	var clueList = srcMap[wordList];
+	if (clueList) {
+	    // TODO: something like: _.concat(resultList, _.extract(clueList, 'name'));
+	    clueList.forEach(clue => {
+		resultList.push(clue.name);
+	    });
+	}
+    });
+    return resultList;
 }
 

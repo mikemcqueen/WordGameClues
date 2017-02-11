@@ -6,19 +6,20 @@
 
 var _            = require('lodash');
 var Promise      = require('bluebird');
-//var FS           = require('fs');
-//var fsWriteFile  = Promise.promisify(FS.writeFile);
 var Dir          = require('node-dir');
 var Path         = require('path');
 
 var ClueManager  = require('../clue_manager.js');
 
-var Opt          = require('node-getopt')
-    .create([
-	['s', 'synthesis',           'use synth clues'],
-	['h', 'help',                'this screen']
-    ])
-    .bindHelp().parseSystem();
+var Opt          = require('node-getopt').create([
+//    ['c', 'count',               'show result/url counts only'],
+//    ['k', 'known',               'filter known results'],  // easy!, call ClueManager.filter()
+//    ['r', 'rejects',              'show only results that fail all filters'],
+    ['s', 'synthesis',           'use synth clues'],
+//    ['t', 'title',               'filter results based on title word count'],
+//    ['v', 'verbose',             'show logging']
+    ['h', 'help',                'this screen']
+]).bindHelp().parseSystem();
 
 //
 
@@ -31,6 +32,7 @@ var RESULTS_DIR = '../../data/results/';
 function main() {
     var filteredList = [];
     var base = 'meta';
+
     ClueManager.loadAllClues({
 	baseDir:  base,
     });
@@ -79,7 +81,8 @@ function filterResultList(filepath, resultList, options) {
 	    //console.log('urlList.size = ' + _.size(urlList));
 	    resolve({
 		src:     wordList.toString(),
-		urlList: urlList
+		urlList: urlList,
+		known:   ClueManager.getKnownClues(wordList)
 	    });
 	});
     });
