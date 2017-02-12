@@ -12,11 +12,11 @@ var Path         = require('path');
 var ClueManager  = require('../clue_manager.js');
 
 var Opt          = require('node-getopt').create([
-//    ['c', 'count',               'show result/url counts only'],
+    ['c', 'count',               'show result/url counts only'],
 //    ['k', 'known',               'filter known results'],  // easy!, call ClueManager.filter()
-//    ['r', 'rejects',              'show only results that fail all filters'],
+    ['r', 'rejects',             'show only results that fail all filters'],
     ['s', 'synthesis',           'use synth clues'],
-//    ['t', 'title',               'filter results based on title word count'],
+    ['t', 'title',               'filter results based on title word count'],
 //    ['v', 'verbose',             'show logging']
     ['h', 'help',                'this screen']
 ]).bindHelp().parseSystem();
@@ -32,6 +32,9 @@ var RESULTS_DIR = '../../data/results/';
 function main() {
     var filteredList = [];
     var base = 'meta';
+    
+    // default to title filter for now
+    Opt.options.title = true;
 
     ClueManager.loadAllClues({
 	baseDir:  base,
@@ -45,7 +48,8 @@ function main() {
 	if (err) throw err;
 	//console.log('filename: ' + filepath);
 	filterResultList(filepath, JSON.parse(content), {
-	    allWordsInTitle: true
+	    filterTitle:   Opt.options.title,
+	    filterRejects: Opt.options.rejects
 	}).catch(err => {
 	    console.error('error: ' + err.message);
 	}).then(result => {
@@ -56,8 +60,15 @@ function main() {
 	    return next();
 	});
     }, function(err, files) {
+
         if (err) throw err;
-	console.log(JSON.stringify(filteredList));
+	if (Opt.options.count) {
+	    console.log('Results: ' + _.size(filteredList) +
+			', Urls: ' + getUrlCount(filteredList));
+	}
+	else {
+	    console.log(JSON.stringify(filteredList));
+	}
 	//console.log('total: ' + _.size(filteredList));
     });
 }
@@ -92,15 +103,27 @@ function filterResultList(filepath, resultList, options) {
 
 function filterResult(result, wordList, options) {
     return new Promise(function(resolve, reject) {
+	var passTitle = false;
 	if (result.score) {
-	    if (options.allWordsInTitle) {
-		if (result.score.wordsInTitle >= _.size(wordList)) {
-		    resolve(result);
-		}
+	    if (options.filterTitle) {
+		passTitle = (result.score.wordsInTitle >= _.size(wordList));
+	    }
+	    if (passTitle || options.filterRejects) {
+		resolve(result);
 	    }
 	}
 	resolve(null);
     });
+}
+
+//
+
+function getUrlCount(resultList) {
+    var urlCount = 0;
+    resultList.forEach(result => {
+	urlCount += _.size(result.urlList);
+    });
+    return urlCount;
 }
 
 //
