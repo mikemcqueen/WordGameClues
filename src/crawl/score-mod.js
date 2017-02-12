@@ -7,6 +7,7 @@
 const _       = require('lodash');
 const Promise = require('bluebird');
 const Wiki    = require('wikijs').default;
+const Path    = require('path');
 
 //
 
@@ -50,14 +51,21 @@ function getDisambiguation(result) {
 function getWikiContent(title) {
     return new Promise(function (resolve, reject) {
 	Wiki().page(title).then(page => {
-	    Promise.all([page.content(), page.info()]).then(result => {
+	    Promise.all([
+		Promise.resolve(page.content()),
+		Promise.resolve(page.info()).reflect()
+	    ]).then(result => {
 		resolve({
 		    text:  result[0],
 		    info : result[1]
 		});
+	    }).catch(err => {
+		// TODO: use VError
+		console.error(`getWikiContent promise.all: ${err}`);
+		reject(err);
 	    });
 	}).catch(err => {
-	    console.error(`getWikiContent: ${err}`);
+	    console.error(`getWikiContent Wiki.page: ${err}`);
 	    reject(err);
 	});
     });
@@ -136,5 +144,6 @@ function processResultFile(filepath, content, options) {
 module.exports = {
     getScore              : getScore,
     getWikiContent        : getWikiContent,
+    processResultFile     : processResultFile,
     removeWikipediaSuffix : removeWikipediaSuffix
 };

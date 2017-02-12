@@ -7,7 +7,8 @@
 const _     = require('lodash');
 const Score = require('../score-mod.js');
 
-function testScore() {
+
+function testScore1() {
     const words = [ 'betsy', 'king' ];
     const searchResult = {
 	title:   'Lizzie Lloyd King - Wikipedia',
@@ -19,6 +20,10 @@ function testScore() {
 	    console.log(`${key} : ${score[key]}`);
 	});
     });
+}
+
+function testScore() {
+    testScore1();
 }
 
 testScore();

@@ -17,7 +17,7 @@ const Opt          = require('node-getopt')
     ])
     .bindHelp().parseSystem();
 
-const Score        = require('score-mod');
+const Score        = require('./score-mod');
 
 //
 
