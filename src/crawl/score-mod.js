@@ -7,7 +7,6 @@
 const _       = require('lodash');
 const Promise = require('bluebird');
 const Wiki    = require('wikijs').default;
-const Path    = require('path');
 
 //
 
@@ -106,20 +105,29 @@ function getScore(wordList, result) {
 }
 
 
-function processResultFile(filepath, content, options) {
+function scoreResultList(wordList, resultList, options) {
     return new Promise((resolve, reject) => {
-	var basename = Path.basename(filepath, '.json');
-	var splitList = _.split(basename, '-');
-	var resultList = JSON.parse(content);
-	var wordList = [];
+	var anotherWordList = [];
 	var any = false;
 	
-	splitList.forEach(splitStr => {
-	    splitStr.split(' ').forEach(word => {
-		wordList.push(word);
+	wordList.forEach(word => {
+	    word.split(' ').forEach(word => {
+		anotherWordList.push(word);
 	    });
 	});
+	wordList = anotherWordList;
 	console.log('wordList: ' + wordList);
+	Promise.mapSeries(resultList, (result, index) => {
+	    // don't need to get score if it's already present
+	    if (!result.score || options.force) {
+		return getScore(wordList, result)
+		    .then(score => {
+			resultList[index].score = score;
+			any = true;
+		    });
+	    }
+	    return undefined;
+	/*
 	Promise.map(resultList, result => {
 	    // don't need to get score if it's already present
 	    if (result.score && !options.force) {
@@ -133,7 +141,8 @@ function processResultFile(filepath, content, options) {
 		resultList[index].score = score;
 		any = true;
 	    }
-	}).then(scoreList => {
+	*/
+	}).then(unused => {
 	    resolve(any ? resultList : []);
 	});
     });
@@ -144,6 +153,6 @@ function processResultFile(filepath, content, options) {
 module.exports = {
     getScore              : getScore,
     getWikiContent        : getWikiContent,
-    processResultFile     : processResultFile,
+    scoreResultList       : scoreResultList,
     removeWikipediaSuffix : removeWikipediaSuffix
 };

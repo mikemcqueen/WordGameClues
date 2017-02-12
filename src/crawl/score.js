@@ -9,6 +9,7 @@ const Promise      = require('bluebird');
 const FS           = require('fs');
 const fsWriteFile  = Promise.promisify(FS.writeFile);
 const Dir          = require('node-dir');
+const Path         = require('path');
 const Opt          = require('node-getopt')
     .create([
 	['f', 'force',               'force re-score'],
@@ -46,10 +47,12 @@ function main() {
     }, function(err, content, filepath, next) {
 	if (err) throw err;
 	console.log('filename: ' + filepath);
-	Score.processResultFile(filepath, content, {
-	    force: Opt.options.force
-	}).catch(err => {
-	    console.error('error: ' + err.message);
+	Score.scoreResultList(
+	    _.split(Path.basename(filepath, '.json'), '-'),
+	    JSON.parse(content),
+	    { force: Opt.options.force }
+	).catch(err => {
+	    console.error('error: ' + err);
 	}).then(list => {
 	    if (_.isEmpty(list)) {
 		return next();
