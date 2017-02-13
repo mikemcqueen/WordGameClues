@@ -11,21 +11,44 @@ const Wiki    = require('wikijs').default;
 //
 
 function getWordCountInText(wordList, text) {
-    var textWordList = _.words(text.toLowerCase());
-    var countList = [];
-    var wordCount = 0;
+    if (!_.isString(text)) throw new Error('invalid text, ' + text);
 
-    // still not perfect
-    textWordList.forEach(textWord => {
+    let textWordList = _.words(text.toLowerCase());
+    let countList = new Array(wordList.length).fill(0);
+
+    textWordList.forEach((textWord, textIndex) => {
 	wordList.forEach((word, index) => {
-	    //if (_.startsWith(textWord, word)) {
-	    if (word == textWord) {
-		if (!countList[index]) countList[index] = 0;
+	    let nextTextWord = textWord;
+	    if (word.split(' ').every((subWord, subIndex, subWordList) => {
+		//if (_.startsWith(nextTextWord, subWord)) {
+		if (nextTextWord != subWord) {
+		    //console.log(nextTextWord + ' !=  ' + subWord);
+		    return false;
+		}
+		//console.log(nextTextWord + ' ==  ' + subWord);
+		if (subIndex < subWordList.length - 1) {
+		    // we're before the last element in subword list,
+		    // ty to set the next textWord.
+		    let nextTextIndex = textIndex + subIndex + 1;
+		    if (nextTextIndex < textWordList.length) {
+			nextTextWord = textWordList[nextTextIndex];
+		    }
+		    else {
+			// there aren't enough words from the text remaining
+			return false;
+		    }
+		}
+		return true;
+	    })) {
+		//console.log('count[' + index + '] = ' + (countList[index] + 1));
 		countList[index] += 1;
 	    }
 	});
     });
-    countList.forEach(count => wordCount += 1);
+    let wordCount = 0;
+    countList.forEach(count => {
+	if (count > 0) wordCount += 1;
+    });
     return wordCount;
 }
 
@@ -42,7 +65,8 @@ function removeWikipediaSuffix(title) {
 //
 
 function getDisambiguation(result) {
-    return getWordCountInText(['disambiguation'], result.title) > 0;
+    return _.isString(result.title) ?
+	(getWordCountInText(['disambiguation'], result.title) > 0) : false;
 }
 
 //
@@ -51,13 +75,13 @@ function getWikiContent(title) {
     return new Promise(function (resolve, reject) {
 	Wiki().page(title).then(page => {
 	    Promise.all([
-		Promise.resolve(page.content()),
+		Promise.resolve(page.content()).reflect(),
 		Promise.resolve(page.info()).reflect()
 	    ]).then(result => {
 		resolve({
-		    text:  result[0],
-		    info : result[1]
-		});
+		    text: result[0].isFulfilled() ? result[0].value() : '',
+		    info: result[1].isFulfilled() ? result[1].value() : {}
+ 		});
 	    }).catch(err => {
 		// TODO: use VError
 		console.error(`getWikiContent promise.all: ${err}`);
@@ -74,15 +98,13 @@ function getWikiContent(title) {
 
 function getScore(wordList, result) {
     return new Promise(function(resolve, reject) {
-	var score;
-	
-	if (!_.isString(result.title) || !_.isString(result.summary)) {
-	    throw new Error('bad or missing title or summary, ' + wordList);
+	if (_.isNil(result)) {
+	    throw new Error('result is nil, for ' + wordList);
 	}
 	
-	score = {
-	    wordsInTitle   : getWordCountInText(wordList, result.title),
-	    wordsInSummary : getWordCountInText(wordList, result.summary),
+	let score = {
+	    wordsInTitle   : _.isString(result.title) ? getWordCountInText(wordList, result.title) : 0,
+	    wordsInSummary : _.isString(result.summary) ? getWordCountInText(wordList, result.summary) : 0,
 	    disambiguation : getDisambiguation(result)
 	};
 	
@@ -96,7 +118,6 @@ function getScore(wordList, result) {
 		catch(err => {
 		    console.error(`getScore: ${err}`);
 		});
-		//.finally(() => console.log('hi'));
 	}
 	else {
 	    resolve(score);
@@ -104,18 +125,12 @@ function getScore(wordList, result) {
     });
 }
 
+//
 
 function scoreResultList(wordList, resultList, options) {
     return new Promise((resolve, reject) => {
-	var anotherWordList = [];
 	var any = false;
 	
-	wordList.forEach(word => {
-	    word.split(' ').forEach(word => {
-		anotherWordList.push(word);
-	    });
-	});
-	wordList = anotherWordList;
 	console.log('wordList: ' + wordList);
 	Promise.mapSeries(resultList, (result, index) => {
 	    // don't need to get score if it's already present
@@ -126,22 +141,8 @@ function scoreResultList(wordList, resultList, options) {
 			any = true;
 		    });
 	    }
+	    // TODO: understand why returning here, and getScore()
 	    return undefined;
-	/*
-	Promise.map(resultList, result => {
-	    // don't need to get score if it's already present
-	    if (result.score && !options.force) {
-		return {};
-	    }
-	    return getScore(wordList, result);
-	}).each((score, index) => {
-	    if (!_.isEmpty(score)) {
-		// TODO: really want to do "replace own properties" here,
-		// then no empty check is necessary.
-		resultList[index].score = score;
-		any = true;
-	    }
-	*/
 	}).then(unused => {
 	    resolve(any ? resultList : []);
 	});

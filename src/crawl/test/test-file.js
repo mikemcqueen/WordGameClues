@@ -4,10 +4,11 @@
 
 'use strict';
 
-const _      = require('lodash');
-const Score  = require('../score-mod.js');
-const fs     = require('fs');
-const expect = require('chai').expect;
+const _       = require('lodash');
+//const Promise = require('bluebird');
+const Score   = require('../score-mod.js');
+const fs      = require('fs');
+const expect  = require('chai').expect;
 
 function testFile(filename, wordList) {
     return new Promise((resolve, reject) => {
@@ -18,37 +19,56 @@ function testFile(filename, wordList) {
 	    JSON.parse(content),
 	    { force: true }
 	).catch(err => {
-	    console.error('testScore: ' + err);
+	    reject(err);
 	}).then(list => {
 	    console.log('done: ' + _.size(list));
-	    return list;
+	    resolve(list);
 	});
     });
 }
 
-try {
+describe('test score-mod', function() {
+    this.timeout(5000);
+    this.slow(2000);
+    
     //
-    testFile('./noInfoBox-testfile.json', [ 'bureau', 'chief' ])
-	.then(list => {
-	    let result = list[0];
-	    console.log('score: ' + JSON.stringify(result.score));
-	    expect(result.score)
-		.to.have.property('wordsInArticle')
-		.and.to.equal(2);
-	});
+    it('should score a page with no InfoBox', function(done) {
+	testFile('./noInfoBox-testfile.json', [ 'bureau', 'chief' ])
+	    .then(list => {
+		let result = list[0];
+		console.log('score: ' + JSON.stringify(result.score));
+		expect(result.score)
+		    .to.have.property('wordsInArticle')
+		    .and.to.equal(2);
+		done();
+	    });
+    });
 	    
     //
-
-    testFile('./file-testfile.json', [ 'betsy', 'ariana' ])
-	.then(list => {
-	    list.forEach(result => {
+    it('should not fail to score an invalid page title', function(done) {
+	testFile('./noContent-testfile.json', [ 'what', 'ever' ])
+	    .then(list => {
+		let result = list[0];
 		console.log('score: ' + JSON.stringify(result.score));
+		expect(_.size(list))
+		    .to.equal(1);
+		done();
 	    });
-	    expect(_.size(list))
-		.to.equal(20);
-	});
-}
-catch(err) {
-    console.log(err);
-}
+    });
+	    
+    //
+    it('should score a list of results', function(done) {
+	this.timeout(20 * 5000);
+	this.slow(20 * 2000);
 
+	testFile('./file-testfile.json', [ 'betsy', 'ariana' ])
+	    .then(list => {
+		list.forEach(result => {
+		    console.log('score: ' + JSON.stringify(result.score));
+		});
+		expect(list)
+		    .to.have.lengthOf(20);
+		done();
+	    });
+    });
+});
