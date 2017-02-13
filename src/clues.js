@@ -34,8 +34,10 @@ var Opt = require('node-getopt')
 	['o', 'output'             ,         'output json -or- clues' ],
 	['p', 'primary-sources=SOURCE[,SOURCE,...]', 'limit results to the specified primary source(s)' ],
 	['q', 'require-counts=COUNT+',       'require clue(s) of specified count(s)' ],
-	['s', 'show-sources=NAME[:COUNT][,v]', 'show possible source combinations for the specified name[:count]' ],
-	['t', 'test=NAME[,NAME,...]',        'test the specified source list, e.g. blue,fish' ],
+	['s', 'show-sources=NAME[:COUNT][,v]', 'show primary source combinations for the specified name[:count]' ],
+	['t', 'test=SOURCE[,SOURCE,...]',    'test the specified source list, e.g. blue,fish' ],
+	['',  'add=NAME',                    '  add combination to known list as NAME; use with --try' ],
+	['',  'reject',                      '  add combination to reject list; use with --try' ],
 	['u', 'use=NAME[:COUNT]+',           'use the specified name[:count](s)' ],
 	['x', 'max=COUNT',                   'specify maximum # of components to combine'],
 	['y', 'synthesis',                   'use synthesis clues, same as --json synth' ],
@@ -59,54 +61,29 @@ const VERBOSE_FLAG_LOAD     = 'load';
 //
 
 function main() {
-    var countArg;
-    var maxArg;
-    var requiredSizes;
-    var metaFlag;
-    var synthFlag;
-    var verboseArg;
-    var showSourcesClueName;
-    var altSourcesArg;
-    var allAltSourcesFlag;
-    var testSrcList;
-    var useClueList;
-    var allowDupeSrcFlag;
     var needCount;
-    var outputArg;
-    var showKnownArg;
-    var jsonArg;
-    var primarySourcesArg;
-    var flagsArg;
     var validateAllOnLoad;
     var ignoreLoadErrors;
 
-/*    if (Opt.argv.length) {
-	console.log('Usage: node clues.js [options]');
-	console.log('');
-	console.log(Opt);
-	return 1;
-    }
-*/
-
     // options
 
-    countArg = _.toNumber(Opt.options['count']);
-    maxArg = _.toNumber(Opt.options['max']);
-    requiredSizes = Opt.options['require-counts'];
-    useClueList = Opt.options['use'];
-    metaFlag = Opt.options['meta'];
-    verboseArg = Opt.options['verbose'];
-    outputArg = Opt.options['output'];
-    showSourcesClueName = Opt.options['show-sources'];
-    altSourcesArg = Opt.options['alt-sources'];
-    allAltSourcesFlag = Opt.options['all-alt-sources'];
-    allowDupeSrcFlag = Opt.options['allow-dupe-source'];
-    testSrcList = Opt.options['test'];
-    showKnownArg = Opt.options['show-known'];
-    synthFlag = Opt.options['synthesis'];
-    jsonArg = Opt.options['json'];
-    primarySourcesArg = Opt.options['primary-sources'];
-    flagsArg = Opt.options.flags;
+    // TODO: get rid of this, just pass Opt.options around
+    let countArg = _.toNumber(Opt.options['count']);
+    let maxArg = _.toNumber(Opt.options['max']);
+    let requiredSizes = Opt.options['require-counts'];
+    let useClueList = Opt.options['use'];
+    let metaFlag = Opt.options['meta'];
+    let verboseArg = Opt.options['verbose'];
+    let outputArg = Opt.options['output'];
+    let showSourcesClueName = Opt.options['show-sources'];
+    let altSourcesArg = Opt.options['alt-sources'];
+    let allAltSourcesFlag = Opt.options['all-alt-sources'];
+    let allowDupeSrcFlag = Opt.options['allow-dupe-source'];
+    let showKnownArg = Opt.options['show-known'];
+    let synthFlag = Opt.options['synthesis'];
+    let jsonArg = Opt.options['json'];
+    let primarySourcesArg = Opt.options['primary-sources'];
+    let flagsArg = Opt.options.flags;
 
     if (!maxArg) {
 	maxArg = 2; // TODO: default values in opt
@@ -118,7 +95,7 @@ function main() {
 	    altSourcesArg ||
 	    allAltSourcesFlag ||
 	    showKnownArg ||
-	    testSrcList ||
+	    Opt.options.test ||
 	    useClueList
 	   ) {
 	    needCount = false;
@@ -186,8 +163,8 @@ function main() {
 	    max:      countArg
 	});
     }
-    else if (testSrcList) {
-	showValidSrcListCounts(testSrcList);
+    else if (Opt.options.test) {
+	showValidSrcListCounts(Opt.options);
     }
     else if (showSourcesClueName) {
 	showSources(showSourcesClueName);
@@ -255,7 +232,8 @@ function loadClues(synthFlag, metaFlag, jsonArg,
 //
 //
 
-function showValidSrcListCounts(srcList) {
+function showValidSrcListCounts(options) {
+    let srcList = options.test;
     var nameList;
     var countListArray;
     var count;
@@ -264,6 +242,9 @@ function showValidSrcListCounts(srcList) {
 
     if (!srcList) {
 	throw new Error('missing arg, srcList: ' + srcList);
+    }
+    if (options.add && options.reject) {
+	throw new Error('cannot specify both --add and --reject');
     }
 
     nameList = srcList.split(',');
@@ -279,18 +260,14 @@ function showValidSrcListCounts(srcList) {
 
     // each count list contains the clueMapArray indexes in which
     // each name appears
-    countListArray = [];
+    countListArray = Array(_.size(nameList)).fill().map(() => []);
+    //console.log(countListArray);
     for (count = 1; count <= ClueManager.maxClues; ++count) {
 	map = ClueManager.knownClueMapArray[count];
-	if (map) {
+	if (!_.isUndefined(map)) {
 	    nameList.forEach((name, index) => {
-		if (map[name]) {
-		    if (!countListArray[index])  {
-			countListArray[index] = [ count ];
-		    }
-		    else {
-			countListArray[index].push(count);
-		    }
+		if (!_.isUndefined(map[name])) {
+		    countListArray[index].push(count);
 		}
 	    });
 	}
@@ -318,42 +295,55 @@ function showValidSrcListCounts(srcList) {
 	console.log('No matches');
 	return;
     }
+    let addCountSet = new Set();
     resultList.forEach(clueCountList => {
-	var sum;
-	var result;
-	var msg;
-	var clueList;
-	sum = 0;
+	let sum = 0;
 	clueCountList.forEach(count => { sum += count });
-	result = Validator.validateSources({
+	let sum2 = clueCountList.reduce((a, b) => a + b);
+	if (sum !== sum2) {
+	    throw new Error('I was wrong');
+	}
+
+	let result = Validator.validateSources({
 	    sum:      sum,
 	    nameList: nameList,
 	    count:    nameList.length,
 	    validateAll: true
 	});
 	//console.log('validate [' + nameList + ']: ' + result);
-	msg = clueCountList.toString();
+	let msg = clueCountList.toString();
 	if (!result.success) {
 	    msg += ': INVALID';
 	}
 	else {
-	    clueList = ClueManager.knownSourceMapArray[sum][nameList];
+	    let clueList = ClueManager.knownSourceMapArray[sum][nameList];
 	    if (clueList) {
-		msg += ': PRESENT as ';
-		clueList.forEach((clue, index) => {
-		    if (index > 0) {
-			msg += ', ';
-		    }
-		    msg += clue.name;
-		});
+		msg += ': PRESENT as ' + _.toString(clueList.map(clue => clue.name));
 	    }
 	    else if (ClueManager.isRejectSource(nameList)) {
 		msg += ': REJECTED';
 	    }
-
+	    else {
+		// valid combo, neither known nor reject
+		if (!_.isUndefined(options.add)) {
+		    addCountSet.add(sum);
+		}
+	    }
 	}
 	console.log(msg);
     });
+
+    if (!_.isUndefined(options.add)) {
+	addCountSet.forEach(count => {
+	    if (ClueManager.addClue(count, {
+		name: options.add,
+		src:  nameList.toString()
+	    }, true));
+	});
+    }
+    else if (!_.isUndefined(options.reject)) {
+	ClueManager.addReject(nameList, true);
+    }
 }
 
 //

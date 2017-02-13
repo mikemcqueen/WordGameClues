@@ -88,6 +88,7 @@ function assignMethods(list) {
     list.init          = init;
     list.makeKey       = makeKey;
     list.toJSON        = toJSON;
+    list.save          = save;
 
     return list;
 }
@@ -116,6 +117,8 @@ function persist(filename) {
     Fs.writeFileSync(filename, this.toJSON());
 }
 
+//
+
 function toJSON() {
     var result = '[\n';
     var first = true;
@@ -139,15 +142,27 @@ function toJSON() {
 
 //
 
+function save(filename) {
+    Fs.writeFileSync(filename, this.toJSON(), { encoding: 'utf8' });
+}
+
+//
+
 function clueToJSON(clue) {
     var s;
 
-    s = '{' +
-        ' "name": "'  + clue.name  + '", ' + format2(clue.name, 25) +
-        ' "src": "' + clue.src + '"';
+    s = '{';
+
+    if (clue.name) {
+	s += ' "name": "'  + clue.name  + '", ' + format2(clue.name, 25);
+    }
+    s += ' "src": "' + clue.src + '"';
 
     if (clue.note) {
 	s+= ', "note" : "' + clue.note + '"';
+    }
+    if (clue.x) {
+	s+= ', "x" : ' + clue.x;
     }
     if (clue.ignore) {
 	s+= ', "ignore" : ' + clue.ignore;

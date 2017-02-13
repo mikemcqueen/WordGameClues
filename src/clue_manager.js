@@ -66,11 +66,11 @@ ClueManager.prototype.loadAllClues = function(args) {
     var count;
     var optional = false;
     var knownClueList;
-    var rejectClueList;
-    var dir = DATA_DIR + args.baseDir;
     var max;
     var required;
     var result;
+
+    this.dir = DATA_DIR + args.baseDir;
 
     if (args.ignoreErrors) {
 	this.ignoreLoadErrors = true;
@@ -84,7 +84,7 @@ ClueManager.prototype.loadAllClues = function(args) {
     for (count = 1; count <= max; ++count) {
 	optional = count > required;
 	knownClueList = ClueList.makeFrom(
-	    { 'filename' : dir + '/clues' + count + '.json',
+	    { 'filename' : this.getKnownFilename(count),
 	      'optional' : optional
 	    }
 	);
@@ -99,21 +99,19 @@ ClueManager.prototype.loadAllClues = function(args) {
 	}
     }
 
-    for (count = 2; count <= args.max; ++count) {
-	rejectClueList = null;
+    for (count = 2; count <= max; ++count) {
+	let rejectClueList = null;
 	try {
 	    rejectClueList = ClueList.makeFrom({
-		'filename' : dir + '/rejects' + count + '.json',
+		'filename' : this.getRejectFilename(count),
 		'optional' : optional
 	    });
 	}
 	catch (e) {
-	    if (this.logging) {
-		this.log('missing reject file: ' + 
-			 dir + '/rejects' + count + '.json');
-	    }
+	    this.log('WARNING: missing reject file: ' + 
+		     this.getRejectFilename(count));
 	}
-	if (rejectClueList ) {
+	if (rejectClueList) {
 	    this.rejectListArray[count] = rejectClueList;
 	    this.addRejectCombos(rejectClueList, count);
 	}
@@ -173,6 +171,18 @@ ClueManager.prototype.addKnownPrimaryClues = function(clueList) {
 }
 
 //
+
+ClueManager.prototype.getKnownFilename = function(count) {
+    return this.dir + '/clues' + count + '.json';
+}
+
+//
+
+ClueManager.prototype.getRejectFilename = function(count) {
+    return this.dir + '/rejects' + count + '.json';
+}
+
+//
 //
 
 ClueManager.prototype.addKnownCompoundClues = function(clueList, clueCount, validateAll) {
@@ -209,7 +219,7 @@ ClueManager.prototype.addKnownCompoundClues = function(clueList, clueCount, vali
 
 	if (clueCount > 1) {
 	    // new sources need to be validated
-	    if (!srcMap[srcKey]) { // or .contains(clue);
+	    if (!_.keys(srcMap).includes(srcKey)) {
 		if (this.logging) {
 		    this.log('############ validating Known Combo: ' + srcKey);
 		}
@@ -241,9 +251,12 @@ ClueManager.prototype.addKnownCompoundClues = function(clueList, clueCount, vali
 //
 //
 
-ClueManager.prototype.addClue = function(count, clue) {
+ClueManager.prototype.addClue = function(count, clue, save) {
     if (this.addKnownClue(count, clue.name, clue.src, true)) {
 	this.clueListArray[count].push(clue);
+	if (save) {
+	    this.clueListArray[count].save(this.getKnownFilename(count));
+	}
 	return true;
     }
     return false;
@@ -264,13 +277,11 @@ ClueManager.prototype.addKnownClue = function(count, name, source, noThrow) {
     if (!clueMap[name]) {
 	clueMap[name] = [ source ];
     }
-    else if (clueMap[name].indexOf(source) == -1) {
-
+    else if (!clueMap[name].includes(source)) {
 	if (this.logging) {
 	    this.log('addKnownClue(' + count + ') ' +
 		     name + ' : ' + source);
 	}
-
 	clueMap[name].push(source);
     }
     else if (!noThrow ) {
@@ -306,25 +317,45 @@ ClueManager.prototype.addRejectCombos = function(clueList, clueCount) {
 	    }
 	}
 
-
-	srcNameList.sort();
-
-	if (this.isRejectSource(srcNameList.toString())) {
-	    if (this.logging) {
-		this.log('WARNING: Duplicate reject source' +
-			 ', count ' + clueCount +
-	    		 ', ' + srcNameList);
-	    }
-	}
-
-	if (this.logging) {
-	    this.log('addRejectCombo: ' + srcNameList);
-	}
-
-	this.rejectSourceMap[srcNameList.toString()] = true;
-    }, this);
-
+	this.addRejectSource(srcNameList);
+    });
     return this;
+}
+
+//
+
+ClueManager.prototype.addReject = function(srcNameList, save) {
+    let count = _.size(srcNameList);
+    if (this.addRejectSource(srcNameList)) {
+	this.rejectListArray[count].push({
+	    src: srcNameList.toString()
+	});
+	if (save) {
+	    this.rejectListArray[count].save(this.getRejectFilename(count));
+	}
+    }
+}
+
+//
+
+ClueManager.prototype.addRejectSource = function(srcNameList) {
+    srcNameList.sort();
+
+    if (this.logging) {
+	this.log('addRejectSource: ' + srcNameList);
+    }
+
+    // TODO: check known sources?
+
+    if (this.isRejectSource(srcNameList)) {
+	if (this.logging) {
+	    this.log('WARNING: Duplicate reject source' +
+	    	     ', ' + srcNameList);
+	}
+	return false;
+    }
+    this.rejectSourceMap[srcNameList.toString()] = true;
+    return true;
 }
 
 // source is string containing sorted, comma-separated clues

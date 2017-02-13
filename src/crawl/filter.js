@@ -12,11 +12,12 @@ var Path         = require('path');
 var ClueManager  = require('../clue_manager.js');
 
 var Opt          = require('node-getopt').create([
+    ['a', 'article',             'filter results based on article word count'],
     ['c', 'count',               'show result/url counts only'],
 //    ['k', 'known',               'filter known results'],  // easy!, call ClueManager.filter()
     ['r', 'rejects',             'show only results that fail all filters'],
     ['s', 'synthesis',           'use synth clues'],
-    ['t', 'title',               'filter results based on title word count'],
+    ['t', 'title',               'filter results based on title word count (default)'],
 //    ['v', 'verbose',             'show logging']
     ['h', 'help',                'this screen']
 ]).bindHelp().parseSystem();
@@ -30,65 +31,75 @@ var RESULTS_DIR = '../../data/results/';
 //
 
 function main() {
-    var filteredList = [];
     var base = 'meta';
     
-    // default to title filter for now
-    Opt.options.title = true;
+    // default to title filter if no filter specified
+    if (!Opt.options.article && !Opt.options.title) {
+	Opt.options.title = true;
+    }
+
+    let filterOptions = {
+	filterArticle: Opt.options.article,
+	filterTitle:   Opt.options.title,
+	filterRejects: Opt.options.rejects
+    };
 
     ClueManager.loadAllClues({
-	baseDir:  base,
+	baseDir:  base
     });
 
-    Dir.readFiles(RESULTS_DIR + 2, {
+    let filteredList = [];
+    let rejectList = [];
+    Dir.readFiles(RESULTS_DIR + '2', {
 	match:   /\.json$/,
 	exclude: /^\./,
 	recursive: false
     }, function(err, content, filepath, next) {
 	if (err) throw err;
 	//console.log('filename: ' + filepath);
-	filterResultList(filepath, JSON.parse(content), {
-	    filterTitle:   Opt.options.title,
-	    filterRejects: Opt.options.rejects
-	}).catch(err => {
+	// TODO: what happens on JSON.parse throw?
+	filterResultList(
+	    _.split(Path.basename(filepath, '.json'), '-'),
+	    JSON.parse(content),
+	    filterOptions
+	).catch(err => {
 	    console.error('error: ' + err.message);
 	}).then(result => {
 	    if (!_.isEmpty(result.urlList)) {
 		filteredList.push(result);
-		//console.log('list: ' + _.size(filteredList));
+	    }
+	    else {
+		rejectList.push(result);
 	    }
 	    return next();
 	});
     }, function(err, files) {
-
         if (err) throw err;
-	if (Opt.options.count) {
+	if (Opt.options.count === true) {
 	    console.log('Results: ' + _.size(filteredList) +
-			', Urls: ' + getUrlCount(filteredList));
+			', Urls: ' + getUrlCount(filteredList) +
+			', Rejects: ' + _.size(rejectList));
 	}
 	else {
-	    console.log(JSON.stringify(filteredList));
+	    console.log(JSON.stringify(Opt.options.rejects ? rejectList : filteredList));
 	}
-	//console.log('total: ' + _.size(filteredList));
     });
 }
 
 //
 
-function filterResultList(filepath, resultList, options) {
+function filterResultList(wordList, resultList, options) {
     return new Promise((resolve, reject) => {
-	var basename = Path.basename(filepath, '.json');
-	var wordList = _.split(basename, '-');
 	var urlList = [];
 	
 	Promise.map(resultList, result => {
-	    return filterResult(result, wordList, options);
+	    return filterResult(wordList, result, options);
 	}).each((result, index) => {
 	    if (result !== null) {
 		urlList.push(result.url);
 		//console.log('url: ' + result.url);
 	    }
-	}).then(resultList => {
+	}).then(filteredList => {
 	    //console.log('urlList.size = ' + _.size(urlList));
 	    resolve({
 		src:     wordList.toString(),
@@ -101,14 +112,20 @@ function filterResultList(filepath, resultList, options) {
 
 //
 
-function filterResult(result, wordList, options) {
+function filterResult(wordList, result, options) {
     return new Promise(function(resolve, reject) {
-	var passTitle = false;
+	let passTitle = false;
+	let passArticle = false;
+	
 	if (result.score) {
 	    if (options.filterTitle) {
 		passTitle = (result.score.wordsInTitle >= _.size(wordList));
 	    }
-	    if (passTitle || options.filterRejects) {
+	    if (options.filterArticle) {
+		passArticle = (result.score.wordsInSummary >= _.size(wordList) ||
+			       result.score.wordsInArticle >= _.size(wordList));
+	    }
+	    if (passTitle || passArticle) {
 		resolve(result);
 	    }
 	}
