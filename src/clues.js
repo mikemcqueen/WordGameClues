@@ -299,13 +299,7 @@ function showValidSrcListCounts(options) {
     let known = false;
     let reject = false;
     resultList.forEach(clueCountList => {
-	let sum = 0;
-	clueCountList.forEach(count => { sum += count });
-	let sum2 = clueCountList.reduce((a, b) => a + b);
-	if (sum !== sum2) {
-	    throw new Error('I was wrong');
-	}
-
+	let sum = clueCountList.reduce((a, b) => a + b);
 	let result = Validator.validateSources({
 	    sum:      sum,
 	    nameList: nameList,
@@ -317,21 +311,19 @@ function showValidSrcListCounts(options) {
 	if (!result.success) {
 	    msg += ': INVALID';
 	}
+	else if (ClueManager.isRejectSource(nameList)) {
+	    msg += ': REJECTED';
+	    reject = true;
+	}
 	else {
 	    let clueList = ClueManager.knownSourceMapArray[sum][nameList];
-	    if (clueList) {
+	    if (!_.isUndefined(clueList)) {
 		msg += ': PRESENT as ' + _.toString(clueList.map(clue => clue.name));
 		known = true;
 	    }
-	    else if (ClueManager.isRejectSource(nameList)) {
-		msg += ': REJECTED';
-		reject = true;
-	    }
-	    else {
-		// valid combo, neither known nor reject
-		if (!_.isUndefined(options.add)) {
-		    addCountSet.add(sum);
-		}
+	    
+	    if (!_.isUndefined(options.add)) {
+		addCountSet.add(sum);
 	    }
 	}
 	console.log(msg);
@@ -342,22 +334,33 @@ function showValidSrcListCounts(options) {
 	    addCountSet.forEach(count => {
 		if (ClueManager.addClue(count, {
 		    name: options.add,
-		    src:  nameList.toString()
-		}, true));
+		    src:  _.toString(nameList)
+		}, true)) {
+		    console.log('updated ' + count);
+		}
+		else {
+		    console.log('update of ' + count + ' failed.');
+		}
 	    });
 	}
 	else {
-	    console.log('WARNING! cannot add known clue: already rejected, ' + nameList.toString());
+	    console.log('WARNING! cannot add known clue: already rejected, ' + nameList);
 	}
     }
     else if (!_.isUndefined(options.reject)) {
 	if (!known) {
-	    ClueManager.addReject(nameList, true);
+	    if (ClueManager.addReject(nameList, true)) {
+		console.log('updated');
+	    }
+	    else {
+		console.log('update failed');
+	    }
 	}
 	else {
-	    console.log('WARNING! cannot add reject clue: already known, ' + nameList.toString());
+	    console.log('WARNING! cannot add reject clue: already known, ' + nameList);
 	}
     }
+    console.log('done');
 }
 
 //

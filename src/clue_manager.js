@@ -267,14 +267,11 @@ ClueManager.prototype.addClue = function(count, clue, save) {
 //
 
 ClueManager.prototype.addKnownClue = function(count, name, source, noThrow) {
-    var clueMap = this.knownClueMapArray[count];
+    expect(count).to.be.a('number');
+    expect(name).to.be.a('string');
+    expect(source).to.be.a('string');
 
-    if (!count || !name || !source) {
-	throw new Error('missing argument, count: ' + count +
-			', name: ' + name +
-			', source: '+ source);
-    }
-
+    let clueMap = this.knownClueMapArray[count];
     if (!clueMap[name]) {
 	clueMap[name] = [ source ];
     }
@@ -285,7 +282,7 @@ ClueManager.prototype.addKnownClue = function(count, name, source, noThrow) {
 	}
 	clueMap[name].push(source);
     }
-    else if (!noThrow ) {
+    else if (!noThrow) {
 	throw new Error('duplicate clue name/source' + 
 			'(' + count + ') ' +
 			name + ' : ' + source);
@@ -321,12 +318,14 @@ ClueManager.prototype.addReject = function(srcNameList, save) {
     let count = _.size(srcNameList);
     if (this.addRejectSource(srcNameList)) {
 	this.rejectListArray[count].push({
-	    src: srcNameList.toString()
+	    src: _.toString(srcNameList)
 	});
 	if (save) {
 	    this.rejectListArray[count].save(this.getRejectFilename(count));
 	}
+	return true;
     }
+    return false;
 }
 
 //
