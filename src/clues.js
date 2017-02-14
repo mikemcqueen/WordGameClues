@@ -296,6 +296,8 @@ function showValidSrcListCounts(options) {
 	return;
     }
     let addCountSet = new Set();
+    let known = false;
+    let reject = false;
     resultList.forEach(clueCountList => {
 	let sum = 0;
 	clueCountList.forEach(count => { sum += count });
@@ -319,9 +321,11 @@ function showValidSrcListCounts(options) {
 	    let clueList = ClueManager.knownSourceMapArray[sum][nameList];
 	    if (clueList) {
 		msg += ': PRESENT as ' + _.toString(clueList.map(clue => clue.name));
+		known = true;
 	    }
 	    else if (ClueManager.isRejectSource(nameList)) {
 		msg += ': REJECTED';
+		reject = true;
 	    }
 	    else {
 		// valid combo, neither known nor reject
@@ -334,15 +338,25 @@ function showValidSrcListCounts(options) {
     });
 
     if (!_.isUndefined(options.add)) {
-	addCountSet.forEach(count => {
-	    if (ClueManager.addClue(count, {
-		name: options.add,
-		src:  nameList.toString()
-	    }, true));
-	});
+	if (!reject) {
+	    addCountSet.forEach(count => {
+		if (ClueManager.addClue(count, {
+		    name: options.add,
+		    src:  nameList.toString()
+		}, true));
+	    });
+	}
+	else {
+	    console.log('WARNING! cannot add known clue: already rejected, ' + nameList.toString());
+	}
     }
     else if (!_.isUndefined(options.reject)) {
-	ClueManager.addReject(nameList, true);
+	if (!known) {
+	    ClueManager.addReject(nameList, true);
+	}
+	else {
+	    console.log('WARNING! cannot add reject clue: already known, ' + nameList.toString());
+	}
     }
 }
 
@@ -363,11 +377,11 @@ function doCombos(args) {
     var sourcesList;
     var set;
 
-    if (args.sources) {
-	args.sources = _.map(_.split(args.sources, ','), _.toNumber)
+    if (!_.isUndefined(args.sources)) {
+	args.sources = _.chain(args.sources).split(',').map(_.toNumber).value();
     }
-    if (args.require) {
-	args.require = _.map(_.split(args.require, ','), _.toNumber)
+    if (!_.isUndefined(args.require)) {
+	args.require = _.chain(args.require).split(',').map(_.toNumber).value();
     }
 
     console.log('++combos' +

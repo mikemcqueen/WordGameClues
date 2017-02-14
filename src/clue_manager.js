@@ -10,6 +10,7 @@ module.exports = exports = new ClueManager();
 
 const _              = require('lodash');
 const Path           = require('path');
+const expect         = require('chai').expect;
 
 const ClueList       = require('./clue_list');
 const Validator      = require('./validator');
@@ -108,7 +109,7 @@ ClueManager.prototype.loadAllClues = function(args) {
 	    });
 	}
 	catch (e) {
-	    this.log('WARNING: missing reject file: ' + 
+	    this.log('WARNING! missing reject file: ' + 
 		     this.getRejectFilename(count));
 	}
 	if (rejectClueList) {
@@ -301,22 +302,14 @@ ClueManager.prototype.addKnownClue = function(count, name, source, noThrow) {
 ClueManager.prototype.addRejectCombos = function(clueList, clueCount) {
     clueList.forEach(clue => {
 	var srcNameList;
-
-	if (clue.ignore) {
-	    return; // continue;
-	}
-
 	srcNameList = clue.src.split(',');
 
 	if (_.size(srcNameList) !== clueCount) {
-	    if (this.logging) {
-		this.log('WARNING: word count mismatch' +
-			 ', expected ' + clueCount +
-			 ', actual ' + _.size(srcNameList) +
-			 ', ' + srcNameList);
-	    }
+	    this.log('WARNING! word count mismatch' +
+		     ', expected ' + clueCount +
+		     ', actual ' + _.size(srcNameList) +
+		     ', ' + srcNameList);
 	}
-
 	this.addRejectSource(srcNameList);
     });
     return this;
@@ -339,19 +332,19 @@ ClueManager.prototype.addReject = function(srcNameList, save) {
 //
 
 ClueManager.prototype.addRejectSource = function(srcNameList) {
-    srcNameList.sort();
+    expect(srcNameList).to.be.an('array');
 
+    srcNameList.sort();
     if (this.logging) {
 	this.log('addRejectSource: ' + srcNameList);
     }
 
-    // TODO: check known sources?
-
+    if (this.isKnownSource(srcNameList.toString())) {
+	console.log('WARNING! not rejecting known source, ' + srcNameList);
+	return false;
+    }
     if (this.isRejectSource(srcNameList)) {
-	if (this.logging) {
-	    this.log('WARNING: Duplicate reject source' +
-	    	     ', ' + srcNameList);
-	}
+	console.log('WARNING! duplicate reject source, ' + srcNameList);
 	return false;
     }
     this.rejectSourceMap[srcNameList.toString()] = true;
@@ -360,21 +353,27 @@ ClueManager.prototype.addRejectSource = function(srcNameList) {
 
 // source is string containing sorted, comma-separated clues
 //
+ClueManager.prototype.isKnownSource = function(source, count = 0) {
+    expect(source).to.be.a('string');
+    expect(count).to.be.a('number');
 
-ClueManager.prototype.isKnownSource = function(source, count) {
-    if (!source || !count) {
-	throw new Error('missing args, source: ' + source +
-			', count: ' + count);
+    // check for supplied count
+    if (count > 0) {
+	return !_.isUndefined(this.knownSourceMapArray[count][source]);
     }
-    return this.knownSourceMapArray[count][source];
+
+    // check for all counts
+    return this.knownSourceMapArray.some(srcMap => {
+	return !_.isUndefined(srcMap[source]);
+    });
 }
 
-// source is string containing sorted, comma-separated clues
+// source: csv
 // NOTE: works with string or array of strings
-
+//
 ClueManager.prototype.isRejectSource = function(source) {
-    if (!source) {
-	throw new Error('missing args, source: ' + source);
+    if (!_.isString(source) && !_.isArray(source)) {
+	throw new Error('bad source: ' + source);
     }
     return this.rejectSourceMap[source];
 }
@@ -398,8 +397,7 @@ ClueManager.prototype.getCountListForName = function(name) {
 //
 
 ClueManager.prototype.getSrcListForNc = function(nc) {
-    var srcList;
-    srcList = this.knownClueMapArray[nc.count][nc.name];
+    let srcList = this.knownClueMapArray[nc.count][nc.name];
     if (!srcList) {
 	throw new Error('specified clue does not exist, ' + nc);
     }
@@ -410,13 +408,9 @@ ClueManager.prototype.getSrcListForNc = function(nc) {
 //
 
 ClueManager.prototype.getSrcListMapForName = function(name) {
-    var srcListMap;
-    var srclist;
-    var index;
-
-    srcListMap = {};
-    for (index = 1; index < this.maxClues; ++index) {
-	srcList = this.knownClueMapArray[index][name];
+    let srcListMap = {};
+    for (let index = 1; index < this.maxClues; ++index) {
+	let srcList = this.knownClueMapArray[index][name];
 	if (srcList) {
 	    srcListMap[index] = srcList;
 	}
@@ -428,7 +422,7 @@ ClueManager.prototype.getSrcListMapForName = function(name) {
 //
 
 ClueManager.prototype.makeSrcNameListArray = function(nc) {
-    var srcNameListArray = [];
+    let srcNameListArray = [];
 
 //    console.log(nc.toJSON());
 //    console.log(this.getSrcListForNc(nc));
@@ -453,7 +447,7 @@ ClueManager.prototype.makeSrcNameListArray = function(nc) {
 // of clueLists of the specified clue counts, such as [clues1,clues2].
 
 ClueManager.prototype.getClueSourceListArray = function(args) {
-    var clueSourceListArray = [];
+    let clueSourceListArray = [];
 
     if (this.logging) {
 	this.log('++clueSrcListArray' +
@@ -466,7 +460,7 @@ ClueManager.prototype.getClueSourceListArray = function(args) {
 	max:     args.max,
 	require: args.require
     }).getCombinations().forEach(clueCountList => {
-	var clueSourceList = [];
+	let clueSourceList = [];
 
 	if (clueCountList.every(count => {
 	    // empty lists not allowed
@@ -483,14 +477,11 @@ ClueManager.prototype.getClueSourceListArray = function(args) {
 	}
     }, this);
     if (!clueSourceListArray.length) {
-	throw new Error('clueSourceListArray empty!');
-	// this happens, for example, with -c 3 -x 3 -q 1 -q 2 -q 3
+	// this happens, for example, with -c 3 -x 3 -q1,2,3
 	// we require sources 1,2,3, and search for combos with
 	// -max 1,2,3 of which both -max 1,2 will hit here because
 	// we can't match 3 numbers
-	if (this.logging) {
-	    this.log('--clueSrcListArray empty!');
-	}
+	console.log('WARNING! getClueSrcListArray empty!');
     }
 
     return clueSourceListArray;
@@ -500,7 +491,7 @@ ClueManager.prototype.getClueSourceListArray = function(args) {
 //
 
 ClueManager.prototype.filterAddends = function(addends, sizes) {
-    var filtered = [];
+    let filtered = [];
 
     addends.forEach(list => {
 	if (sizes.every(size => {
@@ -516,15 +507,13 @@ ClueManager.prototype.filterAddends = function(addends, sizes) {
 //
 
 ClueManager.prototype.filter = function(clueListArray, clueCount) {
-    var index;
-    var source;
-    var known = 0;
-    var reject = 0;
-    var map = {};
+    let known = 0;
+    let reject = 0;
+    let map = {};
 
     // TODO: rather than deleting in array, build a new one?
-    for (index = 0; index < clueListArray.length; ++index) {
-	source = clueListArray[index].makeKey();
+    for (let index = 0; index < clueListArray.length; ++index) {
+	let source = clueListArray[index].makeKey();
 	if (this.isKnownSource(source, clueCount)) {
 	    if (this.logging) {
 		this.log('isKnownSource(' + clueCount + ') ' + source);
@@ -555,7 +544,7 @@ ClueManager.prototype.filter = function(clueListArray, clueCount) {
 //
 
 ClueManager.prototype.getKnownClues = function(wordList) {
-    var resultList = [];
+    let resultList = [];
 
     if (_.isArray(wordList)) {
 	wordList = _.toString(wordList);
