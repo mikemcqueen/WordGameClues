@@ -6,8 +6,11 @@
 
 var _            = require('lodash');
 var Promise      = require('bluebird');
+var expect       = require('chai').expect;
+
 var fs           = Promise.promisifyAll(require('fs'));
-var csvParse     = Promise.promisifyAll(require('csv-parse'));
+var fsReadFile   = Promise.promisify(fs.readFile);
+var csvParse     = Promise.promisify(require('csv-parse'));
 
 var Delay        = require('../util/delay');
 var googleResult = require('./googleResult');
@@ -16,7 +19,7 @@ var RESULTS_DIR = '../../data/results/';
 
 var Opt = require('node-getopt')
     .create([
-	['h' , 'help',         'this screen']
+	[ 'h' , 'help',         'this screen' ]
     ])
     .bindHelp().parseSystem();
 
@@ -26,7 +29,6 @@ var Opt = require('node-getopt')
 
 function main() {
     var filename;
-//fileLoadDefer,
 
     if (Opt.argv.length < 1) {
 	console.log('Usage: node search pairs-file');
@@ -38,28 +40,28 @@ function main() {
     filename = Opt.argv[0];
     console.log('filename: ' + filename);
 
-//    fileLoadDefer = Q.defer();
-    fs.readFile(filename, 'utf8').then(err, csvData) { //, (err, data) => {
-	if (err) throw err;
-	csvParse(csvData, null).then(err, wordListArray) { //, (err, wordListArray) => {
-	    if (err) throw err;
+    fsReadFile(filename, 'utf8').then(csvData => {
+	csvParse(csvData, null).then(wordListArray => {
 	    getAllResults(wordListArray);
+	}).catch(err => {
+	    console.log('csvParse error, ' + err);
 	});
+    }).catch(err => {
+	console.log('fs.readFile error, ' + err);
     });
+	
 }
 
 //
 
 function getAllResults(wordListArray) {
-    var wordList = wordListArray.pop(),
-	filename,
-	path;
+    expect(wordListArray).to.be.an('array');
 
-    if (wordList === undefined) {
-	return;
-    }
-    filename = makeFilename(wordList);
-    path = RESULTS_DIR + _.size(wordList) + '/' + filename;
+    let wordList = wordListArray.pop();
+    if (_.isUndefined(wordList)) return;
+
+    let filename = makeFilename(wordList);
+    let path = RESULTS_DIR + _.size(wordList) + '/' + filename;
     
     console.log('list: ' + wordList);
     console.log('file: ' + filename);
@@ -68,9 +70,9 @@ function getAllResults(wordListArray) {
 	if (err) throw err;
 	if (isFile) {
 	    console.log('Skip: file exists, ' + filename);
-	    getResults(wordListArray);
+	    return getResults(wordListArray);
 	}
-	else {
+//	else {
 	    getOneResult(wordList, (err, data) => {
 		if (err) throw err;
 		if (_.size(data) > 0) {
@@ -82,7 +84,7 @@ function getAllResults(wordListArray) {
 		    getResults(wordListArray);
 		}, Delay.between(8, 12, Delay.Minutes));
 	    });
-	}
+//	}
     });
 }
 
