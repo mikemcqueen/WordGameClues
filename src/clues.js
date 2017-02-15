@@ -7,6 +7,7 @@
 var _           = require('lodash');
 var Duration    = require('duration');
 var Np          = require('named-parameters');
+var expect      = require('chai').expect;
 
 var ClueManager = require('./clue_manager');
 var ComboMaker  = require('./combo_maker');
@@ -30,6 +31,7 @@ var Opt = require('node-getopt')
 	['d', 'allow-dupe-source'  ,         'allow duplicate source, override default behavior of --meta' ],
 	['' , 'json=WHICH',                  'specify which clue files to use. WHICH=meta|synth' ],
 	['k', 'show-known'         ,         'show compatible known clues; -u <clue> required' ],
+	['',  'csv',                         '  output in search-term csv format' ],
 	['m', 'meta'               ,         'use metamorphosis clues, same as --json meta (default)' ],
 	['o', 'output'             ,         'output json -or- clues' ],
 	['p', 'primary-sources=SOURCE[,SOURCE,...]', 'limit results to the specified primary source(s)' ],
@@ -149,7 +151,7 @@ function main() {
     if (showKnownArg) {
 	if (!useClueList) {
 	    // TODO: require max if !metaFlag
-	    console.log('-u NAME:COUNT required with that option');
+	    console.log('one or more -u NAME:COUNT required with that option');
 	    return 1;
 	}
 	if (!metaFlag) {
@@ -160,7 +162,8 @@ function main() {
 	}
 	Show.compatibleKnownClues({
 	    nameList: useClueList,
-	    max:      countArg
+	    max:      countArg,
+	    asCsv:    Opt.options.csv
 	});
     }
     else if (Opt.options.test) {
@@ -237,20 +240,16 @@ function showValidSrcListCounts(options) {
     var nameList;
     var countListArray;
     var count;
-    var map;
     var resultList;
 
     if (!srcList) {
 	throw new Error('missing arg, srcList: ' + srcList);
     }
-    if (options.add && options.reject) {
+    if (!_.isUndefined(options.add) && !_.isUndefined(options.reject)) {
 	throw new Error('cannot specify both --add and --reject');
     }
 
     nameList = srcList.split(',');
-    if (nameList.length < 2) {
-//	throw new Error('use grep or supply 2 source names, dumbass');
-    }
     nameList.sort();
     nameList.forEach(name => {
 	console.log('name: ' + name);
@@ -263,7 +262,7 @@ function showValidSrcListCounts(options) {
     countListArray = Array(_.size(nameList)).fill().map(() => []);
     //console.log(countListArray);
     for (count = 1; count <= ClueManager.maxClues; ++count) {
-	map = ClueManager.knownClueMapArray[count];
+	let map = ClueManager.knownClueMapArray[count];
 	if (!_.isUndefined(map)) {
 	    nameList.forEach((name, index) => {
 		if (!_.isUndefined(map[name])) {
@@ -316,21 +315,38 @@ function showValidSrcListCounts(options) {
 	    reject = true;
 	}
 	else {
-	    let clueList = ClueManager.knownSourceMapArray[sum][nameList];
-	    if (!_.isUndefined(clueList)) {
-		msg += ': PRESENT as ' + _.toString(clueList.map(clue => clue.name));
-		known = true;
+	    if (nameList.length === 1) {
+		let name = nameList[0];
+		let clueNameList = ClueManager.clueListArray[sum].map(clue => clue.name);
+		if (clueNameList.includes(name)) {
+		    let clueSrcList = [];
+		    ClueManager.clueListArray[sum].forEach(clue => {
+			if (clue.name == name) {
+			    clueSrcList.push(`"${clue.src}"`);
+			}
+		    });
+		    msg += ': PRESENT as clue with sources: ' + clueSrcList;
+		}
 	    }
-	    
-	    if (!_.isUndefined(options.add)) {
-		addCountSet.add(sum);
+	    else {
+		let clueList = ClueManager.knownSourceMapArray[sum][nameList];
+		if (!_.isUndefined(clueList)) {
+		    msg += ': PRESENT as ' + clueList.map(clue => clue.name);
+		    known = true;
+		}
+		if (!_.isUndefined(options.add)) {
+		    addCountSet.add(sum);
+		}
 	    }
 	}
 	console.log(msg);
     });
 
     if (!_.isUndefined(options.add)) {
-	if (!reject) {
+	if (nameList.length === 1) {
+	    console.log('WARNING! ignoring --add due to single source');
+	}
+	else if (!reject) {
 	    addCountSet.forEach(count => {
 		if (ClueManager.addClue(count, {
 		    name: options.add,
@@ -348,7 +364,10 @@ function showValidSrcListCounts(options) {
 	}
     }
     else if (!_.isUndefined(options.reject)) {
-	if (!known) {
+	if (nameList.length === 1) {
+	    console.log('WARNING! ignoring --reject due to single source');
+	}
+	else if (!known) {
 	    if (ClueManager.addReject(nameList, true)) {
 		console.log('updated');
 	    }
@@ -360,7 +379,6 @@ function showValidSrcListCounts(options) {
 	    console.log('WARNING! cannot add reject clue: already known, ' + nameList);
 	}
     }
-    console.log('done');
 }
 
 //

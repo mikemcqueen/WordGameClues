@@ -1,15 +1,8 @@
 'use strict';
 
-var showExports = {
-    compatibleKnownClues : compatibleKnownClues
-};
-
-module.exports = showExports;
-
-//
-
 var Np          = require('named-parameters');
 var _           = require('lodash');
+var expect      = require('chai').expect;
 
 //
 
@@ -49,16 +42,10 @@ function log(text) {
 //    NCs will likely yield some funky results, until
 //    I get that implemented
 //
-function compatibleKnownClues(args) {
-    var ncList;
-    var nameSourceList;
-    var remain;
-    var totalCount;
-    var count;
-    var matchNameMapArray; // should probably be SrcMap[src] = [ { name: name, srcCounts: [1,2,3] }, ... ]
-    var clueList;
-    var vsResult;
 
+// TODO: take an ncList as an arg, not a nameList
+
+function compatibleKnownClues(args) {
     if (!_.has(args, 'nameList') ||
 	!_.has(args, 'max'))
     {
@@ -66,8 +53,8 @@ function compatibleKnownClues(args) {
     }
 
     // build ncList of supplied name:counts
-    totalCount = 0;
-    ncList = [];
+    let totalCount = 0;
+    let ncList = [];
     args.nameList.forEach(name => {
 	var nc = NameCount.makeNew(name);
 	if (!nc.count) {
@@ -77,7 +64,7 @@ function compatibleKnownClues(args) {
 	ncList.push(nc);
     });
 
-    remain = args.max - totalCount;
+    let remain = args.max - totalCount;
     if (remain < 1) {
 	console.log('The total count of specified clues (' + totalCount + ')' +
 		    ' equals or exceeds the maximum clue count (' + args.max + ')');
@@ -88,12 +75,13 @@ function compatibleKnownClues(args) {
 		', total = ' + totalCount +
 		', remain = ' + remain);
 
+    let realNameList = args.nameList.map(name => NameCount.makeNew(name)).map(nc => nc.name);
     // first, make sure the supplied nameList by itself is a valid clue
     // combination, and find out how many primary-clue variations there
     // are in which the clue names in useNameList can result.
-    vsResult = Validator.validateSources({
+    let vsResult = Validator.validateSources({
 	sum:         totalCount,
-	nameList:    NameCount.makeNameList(NameCount.makeListFromNameList(args.nameList)),
+	nameList:    realNameList,
 	count:       args.nameList.length,
 	validateAll: true
     });
@@ -102,33 +90,37 @@ function compatibleKnownClues(args) {
 	return;
     }
 
-    // for each final result from validateResults
+    // for each primary-clue variation from validateResults
     vsResult.ncListArray.forEach(result => {
 	log('final result: ' + result.nameSrcList);
-	var primarySrcList = NameCount.makeCountList(result.nameSrcList);
+	var primarySrcList = result.nameSrcList.map(nc => _.toNumber(nc.count));
 	var result;
 
-	// for each clue in each clueList[count] where count is
+	// for each clue in each clueListArray[count] where count is
 	// less than or equal to the remaining count, add compatible
 	// clues to the compatible map.
-	matchNameMapArray = [];
-	for (count = 1; count <= remain; ++count) {
-	    clueList = ClueManager.clueListArray[count];
-	    clueList.forEach(clue => {
-		var resultList;
+
+	// should probably be SrcMap[src] = [ { name: name, srcCounts: [1,2,3] }, ... ]
+	let matchNameMapArray = [];
+	for (let count = 1; count <= remain; ++count) {
+	    // use only uniquely named clues
+	    _.uniqWith(ClueManager.clueListArray[count], (c1, c2) => {
+		return c1.name === c2.name;
+	    }).forEach(clue => {
 		log('checking: ' + clue.name);
+		let resultList;
 		if (resultList = isCompatibleClue({
-		    sum:           count,
-		    clue:          clue,
-		    excludeSrcList:primarySrcList
+		    sum:            count,
+		    clue:           clue,
+		    excludeSrcList: primarySrcList
 		})) {
 		    log('success, adding ' + clue.name);
 		    addToCompatibleMap({
-			clue:          clue,
-			resultList:    resultList,
-			excludeSrcList:primarySrcList,
-			nameMapArray:  matchNameMapArray,
-			index:         count
+			clue:           clue,
+			resultList:     resultList,
+			excludeSrcList: primarySrcList,
+			nameMapArray:   matchNameMapArray,
+			index:          count
 		    });
 		}
 		else {
@@ -139,49 +131,32 @@ function compatibleKnownClues(args) {
 	dumpCompatibleClues({
 	    nameList:     args.nameList,
 	    srcList:      primarySrcList,
-	    nameMapArray: matchNameMapArray
+	    nameMapArray: matchNameMapArray,
+	    asCsv:        args.asCsv
 	});
     });
 }
 
-//
-//
 // args:
-//  sum:           count,
-//  clue:          clue
+//  sum:           
+//  clue:          
 //  excludeSrcList:
 //
 function isCompatibleClue(args) {
-    var result;
-    var resultList;
-    var primarySrc;
-
-    if (!_.has(args, 'sum') ||
-	!_.has(args, 'clue') ||
-	!_.has(args, 'excludeSrcList'))
-    {
-	throw new Error('missing argument');
-    }
+    expect(args).to.have.property('sum')
+	.that.is.a('number');
+    expect(args).to.have.property('clue')
+	.that.is.an('object');
+    expect(args).to.have.property('excludeSrcList')
+	.that.is.an('array');
 
     if (_.includes(args.excludeSrcList, _.toNumber(args.clue.src))) {
 	return false;
     }
 
-    //TODO: sort
-
-    /*
-    var nameList;
-    nameList = [ clue.name ];
-    ncList.forEach(nc => {
-	nameList.push(nc.name);
-    });
-    nameList.push(clue.name);
-    nameList.sort(); // necessary?
-    */
-
     log('Validating ' + args.name + ' (' + args.sum + ')');
 
-    result = Validator.validateSources({
+    let result = Validator.validateSources({
 	sum:            args.sum,
 	nameList:       [ args.clue.name ],
 	count:          1,
@@ -204,10 +179,12 @@ function isCompatibleClue(args) {
 //  index
 //
 function addToCompatibleMap(args) {
-    var map;
-    var name;
-    var src;
-    var verbose;
+    expect(args).to.have.property('resultList')
+	.that.is.an('array').and.is.not.empty;
+    expect(args).to.have.property('excludeSrcList')
+	.that.is.an('array');//.and.is.not.empty;
+    expect(args).to.have.property('nameMapArray')
+	.that.is.an('array');//.and.is.not.empty;
 
     if (LOGGING) {
 	log('++addToCompatibleMap' +
@@ -215,13 +192,7 @@ function addToCompatibleMap(args) {
 	    ', resultList: ' + args.resultList);
     }
 
-    if (!args.resultList || _.isEmpty(args.resultList) ||
-	!_.has(args, 'excludeSrcList') ||
-	!_.has(args, 'nameMapArray'))
-    {
-	throw new Error('missing or empty argument');
-    }
-
+    let map;
     if (!args.nameMapArray[args.index]) {
 	map = args.nameMapArray[args.index] = {};
     }
@@ -229,38 +200,23 @@ function addToCompatibleMap(args) {
 	map = args.nameMapArray[args.index];
     }
 	
-    name = args.clue.name;
-    src = args.clue.src;
-
-    verbose = false; // name == 'ace';
+    let name = args.clue.name;
+    let src = args.clue.src;
 
     args.resultList.forEach(result => {
-	var primarySrcList;
-	var key;
-	primarySrcList = NameCount.makeCountList(result.nameSrcList);
-	if (verbose) {
-	    console.log('primary sources for ' + name + ': ' + primarySrcList);
-	}
-	primarySrcList = filterExcludedSources(primarySrcList, args.excludeSrcList, verbose);
+	let primarySrcList = result.nameSrcList.map(nc => _.toNumber(nc.count));
+	primarySrcList = filterExcludedSources(primarySrcList, args.excludeSrcList);
 	if (!primarySrcList.length) {
 	    throw new Error('should not happen');
 	}
-	key = name + ':' + primarySrcList;
-	if (!map[key]) {
-	    map[key] = [{
-		src:            src,
-		primarySrcList: primarySrcList
-	    }];
+	let key = name + ':' + primarySrcList;
+	if (_.isUndefined(map[key])) {
+	    map[key] = [];
 	}
-	else {
-	    map[key].push({
-		src:            src,
-		primarySrcList: primarySrcList
-	    });
-	}
-	if (verbose) {
-	    console.log('adding: ' + primarySrcList + ' - ' + src);
-	}
+	map[key].push({
+	    src:            src,
+	    primarySrcList: primarySrcList
+	});
 	log('adding: ' + primarySrcList + ' - ' + src);
     });
 }
@@ -269,22 +225,10 @@ function addToCompatibleMap(args) {
 //
 
 function filterExcludedSources(srcList, excludeSrcList, verboseFlag) {
-    var resultList;
-    resultList = [];
-
+    let resultList = [];
     srcList.forEach(src => {
-	if (verboseFlag) {
-	    console.log('looking for ' + src + ' in ' + excludeSrcList);
-	}
-	src = _.toNumber(src);
-	if (excludeSrcList.indexOf(src) === -1) {
-	    if (verboseFlag) {
-		console.log('not found');
-	    }
+	if (!excludeSrcList.includes(_.toNumber(src))) {
 	    resultList.push(src);
-	}
-	else if (verboseFlag) {
-	    console.log('found');
 	}
     });
     return resultList;
@@ -297,21 +241,22 @@ function filterExcludedSources(srcList, excludeSrcList, verboseFlag) {
 //
 function dumpCompatibleClues(args) {
     var count;
-    var map;
     var list;
-    var dumpList;
     var name;
     var countList = [ 1 ];
-    var sources = '';
-    
+
+    let sources = '';
     args.nameList.forEach(name => {
 	var nc = NameCount.makeNew(name);
 	if (sources.length > 0) {
 	    sources += ', ';
 	}
 	// TODO: [0] looks like a bug
+	// sortof. simplifying the output header
 	sources += ClueManager.knownClueMapArray[nc.count][nc.name][0];
     });
+
+    let csvNameList = args.nameList.map(name => NameCount.makeNew(name)).map(nc => nc.name);
 
     console.log(args.srcList + format2(args.srcList, FIRST_COLUMN_WIDTH) +
 		' ' + sources + format2(sources, SECOND_COLUMN_WIDTH) +
@@ -319,24 +264,27 @@ function dumpCompatibleClues(args) {
 		'\n');
 
     for (count = 1; count < ClueManager.maxClues; ++count) {
-	map = args.nameMapArray[count];
-
 	// copy all map entries to array and sort by source length,
 	// source #s, alpha name
 
-	dumpList = [];
-	for (name in map) {
-	    map[name].forEach(elem => {
-		elem.name = name.split(':')[0]; // isolate name from name:count
+	let map = args.nameMapArray[count];
+	let dumpList = [];
+	_.forOwn(map, (value, key) => {
+	    value.forEach(elem => {
+		// TODO: can't I do this up higher somewwhere?
+		elem.name = NameCount.makeNew(key).name; // .split(':')[0]; // isolate name from name:count
 		dumpList.push(elem);
 	    });
-	}
+	});
 
-	// TODO:
-	// list.sort(compatibleClueSort);
-
-	if (dumpList.length) {
-	    dumpCompatibleClueList(dumpList);
+	if (!_.isEmpty(dumpList)) {
+	    dumpList.sort((a, b) => {
+		return a.primarySrcList.toString().localeCompare(b.primarySrcList.toString());
+	    });
+	    dumpCompatibleClueList(
+		dumpList,
+		args.asCsv ? csvNameList.toString() : undefined
+	    );
 	}
     }
     console.log('');
@@ -344,11 +292,16 @@ function dumpCompatibleClues(args) {
 
 //
 
-function dumpCompatibleClueList(list) {
+function dumpCompatibleClueList(list, csvNames = undefined) {
     list.forEach(elem => {
-	console.log(elem.primarySrcList + format2(elem.primarySrcList, FIRST_COLUMN_WIDTH) +
+	if (csvNames) {
+	    console.log(csvNames + ',' + elem.name);
+	}
+	else {
+	    console.log(elem.primarySrcList + format2(elem.primarySrcList, FIRST_COLUMN_WIDTH) +
 		    ' ' + elem.src + format2(elem.src, SECOND_COLUMN_WIDTH) + 
-		    ' ' + elem.name);
+			' ' + elem.name);
+	}
     });
 }
 
@@ -362,4 +315,10 @@ function format2(text, span) {
     for (var len = text.toString().length; len < span; ++len) { result += " "; }
     return result;
 }
+
+var showExports = {
+    compatibleKnownClues : compatibleKnownClues
+};
+
+module.exports = showExports;
 

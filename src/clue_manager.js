@@ -316,6 +316,7 @@ ClueManager.prototype.addRejectCombos = function(clueList, clueCount) {
 
 ClueManager.prototype.addReject = function(srcNameList, save) {
     let count = _.size(srcNameList);
+    expect(count).to.be.at.least(2);
     if (this.addRejectSource(srcNameList)) {
 	this.rejectListArray[count].push({
 	    src: _.toString(srcNameList)
