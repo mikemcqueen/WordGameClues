@@ -10,8 +10,10 @@
     "duration": "^0.2.0",
     "google": "^2.1.0",
     "lodash": "^4.17.4",
+    "milliseconds": "^1.0.3",
     "named-parameters": "^0.0.3",
     "node-getopt": "^0.2.3",
+    "pretty-ms": "^2.1.0",
     "q": "^1.4.1",
     "wikijs": "^1.1.1"
   },

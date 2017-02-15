@@ -7,6 +7,8 @@
 var _            = require('lodash');
 var Promise      = require('bluebird');
 var expect       = require('chai').expect;
+var prettyMs     = require('pretty-ms');
+var expect       = require('chai').expect;
 
 var fs           = Promise.promisifyAll(require('fs'));
 var fsReadFile   = Promise.promisify(fs.readFile);
@@ -23,6 +25,9 @@ var Opt = require('node-getopt')
     ])
     .bindHelp().parseSystem();
 
+const DEFAULT_DELAY_LOW = 8;
+const DEFAULT_DELAY_HIGH = 12;
+
 //
 //
 //
@@ -31,10 +36,26 @@ function main() {
     var filename;
 
     if (Opt.argv.length < 1) {
-	console.log('Usage: node search pairs-file');
-	console.log('');
+	console.log('Usage: node search pairs-file [delay-minutes-low delay-minutes-high]');
+	console.log(' ex: node search file 4    ; delay 4 minutes between searches');
+	console.log(' ex: node search file 4 5  ; delay 4 to 5 minutes between searches');
+	console.log(' defaults, low: ' + DEFAULT_DELAY_LOW + ', high: ' + DEFAULT_DELAY_HIGH);
 	console.log(Opt);
 	return 1;
+    }
+
+    let delayLow = DEFAULT_DELAY_LOW;
+    let delayHigh = DEFAULT_DELAY_HIGH;
+
+    if (Opt.argv.length > 1) {
+	delayLow = _.toNumber(Opt.argv[1])
+	expect(delayLow).to.be.at.least(1);
+	let delayHigh = delayLow;
+	if (Opt.argv.length > 2) {
+	    delayHigh = _.toNumber(Opt.argv[2]);
+	    expect(delayHigh).to.be.at.least(delayLow);
+	}
+	console.log(`Delay ${delayLow} to ${delayHigh} minutes between searches`);
     }
 
     filename = Opt.argv[0];
@@ -42,20 +63,24 @@ function main() {
 
     fsReadFile(filename, 'utf8').then(csvData => {
 	csvParse(csvData, null).then(wordListArray => {
-	    getAllResults(wordListArray);
+	    getAllResults(wordListArray, {
+		low:  delayLow,
+		high: delayHigh
+	    });
 	}).catch(err => {
 	    console.log('csvParse error, ' + err);
 	});
     }).catch(err => {
 	console.log('fs.readFile error, ' + err);
     });
-	
 }
 
 //
 
-function getAllResults(wordListArray) {
+function getAllResults(wordListArray, delay) {
     expect(wordListArray).to.be.an('array');
+    expect(delay).to.have.property('low')
+    expect(delay).to.have.property('high')
 
     let wordList = wordListArray.pop();
     if (_.isUndefined(wordList)) return;
@@ -69,22 +94,21 @@ function getAllResults(wordListArray) {
     checkIfFile(path, (err, isFile) => {
 	if (err) throw err;
 	if (isFile) {
-	    console.log('Skip: file exists, ' + filename);
-	    return getResults(wordListArray);
+	    console.log(`Skip: file exists, ${filename}`);
+	    return getAllResults(wordListArray, delay);
 	}
-//	else {
-	    getOneResult(wordList, (err, data) => {
-		if (err) throw err;
-		if (_.size(data) > 0) {
-		    fs.writeFile(path, JSON.stringify(data), (err) => {
-			if (err) throw err;
-		    });
-		}
-		setTimeout(() => {
-		    getResults(wordListArray);
-		}, Delay.between(8, 12, Delay.Minutes));
-	    });
-//	}
+	getOneResult(wordList, (err, data) => {
+	    if (err) throw err;
+	    if (_.size(data) > 0) {
+		fs.writeFile(path, JSON.stringify(data), (err) => {
+		    if (err) throw err;
+		    console.log(`Saved: ${filename}`);
+		});
+	    }
+	    let msDelay = Delay.between(delay.low, delay.high, Delay.Minutes);
+	    console.log('Delaying ' + prettyMs(msDelay) + ' for next search...');
+	    setTimeout(() => getAllResults(wordListArray, delay), msDelay);
+	});
     });
 }
 

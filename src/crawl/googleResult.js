@@ -1,7 +1,8 @@
 'use strict';
 
-var google = require('google');
-var Delay = require('../util/delay');
+var google     = require('google');
+var Delay      = require('../util/delay');
+var prettyMs   = require('pretty-ms');
 
 var GoogleResultExports = {
     get : get
@@ -35,7 +36,7 @@ function get(text, callback) {
 	    counter += 1;
 	    if (res.next) {
 		delay = Delay.between(30, 60, Delay.Seconds);
-		console.log('Delaying ' + (delay / 1000) + ' seconds for next page of results...');
+		console.log('Delaying ' + prettyMs(delay) + ' for next page of results...');
 		setTimeout(res.next, delay);
 		waitForNext = true;
 	    }

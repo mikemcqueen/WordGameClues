@@ -15,6 +15,7 @@ var Opt          = require('node-getopt').create([
     ['a', 'article',             'filter results based on article word count'],
     ['c', 'count',               'show result/url counts only'],
 //    ['k', 'known',               'filter known results'],  // easy!, call ClueManager.filter()
+    ['m', 'match',               'filename match expression' ],
     ['r', 'rejects',             'show only results that fail all filters'],
     ['s', 'synthesis',           'use synth clues'],
     ['t', 'title',               'filter results based on title word count (default)'],
