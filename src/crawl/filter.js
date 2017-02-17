@@ -14,6 +14,7 @@ var ClueManager  = require('../clue_manager.js');
 var Opt          = require('node-getopt').create([
     ['a', 'article',             'filter results based on article word count'],
     ['c', 'count',               'show result/url counts only'],
+    ['d', 'dir=NAME',            'directory name'],
 //    ['k', 'known',               'filter known results'],  // easy!, call ClueManager.filter()
     ['m', 'match',               'filename match expression' ],
     ['r', 'rejects',             'show only results that fail all filters'],
@@ -25,7 +26,7 @@ var Opt          = require('node-getopt').create([
 
 //
 
-var RESULTS_DIR = '../../data/results/';
+var RESULT_DIR = '../../data/results/';
 
 //
 //
@@ -39,6 +40,8 @@ function main() {
 	Opt.options.title = true;
     }
 
+    let dir = RESULT_DIR + (_.isUndefined(Opt.options.dir) ? 2 : Opt.options.dir);
+
     let filterOptions = {
 	filterArticle: Opt.options.article,
 	filterTitle:   Opt.options.title,
@@ -51,7 +54,7 @@ function main() {
 
     let filteredList = [];
     let rejectList = [];
-    Dir.readFiles(RESULTS_DIR + '2', {
+    Dir.readFiles(dir , {
 	match:   /\.json$/,
 	exclude: /^\./,
 	recursive: false
@@ -64,7 +67,7 @@ function main() {
 	    JSON.parse(content),
 	    filterOptions
 	).catch(err => {
-	    console.error('error: ' + err.message);
+	    console.error('filterResultList error: ' + err.message);
 	}).then(result => {
 	    if (!_.isEmpty(result.urlList)) {
 		filteredList.push(result);

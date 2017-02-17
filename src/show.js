@@ -256,13 +256,13 @@ function dumpCompatibleClues(args) {
 	sources += ClueManager.knownClueMapArray[nc.count][nc.name][0];
     });
 
-    let csvNameList = args.nameList.map(name => NameCount.makeNew(name)).map(nc => nc.name);
-
     console.log(args.srcList + format2(args.srcList, FIRST_COLUMN_WIDTH) +
 		' ' + sources + format2(sources, SECOND_COLUMN_WIDTH) +
 		' ' + args.nameList +
 		'\n');
 
+    // strip ":COUNT" suffix from names in nameList
+    let rawNameList = args.nameList.map(name => NameCount.makeNew(name)).map(nc => nc.name);
     for (count = 1; count < ClueManager.maxClues; ++count) {
 	// copy all map entries to array and sort by source length,
 	// source #s, alpha name
@@ -283,7 +283,7 @@ function dumpCompatibleClues(args) {
 	    });
 	    dumpCompatibleClueList(
 		dumpList,
-		args.asCsv ? csvNameList.toString() : undefined
+		args.asCsv ? rawNameList : undefined
 	    );
 	}
     }
@@ -292,14 +292,14 @@ function dumpCompatibleClues(args) {
 
 //
 
-function dumpCompatibleClueList(list, csvNames = undefined) {
+function dumpCompatibleClueList(list, nameList = undefined) {
     list.forEach(elem => {
-	if (csvNames) {
-	    console.log(csvNames + ',' + elem.name);
+	if (!_.isUndefined(nameList)) {
+	    console.log(_.concat(nameList, elem.name).sort().toString());
 	}
 	else {
 	    console.log(elem.primarySrcList + format2(elem.primarySrcList, FIRST_COLUMN_WIDTH) +
-		    ' ' + elem.src + format2(elem.src, SECOND_COLUMN_WIDTH) + 
+			' ' + elem.src + format2(elem.src, SECOND_COLUMN_WIDTH) + 
 			' ' + elem.name);
 	}
     });

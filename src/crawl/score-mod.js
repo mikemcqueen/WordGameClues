@@ -7,11 +7,12 @@
 const _       = require('lodash');
 const Promise = require('bluebird');
 const Wiki    = require('wikijs').default;
+const expect  = require('chai').expect;
 
 //
 
 function getWordCountInText(wordList, text) {
-    if (!_.isString(text)) throw new Error('invalid text, ' + text);
+    expect(text).to.be.a('string');
 
     let textWordList = _.words(text.toLowerCase());
     let countList = new Array(wordList.length).fill(0);
@@ -97,11 +98,10 @@ function getWikiContent(title) {
 //
 
 function getScore(wordList, result) {
+    expect(wordList).to.be.an('array');
+    expect(result).to.be.an('object');
+
     return new Promise(function(resolve, reject) {
-	if (_.isNil(result)) {
-	    throw new Error('result is nil, for ' + wordList);
-	}
-	
 	let score = {
 	    wordsInTitle   : _.isString(result.title) ? getWordCountInText(wordList, result.title) : 0,
 	    wordsInSummary : _.isString(result.summary) ? getWordCountInText(wordList, result.summary) : 0,
@@ -128,9 +128,15 @@ function getScore(wordList, result) {
 //
 
 function scoreResultList(wordList, resultList, options) {
+    expect(wordList).to.be.an('array');
+    expect(resultList).to.be.an('array');
+
     return new Promise((resolve, reject) => {
 	var any = false;
 	
+	if (1) {
+	    wordList = _.chain(wordList).map(word => word.split(' ')).flatten().value();
+	}
 	console.log('wordList: ' + wordList);
 	Promise.mapSeries(resultList, (result, index) => {
 	    // don't need to get score if it's already present
