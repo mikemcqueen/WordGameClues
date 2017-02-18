@@ -21,7 +21,8 @@ var RESULTS_DIR = '../../data/results/';
 
 var Opt = require('node-getopt')
     .create([
-	[ 'h' , 'help',         'this screen' ]
+	['d', 'dir=NAME',            'directory name'],
+	['h', 'help',                'this screen' ]
     ])
     .bindHelp().parseSystem();
 
@@ -61,6 +62,17 @@ function main() {
     filename = Opt.argv[0];
     console.log('filename: ' + filename);
 
+    fsReadFile(filename, 'utf8')
+	.then(csvData => csvParse(csvData, null))
+	.then(wordListArray => {
+	    getAllResults(wordListArray, {
+		low:  delayLow,
+		high: delayHigh
+	    });
+	}).catch(err => {
+	    console.log('error, ' + err);
+	});
+    /*
     fsReadFile(filename, 'utf8').then(csvData => {
 	csvParse(csvData, null).then(wordListArray => {
 	    getAllResults(wordListArray, {
@@ -73,6 +85,7 @@ function main() {
     }).catch(err => {
 	console.log('fs.readFile error, ' + err);
     });
+    */
 }
 
 //
@@ -115,7 +128,7 @@ function getAllResults(wordListArray, delay) {
 //
 
 function getOneResult(wordList, cb) {
-    var term = makeSearchTerm(wordList, { wikipedia: true });
+    let term = makeSearchTerm(wordList, { wikipedia: true });
 
     console.log('term: ' + term);
     googleResult.get(term, cb);
@@ -139,8 +152,8 @@ function checkIfFile(file, cb) {
 //
 
 function makeFilename(wordList) {
-    var filename = '';
-
+    let filename = '';
+    
     wordList.forEach(word => {
 	if (_.size(filename) > 0) {
 	    filename += '-';
@@ -153,7 +166,7 @@ function makeFilename(wordList) {
 //
 
 function makeSearchTerm(wordList, options) {
-    var term = '';
+    let term = '';
 
     wordList.forEach(word => {
 	if (_.size(term) > 0) {

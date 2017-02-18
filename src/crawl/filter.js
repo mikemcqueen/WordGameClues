@@ -94,10 +94,10 @@ function main() {
 
 function filterResultList(wordList, resultList, options) {
     return new Promise((resolve, reject) => {
-	var urlList = [];
-	
+	let urlList = [];
+	let wordCount = _.chain(wordList).map(word => word.split(' ')).flatten().value().size();
 	Promise.map(resultList, result => {
-	    return filterResult(wordList, result, options);
+	    return filterResult(wordCount, result, options);
 	}).each((result, index) => {
 	    if (result !== null) {
 		urlList.push(result.url);
@@ -116,18 +116,18 @@ function filterResultList(wordList, resultList, options) {
 
 //
 
-function filterResult(wordList, result, options) {
+function filterResult(wordCount, result, options) {
     return new Promise(function(resolve, reject) {
 	let passTitle = false;
 	let passArticle = false;
 	
 	if (result.score) {
 	    if (options.filterTitle) {
-		passTitle = (result.score.wordsInTitle >= _.size(wordList));
+		passTitle = (result.score.wordsInTitle >= wordCount);
 	    }
 	    if (options.filterArticle) {
-		passArticle = (result.score.wordsInSummary >= _.size(wordList) ||
-			       result.score.wordsInArticle >= _.size(wordList));
+		passArticle = (result.score.wordsInSummary >= wordCount ||
+			       result.score.wordsInArticle >= wordCount);
 	    }
 	    if (passTitle || passArticle) {
 		resolve(result);

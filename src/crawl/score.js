@@ -13,7 +13,7 @@ const Path         = require('path');
 const expect       = require('chai').expect;
 const Opt          = require('node-getopt')
     .create([
-	['d', 'dir=NAME',                 'directory name'],
+	['d', 'dir=NAME',            'directory name'],
 	['f', 'force',               'force re-score'],
 	//['m', 'match=REGEX',         'match file regex'],
 	['s', 'synth',               'use synth clues'],
