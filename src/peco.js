@@ -128,18 +128,16 @@ Peco.prototype.getCombinations = function() {
 //
 
 Peco.prototype.getAllAddends = function(combFlag) {
-    var count;
-    var list;
-    
+    let list;
     if (this.count) {
 	list = this.getAddendsForCount(this.count, combFlag);
     }
     else {
-	for (count = 2; count <= this.max; ++count) {
+	for (let count = 2; count <= this.max; ++count) {
 	    list = this.getAddendsForCount(count, combFlag, list);
 	}
     }
-    return list ? list : [];
+    return list;
 }
 
 //
@@ -167,8 +165,6 @@ Peco.prototype.getAddendsForCount = function(count, combFlag, pecoList, quiet) {
 //
 
 Peco.prototype.getListCombinations = function(listArray) {
-    var pecoList;
-
     return this.buildResult({
 	listArray: listArray,
 	combFlag:  true
@@ -204,7 +200,7 @@ Peco.prototype.buildResult = function(args) {
 	if (LOGGING) {
 	    this.log('Peco: no ' + args.count + ' in ' +  list);
 	}
-	return null;
+	return [];
     }
     do {
 	if (LOGGING) {

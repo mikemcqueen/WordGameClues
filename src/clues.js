@@ -70,8 +70,8 @@ function main() {
     // options
 
     // TODO: get rid of this, just pass Opt.options around
-    let countArg = _.toNumber(Opt.options['count']);
-    let maxArg = _.toNumber(Opt.options['max']);
+    let countArg = _.toNumber(Opt.options.count);
+    let maxArg = _.toNumber(Opt.options.max);
     let requiredSizes = Opt.options['require-counts'];
     let useClueList = Opt.options['use'];
     let metaFlag = Opt.options['meta'];
@@ -90,7 +90,7 @@ function main() {
     if (!maxArg) {
 	maxArg = 2; // TODO: default values in opt
     }
-    if (!countArg) {
+    if (_.isUndefined(Opt.options.count)) {
 	needCount = true;
 
 	if (showSourcesClueName ||
@@ -156,6 +156,7 @@ function main() {
 	}
 	if (!metaFlag) {
 	    console.log('--meta required with that option');
+	    return 1;
 	}
 	if (!countArg) {
 	    countArg = ClueManager.maxClues;
@@ -237,19 +238,16 @@ function loadClues(synthFlag, metaFlag, jsonArg,
 
 function showValidSrcListCounts(options) {
     let srcList = options.test;
-    var nameList;
-    var countListArray;
-    var count;
-    var resultList;
 
     if (!srcList) {
 	throw new Error('missing arg, srcList: ' + srcList);
     }
-    if (!_.isUndefined(options.add) && !_.isUndefined(options.reject)) {
+    // TODO: expect(options).one.of('add', 'reject').to.exist;
+    if (!_.isUndefined(options.add) && options.reject) {
 	throw new Error('cannot specify both --add and --reject');
     }
 
-    nameList = srcList.split(',');
+    let nameList = srcList.split(',');
     nameList.sort();
     nameList.forEach(name => {
 	console.log('name: ' + name);
@@ -259,9 +257,9 @@ function showValidSrcListCounts(options) {
 
     // each count list contains the clueMapArray indexes in which
     // each name appears
-    countListArray = Array(_.size(nameList)).fill().map(() => []);
+    let countListArray = Array(_.size(nameList)).fill().map(() => []);
     //console.log(countListArray);
-    for (count = 1; count <= ClueManager.maxClues; ++count) {
+    for (let count = 1; count <= ClueManager.maxClues; ++count) {
 	let map = ClueManager.knownClueMapArray[count];
 	if (!_.isUndefined(map)) {
 	    nameList.forEach((name, index) => {
@@ -285,15 +283,15 @@ function showValidSrcListCounts(options) {
 
     console.log(countListArray);
 
-    resultList = Peco.makeNew({
+    let resultList = Peco.makeNew({
 	listArray: countListArray,
 	max:       ClueManager.maxClues
     }).getCombinations();
-
-    if (!resultList) {
+    if (_.isEmpty(resultList)) {
 	console.log('No matches');
 	return;
     }
+
     let addCountSet = new Set();
     let known = false;
     let reject = false;
@@ -321,7 +319,7 @@ function showValidSrcListCounts(options) {
 		if (clueNameList.includes(name)) {
 		    let clueSrcList = [];
 		    ClueManager.clueListArray[sum].forEach(clue => {
-			if (clue.name == name) {
+			if (clue.name === name) {
 			    clueSrcList.push(`"${clue.src}"`);
 			}
 		    });
@@ -334,7 +332,7 @@ function showValidSrcListCounts(options) {
 		    msg += ': PRESENT as ' + clueList.map(clue => clue.name);
 		    known = true;
 		}
-		if (!_.isUndefined(options.add)) {
+		if (options.add) {
 		    addCountSet.add(sum);
 		}
 	    }
@@ -347,37 +345,52 @@ function showValidSrcListCounts(options) {
 	    console.log('WARNING! ignoring --add due to single source');
 	}
 	else if (!reject) {
-	    addCountSet.forEach(count => {
-		if (ClueManager.addClue(count, {
-		    name: options.add,
-		    src:  _.toString(nameList)
-		}, true)) {
-		    console.log('updated ' + count);
-		}
-		else {
-		    console.log('update of ' + count + ' failed.');
-		}
-	    });
+	    addClues(addCountSet, options.add, nameList.toString());
 	}
 	else {
 	    console.log('WARNING! cannot add known clue: already rejected, ' + nameList);
 	}
     }
-    else if (!_.isUndefined(options.reject)) {
+    else if (options.reject) {
 	if (nameList.length === 1) {
 	    console.log('WARNING! ignoring --reject due to single source');
 	}
 	else if (!known) {
-	    if (ClueManager.addReject(nameList, true)) {
-		console.log('updated');
-	    }
-	    else {
-		console.log('update failed');
-	    }
+	    addReject(nameList.toString());
 	}
 	else {
 	    console.log('WARNING! cannot add reject clue: already known, ' + nameList);
 	}
+    }
+}
+
+//
+
+function addClues(countSet, name, src) {
+    expect(countSet).to.be.a('Set');
+    expect(name).to.be.a('string');
+    expect(src).to.be.a('string');
+    countSet.forEach(count => {
+	if (ClueManager.addClue(count, {
+	    name: name,
+	    src:  src
+	}, true)) {
+	    console.log('updated ' + count);
+	}
+	else {
+	    console.log('update of ' + count + ' failed.');
+	}
+    });
+}
+
+//
+
+function addReject(nameList) {
+    if (ClueManager.addReject(nameList, true)) {
+	console.log('updated');
+    }
+    else {
+	console.log('update failed');
     }
 }
 

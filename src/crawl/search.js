@@ -34,8 +34,6 @@ const DEFAULT_DELAY_HIGH = 12;
 //
 
 function main() {
-    var filename;
-
     if (Opt.argv.length < 1) {
 	console.log('Usage: node search pairs-file [delay-minutes-low delay-minutes-high]');
 	console.log(' ex: node search file 4    ; delay 4 minutes between searches');
@@ -45,22 +43,26 @@ function main() {
 	return 1;
     }
 
+    // arg0
+    let filename = Opt.argv[0];
+    console.log('filename: ' + filename);
+
+    // arg1
     let delayLow = DEFAULT_DELAY_LOW;
     let delayHigh = DEFAULT_DELAY_HIGH;
-
     if (Opt.argv.length > 1) {
 	delayLow = _.toNumber(Opt.argv[1])
-	expect(delayLow).to.be.at.least(1);
-	let delayHigh = delayLow;
-	if (Opt.argv.length > 2) {
-	    delayHigh = _.toNumber(Opt.argv[2]);
-	    expect(delayHigh).to.be.at.least(delayLow);
-	}
-	console.log(`Delay ${delayLow} to ${delayHigh} minutes between searches`);
+	expect(delayLow, 'delayLow').to.be.at.least(1);
+	delayHigh = delayLow;
     }
 
-    filename = Opt.argv[0];
-    console.log('filename: ' + filename);
+    // arg2
+    if (Opt.argv.length > 2) {
+	delayHigh = _.toNumber(Opt.argv[2]);
+	expect(delayHigh, 'delayHigh').to.be.at.least(delayLow);
+    }
+
+    console.log(`Delaying ${delayLow} to ${delayHigh} minutes between searches`);
 
     fsReadFile(filename, 'utf8')
 	.then(csvData => csvParse(csvData, null))

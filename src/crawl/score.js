@@ -11,54 +11,29 @@ const fsWriteFile  = Promise.promisify(FS.writeFile);
 const Dir          = require('node-dir');
 const Path         = require('path');
 const expect       = require('chai').expect;
-const Opt          = require('node-getopt')
-    .create([
-	['d', 'dir=NAME',            'directory name'],
-	['f', 'force',               'force re-score'],
-	//['m', 'match=REGEX',         'match file regex'],
-	['s', 'synth',               'use synth clues'],
-	['h', 'help',                'this screen']
-    ])
-    .bindHelp().parseSystem();
+const Opt          = require('node-getopt').create([
+    ['d', 'dir=NAME',            'directory name'],
+    ['f', 'force',               'force re-score'],
+    ['m', 'match=EXPR',          'filename match expression' ],
+    ['s', 'synth',               'use synth clues'],
+    ['h', 'help',                'this screen']
+]).bindHelp().parseSystem();
 
 const Score        = require('./score-mod');
 
 //
 
-// NOTE: TODO: This shoudl be in data/meta/results (or synth, depending on flag)
-
 const RESULT_DIR = '../../data/results/';
 const DATA_DIR = '../../data/';
-const RESULTS_DIR = 'results/';
 
-//
-//
-//
+function scoreSearchResultFiles(dir, fileMatch, options) {
+    expect(dir).to.be.a('string');
+    expect(fileMatch).to.be.a('string');
 
-function main() {
-    if (!_.isUndefined(Opt.options.force)) {
-	console.log('force: ' + Opt.options.force);
-    }
-
-    let base = _.isUndefined(Opt.options.synth) ? 'meta' : 'synth';
-
-    if (!_.isUndefined(Opt.options.dir)) {
-	scoreDir(base, Opt.options.dir);
-    }
-    else {
-	expect('not supported').to.equal('specify -d NAME');
-	for (let dir = 2; dir < 8; ++dir) {
-	    scoreDir(base, dir);	    
-	}
-    }
-}
-
-function scoreDir(base, dir) {
-    // DATA_DIR + base + RESULTS_DIR + dir
     let path = RESULT_DIR + dir;
     console.log('dir: ' + path);
     Dir.readFiles(path, {
-	match:   /\.json$/,
+	match:   new RegExp(fileMatch),
 	exclude: /^\./,
 	recursive: false
     }, function(err, content, filepath, next) {
@@ -67,7 +42,7 @@ function scoreDir(base, dir) {
 	Score.scoreResultList(
 	    _.split(Path.basename(filepath, '.json'), '-'),
 	    JSON.parse(content),
-	    { force: Opt.options.force }
+	    options
 	).catch(err => {
 	    console.error('scoreResultList error: ' + err);
 	}).then(list => {
@@ -84,6 +59,37 @@ function scoreDir(base, dir) {
     }, function(err, files) {
         if (err) throw err;
     });
+}
+
+//
+//
+//
+
+function main() {
+    if (!_.isUndefined(Opt.options.force)) {
+	console.log('force: ' + Opt.options.force);
+    }
+
+    expect(Opt.options.dir, 'option -d NAME is required').to.exist;
+
+    let scoreOptions = {
+	force: Opt.options.force
+    };
+
+    let fileMatch = '\.json$';
+    if (!_.isUndefined(Opt.options.match)) {
+	fileMatch = `.*${Opt.options.match}.*` + fileMatch;
+    }
+
+    if (!_.isUndefined(Opt.options.dir)) {
+	scoreSearchResultFiles(Opt.options.dir, fileMatch, scoreOptions);
+    }
+    else {
+	expect('not supported').to.equal('specify -d NAME');
+	for (let dir = 2; dir < 8; ++dir) {
+	    scoreSearchResultFiles(dir, fileMatch, scoreOptions);
+	}
+    }
 }
 
 //
