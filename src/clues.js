@@ -508,15 +508,14 @@ function showValidateResult(args) {
 
 //
 
-function setLogging(verboseArg) {
-    var flag = Boolean(verboseArg);
+function setLogging(flag) {
     ClueManager.logging = flag;
     ComboMaker.logging  = flag;
     Validator.logging   = flag;
     AltSources.logging  = flag;
     ComboSearch.logging = flag;
-    ResultMap.setLogging(flag);
-    Peco.setLogging(flag);
+    //ResultMap.setLogging(flag);
+    //Peco.setLogging(flag);
 
     LOGGING = flag;
 }

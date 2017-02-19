@@ -67,9 +67,7 @@ ClueManager.prototype.loadAllClues = function(args) {
     var count;
     var optional = false;
     var knownClueList;
-    var max;
-    var required;
-    var result;
+    //var max;
 
     this.dir = DATA_DIR + args.baseDir;
 
@@ -78,12 +76,11 @@ ClueManager.prototype.loadAllClues = function(args) {
     }
     //console.log('module.filename: ' + Path.dirname(module.filename));
 
-    result = this.getMaxRequired(args.baseDir);
-    max = result.max;
-    required = result.required;
+    let result = this.getMaxRequired(args.baseDir);
+    this.maxClues = result.max; // need to set this before loading, used by validator
 
-    for (count = 1; count <= max; ++count) {
-	optional = count > required;
+    for (count = 1; count <= result.max; ++count) {
+	optional = count > result.required;
 	knownClueList = ClueList.makeFrom(
 	    { 'filename' : this.getKnownFilename(count),
 	      'optional' : optional
@@ -100,7 +97,7 @@ ClueManager.prototype.loadAllClues = function(args) {
 	}
     }
 
-    for (count = 2; count <= max; ++count) {
+    for (count = 2; count <= result.max; ++count) {
 	let rejectClueList = null;
 	try {
 	    rejectClueList = ClueList.makeFrom({
@@ -119,7 +116,6 @@ ClueManager.prototype.loadAllClues = function(args) {
     }
 
     this.loaded = true;
-    this.maxClues = max;
 
     return this;
 }
