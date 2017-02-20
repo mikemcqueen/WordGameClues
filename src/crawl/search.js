@@ -4,27 +4,27 @@
 
 'use strict';
 
-var _            = require('lodash');
-var Promise      = require('bluebird');
-var expect       = require('chai').expect;
-var prettyMs     = require('pretty-ms');
-var expect       = require('chai').expect;
+const _            = require('lodash');
+const Promise      = require('bluebird');
+const expect       = require('chai').expect;
+const prettyMs     = require('pretty-ms');
+const expect       = require('chai').expect;
 
-var fs           = Promise.promisifyAll(require('fs'));
-var fsReadFile   = Promise.promisify(fs.readFile);
-var csvParse     = Promise.promisify(require('csv-parse'));
+const fs           = require('fs');
+const fsReadFile   = Promise.promisify(fs.readFile);
+const csvParse     = Promise.promisify(require('csv-parse'));
 
-var Delay        = require('../util/delay');
-var googleResult = require('./googleResult');
+const Delay        = require('../util/delay');
+const googleResult = require('./googleResult');
 
-var RESULTS_DIR = '../../data/results/';
+const Opt = require('node-getopt')
+      .create([
+	  ['d', 'dir=NAME',            'directory name'],
+	  ['h', 'help',                'this screen' ]
+      ])
+      .bindHelp().parseSystem();
 
-var Opt = require('node-getopt')
-    .create([
-	['d', 'dir=NAME',            'directory name'],
-	['h', 'help',                'this screen' ]
-    ])
-    .bindHelp().parseSystem();
+const RESULTS_DIR = '../../data/results/';
 
 const DEFAULT_DELAY_LOW = 8;
 const DEFAULT_DELAY_HIGH = 12;
@@ -74,20 +74,6 @@ function main() {
 	}).catch(err => {
 	    console.log('error, ' + err);
 	});
-    /*
-    fsReadFile(filename, 'utf8').then(csvData => {
-	csvParse(csvData, null).then(wordListArray => {
-	    getAllResults(wordListArray, {
-		low:  delayLow,
-		high: delayHigh
-	    });
-	}).catch(err => {
-	    console.log('csvParse error, ' + err);
-	});
-    }).catch(err => {
-	console.log('fs.readFile error, ' + err);
-    });
-    */
 }
 
 //
@@ -182,7 +168,6 @@ function makeSearchTerm(wordList, options) {
     }
     return term;
 }
-
 
 //
 
