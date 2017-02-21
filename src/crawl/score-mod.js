@@ -113,10 +113,11 @@ function getScore(wordList, result) {
 		.then(content => {
 		    score.wordsInArticle = getWordCountInText(
 			wordList, content.text + ' ' + _.values(content.info).join(' '));
-		    resolve(score);
 		}).
 		catch(err => {
 		    console.error(`getScore: ${err}`);
+		}).then(() => {
+		    resolve(score);
 		});
 	}
 	else {

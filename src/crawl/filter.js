@@ -159,12 +159,10 @@ function main() {
     }
 
     let dir = RESULT_DIR + (_.isUndefined(Opt.options.dir) ? '2' : Opt.options.dir);
-
     let fileMatch = '\.json$';
     if (!_.isUndefined(Opt.options.match)) {
 	fileMatch = `.*${Opt.options.match}.*` + fileMatch;
     }
-
     let filterOptions = {
 	filterArticle: Opt.options.article,
 	filterTitle:   Opt.options.title,
@@ -177,7 +175,7 @@ function main() {
 
     filterSearchResultFiles(dir, fileMatch, filterOptions)
     .then(result => {
-	if (Opt.options.count === true) {
+	if (Opt.options.count) {
 	    console.log('Results: ' + _.size(result.filtered) +
 			', Urls: ' + getUrlCount(result.filtered) +
 			', Rejects: ' + _.size(result.rejects));

@@ -1,8 +1,9 @@
 'use strict';
 
 var clueListExports = {
-    makeNew : makeNew,
-    makeFrom: makeFrom
+    makeNew:  makeNew,
+    makeFrom: makeFrom,
+    makeKey:  makeKey
 };
 
 module.exports = clueListExports;
@@ -195,12 +196,6 @@ function init() {
 //
 
 function makeKey() {
-    var keyArray = [];
-    this.forEach(clue => {
-	keyArray.push(clue.name);
-    });
-    keyArray.sort();
-
-    return keyArray.toString();
+    return this.map(clue => clue.name).sort().toString();
 }
 

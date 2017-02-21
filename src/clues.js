@@ -404,13 +404,6 @@ function addReject(nameList) {
 //
 
 function doCombos(args) {
-    var comboListArray;
-    var beginDate;
-    var result;
-    var count;
-    var sourcesList;
-    var set;
-
     if (!_.isUndefined(args.sources)) {
 	args.sources = _.chain(args.sources).split(',').map(_.toNumber).value();
     }
@@ -425,28 +418,24 @@ function doCombos(args) {
 		', sources: ' + args.sources +
 		', use: ' + args.use);
 
-    beginDate = new Date();
-
-    comboListArray = ComboMaker.makeCombos(args);
-
+    let beginDate = new Date();
+    let nameCsvList = ComboMaker.makeCombos(args);
     log('--combos: ' + (new Duration(beginDate, new Date())).seconds + ' seconds');
 
-    result = ClueManager.filter(comboListArray, args.sum);
+    let total = nameCsvList.length;
+    let result = ClueManager.filter(nameCsvList, args.sum);
 
-    count = 0;
-    _.keys(result.set).forEach(nameStr => {
-	console.log(nameStr);
-	++count;
-    });
+    _.keys(result.set).forEach(nameCsv => console.log(nameCsv));
 
-    console.log('total: ' + _.size(result.set) +
-		' known: ' + result.known +
-		' reject: ' + result.reject);
+    console.log(`total: ${total}` +
+		', filtered: ' + _.size(result.set) +
+		', known: ' + result.known +
+		', reject: ' + result.reject +
+		', duplicate: ' + result.duplicate)
 
-    if (result.array.length != count + result.known + result.reject) {
-	//throw new Error('Amounts do not add up!');
+    if (nameCsvList.length !== _.size(result.set) + result.known + result.reject + result.duplicate) {
+	console.warn('WARNING: amounts to not add up!');
     }
-
 }
 
 //
@@ -461,7 +450,7 @@ function showSources(clueName) {
     clueName = clueSplitList[0];
     nc = NameCount.makeNew(clueName);
     if (_.size(clueSplitList) > 1) {
-	verbose = clueSplitList[1] == 'v';
+	verbose = clueSplitList[1] === 'v';
     }
     if (!nc.count) {
 	throw new Error('Need to supply a count as name:count (for now)');

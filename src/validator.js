@@ -10,14 +10,18 @@ module.exports = exports = new Validator();
 
 //
 
-var _             = require('lodash');
-var expect        = require('chai').expect;
+const _             = require('lodash');
+const expect        = require('chai').expect;
 
-var ClueManager   = require('./clue_manager');
-var ClueList      = require('./clue_list');
-var ResultMap     = require('./resultmap');
-var NameCount     = require('./name_count');
-var Peco          = require('./peco');
+const ClueManager   = require('./clue_manager');
+const ClueList      = require('./clue_list');
+const ResultMap     = require('./resultmap');
+const NameCount     = require('./name_count');
+const Peco          = require('./peco');
+
+//
+
+var xp = false;
 
 //
 
@@ -141,8 +145,10 @@ Validator.prototype.validateSources = function(args) {
 // TODO: ForNameList
 
 Validator.prototype.recursiveValidateSources = function(args) {
-    expect(args.clueNameList).to.be.an('array').that.is.not.empty;
-    expect(args.clueCountList).to.be.an('array').that.is.not.empty;
+    if (xp) {
+	expect(args.clueNameList).to.be.an('array').that.is.not.empty;
+	expect(args.clueCountList).to.be.an('array').that.is.not.empty;
+    }
 
     this.logLevel++;
     if (this.logging) {
@@ -150,7 +156,7 @@ Validator.prototype.recursiveValidateSources = function(args) {
 		 ', looking for [' + args.clueNameList + ']' +
 		 ' in [' + args.clueCountList + ']');
     }
-    expect(args.clueNameList.length).to.equal(args.clueCountList.length);
+    if (xp) expect(args.clueNameList.length).to.equal(args.clueCountList.length);
 
     let ncList = _.isUndefined(args.nameCountList) ? [] : args.nameCountList;
     let nameIndex = 0;
@@ -229,13 +235,15 @@ Validator.prototype.rvsWorker = function(args) {
 		 this.indentNewline() + '  ncList: ' + args.ncList +
 		 ', nameList: ' + args.nameList);
     }
-    expect(args.name).to.be.a('string').that.is.not.empty;
-    expect(args.count).to.be.a('number')
-	.that.is.at.least(1)
-	.and.at.most(ClueManager.maxClues);
-    expect(args.ncList).to.be.an('array');
-    expect(args.nameList).to.be.an('array');
-
+    if (xp) {
+	expect(args.name).to.be.a('string').that.is.not.empty;
+	expect(args.count).to.be.a('number')
+	    .that.is.at.least(1)
+	    .and.at.most(ClueManager.maxClues);
+	expect(args.ncList).to.be.an('array');
+	expect(args.nameList).to.be.an('array');
+    }
+	
     let newNameCountList = this.copyAddNcList(args.ncList, args.name, args.count);
     if (newNameCountList === null) {
 	// TODO:
@@ -384,7 +392,7 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 	    // break down all compound clues into source components
 	    buildArgs.ncList = nameCountList;
 	    buildResult = this.buildSrcNameList(buildArgs);
-	    expect(buildResult.count).to.be.at.most(ClueManager.maxClues);
+	    if (xp) expect(buildResult.count).to.be.at.most(ClueManager.maxClues);
 
 	    // skip recursive call to validateSources if we have all primary clues
 	    if (buildResult.allPrimary) {
@@ -411,7 +419,7 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 		    break; // fail, try other combos
 		}
 		// sanity check
-		expect(vsResult.ncListArray).is.not.empty;
+		if (xp) expect(vsResult.ncListArray).is.not.empty;
 		if (this.logging) {
 		    this.log('from validateSources(' + buildResult.count + ')');
 		    this.log('  compoundSrcNameList: ' + buildResult.compoundSrcNameList);
@@ -433,7 +441,7 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 	    let anyCandidate = false;
 	    candidateResultList.some(result => {
 		let findResult = this.findDuplicatePrimaryClue({ ncList: result.ncList });
-		expect(findResult.allPrimary).to.be.true;
+		if (xp) expect(findResult.allPrimary).to.be.true;
 		if (!this.evalFindDuplicateResult(findResult, '2nd')) {
 		    return false; // some.continue
 		}
@@ -470,7 +478,7 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 	    return this.uniqueResult(anyFlag, resultList); // success - exit function
 	}
 	// sanity check
-	expect(buildResult, 'buildResult').to.exist;
+	if (xp) expect(buildResult, 'buildResult').to.exist;
 	if (!this.incrementIndexMap(buildResult.indexMap)) {
 	    if (this.logging) {
 		this.log(`--checkUniqueSources, full validate, ${anyFlag}`);
@@ -509,9 +517,11 @@ Validator.prototype.getCompatibleResults = function(args) {
 		 this.indentNewline() + '  ncList:      ' + args.ncList +
 		 this.indentNewline() + '  nameSrcList: ' + args.nameSrcList);
     }
-    expect(args.origNcList).to.be.an('array').that.is.not.empty;
-    expect(args.ncList).to.be.an('array').that.is.not.empty;
-    expect(args.nameSrcList).to.be.an('array').that.is.not.empty;
+    if (xp) {
+	expect(args.origNcList).to.be.an('array').that.is.not.empty;
+	expect(args.ncList).to.be.an('array').that.is.not.empty;
+	expect(args.nameSrcList).to.be.an('array').that.is.not.empty;
+    }
 
     let resultList = [];
     if (!this.hasExcludedSource(args.nameSrcList, args.excludeSrcList)) {
@@ -527,7 +537,7 @@ Validator.prototype.getCompatibleResults = function(args) {
 	    ncList:         args.ncList,
 	    excludeSrcList: args.excludeSrcList
 	}).some(nameSrcList => {
-	    expect(!this.hasNameSrcList(resultList, nameSrcList));
+	    if (xp) expect(!this.hasNameSrcList(resultList, nameSrcList));
 	    if (this.logging) {
 		this.log('aUP: adding cycle primary result: ' +
 			 this.indentNewline() + '  ' +
@@ -542,9 +552,11 @@ Validator.prototype.getCompatibleResults = function(args) {
 
 //
 Validator.prototype.addCompatibleResult = function(resultList, nameSrcList, args) {
-    expect(resultList).to.be.an('array');
-    expect(nameSrcList).to.be.an('array');
-    expect(args.ncList).to.be.an('array');
+    if (xp) {
+	expect(resultList).to.be.an('array');
+	expect(nameSrcList).to.be.an('array');
+	expect(args.ncList).to.be.an('array');
+    }
 
     resultList.push({
 	ncList:      args.ncList,
@@ -567,7 +579,7 @@ Validator.prototype.addCompatibleResult = function(resultList, nameSrcList, args
 //  exclueSrcList:
 //
 Validator.prototype.cyclePrimaryClueSources = function(args) {
-    expect(args.ncList).to.be.an('array').that.is.not.empty;
+    if (xp) expect(args.ncList).to.be.an('array').that.is.not.empty;
 
     if (this.logging) {
 	this.log('++cyclePrimaryClueSources');
@@ -602,7 +614,7 @@ Validator.prototype.cyclePrimaryClueSources = function(args) {
 	if (findResult.duplicateSrc) {
 	    continue;
 	}
-	expect(_.size(localNcList), 'localNcList').to.equal(_.size(srcMap));
+	if (xp) expect(_.size(localNcList), 'localNcList').to.equal(_.size(srcMap));
 
 	let nameSrcList = this.getNameSrcList(srcMap);
 	if (this.logging) {
@@ -692,7 +704,7 @@ Validator.prototype.findDuplicatePrimaryClue = function(args) {
 Validator.prototype.findPrimarySourceConflicts = function(args) {
     let duplicateName;
 
-    expect(args.ncList, 'args.ncList').to.exist;
+    if (xp) expect(args.ncList, 'args.ncList').to.exist;
 
     let allPrimary = true;
     let nameMap = {};
@@ -834,7 +846,7 @@ Validator.prototype.resolvePrimarySourceConflicts = function(args) {
 //  nameMap:
 //
 Validator.prototype.findDuplicatePrimarySource = function(args) {
-    expect(args.ncList).to.be.an('array');
+    if(xp ) expect(args.ncList).to.be.an('array');
 
     let duplicateSrcName;
     let duplicateSrc;
@@ -977,7 +989,7 @@ Validator.prototype.buildSrcNameList = function(args) {
 		return; // forEach.next
 	    }
 	}
-	expect(resultMap.map()[nc]).to.be.undefined;
+	if (xp) expect(resultMap.map()[nc]).to.be.undefined;
 
 	// if nc is a primary clue
 	if (nc.count == 1) {

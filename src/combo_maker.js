@@ -12,6 +12,7 @@ module.exports = exports = new ComboMaker();
 
 var _           = require('lodash');
 var Duration    = require('duration');
+var expect      = require('chai').expect;
 
 //
 
@@ -48,133 +49,114 @@ ComboMaker.prototype.log = function(text) {
 //  use:     list of clue name-counts, e.g. ['john:1','bob:5']
 //
 // A "clueSourceList" is a list (array) where each element is a
-// object that cointas a list (cluelist) and a count, such as
+// object that contains a list (cluelist) and a count, such as
 // [ { list:clues1, count:1 },{ list:clues2, count:2 }].
 //
-
 ComboMaker.prototype.makeCombos = function(args) {
-    var clueSourceListArray;
-    var clueListArray = [];
+    var nameCsvList = [];
     var successDuration = 0;
     var failDuration = 0;
     var nextDuration = 0;
     var useNcList;
     var require;
-    var validateAll;
 
     this.nextSort = 0;
     this.nextDupeClue = 0;
     this.nextDupeSrc = 0;
     this.nextDupeCombo = 0;
 
-    //console.log('CMaker: sum: '  + typeof args.sum + ', max: ' + typeof args.max);
+    if (_.isUndefined(args.maxResults)) {
+	args.maxResults = 50000;
+    }
 
     // TODO USE "validateArgs" 
 
-    /*
-    this.log('CM: sum=' + args.sum + ' max=' + args.max);
-    */
-
-    if (args.use) {
+    if (!_.isUndefined(args.use)) {
 	useNcList = this.buildUseNcList(args.use); // , require);
     }
-    if (args.sources) {
+    let validateAll = false;
+    if (!_.isUndefined(args.sources)) {
 	console.log('Valididating sources: ' + args.sources);
 	validateAll = true;
     }
 
+    let totalCount = 0;
+    let skipCount = 0;
     // for each sourceList in sourceListArray
     ClueManager.getClueSourceListArray({
 	sum:     args.sum,
 	max:     args.max,
 	require: args.require,
     }).forEach(clueSourceList => {
-	var sourceIndexes = [];
-	var clueNameList;
-	var clueList;
-	var clue;
-	var result;
-	var validateResult;
-	var start;
-	var duration;
-	var ncMap;
-	var first;
+	let sourceIndexes = [];
 
-	result = this.first(clueSourceList, sourceIndexes);
-	if (!result) {
+	let result = this.first(clueSourceList, sourceIndexes);
+	if (result.done) {
 	    throw new Error('no valid combos');
 	}
 
-	first = true;
 	// this is effectively Peco.getCombinations().forEach()
-	while (result) {
+	let first = true;
+	while (!result.done) {
 	    if (!first) {
-		start = new Date();
+		let start = new Date();
 		result = this.next(clueSourceList, sourceIndexes);
-		duration = new Duration(start, new Date());
-		nextDuration += duration.milliseconds;
+		nextDuration += (new Duration(start, new Date())).milliseconds;
+		if (result.done) {
+		    break;
+		}
 	    }
 	    else {
 		first = false;
 	    }
-	    ncMap = {};
-	    clueNameList = [];
-	    if (!clueSourceList.every((clueSource, index) => {
-		clue = clueSource.list[sourceIndexes[index]];
-		clueNameList.push(clue.name);
-		if (ncMap[clue.name]) {
-		    return false; // duplicate clue name
-		}
-		ncMap[clue.name] = NameCount.makeNew(clue.name, clueSource.count);
-		return true;
-	    })) {
+
+	    /*
+	    // build list of clue names from list of clue sources and sourceIndex array
+	    let clueNameList = clueSourceList.map(
+		(clueSource, index) => clueSource.list[sourceIndexes[index]].name);
+
+	    // DUBIOUS! filter out clue lists with duplicate clue names.
+	    if (_.uniq(clueNameList).length !== clueNameList.length) {
+		expect(true).to.be.false; // because we filter these out in next()
 		continue;
 	    }
+	    */
 
-	    if (useNcList) {
-		// every name in useNcList must exist as a key in ncMap
-		if (!useNcList.every(nc => {
-		    return ncMap[nc.name];
-		})) {
-		    continue; // invalid combo
+	    // if useNcList, all nc must exist in current combo's nc list
+	    if (!_.isUndefined(useNcList)) {
+		if (_.intersection(useNcList, result.ncList).length !== useNcList.length) {
+		    ++skipCount;
+		    continue;
 		}
 	    }
 
-	    start = new Date();
-	    validateResult = Validator.validateSources({
+	    let start = new Date();
+	    let validateResult = Validator.validateSources({
 		sum:         args.sum,
-		nameList:    clueNameList,
-		count:       clueNameList.length,
-		require:     require,
+		nameList:    result.nameList,
+		count:       result.nameList.length,
+		require:     args.require, // ??
 		validateAll: validateAll
 	    });
-	    duration = new Duration(start, new Date());
+	    let duration = new Duration(start, new Date());
 
 	    if (validateResult.success) {
 		successDuration += duration.milliseconds;
 
 		if (validateAll &&
-		    !this.checkPrimarySources(validateResult.ncListArray,
-					      args.sources))
-		{
+		    !this.checkPrimarySources(validateResult.ncListArray, args.sources)) {
 		    continue;
 		}			
-		clueList = ClueList.makeNew();
-		clueSourceList.forEach((clueSource, index) => {
-		    clue = clueSource.list[sourceIndexes[index]];
-		    clueList.push({
-			name:  clue.name,
-			src:   clue.src,
-			count: clueSource.count
-		    });
-
-		});
-		clueListArray.push(clueList);
+		if (nameCsvList.length < args.maxResults) {
+		    nameCsvList.push(result.nameList.toString());
+		}
+		if ((++totalCount % 10000) === 0) {
+		    console.log(`total(${totalCount}), hash(${_.size(this.hash)}), list(${nameCsvList.length})`);
+		}
 	    }
 	    else {
 		failDuration += duration.milliseconds;
 	    }
-
 	}
     }, this);
 
@@ -182,13 +164,15 @@ ComboMaker.prototype.makeCombos = function(args) {
 		', fail: ' + failDuration + 'ms' +
 		', next: ' + nextDuration + 'ms' +
 		', nextSort: ' + this.nextSort + 'ms');
-    console.log('dupeClue(' + this.nextDupeClue + ') ' +
-		'dupeSrc(' + this.nextDupeSrc + ') ' +
-		'dupeCombo(' + this.nextDupeCombo + ') ');
+    console.log(`total(${totalCount})` +
+		', dupeClue(' + this.nextDupeClue + ')' +
+		', dupeSrc(' + this.nextDupeSrc + ')' +
+		', dupeCombo(' + this.nextDupeCombo + ')' +
+		`, skip(${skipCount})`);
 
     if (0) { this.displayCombos(clueListArray); }
 
-    return clueListArray;
+    return nameCsvList;
 }
 
 // As long as one final result has only primary sources from 'sources'
@@ -207,10 +191,9 @@ ComboMaker.prototype.checkPrimarySources = function(resultList, sources) {
 //
 
 ComboMaker.prototype.buildUseNcList = function(nameList, countList) {
-    var ncList;
-    ncList = [];
+    let ncList = [];
     nameList.forEach(name =>  {
-	var nc = NameCount.makeNew(name);
+	let nc = NameCount.makeNew(name);
 	if (nc.count) {
 	    if (!ClueManager.knownClueMapArray[nc.count][nc.name]) {
 		throw new Error('specified clue does not exist, ' + nc);
@@ -230,7 +213,7 @@ ComboMaker.prototype.buildUseNcList = function(nameList, countList) {
 //
 
 ComboMaker.prototype.hasUniqueClues = function(clueList) {
-    var sourceMap = {};
+    let sourceMap = {};
     clueList.forEach(function(clue) {
 	if (isNaN(clue.count)) {
 	    throw new Error('bad clue count');
@@ -275,7 +258,7 @@ ComboMaker.prototype.displaySourceListArray = function(sourceListArray) {
 //
 
 ComboMaker.prototype.first = function(clueSourceList, sourceIndexes) {
-    var index;
+    let index;
 
     this.hash = {};
     for (index = 0; index < clueSourceList.length; ++index) {
@@ -290,82 +273,63 @@ ComboMaker.prototype.first = function(clueSourceList, sourceIndexes) {
 //
 
 ComboMaker.prototype.next = function(clueSourceList, sourceIndexes) {
-    var hash;
-    var listIndex;
-    var comboStr;
-    var clue;
-    var start;
-    var count;
-    var name;
-    var src;
-
     for (;;) {
 	if (!this.nextIndex(clueSourceList, sourceIndexes)) {
-	    return false;
+	    return { done: true };
 	}
-
-	var comboList = [];
+	let ncList = [];          // e.g. [ { name: "pollock", count: 2 }, { name: "jackson", count: 4 } ]
+	let nameList = [];        // e.g. [ "pollock", "jackson" ]
+	let srcCountStrList = []  // e.g. [ "white,fish:2", "moon,walker:4" ]
 	if (!clueSourceList.every((clueSource, index) => {
-	    clue = clueSource.list[sourceIndexes[index]];
+	    let clue = clueSource.list[sourceIndexes[index]];
 	    if (clue.ignore || clue.skip) {
-		return false;
+		return false; // every.exit
 	    }
-	    comboList.push(clue.name + ':' + clue.src);
-	    return true;
+	    nameList.push(clue.name);
+	    // I think this is right
+	    ncList.push(NameCount.makeNew(clue.name, clueSource.count)); //clue.src));
+	    srcCountStrList.push(NameCount.makeCanonicalName(clue.src, clueSource.count));
+	    return true; // every.continue;
 	})) {
 	    continue;
 	}
-	comboStr = comboList.toString();
 
-	hash = {};
-	// skip combinations that have duplicate clues or sources
-	if (!clueSourceList.every((clueSource, index) => {
-
-	    // check for duplicate clues
-	    clue = clueSource.list[sourceIndexes[index]];
-	    count = clueSource.count;
-	    name = NameCount.makeCanonicalName(clue.name, count);
-	    if (name in hash) {
-		this.nextDupeClue++;
-		if (this.logging) {
-		    this.log('skipping duplicate clue: ' + comboStr);
-		}
-		return false;
+	// skip combinations that have duplicate source:count
+	if (_.uniq(srcCountStrList).length !== srcCountStrList.length) {
+	    if (this.logging) {
+		this.log('skipping duplicate clue src: ' + strCountStrList);
 	    }
-	    hash[name] = true;
+	    ++this.nextDupeSrc;
+	    continue;
+	}
 
-	    // questionable whether this is "correct", but it's probably OK.
-	    src =  NameCount.makeCanonicalName(clue.src, count);
-	    if (src in hash) {
-		this.nextDupeSrc++;
-		if (this.logging) {
-		    this.log('skipping duplicate source: ' + comboStr);
-		}
-		return false;
+	// skip combinations that have duplicate names
+	nameList.sort();
+	if (_.sortedUniq(nameList).length !== nameList.length) {
+	    if (this.logging) {
+		this.log('skipping duplicate clue name: ' + nameList);
 	    }
-	    hash[src] = true;
-
-	    return true;
-	})) {
+	    ++this.nextDupeClue; // TODO: DupeName
 	    continue;
 	}
 
 	// skip duplicate combinations
-	start = new Date();
-	comboList.sort();
-	this.nextSort += (new Duration(start, new Date())).milliseconds;
-	comboStr = comboList.toString();
-
-	if (comboStr in this.hash) {
-	    this.nextDupeCombo++;
+	ncList.sort();
+	let ncCsv = ncList.toString();
+	if (ncCsv in this.hash) {
 	    if (this.logging) {
-		this.log('skipping duplicate combo: ' + comboStr);
+		this.log('skipping duplicate combo: ' + ncCsv);
 	    }
+	    ++this.nextDupeCombo;
 	    continue;
 	}
-	this.hash[comboStr] = true;
+	this.hash[ncCsv] = true;
 
-	return true; // success
+	return {
+	    done:     false,
+	    ncList:   ncList,
+	    nameList: nameList
+	};
     }
 }
 
@@ -373,7 +337,7 @@ ComboMaker.prototype.next = function(clueSourceList, sourceIndexes) {
 //
 
 ComboMaker.prototype.nextIndex = function(clueSourceList, sourceIndexes) {
-    var index = sourceIndexes.length - 1;
+    let index = sourceIndexes.length - 1;
 
     // increment last index
     ++sourceIndexes[index];
@@ -395,7 +359,7 @@ ComboMaker.prototype.nextIndex = function(clueSourceList, sourceIndexes) {
 
 ComboMaker.prototype.displayCombos = function(clueListArray) {
     console.log('\n-----\n');
-    var count = 0;
+    let count = 0;
     clueListArray.forEach(function(clueList) {
 	clueList.display();
 	++count;
@@ -407,7 +371,7 @@ ComboMaker.prototype.displayCombos = function(clueListArray) {
 //
 
 ComboMaker.prototype.clueListToString = function(clueList) {
-    var str = '';
+    let str = '';
 
     clueList.forEach(function(clue) {
 	if (str.length > 0) {

@@ -371,7 +371,7 @@ ClueManager.prototype.isRejectSource = function(source) {
     if (!_.isString(source) && !_.isArray(source)) {
 	throw new Error('bad source: ' + source);
     }
-    return this.rejectSourceMap[source];
+    return this.rejectSourceMap[source.toString()];
 }
 
 //
@@ -502,37 +502,42 @@ ClueManager.prototype.filterAddends = function(addends, sizes) {
 //
 //
 
-ClueManager.prototype.filter = function(clueListArray, clueCount) {
+ClueManager.prototype.filter = function(srcCsvList, clueCount) {
     let known = 0;
     let reject = 0;
+    let duplicate = 0;
     let map = {};
 
     // TODO: rather than deleting in array, build a new one?
-    for (let index = 0; index < clueListArray.length; ++index) {
-	let source = clueListArray[index].makeKey();
-	if (this.isKnownSource(source, clueCount)) {
+    // TODO: clueListArray.
+    srcCsvList.forEach(srcCsv => {
+	if (this.isKnownSource(srcCsv, clueCount)) {
 	    if (this.logging) {
-		this.log('isKnownSource(' + clueCount + ') ' + source);
+		this.log('isKnownSource(' + clueCount + ') ' + srcCsv);
 	    }
 	    ++known;
-	    delete clueListArray[index];
+	    //delete clueListArray[index];
 	}
-	else if (this.isRejectSource(source)) {
+	else if (this.isRejectSource(srcCsv)) {
 	    if (this.logging) {
-		this.log('isRejectSource(' + clueCount + ') ' + source);
+		this.log('isRejectSource(' + clueCount + ') ' + srcCsv);
 	    }
 	    ++reject;
-	    delete clueListArray[index];
+	    //delete clueListArray[index];
 	}
 	else {
-	    map[source] = true;
+	    if (map[srcCsv]) {
+		console.warn(`duplicate: ${srcCsv}`);
+		++duplicate;
+	    }
+	    map[srcCsv] = true;
 	}
-    }
+    });
     return {
-	array:  clueListArray,
-	set:    map,
-	known:  known,
-	reject: reject
+	set:       map,
+	known:     known,
+	reject:    reject,
+	duplicate: duplicate
     };
 }
 
