@@ -147,72 +147,58 @@ ClueManager.prototype.getMaxRequired = function(baseDir) {
 //
 //
 ClueManager.prototype.addKnownPrimaryClues = function(clueList) {
-    var clueCount = 1;
-    var clueMap;
-    var sourceArray;
-    
-    clueMap = this.knownClueMapArray[clueCount] = {};
+    const count = 1;
+    let clueMap = this.knownClueMapArray[count] = {};
     clueList.forEach(clue => {
 	if (clue.ignore) {
 	    return; // continue
 	}
-	if (!clueMap[clue.name]) {
-	    clueMap[clue.name] = [ clue.src ];
+	if (!_.has(clueMap, clue.name)) {
+	    clueMap[clue.name] = [];
 	}
-	else {
-	    clueMap[clue.name].push(clue.src);
-	}
-    }, this);
-
+	clueMap[clue.name].push(clue.src);
+    });
     return this;
 }
 
 //
 
 ClueManager.prototype.getKnownFilename = function(count) {
-    return this.dir + '/clues' + count + '.json';
+    return Path.format({
+	dir:  `${this.dir}`,
+	base: `clues${count}.json`
+    });
 }
 
 //
 
 ClueManager.prototype.getRejectFilename = function(count) {
-    return this.dir + '/rejects' + count + '.json';
+    return Path.format({
+	dir:  `${this.dir}`,
+	base: `rejects${count}.json1`
+    });
 }
 
 //
 //
 
 ClueManager.prototype.addKnownCompoundClues = function(clueList, clueCount, validateAll) {
-    var srcMap;
-
-    if (!this.knownClueMapArray[clueCount]) {
-	this.knownClueMapArray[clueCount] = {};
-    }
-    else {
-	// TODO: remove this and "if" check block above
-	throw new Error('really? how odd');
-    }
-	
-    if ((clueCount > 1) && !this.knownSourceMapArray[clueCount]) {
+    // so this is currently only callable once per clueCount.
+    expect(this.knownClueMapArray[clueCount]).to.be.undefined;
+    this.knownClueMapArray[clueCount] = {};
+    if (clueCount > 1) {
+	expect(this.knownSourceMapArray[clueCount]).to.be.undefined;
 	this.knownSourceMapArray[clueCount] = {};
     }
-    else {
-	// TODO: remove this and "if" check block above
-	throw new Error('really? how odd #2');
-    }
-	
-    srcMap = this.knownSourceMapArray[clueCount];
-    clueList.forEach(clue => {
-	var srcNameList;
-	var srcKey;
 
+    let srcMap = this.knownSourceMapArray[clueCount];
+    clueList.forEach(clue => {
 	if (clue.ignore) {
 	    return; // continue
 	}
 
-	srcNameList = clue.src.split(',');
-	srcNameList.sort();
-	srcKey = srcNameList.toString();
+	let srcNameList = clue.src.split(',').sort();
+	let srcKey = srcNameList.toString();
 
 	if (clueCount > 1) {
 	    // new sources need to be validated
@@ -220,24 +206,18 @@ ClueManager.prototype.addKnownCompoundClues = function(clueList, clueCount, vali
 		if (this.logging) {
 		    this.log('############ validating Known Combo: ' + srcKey);
 		}
-		
-		if (!Validator.validateSources({
+		let vsResult = Validator.validateSources({
 		    sum:         clueCount,
 		    nameList:    srcNameList,
 		    count:       srcNameList.length,
 		    validateAll: validateAll
-		}).success) {
-		    if (!this.ignoreLoadErrors) {
-			throw new Error('Known validate sources failed' +
-					', count(' + clueCount + ') ' +
-					clue.name + ' : ' + srcKey);
-		    }
+		});
+		if (!this.ignoreLoadErrors) {
+		    expect(vsResult.success, 'vsResult').to.be.true;
 		}
-		srcMap[srcKey] = [ clue ];
+		srcMap[srcKey] = [];
 	    }
-	    else {
-		srcMap[srcKey].push(clue);
-	    }
+	    srcMap[srcKey].push(clue);
 	}
 	this.addKnownClue(clueCount, clue.name, srcKey);
     }, this);
@@ -294,9 +274,7 @@ ClueManager.prototype.addKnownClue = function(count, name, source, noThrow) {
 
 ClueManager.prototype.addRejectCombos = function(clueList, clueCount) {
     clueList.forEach(clue => {
-	var srcNameList;
-	srcNameList = clue.src.split(',');
-
+	let srcNameList = clue.src.split(',');
 	if (_.size(srcNameList) !== clueCount) {
 	    this.log('WARNING! word count mismatch' +
 		     ', expected ' + clueCount +
@@ -360,7 +338,7 @@ ClueManager.prototype.isKnownSource = function(source, count = 0) {
 
     // check for all counts
     return this.knownSourceMapArray.some(srcMap => {
-	return !_.isUndefined(srcMap[source]);
+	return _.has(srcMap, source);
     });
 }
 
@@ -371,7 +349,7 @@ ClueManager.prototype.isRejectSource = function(source) {
     if (!_.isString(source) && !_.isArray(source)) {
 	throw new Error('bad source: ' + source);
     }
-    return this.rejectSourceMap[source.toString()];
+    return _.has(this.rejectSourceMap, source.toString());
 }
 
 //
@@ -391,11 +369,9 @@ ClueManager.prototype.getCountListForName = function(name) {
 //
 
 ClueManager.prototype.getSrcListForNc = function(nc) {
-    let srcList = this.knownClueMapArray[nc.count][nc.name];
-    if (!srcList) {
-	throw new Error('specified clue does not exist, ' + nc);
-    }
-    return srcList;
+    let clueMap = this.knownClueMapArray[nc.count];
+    expect(clueMap, `${nc}`).to.have.property(nc.name);
+    return clueMap[nc.name];
 }
 
 //
