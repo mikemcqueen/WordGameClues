@@ -486,7 +486,7 @@ function setLogging(flag) {
     Validator.setLogging(flag);
     AltSources.logging  = flag;
     ComboSearch.logging = flag;
-    //ResultMap.setLogging(flag);
+    ResultMap.setLogging(flag);
     //Peco.setLogging(flag);
 
     LOGGING = flag;

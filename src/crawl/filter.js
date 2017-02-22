@@ -161,7 +161,7 @@ function main() {
     let dir = RESULT_DIR + (_.isUndefined(Opt.options.dir) ? '2' : Opt.options.dir);
     let fileMatch = '\.json$';
     if (!_.isUndefined(Opt.options.match)) {
-	fileMatch = `.*${Opt.options.match}.*` + fileMatch;
+	fileMatch = `.*${Opt.options.match}.*${fileMatch}`;
     }
     let filterOptions = {
 	filterArticle: Opt.options.article,

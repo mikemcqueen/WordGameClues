@@ -360,8 +360,6 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 		 ', ncList: ' + args.nameCountList);
     }
 
-    //resultMap = ResultMap.makeNew();
-
     // first, check for duplicate primary clues, add all to primaryMap
     let findResult = this.findDuplicatePrimaryClue({ ncList: nameCountList });
     if (!this.evalFindDuplicateResult(findResult, '1st')) {
@@ -1026,7 +1024,7 @@ Validator.prototype.buildSrcNameList = function(args) {
 	// if nc is a primary clue
 	if (nc.count == 1) {
 	    // add map entry for list of primary name:sources
-	    if (!resultMap.map()[this.PRIMARY_KEY]) {
+	    if (!_.has(resultMap.map(), this.PRIMARY_KEY)) {
 		resultMap.map()[this.PRIMARY_KEY] = [];
 	    }
 	    resultMap.map()[this.PRIMARY_KEY].push(_.toString(nc)); // consider nc.name here instead
