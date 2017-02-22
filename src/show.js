@@ -21,77 +21,58 @@ function log(text) {
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////
 //
 // Show.compatibleKnownClues()
 //
-// 1. 1st pass, require  name:count on all useNames, 
-//    later I can loop through all possible nc combos
-// 2. start with total maxclues - total primary clue count,
-//    later I can loop from cluecount + 1 to maxclues
-// 3. iterate through clue lists that are equal or less
-//    than remainder. validate & add to map
-// 4. dump map (array) contents
-// 5. for -o:
-//     will need to integrate in show-sources data 
-//     will need some sort by sources, then alpha
-// 6. note that validateSources' refusal to validate
-//    NCs will likely yield some funky results, until
-//    I get that implemented
-//
-
 // TODO: take an ncList as an arg, not a nameList
-
+//
 function compatibleKnownClues(args) {
-    expect(args).to.have.property('nameList')
-	.that.is.an('array');
-    expect(args).to.have.property('max')
-	.that.is.a('number');
+    expect(args.nameList).to.be.an('array'); // this is actually a NAME:COUNT string (ncStr) list
+    expect(args.max).to.be.a('number');
 
     // build ncList of supplied name:counts
-    let totalCount = 0;
-    let ncList = [];
-    args.nameList.forEach(name => {
-	var nc = NameCount.makeNew(name);
+    let ncList = args.nameList.map(name => NameCount.makeNew(name));
+    if (!ncList.every(nc => {
 	if (!nc.count) {
-	    throw new Error('All -u names require a count (for now)');
+	    console.log('All -u names require a count (for now)');
 	}
-	totalCount += nc.count;
-	ncList.push(nc);
-    });
+	return !!nc.count;
+    })) {
+	return;
+    }
 
-    let remain = args.max - totalCount;
+    // TODO: some more clear way to extract just ".count"s into an array, then reduce them
+    let sum = ncList.reduce((a, b) => Object({ count: (a.count + b.count) })).count;
+    let remain = args.max - sum;
     if (remain < 1) {
-	console.log('The total count of specified clues (' + totalCount + ')' +
+	console.log('The sum of the specified clue counts (' + sum + ')' +
 		    ' equals or exceeds the maximum clue count (' + args.max + ')');
 	return;
     }
     
     console.log('Show.compatibleKnownClues, ' + args.nameList + 
-		', total = ' + totalCount +
-		', remain = ' + remain);
+		', sum: ' + sum +
+		', remain: ' + remain);
 
-    // first, make sure the supplied nameList by itself is a valid clue
+    // first, make sure the supplied nameList:sum by itself is a valid clue
     // combination, and find out how many primary-clue variations there
-    // are in which the clue names in useNameList exist.
-    // strip :COUNT from names in nameList.
-    let realNameList = args.nameList.map(name => NameCount.makeNew(name)).map(nc => nc.name);
+    // are in which the clue names in args.nameList exist.
+    let realNameList = ncList.map(nc => nc.name);
     let vsResult = Validator.validateSources({
-	sum:         totalCount,
+	sum:         sum,
 	nameList:    realNameList,
 	count:       args.nameList.length,
 	validateAll: true
     });
     if (!vsResult.success) {
-	console.log('The nameList [ ' + args.nameList + ' ] is not a valid clue combination');
+	console.log(`The nameList [ ${args.nameList} ] is not a valid clue combination`);
 	return;
     }
 
     // for each primary-clue variation from validateResults
     vsResult.ncListArray.forEach(result => {
-	log('final result: ' + result.nameSrcList);
-	var primarySrcList = result.nameSrcList.map(nc => _.toNumber(nc.count));
-	var result;
+	log(`final result: ${result.nameSrcList}`);
+	let primarySrcList = result.nameSrcList.map(nc => _.toNumber(nc.count));
 
 	// for each clue in each clueListArray[count] where count is
 	// less than or equal to the remaining count, add compatible
@@ -100,11 +81,11 @@ function compatibleKnownClues(args) {
 	// should probably be SrcMap[src] = [ { name: name, srcCounts: [1,2,3] }, ... ]
 	let matchNameMapArray = [];
 	for (let count = 1; count <= remain; ++count) {
-	    // use only uniquely named clues
+	    // for each non-duplicate clue names
 	    _.uniqWith(ClueManager.clueListArray[count], (c1, c2) => c1.name === c2.name)
 		.forEach(clue => {
-		    log('checking: ' + clue.name);
 		    let nc = NameCount.makeNew(clue.name, count);
+		    log(`checking: ${nc}`);
 		    let resultList = getCompatibleResults(nc, primarySrcList);
 		    if (!_.isEmpty(resultList)) {
 			log('success, adding ' + clue.name);
@@ -130,26 +111,22 @@ function compatibleKnownClues(args) {
 }
 
 // args:
-//  sum:           
-//  clue:          
+//  nameCount:
 //  excludeSrcList:
 //
-// TODO: bad function name;
-// getCompatibleResults
 function getCompatibleResults(nameCount, excludeSrcList) {
     expect(nameCount).to.be.an('object');
     expect(excludeSrcList).to.be.an('array');
 
-    log(`Validating ${nameCount.name} (${nameCount.count})`);
+    log(`Validating ${nameCount}`);
     let result = Validator.validateSources({
 	sum:            nameCount.count,
 	nameList:       [ nameCount.name ],
 	count:          1,
 	excludeSrcList: excludeSrcList,
-	validateAll:    true,
-	wantResults:    true
+	validateAll:    true
     });
-    log(`isCompatible: ${nameCount.name} (${nameCount.count}), ${result.success}`);
+    log(`isCompatible: ${nameCount}, ${result.success}`);
     return result.success ? result.ncListArray : [];
 }
 
@@ -157,7 +134,7 @@ function getCompatibleResults(nameCount, excludeSrcList) {
 //  nameCount
 //  resultList
 //  excludeSrcList
-//  mapArray
+//  nameMapArray
 //
 function addToCompatibleMap(args) {
     expect(args.nameCount).to.be.an('object');
@@ -177,22 +154,24 @@ function addToCompatibleMap(args) {
 	    .map(nc => _.toNumber(nc.count))             // to array of sources
 	    .without(args.excludeSrcList).value();       // to array of non-excluded sources
 	expect(primarySrcList.length).to.be.at.least(1);
-	// TODO: shouldn't this be name:nameCount.count
-	let key = args.nameCount.name + ':' + primarySrcList;
-	if (_.isUndefined(map[key])) {
+	// TODO: shouldn't this be name:nameCount.count (maybe not)
+	let key = args.nameCount.name + ':' + primarySrcList.sort();
+	if (!(key in map)) {
 	    map[key] = [];
 	}
 	if (LOGGING) {
 	    result.resultMap.dump();
 	}
+	// the root resultMap property should be args.nameCount
 	expect(result.resultMap.map(), args.nameCount).to.have.property(args.nameCount.toString());
+	// inner = the inner object (value) of the root object
 	let inner = result.resultMap.map()[args.nameCount.toString()];
 	let csvNames;
 	if (_.isArray(inner)) { // special case, a single primary clue is represented by an array
 	    csvNames = args.nameCount.name;
 	}
 	else {
-	    csvNames = _.chain(inner).keys() 	             // from array of name:count csv strings
+	    csvNames = _.chain(inner).keys() 	             // from array of name:count (sometimes csv) strings
 		.map(ncCsv => ncCsv.split(',')).flatten()    // to array of name:count strings
 		.map(ncStr => NameCount.makeNew(ncStr).name) // to array of names
 		.sort().value().toString();                  // to sorted csv names

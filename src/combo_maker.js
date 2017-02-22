@@ -33,7 +33,6 @@ function ComboMaker() {
 
 //
 //
-
 ComboMaker.prototype.log = function(text) {
     if (this.logging) {
 	console.log(text);
@@ -53,7 +52,6 @@ ComboMaker.prototype.log = function(text) {
 // [ { list:clues1, count:1 },{ list:clues2, count:2 }].
 //
 ComboMaker.prototype.makeCombos = function(args) {
-    var nameCsvList = [];
     var successDuration = 0;
     var failDuration = 0;
     var nextDuration = 0;
@@ -80,6 +78,8 @@ ComboMaker.prototype.makeCombos = function(args) {
 	validateAll = true;
     }
 
+    this.hash = {};
+    let csvNameList = [];
     let totalCount = 0;
     let skipCount = 0;
     // for each sourceList in sourceListArray
@@ -147,11 +147,11 @@ ComboMaker.prototype.makeCombos = function(args) {
 		    !this.checkPrimarySources(validateResult.ncListArray, args.sources)) {
 		    continue;
 		}			
-		if (nameCsvList.length < args.maxResults) {
-		    nameCsvList.push(result.nameList.toString());
+		if (csvNameList.length < args.maxResults) {
+		    csvNameList.push(result.nameList.toString());
 		}
 		if ((++totalCount % 10000) === 0) {
-		    console.log(`total(${totalCount}), hash(${_.size(this.hash)}), list(${nameCsvList.length})`);
+		    console.log(`total(${totalCount}), hash(${_.size(this.hash)}), list(${csvNameList.length})`);
 		}
 	    }
 	    else {
@@ -172,7 +172,7 @@ ComboMaker.prototype.makeCombos = function(args) {
 
     if (0) { this.displayCombos(clueListArray); }
 
-    return nameCsvList;
+    return csvNameList;
 }
 
 // As long as one final result has only primary sources from 'sources'
@@ -189,7 +189,6 @@ ComboMaker.prototype.checkPrimarySources = function(resultList, sources) {
 
 //
 //
-
 ComboMaker.prototype.buildUseNcList = function(nameList, countList) {
     let ncList = [];
     nameList.forEach(name =>  {
@@ -211,7 +210,6 @@ ComboMaker.prototype.buildUseNcList = function(nameList, countList) {
 
 //
 //
-
 ComboMaker.prototype.hasUniqueClues = function(clueList) {
     let sourceMap = {};
     clueList.forEach(function(clue) {
@@ -231,10 +229,9 @@ ComboMaker.prototype.hasUniqueClues = function(clueList) {
 
 //
 //
-
-ComboMaker.prototype.testSetKey = function(map, key) {
-    if (!map[key]) {
-	map[key] = true;
+ComboMaker.prototype.testSetKey = function(map, key, value = true) {
+    if (!_.has(map, key)) {
+	map[key] = value;
 	return true;
     }
     return false;
@@ -242,7 +239,6 @@ ComboMaker.prototype.testSetKey = function(map, key) {
 
 //
 //
-
 ComboMaker.prototype.displaySourceListArray = function(sourceListArray) {
     console.log('-----\n');
     sourceListArray.forEach(function(sourceList) {
@@ -256,22 +252,16 @@ ComboMaker.prototype.displaySourceListArray = function(sourceListArray) {
 
 //
 //
-
 ComboMaker.prototype.first = function(clueSourceList, sourceIndexes) {
-    let index;
-
-    this.hash = {};
-    for (index = 0; index < clueSourceList.length; ++index) {
+    for (let index = 0; index < clueSourceList.length; ++index) {
 	sourceIndexes[index] = 0;
     }
     sourceIndexes[sourceIndexes.length - 1] = -1;
-
     return this.next(clueSourceList, sourceIndexes);
 }
 
 //
 //
-
 ComboMaker.prototype.next = function(clueSourceList, sourceIndexes) {
     for (;;) {
 	if (!this.nextIndex(clueSourceList, sourceIndexes)) {
@@ -279,7 +269,7 @@ ComboMaker.prototype.next = function(clueSourceList, sourceIndexes) {
 	}
 	let ncList = [];          // e.g. [ { name: "pollock", count: 2 }, { name: "jackson", count: 4 } ]
 	let nameList = [];        // e.g. [ "pollock", "jackson" ]
-	let srcCountStrList = []  // e.g. [ "white,fish:2", "moon,walker:4" ]
+	let srcCountStrList = []; // e.g. [ "white,fish:2", "moon,walker:4" ]
 	if (!clueSourceList.every((clueSource, index) => {
 	    let clue = clueSource.list[sourceIndexes[index]];
 	    if (clue.ignore || clue.skip) {
@@ -294,6 +284,10 @@ ComboMaker.prototype.next = function(clueSourceList, sourceIndexes) {
 	    continue;
 	}
 
+	nameList.sort();
+	// skip combinations we've already checked
+	if (!this.addComboToFoundHash(nameList.toString())) continue; // already checked
+
 	// skip combinations that have duplicate source:count
 	if (_.uniq(srcCountStrList).length !== srcCountStrList.length) {
 	    if (this.logging) {
@@ -303,8 +297,7 @@ ComboMaker.prototype.next = function(clueSourceList, sourceIndexes) {
 	    continue;
 	}
 
-	// skip combinations that have duplicate names
-	nameList.sort();
+	// skip combinations that duplicate duplicate names
 	if (_.sortedUniq(nameList).length !== nameList.length) {
 	    if (this.logging) {
 		this.log('skipping duplicate clue name: ' + nameList);
@@ -313,21 +306,9 @@ ComboMaker.prototype.next = function(clueSourceList, sourceIndexes) {
 	    continue;
 	}
 
-	// skip duplicate combinations
-	ncList.sort();
-	let ncCsv = ncList.toString();
-	if (ncCsv in this.hash) {
-	    if (this.logging) {
-		this.log('skipping duplicate combo: ' + ncCsv);
-	    }
-	    ++this.nextDupeCombo;
-	    continue;
-	}
-	this.hash[ncCsv] = true;
-
 	return {
 	    done:     false,
-	    ncList:   ncList,
+	    ncList:   ncList.sort(),
 	    nameList: nameList
 	};
     }
@@ -335,7 +316,20 @@ ComboMaker.prototype.next = function(clueSourceList, sourceIndexes) {
 
 //
 //
+ComboMaker.prototype.addComboToFoundHash = function(nameListCsv) {
+    if (this.testSetKey(this.hash, nameListCsv)) {
+	this.hash[nameListCsv] = true;
+	return true;
+    }
+    if (this.logging) {
+	console.log('skipping duplicate combo: ' + nameListCsv);
+    }
+    ++this.nextDupeCombo;
+    return false;
+}
 
+//
+//
 ComboMaker.prototype.nextIndex = function(clueSourceList, sourceIndexes) {
     let index = sourceIndexes.length - 1;
 
@@ -343,7 +337,7 @@ ComboMaker.prototype.nextIndex = function(clueSourceList, sourceIndexes) {
     ++sourceIndexes[index];
 
     // if last index is maxed reset to zero, increment next-to-last index, etc.
-    while (sourceIndexes[index] == clueSourceList[index].list.length) {
+    while (sourceIndexes[index] === clueSourceList[index].list.length) {
 	sourceIndexes[index] = 0;
 	--index;
 	if (index < 0) {
@@ -356,7 +350,6 @@ ComboMaker.prototype.nextIndex = function(clueSourceList, sourceIndexes) {
 
 //
 //
-
 ComboMaker.prototype.displayCombos = function(clueListArray) {
     console.log('\n-----\n');
     let count = 0;
@@ -369,10 +362,8 @@ ComboMaker.prototype.displayCombos = function(clueListArray) {
 
 //
 //
-
 ComboMaker.prototype.clueListToString = function(clueList) {
     let str = '';
-
     clueList.forEach(function(clue) {
 	if (str.length > 0) {
 	    str += ' ';
@@ -382,7 +373,6 @@ ComboMaker.prototype.clueListToString = function(clueList) {
 	    str += ':' + clue.src;
 	}
     });
-
     return str;
 }
 

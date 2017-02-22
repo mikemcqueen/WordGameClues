@@ -216,7 +216,7 @@ ClueManager.prototype.addKnownCompoundClues = function(clueList, clueCount, vali
 
 	if (clueCount > 1) {
 	    // new sources need to be validated
-	    if (!_.keys(srcMap).includes(srcKey)) {
+	    if (!_.has(srcMap, srcKey)) {
 		if (this.logging) {
 		    this.log('############ validating Known Combo: ' + srcKey);
 		}
@@ -379,13 +379,11 @@ ClueManager.prototype.isRejectSource = function(source) {
 
 ClueManager.prototype.getCountListForName = function(name) {
     var countList = [];
-    var count;
-    
-    for (count in this.knownClueMapArray) {
-	if (this.knownClueMapArray[count][name]) {
+    this.knownClueMapArray.forEach(clueMap => {
+	if (_.has(clueMap, name)) {
 	    countList.push(count);
 	}
-    }
+    });
     return countList;
 }
 
@@ -527,7 +525,7 @@ ClueManager.prototype.filter = function(srcCsvList, clueCount) {
 	}
 	else {
 	    if (map[srcCsv]) {
-		console.warn(`duplicate: ${srcCsv}`);
+		console.log(`duplicate: ${srcCsv}`);
 		++duplicate;
 	    }
 	    map[srcCsv] = true;

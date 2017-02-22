@@ -500,7 +500,7 @@ function showValidateResult(args) {
 function setLogging(flag) {
     ClueManager.logging = flag;
     ComboMaker.logging  = flag;
-    Validator.logging   = flag;
+    Validator.setLogging(flag);
     AltSources.logging  = flag;
     ComboSearch.logging = flag;
     //ResultMap.setLogging(flag);
