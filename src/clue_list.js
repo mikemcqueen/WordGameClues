@@ -72,9 +72,9 @@ function objectFrom(args) {
     }
     else {
 	console.log('args:');
-	for (key in args) { 
+	_.keys(args).forEach(key => {
 	    console.log('  ' + key + ' : ' + args[key]);
-	}
+	});
 	throw new Error('missing argument');
     }
     

@@ -809,8 +809,6 @@ Validator.prototype.resolvePrimarySourceConflicts = function(args) {
     }
 
     // resolve primary source conflicts
-//    var conflictSrc;
-//    for (conflictSrc in args.conflictSrcMap) {
     _.keys(args.conflictSrcMap).every(conflictSrc => {
 	let srcList = conflictSrc.split(',');
 	let conflictNameList = args.conflictSrcMap[conflictSrc];

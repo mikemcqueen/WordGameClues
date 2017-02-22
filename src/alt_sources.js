@@ -35,7 +35,6 @@ AltSources.prototype.log = function(text) {
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////
 //
 //
 //
@@ -60,28 +59,21 @@ AltSources.prototype.show = function(args) {
 //
 
 AltSources.prototype.showAllAlternates = function(args) {
-    var index;
-    var max;
-    var map;
-    var name;
-    var anyAdded;
-
     if (args.output && !args.count) {
 	console.log('WARNING: output format ignored, no -c COUNT specified');
     }
     if (!args.output) {
 	console.log('showAlternates: all');
     }
-    
-    
+    let anyAdded = false;
+    let max = ClueManager.maxClues;
     do {
-	max = ClueManager.maxClues;
-	for (index = 2; index <= max; ++index) {
-	    map = ClueManager.knownClueMapArray[index];
-	    for (name in map) {
-		anyAdded = this.showAllAlternatesForNc(NameCount.makeNew(name, index),
-						       args.count, args.output);
-	    }
+	for (let index = 2; index <= max; ++index) {
+	    let map = ClueManager.knownClueMapArray[index];
+	    _.keys(map).forEach(name = {
+		anyAdded = this.showAllAlternatesForNc(
+		    NameCount.makeNew(name, index), args.count, args.output);
+	    });
 	}
     } while (anyAdded);
     if (args.output && args.count) {

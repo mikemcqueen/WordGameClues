@@ -156,7 +156,7 @@ function addToCompatibleMap(args) {
 	expect(primarySrcList.length).to.be.at.least(1);
 	// TODO: shouldn't this be name:nameCount.count (maybe not)
 	let key = args.nameCount.name + ':' + primarySrcList.sort();
-	if (!(key in map)) {
+	if (!_.has(map, key)) {
 	    map[key] = [];
 	}
 	if (LOGGING) {

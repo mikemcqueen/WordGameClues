@@ -480,23 +480,6 @@ function showSources(clueName) {
 
 //
 
-function showValidateResult(args) {
-    var name;
-    var map;
-
-    if (args.result[args.key]) {
-	console.log(args.title);
-	map = args.result[args.key];
-	for (name in map) {
-	    map[name].forEach(ncList => {
-		console.log(name + ': ' + ncList);
-	    });
-	}
-    }
-}
-
-//
-
 function setLogging(flag) {
     ClueManager.logging = flag;
     ComboMaker.logging  = flag;
