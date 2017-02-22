@@ -70,7 +70,7 @@ AltSources.prototype.showAllAlternates = function(args) {
     do {
 	for (let index = 2; index <= max; ++index) {
 	    let map = ClueManager.knownClueMapArray[index];
-	    _.keys(map).forEach(name = {
+	    _.keys(map).forEach(name => {
 		anyAdded = this.showAllAlternatesForNc(
 		    NameCount.makeNew(name, index), args.count, args.output);
 	    });
