@@ -519,21 +519,16 @@ ClueManager.prototype.filter = function(srcCsvList, clueCount) {
 //
 
 ClueManager.prototype.getKnownClues = function(wordList) {
-    let resultList = [];
-
     if (_.isArray(wordList)) {
 	wordList = _.toString(wordList);
     }
-    else if (!_.isString(wordList)) {
-	throw new Error('invalid wordlist type, ' + (typeof wordList));
-    }
+    expect(wordList).to.be.a('string');
+
+    let resultList = [];
     this.knownSourceMapArray.forEach(srcMap => {
-	var clueList = srcMap[wordList];
-	if (clueList) {
-	    // TODO: something like: _.concat(resultList, _.extract(clueList, 'name'));
-	    clueList.forEach(clue => {
-		resultList.push(clue.name);
-	    });
+	if (_.has(srcMap, wordList)) {
+	    // srcMap[wordList] is a clueList
+	    resultList.push(...srcMap[wordList].map(clue => clue.name));
 	}
     });
     return resultList;

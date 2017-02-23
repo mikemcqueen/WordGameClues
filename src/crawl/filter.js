@@ -4,15 +4,15 @@
 
 'use strict';
 
-var _            = require('lodash');
-var Promise      = require('bluebird');
-var Dir          = require('node-dir');
-var Path         = require('path');
-var expect       = require('chai').expect;
+const _            = require('lodash');
+const Promise      = require('bluebird');
+const Dir          = require('node-dir');
+const Path         = require('path');
+const expect       = require('chai').expect;
 
-var ClueManager  = require('../clue_manager.js');
+const ClueManager  = require('../clue_manager.js');
 
-var Opt          = require('node-getopt').create([
+const Opt          = require('node-getopt').create([
     ['a', 'article',             'filter results based on article word count'],
     ['c', 'count',               'show result/url counts only'],
     ['d', 'dir=NAME',            'directory name'],
@@ -27,7 +27,7 @@ var Opt          = require('node-getopt').create([
 
 //
 
-var RESULT_DIR = '../../data/results/';
+const RESULT_DIR = '../../data/results/';
 
 //
 
@@ -141,7 +141,24 @@ function filterSearchResultFiles(dir, fileMatch, options) {
 //
 
 function displayFilterResults(resultList) {
-    console.log(JSON.stringify(resultList));
+    resultList.forEach(result => {
+	if (_.isEmpty(result.urlList)) return;
+	if (ClueManager.isRejectSource(result.src)) return;
+
+	console.log(`:${result.src}`);
+	result.urlList.forEach(url => {
+	    console.log(url);
+	});
+	const known = ClueManager.getKnownClues(result.src);
+	if (!_.isEmpty(known)) {
+	    console.log('+known');
+	    for (const clue of known) {
+		const x = _.isUndefined(clue.x) ? '' : clue.x;
+		console.log(`+${clue.name},${clue.src},${x}`);
+	    }
+	}
+	console.log();
+    });
 }
 
 //
@@ -174,16 +191,16 @@ function main() {
     });
 
     filterSearchResultFiles(dir, fileMatch, filterOptions)
-    .then(result => {
-	if (Opt.options.count) {
-	    console.log('Results: ' + _.size(result.filtered) +
-			', Urls: ' + getUrlCount(result.filtered) +
-			', Rejects: ' + _.size(result.rejects));
-	}
-	else {
-	    displayFilterResults(Opt.options.rejects ? result.rejects : result.filtered);
-	}
-    }).catch(err => console.error);
+	.then(result => {
+	    if (Opt.options.count) {
+		console.log('Results: ' + _.size(result.filtered) +
+			    ', Urls: ' + getUrlCount(result.filtered) +
+			    ', Rejects: ' + _.size(result.rejects));
+	    }
+	    else {
+		displayFilterResults(Opt.options.rejects ? result.rejects : result.filtered);
+	    }
+	}).catch(err => console.error);
 }
 
 //
