@@ -237,18 +237,12 @@ function loadClues(synthFlag, metaFlag, jsonArg,
 //
 
 function showValidSrcListCounts(options) {
-    let srcList = options.test;
-
-    if (!srcList) {
-	throw new Error('missing arg, srcList: ' + srcList);
-    }
-    // TODO: expect(options).one.of('add', 'reject').to.exist;
-    if (!_.isUndefined(options.add) && options.reject) {
-	throw new Error('cannot specify both --add and --reject');
+    expect(options.test, 'options.test').to.be.a('string');
+    if (options.reject) {
+	expect(options.add, 'cannot specify both --add and --reject').to.be.undefined;
     }
 
-    let nameList = srcList.split(',');
-    nameList.sort();
+    let nameList = options.test.split(',').sort();
     nameList.forEach(name => {
 	console.log('name: ' + name);
     });
@@ -263,22 +257,19 @@ function showValidSrcListCounts(options) {
 	let map = ClueManager.knownClueMapArray[count];
 	if (!_.isUndefined(map)) {
 	    nameList.forEach((name, index) => {
-		if (!_.isUndefined(map[name])) {
+		if (_.has(map, name)) {
 		    countListArray[index].push(count);
 		}
 	    });
 	}
 	else {
-	    console.log('missing cluemap: ' + count);
+	    console.log('missing known cluemap #' + count);
 	}
     }
 
     // verify that all names were found
     nameList.forEach((name, index) => {
-	if (!countListArray[index]) {
-	    throw new Error('Cannot find clue, ' + name +
-			    ', array: ' + countListArray[index]);
-	}
+	expect(countListArray[index], `cannot find clue, ${name}`).to.exit;
     });
 
     console.log(countListArray);
@@ -315,15 +306,24 @@ function showValidSrcListCounts(options) {
 	else {
 	    if (nameList.length === 1) {
 		let name = nameList[0];
-		let clueNameList = ClueManager.clueListArray[sum].map(clue => clue.name);
-		if (clueNameList.includes(name)) {
-		    let clueSrcList = [];
+		let nameSrcList = ClueManager.clueListArray[sum]
+		    .filter(clue => clue.name === name)
+		    .map(clue => clue.src);
+
+		if (nameSrcList.length > 0) {
+
+		//let clueNameList = ClueManager.clueListArray[sum].map(clue => clue.name);
+		//if (clueNameList.includes(name)) {
+		//
+		    
+		    /*
 		    ClueManager.clueListArray[sum].forEach(clue => {
 			if (clue.name === name) {
 			    clueSrcList.push(`"${clue.src}"`);
 			}
 		    });
-		    msg += ': PRESENT as clue with sources: ' + clueSrcList;
+		    */
+		    msg += ': PRESENT as clue with sources: ' + nameSrcList;
 		}
 	    }
 	    else {
@@ -344,22 +344,22 @@ function showValidSrcListCounts(options) {
 	if (nameList.length === 1) {
 	    console.log('WARNING! ignoring --add due to single source');
 	}
-	else if (!reject) {
-	    addClues(addCountSet, options.add, nameList.toString());
+	else if (reject) {
+	    console.log('WARNING! cannot add known clue: already rejected, ' + nameList);
 	}
 	else {
-	    console.log('WARNING! cannot add known clue: already rejected, ' + nameList);
+	    addClues(addCountSet, options.add, nameList.toString());
 	}
     }
     else if (options.reject) {
 	if (nameList.length === 1) {
 	    console.log('WARNING! ignoring --reject due to single source');
 	}
-	else if (!known) {
-	    addReject(nameList.toString());
+	else if (known) {
+	    console.log('WARNING! cannot add reject clue: already known, ' + nameList);
 	}
 	else {
-	    console.log('WARNING! cannot add reject clue: already known, ' + nameList);
+	    addReject(nameList.toString());
 	}
     }
 }

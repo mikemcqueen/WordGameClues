@@ -228,7 +228,7 @@ ClueManager.prototype.addKnownCompoundClues = function(clueList, clueCount, vali
 //
 //
 
-ClueManager.prototype.addClue = function(count, clue, save) {
+ClueManager.prototype.addClue = function(count, clue, save, dir) {
     if (this.addKnownClue(count, clue.name, clue.src, true)) {
 	this.clueListArray[count].push(clue);
 	if (save) {
@@ -357,7 +357,7 @@ ClueManager.prototype.isRejectSource = function(source) {
 
 ClueManager.prototype.getCountListForName = function(name) {
     var countList = [];
-    this.knownClueMapArray.forEach(clueMap => {
+    this.knownClueMapArray.forEach((clueMap, count) => {
 	if (_.has(clueMap, name)) {
 	    countList.push(count);
 	}
@@ -532,5 +532,58 @@ ClueManager.prototype.getKnownClues = function(wordList) {
 	}
     });
     return resultList;
+}
+
+
+//
+ClueManager.prototype.getClueCountListArray = function(nameList) {
+    expect(nameList.length).to.be.not.empty;
+    // each count list contains the clueMapArray indexes in which
+    // each name appears
+    let countListArray = Array(_.size(nameList)).fill().map(() => []);
+    //console.log(countListArray);
+    for (let count = 1; count <= this.maxClues; ++count) {
+	let map = this.knownClueMapArray[count];
+	expect(map).to.exist; // I know this will fail when I move to synth clues
+	nameList.forEach((name, index) => {
+	    if (_.has(map, name)) {
+		countListArray[index].push(count);
+	    }
+	});
+    }
+    return countListArray;
+}
+
+
+//
+ClueManager.prototype.getValidCounts = function(nameList, countListArray) {
+    if ((nameList.length === 1) || this.isRejectSource(nameList)) return [];
+
+    let addCountSet = new Set();
+    let known = false;
+    let reject = false;
+
+    Peco.makeNew({
+	listArray: countListArray,
+	max:       this.maxClues
+    }).getCombinations().forEach(clueCountList => {
+	let sum = clueCountList.reduce((a, b) => a + b);
+	if (Validator.validateSources({
+	    sum:      sum,
+	    nameList: nameList,
+	    count:    nameList.length,
+	    validateAll: true
+	}).success) {
+	    addCountSet.add(sum);
+	}
+    });
+    return Array.from(addCountSet);
+}
+
+//
+
+ClueManager.prototype.getCountList = function(nameOrList) {
+    return (_.isString(nameOrList)) ? this.getCountListForName(nameOrList) :
+	this.getValidCounts(nameOrList, this.getClueCountListArray(nameOrList));
 }
 

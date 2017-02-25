@@ -166,7 +166,7 @@ function filterSearchResultFiles(dir, fileMatch, options) {
 	    // filter out rejected word combos
 	    if (ClueManager.isRejectSource(wordList)) next();
 
-	    loadFilteredUrls(dir, wordList)
+  	    loadFilteredUrls(dir, wordList)
 		.then(filteredUrls => {
 		    // TODO: what happens on JSON.parse throw?
 		    return filterSearchResultList(JSON.parse(content), wordList, filteredUrls, options);
