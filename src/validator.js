@@ -125,7 +125,6 @@ Validator.prototype.validateSources = function(args) {
 	    if (this.logging) {
 		this.log('validateSources: VALIDATE SUCCESS!');
 	    }
-	    //resultList = _.concat(resultList, rvsResult.list);
 	    resultList.push(...rvsResult.list);
 	    found = true;
 	    // we may not care about all possible combinations
@@ -1040,7 +1039,6 @@ Validator.prototype.buildSrcNameList = function(args) {
 	    localPrimaryNcList = srcNameList.map(name => NameCount.makeNew(name, 1));
 	    // add map entry for list of (eventual) primary name:sources
 	    map[localPrimaryNcList] = [];
-	    //primaryNcList = _.concat(primaryNcList, localPrimaryNcList);
 	    primaryNcList.push(...localPrimaryNcList);
 	    return; // forEach.next;
 	}
@@ -1053,7 +1051,6 @@ Validator.prototype.buildSrcNameList = function(args) {
 	// why don't we just add empty maps here? because we don't
 	// know the nc.count for these names
 	map[this.SOURCES_KEY] = srcNameList;
-	//compoundSrcNameList = _.concat(compoundSrcNameList, srcNameList);
 	compoundSrcNameList.push(...srcNameList);
 	compoundNcList.push(nc);
     }, this);

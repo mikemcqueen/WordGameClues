@@ -55,7 +55,7 @@ function getLineType(line) {
     let lineType;
     if (line[0] === '@') lineType =         Src;
     if (line[0] === ':') lineType =         Maybe;
-    if (line[0] === '#') lineType =        Known;
+    if (line[0] === '#') lineType =         Known;
     // all of the above get first char sliced off
     if (!_.isUndefined(lineType)) {
 	line = line.slice(1);

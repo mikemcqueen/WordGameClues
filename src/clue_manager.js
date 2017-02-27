@@ -548,11 +548,11 @@ ClueManager.prototype.filter = function(srcCsvList, clueCount) {
 //
 
 ClueManager.prototype.getKnownClues = function(wordList) {
-    if (_.isArray(wordList)) {
-	wordList = _.toString(wordList);
+    if (_.isString(wordList)) {
+	wordList = wordList.split(',');
     }
-    expect(wordList).to.be.a('string');
-
+    expect(wordList).to.be.an('array');
+    wordList = wordList.sort().toString();
     let resultList = [];
     this.knownSourceMapArray.forEach(srcMap => {
 	if (_.has(srcMap, wordList)) {

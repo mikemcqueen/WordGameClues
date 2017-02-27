@@ -11,6 +11,8 @@ const Path         = require('path');
 const FS           = require('fs');
 const fsReadFile   = Promise.promisify(FS.readFile);
 const expect       = require('chai').expect;
+const Duration     = require('duration');
+const PrettyMs     = require('pretty-ms');
 
 const ClueManager  = require('../clue_manager.js');
 const Result       = require('./result-mod');
@@ -39,26 +41,25 @@ function getUrlCount(resultList) {
 }
 
 //
+// TODO: Result.wordCountFilter(result, wordCount);
 
 function searchResultWordCountFilter(result, wordCount, options) {
-    return new Promise(function(resolve, reject) {
-	let passTitle = false;
-	let passArticle = false;
-	
-	if (result.score) {
-	    if (options.filterTitle) {
-		passTitle = (result.score.wordsInTitle >= wordCount);
-	    }
-	    if (options.filterArticle) {
-		passArticle = (result.score.wordsInSummary >= wordCount ||
-			       result.score.wordsInArticle >= wordCount);
-	    }
-	    if (passTitle || passArticle) {
-		resolve(result);
-	    }
+    let passTitle = false;
+    let passArticle = false;
+    
+    if (result.score) {
+	if (options.filterTitle) {
+	    passTitle = (result.score.wordsInTitle >= wordCount);
 	}
-	resolve(undefined);
-    });
+	if (options.filterArticle) {
+	    passArticle = (result.score.wordsInSummary >= wordCount ||
+			   result.score.wordsInArticle >= wordCount);
+	}
+	if (passTitle || passArticle) {
+	    return result;
+	}
+    }
+    return undefined;
 }
 
 //
@@ -166,16 +167,17 @@ function filterSearchResultFiles(dir, fileMatch, options) {
 		    else {
 			rejectList.push(filterResult);
 		    }
-		    return next();
+		    return undefined;
 		}).catch(err => {
 		    // TODO:
 		    console.error('filterSearchResultFiles, error: ' + err.message);
 		});
+	    return next(); // process files async
 	}, function(err, files) {
             if (err) throw err;  // TODO: 
 	    resolve({
 		filtered: filteredList,
-		rejects: rejectList
+		rejects:  rejectList
 	    });
 	});
     });
@@ -192,12 +194,11 @@ function displayFilterResults(resultList) {
 	result.urlList.forEach(url => {
 	    console.log(url);
 	});
-	const known = ClueManager.getKnownClues(result.src);
-	if (!_.isEmpty(known)) {
-	    console.log('+known');
-	    for (const clue of known) {
-		const x = _.isUndefined(clue.x) ? '' : clue.x;
-		console.log(`+${clue.name},${clue.src},${x}`);
+	const nameList = ClueManager.getKnownClues(result.src);
+	if (!_.isEmpty(nameList)) {
+	    console.log('#known:');
+	    for (const name of nameList) {
+		console.log(`#${name}`);
 	    }
 	}
 	console.log();
@@ -231,12 +232,16 @@ function main() {
 	baseDir:  base
     });
 
+    let start = new Date();
     filterSearchResultFiles(dir, Result.getFileMatch(Opt.options.match), filterOptions)
 	.then(result => {
+	    let d = new Duration(start, new Date()).milliseconds;
 	    if (Opt.options.count) {
 		console.log('Results: ' + _.size(result.filtered) +
 			    ', Urls: ' + getUrlCount(result.filtered) +
-			    ', Rejects: ' + _.size(result.rejects));
+			    ', Rejects: ' + _.size(result.rejects) +
+			    `, duration, ${PrettyMs(d)}`);
+						   
 	    }
 	    else {
 		displayFilterResults(Opt.options.rejects ? result.rejects : result.filtered);
