@@ -364,7 +364,7 @@ ClueManager.prototype.isKnownSource = function(source, count = 0) {
 
     // check for supplied count
     if (count > 0) {
-	return _.has(his.knownSourceMapArray[count], source);
+	return _.has(this.knownSourceMapArray[count], source);
     }
 
     // check for all counts
