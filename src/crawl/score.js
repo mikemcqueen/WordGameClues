@@ -129,7 +129,7 @@ function main() {
     if (Opt.options.force === true) {
 	console.log('force: ' + Opt.options.force);
     }
-    let fileMatch = '\.json$';
+    let fileMatch = '[^_filtered]\.json$';
     if (!_.isUndefined(Opt.options.match)) {
 	fileMatch = `.*${Opt.options.match}.*` + fileMatch;
     }
