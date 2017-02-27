@@ -22,11 +22,9 @@ const Opt          = require('node-getopt')
 	  ['h', 'help',                'this screen']
       ]).bindHelp().parseSystem();
 
+
 const Score        = require('./score-mod');
-
-//
-
-const RESULT_DIR   = '../../data/results/';
+const Result       = require('./result-mod');
 
 //
 
@@ -34,7 +32,7 @@ function scoreSearchResultDir(dir, fileMatch, options) {
     expect(dir).to.be.a('string');
     expect(fileMatch).to.be.a('string');
 
-    let path = RESULT_DIR + dir;
+    let path = Result.DIR + dir;
     console.log('dir: ' + path);
     Dir.readFiles(path, {
 	match:   new RegExp(fileMatch),
@@ -104,7 +102,7 @@ function scoreSearchResultFiles(dir, inputFilename, options) {
     expect(dir).to.be.a('string');
     expect(inputFilename).to.be.a('string');
 
-    dir = RESULT_DIR + dir;
+    dir = Result.DIR + dir;
     console.log('dir: ' + dir);
 
     let readLines = new Readlines(inputFilename);
@@ -129,10 +127,6 @@ function main() {
     if (Opt.options.force === true) {
 	console.log('force: ' + Opt.options.force);
     }
-    let fileMatch = '[^_filtered]\.json$';
-    if (!_.isUndefined(Opt.options.match)) {
-	fileMatch = `.*${Opt.options.match}.*` + fileMatch;
-    }
     let scoreOptions = {
 	force: Opt.options.force
     };
@@ -140,7 +134,7 @@ function main() {
 	scoreSearchResultFiles(Opt.options.dir, inputFile, scoreOptions);
     }
     else {
-	scoreSearchResultDir(Opt.options.dir, fileMatch, scoreOptions);
+	scoreSearchResultDir(Opt.options.dir, Result.getFileMatch(Opt.options.match), scoreOptions);
     }
     /*
     else {

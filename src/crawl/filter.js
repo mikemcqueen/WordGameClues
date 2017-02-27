@@ -13,6 +13,7 @@ const fsReadFile   = Promise.promisify(FS.readFile);
 const expect       = require('chai').expect;
 
 const ClueManager  = require('../clue_manager.js');
+const Result       = require('./result-mod');
 
 const Opt          = require('node-getopt').create([
     ['a', 'article',             'filter results based on article word count'],
@@ -23,14 +24,9 @@ const Opt          = require('node-getopt').create([
     ['r', 'rejects',             'show only results that fail all filters'],
     ['s', 'synthesis',           'use synth clues'],
     ['t', 'title',               'filter results based on title word count (default)'],
-//    ['v', 'verbose',             'show logging']
+    ['v', 'verbose',             'show logging'],
     ['h', 'help',                'this screen']
 ]).bindHelp().parseSystem();
-
-//
-
-const RESULT_DIR =      '../../data/results/';
-const FILTERED_SUFFIX = '_filtered';
 
 //
 
@@ -40,24 +36,6 @@ function getUrlCount(resultList) {
 	urlCount += _.size(result.urlList);
     });
     return urlCount;
-}
-
-//
-
-function makeFilename(wordList, suffix) {
-    expect(wordList.length).to.be.at.least(2);
-
-    let filename = '';
-    wordList.forEach(word => {
-	if (_.size(filename) > 0) {
-	    filename += '-';
-	}
-	filename += word;
-    });
-    if (!_.isUndefined(suffix)) {
-	filename += suffix;
-    }
-    return filename + '.json';
 }
 
 //
@@ -94,7 +72,6 @@ function isFilteredUrl(url, filteredUrls) {
     return known || reject;
 }
 
-
 //
 
 function filterSearchResultList(resultList, wordList, filteredUrls, options) {
@@ -106,8 +83,11 @@ function filterSearchResultList(resultList, wordList, filteredUrls, options) {
 	    if (!isFilteredUrl(result.url, filteredUrls)) {
 		return searchResultWordCountFilter(result, wordCount, options);
 	    }
+	    if (options.verbose) {
+		console.log(`filtered url, ${result.url}`);
+	    }
 	    return undefined;
-	}).each((result, index) => {
+	}).each(result => {
 	    if (!_.isUndefined(result)) {
 		//console.log('url: ' + result.url);
 		urlList.push(result.url);
@@ -125,15 +105,24 @@ function filterSearchResultList(resultList, wordList, filteredUrls, options) {
 
 //
 
-function loadFilteredUrls(dir, wordList) {
+function loadFilteredUrls(dir, wordList, options) {
     return new Promise((resolve, reject) => {
-	let filename = makeFilename(wordList, FILTERED_SUFFIX);
-	return fsReadFile(filename, 'utf8')
+	let filteredFilename = Result.makeFilteredFilename(wordList);
+	if (options.verbose) {
+	    console.log(`filtered filename: ${filteredFilename}`);
+	}
+	return fsReadFile(`${dir}/${filteredFilename}`, 'utf8')
 	    .then(content => {
+		if (options.verbose) {
+		    console.log(`resolving filtered urls, ${wordList}`);
+		}
 		// TODO: what happens on JSON.parse throw?
 		resolve(JSON.parse(content));
 	    }).catch(err => {
-		// ignore file errors, this file is optional
+		if (options.verbose) {
+		    console.log(`no filtered urls, ${wordList}, ${err}`);
+		}
+		// ignore file errors, filtered url file is optional
 		resolve(undefined);
 	    });
     });
@@ -161,12 +150,12 @@ function filterSearchResultFiles(dir, fileMatch, options) {
 	    if (options.verbose) {
 		console.log(`filename: ${filepath}`);
 	    }
-	    if (err) throw err;
+	    if (err) throw err; // TODO:
 	    let wordList = _.split(Path.basename(filepath, '.json'), '-');
 	    // filter out rejected word combos
 	    if (ClueManager.isRejectSource(wordList)) next();
 
-  	    loadFilteredUrls(dir, wordList)
+  	    loadFilteredUrls(dir, wordList, options)
 		.then(filteredUrls => {
 		    // TODO: what happens on JSON.parse throw?
 		    return filterSearchResultList(JSON.parse(content), wordList, filteredUrls, options);
@@ -179,10 +168,11 @@ function filterSearchResultFiles(dir, fileMatch, options) {
 		    }
 		    return next();
 		}).catch(err => {
+		    // TODO:
 		    console.error('filterSearchResultFiles, error: ' + err.message);
 		});
 	}, function(err, files) {
-            if (err) throw err;
+            if (err) throw err;  // TODO: 
 	    resolve({
 		filtered: filteredList,
 		rejects: rejectList
@@ -228,22 +218,20 @@ function main() {
 	Opt.options.title = true;
     }
 
-    let dir = RESULT_DIR + (_.isUndefined(Opt.options.dir) ? '2' : Opt.options.dir);
-    let fileMatch = '\.json$';
-    if (!_.isUndefined(Opt.options.match)) {
-	fileMatch = `.*${Opt.options.match}.*${fileMatch}`;
-    }
+    let dir = Result.DIR + (_.isUndefined(Opt.options.dir) ? '2' : Opt.options.dir);
+    
     let filterOptions = {
 	filterArticle: Opt.options.article,
 	filterTitle:   Opt.options.title,
-	filterRejects: Opt.options.rejects
+	filterRejects: Opt.options.rejects,
+	verbose:       Opt.options.verbose
     };
 
     ClueManager.loadAllClues({
 	baseDir:  base
     });
 
-    filterSearchResultFiles(dir, fileMatch, filterOptions)
+    filterSearchResultFiles(dir, Result.getFileMatch(Opt.options.match), filterOptions)
 	.then(result => {
 	    if (Opt.options.count) {
 		console.log('Results: ' + _.size(result.filtered) +

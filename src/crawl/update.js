@@ -22,34 +22,7 @@ const Opt          = require('node-getopt').create([
     ['h', 'help',                'this screen']
 ]).bindHelp().parseSystem();
 
-//
-
-const RESULT_DIR = '../../data/results/';
-const FILTERED_SUFFIX = '_filtered';
-
-//
-
-function makeFilename(wordList, suffix) {
-    expect(wordList.length).to.be.at.least(2);
-
-    let filename = '';
-    wordList.forEach(word => {
-	if (_.size(filename) > 0) {
-	    filename += '-';
-	}
-	filename += word;
-    });
-    if (!_.isUndefined(suffix)) {
-	filename += suffix;
-    }
-    return filename + '.json';
-}
-
-//
-
-function makeFilteredFilename(wordList) {
-    return makeFilename(wordList, FILTERED_SUFFIX);
-}
+const Result       = require('./result-mod');
 
 //---------------------------------------------
 
@@ -73,6 +46,8 @@ const SM = {
     [Maybe] : { next: [ Url,  /*no*/  Maybe, Known, Src ], func: processMaybe },
     [Known] : { next: [ Known, Src ],                      func: processKnown }
 }
+
+//---------------------------------------------
 
 //
 function getLineType(line) {
@@ -127,10 +102,8 @@ function processSrc(line, args, options) {
 	};
     }
 
-    let dir = `${RESULT_DIR}${args.dir}`;
-    let path = `${dir}/${makeFilteredFilename(nameList)}`;
-    let filteredUrls;
-
+    let dir = `${Result.DIR}${args.dir}`;
+    let path = `${dir}/${Result.makeFilteredFilename(nameList)}`;
     let content;
     try {
 	content = fs.readFileSync(path, 'utf8');
@@ -141,6 +114,7 @@ function processSrc(line, args, options) {
 	}
     }
     // if file exists, notify if it doesn't parse correctly.
+    let filteredUrls;
     if (!_.isUndefined(content)) {
 	filteredUrls = JSON.parse(content);
 	console.log(`loaded: ${path}`);
