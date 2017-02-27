@@ -144,7 +144,7 @@ ComboMaker.prototype.makeCombos = function(args) {
 		successDuration += duration.milliseconds;
 
 		if (validateAll &&
-		    !this.checkPrimarySources(validateResult.ncListArray, args.sources)) {
+		    !this.checkPrimarySources(validateResult.list, args.sources)) {
 		    continue;
 		}			
 		if (csvNameList.length < args.maxResults) {

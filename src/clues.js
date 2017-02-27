@@ -465,7 +465,7 @@ function showSources(clueName) {
 	validateAll:  true
     });
     if (result.success) {
-	result.ncListArray.forEach(result => {
+	result.list.forEach(result => {
 	    console.log('nameSrcList: ' + result.nameSrcList);
 	    if (verbose) {
 		console.log('ncList:      ' + result.ncList);

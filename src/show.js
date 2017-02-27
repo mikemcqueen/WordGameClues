@@ -70,7 +70,7 @@ function compatibleKnownClues(args) {
     }
 
     // for each primary-clue variation from validateResults
-    vsResult.ncListArray.forEach(result => {
+    vsResult.list.forEach(result => {
 	log(`final result: ${result.nameSrcList}`);
 	let primarySrcList = result.nameSrcList.map(nc => _.toNumber(nc.count));
 
@@ -127,7 +127,7 @@ function getCompatibleResults(nameCount, excludeSrcList) {
 	validateAll:    true
     });
     log(`isCompatible: ${nameCount}, ${result.success}`);
-    return result.success ? result.ncListArray : [];
+    return result.success ? result.list : [];
 }
 
 // args:

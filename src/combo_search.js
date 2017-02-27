@@ -114,6 +114,7 @@ ComboSearch.prototype.findAlternateSourcesForName = function(name, count) {
 	    }, this);
 	}
 
+	// really: countListArrayArray
 	matchCountListArray.forEach((countListArray, claaIndex) => {
 	    var ncListArray = [];
 	    countListArray.forEach((countList, claIndex) => {
@@ -139,7 +140,6 @@ ComboSearch.prototype.findAlternateSourcesForName = function(name, count) {
 	    resultNcListArray[claaIndex] = ncListArray;
 	});
     });
-
     return resultNcListArray;
 }
 

@@ -125,7 +125,8 @@ Validator.prototype.validateSources = function(args) {
 	    if (this.logging) {
 		this.log('validateSources: VALIDATE SUCCESS!');
 	    }
-	    resultList = _.concat(resultList, rvsResult.ncListArray);
+	    //resultList = _.concat(resultList, rvsResult.list);
+	    resultList.push(...rvsResult.list);
 	    found = true;
 	    // we may not care about all possible combinations
 	    if (!args.validateAll) {
@@ -144,7 +145,7 @@ Validator.prototype.validateSources = function(args) {
     }
     return {
 	success:     found,
-	ncListArray: resultList
+	list:        (found ? resultList : undefined)
     }
 }
 
@@ -220,11 +221,9 @@ Validator.prototype.recursiveValidateSources = function(args) {
     });
     --this.logLevel;
 
-    return someResult ? {
-	success:     true,
-	ncListArray: rvsResult.ncListArray
-    } : {
-	success: false
+    return {
+	success: someResult,
+	list:    (someResult ? rvsResult.list : undefined)
     };
 }
 
@@ -290,8 +289,8 @@ Validator.prototype.rvsWorker = function(args) {
 			 ', ' + newNameCountList);
 	    }
 	    return {
-		success:     true,
-		ncListArray: uniqResult.ncListArray
+		success: true,
+		list:    uniqResult.list
 	    };
 	}
 	if (this.logging) {
@@ -329,8 +328,8 @@ Validator.prototype.rvsWorker = function(args) {
 		 ', ' + newNameCountList);
     }
     return {
-	success:     true,
-	ncListArray: rvsResult.ncListArray
+	success: true,
+	list:    rvsResult.list
     };
 }
 
@@ -430,12 +429,12 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 		    break; // fail, try other combos
 		}
 		// sanity check
-		if (xp) expect(vsResult.ncListArray).is.not.empty;
+		if (xp) expect(vsResult.list).is.not.empty;
 		if (this.logging) {
 		    this.log('from validateSources(' + buildResult.count + ')');
 		    this.log('  compoundSrcNameList: ' + buildResult.compoundSrcNameList);
-		    this.log('  ncListArray.size: ' + _.size(vsResult.ncListArray));
-		    vsResult.ncListArray.forEach(result => {
+		    this.log('  list.size: ' + _.size(vsResult.list));
+		    vsResult.list.forEach(result => {
 			this.log('   ncList:      ' + result.ncList);
 			this.log('   nameSrcList: ' + result.nameSrcList);
 			this.log('   -----------');
@@ -443,7 +442,7 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 		}
 		// we only sent compound clues to validateSources, so add the
 		// primary clues that build filtered out to make a complete list
-		candidateResultList = vsResult.ncListArray.map(result => Object({
+		candidateResultList = vsResult.list.map(result => Object({
 		    ncList:    _.concat(result.ncList, buildResult.primaryNcList),
 		    resultMap: _.cloneDeep(buildResult.resultMap).merge(result.resultMap, buildResult.compoundNcList)
 		}));
@@ -504,10 +503,10 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 }
 
 //
-Validator.prototype.uniqueResult = function(success, resultList) {
+Validator.prototype.uniqueResult = function(success, list) {
     return {
-	success:     success,
-	ncListArray: resultList // _.uniqBy(resultList, () => {})
+	success: success,
+	list:    list // _.uniqBy(resultList, () => {})
     };
 }
 
@@ -1041,7 +1040,8 @@ Validator.prototype.buildSrcNameList = function(args) {
 	    localPrimaryNcList = srcNameList.map(name => NameCount.makeNew(name, 1));
 	    // add map entry for list of (eventual) primary name:sources
 	    map[localPrimaryNcList] = [];
-	    primaryNcList = _.concat(primaryNcList, localPrimaryNcList);
+	    //primaryNcList = _.concat(primaryNcList, localPrimaryNcList);
+	    primaryNcList.push(...localPrimaryNcList);
 	    return; // forEach.next;
 	}
 
@@ -1053,7 +1053,8 @@ Validator.prototype.buildSrcNameList = function(args) {
 	// why don't we just add empty maps here? because we don't
 	// know the nc.count for these names
 	map[this.SOURCES_KEY] = srcNameList;
-	compoundSrcNameList = _.concat(compoundSrcNameList, srcNameList);
+	//compoundSrcNameList = _.concat(compoundSrcNameList, srcNameList);
+	compoundSrcNameList.push(...srcNameList);
 	compoundNcList.push(nc);
     }, this);
 
