@@ -21,7 +21,7 @@ const Peco          = require('./peco');
 
 //
 
-var xp = false;
+const xp = false;
 
 //
 
@@ -80,8 +80,8 @@ Validator.prototype.setAllowDupeFlags = function(args) {
 // args:
 //  nameList:       list of clue names, e.g. ['bob','jim']
 //  sum:            # of primary clues represented by names in nameList
-//  max:            max # of sources to combine (either this ,or, count must be set)
-//  count:          exact # of sources to combine (either this ,or, max must be set)
+//  max:            max # of sources to combine (either this -or- count must be set)
+//  count:          exact # of sources to combine (either this -or- max must be set)
 //  require:        list of required clue counts, e.g. [2, 4]
 //  exclude:        list of excluded clue counts, e.g. [3, 5]
 //  excludeSrcList: list of excluded primary sources
@@ -184,7 +184,7 @@ Validator.prototype.recursiveValidateSources = function(args) {
 	if (this.logging) {
 	    this.log('looking for ' + clueName + ' in ' + count);
 	}
-	if (!ClueManager.knownClueMapArray[count][clueName]) {
+	if (!_.has(ClueManager.knownClueMapArray[count], clueName)) {
 	    if (this.logging) {
 		this.log(' not found, ' + clueName + ':' + count);
 	    }
@@ -275,7 +275,7 @@ Validator.prototype.rvsWorker = function(args) {
     }
     // If only one name & count remain, we're done.
     // (name & count lists are equal length, just test one)
-    if (args.nameList.length == 1) {
+    if (args.nameList.length === 1) {
 	let uniqResult = this.checkUniqueSources(newNameCountList, args);
 	if (uniqResult.success) {
 	    if (this.logging) {
@@ -343,9 +343,6 @@ Validator.prototype.rvsWorker = function(args) {
 ///
 Validator.prototype.checkUniqueSources = function(nameCountList, args) {
     let origNcList = nameCountList;
-    var buildResult;
-    var resultMap;
-    var candidateResultList;
 
     // assert(nameCountList) && Array.isArray(nameCountList)
 
@@ -369,7 +366,7 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
     }
     else if (findResult.allPrimary) {
 	let nameSrcList = this.getNameSrcList(findResult.srcMap);
-	resultMap = ResultMap.makeNew();
+	let resultMap = ResultMap.makeNew();
 	resultMap.addPrimaryLists(nameCountList, nameSrcList);
 	let compatList = this.getCompatibleResults({
 	    origNcList:     nameCountList,
@@ -385,6 +382,9 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 	return this.uniqueResult(false);
     }
 
+    let resultMap;
+    let buildResult;
+    let candidateResultList;
     let anyFlag = false;
     let resultList = [];
     let buildArgs = {
@@ -440,7 +440,8 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 		    });
 		}
 		// we only sent compound clues to validateSources, so add the
-		// primary clues that build filtered out to make a complete list
+		// primary clues that build filtered out to make a complete list.
+		// also merge buildResults data into resultMap
 		candidateResultList = vsResult.list.map(result => Object({
 		    ncList:    _.concat(result.ncList, buildResult.primaryNcList),
 		    resultMap: _.cloneDeep(buildResult.resultMap).merge(result.resultMap, buildResult.compoundNcList)
@@ -548,13 +549,13 @@ Validator.prototype.getCompatibleResults = function(args) {
 	    ncList:         args.ncList,
 	    excludeSrcList: args.excludeSrcList
 	}).some(nameSrcList => {
+	    // check if nameSrcList is already in result list
 	    if (this.hasNameSrcList(resultList, nameSrcList)) {
 		if (logit || this.logging) {
 		    this.log(`aUP cycle: already in resultList: ${nameSrcList}`);
 		}
 		return false;
 	    }
-	    expect(this.hasNameSrcList(resultList, nameSrcList)).to.be.false;
 	    if (logit || this.logging) {
 		this.log('aUP cycle: adding primary result');
 		this.log(`  ${args.ncList}`);
@@ -755,14 +756,14 @@ Validator.prototype.findPrimarySourceConflicts = function(args) {
 	//console.log(`srcList for ${nc.name}:1, ${srcList}`);
 	// look for an as-yet-unused src for the given clue name
 	if (!srcList.some(src => {
-	    if (!srcMap[src]) {
+	    if (!_.has(srcMap, src)) {
 		srcMap[src] = nc.name;
 		return true; // found; some.exit
 	    }
 	    return false; // not found; some.continue
 	})) {
 	    // unused src not found: add to conflict map, resolve later
-	    if (_.isUndefined(conflictSrcMap[srcList])) {
+	    if (!_.has(conflictSrcMap, srcList)) {
 		conflictSrcMap[srcList] = [];
 	    }
 	    conflictSrcMap[srcList].push(nc.name);
@@ -901,8 +902,8 @@ Validator.prototype.findDuplicatePrimarySource = function(args) {
 //
 
 Validator.prototype.evalFindDuplicateResult = function(result, logPrefix) {
-    var dupeType = '';
-    var dupeValue = '';
+    let dupeType = '';
+    let dupeValue = '';
 
     if (this.logging) {
 	if (result.duplicateName || result.duplicateSrc) {
@@ -978,22 +979,15 @@ Validator.prototype.buildSrcNameList = function(args) {
     let resultMap = ResultMap.makeNew();
 
     args.ncList.forEach((nc, ncIndex) => {
-	var srcList;          // e.g. [ 'src1,src2,src3', 'src2,src3,src4' ]
-	var slIndex;          // srcListIndex
-	var srcNameList;      // e.g. [ 'src1', 'src2', 'src3' ]
-	var src;
-	var localPrimaryNcList;
-	var map;
-	var path;
-
-	src = args.allPrimary ? 1 : nc.count;
-	srcList = ClueManager.knownClueMapArray[src][nc.name];
+	let src = args.allPrimary ? 1 : nc.count;
+	let srcList = ClueManager.knownClueMapArray[src][nc.name]; // e.g. [ 'src1,src2,src3', 'src2,src3,src4' ]
 	if (!srcList) {
 	    throw new Error('kind of impossible but missing clue!');
 	}
 
 	// only do indexing if all clues are primary, or if this
 	// is a compound clue
+	let slIndex; // srcListIndex
 	if (args.allPrimary || (nc.count > 1)) {
 	    slIndex = this.getSrcListIndex(indexMap, nc, srcList);
 	}
@@ -1005,15 +999,12 @@ Validator.prototype.buildSrcNameList = function(args) {
 		     ', source: ' + srcList[slIndex]);
 	}
 
-	srcNameList = srcList[slIndex].split(',');
-
-	// short circuit if we're called with allPrimary:true.
+	let srcNameList = srcList[slIndex].split(',');      // e.g. [ 'src1', 'src2', 'src3' ]
 	if (nc.count === 1) {
 	    primaryNcList.push(nc);
+	    // short circuit if we're called with allPrimary:true.
 	    if (args.allPrimary) {
-		srcNameList.forEach(name => {
-		    primarySrcNameList.push(name);
-		});
+		primarySrcNameList.push(...srcNameList);
 		return; // forEach.next
 	    }
 	}
@@ -1028,15 +1019,14 @@ Validator.prototype.buildSrcNameList = function(args) {
 	    resultMap.map()[this.PRIMARY_KEY].push(_.toString(nc)); // consider nc.name here instead
 	    return; // forEach.next;
 	}
-
-	compoundNcNameListPairs.push([nc, _.clone(srcNameList)]);
-
+	
 	// nc is a compound clue
-	map = resultMap.map()[nc] = {};
+	compoundNcNameListPairs.push([nc, _.clone(srcNameList)]);
+	let map = resultMap.map()[nc] = {};
 	// if sources for this nc are all primary clues
 	if (_.size(srcNameList) === nc.count) {
 	    // build component primary NC list
-	    localPrimaryNcList = srcNameList.map(name => NameCount.makeNew(name, 1));
+	    let localPrimaryNcList = srcNameList.map(name => NameCount.makeNew(name, 1));
 	    // add map entry for list of (eventual) primary name:sources
 	    map[localPrimaryNcList] = [];
 	    primaryNcList.push(...localPrimaryNcList);
@@ -1112,13 +1102,11 @@ Validator.prototype.getIndexMap = function(indexMap) {
 //
 
 Validator.prototype.getSrcListIndex = function(indexMap, nc, srcList) {
-    var slIndex;
-    if (indexMap[nc]) {
+    let slIndex;
+    if (_.has(indexMap, nc)) {
 	slIndex = indexMap[nc].index;
 	// sanity check
-	if (indexMap[nc].length != srcList.length) {
-	    throw new Error('mismatched index lengths');
-	}
+	if (xp) expect(indexMap[nc].length, 'mismatched index lengths').to.equal(srcList.length);
 	if (this.logging) {
 	    this.log(nc.name + ': using preset index ' + slIndex +
 		     ', length(' + indexMap[nc].length + ')' +
@@ -1140,10 +1128,7 @@ Validator.prototype.getSrcListIndex = function(indexMap, nc, srcList) {
 //
 
 Validator.prototype.incrementIndexMap = function(indexMap) {
-    if (!indexMap || _.isEmpty(indexMap)) {
-	throw new Error('null or empty index map, ' + indexMap);
-    }
-
+    if (xp) expect(indexMap, 'bad indexMap').to.be.an('object').that.is.not.empty;
     if (this.logging) {
 	this.log('++indexMap: ' + this.indexMapToJSON(indexMap));
     }
@@ -1157,20 +1142,20 @@ Validator.prototype.incrementIndexMap = function(indexMap) {
     indexObj.index += 1;
 
     // while index is maxed reset to zero, increment next-to-last index, etc.
-    // using >= because it's possible both index and length are zero, for
-    // primary clues, which are skipped.
+    // using >= because it's possible both index and length are zero
+    // for primary clues, which are skipped.
     while (indexObj.index >= indexObj.length) {
 	if(this.logging) {
 	    this.log('keyIndex ' + keyIndex + ': ' + indexObj.index +
 		     ' >= ' + indexObj.length + ', resetting')
 	}
 	indexObj.index = 0;
-	--keyIndex;
+	keyIndex -= 1;
 	if (keyIndex < 0) {
 	    return false;
 	}
 	indexObj = indexMap[keyList[keyIndex]];
-	++indexObj.index;
+	indexObj.index += 1;
 	if (this.logging) {
 	    this.log('keyIndex ' + keyIndex + ': ' + indexObj.index +
 		     ', length: ' + indexObj.length);
@@ -1187,7 +1172,7 @@ Validator.prototype.incrementIndexMap = function(indexMap) {
 //
 
 Validator.prototype.indexMapToJSON = function(map) {
-    var s = '';
+    let s = '';
     _.keys(map).forEach(key => {
 	if (s.length > 0) {
 	    s += ',';
@@ -1201,7 +1186,7 @@ Validator.prototype.indexMapToJSON = function(map) {
 //
 
 Validator.prototype.copyAddNcList = function(ncList, name, count) {
-    var newNcList;
+    let newNcList;
 
     // for non-primary check for duplicate name:count entry
     // technically this is allowable for count > 1 if the there are
@@ -1231,11 +1216,8 @@ Validator.prototype.copyAddNcList = function(ncList, name, count) {
 //
 
 Validator.prototype.getDiffNcList = function(origNcList, nameCountList) {
-    var ncList;
-    var index;
-
-    ncList = [];
-    for (index = origNcList.length; index < nameCountList.length; ++index) {
+    let ncList = [];
+    for (let index = origNcList.length; index < nameCountList.length; ++index) {
 	ncList.push(nameCountList[index]);
     }
     return ncList;
@@ -1252,7 +1234,7 @@ Validator.prototype.getNameSrcList = function(srcMap) {
 //
 
 Validator.prototype.chop = function(list, removeValue) {
-    var copy = [];
+    let copy = [];
     list.forEach(value => {
 	if (value == removeValue) {
 	    removeValue = undefined;
@@ -1316,15 +1298,13 @@ Validator.prototype.dumpIndexMap = function(indexMap) {
 //  compound: t/f
 //
 Validator.prototype.dumpResult = function(args) {
-    var header = 'Validate results';
-    var keyNameList;
-
+    let header = 'Validate results';
     if (args.header) {
 	header += ' for ' + args.header;
     }
     console.log(header);
 
-    keyNameList = [];
+    let keyNameList = [];
     if (args.compound) {
 	keyNameList.push({
 	    key:  this.COMPOUND_KEY,
@@ -1339,7 +1319,7 @@ Validator.prototype.dumpResult = function(args) {
     }
 
     keyNameList.forEach(keyName => {
-	var header = keyName.name + ':';
+	header = keyName.name + ':';
 	if (!args.result[keyName.key]) {
 	    console.log(header + ' empty');
 	    return;
@@ -1365,8 +1345,6 @@ Validator.prototype.dumpResult = function(args) {
 //  compound: t/f
 //
 Validator.prototype.dumpResultMap = function(seq, level) {
-//    console.log(_(seq).toJSON());
-//    return;
     if (!level) level = 0;
     if (typeof seq === 'object') {
 	console.log(this.indent() + spaces(2 * level) + (_.isArray(seq) ? '[' : '{'));

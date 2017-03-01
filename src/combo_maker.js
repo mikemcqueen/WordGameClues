@@ -55,10 +55,7 @@ ComboMaker.prototype.makeCombos = function(args) {
     var successDuration = 0;
     var failDuration = 0;
     var nextDuration = 0;
-    var useNcList;
-    var require;
 
-    this.nextSort = 0;
     this.nextDupeClue = 0;
     this.nextDupeSrc = 0;
     this.nextDupeCombo = 0;
@@ -69,8 +66,12 @@ ComboMaker.prototype.makeCombos = function(args) {
 
     // TODO USE "validateArgs" 
 
+    let require = _.isUndefined(args.require) ? [] : _.clone(args.require);
+    let useNcList;
     if (!_.isUndefined(args.use)) {
-	useNcList = this.buildUseNcList(args.use); // , require);
+	let buildResult = this.buildUseNcList(args.use);
+	useNcList = buildResult.ncList;
+	require.push(...buildResult.countList);
     }
     let validateAll = false;
     if (!_.isUndefined(args.sources)) {
@@ -86,7 +87,7 @@ ComboMaker.prototype.makeCombos = function(args) {
     ClueManager.getClueSourceListArray({
 	sum:     args.sum,
 	max:     args.max,
-	require: args.require,
+	require: require,
     }).forEach(clueSourceList => {
 	let sourceIndexes = [];
 
@@ -124,7 +125,10 @@ ComboMaker.prototype.makeCombos = function(args) {
 
 	    // if useNcList, all nc must exist in current combo's nc list
 	    if (!_.isUndefined(useNcList)) {
-		if (_.intersection(useNcList, result.ncList).length !== useNcList.length) {
+		if (_.intersectionBy(useNcList, result.ncList, _.toString).length !== useNcList.length) {
+		    if (this.logging) {
+			console.log(`skipping: ${result.ncList}`);
+		    }
 		    ++skipCount;
 		    continue;
 		}
@@ -135,7 +139,7 @@ ComboMaker.prototype.makeCombos = function(args) {
 		sum:         args.sum,
 		nameList:    result.nameList,
 		count:       result.nameList.length,
-		require:     args.require, // ??
+		require:     require,
 		validateAll: validateAll
 	    });
 	    let duration = new Duration(start, new Date());
@@ -162,8 +166,7 @@ ComboMaker.prototype.makeCombos = function(args) {
 
     console.log('success: ' + successDuration + 'ms' +
 		', fail: ' + failDuration + 'ms' +
-		', next: ' + nextDuration + 'ms' +
-		', nextSort: ' + this.nextSort + 'ms');
+		', next: ' + nextDuration + 'ms');
     console.log(`total(${totalCount})` +
 		', dupeClue(' + this.nextDupeClue + ')' +
 		', dupeSrc(' + this.nextDupeSrc + ')' +
@@ -189,23 +192,25 @@ ComboMaker.prototype.checkPrimarySources = function(resultList, sources) {
 
 //
 //
-ComboMaker.prototype.buildUseNcList = function(nameList, countList) {
+ComboMaker.prototype.buildUseNcList = function(nameList) {
     let ncList = [];
+    let countList = [];
     nameList.forEach(name =>  {
 	let nc = NameCount.makeNew(name);
-	if (nc.count) {
-	    if (!ClueManager.knownClueMapArray[nc.count][nc.name]) {
+	if (nc.count > 0) {
+	    if (!_.has(ClueManager.knownClueMapArray[nc.count], nc.name)) {
 		throw new Error('specified clue does not exist, ' + nc);
 	    }
-	    /*
-	    if (!_.includes(countList, nc.count)) {
-		countList.push(nc.count);
-	    }
-	    */
+	    //if (!_.includes(countList, nc.count)) {
+	    countList.push(nc.count);
+	    //}
 	}
 	ncList.push(nc);
     });
-    return ncList;
+    return {
+	ncList:    ncList,
+	countList: countList
+    };
 }
 
 //
@@ -277,7 +282,7 @@ ComboMaker.prototype.next = function(clueSourceList, sourceIndexes) {
 	    }
 	    nameList.push(clue.name);
 	    // I think this is right
-	    ncList.push(NameCount.makeNew(clue.name, clueSource.count)); //clue.src));
+	    ncList.push(NameCount.makeNew(clue.name, clueSource.count));
 	    srcCountStrList.push(NameCount.makeCanonicalName(clue.src, clueSource.count));
 	    return true; // every.continue;
 	})) {

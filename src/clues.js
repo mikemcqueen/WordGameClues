@@ -72,8 +72,7 @@ function main() {
     // TODO: get rid of this, just pass Opt.options around
     let countArg = _.toNumber(Opt.options.count);
     let maxArg = _.toNumber(Opt.options.max);
-    let requiredSizes = Opt.options['require-counts'];
-    let useClueList = Opt.options['use'];
+    let useClueList = Opt.options.use;
     let metaFlag = Opt.options['meta'];
     let verboseArg = Opt.options['verbose'];
     let outputArg = Opt.options['output'];
@@ -84,7 +83,6 @@ function main() {
     let showKnownArg = Opt.options['show-known'];
     let synthFlag = Opt.options['synthesis'];
     let jsonArg = Opt.options['json'];
-    let primarySourcesArg = Opt.options['primary-sources'];
     let flagsArg = Opt.options.flags;
 
     if (!maxArg) {
@@ -188,8 +186,8 @@ function main() {
 	doCombos({
 	    sum:     countArg,
 	    max:     maxArg,
-	    require: requiredSizes,
-	    sources: primarySourcesArg,
+	    require: Opt.options['require-counts'],
+	    sources: Opt.options['primary-sources'],
 	    use:     useClueList
 	});
     }

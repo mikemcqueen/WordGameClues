@@ -243,7 +243,7 @@ ClueManager.prototype.addClue = function(count, clue, save = false) {
     if (this.addKnownClue(count, clue.name, clue.src, true)) {
 	this.clueListArray[count].push(clue);
 	if (save) {
-	    saveClues(count);
+	    this.saveClues(count);
 	}
 	return true;
     }
