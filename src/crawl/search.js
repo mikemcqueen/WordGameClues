@@ -8,7 +8,6 @@ const _            = require('lodash');
 const Promise      = require('bluebird');
 const expect       = require('chai').expect;
 const prettyMs     = require('pretty-ms');
-const expect       = require('chai').expect;
 
 const fs           = require('fs');
 const fsReadFile   = Promise.promisify(fs.readFile);

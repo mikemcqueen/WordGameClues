@@ -875,14 +875,14 @@ Validator.prototype.resolvePrimarySourceConflicts = function(args) {
 //  nameMap:
 //
 Validator.prototype.findDuplicatePrimarySource = function(args) {
-    if(xp ) expect(args.ncList).to.be.an('array');
+    if (xp) expect(args.ncList).to.be.an('array');
 
     let duplicateSrcName;
     let duplicateSrc;
 
     args.ncList.some(nc => {
 	let src = nc.count;
-	if (args.srcMap[src]) {
+	if (_.has(args.srcMap, src)) {
 	    // duplicate source
 	    duplicateSrcName = nc.name;
 	    duplicateSrc = src;
@@ -1267,14 +1267,6 @@ Validator.prototype.hasExcludedSource = function(nameSrcList, excludeSrcList) {
     return _.isUndefined(excludeSrcList) ? false :
 	!_.isEmpty(_.intersection(excludeSrcList, nameSrcList.map(nc => nc.count)));
 }
-
-/*
-Validator.prototype.listContainsAny = function(list1, list2) {
-    return list1.some(elem => {
-	return list2.indexOf(elem) !== -1;
-    });
-}
-*/
 
 //
 //

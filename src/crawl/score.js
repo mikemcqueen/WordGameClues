@@ -75,8 +75,12 @@ function scoreNextFile(dir, readLines, options) {
     let filepath = dir + '/' + filename;
     console.log('filepath: ' + filepath);
     fsReadFile(filepath, 'utf8')
-	.then(content => JSON.parse(content))
-	.then(inputList => {
+	.catch(err => {
+	    console.log(`readFile ${filepath} failed, ${err}`);
+	}).then(content => JSON.parse(content))
+	.catch(err => {
+	    console.log(`JSON.parse ${filepath} failed, ${err}`);
+	}).then(inputList => {
 	    return Score.scoreResultList(
 		_.split(Path.basename(filepath, '.json'), '-'),
 		inputList,
@@ -87,8 +91,8 @@ function scoreNextFile(dir, readLines, options) {
 		return true;
 	    }
 	    return fsWriteFile(filepath, JSON.stringify(outputList));
-	}).then((empty) => {
-	    if (empty !== true) {
+	}).then(emptyFlag => {
+	    if (emptyFlag !== true) {
 		console.log('updated');
 	    }
 	}).catch(err => {
