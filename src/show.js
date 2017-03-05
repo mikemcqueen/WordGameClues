@@ -213,22 +213,13 @@ function dumpCompatibleClues(args) {
     let rawNameList = args.nameList.map(name => NameCount.makeNew(name)).map(nc => nc.name);
     for (let count = 1; count < ClueManager.maxClues; ++count) {
 	let map = args.nameMapArray[count];
-//	let dumpList = [];
-	let dumpList = _.chain(map).keys().map(key => {              // from array of name:src,src,src
+	let dumpList = _.chain(map).keys().map(key => { // from array of name:src,src,src
 	    let name = NameCount.makeNew(key).name;
-	    return map[key].map(elem => {             // to array of array of elements
+	    return map[key].map(elem => {               // to array of array of elements
 		elem.name = name;
 		return elem;
 	    });
-	}).flatten().value();                         // to array of elements
-	/*
-	_.forOwn(map, (value, key) => {
-	    value.forEach(elem => {
-		elem.name = NameCount.makeNew(key).name;
-		dumpList.push(elem);
-	    });
-	});
-	*/
+	}).flatten().value();                           // to array of elements
 
 	if (!_.isEmpty(dumpList)) {
 	    dumpList.sort((a, b) => {

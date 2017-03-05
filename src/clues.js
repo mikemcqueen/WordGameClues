@@ -321,7 +321,7 @@ function showValidSrcListCounts(options) {
 			}
 		    });
 		    */
-		    msg += ': PRESENT as clue with sources: ' + nameSrcList;
+		    msg += ': PRESENT as clue with sources: ' + nameSrcList.join(' - ');
 		}
 	    }
 	    else {
