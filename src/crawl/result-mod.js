@@ -17,7 +17,7 @@ const EXT_JSON =        '.json';
 //
 function getFileMatch(match = undefined) {
     let prefix = `(?=^((?!${FILTERED_SUFFIX}).)*$)`;
-    let suffix = `.*\${EXT_JSON}$`;
+    let suffix = `.*\\${EXT_JSON}$`;
     return _.isUndefined(match) ? `${prefix}${suffix}` : `${prefix}.*${match}${suffix}`;
 }
 
@@ -25,14 +25,7 @@ function getFileMatch(match = undefined) {
 //
 function makeFilename(wordList, suffix) {
     expect(wordList.length).to.be.at.least(2);
-
-    let filename = '';
-    wordList.forEach(word => {
-	if (_.size(filename) > 0) {
-	    filename += '-';
-	}
-	filename += word;
-    });
+    let filename = wordList.join('-');
     if (!_.isUndefined(suffix)) {
 	filename += suffix;
     }

@@ -7,16 +7,12 @@
 const _            = require('lodash');
 const Promise      = require('bluebird');
 const fs           = require('fs');
-const fsReadFile   = Promise.promisify(fs.readFile);
-const fsWriteFile  = Promise.promisify(fs.writeFile);
 const Readlines    = require('n-readlines');
 const Dir          = require('node-dir');
 const Path         = require('path');
-const expect       = require('chai').expect;
-
+const Expect       = require('chai').expect;
 const Score        = require('./score-mod');
 const Result       = require('./result-mod');
-
 const Opt          = require('node-getopt')
       .create([
 	  ['d', 'dir=NAME',            'directory name'],
@@ -26,11 +22,14 @@ const Opt          = require('node-getopt')
 	  ['h', 'help',                'this screen']
       ]).bindHelp().parseSystem();
 
+const fsReadFile   = Promise.promisify(fs.readFile);
+const fsWriteFile  = Promise.promisify(fs.writeFile);
+
 //
 
 function scoreSearchResultDir(dir, fileMatch, options) {
-    expect(dir).to.be.a('string');
-    expect(fileMatch).to.be.a('string');
+    Expect(dir).to.be.a('string');
+    Expect(fileMatch).to.be.a('string');
 
     let path = Result.DIR + dir;
     console.log('dir: ' + path);
@@ -39,24 +38,28 @@ function scoreSearchResultDir(dir, fileMatch, options) {
 	exclude: /^\./,
 	recursive: false
     }, function(err, content, filepath, next) {
-	if (err) throw err;
+	if (err) throw err; // TODO: test this
 	console.log('filename: ' + filepath);
+	let saving = false;
 	Score.scoreResultList(
 	    _.split(Path.basename(filepath, '.json'), '-'),
 	    JSON.parse(content),
 	    options
-	).catch(err => {
-	    console.error('scoreResultList error: ' + err);
-	}).then(list => {
-	    if (_.isEmpty(list)) {
-		return next();
+	).then(list => {
+	    if (!_.isEmpty(list)) {
+		saving = true;
+		return fsWriteFile(filepath, JSON.stringify(list));
 	    }
-	    fsWriteFile(filepath, JSON.stringify(list)).then(() => {
+	    return undefined;
+	}).then(() => {
+	    if (saving) {
 		console.log('updated');
-		return next();
-	    }).catch(err => {
-		console.error('fsWriteFile error: ' + err);
-	    });
+	    }
+	    return undefined;
+	}).catch(err => {
+	    console.error(`scoreSearchResultDir error, ${err.message}`);
+	}).then(() => {
+	    return next();
 	});
     }, function(err, files) {
         if (err) throw err;
@@ -103,8 +106,8 @@ function scoreNextFile(dir, readLines, options) {
 //
 
 function scoreSearchResultFiles(dir, inputFilename, options) {
-    expect(dir).to.be.a('string');
-    expect(inputFilename).to.be.a('string');
+    Expect(dir).to.be.a('string');
+    Expect(inputFilename).to.be.a('string');
 
     dir = Result.DIR + dir;
     console.log('dir: ' + dir);
@@ -118,15 +121,15 @@ function scoreSearchResultFiles(dir, inputFilename, options) {
 //
 
 function main() {
-    expect(Opt.argv.length, 'only one optional FILE parameter is allowed')
+    Expect(Opt.argv.length, 'only one optional FILE parameter is allowed')
 	.to.be.at.most(1);
-    expect(Opt.options.dir, 'option -d NAME is required').to.exist;
+    Expect(Opt.options.dir, 'option -d NAME is required').to.exist;
 
     let inputFile;
     if (Opt.argv.length === 1) {
 	inputFile = Opt.argv[0];
 	console.log(`file: ${inputFile}`);
-	expect(Opt.options.match, 'option -m EXPR not allowed with FILE').to.be.undefined;
+	Expect(Opt.options.match, 'option -m EXPR not allowed with FILE').to.be.undefined;
     }
     if (Opt.options.force === true) {
 	console.log('force: ' + Opt.options.force);
@@ -138,16 +141,10 @@ function main() {
 	scoreSearchResultFiles(Opt.options.dir, inputFile, scoreOptions);
     }
     else {
-	scoreSearchResultDir(Opt.options.dir, Result.getFileMatch(Opt.options.match), scoreOptions);
+	let fileMatch = Result.getFileMatch(Opt.options.match);
+	console.log(`fileMatch: ${fileMatch}`);
+	scoreSearchResultDir(Opt.options.dir, fileMatch, scoreOptions);
     }
-    /*
-    else {
-	expect('not supported').to.equal('specify -d NAME');
-	for (let dir = 2; dir < 8; ++dir) {
-	    scoreSearchResultFiles(dir, fileMatch, scoreOptions);
-	}
-    }
-    */
 }
 
 //
@@ -156,7 +153,7 @@ try {
     main();
 }
 catch(e) {
-    console.error(e.stack);
+    console.log(e.stack);
 }
 finally {
 }
