@@ -1,49 +1,43 @@
+//
+// GOOGLERESULT.JS
+//
+
 'use strict';
 
-var google     = require('google');
-var Delay      = require('../util/delay');
-var prettyMs   = require('pretty-ms');
+//
 
-var GoogleResultExports = {
-    get : get
-};
+let Google     = require('google');
+let Ms         = require('ms');
+let PrettyMs   = require('pretty-ms');
+let Between    = require('../util/between');
 
-module.exports = GoogleResultExports;
+//
 
-function get(text, callback) {
-    var resultList = [];
-    var counter = 0;
-
-    google(text, function (err, res) {
-	var waitForNext;
-	var delay;
-	
-	if (err) {
-	    callback(err);
-	    return;
+function get(text, pages, cb) {
+    let resultList = [];
+    let count = 0;
+    Google(text, function (err, result) {
+	if (err) return cb(err);
+	resultList.push(...result.links.map(link => Object({
+	    title:   link.title,
+	    url:     link.href,
+	    summary: link.description
+	})));
+	count += 1;
+	if (count < pages && result.next) {
+	    let msDelay = Between(Ms('30s'), Ms('60s'));
+	    console.log(`Delaying ${PrettyMs(msDelay)} for next page of results...`);
+	    setTimeout(result.next, msDelay);
 	}
- 
-	res.links.forEach(function(link) {
-	    resultList.push({
-		title:   link.title,
-		url:     link.href,
-		summary: link.description
-	    });
-	});
-	    
-	waitForNext = false;
-	if (counter < 1) {
-	    counter += 1;
-	    if (res.next) {
-		delay = Delay.between(30, 60, Delay.Seconds);
-		console.log('Delaying ' + prettyMs(delay) + ' for next page of results...');
-		setTimeout(res.next, delay);
-		waitForNext = true;
-	    }
-	}
-	if (!waitForNext) {
-	    callback(null, resultList);
-	    return;
+	else {
+	    return cb(null, resultList);
 	}
     });
 }
+
+//
+
+module.exports = {
+    get            : get
+};
+

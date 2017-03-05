@@ -12,6 +12,7 @@
     "google": "^2.1.0",
     "lodash": "^4.17.4",
     "milliseconds": "^1.0.3",
+    "ms": "^0.7.2",
     "n-readlines": "^0.2.7",
     "named-parameters": "^0.0.3",
     "node-getopt": "^0.2.3",

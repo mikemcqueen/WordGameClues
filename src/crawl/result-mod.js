@@ -4,24 +4,25 @@
 
 const _            = require('lodash');
 const expect       = require('chai').expect;
+const Path         = require('path');
 
 //
 
 const RESULT_DIR   =    '../../data/results/';
 const FILTERED_SUFFIX = '_filtered';
-const EXT_JSON =        'json';
+const EXT_JSON =        '.json';
 
+// match *.json, or *match*.json, but not
+// *_filtered.json, or *match*_filtered.json
 //
-
 function getFileMatch(match = undefined) {
-    let prefix = `(?=^((?!${FILTERED_SUFFIX}).)*$)`
-    let suffix = `.*\.${EXT_JSON}$`;
+    let prefix = `(?=^((?!${FILTERED_SUFFIX}).)*$)`;
+    let suffix = `.*\${EXT_JSON}$`;
     return _.isUndefined(match) ? `${prefix}${suffix}` : `${prefix}.*${match}${suffix}`;
 }
 
+// ([ "word", "list" ], "_suffix" ) => word-list[_suffix].json
 //
-
-
 function makeFilename(wordList, suffix) {
     expect(wordList.length).to.be.at.least(2);
 
@@ -35,7 +36,10 @@ function makeFilename(wordList, suffix) {
     if (!_.isUndefined(suffix)) {
 	filename += suffix;
     }
-    return `${filename}.${EXT_JSON}`;
+    return Path.format({
+	name: filename,
+	ext:  EXT_JSON
+    });
 }
 
 //
@@ -46,9 +50,20 @@ function makeFilteredFilename(wordList) {
 
 //
 
+function pathFormat(args) {
+    expect(args.dir, 'args.dir').to.be.a('string');
+    let root = _.isUndefined(args.root) ? RESULT_DIR : args.root;
+    args.dir = root + args.dir;
+    // Path.format ignore args.root if args.dir is set
+    return Path.format(args);
+}
+
+//
+
 module.exports = {
     getFileMatch:         getFileMatch,
     makeFilename:         makeFilename,
     makeFilteredFilename: makeFilteredFilename,
-    DIR:          RESULT_DIR
+    pathFormat:           pathFormat,
+    DIR:                  RESULT_DIR
 };

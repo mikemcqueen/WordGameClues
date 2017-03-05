@@ -13,6 +13,10 @@ const Readlines    = require('n-readlines');
 const Dir          = require('node-dir');
 const Path         = require('path');
 const expect       = require('chai').expect;
+
+const Score        = require('./score-mod');
+const Result       = require('./result-mod');
+
 const Opt          = require('node-getopt')
       .create([
 	  ['d', 'dir=NAME',            'directory name'],
@@ -21,10 +25,6 @@ const Opt          = require('node-getopt')
 	  ['s', 'synth',               'use synth clues'],
 	  ['h', 'help',                'this screen']
       ]).bindHelp().parseSystem();
-
-
-const Score        = require('./score-mod');
-const Result       = require('./result-mod');
 
 //
 

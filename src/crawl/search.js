@@ -6,26 +6,26 @@
 
 const _            = require('lodash');
 const Promise      = require('bluebird');
-const expect       = require('chai').expect;
-const prettyMs     = require('pretty-ms');
-
-const fs           = require('fs');
-const fsReadFile   = Promise.promisify(fs.readFile);
-const csvParse     = Promise.promisify(require('csv-parse'));
-
-const Delay        = require('../util/delay');
-const googleResult = require('./googleResult');
-
-const Opt = require('node-getopt')
+const Expect       = require('chai').expect;
+const Fs           = require('fs');
+const Ms           = require('ms');
+const Search       = require('./search-mod');
+const Opt          = require('node-getopt')
       .create([
 	  ['d', 'dir=NAME',            'directory name'],
 	  ['h', 'help',                'this screen' ]
       ])
       .bindHelp().parseSystem();
 
-const RESULTS_DIR = '../../data/results/';
+//
 
-const DEFAULT_DELAY_LOW = 8;
+const fsReadFile   = Promise.promisify(Fs.readFile);
+const csvParse     = Promise.promisify(require('csv-parse'));
+
+//
+
+const DEFAULT_PAGE_COUNT = 2;
+const DEFAULT_DELAY_LOW  = 8;
 const DEFAULT_DELAY_HIGH = 12;
 
 //
@@ -37,135 +37,47 @@ function main() {
 	console.log('Usage: node search pairs-file [delay-minutes-low delay-minutes-high]');
 	console.log(' ex: node search file 4    ; delay 4 minutes between searches');
 	console.log(' ex: node search file 4 5  ; delay 4 to 5 minutes between searches');
-	console.log(' defaults, low: ' + DEFAULT_DELAY_LOW + ', high: ' + DEFAULT_DELAY_HIGH);
+	console.log(` defaults, low: ${DEFAULT_DELAY_LOW}, high: ${DEFAULT_DELAY_HIGH}`);
 	console.log(Opt);
 	return 1;
     }
 
     // arg0
     let filename = Opt.argv[0];
-    console.log('filename: ' + filename);
+    console.log(`filename: ${filename}`);
 
     // arg1
     let delayLow = DEFAULT_DELAY_LOW;
     let delayHigh = DEFAULT_DELAY_HIGH;
     if (Opt.argv.length > 1) {
-	delayLow = _.toNumber(Opt.argv[1])
-	expect(delayLow, 'delayLow').to.be.at.least(1);
+	delayLow = _.toNumber(Opt.argv[1]);
+	Expect(delayLow, 'delayLow').to.be.at.least(1);
 	delayHigh = delayLow;
     }
 
     // arg2
     if (Opt.argv.length > 2) {
 	delayHigh = _.toNumber(Opt.argv[2]);
-	expect(delayHigh, 'delayHigh').to.be.at.least(delayLow);
+	Expect(delayHigh, 'delayHigh').to.be.at.least(delayLow);
     }
 
     console.log(`Delaying ${delayLow} to ${delayHigh} minutes between searches`);
 
     fsReadFile(filename, 'utf8')
-	.then(csvData => csvParse(csvData, null))
-	.then(wordListArray => {
-	    getAllResults(wordListArray, {
-		low:  delayLow,
-		high: delayHigh
-	    });
-	}).catch(err => {
-	    console.log('error, ' + err);
-	});
-}
-
-//
-
-function getAllResults(wordListArray, delay) {
-    expect(wordListArray).to.be.an('array');
-    expect(delay).to.have.property('low')
-    expect(delay).to.have.property('high')
-
-    let wordList = wordListArray.pop();
-    if (_.isUndefined(wordList)) return;
-
-    let filename = makeFilename(wordList);
-    let path = RESULTS_DIR + _.size(wordList) + '/' + filename;
-    
-    console.log('list: ' + wordList);
-    console.log('file: ' + filename);
-    
-    checkIfFile(path, (err, isFile) => {
-	if (err) throw err;
-	if (isFile) {
-	    console.log(`Skip: file exists, ${filename}`);
-	    return getAllResults(wordListArray, delay);
-	}
-	getOneResult(wordList, (err, data) => {
-	    if (err) throw err;
-	    if (_.size(data) > 0) {
-		fs.writeFile(path, JSON.stringify(data), (err) => {
-		    if (err) throw err;
-		    console.log(`Saved: ${filename}`);
-		});
+	.then(csvContent => csvParse(csvContent, null))
+	.then(wordListArray => Search.getAllResults({
+	    // NOTE: use default dir
+	    wordListArray: wordListArray,
+	    pages:         DEFAULT_PAGE_COUNT,
+	    delay: {
+		low:   Ms(`${delayLow}m`),
+		high:  Ms(`${delayHigh}m`)
 	    }
-	    let msDelay = Delay.between(delay.low, delay.high, Delay.Minutes);
-	    console.log('Delaying ' + prettyMs(msDelay) + ' for next search...');
-	    setTimeout(() => getAllResults(wordListArray, delay), msDelay);
+	})
+	.catch(err => {
+	    console.log(`error caught in main, ${err}`);
+	    console.log(e.stack);
 	});
-    });
-}
-
-//
-
-function getOneResult(wordList, cb) {
-    let term = makeSearchTerm(wordList, { wikipedia: true });
-
-    console.log('term: ' + term);
-    googleResult.get(term, cb);
-}
-
-//
-
-function checkIfFile(file, cb) {
-    fs.stat(file, function fsStat(err, stats) {
-	if (err) {
-	    if (err.code === 'ENOENT') {
-		return cb(null, false);
-	    } else {
-		return cb(err);
-	    }
-	}
-	return cb(null, stats.isFile());
-    });
-}
-
-//
-
-function makeFilename(wordList) {
-    let filename = '';
-    
-    wordList.forEach(word => {
-	if (_.size(filename) > 0) {
-	    filename += '-';
-	}
-	filename += word;
-    });
-    return filename + '.json';
-}
-
-//
-
-function makeSearchTerm(wordList, options) {
-    let term = '';
-
-    wordList.forEach(word => {
-	if (_.size(term) > 0) {
-	    term += ' ';
-	}
-	term += word;
-    });
-    
-    if (options && options.wikipedia) {
-	term += ' site:en.wikipedia.org';
-    }
-    return term;
 }
 
 //
@@ -174,7 +86,8 @@ try {
     main();
 }
 catch(e) {
-    console.error(e.stack);
+    console.log(`error caught in try/catch, ${err}`);
+    console.log(e.stack);
 }
 finally {
 }
