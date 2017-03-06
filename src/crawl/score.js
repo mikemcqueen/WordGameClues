@@ -38,31 +38,25 @@ function scoreSearchResultDir(dir, fileMatch, options) {
 	exclude: /^\./,
 	recursive: false
     }, function(err, content, filepath, next) {
-	if (err) throw err; // TODO: test this
+	if (err) throw err; // TODO: why throw? test this
 	console.log('filename: ' + filepath);
-	let saving = false;
 	Score.scoreResultList(
 	    _.split(Path.basename(filepath, '.json'), '-'),
 	    JSON.parse(content),
 	    options
 	).then(list => {
-	    if (!_.isEmpty(list)) {
-		saving = true;
-		return fsWriteFile(filepath, JSON.stringify(list));
-	    }
-	    return undefined;
-	}).then(() => {
-	    if (saving) {
+	    return _.isEmpty(list) ? true : fsWriteFile(filepath, JSON.stringify(list));
+	}).then(isEmpty => {
+	    if (!isEmpty) {
 		console.log('updated');
 	    }
-	    return undefined;
 	}).catch(err => {
 	    console.error(`scoreSearchResultDir error, ${err.message}`);
 	}).then(() => {
 	    return next();
 	});
     }, function(err, files) {
-        if (err) throw err;
+        if (err) throw err; // TODO: test this
     });
 }
 
@@ -71,36 +65,28 @@ function scoreSearchResultDir(dir, fileMatch, options) {
 function scoreNextFile(dir, readLines, options) {
     let filename = readLines.next();
     if (filename === false) return;
-    filename = filename.toString();
-    if (filename.trim() === '') return scoreNextFile(readLines, options);
+    filename = filename.toString().trim();
 
     // TODO: Path.makePath() or something similar
     let filepath = dir + '/' + filename;
     console.log('filepath: ' + filepath);
     fsReadFile(filepath, 'utf8')
-	.catch(err => {
-	    console.log(`readFile ${filepath} failed, ${err}`);
-	}).then(content => JSON.parse(content))
-	.catch(err => {
-	    console.log(`JSON.parse ${filepath} failed, ${err}`);
-	}).then(inputList => {
+	.then(content => JSON.parse(content))
+	.then(inputList => {
 	    return Score.scoreResultList(
 		_.split(Path.basename(filepath, '.json'), '-'),
 		inputList,
 		options);
 	}).then(outputList => {
-	    if (_.isEmpty(outputList)) {
-		console.log('empty output list, not updating');
-		return true;
-	    }
-	    return fsWriteFile(filepath, JSON.stringify(outputList));
-	}).then(emptyFlag => {
-	    if (emptyFlag !== true) {
-		console.log('updated');
-	    }
+	    return _.isEmpty(outputList) ? true : fsWriteFile(filepath, JSON.stringify(outputList));
+	}).then(isEmpty  => {
+	    console.log(isEmpty ? 'empty output list, not updating' : 'updated');
 	}).catch(err => {
-	    throw err;
-	}).then(() => scoreNextFile(dir, readLines, options));
+	    // report & eat all errors
+	    console.log(`scoreNextFile error, ${err.message}`);
+	}).then(() => {
+	    return setTimeout(scoreNextFile(dir, readLines, options), 0);
+	});
 }
 
 //
@@ -111,7 +97,6 @@ function scoreSearchResultFiles(dir, inputFilename, options) {
 
     dir = Result.DIR + dir;
     console.log('dir: ' + dir);
-
     let readLines = new Readlines(inputFilename);
     scoreNextFile(dir, readLines, options);
 }

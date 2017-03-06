@@ -8,12 +8,10 @@ const _            = require('lodash');
 const Promise      = require('bluebird');
 const Dir          = require('node-dir');
 const Path         = require('path');
-const FS           = require('fs');
-const fsReadFile   = Promise.promisify(FS.readFile);
-const expect       = require('chai').expect;
+const Fs           = require('fs');
+const Expect       = require('chai').expect;
 const Duration     = require('duration');
 const PrettyMs     = require('pretty-ms');
-
 const ClueManager  = require('../clue_manager.js');
 const Result       = require('./result-mod');
 
@@ -30,46 +28,25 @@ const Opt          = require('node-getopt').create([
     ['h', 'help',                'this screen']
 ]).bindHelp().parseSystem();
 
+const fsReadFile   = Promise.promisify(Fs.readFile);
+
 //
 
 function getUrlCount(resultList) {
+    // TODO _.reduce()
     let urlCount = 0;
-    resultList.forEach(result => {
+    for (const result of resultList) {
 	urlCount += _.size(result.urlList);
-    });
-    return urlCount;
-}
-
-//
-// TODO: Result.wordCountFilter(result, wordCount);
-
-function searchResultWordCountFilter(result, wordCount, options) {
-    let passTitle = false;
-    let passArticle = false;
-    
-    if (result.score) {
-	if (options.filterTitle) {
-	    passTitle = (result.score.wordsInTitle >= wordCount);
-	}
-	if (options.filterArticle) {
-	    passArticle = (result.score.wordsInSummary >= wordCount ||
-			   result.score.wordsInArticle >= wordCount);
-	}
-	if (passTitle || passArticle) {
-	    return result;
-	}
     }
-    return undefined;
+    return urlCount;
 }
 
 //
 
 function isFilteredUrl(url, filteredUrls) {
     if (_.isUndefined(filteredUrls)) return false; 
-    let reject = !_.isUndefined(filteredUrls.rejectUrls) &&
-	filteredUrls.rejectUrls.includes(url);
-    let known = !_.isUndefined(filteredUrls.knownUrls) &&
-	filteredUrls.knownUrls.includes(url);
+    let reject = _.isArray(filteredUrls.rejectUrls) && filteredUrls.rejectUrls.includes(url);
+    let known = _.isArray(filteredUrls.knownUrls) && filteredUrls.knownUrls.includes(url);
     return known || reject;
 }
 
@@ -82,7 +59,7 @@ function filterSearchResultList(resultList, wordList, filteredUrls, options) {
 	let wordCount = _.chain(wordList).map(word => word.split(' ')).flatten().size().value();
 	Promise.map(resultList, result => {
 	    if (!isFilteredUrl(result.url, filteredUrls)) {
-		return searchResultWordCountFilter(result, wordCount, options);
+		return Result.wordCountFilter(result, wordCount, options);
 	    }
 	    if (options.verbose) {
 		console.log(`filtered url, ${result.url}`);
@@ -101,6 +78,7 @@ function filterSearchResultList(resultList, wordList, filteredUrls, options) {
 		known:   ClueManager.getKnownClues(wordList)
 	    });
 	});
+	// TODO: .catch()
     });
 }
 
@@ -129,7 +107,7 @@ function loadFilteredUrls(dir, wordList, options) {
     });
 }
 
-// for each search result filename in dir that matches fileMatch
+// for each search result filename that matches fileMatch in dir 
 //   filter out rejected word combinations
 //   load the file, build filtered URL list
 //   load the _filtered.json file, filter out known/reject URLs
@@ -148,17 +126,16 @@ function filterSearchResultFiles(dir, fileMatch, options) {
 	    exclude: /^\./,
 	    recursive: false
 	}, function(err, content, filepath, next) {
+	    if (err) throw err; // TODO: test
 	    if (options.verbose) {
 		console.log(`filename: ${filepath}`);
 	    }
-	    if (err) throw err; // TODO:
 	    let wordList = _.split(Path.basename(filepath, '.json'), '-');
 	    // filter out rejected word combos
 	    if (ClueManager.isRejectSource(wordList)) next();
 
   	    loadFilteredUrls(dir, wordList, options)
 		.then(filteredUrls => {
-		    // TODO: what happens on JSON.parse throw?
 		    return filterSearchResultList(JSON.parse(content), wordList, filteredUrls, options);
 		}).then(filterResult => {
 		    if (!_.isEmpty(filterResult.urlList)) {
@@ -169,12 +146,11 @@ function filterSearchResultFiles(dir, fileMatch, options) {
 		    }
 		    return undefined;
 		}).catch(err => {
-		    // TODO:
-		    console.error('filterSearchResultFiles, error: ' + err.message);
-		});
-	    return next(); // process files async
+		    // report & eat all errors
+		    console.log('filterSearchResultFiles, error: ' + err.message);
+		}).then(() => next()); // process files synchronously
 	}, function(err, files) {
-            if (err) throw err;  // TODO: 
+            if (err) throw err;  // TODO: test
 	    resolve({
 		filtered: filteredList,
 		rejects:  rejectList
@@ -186,14 +162,14 @@ function filterSearchResultFiles(dir, fileMatch, options) {
 //
 
 function displayFilterResults(resultList) {
-    resultList.forEach(result => {
-	if (_.isEmpty(result.urlList)) return;
-	if (ClueManager.isRejectSource(result.src)) return;
+    for (const result of resultList) {
+	if (_.isEmpty(result.urlList)) continue;
+	if (ClueManager.isRejectSource(result.src)) continue;
 
 	console.log(`:${result.src}`);
-	result.urlList.forEach(url => {
+	for (const url of result.urlList) {
 	    console.log(url);
-	});
+	}
 	const nameList = ClueManager.getKnownClues(result.src);
 	if (!_.isEmpty(nameList)) {
 	    console.log('#known:');
@@ -202,52 +178,48 @@ function displayFilterResults(resultList) {
 	    }
 	}
 	console.log();
-    });
+    }
 }
 
 //
 //
 //
-
 function main() {
-    expect(Opt.argv, 'no non-switch arguments allowed').to.be.empty;
+    Expect(Opt.argv, 'no non-switch arguments allowed').to.be.empty;
+    Expect(Opt.options.dir, 'option -d NAME is required').to.exist;
 
-    let base = Opt.options.synth ? 'synth' : 'meta';
-    
     // default to title filter if no filter specified
     if (!Opt.options.article && !Opt.options.title) {
 	Opt.options.title = true;
     }
 
-    let dir = Result.DIR + (_.isUndefined(Opt.options.dir) ? '2' : Opt.options.dir);
-    
+    ClueManager.loadAllClues({
+	baseDir: Opt.options.synth ? 'synth' : 'meta'
+    });
+
+    let dir = Result.DIR + Opt.options.dir;
     let filterOptions = {
 	filterArticle: Opt.options.article,
 	filterTitle:   Opt.options.title,
 	filterRejects: Opt.options.rejects,
 	verbose:       Opt.options.verbose
     };
-
-    ClueManager.loadAllClues({
-	baseDir:  base
-    });
-
     let start = new Date();
     filterSearchResultFiles(dir, Result.getFileMatch(Opt.options.match), filterOptions)
 	.then(result => {
 	    let d = new Duration(start, new Date()).milliseconds;
 	    if (Opt.options.count) {
-		console.log('Results: ' + _.size(result.filtered) +
-			    ', Urls: ' + getUrlCount(result.filtered) +
-			    ', Rejects: ' + _.size(result.rejects) +
+		console.log(`Results: ${_.size(result.filtered)}` +
+			    `, Urls: ${getUrlCount(result.filtered)}` +
+			    `, Rejects: ${_.size(result.rejects)}` +
 			    `, duration, ${PrettyMs(d)}`);
-						   
 	    }
 	    else {
 		displayFilterResults(Opt.options.rejects ? result.rejects : result.filtered);
 	    }
 	}).catch(err => {
-	    console.error(err);
+	    // TODO: test
+	    console.log(err);
 	});
 }
 
@@ -257,7 +229,7 @@ try {
     main();
 }
 catch(e) {
-    console.error(e.stack);
+    console.log(e.stack);
 }
 finally {
 }

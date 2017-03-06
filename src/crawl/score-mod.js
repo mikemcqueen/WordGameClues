@@ -19,10 +19,16 @@ function getWordCountInText(wordList, text) {
 
     textWordList.forEach((textWord, textIndex) => {
 	wordList.forEach((word, index) => {
+ 	    countList[index] += 1;
+	    /*
+	    // NOTE: words are all currently already split before calling this function.
+	    // this code was previously used for a different multi-word lookup strategy
+	    // (which may be re-employed).
 	    let nextTextWord = textWord;
 	    if (word.split(' ').every((subWord, subIndex, subWordList) => {
+	       expect(nextTextWord).to.equal(subWord);
 		//if (_.startsWith(nextTextWord, subWord)) {
-		if (nextTextWord != subWord) {
+		if (nextTextWord !== subWord) {
 		    //console.log(nextTextWord + ' !=  ' + subWord);
 		    return false;
 		}
@@ -33,19 +39,20 @@ function getWordCountInText(wordList, text) {
 		    let nextTextIndex = textIndex + subIndex + 1;
 		    if (nextTextIndex < textWordList.length) {
 			nextTextWord = textWordList[nextTextIndex];
-		    }
-		    else {
+		    } else {
 			// there aren't enough words from the text remaining
 			return false;
 		    }
 		}
-		return true;
-	    })) {
-		//console.log('count[' + index + '] = ' + (countList[index] + 1));
-		countList[index] += 1;
-	    }
+	        return true;
+	     })) {
+	         //console.log('count[' + index + '] = ' + (countList[index] + 1));
+ 	         countList[index] += 1;
+	     }
+	     */
 	});
     });
+    // TODO: _.reduce()
     let wordCount = 0;
     countList.forEach(count => {
 	if (count > 0) wordCount += 1;
@@ -66,8 +73,9 @@ function removeWikipediaSuffix(title) {
 //
 
 function getDisambiguation(result) {
-    return _.isString(result.title) ?
-	(getWordCountInText(['disambiguation'], result.title) > 0) : false;
+    return _.isString(result.title)
+	? (getWordCountInText(['disambiguation'], result.title) > 0)
+	: false;
 }
 
 //
@@ -85,11 +93,11 @@ function getWikiContent(title) {
  		});
 	    }).catch(err => {
 		// TODO: use VError
-		console.error(`getWikiContent promise.all: ${err}`);
+		console.log(`getWikiContent promise.all: ${err}`);
 		reject(err);
 	    });
 	}).catch(err => {
-	    console.error(`getWikiContent Wiki.page: ${err}`);
+	    console.log(`getWikiContent Wiki.page: ${err}`);
 	    reject(err);
 	});
     });
@@ -112,15 +120,14 @@ function getScore(wordList, result) {
 	    getWikiContent(removeWikipediaSuffix(result.title))
 		.then(content => {
 		    score.wordsInArticle = getWordCountInText(
-			wordList, content.text + ' ' + _.values(content.info).join(' '));
+			wordList, `${content.text} ${_.values(content.info).join(' ')}`);
 		}).
 		catch(err => {
-		    console.error(`getScore: ${err}`);
+		    console.log(`getScore: ${err}`);
 		}).then(() => {
 		    resolve(score);
 		});
-	}
-	else {
+	} else {
 	    resolve(score);
 	}
     });
@@ -133,26 +140,25 @@ function scoreResultList(wordList, resultList, options) {
     expect(resultList).to.be.an('array');
 
     return new Promise((resolve, reject) => {
-	var any = false;
-	
-	if (1) {
-	    wordList = _.chain(wordList).map(word => word.split(' ')).flatten().value();
-	}
+	let any = false;
+	// convert space-separated words to separate words
+	wordList = _.chain(wordList).map(word => word.split(' ')).flatten().value();
 	console.log('wordList: ' + wordList);
 	Promise.mapSeries(resultList, (result, index) => {
-	    // don't need to get score if it's already present
+	    // only get score if it's not present, or force flag
 	    if (!result.score || options.force) {
 		return getScore(wordList, result)
 		    .then(score => {
+			// result.score = score; ?
 			resultList[index].score = score;
 			any = true;
 		    });
+		// TODO: no .catch()
 	    }
-	    // TODO: understand why returning here, and getScore()
-	    return undefined;
 	}).then(unused => {
 	    resolve(any ? resultList : []);
 	});
+	// TODO: no .catch()
     });
 }
 
