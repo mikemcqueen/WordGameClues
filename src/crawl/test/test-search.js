@@ -13,7 +13,7 @@ const GoogleResult = require('../googleResult');
 
 //
 
-let _args = { root: './', dir:  'tmp' };
+const _args = { root: './', dir:  'tmp' };
 
 //
 
@@ -46,8 +46,7 @@ function deleteFile(wordList) {
     }
 }
 
-
-// args to getAllResults:
+// args to Search.getAllResults:
 // 
 // wordListArray : array of array of strings
 // pages         : # of pages of results to retrieve for each wordlist
@@ -60,17 +59,14 @@ describe('search tests:', function() {
     this.slow(4000);
 
     let delay = { low: 500, high: 1000 };
+    // NOTE: csvParse parses csv file in reverse order, so simulate that in word lists here
     let wla1234 = [ [ 'three', 'four' ], [ 'one', 'two' ] ];
 
-    // NOTE: csvParse parses csv file in reverse order, so simulate that in word lists here
-
-    // test "skip" throwing an error for control flow
+    // test skip-when-file-exists functionality
     it('should skip [one,two] because file exists, then process [three,four]', function(done) {
-	let wla = _.clone(wla1234);
-	// create one-two.json
-	createFile(wla[1]);
-	// delete three-four.json
-	deleteFile(wla[0]);
+	let wla = wla1234;
+	createFile(wla[1]);	// create one-two.json
+	deleteFile(wla[0]);	// delete three-four.json
 	// get the results
 	Search.getAllResults({
 	    wordListArray: wla,
@@ -82,17 +78,16 @@ describe('search tests:', function() {
 	    if (err) throw err;
 	    Expect(result.skip, 'skip').to.equal(1);
 	    Expect(result.data, 'data').to.equal(1);
-	    Expect(result.error, 'error').to.equal(1);
+	    Expect(result.error, 'error').to.be.undefined;
 	    done();
 	});
     });
 
+    // test forced rejection in Search.getOneResult
     it('should skip [one,two] because of forced rejection, then process [three,four]', function(done) {
-	let wla = _.clone(wla1234);
-	// delete one-two.json
-	deleteFile(wla[1]);
-	// delete three-four.json
-	deleteFile(wla[0]);
+	let wla = wla1234;
+	deleteFile(wla[1]);	// delete one-two.json
+	deleteFile(wla[0]);	// delete three-four.json
 	// get the results
 	Search.getAllResults({
 	    wordListArray:  wla,
@@ -111,14 +106,12 @@ describe('search tests:', function() {
     });
 
     it('should process both results successfully', function(done) {
-	let wla = _.clone(wla1234);
-	// delete one-two.json
-	deleteFile(wla1234[1]);
-	// delete three-four.json
-	deleteFile(wla1234[0]);
+	let wla = wla1234;
+	deleteFile(wla[1]);	// delete one-two.json
+	deleteFile(wla[0]);	// delete three-four.json
 	// get the results
 	Search.getAllResults({
-	    wordListArray:  wla1234,
+	    wordListArray:  wla,
 	    pages:          1,
 	    delay:          delay,
 	    root:           _args.root,

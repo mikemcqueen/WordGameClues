@@ -4,13 +4,24 @@
 
 const _            = require('lodash');
 const Expect       = require('chai').expect;
+const Fs           = require('fs');
 const Path         = require('path');
+const Promise      = require('bluebird');
+const Score        = require('./score-mod.js');
+
+const fsWriteFile  = Promise.promisify(Fs.writeFile);
 
 //
 
 const RESULT_DIR      = '../../data/results/';
 const FILTERED_SUFFIX = '_filtered';
 const EXT_JSON        = '.json';
+
+// '../../results/file-path.json' => [ 'file', 'path' ]
+//
+function makeWordlist (filepath) {
+    return _.split(Path.basename(filepath, EXT_JSON), '-');
+}
 
 // match *.json, or *match*.json, but not
 // *_filtered.json, or *match*_filtered.json
@@ -21,7 +32,7 @@ function getFileMatch (match = undefined) {
     return _.isUndefined(match) ? `${prefix}${suffix}` : `${prefix}.*${match}${suffix}`;
 }
 
-// ([ "word", "list" ], "_suffix" ) => word-list[_suffix].json
+// ([ 'word', 'list' ], '_suffix' ) => 'word-list_suffix.json'
 //
 function makeFilename (wordList, suffix = undefined) {
     Expect(wordList.length).to.be.at.least(2);
@@ -71,11 +82,33 @@ function wordCountFilter (result, wordCount, options) {
 
 //
 
+function scoreSaveCommit (resultList, filepath, options) {
+    Expect(resultList).to.be.an('array');
+    Expect(filepath).to.be.a('string');
+
+    console.log('filename: ' + filepath);
+    return Score.scoreResultList(
+	makeWordlist(filepath),
+	resultList,
+	options
+    ).then(list => {
+	if (!_.isEmpty(list)) {
+	    return fsWriteFile(filepath, JSON.stringify(list))
+		.then(() => console.log('updated'));
+	}
+	return undefined;
+    });
+    // TODO: .catch()
+}
+
+//
+
 module.exports = {
     getFileMatch:         getFileMatch,
     makeFilename:         makeFilename,
     makeFilteredFilename: makeFilteredFilename,
     pathFormat:           pathFormat,
+    scoreSaveCommit:      scoreSaveCommit,
     wordCountFilter:      wordCountFilter,
     DIR:                  RESULT_DIR
 };

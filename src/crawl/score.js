@@ -38,23 +38,13 @@ function scoreSearchResultDir(dir, fileMatch, options) {
 	exclude: /^\./,
 	recursive: false
     }, function(err, content, filepath, next) {
-	if (err) throw err; // TODO: why throw? test this
-	console.log('filename: ' + filepath);
-	Score.scoreResultList(
-	    _.split(Path.basename(filepath, '.json'), '-'),
-	    JSON.parse(content),
-	    options
-	).then(list => {
-	    return _.isEmpty(list) ? true : fsWriteFile(filepath, JSON.stringify(list));
-	}).then(isEmpty => {
-	    if (!isEmpty) {
-		console.log('updated');
-	    }
-	}).catch(err => {
-	    console.error(`scoreSearchResultDir error, ${err.message}`);
-	}).then(() => {
-	    return next();
-	});
+	if (err) throw err; // TODO: test this
+	Result.scoreSaveCommit(JSON.parse(content), filepath, options)
+	    .catch(err => {
+		console.error(`scoreSaveCommit error, ${err}`);
+	    }).then(() => {
+		return next();
+	    });
     }, function(err, files) {
         if (err) throw err; // TODO: test this
     });

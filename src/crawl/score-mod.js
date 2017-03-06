@@ -132,8 +132,8 @@ function getScore(wordList, result) {
 //
 
 function scoreResultList(wordList, resultList, options) {
-    expect(wordList).to.be.an('array');
-    expect(resultList).to.be.an('array');
+    expect(wordList, 'wordList').to.be.an('array');
+    expect(resultList, 'resultList').to.be.an('array');
 
     return new Promise((resolve, reject) => {
 	let any = false;

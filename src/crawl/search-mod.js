@@ -79,18 +79,14 @@ function getOneResult(wordList, pages, options) {
 // root          : root results directory (optional; default: Results.dir)
 // dir           : directory within root to store results (optional; default: wordList.length)
 // 
-// asynchronously "recursive". mutates wordListArray by
-// callin pop() each time.
+// asynchronously "recursive". mutates args.wordListArray by
+// calling pop() each time.
 //
-function getAllResults(args, cb) { // optional callback with stats, for testing
+function mutatingGetAllResults(args, cb) { // optional callback with stats, for testing
     Expect(cb, 'cb').to.be.a('function');
     Expect(args, 'args').to.exist;
     Expect(args.wordListArray, 'wordListArray')
-	.to.be.an('array').that.has.length.above(0);
-    Expect(args.delay, 'delay.low').to.have.property('low');
-    Expect(args.delay, 'delay.high').to.have.property('high');
-    Expect(args.delay.high, 'delay.high < delay.low')
-	.to.be.at.least(args.delay.low);
+	.to.be.an('array').that.is.not.empty;
 
     let wordList = args.wordListArray.pop();
     let filename = Result.makeFilename(wordList);
@@ -107,29 +103,27 @@ function getAllResults(args, cb) { // optional callback with stats, for testing
 	.then(result => {
 	    if (result.exists) { 
 		args.skip = (args.skip || 0) + 1; // test support
-		// dubious, using exception for flow control
-		throw new Error(`Skip: file exists, ${path}`); 
+		console.log(`Skip: file exists, ${path}`); 
+		return undefined;
 	    }
 	    // file does not already exist; do the search
-	    let saving = false;
-	    let options = { reject : args.forceNextError };
+	    let options = { reject : args.forceNextError }; // test support
 	    args.forceNextError = false;
 	    return getOneResult(wordList, args.pages, options)
 		.then(data => {
 		    if (_.size(data) > 0) {
 			args.data = (args.data || 0) + 1; // test support
-			saving = true;
-			return fsWriteFile(path, JSON.stringify(data));
+			return fsWriteFile(path, JSON.stringify(data))
+			    .then(() => console.log(`Saved: ${path}`));
 		    }
 		    args.empty = (args.empty || 0) + 1; // test support
+		    return undefined
 		}).then(() => {
-		    if (saving) {
-			console.log(`Saved: ${path}`);
-		    }
 		    if (args.wordListArray.length > 0) {
 			nextDelay = Between(args.delay.low, args.delay.high);
 		    }
 		});
+	    // TODO: .catch()
 	})
     	.catch(err => {
 	    // eat all errors. continue  with any remaining wordlists.
@@ -147,6 +141,15 @@ function getAllResults(args, cb) { // optional callback with stats, for testing
 		cb(null, args);
 	    }
 	});
+}
+
+// shim to protect args.wordListArray from mutating
+//
+function getAllResults(args, cb) {
+    Expect(args.wordListArray, 'wordListArray')
+	.to.be.an('array').that.is.not.empty;
+    args.wordListArray = _.clone(args.wordListArray);
+    return mutatingGetAllResults(args, cb);
 }
 
 //

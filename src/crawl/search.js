@@ -45,7 +45,6 @@ function main() {
     // arg0
     let filename = Opt.argv[0];
     console.log(`filename: ${filename}`);
-
     // arg1
     let delayLow = DEFAULT_DELAY_LOW;
     let delayHigh = DEFAULT_DELAY_HIGH;
@@ -54,29 +53,26 @@ function main() {
 	Expect(delayLow, 'delayLow').to.be.at.least(1);
 	delayHigh = delayLow;
     }
-
     // arg2
     if (Opt.argv.length > 2) {
 	delayHigh = _.toNumber(Opt.argv[2]);
 	Expect(delayHigh, 'delayHigh').to.be.at.least(delayLow);
     }
-
     console.log(`Delaying ${delayLow} to ${delayHigh} minutes between searches`);
 
+    let delay = {
+	low:   Ms(`${delayLow}m`),
+	high:  Ms(`${delayHigh}m`)
+    };
     fsReadFile(filename, 'utf8')
 	.then(csvContent => csvParse(csvContent, null))
 	.then(wordListArray => Search.getAllResults({
 	    // NOTE: use default dir
 	    wordListArray: wordListArray,
 	    pages:         DEFAULT_PAGE_COUNT,
-	    delay: {
-		low:   Ms(`${delayLow}m`),
-		high:  Ms(`${delayHigh}m`)
-	    }
-	})
-	.catch(err => {
+	    delay:         delay
+	}).catch(err => {
 	    console.log(`error caught in main, ${err}`);
-	    console.log(e.stack);
 	});
 }
 
