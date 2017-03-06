@@ -19,14 +19,11 @@ function getWordCountInText(wordList, text) {
 
     textWordList.forEach((textWord, textIndex) => {
 	wordList.forEach((word, index) => {
- 	    countList[index] += 1;
-	    /*
 	    // NOTE: words are all currently already split before calling this function.
 	    // this code was previously used for a different multi-word lookup strategy
 	    // (which may be re-employed).
 	    let nextTextWord = textWord;
 	    if (word.split(' ').every((subWord, subIndex, subWordList) => {
-	       expect(nextTextWord).to.equal(subWord);
 		//if (_.startsWith(nextTextWord, subWord)) {
 		if (nextTextWord !== subWord) {
 		    //console.log(nextTextWord + ' !=  ' + subWord);
@@ -49,7 +46,6 @@ function getWordCountInText(wordList, text) {
 	         //console.log('count[' + index + '] = ' + (countList[index] + 1));
  	         countList[index] += 1;
 	     }
-	     */
 	});
     });
     // TODO: _.reduce()
