@@ -7,11 +7,10 @@ const Expect       = require('chai').expect;
 const Fs           = require('fs');
 const Google       = require('google');
 const Ms           = require('ms');
+const My           = require('../misc/util');
 const Path         = require('path');
 const PrettyMs     = require('pretty-ms');
 const Promise      = require('bluebird');
-
-const My           = require('../util/util');
 const Score        = require('./score-mod');
 
 const fsReadFile   = Promise.promisify(Fs.readFile);
