@@ -73,6 +73,9 @@ function pathFormat (args) {
 //
 
 function get(text, pages, cb) {
+    Expect(text, 'text').to.be.a('string');
+    Expect(pages, 'pages').to.be.a('number').that.is.at.least(1);
+    Expect(cb, 'callback').to.be.a('function');
     let resultList = [];
     let count = 0;
     Google(text, function (err, result) {
@@ -85,13 +88,16 @@ function get(text, pages, cb) {
 	    };
 	}));
 	count += 1;
-	if (count < pages && result.next) {
-	    let msDelay = My.between(Ms('30s'), Ms('60s'));
-	    console.log(`Delaying ${PrettyMs(msDelay)} for next page of results...`);
-	    setTimeout(result.next, msDelay);
-	    return undefined;
+	// done?
+	if (count === pages || !result.next) {
+	    return cb(null, resultList);
 	}
-	return cb(null, resultList);
+	Expect(count).to.be.below(pages);
+	Expect(result.next).to.exist;
+	let msDelay = My.between(Ms('30s'), Ms('60s'));
+	console.log(`Delaying ${PrettyMs(msDelay)} for next page of results...`);
+	setTimeout(result.next, msDelay);
+	return undefined;
     });
 }
 

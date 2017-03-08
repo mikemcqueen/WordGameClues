@@ -20,9 +20,37 @@ const fsWriteFile  = Promise.promisify(Fs.writeFile);
 
 const TESTFILES_DIR = `${__dirname}/test-files/`;
 
+// TODO: move to util/test. this is useful for testing git primitives.
+//
+function removeCommitIfExists (filepath, message = 'removing test file') {
+    Expect(filepath).to.be.a('string');
+    Expect(message).to.be.a('string');
+    return My.checkIfFile(filepath)
+	.then(result => {
+	    if (!result.exists) {
+		return undefined;
+	    }
+	    // file exists, try to git remove/commit it
+	    console.log(`git-removing ${filepath}`);
+	    return My.gitRemoveCommit(filepath, message)
+		.then(() => My.checkIfFile(filepath))
+		.then(result => {
+		    Expect(result.exists).to.be.false;
+		    console.log(`git-removed ${filepath}`);
+		    return undefined;
+		}).catch(err => {
+		    console.log(`gitRemoveCommit error, ${err}`);
+		});
+	    // TODO: add "git reset HEAD -- filename" if we had git remove error or file
+	    // still exists; file may be added but not commited.
+	}).catch(err => {
+	    console.log(`removeCommitIfExists error, ${err}`);
+	});
+}
+
 //
 
-function removeCommitIfExists (filepath, message) {
+function removeCommitIfExistsV1 (filepath, message) {
     Expect(filepath).to.be.a('string');
     Expect(message).to.be.a('string');
     return My.checkIfFile(filepath)
@@ -59,6 +87,7 @@ describe ('result tests:', function() {
 
     // TODO: move these purely git tests to util/test
 
+    ////////////////////////////////////////////////////////////////////////////////
     //
     // test gitRemoveCommit, gitAddCommit
     //
@@ -80,6 +109,7 @@ describe ('result tests:', function() {
 	    });
     });
 
+    ////////////////////////////////////////////////////////////////////////////////
     //
     // test Result.fileScoreSaveCommit
     //
@@ -109,47 +139,24 @@ describe ('result tests:', function() {
 		done(err);
 	    });
     });
-
-/*
-    it('should remove/commit, then use asynchronous add/commit generator to commit a file to git', function(done) {
-	let filepath = TMP_DIR + 'test-async-add-commit';
-	let gen = My.gitAddCommitGenerator();
-	removeCommitIfExists(filepath, 'removing test file')
-	    .then(() => {
-		console.log('writing new file');
-		return fsWriteFile(filepath, JSON.stringify('[]'));
-	    }).then(() => {
-		console.log('committing file');
-		gen.next(); // start generator
-		return gen.next({ filepath, message: `adding test file ${filepath}` });
-	    }).then(result => {
-		Expect(result.done).to.be.false;
-		let err = gen.next().value;
-		if (err) throw err;
-		console.log('done');
-		done ();
-	    }).catch(err => {
-		console.log(`error, ${err}`);
-		done(err);
-	    });
-    });
-*/
-    
 });
 
 
-describe('google one word pair, show result', function() {
+describe('google one word pair, show result count', function() {
 
-    it.skip('test one pair', function(done) {
+    this.slow(2000);
+    this.timeout(5000);
+
+    it ('should get results for one word pair', function(done) {
 	const wiki = 'site:en.wikipedia.org';
-	this.timeout(75000);
-	Result.get('one' + 'two' + wiki, function(err, res) {
+	Result.get('one two ' + wiki, 1, function(err, result) {
 	    if (err) {
-		console.log(err);
+		console.log(`error, ${err}`);
+		done(err);
 	    } else {
-		console.log(res);
+		console.log(`results (${_.size(result)})`);
+		done();
 	    }
-	    done();
 	});
     });
 

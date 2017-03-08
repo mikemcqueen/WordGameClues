@@ -57,9 +57,10 @@ function getOneResult (wordList, pages, options = {}) {
 //
 // forceNextError: test support, move to options arg
 //
-async function getAllResultsLoop (args) {
+async function getAllResultsLoop (args, options = {}) {
     Expect(args).to.exist;
     Expect(args.wordListArray).to.be.an('array').that.is.not.empty;
+    Expect(options).to.be.an('object');
     let result = { skip: 0, empty: 0, data: 0, error: 0 }; // test support
     for (const [index, wordList] of args.wordListArray.entries()) {
 	let filename = Result.makeFilename(wordList);
@@ -73,25 +74,25 @@ async function getAllResultsLoop (args) {
 	let nextDelay = 0;
 	let saved = await My.checkIfFile(path)
 	    .then(checkResult => {
-		// skip this file if it already exists
-		if (checkResult.exists) { 
+		// skip this file if it already exists, unless force flag set
+		if (checkResult.exists && !options.force) { 
 		    result.skip += 1;
 		    console.log(`Skip: file exists, ${path}`); 
 		    return Promise.reject();
 		}
+		let oneResultOptions = { reject : options.forceNextError };
+		options.forceNextError = false;
 		// file does not already exist; do the search
-		let options = { reject : args.forceNextError }; // test support
-		args.forceNextError = false;
-		return getOneResult(wordList, args.pages, options);
-	    }).then(data => {
+		return getOneResult(wordList, args.pages, oneResultOptions);
+	    }).then(oneResult => {
 		// we successfully searched. set delay for next search
 		nextDelay = My.between(args.delay.low, args.delay.high);
-		if (_.isEmpty(data)) {
+		if (_.isEmpty(oneResult)) {
 		    result.empty += 1;
 		    return Promise.reject();
 		}
 		result.data += 1;
-		return fsWriteFile(path, JSON.stringify(data)).then(() => {
+		return fsWriteFile(path, JSON.stringify(oneResult)).then(() => {
 		    console.log(`Saved: ${path}`);
 		    return true; // saved
 		});
@@ -108,9 +109,10 @@ async function getAllResultsLoop (args) {
 	    // add-commit-score-commit operations. they can be executed asynchronously
 	    // with the execution of this loop. makes logs a little messier though.
 	    My.gitAddCommit(path, 'new result')
-		.then(() => console.log(`Commited: ${path}`))
-		.then(() => Result.fileScoreSaveCommit(path))
-		.catch(err => {
+		.then(() => {
+		    console.log(`Committed: ${path}`);
+		    return Result.fileScoreSaveCommit(path);
+		}).catch(err => {
 		    // log & eat all errors
 		    console.log(`getAllResults commit error, ${err}`);
 		});
@@ -130,11 +132,11 @@ async function getAllResultsLoop (args) {
 
 //
 //
-function getAllResults (args) {
+function getAllResults (args, options = {}) {
     Expect(args).to.be.an('object');
     Expect(args.wordListArray).to.be.an('array').that.is.not.empty;
     return new Promise((resolve, reject) => {
-	getAllResultsLoop(args)
+	getAllResultsLoop(args, options)
 	    .then(data => resolve(data))
 	    .catch(err => reject(err));
     });
