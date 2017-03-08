@@ -1,29 +1,26 @@
 {
   "name": "clues",
-  "version": "1.0.0",
-  "description": "",
+  "version": "0.0.1",
+  "description": "Word-game clue manager",
   "main": "index.js",
   "dependencies": {
     "bluebird": "^3.4.7",
     "chai": "^3.5.0",
     "csv-parse": "^1.2.0",
     "duration": "^0.2.0",
-    "event-stream": "^3.3.4",
     "google": "^2.1.0",
     "lodash": "^4.17.4",
     "milliseconds": "^1.0.3",
     "ms": "^0.7.2",
     "n-readlines": "^0.2.7",
-    "named-parameters": "^0.0.3",
     "node-getopt": "^0.2.3",
     "pretty-ms": "^2.1.0",
-    "q": "^1.4.1",
     "wikijs": "^1.1.1"
   },
   "devDependencies": {},
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "make test"
   },
-  "author": "",
-  "license": "ISC"
+  "author": "Mike McQueen",
+  "license": "MIT"
 }

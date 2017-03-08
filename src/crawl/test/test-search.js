@@ -167,4 +167,9 @@ describe ('search tests:', function() {
 	    done();
 	});
     });
+
+/* TODO:  test bird-pest search, results look funny, duplicated title and 2nd result is empty url
+*/
+
+
 });

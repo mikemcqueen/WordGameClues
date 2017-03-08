@@ -143,6 +143,7 @@ module.exports = {
     getFileMatch,
     makeFilename,
     makeFilteredFilename,
+    makeWordlist,
     pathFormat,
     scoreSaveCommit,
 

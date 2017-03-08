@@ -23,11 +23,11 @@ function wordCountFilter (score, wordCount, options) {
     let passTitle = false;
     let passArticle = false;
     if (options.filterTitle) {
-	passTitle = (result.score.wordsInTitle >= wordCount);
+	passTitle = (score.wordsInTitle >= wordCount);
     }
     if (options.filterArticle) {
-	passArticle = (result.score.wordsInSummary >= wordCount ||
-		       result.score.wordsInArticle >= wordCount);
+	passArticle = (score.wordsInSummary >= wordCount ||
+		       score.wordsInArticle >= wordCount);
     }
     return (passTitle || passArticle);
 }
