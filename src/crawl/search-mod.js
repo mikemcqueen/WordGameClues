@@ -5,47 +5,23 @@
 'use strict';
 
 const _            = require('lodash');
-const Promise      = require('bluebird');
 const Expect       = require('chai').expect;
 const Fs           = require('fs');
+const Ms           = require('ms');
+const My           = require('../util/util.js');
 const Path         = require('path');
 const PrettyMs     = require('pretty-ms');
-const Ms           = require('ms');
-const Between      = require('../util/between');
-const GoogleResult = require('./googleResult');
+const Promise      = require('bluebird');
 const Result       = require('./result-mod');
 
 const fsWriteFile  = Promise.promisify(Fs.writeFile);
 
-// check if path exists, and whether it is a file.
-//
-function checkIfFile(path) {
-    return new Promise((resolve, reject) => {
-	Fs.stat(path, (err, stats) => {
-	    if (err) {
-		if (err.code === 'ENOENT') {
-		    resolve({       // does not exist, therefore not a file
-			exists: false,
-			isFile: false
-		    });
-		} else {
-		    reject(err);
-		}
-	    } else {
-		resolve ({          // exists, maybe is a file
-		    exists: true,
-		    isFile: stats.isFile()
-		});
-	    }
-	});
-    });
-}
-
 // make a search term from a list of words and the supplied options
 //
-function makeSearchTerm(wordList, options) {
+function makeSearchTerm (wordList, options = {}) {
+    Expect(options).is.an('object');
     let term = wordList.join(' ');
-    if (_.isObject(options) && options.wikipedia) {
+    if (options.wikipedia) {
 	term += ' site:en.wikipedia.org';
     }
     return term;
@@ -53,19 +29,19 @@ function makeSearchTerm(wordList, options) {
 
 // 
 //
-function getOneResult(wordList, pages, options) {
+function getOneResult (wordList, pages, options = {}) {
+    Expect(options).is.an('object');
     return new Promise((resolve, reject) => {
 	let term = makeSearchTerm(wordList, { wikipedia: true });
 	console.log(`term: ${term}, pages: ${pages}`);
-	GoogleResult.get(term, pages, (err, data) => {
+	Result.get(term, pages, (err, data) => {
 	    if (!err && options.reject) {
 		err = new Error('getOneResult: forced rejection');
 	    }
 	    if (err) {
 		console.log('getOneResult: rejecting');
 		reject(err);
-	    }
-	    else {
+	    } else {
 		resolve(data);
 	    }
 	});
@@ -77,83 +53,95 @@ function getOneResult(wordList, pages, options) {
 // pages         : # of pages of results to retrieve for each wordlist
 // delay         : object w/properties: high,low; ms delay between searches
 // root          : root results directory (optional; default: Results.dir)
-// dir           : directory within root to store results (optional; default: wordList.length)
-// 
-// asynchronously "recursive". mutates args.wordListArray by
-// calling pop() each time.
+// dir           : directory within root to store results (optional, default: wordList.length)
 //
-function mutatingGetAllResults(args, cb) { // optional callback with stats, for testing
-    Expect(cb, 'cb').to.be.a('function');
-    Expect(args, 'args').to.exist;
-    Expect(args.wordListArray, 'wordListArray')
-	.to.be.an('array').that.is.not.empty;
-
-    let wordList = args.wordListArray.pop();
-    let filename = Result.makeFilename(wordList);
-    console.log(`list: ${wordList}`);
-    console.log(`file: ${filename}`);
-    
-    let path = Result.pathFormat({
-	root:  args.root,
-	dir:  _.isUndefined(args.dir) ? _.toString(wordList.length) : args.dir,
-	base: filename
-    });
-    let nextDelay = 0;
-    checkIfFile(path)
-	.then(result => {
-	    if (result.exists) { 
-		args.skip = (args.skip || 0) + 1; // test support
-		console.log(`Skip: file exists, ${path}`); 
-		return undefined;
-	    }
-	    // file does not already exist; do the search
-	    let options = { reject : args.forceNextError }; // test support
-	    args.forceNextError = false;
-	    return getOneResult(wordList, args.pages, options)
-		.then(data => {
-		    if (_.size(data) > 0) {
-			args.data = (args.data || 0) + 1; // test support
-			return fsWriteFile(path, JSON.stringify(data))
-			    .then(() => console.log(`Saved: ${path}`));
-		    }
-		    args.empty = (args.empty || 0) + 1; // test support
-		    return undefined
-		}).then(() => {
-		    if (args.wordListArray.length > 0) {
-			nextDelay = Between(args.delay.low, args.delay.high);
-		    }
-		});
-	    // TODO: .catch()
-	})
-    	.catch(err => {
-	    // eat all errors. continue  with any remaining wordlists.
-	    console.log(`getAllResults, ${err.message}`);
-	    args.error = (args.error || 0) + 1; // test support
-	}).then(() => { // finally
-	    //  queue up next call
-	    if (args.wordListArray.length > 0) {
-		if (nextDelay > 0) {
-		    console.log(`Delaying ${PrettyMs(nextDelay)} for next search...`);
-		}
-		setTimeout(() => getAllResults(args, cb), nextDelay);
-	    }
-	    else {
-		cb(null, args);
-	    }
+// forceNextError: test support, move to options arg
+//
+async function getAllResultsLoop (args) {
+    Expect(args).to.exist;
+    Expect(args.wordListArray).to.be.an('array').that.is.not.empty;
+    let result = { skip: 0, empty: 0, data: 0, error: 0 }; // test support
+    for (const [index, wordList] of args.wordListArray.entries()) {
+	let filename = Result.makeFilename(wordList);
+	console.log(`list: ${wordList}`);
+	console.log(`file: ${filename}`);
+	let path = Result.pathFormat({
+	    root:  args.root,
+	    dir:  _.isUndefined(args.dir) ? _.toString(wordList.length) : args.dir,
+	    base: filename
 	});
+	let nextDelay = 0;
+	let saved = await My.checkIfFile(path)
+	    .then(checkResult => {
+		// skip this file if it already exists
+		if (checkResult.exists) { 
+		    result.skip += 1;
+		    console.log(`Skip: file exists, ${path}`); 
+		    return Promise.reject();
+		}
+		// file does not already exist; do the search
+		let options = { reject : args.forceNextError }; // test support
+		args.forceNextError = false;
+		return getOneResult(wordList, args.pages, options);
+	    }).then(data => {
+		// we successfully searched. set delay for next search
+		nextDelay = My.between(args.delay.low, args.delay.high);
+		if (_.isEmpty(data)) {
+		    result.empty += 1;
+		    return Promise.reject();
+		}
+		result.data += 1;
+		return fsWriteFile(path, JSON.stringify(data)).then(() => {
+		    console.log(`Saved: ${path}`);
+		    return true; // saved
+		});
+	    }).catch(err => {
+		// log & eat all errors (err might be undefined from Promise.reject())
+		if (err) {
+		    console.log(`getAllResults error, ${err}`);
+		    result.error += 1;
+		}
+	    });
+
+	if (saved === true) {
+	    // NOTE: we intentionally do NOT await completion of the following
+	    // add-commit-score-commit operations. they can be executed asynchronously
+	    // with the execution of this loop. makes logs a little messier though.
+	    My.gitAddCommit(path, 'new result')
+		.then(() => console.log(`Commited: ${path}`))
+		.then(() => Result.fileScoreSaveCommit(path))
+		.catch(err => {
+		    // log & eat all errors
+		    console.log(`getAllResults commit error, ${err}`);
+		});
+	}
+
+	// if there are more wordlists to process
+	if (index < args.wordListArray.length - 1) {
+	    // if nextDelay is specified, delay before next search
+	    if (nextDelay > 0) {
+		console.log(`Delaying ${PrettyMs(nextDelay)} for next search...`);
+		await My.waitFor(nextDelay);
+	    }
+	}
+    }
+    return result;
 }
 
-// shim to protect args.wordListArray from mutating
 //
-function getAllResults(args, cb) {
-    Expect(args.wordListArray, 'wordListArray')
-	.to.be.an('array').that.is.not.empty;
-    args.wordListArray = _.clone(args.wordListArray);
-    return mutatingGetAllResults(args, cb);
+//
+function getAllResults (args) {
+    Expect(args).to.be.an('object');
+    Expect(args.wordListArray).to.be.an('array').that.is.not.empty;
+    return new Promise((resolve, reject) => {
+	getAllResultsLoop(args)
+	    .then(data => resolve(data))
+	    .catch(err => reject(err));
+    });
 }
 
 //
 
 module.exports = {
-    getAllResults  : getAllResults
+    getAllResults
 }

@@ -7,29 +7,57 @@
 const _       = require('lodash');
 const Promise = require('bluebird');
 const Wiki    = require('wikijs').default;
-const expect  = require('chai').expect;
+const Expect  = require('chai').expect;
 
 //
 
-function getWordCountInText(wordList, text) {
-    expect(text).to.be.a('string');
+const WIKIPEDIA_SUFFIX         = ' - Wikipedia';
+const WIKIPEDIA_DISAMBIGUATION = 'disambiguation';
+
+//
+
+function wordCountFilter (score, wordCount, options) {
+    Expect(score).to.be.an('object');
+    Expect(wordCount).to.be.a('number');
+    Expect(options).to.be.an('object');
+    let passTitle = false;
+    let passArticle = false;
+    if (options.filterTitle) {
+	passTitle = (result.score.wordsInTitle >= wordCount);
+    }
+    if (options.filterArticle) {
+	passArticle = (result.score.wordsInSummary >= wordCount ||
+		       result.score.wordsInArticle >= wordCount);
+    }
+    return (passTitle || passArticle);
+}
+
+//
+
+function getWordCount (wordList, text, options = {}) {
+    if (_.isString(wordList)) { wordList = [ wordList ]; } // or .split(',')
+    Expect(wordList).to.be.an('array').that.is.not.empty;
+    Expect(text).to.be.a('string');
 
     let textWordList = _.words(text.toLowerCase());
     let countList = new Array(wordList.length).fill(0);
-
     textWordList.forEach((textWord, textIndex) => {
 	wordList.forEach((word, index) => {
-	    // NOTE: words are all currently already split before calling this function.
-	    // this code was previously used for a different multi-word lookup strategy
-	    // (which may be re-employed).
+	    // NOTE: words have already been split before this function
+	    // is called. this code was previously used for a different 
+	    // multi-word lookup strategy (which may be re-employed).
 	    let nextTextWord = textWord;
 	    if (word.split(' ').every((subWord, subIndex, subWordList) => {
 		//if (_.startsWith(nextTextWord, subWord)) {
 		if (nextTextWord !== subWord) {
-		    //console.log(nextTextWord + ' !=  ' + subWord);
-		    return false;
+		    if (options.verbose) {
+			console.log(`${nextTextWord} !== ${subWord}`);
+		    }
+		    return false; // every.exit
 		}
-		//console.log(nextTextWord + ' ==  ' + subWord);
+		if (options.verbose) {
+		    console.log(`${nextTextWord} === ${subWord}`);
+		}
 		if (subIndex < subWordList.length - 1) {
 		    // we're before the last element in subword list,
 		    // ty to set the next textWord.
@@ -38,13 +66,15 @@ function getWordCountInText(wordList, text) {
 			nextTextWord = textWordList[nextTextIndex];
 		    } else {
 			// there aren't enough words from the text remaining
-			return false;
+			return false; // every.exit
 		    }
 		}
-	        return true;
+	        return true; // every.continue
 	     })) {
-	         //console.log('count[' + index + '] = ' + (countList[index] + 1));
- 	         countList[index] += 1;
+ 	        countList[index] += 1;
+		if (options.verbose) {
+	            console.log(`count[${index}] = ${countList[index]}`);
+		}
 	     }
 	});
     });
@@ -58,8 +88,16 @@ function getWordCountInText(wordList, text) {
 
 //
 
-function removeWikipediaSuffix(title) {
-    const index = title.lastIndexOf(' - Wikipedia');
+function getDisambiguation (result, options) {
+    Expect(result).to.exist;
+    return _.isString(result.title) ? (getWordCount(WIKIPEDIA_DISAMBIGUATION, result.title, options) > 0) : false;
+}
+
+//
+
+function removeWikipediaSuffix (title) {
+    Expect(title).to.be.a('string');
+    const index = title.lastIndexOf(WIKIPEDIA_SUFFIX);
     if (index !== -1) {
 	title = title.substr(0, index);
     }
@@ -68,17 +106,10 @@ function removeWikipediaSuffix(title) {
 
 //
 
-function getDisambiguation(result) {
-    return _.isString(result.title)
-	? (getWordCountInText(['disambiguation'], result.title) > 0)
-	: false;
-}
-
-//
-
-function getWikiContent(title) {
+function getWikiContent (title) {
+    Expect(title).to.be.a('string');
     return new Promise(function (resolve, reject) {
-	Wiki().page(title).then(page => {
+	Wiki().page(removeWikipediaSuffix(title)).then(page => {
 	    Promise.all([
 		Promise.resolve(page.content()).reflect(),
 		Promise.resolve(page.info()).reflect()
@@ -89,11 +120,11 @@ function getWikiContent(title) {
  		});
 	    }).catch(err => {
 		// TODO: use VError
-		console.log(`getWikiContent promise.all: ${err}`);
+		console.log(`getWikiContent promise.all error, ${err}`);
 		reject(err);
 	    });
 	}).catch(err => {
-	    console.log(`getWikiContent Wiki.page: ${err}`);
+	    console.log(`getWikiContent Wiki.page error, ${err}`);
 	    reject(err);
 	});
     });
@@ -101,25 +132,24 @@ function getWikiContent(title) {
 
 //
 
-function getScore(wordList, result) {
-    expect(wordList).to.be.an('array');
-    expect(result).to.be.an('object');
-
+function getScore (wordList, result, options = {}) {
+    Expect(wordList).to.be.an('array').that.is.not.empty;
+    Expect(result).to.be.an('object');
     return new Promise(function(resolve, reject) {
 	let score = {
-	    wordsInTitle   : _.isString(result.title) ? getWordCountInText(wordList, result.title) : 0,
-	    wordsInSummary : _.isString(result.summary) ? getWordCountInText(wordList, result.summary) : 0,
-	    disambiguation : getDisambiguation(result)
+	    wordsInTitle   : _.isString(result.title) ? getWordCount(wordList, result.title, options) : 0,
+	    wordsInSummary : _.isString(result.summary)	? getWordCount(wordList, result.summary, options) : 0,
+	    disambiguation : getDisambiguation(result, options)
 	};
 	
 	if (score.wordsInSummary < _.size(wordList)) {
-	    getWikiContent(removeWikipediaSuffix(result.title))
+	    getWikiContent(result.title)
 		.then(content => {
-		    score.wordsInArticle = getWordCountInText(
-			wordList, `${content.text} ${_.values(content.info).join(' ')}`);
+		    score.wordsInArticle = getWordCount(
+			wordList, `${content.text} ${_.values(content.info).join(' ')}`, options);
 		}).
 		catch(err => {
-		    console.log(`getScore: ${err}`);
+		    console.log(`getScore error, ${err}`);
 		}).then(() => {
 		    resolve(score);
 		});
@@ -131,19 +161,18 @@ function getScore(wordList, result) {
 
 //
 
-function scoreResultList(wordList, resultList, options) {
-    expect(wordList, 'wordList').to.be.an('array');
-    expect(resultList, 'resultList').to.be.an('array');
-
+function scoreResultList (wordList, resultList, options = {}) {
+    Expect(wordList, 'wordList').to.be.an('array').that.is.not.empty;
+    Expect(resultList, 'resultList').to.be.an('array');
     return new Promise((resolve, reject) => {
 	let any = false;
 	// convert space-separated words to separate words
 	wordList = _.chain(wordList).map(word => word.split(' ')).flatten().value();
 	console.log('wordList: ' + wordList);
 	Promise.mapSeries(resultList, (result, index) => {
-	    // only get score if it's not present, or force flag
-	    if (!result.score || options.force) {
-		return getScore(wordList, result)
+	    // only get score if it's not present, or force flag set
+	    if (_.isUndefined(result.score) || options.force) {
+		return getScore(wordList, result, options)
 		    .then(score => {
 			// result.score = score; ?
 			resultList[index].score = score;
@@ -161,8 +190,9 @@ function scoreResultList(wordList, resultList, options) {
 //
 
 module.exports = {
-    getScore              : getScore,
-    getWikiContent        : getWikiContent,
-    scoreResultList       : scoreResultList,
-    removeWikipediaSuffix : removeWikipediaSuffix
+    getScore,
+    getWikiContent,
+    getWordCount,
+    scoreResultList,
+    wordCountFilter
 };

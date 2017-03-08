@@ -5,7 +5,7 @@
 'use strict';
 
 const _      = require('lodash');
-const expect = require('chai').expect;
+const Expect = require('chai').expect;
 const Score  = require('../score-mod.js');
 
 function showScores(score) {
@@ -22,19 +22,22 @@ describe('test some scoring scenarios', function() {
 	const wordList = [ 'betsy', 'king' ]; // betsy is only in infobox
 	const searchResult = {
 	    title:   'Lizzie Lloyd King - Wikipedia',
-	    summary: 'Only King not the B word here'
+	    summary: 'Only King not the etsyBay word here'
 	};
 	Score.getScore(wordList, searchResult).then(score => {
 	    showScores(score);
-	    expect(score)
-		.to.have.property('wordsInArticle')
-		.and.to.equal(2);
+
+	    Expect(score.wordsInArticle).to.equal(2);
 	    done();
 	});
     });
 
-    it('should count compound and single word in title, and only single word in summary', function(done) {
-	const wordList = [ 'randolph campbell', 'anne' ]
+    // Test space-separated "compound" words
+    // NOTE: this test could be skipped, because it is not how we're
+    // currently calling getScore - we split space-separated words first.
+    // but this functionality works, if I ever want to re-enable it.
+    it('should count both words in title, and only single word in summary', function(done) {
+	const wordList = [ 'randolph campbell', 'anne' ];
 	const searchResult = {
 	    // no title
 	    title:   'Randolph Campbell Anne',
@@ -42,15 +45,17 @@ describe('test some scoring scenarios', function() {
 	};
 	Score.getScore(wordList, searchResult).then(score => {
 	    showScores(score);
-	    expect(score)
-		.to.have.property('wordsInTitle')
-		.and.to.equal(2);
-	    expect(score)
-		.to.have.property('wordsInSummary')
-		.and.to.equal(1);
+
+	    Expect(score.wordsInTitle).to.equal(2);
+	    Expect(score.wordsInSummary).to.equal(1);
 	    done();
 	});
     });
+
+/* TODO:  test why wordsInArticle < wordsInSummary
+    "title": "1000 Ways to Die (season 3, 2012) - Wikipedia",
+    "url": "https://en.wikipedia.org/wiki/1000_Ways_to_Die_(season_3,_2012)",
+*/
 
 });
 

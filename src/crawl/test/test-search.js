@@ -5,19 +5,50 @@
 'use strict';
 
 const _            = require('lodash');
+//const Promise      = require('bluebird');
 const Expect       = require('chai').expect;
 const Fs           = require('fs');
+const My           = require('../../util/util');
 const Search       = require('../search-mod');
 const Result       = require('../result-mod');
-const GoogleResult = require('../googleResult');
 
 //
 
-const _args = { root: './', dir:  'tmp' };
+const _args = { root: './', dir:  'test-files' };
+
+const TEST_DIR = './test-files/';
 
 //
 
-function createFile(wordList) {
+function removeCommitIfExists (filepath, message) {
+    Expect(filepath).to.be.a('string');
+    Expect(message).to.be.a('string');
+    return My.checkIfFile(filepath)
+	.then(result => {
+	    if (!result.exists) {
+		return undefined;
+	    }
+	    // file exists, try to git remove/commit it
+	    console.log(`git-removing ${filepath}`);
+	    return My.gitRemoveCommit(filepath, message)
+		.then(() => My.checkIfFile(filepath))
+		.then(result => {
+		    Expect(result.exists).to.be.false;
+		    console.log(`git-removed ${filepath}`);
+		    return undefined;
+		}).catch(err => {
+		    console.log(`gitRemoveCommit error, ${err}`);
+		});
+	    // TODO: add "git reset" if we had git remove error or file
+	    // still exists; file may be added but not commited.
+	}).catch(err => {
+	    console.log(`removeCommitIfExists error, ${err}`);
+	});
+}
+
+//
+
+function createFileSync (wordList) {
     let filename = Result.makeFilename(wordList); 
     console.log(`creating: ${filename}`);
     let args = _.clone(_args);
@@ -31,8 +62,8 @@ function createFile(wordList) {
 
 //
 
-function deleteFile(wordList) {
-    let filename = Result.makeFilename(wordList); 
+function deleteFileSync (filename) {
+    Expect(filename).to.be.a('string');
     console.log(`deleting: ${filename}`);
     let args = _.clone(_args);
     args.base = filename;
@@ -54,40 +85,50 @@ function deleteFile(wordList) {
 // root          : root results directory (optional; default: Results.dir)
 // dir           : directory within root to store results (optional; default: wordList.length)
 
-describe('search tests:', function() {
-    this.timeout(6000);
+describe ('search tests:', function() {
+    this.timeout(8000);
     this.slow(4000);
 
     let delay = { low: 500, high: 1000 };
-    // NOTE: csvParse parses csv file in reverse order, so simulate that in word lists here
-    let wla1234 = [ [ 'three', 'four' ], [ 'one', 'two' ] ];
+
+    let wla1234 = [ [ 'one', 'two' ], [ 'three', 'four' ] ];
+
+////////////////////////////////////////////////////////////////////////////////
 
     // test skip-when-file-exists functionality
-    it('should skip [one,two] because file exists, then process [three,four]', function(done) {
+    it ('should skip [one,two] because file exists, then process [three,four]', function (done) {
 	let wla = wla1234;
-	createFile(wla[1]);	// create one-two.json
-	deleteFile(wla[0]);	// delete three-four.json
-	// get the results
-	Search.getAllResults({
-	    wordListArray: wla,
-	    pages:         1,
-	    delay:         delay,
-	    root:          _args.root,
-	    dir:           _args.dir
-	}, function(err, result) {
-	    if (err) throw err;
-	    Expect(result.skip, 'skip').to.equal(1);
-	    Expect(result.data, 'data').to.equal(1);
-	    Expect(result.error, 'error').to.be.undefined;
-	    done();
-	});
+
+	let file1 = Result.makeFilename(wla[1]); 
+	removeCommitIfExists(TEST_DIR + file1, 'removing test file')
+	    .then(() => {
+		createFileSync(wla[0]);	// create one-two.json
+		deleteFileSync(file1);	// delete three-four.json
+		return undefined;
+	    }).then(() => {
+		return Search.getAllResults({
+		    wordListArray: wla,
+		    pages:         1,
+		    delay:         delay,
+		    root:          _args.root,
+		    dir:           _args.dir
+		});
+	    }).then(result => {
+		console.log(`result, ${result}, typeof ${typeof result} entries ${_.entries(result)}`);
+		Expect(result.skip, 'skip').to.equal(1);
+		Expect(result.data, 'data').to.equal(1);
+		Expect(result.error, 'error').to.equal(0);
+		done();
+	    }).catch(err => done(err));
     });
 
+////////////////////////////////////////////////////////////////////////////////
+
     // test forced rejection in Search.getOneResult
-    it('should skip [one,two] because of forced rejection, then process [three,four]', function(done) {
+    it.skip ('should skip [one,two] because of forced rejection, then process [three,four]', function (done) {
 	let wla = wla1234;
-	deleteFile(wla[1]);	// delete one-two.json
-	deleteFile(wla[0]);	// delete three-four.json
+	deleteFileSync(wla[1]);	// delete one-two.json
+	deleteFileSync(wla[0]);	// delete three-four.json
 	// get the results
 	Search.getAllResults({
 	    wordListArray:  wla,
@@ -98,14 +139,16 @@ describe('search tests:', function() {
 	    forceNextError: true
 	}, function(err, result) {
 	    if (err) throw err;
-	    Expect(result.skip, 'skip').to.be.undefined;
+	    Expect(result.skip, 'skip').to.equal(0);
 	    Expect(result.data, 'data').to.equal(1);
 	    Expect(result.error, 'error').to.equal(1);
 	    done();
 	});
     });
 
-    it('should process both results successfully', function(done) {
+////////////////////////////////////////////////////////////////////////////////
+
+    it.skip('should process both results successfully', function(done) {
 	let wla = wla1234;
 	deleteFile(wla[1]);	// delete one-two.json
 	deleteFile(wla[0]);	// delete three-four.json
@@ -115,14 +158,13 @@ describe('search tests:', function() {
 	    pages:          1,
 	    delay:          delay,
 	    root:           _args.root,
-	    dir:            _args.dir,
+	    dir:            _args.dir
 	}, function(err, result) {
 	    if (err) throw err;
-	    Expect(result.skip, 'skip').to.be.undefined;
+	    Expect(result.skip, 'skip').to.equal(0);
 	    Expect(result.data, 'data').to.equal(2);
-	    Expect(result.error, 'error').to.be.undefined;
+	    Expect(result.error, 'error').to.equal(0);
 	    done();
 	});
     });
-
 });

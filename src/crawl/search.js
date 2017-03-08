@@ -59,7 +59,7 @@ function main() {
 	Expect(delayHigh, 'delayHigh').to.be.at.least(delayLow);
     }
     console.log(`Delaying ${delayLow} to ${delayHigh} minutes between searches`);
-
+    
     let delay = {
 	low:   Ms(`${delayLow}m`),
 	high:  Ms(`${delayHigh}m`)
@@ -71,7 +71,7 @@ function main() {
 	    wordListArray: wordListArray,
 	    pages:         DEFAULT_PAGE_COUNT,
 	    delay:         delay
-	}).catch(err => {
+	})).catch(err => {
 	    console.log(`error caught in main, ${err}`);
 	});
 }

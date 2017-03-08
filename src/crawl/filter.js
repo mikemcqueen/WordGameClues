@@ -14,7 +14,7 @@ const Duration     = require('duration');
 const PrettyMs     = require('pretty-ms');
 const ClueManager  = require('../clue_manager.js');
 const Result       = require('./result-mod');
-
+const Score        = require('./score-mod');
 const Opt          = require('node-getopt').create([
     ['a', 'article',             'filter results based on article word count'],
     ['c', 'count',               'show result/url counts only'],
@@ -32,7 +32,7 @@ const fsReadFile   = Promise.promisify(Fs.readFile);
 
 //
 
-function getUrlCount(resultList) {
+function getUrlCount (resultList) {
     // TODO _.reduce()
     let urlCount = 0;
     for (const result of resultList) {
@@ -43,7 +43,7 @@ function getUrlCount(resultList) {
 
 //
 
-function isFilteredUrl(url, filteredUrls) {
+function isFilteredUrl (url, filteredUrls) {
     if (_.isUndefined(filteredUrls)) return false; 
     let reject = _.isArray(filteredUrls.rejectUrls) && filteredUrls.rejectUrls.includes(url);
     let known = _.isArray(filteredUrls.knownUrls) && filteredUrls.knownUrls.includes(url);
@@ -52,26 +52,30 @@ function isFilteredUrl(url, filteredUrls) {
 
 //
 
-function filterSearchResultList(resultList, wordList, filteredUrls, options) {
+function filterSearchResultList (resultList, wordList, filteredUrls, options) {
     return new Promise((resolve, reject) => {
 	let urlList = [];
 	// make any clue words with a space into multiple words.
 	let wordCount = _.chain(wordList).map(word => word.split(' ')).flatten().size().value();
 	Promise.map(resultList, result => {
-	    if (!isFilteredUrl(result.url, filteredUrls)) {
-		return Result.wordCountFilter(result, wordCount, options);
+	    if (isFilteredUrl(result.url, filteredUrls) || _.isUndefined(result.score)) {
+		if (options.verbose) {
+		    console.log(`filtered or unscored url, ${result.url}`);
+		}
+		return undefined;
 	    }
-	    if (options.verbose) {
-		console.log(`filtered url, ${result.url}`);
-	    }
-	    return undefined;
+	    return Score.wordCountFilter(result.score, wordCount, options) ? result : undefined;
 	}).each(result => {
 	    if (!_.isUndefined(result)) {
-		//console.log('url: ' + result.url);
+		if (options.verbose) {
+		    console.log('url: ' + result.url);
+		}
 		urlList.push(result.url);
 	    }
 	}).then(filteredList => {
-	    //console.log('urlList.size = ' + _.size(urlList));
+	    if (options.verbose) {
+		console.log('urlList.size = ' + _.size(urlList));
+	    }
 	    resolve({
 		src:     wordList.toString(),
 		urlList: urlList,
@@ -84,25 +88,23 @@ function filterSearchResultList(resultList, wordList, filteredUrls, options) {
 
 //
 
-function loadFilteredUrls(dir, wordList, options) {
+function loadFilteredUrls (dir, wordList, options) {
     return new Promise((resolve, reject) => {
 	let filteredFilename = Result.makeFilteredFilename(wordList);
 	if (options.verbose) {
 	    console.log(`filtered filename: ${filteredFilename}`);
 	}
-	return fsReadFile(`${dir}/${filteredFilename}`, 'utf8')
+	fsReadFile(Path.format({ dir, base: filteredFilename }), 'utf8')
 	    .then(content => {
 		if (options.verbose) {
 		    console.log(`resolving filtered urls, ${wordList}`);
 		}
-		// TODO: what happens on JSON.parse throw?
-		resolve(JSON.parse(content));
+		return resolve(JSON.parse(content));
 	    }).catch(err => {
 		if (options.verbose) {
 		    console.log(`no filtered urls, ${wordList}, ${err}`);
 		}
-		// ignore file errors, filtered url file is optional
-		resolve(undefined);
+		return reject();
 	    });
     });
 }
@@ -117,7 +119,7 @@ function loadFilteredUrls(dir, wordList, options) {
 // files that match fileMatch, even if the file's word-combo is
 // a rejected combo. 
 // 
-function filterSearchResultFiles(dir, fileMatch, options) {
+function filterSearchResultFiles (dir, fileMatch, options) {
     return new Promise((resolve, reject) => {
 	let filteredList = [];
 	let rejectList = [];
@@ -135,19 +137,23 @@ function filterSearchResultFiles(dir, fileMatch, options) {
 	    if (ClueManager.isRejectSource(wordList)) next();
 
   	    loadFilteredUrls(dir, wordList, options)
+		.catch(err => {
+		    // loadFilteredUrls may reject and land here. but err will be undefined,
+		    // and we can continue.
+		    if (err) throw err; 
+		})
 		.then(filteredUrls => {
 		    return filterSearchResultList(JSON.parse(content), wordList, filteredUrls, options);
 		}).then(filterResult => {
-		    if (!_.isEmpty(filterResult.urlList)) {
-			filteredList.push(filterResult);
-		    }
-		    else {
+		    if (_.isEmpty(filterResult.urlList)) {
 			rejectList.push(filterResult);
+		    } else {
+			filteredList.push(filterResult);
 		    }
 		    return undefined;
 		}).catch(err => {
 		    // report & eat all errors
-		    console.log('filterSearchResultFiles, error: ' + err.message);
+		    console.log(`filterSearchResultFiles, path: ${path}, error; ${err.message}`);
 		}).then(() => next()); // process files synchronously
 	}, function(err, files) {
             if (err) throw err;  // TODO: test
@@ -161,7 +167,7 @@ function filterSearchResultFiles(dir, fileMatch, options) {
 
 //
 
-function displayFilterResults(resultList) {
+function displayFilterResults (resultList) {
     for (const result of resultList) {
 	if (_.isEmpty(result.urlList)) continue;
 	if (ClueManager.isRejectSource(result.src)) continue;
@@ -184,7 +190,7 @@ function displayFilterResults(resultList) {
 //
 //
 //
-function main() {
+function main () {
     Expect(Opt.argv, 'no non-switch arguments allowed').to.be.empty;
     Expect(Opt.options.dir, 'option -d NAME is required').to.exist;
 
