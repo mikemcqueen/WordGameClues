@@ -7,8 +7,10 @@ TEST_PREFIX    = test-
 TEST_FILES     = $(patsubst %,%/$(TEST_PREFIX)*.js,$(TEST_MODULES))
 TEST_DEPEND    = $(patsubst %,%/*.js,$(TEST_MODULES))
 
-REPORTER       = dot
-MOCHA_DIR      =./node_modules/.bin/
+MOCHA_DIR      = ./node_modules/.bin/
+MOCHA_OPT      = --no-exit
+
+
 
 target: all
 
@@ -17,14 +19,13 @@ all:
 
 
 test: $(MODULE_DEPEND) $(TEST_DEPEND)
-	@NODE_ENV=test $(MOCHA_DIR)mocha $(TEST_FILES) # --reporter $(REPORTER) 
+	@NODE_ENV=test $(MOCHA_DIR)mocha $(MOCHA_OPT) $(TEST_FILES) 
 
 
 $(MODULE_DEPEND):
 
 
 $(TEST_DEPEND):
-
 
 
 
