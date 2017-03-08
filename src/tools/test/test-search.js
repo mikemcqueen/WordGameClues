@@ -114,7 +114,6 @@ describe ('search tests:', function() {
 		    dir:           _args.dir
 		});
 	    }).then(result => {
-		console.log(`result, ${result}, typeof ${typeof result} entries ${_.entries(result)}`);
 		Expect(result.skip, 'skip').to.equal(1);
 		Expect(result.data, 'data').to.equal(1);
 		Expect(result.error, 'error').to.equal(0);
