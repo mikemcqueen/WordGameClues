@@ -17,7 +17,9 @@
     "pretty-ms": "^2.1.0",
     "wikijs": "^1.1.1"
   },
-  "devDependencies": {},
+  "devDependencies": {
+    "mocha": "^3.2.0"
+  },
   "scripts": {
     "test": "make test"
   },

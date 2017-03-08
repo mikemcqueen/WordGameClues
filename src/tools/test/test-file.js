@@ -12,7 +12,7 @@ const Score   = require('../score-mod.js');
 
 //
 
-const TESTFILES_DIR = './test-files/';
+const TESTFILES_DIR = `${__dirname}/test-files/`;
 
 //
 
@@ -34,11 +34,12 @@ function testFile (filename, wordList) {
 
 //
 
-describe ('test some result files', function() {
+describe ('file tests:', function() {
     this.timeout(5000);
     this.slow(2000);
     
-    //
+////////////////////////////////////////////////////////////////////////////////    
+
     it ('should score a page with no InfoBox', function (done) {
 	testFile('noInfoBox.json', [ 'bureau', 'chief' ])
 	    .then(list => {
@@ -50,7 +51,8 @@ describe ('test some result files', function() {
 	    });
     });
 	    
-    //
+////////////////////////////////////////////////////////////////////////////////    
+
     it ('should not fail to score an invalid page title', function (done) {
 	testFile('noContent.json', [ 'what', 'ever' ])
 	    .then(list => {
@@ -62,8 +64,9 @@ describe ('test some result files', function() {
 	    });
     });
 	    
-    //
-    it ('should score a list of results', function (done) {
+////////////////////////////////////////////////////////////////////////////////    
+
+    it.skip ('should score a list of results', function (done) {
 	this.timeout(20 * 5000);
 	this.slow(20 * 2000);
 

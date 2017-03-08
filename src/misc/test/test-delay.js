@@ -1,16 +1,21 @@
-const Delay    = require('../delay');
-const ms       = require('milliseconds');
-const expect   = require('chai').expect;
-const prettyMs = require('pretty-ms');
+//
+// TEST-UTIL.JS
+//
 
-describe('test delay', function() {
+const Expect   = require('chai').expect;
+const Ms       = require('ms');
+const My       = require('../util');
+const PrettyMs = require('pretty-ms');
 
-    it('loop 2-3 minute delay', function() {
-	let lo = 2, hi = 3;
+describe ('delay tests:', function() {
+
+    it ('between: verify 20x 2-3 minute values', function() {
+	let lo = Ms('2m');
+	let hi = Ms('3m');
 	for (let count = 0; count < 20; ++count) {
-	    let delay = Delay.between(lo, hi, Delay.Minutes);
-	    expect(delay).to.be.at.least(ms.minutes(lo)).and.at.most(ms.minutes(hi));
-	    console.log(prettyMs(delay));
+	    let delay = My.between(lo, hi);
+	    Expect(delay).to.be.at.least(lo).and.at.most(hi);
+	    console.log(PrettyMs(delay));
 	}
     });
 

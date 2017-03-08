@@ -8,7 +8,7 @@ const _            = require('lodash');
 const Expect       = require('chai').expect;
 const Fs           = require('fs');
 const Git          = require('simple-git');
-const My           = require('../../util/util');
+const My           = require('../../misc/util');
 const Path         = require('path');
 const Promise      = require('bluebird');
 const Result       = require('../result-mod');
@@ -18,7 +18,7 @@ const fsWriteFile  = Promise.promisify(Fs.writeFile);
 
 //
 
-const TESTFILES_DIR = './test-files/';
+const TESTFILES_DIR = `${__dirname}/test-files/`;
 
 //
 
@@ -135,4 +135,22 @@ describe ('result tests:', function() {
     });
 */
     
+});
+
+
+describe('google one word pair, show result', function() {
+
+    it.skip('test one pair', function(done) {
+	const wiki = 'site:en.wikipedia.org';
+	this.timeout(75000);
+	Result.get('one' + 'two' + wiki, function(err, res) {
+	    if (err) {
+		console.log(err);
+	    } else {
+		console.log(res);
+	    }
+	    done();
+	});
+    });
+
 });

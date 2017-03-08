@@ -8,15 +8,15 @@ const _            = require('lodash');
 //const Promise      = require('bluebird');
 const Expect       = require('chai').expect;
 const Fs           = require('fs');
-const My           = require('../../util/util');
+const My           = require('../../misc/util');
 const Search       = require('../search-mod');
 const Result       = require('../result-mod');
 
 //
 
-const _args = { root: './', dir:  'test-files' };
+const _args = { root: `${__dirname}/`, dir:  'test-files' };
 
-const TEST_DIR = './test-files/';
+const TEST_DIR = `${__dirname}/test-files/`;
 
 //
 
