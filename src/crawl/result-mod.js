@@ -111,7 +111,10 @@ function scoreSaveCommit (resultList, filepath, options = {}, wordList = undefin
 	resultList,
 	options
     ).then(list => {
-	Expect(list.length, 'list.length !== resultList.length').to.equal(resultList.length);
+	if (_.isEmpty(list)) {
+	    // if list is empty, all the results in this file were already scored
+	    return Promise.reject(); // skip save/commit
+	}
 	return fsWriteFile(filepath, JSON.stringify(list))
 	    .then(() => console.log(' updated'));
     }).then(() => {

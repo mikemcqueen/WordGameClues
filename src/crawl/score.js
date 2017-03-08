@@ -41,7 +41,9 @@ function scoreSearchResultDir(dir, fileMatch, options) {
 	if (err) throw err; // TODO: test this
 	Result.scoreSaveCommit(JSON.parse(content), filepath, options)
 	    .catch(err => {
-		console.error(`scoreSaveCommit error, ${err}`);
+		if (err) {
+		    console.error(`scoreSaveCommit error, ${err}`);
+		}
 	    }).then(() => {
 		return next();
 	    });
