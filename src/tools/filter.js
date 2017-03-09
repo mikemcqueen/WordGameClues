@@ -71,7 +71,7 @@ function filterSearchResultList (resultList, wordList, filteredUrls, options) {
     let logUnscored = false;
     // make any clue words with a space into multiple words.
     let wordCount = _.chain(wordList).map(word => word.split(' ')).flatten().size().value();
-    Promise.map(resultList, result => {
+    return Promise.map(resultList, result => {
 	if (options.verbose) {
 	    console.log(`result: ${_.entries(result)}`);
 	}
@@ -139,7 +139,6 @@ function loadFilteredUrls (dir, wordList, options) {
 		console.log(`no filtered urls, ${wordList}, ${err}`);
 	    }
 	}).then(() => undefined);
-});
 }
 
 // for each search result filename that matches fileMatch in dir 
