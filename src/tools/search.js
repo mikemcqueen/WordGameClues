@@ -73,6 +73,7 @@ function main() {
 	    delay:         delay
 	})).catch(err => {
 	    console.log(`error caught in main, ${err}`);
+	    console.log(err.stack);
 	});
 }
 
@@ -81,9 +82,9 @@ function main() {
 try {
     main();
 }
-catch(e) {
+catch(err) {
     console.log(`error caught in try/catch, ${err}`);
-    console.log(e.stack);
+    console.log(err.stack);
 }
 finally {
 }
