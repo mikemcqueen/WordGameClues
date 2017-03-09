@@ -67,56 +67,54 @@ function filterSearchResultList (resultList, wordList, filteredUrls, options) {
     Expect(wordList).to.be.an('array').that.is.not.empty;
     // filteredUrls can be undefined or array
     Expect(options).to.be.an('object');
-    return new Promise((resolve, reject) => {
-	let urlList = [];
-	let logUnscored = false;
-	// make any clue words with a space into multiple words.
-	let wordCount = _.chain(wordList).map(word => word.split(' ')).flatten().size().value();
-	Promise.map(resultList, result => {
-	    if (options.verbose) {
-		console.log(`result: ${_.entries(result)}`);
-	    }
-	    // shouldn't happen, but does, or did. xfactor gives a list of them.
-	    if (!result.url) {
-		if (options.xfactor === XFACTOR_NULL_URL) { 
-		    console.log(options.filepath);
-		}
-		return undefined;
-	    }
-	    // log un-scored results
-	    if (options.xfactor === XFACTOR_UNSCORED && _.isUndefined(result.score)) {
-		if (!logUnscored) {
-		    console.log(options.filepath);
-		    logUnscored = true;
-		}
-	    }
-	    if (isFilteredUrl(result.url, filteredUrls) || _.isUndefined(result.score)) {
-		if (options.verbose) {
-		    console.log(`filtered or unscored url, ${result.url}`);
-		}
-		return undefined;
-	    }
-	    return Score.wordCountFilter(result.score, wordCount, options) ? result : undefined;
-	}).each(filterResult => {
-	    if (!_.isUndefined(filterResult)) {
-		if (options.verbose) {
-		    console.log(`url: ${filterResult.url}`);
-		}
-		urlList.push(filterResult.url);
+    let urlList = [];
+    let logUnscored = false;
+    // make any clue words with a space into multiple words.
+    let wordCount = _.chain(wordList).map(word => word.split(' ')).flatten().size().value();
+    Promise.map(resultList, result => {
+	if (options.verbose) {
+	    console.log(`result: ${_.entries(result)}`);
+	}
+	// shouldn't happen, but does, or did. xfactor gives a list of them.
+	if (!result.url) {
+	    if (options.xfactor === XFACTOR_NULL_URL) { 
+		console.log(options.filepath);
 	    }
 	    return undefined;
-	}).then(() => {
-	    if (options.verbose) {
-		console.log(`urlList.size = ${_.size(urlList)}`);
+	}
+	// log un-scored results
+	if (options.xfactor === XFACTOR_UNSCORED && _.isUndefined(result.score)) {
+	    if (!logUnscored) {
+		console.log(options.filepath);
+		logUnscored = true;
 	    }
-	    resolve({
-		src:     wordList.toString(),
-		urlList: urlList,
-		known:   ClueManager.getKnownClues(wordList)
-	    });
-	});
-	// TODO: .catch()
+	}
+	if (isFilteredUrl(result.url, filteredUrls) || _.isUndefined(result.score)) {
+	    if (options.verbose) {
+		console.log(`filtered or unscored url, ${result.url}`);
+	    }
+	    return undefined;
+	}
+	return Score.wordCountFilter(result.score, wordCount, options) ? result : undefined;
+    }).each(filterResult => {
+	if (!_.isUndefined(filterResult)) {
+	    if (options.verbose) {
+		console.log(`url: ${filterResult.url}`);
+	    }
+	    urlList.push(filterResult.url);
+	}
+	return undefined;
+    }).then(() => {
+	if (options.verbose) {
+	    console.log(`urlList.size = ${_.size(urlList)}`);
+	}
+	return {
+	    src:     wordList.toString(),
+	    urlList: urlList,
+	    known:   ClueManager.getKnownClues(wordList)
+	};
     });
+    // TODO: .catch()
 }
 
 //
@@ -125,24 +123,23 @@ function loadFilteredUrls (dir, wordList, options) {
     Expect(dir).to.be.a('string');
     Expect(wordList).to.be.an('array');
     Expect(options).to.be.an('object');
-    return new Promise((resolve, reject) => {
-	let filteredFilename = Result.makeFilteredFilename(wordList);
-	if (options.verbose) {
-	    console.log(`filtered filename: ${filteredFilename}`);
-	}
-	fsReadFile(Path.format({ dir, base: filteredFilename }), 'utf8')
-	    .then(content => {
-		if (options.verbose) {
-		    console.log(`resolving filtered urls, ${wordList}`);
-		}
-		resolve(JSON.parse(content));
-	    }).catch(err => {
-		if (options.verbose) {
-		    console.log(`no filtered urls, ${wordList}, ${err}`);
-		}
-		reject(); // do NOT pass err
-	    });
-    });
+    let filteredFilename = Result.makeFilteredFilename(wordList);
+    if (options.verbose) {
+	console.log(`filtered filename: ${filteredFilename}`);
+    }
+    return fsReadFile(Path.format({ dir, base: filteredFilename }), 'utf8')
+	.then(content => {
+	    if (options.verbose) {
+		console.log(`resolving filtered urls, ${wordList}`);
+	    }
+	    return JSON.parse(content);
+	}).catch(err => {
+	    if (err && err.code !== 'ENOENT') throw err;
+	    if (options.verbose) {
+		console.log(`no filtered urls, ${wordList}, ${err}`);
+	    }
+	}).then(() => undefined);
+});
 }
 
 // for each search result filename that matches fileMatch in dir 
@@ -176,12 +173,6 @@ function filterSearchResultDir (dir, fileMatch, options) {
 	    if (ClueManager.isRejectSource(wordList)) return next();
 	    
   	    loadFilteredUrls(dir, wordList, options)
-		.catch(err => {
-		    // loadFilteredUrls may reject and land here, but err will
-		    // be undefined. we can continue filtering without existing
-		    // filteredUrls.
-		    if (err) throw err; 
-		})
 		.then(filteredUrls => {
 		    options.filepath = filepath;
 		    return filterSearchResultList(JSON.parse(content), wordList, filteredUrls, options);

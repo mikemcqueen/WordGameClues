@@ -51,11 +51,13 @@ function getOneResult (wordList, pages, options = {}) {
 //args:
 // wordListArray : array of array of strings
 // pages         : # of pages of results to retrieve for each wordlist
-// delay         : object w/properties: high,low; ms delay between searches
+// delay         : object w/properties: high,low - ms delay between searches
 // root          : root results directory (optional; default: Results.dir)
 // dir           : directory within root to store results (optional, default: wordList.length)
 //
-// forceNextError: test support, move to options arg
+// optiosn:
+//   force       : search even if results file already exists (overwrites. TODO: append new results, instead)
+//   forceNextError: test support, sets getOnePromise.options.reject one time
 //
 async function getAllResultsLoop (args, options = {}) {
     Expect(args).to.exist;

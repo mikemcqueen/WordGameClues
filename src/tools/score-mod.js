@@ -108,25 +108,21 @@ function removeWikipediaSuffix (title) {
 
 function getWikiContent (title) {
     Expect(title).to.be.a('string');
-    return new Promise(function (resolve, reject) {
-	Wiki().page(removeWikipediaSuffix(title)).then(page => {
-	    Promise.all([
-		Promise.resolve(page.content()).reflect(),
-		Promise.resolve(page.info()).reflect()
-	    ]).then(result => {
-		resolve({
-		    text: result[0].isFulfilled() ? result[0].value() : '',
-		    info: result[1].isFulfilled() ? result[1].value() : {}
- 		});
-	    }).catch(err => {
-		// TODO: use VError
-		console.log(`getWikiContent promise.all error, ${err}`);
-		reject(err);
-	    });
-	}).catch(err => {
-	    console.log(`getWikiContent Wiki.page error, ${err}`);
-	    reject(err);
+    return Wiki().page(removeWikipediaSuffix(title)).then(page => {
+	return Promise.all([
+	    Promise.resolve(page.content()).reflect(),
+	    Promise.resolve(page.info()).reflect()
+	]).then(allResults => Object({
+	    text: allResults[0].isFulfilled() ? allResults[0].value() : '',
+	    info: allResults[1].isFulfilled() ? allResults[1].value() : {}
+	})).catch(err => {
+	    // TODO: use VError?
+	    console.log(`getWikiContent promise.all error, ${err}`);
+	    if (err) throw err;
 	});
+    }).catch(err => {
+	console.log(`getWikiContent Wiki.page error, ${err}`);
+	if (err) throw err;
     });
 }
 
@@ -135,28 +131,24 @@ function getWikiContent (title) {
 function getScore (wordList, result, options = {}) {
     Expect(wordList).to.be.an('array').that.is.not.empty;
     Expect(result).to.be.an('object');
-    return new Promise(function(resolve, reject) {
-	let score = {
-	    wordsInTitle   : _.isString(result.title) ? getWordCount(wordList, result.title, options) : 0,
-	    wordsInSummary : _.isString(result.summary)	? getWordCount(wordList, result.summary, options) : 0,
-	    disambiguation : getDisambiguation(result, options)
-	};
-	
-	if (score.wordsInSummary < _.size(wordList)) {
-	    getWikiContent(result.title)
-		.then(content => {
-		    score.wordsInArticle = getWordCount(
-			wordList, `${content.text} ${_.values(content.info).join(' ')}`, options);
-		}).
-		catch(err => {
-		    console.log(`getScore error, ${err}`);
-		}).then(() => {
-		    resolve(score);
-		});
-	} else {
-	    resolve(score);
-	}
-    });
+    let score = {
+	wordsInTitle   : _.isString(result.title)   ? getWordCount(wordList, result.title, options)   : 0,
+	wordsInSummary : _.isString(result.summary) ? getWordCount(wordList, result.summary, options) : 0,
+	disambiguation : getDisambiguation(result, options)
+    };
+    // if summary has all our words, we don't need to search article
+    if (score.wordsInSummary >= _.size(wordList)) {
+	return Promise.resolve(score);
+    }
+    return getWikiContent(result.title)
+	.then(content => {
+	    score.wordsInArticle = getWordCount(
+		wordList, `${content.text} ${_.values(content.info).join(' ')}`, options);
+	}).
+	catch(err => {
+	    // eat error
+	    console.log(`getScore error, ${err}`);
+	}).then(() => score);
 }
 
 //
@@ -164,27 +156,24 @@ function getScore (wordList, result, options = {}) {
 function scoreResultList (wordList, resultList, options = {}) {
     Expect(wordList, 'wordList').to.be.an('array').that.is.not.empty;
     Expect(resultList, 'resultList').to.be.an('array');
-    return new Promise((resolve, reject) => {
-	let any = false;
-	// convert space-separated words to separate words
-	wordList = _.chain(wordList).map(word => word.split(' ')).flatten().value();
-	console.log('wordList: ' + wordList);
-	Promise.mapSeries(resultList, (result, index) => {
-	    // only get score if it's not present, or force flag set
-	    if (_.isUndefined(result.score) || options.force) {
-		return getScore(wordList, result, options)
-		    .then(score => {
-			// result.score = score; ?
-			resultList[index].score = score;
-			any = true;
-		    });
-		// TODO: no .catch()
-	    }
-	}).then(unused => {
-	    resolve(any ? resultList : []);
-	});
+    // convert space-separated words to separate words
+    wordList = _.chain(wordList).map(word => word.split(' ')).flatten().value();
+    console.log('wordList: ' + wordList);
+    let any = false;
+    return Promise.mapSeries(resultList, (result, index) => {
+	// skip scoring if score already present, unless force flag set
+	if (!_.isUndefined(result.score) && !options.force) {
+	    return undefined;
+	}
+	return getScore(wordList, result, options)
+	    .then(score => {
+		// TODO: result.score = score; ?
+		resultList[index].score = score;
+		any = true;
+	    });
 	// TODO: no .catch()
-    });
+    }).then(() => any ? resultList : []);
+    // TODO: no .catch()
 }
 
 //
