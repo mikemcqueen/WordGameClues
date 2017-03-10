@@ -1,5 +1,5 @@
 //
-// RESULT-MOD
+// RESULT-MOD.JS
 //
 
 const _            = require('lodash');
@@ -72,7 +72,7 @@ function pathFormat (args) {
 
 //
 
-function get(text, pages, cb) {
+function get (text, pages, cb) {
     Expect(text, 'text').to.be.a('string');
     Expect(pages, 'pages').to.be.a('number').that.is.at.least(1);
     Expect(cb, 'callback').to.be.a('function');

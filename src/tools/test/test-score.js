@@ -70,10 +70,17 @@ describe('test some scoring scenarios', function() {
     });
 
     ////////////////////////////////////////////////////////////////////////////////
-    // TODO:
-
-    it ('should test why wordsInArticle < wordsInSummary');
     // "title": "1000 Ways to Die (season 3, 2012) - Wikipedia",
     // "url": "https://en.wikipedia.org/wiki/1000_Ways_to_Die_(season_3,_2012)",
 
+    it ('should test why wordsInArticle < wordsInSummary', function (done) {
+	const title = '1000 Ways to Die (season 3, 2012) - Wikipedia';
+	Score.getWikiContent(title)
+	    .then(content => {
+		//console.log(content.text + ' ' + _.values(content.info).map(value => value).join(' '));
+		console.log(`content(${_(content.text).words().size()}) ` +
+                            `info(${_(content.info).words().size()})`);
+		done();
+	    });
+    });
 });

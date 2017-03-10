@@ -25,7 +25,8 @@ const Opt          = require('node-getopt').create([
     ['r', 'rejects',             'show only results that fail all filters'],
     ['s', 'synthesis',           'use synth clues'],
     ['t', 'title',               'filter results based on title word count (default)'],
-    ['x', 'xfactor=VALUE',       'show result filenames with: 1:null URLs, 2:unscored URLs'], 
+    ['x', 'xfactor=VALUE',       'show borked results, with 1) missing URL/title/summary 2) unscored URLs' +
+                                   ' 3) article > summary'], 
     ['v', 'verbose',             'show logging'],
     ['h', 'help',                'this screen']
 ]).bindHelp().parseSystem();
@@ -34,8 +35,9 @@ const fsReadFile   = Promise.promisify(Fs.readFile);
 
 //
 
-const XFACTOR_NULL_URL = 1;
+const XFACTOR_MISSING  = 1;
 const XFACTOR_UNSCORED = 2;
+const XFACTOR_BADSCORE = 3;
 
 //
 
@@ -60,6 +62,23 @@ function isFilteredUrl (url, filteredUrls) {
     return known || reject;
 }
 
+// check for broken results if xfactor option specified
+
+function isXFactor (result, options) {
+    Expect(result).to.be.an('object');
+    Expect(options).to.be.an('object');
+    if (options.xfactor === XFACTOR_MISSING) { 
+	return _.isEmpty(result.url) || _.isEmpty(result.title) || _.isEmpty(result.summary);
+    }
+    if (options.xfactor === XFACTOR_UNSCORED) {
+	return _.isEmpty(result.score);
+    }
+    if (options.xfactor === XFACTOR_BADSCORE && _.isObject(result.score)) {
+	return result.score.wordsInArticle < result.score.wordsInSummary;
+    }
+    return false;
+}
+
 //
 
 function filterSearchResultList (resultList, wordList, filteredUrls, options) {
@@ -68,26 +87,19 @@ function filterSearchResultList (resultList, wordList, filteredUrls, options) {
     // filteredUrls can be undefined or array
     Expect(options).to.be.an('object');
     let urlList = [];
-    let logUnscored = false;
+    let loggedXFactor = false;
     // make any clue words with a space into multiple words.
     let wordCount = _.chain(wordList).map(word => word.split(' ')).flatten().size().value();
     return Promise.map(resultList, result => {
 	if (options.verbose) {
 	    console.log(`result: ${_.entries(result)}`);
 	}
-	// shouldn't happen, but does, or did. xfactor gives a list of them.
-	if (!result.url) {
-	    if (options.xfactor === XFACTOR_NULL_URL) { 
+	if (options.xfactor && isXFactor(result, options)) {
+	    if (!loggedXFactor) {
 		console.log(options.filepath);
+		loggedXFactor = true;
 	    }
 	    return undefined;
-	}
-	// log un-scored results
-	if (options.xfactor === XFACTOR_UNSCORED && _.isUndefined(result.score)) {
-	    if (!logUnscored) {
-		console.log(options.filepath);
-		logUnscored = true;
-	    }
 	}
 	if (isFilteredUrl(result.url, filteredUrls) || _.isUndefined(result.score)) {
 	    if (options.verbose) {
@@ -138,7 +150,8 @@ function loadFilteredUrls (dir, wordList, options) {
 	    if (options.verbose) {
 		console.log(`no filtered urls, ${wordList}, ${err}`);
 	    }
-	}).then(() => undefined);
+	    return undefined;
+	});
 }
 
 // for each search result filename that matches fileMatch in dir 

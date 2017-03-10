@@ -89,7 +89,7 @@ function getWordCount (wordList, text, options = {}) {
 //
 
 function getDisambiguation (result, options) {
-    Expect(result).to.exist;
+    Expect(result).to.be.an('object');
     return _.isString(result.title) ? (getWordCount(WIKIPEDIA_DISAMBIGUATION, result.title, options) > 0) : false;
 }
 
@@ -98,10 +98,7 @@ function getDisambiguation (result, options) {
 function removeWikipediaSuffix (title) {
     Expect(title).to.be.a('string');
     const index = title.lastIndexOf(WIKIPEDIA_SUFFIX);
-    if (index !== -1) {
-	title = title.substr(0, index);
-    }
-    return title;
+    return (index !== -1) ? title.substr(0, index) : title;
 }
 
 //
@@ -131,15 +128,17 @@ function getWikiContent (title) {
 function getScore (wordList, result, options = {}) {
     Expect(wordList).to.be.an('array').that.is.not.empty;
     Expect(result).to.be.an('object');
+    // TODO: some conditions may warrant a re-fetch of either the
+    // Google search results (null title or summary). then we could 
+    // expect valid entries here.
+    //Expect(result.title).to.be.a('string').that.is.not.empty;
+    //Expect(result.summary).to.be.a('string').that.is.not.empty;
+
     let score = {
 	wordsInTitle   : _.isString(result.title)   ? getWordCount(wordList, result.title, options)   : 0,
 	wordsInSummary : _.isString(result.summary) ? getWordCount(wordList, result.summary, options) : 0,
 	disambiguation : getDisambiguation(result, options)
     };
-    // if summary has all our words, we don't need to search article
-    if (score.wordsInSummary >= _.size(wordList)) {
-	return Promise.resolve(score);
-    }
     return getWikiContent(result.title)
 	.then(content => {
 	    score.wordsInArticle = getWordCount(
