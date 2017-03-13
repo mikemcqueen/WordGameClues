@@ -22,6 +22,10 @@ const RESULT_DIR      = '../../data/results/';
 const FILTERED_SUFFIX = '_filtered';
 const EXT_JSON        = '.json';
 
+const SRC_PREFIX      = '@';
+const MAYBE_PREFIX    = ':';
+const KNOWN_PREFIX    = '#';
+
 // '../../file-path.json' => [ 'file', 'path' ]
 //
 function makeWordlist (filepath) {
@@ -152,5 +156,8 @@ module.exports = {
     pathFormat,
     scoreSaveCommit,
 
+    SRC_PREFIX,
+    MAYBE_PREFIX,
+    KNOWN_PREFIX,
     DIR: RESULT_DIR
 };

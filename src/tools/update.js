@@ -5,14 +5,14 @@
 'use strict';
 
 const _            = require('lodash');
-const Promise      = require('bluebird');
+const ClueManager  = require('../clue_manager');
 const Dir          = require('node-dir');
+const expect       = require('chai').expect;
 const fs           = require('fs');
 const Path         = require('path');
+const Promise      = require('bluebird');
 const Readlines    = require('n-readlines');
-const expect       = require('chai').expect;
-
-const ClueManager  = require('../clue_manager.js');
+const Result       = require('./result-mod');
 
 const Opt          = require('node-getopt').create([
     ['c', 'count',               'show result/url counts only'],
@@ -21,8 +21,6 @@ const Opt          = require('node-getopt').create([
 //    ['v', 'verbose',             'show logging']
     ['h', 'help',                'this screen']
 ]).bindHelp().parseSystem();
-
-const Result       = require('./result-mod');
 
 //---------------------------------------------
 
@@ -53,9 +51,9 @@ const SM = {
 function getLineType(line) {
     expect(line.length).to.be.at.least(1);
     let lineType;
-    if (line[0] === '@') lineType =         Src;
-    if (line[0] === ':') lineType =         Maybe;
-    if (line[0] === '#') lineType =         Known;
+    if (line[0] === Result.SRC_PREFIX) lineType = Src;
+    if (line[0] === Result.MAYBE_PREFIX) lineType = Maybe;
+    if (line[0] === Result.KNOWN_PREFIX) lineType = Known;
     // all of the above get first char sliced off
     if (!_.isUndefined(lineType)) {
 	line = line.slice(1);

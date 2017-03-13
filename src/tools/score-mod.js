@@ -32,58 +32,66 @@ function wordCountFilter (score, wordCount, options) {
     return (passTitle || passArticle);
 }
 
+/* cut&paste not ready for use
+function getWordCountV2 () {
+    // NOTE: words have already been split before this function
+    // is called. this code was previously used for a different 
+    // multi-word lookup strategy (which may be re-employed).
+    let nextTextWord = textWord;
+    if (word.split(' ').every((subWord, subIndex, subWordList) => {
+	//if (_.startsWith(nextTextWord, subWord)) {
+	if (nextTextWord !== subWord) {
+	    if (options.verbose) {
+		console.log(`${nextTextWord} !== ${subWord}`);
+	    }
+	    return false; // every.exit
+	}
+	if (options.verbose) {
+	    console.log(`${nextTextWord} === ${subWord}`);
+	}
+	if (subIndex < subWordList.length - 1) {
+	    // we're before the last element in subword list,
+	    // ty to set the next textWord.
+	    let nextTextIndex = textIndex + subIndex + 1;
+	    if (nextTextIndex < textWordList.length) {
+		nextTextWord = textWordList[nextTextIndex];
+	    } else {
+		// there aren't enough words from the text remaining
+		return false; // every.exit
+	    }
+	}
+	return true; // every.continue
+    })) {
+ 	countList[index] += 1;
+	if (options.verbose) {
+	    console.log(`count[${index}] = ${countList[index]}`);
+	}
+    }
+}
+*/
+
 //
 
 function getWordCount (wordList, text, options = {}) {
-    if (_.isString(wordList)) { wordList = [ wordList ]; } // or .split(',')
-    Expect(wordList).to.be.an('array').that.is.not.empty;
+    if (_.isString(wordList)) {
+	Expect(_.includes(wordList, ',')).to.be.false; // easy to support, but no need yet
+	wordList = [ wordList ];  // or .split(',')
+    }
+    Expect(wordList).to.be.an('array').that.is.not.empty; // can be 1, e.g. disambiguation
     Expect(text).to.be.a('string');
-
     let textWordList = _.words(text.toLowerCase());
-    let countList = new Array(wordList.length).fill(0);
-    textWordList.forEach((textWord, textIndex) => {
-	wordList.forEach((word, index) => {
-	    // NOTE: words have already been split before this function
-	    // is called. this code was previously used for a different 
-	    // multi-word lookup strategy (which may be re-employed).
-	    let nextTextWord = textWord;
-	    if (word.split(' ').every((subWord, subIndex, subWordList) => {
-		//if (_.startsWith(nextTextWord, subWord)) {
-		if (nextTextWord !== subWord) {
-		    if (options.verbose) {
-			console.log(`${nextTextWord} !== ${subWord}`);
-		    }
-		    return false; // every.exit
-		}
-		if (options.verbose) {
-		    console.log(`${nextTextWord} === ${subWord}`);
-		}
-		if (subIndex < subWordList.length - 1) {
-		    // we're before the last element in subword list,
-		    // ty to set the next textWord.
-		    let nextTextIndex = textIndex + subIndex + 1;
-		    if (nextTextIndex < textWordList.length) {
-			nextTextWord = textWordList[nextTextIndex];
-		    } else {
-			// there aren't enough words from the text remaining
-			return false; // every.exit
-		    }
-		}
-	        return true; // every.continue
-	     })) {
- 	        countList[index] += 1;
-		if (options.verbose) {
-	            console.log(`count[${index}] = ${countList[index]}`);
-		}
-	     }
+    return _(wordList).map(word => _.includes(textWordList, word))
+	.tap(foundList => {
+	    if (options.verbose) {
+		console.log(`foundList(${foundList.length}) ${_.values(foundList)}`);
+	    }
+	}).reduce((accum, found, index, foundList) => {
+	    if (found) accum += 1;
+	    if (options.verbose) {
+		console.log(`found[${wordList[index]}] = ${foundList[index]}, accum(${accum})`);
+	    }
+	    return accum;
 	});
-    });
-    // TODO: _.reduce()
-    let wordCount = 0;
-    countList.forEach(count => {
-	if (count > 0) wordCount += 1;
-    });
-    return wordCount;
 }
 
 //

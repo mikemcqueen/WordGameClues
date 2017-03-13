@@ -101,7 +101,7 @@ async function getAllResultsLoop (args, options = {}) {
 	    }).catch(err => {
 		// log & eat all errors (err might be undefined from Promise.reject())
 		if (err) {
-		    console.log(`getAllResults error, ${err}`);
+		    console.log(`getAllResultsLoop error, ${err}`);
 		    result.error += 1;
 		}
 	    });
@@ -116,7 +116,7 @@ async function getAllResultsLoop (args, options = {}) {
 		    return Result.fileScoreSaveCommit(path);
 		}).catch(err => {
 		    // log & eat all errors
-		    console.log(`getAllResults commit error, ${err}`);
+		    console.log(`getAllResultsLoop commit error, ${err}`);
 		});
 	}
 

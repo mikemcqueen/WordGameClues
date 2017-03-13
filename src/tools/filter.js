@@ -172,8 +172,8 @@ function filterSearchResultDir (dir, fileMatch, options) {
 	let filteredList = [];
 	let rejectList = [];
 	Dir.readFiles(dir , {
-	    match:   new RegExp(fileMatch),
-	    exclude: /^\./,
+	    match:     new RegExp(fileMatch),
+	    exclude:   /^\./,
 	    recursive: false
 	}, function(err, content, filepath, next) {
 	    if (err) throw err; // TODO: test
@@ -199,9 +199,8 @@ function filterSearchResultDir (dir, fileMatch, options) {
 		}).catch(err => {
 		    // report & eat all errors
 		    console.log(`filterSearchResultFiles, path: ${filepath}, error; ${err}`);
-		}).then(() => next()); // process files synchronously
-	    //return next(); // process files asynchronously
-	    return undefined;
+		});//.then(() => next()); // process files synchronously
+	    return next(); // process files asynchronously
 	}, function(err, files) {
             if (err) throw err;  // TODO: test
 	    resolve({
@@ -220,15 +219,15 @@ function displayFilterResults (resultList) {
 	if (_.isEmpty(result.urlList)) continue;
 	if (ClueManager.isRejectSource(result.src)) continue;
 
-	console.log(`:${result.src}`);
+	console.log(`${Result.SRC_PREFIX}${result.src}`);
 	for (const url of result.urlList) {
 	    console.log(url);
 	}
 	const nameList = ClueManager.getKnownClues(result.src);
 	if (!_.isEmpty(nameList)) {
-	    console.log('#known:');
+	    console.log('${Result.KNOWN_PREFIX}known:');
 	    for (const name of nameList) {
-		console.log(`#${name}`);
+		console.log(`${Result.KNOWN_PREFIX}${name}`);
 	    }
 	}
 	console.log();
@@ -238,7 +237,7 @@ function displayFilterResults (resultList) {
 //
 //
 //
-function main () {
+async function main () {
     Expect(Opt.argv, 'no non-switch arguments allowed').to.be.empty;
     Expect(Opt.options.dir, 'option -d NAME is required').to.exist;
 
@@ -260,27 +259,23 @@ function main () {
 	xfactor:       _.toNumber(Opt.options.xfactor)
     };
     let start = new Date();
-    return filterSearchResultDir(dir, Result.getFileMatch(Opt.options.match), filterOptions)
-	.then(result => {
-	    let d = new Duration(start, new Date()).milliseconds;
-	    if (Opt.options.count) {
-		console.log(`Results: ${_.size(result.filtered)}` +
-			    `, Urls: ${getUrlCount(result.filtered)}` +
-			    `, Rejects: ${_.size(result.rejects)}` +
-			    `, duration, ${PrettyMs(d)}`);
-	    }
-	    else {
-		displayFilterResults(Opt.options.rejects ? result.rejects : result.filtered);
-	    }
-	});
+    let result = await filterSearchResultDir(dir, Result.getFileMatch(Opt.options.match), filterOptions);
+    let d = new Duration(start, new Date()).milliseconds;
+    if (Opt.options.count) {
+	console.log(`Results: ${_.size(result.filtered)}` +
+		    `, Urls: ${getUrlCount(result.filtered)}` +
+		    `, Rejects: ${_.size(result.rejects)}` +
+		    `, duration, ${PrettyMs(d)}`);
+    }
+    else {
+	displayFilterResults(Opt.options.rejects ? result.rejects : result.filtered);
+    }
 }
 
 //
 
 try {
-    main().catch(err => {
-	console.log(err.stack);
-    });
+    main();
 } catch(err) {
     console.log(err.stack);
 }

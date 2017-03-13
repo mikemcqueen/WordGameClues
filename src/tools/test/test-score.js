@@ -10,7 +10,7 @@ const Score  = require('../score-mod.js');
 
 //
 
-describe('test some scoring scenarios', function() {
+describe ('test some scoring scenarios', function () {
     this.timeout(5000);
     this.slow(2000);
 
@@ -22,7 +22,7 @@ describe('test some scoring scenarios', function() {
 
     ////////////////////////////////////////////////////////////////////////////////
 
-    it('should count word that only exists in infobox in wordsInArticle', function(done) {
+    it ('should count word that only exists in infobox in wordsInArticle', function (done) {
 	const wordList = [ 'betsy', 'king' ]; // betsy is only in infobox
 	const searchResult = {
 	    title:   'Lizzie Lloyd King - Wikipedia',
@@ -38,10 +38,10 @@ describe('test some scoring scenarios', function() {
     ////////////////////////////////////////////////////////////////////////////////
 
     // Test space-separated "compound" words
-    // NOTE: this test could be skipped, because it is not how we're
-    // currently calling getScore - we split space-separated words first.
-    // but this functionality works, if I ever want to re-enable it.
-    it ('should count both words in title, and only single word in summary', function (done) {
+    // NOTE: this test is skipped, because it is not how getScore is currently
+    // called - space-separated words get split first. But this functionality
+    // is possible if I ever want to re-enable it.
+    it.skip ('should count both words in title, and only single word in summary', function (done) {
 	const wordList = [ 'randolph campbell', 'anne' ];
 	const searchResult = {
 	    // no title
@@ -70,17 +70,28 @@ describe('test some scoring scenarios', function() {
     });
 
     ////////////////////////////////////////////////////////////////////////////////
-    // "title": "1000 Ways to Die (season 3, 2012) - Wikipedia",
-    // "url": "https://en.wikipedia.org/wiki/1000_Ways_to_Die_(season_3,_2012)",
-
-    it ('should test why wordsInArticle < wordsInSummary', function (done) {
-	const title = '1000 Ways to Die (season 3, 2012) - Wikipedia';
+    // "title": "USS Munalbro (1916) - Wikipedia",
+    // "url": "https://en.wikipedia.org/wiki/USS_Munalbro_(1916)",
+    //
+    // NOTE: problem here was capital SS, can reuse this test case for something else
+    //
+    it.skip ('should test for correct wordsInArticle count', function (done) {
+	const title = 'USS Munalbro (1916) - Wikipedia';
+	const wordList = [ 'ss', 'james' ];
+	const options = { verbose: true };
 	Score.getWikiContent(title)
 	    .then(content => {
 		//console.log(content.text + ' ' + _.values(content.info).map(value => value).join(' '));
 		console.log(`content(${_(content.text).words().size()}) ` +
                             `info(${_(content.info).words().size()})`);
+		let wordsInArticle = Score.getWordCount(
+		    wordList, `${content.text} ${_.values(content.info).join(' ')}`, options);
+		console.log(`wordsInArticle: ${wordsInArticle}`);
+		Expect(wordsInArticle).to.equal(2);
 		done();
+	    }).catch(err => {
+		console.log('error');
+		done(err);
 	    });
     });
 });

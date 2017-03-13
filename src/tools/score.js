@@ -19,6 +19,7 @@ const Opt          = require('node-getopt')
 	  ['f', 'force',               'force re-score'],
 	  ['m', 'match=EXPR',          'filename match expression' ],
 	  ['s', 'synth',               'use synth clues'],
+	  ['v', 'verbose',             'extra logging'],
 	  ['h', 'help',                'this screen']
       ]).bindHelp().parseSystem();
 
@@ -27,9 +28,10 @@ const fsWriteFile  = Promise.promisify(fs.writeFile);
 
 //
 
-function scoreSearchResultDir(dir, fileMatch, options) {
+function scoreSearchResultDir (dir, fileMatch, options = {}) {
     Expect(dir).to.be.a('string');
     Expect(fileMatch).to.be.a('string');
+    Expect(options).to.be.an('object');
 
     let path = Result.DIR + dir;
     console.log('dir: ' + path);
@@ -54,50 +56,55 @@ function scoreSearchResultDir(dir, fileMatch, options) {
 
 //
 
-function scoreNextFile(dir, readLines, options) {
-    let filename = readLines.next();
-    if (filename === false) return;
-    filename = filename.toString().trim();
+function scoreSaveFile (filepath, options) {
+    Expect(filepath).to.be.a('string');
+    Expect(options).to.be.an('object');
 
-    // TODO: Path.makePath() or something similar
-    let filepath = dir + '/' + filename;
-    console.log('filepath: ' + filepath);
+    // TODO: Path.format()
     fsReadFile(filepath, 'utf8')
-	.then(content => JSON.parse(content))
-	.then(inputList => {
-	    return Score.scoreResultList(
-		_.split(Path.basename(filepath, '.json'), '-'),
-		inputList,
-		options);
-	}).then(outputList => {
-	    return _.isEmpty(outputList) ? true : fsWriteFile(filepath, JSON.stringify(outputList));
-	}).then(isEmpty  => {
-	    console.log(isEmpty ? 'empty output list, not updating' : 'updated');
-	}).catch(err => {
-	    // report & eat all errors
-	    console.log(`scoreNextFile error, ${err.message}`);
-	}).then(() => {
-	    return setTimeout(scoreNextFile(dir, readLines, options), 0);
-	});
+	.then(content => Score.scoreResultList(
+	    Result.makeWordList(filepath),
+	    JSON.parse(content),
+	    options
+	).then(scoreResult => {
+	    if (_.isEmpty(scoreResult)) {
+		console.log('empty score result');
+		return undefined;
+	    }
+	    return fsWriteFile(filepath, JSON.stringify(scoreResult));
+	}));
 }
 
 //
 
-function scoreSearchResultFiles(dir, inputFilename, options) {
+async function scoreSearchResultFiles (dir, inputFilename, options = {}) {
     Expect(dir).to.be.a('string');
     Expect(inputFilename).to.be.a('string');
+    Expect(options).to.be.an('object');
 
     dir = Result.DIR + dir;
     console.log('dir: ' + dir);
     let readLines = new Readlines(inputFilename);
-    scoreNextFile(dir, readLines, options);
+    while (true) {
+	let filename = readLines.next();
+	if (filename === false) return;
+	filename = filename.toString().trim();
+	let filepath = Path.format({ dir, base: filename });
+	console.log('filepath: ' + filepath);
+	await scoreSaveFile(filepath, options)
+	    .then(() => console.log('updated'))
+	    .catch(err => {
+		console.log(`scoreSaveFile error, ${err.message}`);
+		if (err) throw err;
+	    });
+    }
 }
 
 //
 //
 //
 
-function main() {
+function main () {
     Expect(Opt.argv.length, 'only one optional FILE parameter is allowed')
 	.to.be.at.most(1);
     Expect(Opt.options.dir, 'option -d NAME is required').to.exist;
@@ -112,7 +119,8 @@ function main() {
 	console.log('force: ' + Opt.options.force);
     }
     let scoreOptions = {
-	force: Opt.options.force
+	force:   Opt.options.force,
+	verbose: Opt.options.verbose
     };
     if (!_.isUndefined(inputFile)) {
 	scoreSearchResultFiles(Opt.options.dir, inputFile, scoreOptions);

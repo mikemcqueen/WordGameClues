@@ -20,118 +20,38 @@ const fsWriteFile  = Promise.promisify(Fs.writeFile);
 
 const TESTFILES_DIR = `${__dirname}/test-files/`;
 
-// TODO: move to util/test. this is useful for testing git primitives.
-//
-function removeCommitIfExists (filepath, message = 'removing test file') {
-    Expect(filepath).to.be.a('string');
-    Expect(message).to.be.a('string');
-    return My.checkIfFile(filepath)
-	.then(result => {
-	    if (!result.exists) {
-		return undefined;
-	    }
-	    // file exists, try to git remove/commit it
-	    console.log(`git-removing ${filepath}`);
-	    return My.gitRemoveCommit(filepath, message)
-		.then(() => My.checkIfFile(filepath))
-		.then(result => {
-		    Expect(result.exists).to.be.false;
-		    console.log(`git-removed ${filepath}`);
-		    return undefined;
-		}).catch(err => {
-		    console.log(`gitRemoveCommit error, ${err}`);
-		});
-	    // TODO: add "git reset HEAD -- filename" if we had git remove error or file
-	    // still exists; file may be added but not commited.
-	}).catch(err => {
-	    console.log(`removeCommitIfExists error, ${err}`);
-	});
-}
-
-//
-
-function removeCommitIfExistsV1 (filepath, message) {
-    Expect(filepath).to.be.a('string');
-    Expect(message).to.be.a('string');
-    return My.checkIfFile(filepath)
-	.then(result => result.exists ? undefined : Promise.reject())
-	.then(() => {
-	    // file exists, try to git remove/commit it
-	    console.log(`calling gitRemoveCommit ${filepath}`);
-	    return My.gitRemoveCommit(filepath, message);
-	}).then(() => My.checkIfFile(filepath))
-	.then(result => {
-	    // TODO: add "git reset" if we had git remove error or file
-	    // still exists; file may be added but not commited.
-	    Expect(result.exists).to.be.false;
-	    console.log('file removed');
-	    return undefined;
-	}).catch(err => {
-	    // log real errors, eat all errors
-	    if (err) {
-		console.log(`removeCommitIfExists error, ${err}`);
-	    }
-	});
-}
-
 //
 
 describe ('result tests:', function() {
     this.timeout(6000);
     this.slow(4000);
 
-    let delay = { low: 500, high: 1000 };
-
-    // NOTE: csvParse parses csv file in reverse order, so simulate that in word lists here
-    let wla1234 = [ [ 'three', 'four' ], [ 'one', 'two' ] ];
-
-    // TODO: move these purely git tests to util/test
-
-    ////////////////////////////////////////////////////////////////////////////////
-    //
-    // test gitRemoveCommit, gitAddCommit
-    //
-    it ('should remove/commit, then add/commit a file to git', function (done) {
-	let filepath = TESTFILES_DIR + 'test-add-commit';
-	removeCommitIfExists(filepath, 'removing test file')
-	    .then(() => {
-		console.log('writing new file');
-		return fsWriteFile(filepath, JSON.stringify('[]'));
-	    }).then(() => {
-		console.log('committing file');
-		return My.gitAddCommit(filepath, 'adding test file');
-	    }).then(() => {
-		console.log('done');
-		done();
-	    }).catch(err => {
-		console.log(`error, ${err}`);
-		done(err);
-	    });
-    });
-
     ////////////////////////////////////////////////////////////////////////////////
     //
     // test Result.fileScoreSaveCommit
+    //
+    // TODO: all the removing/adding is unnecessary. just make sure the file is there
+    // in before(), then writeAdd if it isn't
     //
     it ('should remove/commit, then add/commit a file to git', function (done) {
 	let wordList = [ 'betsy', 'ariana' ];
 	let options = { force: true };
 	let srcFilepath = TESTFILES_DIR + 'oneResult.json';
 	let filepath = TESTFILES_DIR + 'oneResult-copy.json';
-	removeCommitIfExists(filepath, `removing ${filepath}`)
+	My.gitRemoveCommitIfExists(filepath, `removing ${filepath}`)
 	    .then(() => {
 		console.log(`reading file ${srcFilepath}`);
 		return fsReadFile(srcFilepath, 'utf8');
 	    }).then(data => {
 		console.log(`writing ${filepath}`);
 		return fsWriteFile(filepath, data);
-	    }).then(() => {
+	    }).then(() => { // TODO: actually only need to Add here, not AddCommit
 		console.log('calling gitAddCommit');
 		return My.gitAddCommit(filepath, 'adding test file');
 	    }).then(() => {
 		console.log('calling fileScoreSaveCommit');
 		return Result.fileScoreSaveCommit(filepath, options, wordList);
-	    }).then(() => {
+	    }).then(() => { // TODO: removeCommit when we're done?
 		console.log('done');
 		done();
 	    }).catch(err => {
