@@ -32,7 +32,7 @@ function persist(filename) {
 
 //
 
-function toJSON() {
+function toJSON () {
     var result = '[\n';
     var first = true;
 
@@ -55,22 +55,22 @@ function toJSON() {
 
 //
 
-function save(filename) {
+function save (filename) {
     Fs.writeFileSync(filename, this.toJSON(), { encoding: 'utf8' });
 }
 
 //
 
-function clueToJSON(clue) {
-    var s;
-
-    s = '{';
+function clueToJSON (clue) {
+    let s = '{';
 
     if (clue.name) {
-	s += ' "name": "'  + clue.name  + '", ' + format2(clue.name, 25);
+	s += ` "name": "${clue.name}", ${format2(clue.name, 15)}`;
     }
-    s += ' "src": "' + clue.src + '"';
-
+    s += `"src": "${clue.src}"`;
+    if (clue.actual) {
+	s += `, ${format2(clue.src, 2)}"actual": "${clue.actual}"`;
+    }
     if (clue.note) {
 	s+= ', "note" : "' + clue.note + '"';
     }
@@ -90,7 +90,7 @@ function clueToJSON(clue) {
 
 //
 
-function format2(text, span)
+function format2 (text, span)
 {
     var result = "";
     for (var len = text.toString().length; len < span; ++len) { result += " "; }
@@ -100,14 +100,14 @@ function format2(text, span)
 //
 //
 
-function init() {
+function init () {
     return this;
 }
 
 //
 //
 
-function makeKey() {
+function makeKey () {
     return this.map(clue => clue.name).sort().toString();
 }
 
@@ -135,7 +135,7 @@ function getSameSrcList (startIndex, options = {}) {
 	    return false;
 	}));
     }
-    return [ list, mismatch ];
+    return [list, mismatch];
 }
 
 //
@@ -157,13 +157,21 @@ function sortedBySrc () {
 
 //
 
-function clueMergeFrom(toClue, fromClue, options) {
+function clueSetActual (clue, actualClue) {
+    Expect(actualClue.src).to.exist;
+    clue.actual = actualClue.src;
+}
+
+//
+
+function clueMergeFrom (toClue, fromClue, options) {
     let warnings = 0;
 
-    if (toClue.src !== fromClue.src) {
-	console.log(`WARNING! merging ${toClue.name}.src, ${toClue.src} -> ${fromClue.src}`);
+    if (!_.has(toClue, 'actual')) {
+	clueSetActual(toClue, fromClue);
+    } else if (toClue.actual !== fromClue.src) {
+	console.log(`WARNING! mismatched actual for ${toClue.name}, to:${toClue.actual} from:${fromClue.src}`);
 	warnings += 1;
-	toClue.src = fromClue.src;
     }
     if (toClue.x !== fromClue.x) {
 	if (_.isUndefined(toClue.x)) {
@@ -202,17 +210,22 @@ function clueMergeFrom(toClue, fromClue, options) {
 
 //
 
-function sameSrcMergeFrom(list, options) {
-    Expect(list.length, 'list.length < this.length').is.at.least(this.length);
+function sameSrcMergeFrom (fromList, options = {}) {
+    Expect(fromList.length, 'fromList.length < this.length').is.at.least(this.length);
     let warnings = 0;
     for (let [index, clue] of this.entries()) {
-	Expect(clue.name, `name mismatch, ${clue.name} vs ${list[index].name}`).to.equal(list[index].name);
-	warnings += clueMergeFrom(clue, list[index], options);
+	Expect(clue.name, `name mismatch, ${clue.name} vs ${fromList[index].name}`)
+	    .to.equal(fromList[index].name);
+	warnings += clueMergeFrom(clue, fromList[index], options);
+	this[index] = clue;
     }
     // append remaing non-matching-name clues, but don' allow duplicate names
-    for (let clue of list.slice(this.length, list.length)) {
+    for (let clue of fromList.slice(this.length, fromList.length)) {
 	// check if clue.name already exists in this list
-	Expect(_.find(this, ['name', clue.name])).to.be.undefined; // Clue.NAME
+	Expect(_.find(this, ['name', clue.name])).to.be.undefined; // TODO: define/use Clue.NAME
+	Expect(options.src).to.be.a('string');
+	clueSetActual(clue, clue);
+	clue.src = options.src;
 	this.push(clue);
     }
     return [this, warnings];
@@ -220,17 +233,25 @@ function sameSrcMergeFrom(list, options) {
 
 //
 
-function mergeFrom(fromList, options) {
+function mergeFrom (fromList, options = {}) {
     let merged = makeNew();
     let toIndex = 0;
     let fromIndex = 0;
     let warnings = 0;
-
+    let srcNum = 0;
     while (!_.isUndefined(toIndex) || !_.isUndefined(fromIndex)) {
 	let [sameSrcFromList, nextFromIndex] = fromList.getSameSrcList(fromIndex, options);
 	let [sameSrcToList, nextToIndex] = this.getSameSrcList(toIndex, options);
+	// use the src from TO list if available
+	if (!_.isEmpty(sameSrcToList)) {
+	    srcNum = _.toNumber(sameSrcToList[0].src);
+	} else {
+	    srcNum += 1;
+	}
+	Expect(srcNum).to.be.above(0);
 	//console.log(`to: ${sameSrcToList.toJSON()}`);
-	let [sameSrcMerged, mergeWarnings] = sameSrcToList.sameSrcMergeFrom(sameSrcFromList, options);
+	let mergeOptions = { src: srcNum.toString() };
+	let [sameSrcMerged, mergeWarnings] = sameSrcToList.sameSrcMergeFrom(sameSrcFromList, mergeOptions);
 	merged.push(...sameSrcMerged);
 	warnings += mergeWarnings;
 	
@@ -239,14 +260,13 @@ function mergeFrom(fromList, options) {
     }
     Expect(toIndex, 'looks like toList is bigger than fromlist, manually fix it').to.be.undefined;
     Expect(fromIndex, 'pigs fly').to.be.undefined;
-
     return [merged, warnings];
 }
 
 //
 //
 
-function assignMethods(list) {
+function assignMethods (list) {
     list.display          = display;
     list.getSameSrcList   = getSameSrcList;
     list.init             = init;
@@ -265,7 +285,7 @@ function assignMethods(list) {
 //
 // args: see makeFrom()
 
-function objectFrom(args) {
+function objectFrom (args) {
     let clueList = [];
 
     if (args.filename) {
@@ -291,7 +311,7 @@ function objectFrom(args) {
 //
 //
 
-function makeNew() {
+function makeNew () {
     return assignMethods(Object([]));
 }
 
@@ -302,7 +322,7 @@ function makeNew() {
 //   optional: optional flag suppresses file error
 //   array:    js array
 
-function makeFrom(args) {
+function makeFrom (args) {
     let object = objectFrom(args);
     return assignMethods(Object(object)).init();
 }

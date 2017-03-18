@@ -18,8 +18,9 @@ const Result       = require('./result-mod');
 const Opt          = require('node-getopt').create([
     ['f', 'from=NAME',           'merge from: meta(m), synth(s), harm(h)'],
     ['t', 'to=NAME',             'merge to: synth(s), harm(h), final(f)'],
+    ['',  'save',                'save to results'],
     ['',  'force',               'force merge, ignoring warnings. USE CAUTION.'],
-//    ['v', 'verbose',             'show logging'],
+//  ['v', 'verbose',             'show logging'],
     ['h', 'help',                'this screen']
 ]).bindHelp().parseSystem();
 
@@ -72,22 +73,25 @@ function main () {
     if (Opt.options.verbose) {
 	console.log('verbose: true');
     }
-
-    let [ fromClueList, toClueList ] = loadClueLists(from, to);
+    let [fromClueList, toClueList] = loadClueLists(from, to);
     let fromLength = fromClueList.length;
     let toLength = toClueList.length;
     fromClueList = fromClueList.sortedBySrc();
     toClueList = toClueList.sortedBySrc();
-    Expect(fromClueList.length === fromLength, 'from').to.be.true;
-    Expect(toClueList.length === toLength, 'to').to.be.true;
+    Expect(fromClueList.length, 'from').to.equal(fromLength);
+    Expect(toClueList.length, 'to').to.equal(toLength);
     console.log(`from(${fromClueList.length}), to(${toClueList.length})`);
-
     let options = { copySrc: true };
     let [merged, warnings] = toClueList.mergeFrom(fromClueList, options);
     console.log(merged.toJSON());
     console.log(`length(${merged.length}), warnings(${warnings})`);
-    if (warnings === 0 || Opt.options.force) {
-	ClueManager.saveClueList(merged, 1, { dir: to.name });
+    Expect(merged.length, 'list length mismatch').to.equal(fromClueList.length);
+    if (Opt.options.save) {
+	if (warnings > 0 && !Opt.options.force) {
+	    console.log('warnings found, save aborted. use --force to override');
+	} else {
+	    ClueManager.saveClueList(merged, 1, { dir: to.name });
+	}
     }
 }
 

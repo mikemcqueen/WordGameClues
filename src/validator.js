@@ -11,18 +11,17 @@ module.exports = exports = new Validator();
 //
 
 const _             = require('lodash');
-const expect        = require('chai').expect;
-
-const ClueManager   = require('./clue_manager');
 const ClueList      = require('./clue_list');
-const ResultMap     = require('./resultmap');
+const ClueManager   = require('./clue_manager');
+const Expect        = require('chai').expect;
 const NameCount     = require('./name_count');
 const Peco          = require('./peco');
+const ResultMap     = require('./resultmap');
 
 //
 
-//const xp = false;
-const xp = true;
+const xp = false;
+//const xp = true;
 
 //
 
@@ -160,8 +159,8 @@ Validator.prototype.validateSources = function(args) {
 
 Validator.prototype.recursiveValidateSources = function(args) {
     if (xp) {
-	expect(args.clueNameList).to.be.an('array').that.is.not.empty;
-	expect(args.clueCountList).to.be.an('array').that.is.not.empty;
+	Expect(args.clueNameList).to.be.an('array').that.is.not.empty;
+	Expect(args.clueCountList).to.be.an('array').that.is.not.empty;
     }
 
     this.logLevel++;
@@ -170,7 +169,7 @@ Validator.prototype.recursiveValidateSources = function(args) {
 		 ', looking for [' + args.clueNameList + ']' +
 		 ' in [' + args.clueCountList + ']');
     }
-    if (xp) expect(args.clueNameList.length).to.equal(args.clueCountList.length);
+    if (xp) Expect(args.clueNameList.length).to.equal(args.clueCountList.length);
 
     let ncList = _.isUndefined(args.nameCountList) ? [] : args.nameCountList;
     let nameIndex = 0;
@@ -248,12 +247,12 @@ Validator.prototype.rvsWorker = function(args) {
 		 ', nameList: ' + args.nameList);
     }
     if (xp) {
-	expect(args.name).to.be.a('string').that.is.not.empty;
-	expect(args.count).to.be.a('number')
+	Expect(args.name).to.be.a('string').that.is.not.empty;
+	Expect(args.count).to.be.a('number')
 	    .that.is.at.least(1)
 	    .and.at.most(ClueManager.maxClues);
-	expect(args.ncList).to.be.an('array');
-	expect(args.nameList).to.be.an('array');
+	Expect(args.ncList).to.be.an('array');
+	Expect(args.nameList).to.be.an('array');
     }
 	
     let newNameCountList = this.copyAddNcList(args.ncList, args.name, args.count);
@@ -402,7 +401,7 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 	    // break down all compound clues into source components
 	    buildArgs.ncList = nameCountList;
 	    buildResult = this.buildSrcNameList(buildArgs);
-	    if (xp) expect(buildResult.count).to.be.at.most(ClueManager.maxClues);
+	    if (xp) Expect(buildResult.count).to.be.at.most(ClueManager.maxClues);
 
 	    // skip recursive call to validateSources if we have all primary clues
 	    if (buildResult.allPrimary) {
@@ -429,7 +428,7 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 		    break; // fail, try other combos
 		}
 		// sanity check
-		if (xp) expect(vsResult.list).is.not.empty;
+		if (xp) Expect(vsResult.list).is.not.empty;
 		if (this.logging) {
 		    this.log('from validateSources(' + buildResult.count + ')');
 		    this.log('  compoundSrcNameList: ' + buildResult.compoundSrcNameList);
@@ -452,7 +451,7 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 	    let anyCandidate = false;
 	    candidateResultList.some(result => {
 		let findResult = this.findDuplicatePrimaryClue({ ncList: result.ncList });
-		if (xp) expect(findResult.allPrimary).to.be.true;
+		if (xp) Expect(findResult.allPrimary).to.be.true;
 		if (!this.evalFindDuplicateResult(findResult, '2nd')) {
 		    return false; // some.continue
 		}
@@ -490,7 +489,7 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 	    return this.uniqueResult(anyFlag, resultList); // success , exit function
 	}
 	// sanity check
-	if (xp) expect(buildResult, 'buildResult').to.exist;
+	if (xp) Expect(buildResult, 'buildResult').to.exist;
 	if (!this.incrementIndexMap(buildResult.indexMap)) {
 	    if (this.logging) {
 		this.log(`--checkUniqueSources, full validate, ${anyFlag}`);
@@ -530,9 +529,9 @@ Validator.prototype.getCompatibleResults = function(args) {
 		 this.indentNewline() + '  nameSrcList: ' + args.nameSrcList);
     }
     if (xp) {
-	expect(args.origNcList).to.be.an('array').that.is.not.empty;
-	expect(args.ncList).to.be.an('array').that.is.not.empty;
-	expect(args.nameSrcList).to.be.an('array').that.is.not.empty;
+	Expect(args.origNcList).to.be.an('array').that.is.not.empty;
+	Expect(args.ncList).to.be.an('array').that.is.not.empty;
+	Expect(args.nameSrcList).to.be.an('array').that.is.not.empty;
     }
 
     let logit = false;
@@ -572,9 +571,9 @@ Validator.prototype.getCompatibleResults = function(args) {
 //
 Validator.prototype.addCompatibleResult = function(resultList, nameSrcList, args) {
     if (xp) {
-	expect(resultList).to.be.an('array');
-	expect(nameSrcList).to.be.an('array');
-	expect(args.ncList).to.be.an('array');
+	Expect(resultList).to.be.an('array');
+	Expect(nameSrcList).to.be.an('array');
+	Expect(args.ncList).to.be.an('array');
     }
 
     resultList.push({
@@ -598,7 +597,7 @@ Validator.prototype.addCompatibleResult = function(resultList, nameSrcList, args
 //  exclueSrcList:
 //
 Validator.prototype.cyclePrimaryClueSources = function(args) {
-    if (xp) expect(args.ncList).to.be.an('array').that.is.not.empty;
+    if (xp) Expect(args.ncList).to.be.an('array').that.is.not.empty;
 
     if (this.logging) {
 	this.log('++cyclePrimaryClueSources');
@@ -633,7 +632,7 @@ Validator.prototype.cyclePrimaryClueSources = function(args) {
 	if (findResult.duplicateSrc) {
 	    continue;
 	}
-	if (xp) expect(_.size(localNcList), 'localNcList').to.equal(_.size(srcMap));
+	if (xp) Expect(_.size(localNcList), 'localNcList').to.equal(_.size(srcMap));
 
 	let nameSrcList = this.getNameSrcList(srcMap);
 	if (this.logging) {
@@ -728,7 +727,7 @@ Validator.prototype.findPrimarySourceConflicts = function(args) {
 	this.log(`++findPrimarySourceConflicts, ncList: ${args.ncList}`);
     }
 
-    if (xp) expect(args.ncList, 'args.ncList').to.exist;
+    if (xp) Expect(args.ncList, 'args.ncList').to.exist;
 
     let allPrimary = true;
     let nameMap = {};
@@ -841,7 +840,7 @@ Validator.prototype.resolvePrimarySourceConflicts = function(args) {
 		    args.srcMap[candidateSrc] = candidateName;
 		    // any name will do?!
 		    args.srcMap[src] = conflictNameList.pop();
-		    if (conflictNameList.length === 0) {
+		    if (_.isEmpty(conflictNameList)) {
 			return true; // candidateSrcList.some.exit
 		    }
 		}
@@ -849,7 +848,7 @@ Validator.prototype.resolvePrimarySourceConflicts = function(args) {
 	    })) {
 		return true; // srcList.some.exit
 	    }
-	    return false; // srcList.some.next
+	    return false; // srcList.some.continue
 	})) {
 	    // failed to find an alternate unused source for all conflict names
 	    duplicateSrcName = _.toString(conflictNameList);
@@ -878,7 +877,7 @@ Validator.prototype.resolvePrimarySourceConflicts = function(args) {
 //  nameMap:
 //
 Validator.prototype.findDuplicatePrimarySource = function(args) {
-    if (xp) expect(args.ncList).to.be.an('array');
+    if (xp) Expect(args.ncList).to.be.an('array');
 
     let duplicateSrcName;
     let duplicateSrc;
@@ -998,8 +997,7 @@ Validator.prototype.buildSrcNameList = function(args) {
 	    slIndex = 0;
 	}
 	if (this.logging ) {
-	    this.log('build: index: ' + ncIndex +
-		     ', source: ' + srcList[slIndex]);
+	    this.log(`build: index: {$ncIndex}, source: ${srcList[slIndex]}`);
 	}
 
 	let srcNameList = srcList[slIndex].split(',');      // e.g. [ 'src1', 'src2', 'src3' ]
@@ -1011,7 +1009,7 @@ Validator.prototype.buildSrcNameList = function(args) {
 		return; // forEach.next
 	    }
 	}
-	if (xp) expect(resultMap.map()[nc]).to.be.undefined;
+	if (xp) Expect(resultMap.map()[nc]).to.be.undefined;
 
 	// if nc is a primary clue
 	if (nc.count == 1) {
@@ -1049,18 +1047,18 @@ Validator.prototype.buildSrcNameList = function(args) {
     }, this);
 
     if (args.allPrimary && (primarySrcNameList.length != args.ncList.length)) {
-	throw new Error('something went wrong, primary: ' + primarySrcNameList.length +
-			', ncList: ' + args.ncList.length);
+	throw new Error(`something went wrong, primary: ${primarySrcNameList.length}` +
+			`, ncList: ${args.ncList.length}`);
     }
 
     if (this.logging) {
-	this.log('--buildSrcNameList' +
-		 this.indentNewline() + '  compoundSrcNameList: ' + compoundSrcNameList +
-		 this.indentNewline() + '  compoundNcList: ' + compoundNcList +
-		 this.indentNewline() + '  count: ' + clueCount +
-//		 this.indentNewline() + '  compoundNcNameListPairs: ' + compoundNcNameListPairs +
-		 ', primarySrcNameList: ' + primarySrcNameList +
-		 this.indentNewline() + '  primaryNcList: ' + primaryNcList);
+	this.log('--buildSrcNameList');
+	this.log(`  compoundSrcNameList: ${compoundSrcNameList}`);
+	this.log(`  compoundNcList: ${compoundNcList}`);
+	this.log(`  count: ${clueCount}`);
+	this.log(`  primarySrcNameList: ${primarySrcNameList}`);
+	this.log(`  primaryNcList: ${primaryNcList}`);
+	// this.indentNewline() + '  compoundNcNameListPairs: ' + compoundNcNameListPairs +
 
 	if (this.logResults) {
 	    if (!_.isEmpty(resultMap.map())) {
@@ -1073,15 +1071,15 @@ Validator.prototype.buildSrcNameList = function(args) {
 	}
     }
     return {
-	compoundNcNameListPairs:compoundNcNameListPairs,
-	compoundSrcNameList:    compoundSrcNameList,
-	compoundNcList:         compoundNcList,
-	primaryNcList:          primaryNcList,
-	primarySrcNameList:     primarySrcNameList,
-	resultMap:              resultMap,
-	count:                  clueCount,
-	allPrimary:             allPrimary,
-	indexMap:               indexMap
+	compoundNcNameListPairs,
+	compoundSrcNameList,
+	compoundNcList,
+	primaryNcList,
+	primarySrcNameList,
+	resultMap,
+	allPrimary,
+	indexMap,
+	count: clueCount,
     };
 }
 
@@ -1109,7 +1107,7 @@ Validator.prototype.getSrcListIndex = function(indexMap, nc, srcList) {
     if (_.has(indexMap, nc)) {
 	slIndex = indexMap[nc].index;
 	// sanity check
-	if (xp) expect(indexMap[nc].length, 'mismatched index lengths').to.equal(srcList.length);
+	if (xp) Expect(indexMap[nc].length, 'mismatched index lengths').to.equal(srcList.length);
 	if (this.logging) {
 	    this.log(nc.name + ': using preset index ' + slIndex +
 		     ', length(' + indexMap[nc].length + ')' +
@@ -1131,7 +1129,7 @@ Validator.prototype.getSrcListIndex = function(indexMap, nc, srcList) {
 //
 
 Validator.prototype.incrementIndexMap = function(indexMap) {
-    if (xp) expect(indexMap, 'bad indexMap').to.be.an('object').that.is.not.empty;
+    if (xp) Expect(indexMap, 'bad indexMap').to.be.an('object').that.is.not.empty;
     if (this.logging) {
 	this.log('++indexMap: ' + this.indexMapToJSON(indexMap));
     }
