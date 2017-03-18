@@ -670,8 +670,7 @@ function ensureUniquePrimaryLists() {
     pathList.forEach(path => {
 	var at = path.path ? _.at(this.map(), path.path) : [ this.map() ];
 	var list;
-	if (_.size(at) != 1) {
-	    
+	if (_.size(at) !== 1) {
 	    throw new Error('too much at, ');
 	}
 	at = at[0];

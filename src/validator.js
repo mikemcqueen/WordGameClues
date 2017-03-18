@@ -21,7 +21,8 @@ const Peco          = require('./peco');
 
 //
 
-const xp = false;
+//const xp = false;
+const xp = true;
 
 //
 
@@ -688,10 +689,12 @@ Validator.prototype.findDuplicatePrimaryClue = function(args) {
 
     // log before possible exception, to provide more info
     if (this.logging) {
-	this.log('--findDuplicatePrimaryClue, duplicateName: ' + duplicateName +
-		 ', duplicateSrc: ' + duplicateSrc +
-		 ', allPrimary: ' + findResult.allPrimary +
-		 ', srcMap.size: ' + _.size(findResult.srcMap));
+	this.log('--findDuplicatePrimaryClue' +
+		 `, duplicateName: ${duplicateName}` +
+		 `, duplicateSrcName: ${duplicateSrcName}` +
+		 `, duplicateSrc: ${duplicateSrc}` +
+		 `, allPrimary: ${findResult.allPrimary}` +
+		 `, srcMap.size: ${_.size(findResult.srcMap)}`);
     }
 
     if (findResult.allPrimary && _.isUndefined(duplicateSrc) &&

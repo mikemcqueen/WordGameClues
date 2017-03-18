@@ -23,30 +23,34 @@ var ResultMap   = require('./resultmap');
 // initialize command line options.  do this before logger.
 //
 
+// metamorphois -> synthesis -> harmonize -> finalize
+
 var Opt = require('node-getopt')
     .create([
 	['a', 'alt-sources=NAME',            'show alternate sources for the specified clue' ],
 	['A', 'all-alt-sources',             'show alternate sources for all clues' ],
 	['c', 'count=COUNT',                 '# of primary clues to combine' ],
-	['d', 'allow-dupe-source'  ,         'allow duplicate source, override default behavior of --meta' ],
+	['d', 'allow-dupe-source',           'allow duplicate source, override default behavior of --meta' ],
 	['' , 'json=WHICH',                  'specify which clue files to use. WHICH=meta|synth' ],
-	['k', 'show-known'         ,         'show compatible known clues; -u <clue> required' ],
+	['f', 'final',                       'use harmony clues' ],
+	['k', 'show-known',                  'show compatible known clues; -u <clue> required' ],
 	['',  'csv',                         '  output in search-term csv format' ],
-	['m', 'meta'               ,         'use metamorphosis clues, same as --json meta (default)' ],
-	['o', 'output'             ,         'output json -or- clues' ],
+	['m', 'meta',                        'use metamorphosis clues (default)' ],
+	['o', 'output',                      'output json -or- clues' ],
 	['p', 'primary-sources=SOURCE[,SOURCE,...]', 'limit results to the specified primary source(s)' ],
 	['q', 'require-counts=COUNT+',       'require clue(s) of specified count(s)' ],
+	['r', 'harmony'            ,         'use harmony clues' ],
 	['s', 'show-sources=NAME[:COUNT][,v]', 'show primary source combinations for the specified name[:count]' ],
 	['t', 'test=SOURCE[,SOURCE,...]',    'test the specified source list, e.g. blue,fish' ],
-	['',  'add=NAME',                    '  add combination to known list as NAME; use with --try' ],
-	['',  'reject',                      '  add combination to reject list; use with --try' ],
+	['',  'add=NAME',                    '  add combination to known list as NAME; use with --test' ],
+	['',  'reject',                      '  add combination to reject list; use with --test' ],
 	['u', 'use=NAME[:COUNT]+',           'use the specified name[:count](s)' ],
 	['x', 'max=COUNT',                   'specify maximum # of components to combine'],
-	['y', 'synthesis',                   'use synthesis clues, same as --json synth' ],
+	['y', 'synthesis',                   'use synthesis clues' ],
 	['z', 'flags=OPTION+',               'flags: 1=validateAllOnLoad,2=ignoreLoadErrors' ],
 
-	['v' , 'verbose=OPTION+',             'show logging. OPTION=load' ],
-	['h' , 'help'               ,         'this screen']
+	['v', 'verbose=OPTION+',             'show logging. OPTION=load' ],
+	['h', 'help',                        'this screen']
     ])
     .bindHelp().parseSystem();
 
@@ -112,7 +116,7 @@ function main() {
 
     Validator.setAllowDupeFlags(synthFlag ? {
 	allowDupeNameSrc: false,
-	allowDupeSrc:     true,
+	allowDupeSrc:     false, // NOTE: was true, i changed to false
 	allowDupeName:    true,
     } : {
 	allowDupeNameSrc: false,
@@ -130,12 +134,9 @@ function main() {
     }
 
     setLogging(_.includes(verboseArg, VERBOSE_FLAG_LOAD));
-
-    //
     if (!loadClues(synthFlag, metaFlag, jsonArg, validateAllOnLoad, ignoreLoadErrors)) {
 	return 1;
     }
-
     setLogging(verboseArg);
 
     // hacky.  fix this

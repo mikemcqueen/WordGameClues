@@ -296,7 +296,7 @@ ComboMaker.prototype.next = function(clueSourceList, sourceIndexes) {
 	// skip combinations that have duplicate source:count
 	if (_.uniq(srcCountStrList).length !== srcCountStrList.length) {
 	    if (this.logging) {
-		this.log('skipping duplicate clue src: ' + strCountStrList);
+		this.log('skipping duplicate clue src: ' + srcCountStrList);
 	    }
 	    ++this.nextDupeSrc;
 	    continue;
