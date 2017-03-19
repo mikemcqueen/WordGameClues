@@ -6,6 +6,7 @@
 
 const _            = require('lodash');
 const ClueManager  = require('../clue_manager.js');
+const Clues        = require('../clue-types.js');
 const Dir          = require('node-dir');
 const Fs           = require('fs');
 const Duration     = require('duration');
@@ -18,19 +19,25 @@ const Score        = require('./score-mod');
 
 const Opt          = require('node-getopt').create([
     ['a', 'article',             'filter results based on article word count'],
-    ['c', 'count',               'show result/url counts only'],
     ['d', 'dir=NAME',            'directory name'],
+    //['f', 'final',             'use final clues'],
 //    ['k', 'known',               'filter known results'],  // easy!, call ClueManager.filter()
     ['m', 'match=EXPR',          'filename match expression' ],
-    ['r', 'rejects',             'show only results that fail all filters'],
-    ['s', 'synthesis',           'use synth clues'],
+    ['n', 'count',               'show result/url counts only'],
+//    ['r', 'rejects',             'show only results that fail all filters'],
+    //['r', 'harmony',             'use harmony clues'],
     ['t', 'title',               'filter results based on title word count (default)'],
     ['x', 'xfactor=VALUE',       'show borked results, with 1) missing URL/title/summary 2) unscored URLs' +
                                    ' 3) article > summary'], 
+    ['y', 'synthesis',           'use synthesis clues'],
+
     ['v', 'verbose',             'show logging'],
     ['h', 'help',                'this screen']
 ]).bindHelp().parseSystem();
 
+//
+
+const csvParse     = Promise.promisify(require('csv-parse'));
 const fsReadFile   = Promise.promisify(Fs.readFile);
 
 //
@@ -154,6 +161,30 @@ function loadFilteredUrls (dir, wordList, options) {
 	});
 }
 
+//
+
+function hasRemaining (wordListArray, remaining) {
+    Expect(wordListArray).is.an('array');
+    Expect(remaining).is.an('array').that.is.not.empty;
+    for (const wordList of wordListArray) {
+	if (wordList.length !== remaining.length) continue;
+	if (remaining.some(word => _.includes(wordList, word))) {
+	    return true;
+	}
+    }
+    return false;
+}
+
+//
+
+function isInNameMap (nameMap, wordList) {
+    Expect(nameMap).to.be.an('object');
+    Expect(wordList).to.be.an('array').with.length.of.at.least(1);
+    let word = wordList[0];
+    if (!_.has(nameMap, word)) return false;
+    return hasRemaining(nameMap[word], wordList.slice(1, wordList.length));
+}
+
 // for each search result filename that matches fileMatch in dir 
 //   filter out rejected word combinations
 //   load the file, build filtered URL list
@@ -183,7 +214,12 @@ function filterSearchResultDir (dir, fileMatch, options) {
 	    let wordList = Result.makeWordlist(filepath);
 	    // filter out rejected word combos
 	    if (ClueManager.isRejectSource(wordList)) return next();
-	    
+	    if (!isInNameMap(options.nameMap, wordList)) return next();
+	    // temp
+	    if (!_.isUndefined(options.nameMap)) {
+		console.log(`filename: ${filepath}`);
+		return next();
+	    }
   	    loadFilteredUrls(dir, wordList, options)
 		.then(filteredUrls => {
 		    options.filepath = filepath;
@@ -234,29 +270,60 @@ function displayFilterResults (resultList) {
     }
 }
 
+// TODO: move to Util.js
+
+function loadCsv (filename) {
+    return fsReadFile(filename, 'utf8')
+	.then(csvContent => csvParse(csvContent, null));
+}
+
+//
+
+function buildNameMap (wordListArray) {
+    let map = {};
+    for (const wordList of wordListArray) {
+	for (const word of wordList) {
+	    let remaining = _.difference(wordList, [word]);
+	    Expect(remaining.length, 'remaining').is.at.least(1);
+	    if (!_.has(map, word)) {
+		map[word] = [];
+	    }
+	    if (!hasRemaining(map[word], remaining)) {
+		map[word].push(remaining);
+	    }
+	}
+    }
+    return map;
+}
+
 //
 //
 //
 async function main () {
-    Expect(Opt.argv, 'no non-switch arguments allowed').to.be.empty;
+    Expect(Opt.argv.length, 'only one non-switch FILE argument allowed').is.at.most(1);
     Expect(Opt.options.dir, 'option -d NAME is required').to.exist;
+
+    ClueManager.loadAllClues({
+	baseDir: Opt.options.synth ? Clues.SYNTH.name : Clues.META.name
+    });
 
     // default to title filter if no filter specified
     if (!Opt.options.article && !Opt.options.title) {
 	Opt.options.title = true;
     }
-
-    ClueManager.loadAllClues({
-	baseDir: Opt.options.synth ? 'synth' : 'meta'
-    });
-
+    let nameMap;
+    if (Opt.argv.length > 0) {
+	let wordListArray = await loadCsv(Opt.argv[0]);
+	nameMap = buildNameMap(wordListArray);
+    }
     let dir = Result.DIR + Opt.options.dir;
     let filterOptions = {
 	filterArticle: Opt.options.article,
 	filterTitle:   Opt.options.title,
 	filterRejects: Opt.options.rejects,
 	verbose:       Opt.options.verbose,
-	xfactor:       _.toNumber(Opt.options.xfactor)
+	xfactor:       _.toNumber(Opt.options.xfactor),
+	nameMap
     };
     let start = new Date();
     let result = await filterSearchResultDir(dir, Result.getFileMatch(Opt.options.match), filterOptions);
@@ -274,9 +341,8 @@ async function main () {
 
 //
 
-try {
-    main();
-} catch(err) {
+main()
+.catch(err => {
     console.log(err.stack);
-}
+});
 

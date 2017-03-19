@@ -29,14 +29,12 @@ var Opt = require('node-getopt')
     .create([
 	['a', 'alt-sources=NAME',            'show alternate sources for the specified clue' ],
 	['A', 'all-alt-sources',             'show alternate sources for all clues' ],
+	['o', 'output',                      '  output json -or- clues(huh?)' ],
 	['c', 'count=COUNT',                 '# of primary clues to combine' ],
 	['d', 'allow-dupe-source',           'allow duplicate source, override default behavior of --meta' ],
-	['' , 'json=WHICH',                  'specify which clue files to use. WHICH=meta|synth' ],
-	['f', 'final',                       'use harmony clues' ],
+	['f', 'final',                       'use final clues' ],
 	['k', 'show-known',                  'show compatible known clues; -u <clue> required' ],
 	['',  'csv',                         '  output in search-term csv format' ],
-	['m', 'meta',                        'use metamorphosis clues (default)' ],
-	['o', 'output',                      'output json -or- clues' ],
 	['p', 'primary-sources=SOURCE[,SOURCE,...]', 'limit results to the specified primary source(s)' ],
 	['q', 'require-counts=COUNT+',       'require clue(s) of specified count(s)' ],
 	['r', 'harmony'            ,         'use harmony clues' ],
@@ -77,16 +75,13 @@ function main() {
     let countArg = _.toNumber(Opt.options.count);
     let maxArg = _.toNumber(Opt.options.max);
     let useClueList = Opt.options.use;
-    let metaFlag = Opt.options['meta'];
     let verboseArg = Opt.options['verbose'];
-    let outputArg = Opt.options['output'];
     let showSourcesClueName = Opt.options['show-sources'];
     let altSourcesArg = Opt.options['alt-sources'];
     let allAltSourcesFlag = Opt.options['all-alt-sources'];
     let allowDupeSrcFlag = Opt.options['allow-dupe-source'];
     let showKnownArg = Opt.options['show-known'];
     let synthFlag = Opt.options['synthesis'];
-    let jsonArg = Opt.options['json'];
     let flagsArg = Opt.options.flags;
 
     if (!maxArg) {
@@ -110,7 +105,7 @@ function main() {
 	}
     }
 
-    if (outputArg) {
+    if (Opt.options.output) {
 	QUIET = true;
     }
 
@@ -134,12 +129,13 @@ function main() {
     }
 
     setLogging(_.includes(verboseArg, VERBOSE_FLAG_LOAD));
-    if (!loadClues(synthFlag, metaFlag, jsonArg, validateAllOnLoad, ignoreLoadErrors)) {
+    if (!loadClues(synthFlag, validateAllOnLoad, ignoreLoadErrors)) {
 	return 1;
     }
     setLogging(verboseArg);
 
     // hacky.  fix this
+    let metaFlag;
     if (!synthFlag) {
 	metaFlag = true;
     }
@@ -153,10 +149,12 @@ function main() {
 	    console.log('one or more -u NAME:COUNT required with that option');
 	    return 1;
 	}
+	/*
 	if (!metaFlag) {
 	    console.log('--meta required with that option');
 	    return 1;
 	}
+	 */
 	if (!countArg) {
 	    countArg = ClueManager.maxClues;
 	}
@@ -175,12 +173,12 @@ function main() {
     else if (altSourcesArg || allAltSourcesFlag) {
 	AltSources.show(allAltSourcesFlag ? {
 	    all    : true,
-	    output : outputArg,
+	    output : Opt.options.output,
 	    count  : countArg
 	} : {
 	    all    : false,
 	    name   : altSourcesArg,
-	    output : outputArg
+	    output : Opt.options.output
 	});
     }
     else {
@@ -196,39 +194,18 @@ function main() {
 
 //
 
-function loadClues(synthFlag, metaFlag, jsonArg,
-		   validateAllOnLoad, ignoreLoadErrors) {
-    var base;
-
-    if ((synthFlag  || metaFlag) && jsonArg) {
-	console.log('--json not allowed with --synth or --meta');
-	return false;
-    }
-    if ((synthFlag !== undefined) && (metaFlag !== undefined)) {
-	console.log('--synthesis and --meta not allowed');
-	return false;
-    }
-
-    if (jsonArg) {
-	base = jsonArg;
-    }
-    else if (!synthFlag) {
-	base = 'meta';
-    }
-    else {
+function loadClues (synthFlag, validateAllOnLoad, ignoreLoadErrors) {
+    let base = 'meta';
+    if (synthFlag) {
 	base = 'synth';
     }
-
     log('loading all clues...');
-
     ClueManager.loadAllClues({
 	baseDir:      base,
 	validateAll:  validateAllOnLoad,
 	ignoreErrors: ignoreLoadErrors
     });
-
     log('done.');
-
     return true;
 }
 
@@ -430,10 +407,10 @@ function doCombos(args) {
 		', filtered: ' + _.size(result.set) +
 		', known: ' + result.known +
 		', reject: ' + result.reject +
-		', duplicate: ' + result.duplicate)
+		', duplicate: ' + result.duplicate);
 
     if (nameCsvList.length !== _.size(result.set) + result.known + result.reject + result.duplicate) {
-	console.warn('WARNING: amounts to not add up!');
+	console.log('WARNING: amounts to not add up!');
     }
 }
 

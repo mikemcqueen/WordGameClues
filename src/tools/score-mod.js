@@ -91,7 +91,7 @@ function getWordCount (wordList, text, options = {}) {
 		console.log(`found[${wordList[index]}] = ${foundList[index]}, accum(${accum})`);
 	    }
 	    return accum;
-	});
+	}, 0);
 }
 
 //
@@ -147,6 +147,8 @@ function getScore (wordList, result, options = {}) {
 	wordsInSummary : _.isString(result.summary) ? getWordCount(wordList, result.summary, options) : 0,
 	disambiguation : getDisambiguation(result, options)
     };
+    Expect(score.wordsInTitle).to.be.a('number');
+
     return getWikiContent(result.title)
 	.then(content => {
 	    score.wordsInArticle = getWordCount(
