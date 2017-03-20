@@ -20,6 +20,7 @@ const Validator      = require('./validator');
 //
 
 const DATA_DIR              =  Path.normalize(`${Path.dirname(module.filename)}/../data/`);
+const REJECTS_DIR           = 'rejects';
 
 //
 //
@@ -171,7 +172,7 @@ ClueManager.prototype.getKnownFilename = function (count, dir = undefined) {
 
 ClueManager.prototype.getRejectFilename = function (count) {
     return Path.format({
-	dir:  this.dir,
+	dir:  `${DATA_DIR}${REJECTS_DIR}`,
 	base: `rejects${count}.json`
     });
 }
