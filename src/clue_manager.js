@@ -45,10 +45,10 @@ function ClueManager () {
 //
 
 ClueManager.prototype.log = function (text) {
-    var pad = '';
-    var index;
+    let pad = '';
+    let index;
     if (this.logging) {
-	for (index=0; index<this.logLevel; ++index) { pad += ' '; }
+	for (let index = 0; index < this.logLevel; index += 1) { pad += ' '; }
 	console.log(pad + text);
     }
 }
@@ -286,10 +286,8 @@ ClueManager.prototype.addRejectCombos = function (clueList, clueCount) {
     clueList.forEach(clue => {
 	let srcNameList = clue.src.split(',');
 	if (_.size(srcNameList) !== clueCount) {
-	    this.log('WARNING! word count mismatch' +
-		     ', Expected ' + clueCount +
-		     ', actual ' + _.size(srcNameList) +
-		     ', ' + srcNameList);
+	    this.log(`WARNING! reject word count mismatch` +
+		     `, expected {clueCount}, actual ${_.size(srcNameList)}, ${srcNameList}`);
 	}
 	this.addRejectSource(srcNameList);
     });
@@ -337,7 +335,7 @@ ClueManager.prototype.addRejectSource = function (srcNameList) {
     if (_.isString(srcNameList)) {
 	srcNameList = srcNameList.split(',');
     }
-    Expect(srcNameList).to.be.an('array');
+    Expect(srcNameList).to.be.an('array').that.is.not.empty;
     srcNameList.sort();
     if (this.logging) {
 	this.log('addRejectSource: ' + srcNameList);
@@ -348,8 +346,8 @@ ClueManager.prototype.addRejectSource = function (srcNameList) {
 	return false;
     }
     if (this.isRejectSource(srcNameList)) {
-	//console.log('WARNING! duplicate reject source, ' + srcNameList);
-	return false;
+	console.log('WARNING! duplicate reject source, ' + srcNameList);
+	//return false;
     }
     this.rejectSourceMap[srcNameList.toString()] = true;
     return true;
@@ -370,8 +368,7 @@ ClueManager.prototype.isKnownSource = function (source, count = 0) {
     return this.knownSourceMapArray.some(srcMap => _.has(srcMap, source));
 }
 
-// source: csv
-// NOTE: works with string or array of strings
+// source: csv string or array of strings
 //
 ClueManager.prototype.isRejectSource = function (source) {
     if (!_.isString(source) && !_.isArray(source)) {
@@ -385,9 +382,9 @@ ClueManager.prototype.isRejectSource = function (source) {
 
 ClueManager.prototype.getCountListForName = function (name) {
     let countList = [];
-    for (const [ count, clueMap ] of this.knownClueMapArray.entries()) {
+    for (const [index, clueMap] of this.knownClueMapArray.entries()) {
 	if (_.has(clueMap, name)) {
-	    countList.push(count);
+	    countList.push(index);
 	}
     };
     return countList;
@@ -611,7 +608,8 @@ ClueManager.prototype.getValidCounts = function (nameList, countListArray) {
 //
 
 ClueManager.prototype.getCountList = function (nameOrList) {
-    return (_.isString(nameOrList)) ? this.getCountListForName(nameOrList) :
-	this.getValidCounts(nameOrList, this.getClueCountListArray(nameOrList));
+    return _.isString(nameOrList)
+	? this.getCountListForName(nameOrList)
+	: this.getValidCounts(nameOrList, this.getClueCountListArray(nameOrList));
 }
 

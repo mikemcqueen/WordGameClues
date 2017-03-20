@@ -1057,7 +1057,7 @@ Validator.prototype.buildSrcNameList = function(args) {
 	this.log(`  compoundNcList: ${compoundNcList}`);
 	this.log(`  count: ${clueCount}`);
 	this.log(`  primarySrcNameList: ${primarySrcNameList}`);
-	this.log(`  primaryNcList: ${primaryNcList}`);
+	this.log(`__primaryNcList: ${primaryNcList}`);
 	// this.indentNewline() + '  compoundNcNameListPairs: ' + compoundNcNameListPairs +
 
 	if (this.logResults) {
