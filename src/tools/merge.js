@@ -26,8 +26,8 @@ const Opt          = require('node-getopt').create([
 
 //
 
-const ValidFromList = [ Clues.META, Clues.SYNTH, Clues.HARMONY ];
-const ValidToList   = [ Clues.SYNTH, Clues.HARMONY, Clues.FINAL ];
+const ValidFromList = [Clues.META, Clues.SYNTH, Clues.HARMONY];
+const ValidToList   = [Clues.SYNTH, Clues.HARMONY, Clues.FINAL];
 const ValidFromToMap = {
     [Clues.META.name]:    Clues.SYNTH,
     [Clues.SYNTH.name]:   Clues.HARMONY,
@@ -37,13 +37,13 @@ const ValidFromToMap = {
 // name: e.g., 'meta' or 'm'
 //
 function getFrom (name) {
-    return Clues.isValidName(name) ? _.find(ValidFromList, [ 'name', Clues.getFullName(name) ]) : undefined;
+    return Clues.isValidName(name) ? _.find(ValidFromList, ['name', Clues.getFullName(name)]) : undefined;
 }
 
 // name: e.g., 'meta' or 'm'
 //
 function getTo (name) {
-    return Clues.isValidName(name) ? _.find(ValidToList, [ 'name', Clues.getFullName(name) ]) : undefined;
+    return Clues.isValidName(name) ? _.find(ValidToList, ['name', Clues.getFullName(name)]) : undefined;
 }
 
 // from: e.g, Clues.META
@@ -54,8 +54,8 @@ function isValidFromTo (from, to) {
 //
 
 function loadClueLists (from, to) {
-    return [ ClueManager.loadClueList(from.MAX_CLUE_COUNT, { dir: from.name }),
-	     ClueManager.loadClueList(1, { dir: to.name }) ];
+    return [ClueManager.loadClueList(from.MAX_CLUE_COUNT, { dir: from.name }),
+	     ClueManager.loadClueList(1, { dir: to.name })];
 }
 
 //
@@ -78,11 +78,11 @@ function main () {
     let toLength = toClueList.length;
     fromClueList = fromClueList.sortedBySrc();
     toClueList = toClueList.sortedBySrc();
+    // verify that length doesn't change when we sort
     Expect(fromClueList.length, 'from').to.equal(fromLength);
     Expect(toClueList.length, 'to').to.equal(toLength);
     console.log(`from(${fromClueList.length}), to(${toClueList.length})`);
-    let options = { copySrc: true };
-    let [merged, warnings] = toClueList.mergeFrom(fromClueList, options);
+    let [merged, warnings] = toClueList.mergeFrom(fromClueList);
     console.log(merged.toJSON());
     console.log(`length(${merged.length}), warnings(${warnings})`);
     Expect(merged.length, 'list length mismatch').to.equal(fromClueList.length);

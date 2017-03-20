@@ -36,7 +36,6 @@ describe ('test some scoring scenarios', function () {
     });
 
     ////////////////////////////////////////////////////////////////////////////////
-
     // Test space-separated "compound" words
     // NOTE: this test is skipped, because it is not how getScore is currently
     // called - space-separated words get split first. But this functionality

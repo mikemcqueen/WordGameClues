@@ -5,10 +5,10 @@
 'use strict';
 
 const _            = require('lodash');
-const Promise      = require('bluebird');
 const Expect       = require('chai').expect;
 const Fs           = require('fs');
 const Ms           = require('ms');
+const Promise      = require('bluebird');
 const Search       = require('./search-mod');
 const Opt          = require('node-getopt')
       .create([
@@ -19,8 +19,8 @@ const Opt          = require('node-getopt')
 
 //
 
-const fsReadFile   = Promise.promisify(Fs.readFile);
 const csvParse     = Promise.promisify(require('csv-parse'));
+const fsReadFile   = Promise.promisify(Fs.readFile);
 
 //
 

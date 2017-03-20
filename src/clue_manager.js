@@ -294,7 +294,6 @@ ClueManager.prototype.addRejectCombos = function (clueList, clueCount) {
     return this;
 }
 
-
 //
 //
 
@@ -445,10 +444,8 @@ ClueManager.prototype.getClueSourceListArray = function (args) {
     let clueSourceListArray = [];
 
     if (this.logging) {
-	this.log('++clueSrcListArray' +
-		 ', sum: ' + args.sum +
-		 ', max: ' + args.max +
-		 ', require: ' + args.require);
+	this.log(`++clueSrcListArray` +
+		 `, sum: ${args.sum}, max: ${args.max}, require: {$args.require}`);
     }
     Peco.makeNew({
 	sum:     args.sum,
@@ -456,7 +453,6 @@ ClueManager.prototype.getClueSourceListArray = function (args) {
 	require: args.require
     }).getCombinations().forEach(clueCountList => {
 	let clueSourceList = [];
-
 	if (clueCountList.every(count => {
 	    // empty lists not allowed
 	    if (!this.clueListArray[count].length) {
@@ -478,7 +474,6 @@ ClueManager.prototype.getClueSourceListArray = function (args) {
 	// we can't match 3 numbers
 	console.log('WARNING! getClueSrcListArray empty!');
     }
-
     return clueSourceListArray;
 }
 
@@ -507,25 +502,21 @@ ClueManager.prototype.filter = function (srcCsvList, clueCount) {
     let duplicate = 0;
     let map = {};
 
-    // TODO: rather than deleting in array, build a new one?
-    // TODO: clueListArray.
     srcCsvList.forEach(srcCsv => {
 	if (this.isKnownSource(srcCsv, clueCount)) {
 	    if (this.logging) {
 		this.log('isKnownSource(' + clueCount + ') ' + srcCsv);
 	    }
 	    ++known;
-	    //delete clueListArray[index];
 	}
 	else if (this.isRejectSource(srcCsv)) {
 	    if (this.logging) {
 		this.log('isRejectSource(' + clueCount + ') ' + srcCsv);
 	    }
 	    ++reject;
-	    //delete clueListArray[index];
 	}
 	else {
-	    if (map[srcCsv]) {
+	    if (_.has(map, srcCsv)) {
 		console.log(`duplicate: ${srcCsv}`);
 		++duplicate;
 	    }
@@ -566,7 +557,6 @@ ClueManager.prototype.getClueCountListArray = function (nameList) {
     // each count list contains the clueMapArray indexes in which
     // each name appears
     let countListArray = Array(_.size(nameList)).fill().map(() => []);
-    //console.log(countListArray);
     for (let count = 1; count <= this.maxClues; ++count) {
 	let map = this.knownClueMapArray[count];
 	Expect(map).to.exist; // I know this will fail when I move to synth clues
@@ -587,7 +577,6 @@ ClueManager.prototype.getValidCounts = function (nameList, countListArray) {
     let addCountSet = new Set();
     let known = false;
     let reject = false;
-
     Peco.makeNew({
 	listArray: countListArray,
 	max:       this.maxClues

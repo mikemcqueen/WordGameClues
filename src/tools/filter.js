@@ -178,7 +178,7 @@ function hasRemaining (wordListArray, remaining) {
 //
 
 function isInNameMap (nameMap, wordList) {
-    Expect(nameMap).to.be.an('object');
+    Expect(nameMap).to.be.an('object');       // must be object if defined
     Expect(wordList).to.be.an('array').with.length.of.at.least(1);
     let word = wordList[0];
     if (!_.has(nameMap, word)) return false;
@@ -214,12 +214,14 @@ function filterSearchResultDir (dir, fileMatch, options) {
 	    let wordList = Result.makeWordlist(filepath);
 	    // filter out rejected word combos
 	    if (ClueManager.isRejectSource(wordList)) return next();
-	    if (!isInNameMap(options.nameMap, wordList)) return next();
+	    if (!_.isUndefined(options.nameMap) && !isInNameMap(options.nameMap, wordList)) return next();
 	    // temp
+	    /*
 	    if (!_.isUndefined(options.nameMap)) {
 		console.log(`filename: ${filepath}`);
 		return next();
 	    }
+	     */
   	    loadFilteredUrls(dir, wordList, options)
 		.then(filteredUrls => {
 		    options.filepath = filepath;
@@ -261,7 +263,7 @@ function displayFilterResults (resultList) {
 	}
 	const nameList = ClueManager.getKnownClues(result.src);
 	if (!_.isEmpty(nameList)) {
-	    console.log('${Result.KNOWN_PREFIX}known:');
+	    console.log(`${Result.KNOWN_PREFIX}known:`);
 	    for (const name of nameList) {
 		console.log(`${Result.KNOWN_PREFIX}${name}`);
 	    }
