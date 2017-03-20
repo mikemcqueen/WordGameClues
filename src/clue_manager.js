@@ -55,7 +55,6 @@ ClueManager.prototype.log = function (text) {
 }
 
 //
-//
 
 ClueManager.prototype.loadClueList = function (count, options = {}) {
     return ClueList.makeFrom({
@@ -63,7 +62,6 @@ ClueManager.prototype.loadClueList = function (count, options = {}) {
     });
 }
 
-//
 //
 
 ClueManager.prototype.saveClueList = function (list, count, options = {}) {
@@ -116,7 +114,7 @@ ClueManager.prototype.loadAllClues = function (args) {
 }
 
 //
-//
+
 ClueManager.prototype.getMaxRequired = function (baseDir) {
     let clues = Clues.META;
     
@@ -143,7 +141,7 @@ ClueManager.prototype.getMaxRequired = function (baseDir) {
 }
 
 //
-//
+
 ClueManager.prototype.addKnownPrimaryClues = function (clueList) {
     const count = 1;
     let clueMap = this.knownClueMapArray[count] = {};
@@ -188,16 +186,13 @@ ClueManager.prototype.addKnownCompoundClues = function (clueList, clueCount, val
 	Expect(this.knownSourceMapArray[clueCount]).to.be.undefined;
 	this.knownSourceMapArray[clueCount] = {};
     }
-
     let srcMap = this.knownSourceMapArray[clueCount];
     clueList.forEach(clue => {
 	if (clue.ignore) {
 	    return; // continue
 	}
-
 	let srcNameList = clue.src.split(',').sort();
 	let srcKey = srcNameList.toString();
-
 	if (clueCount > 1) {
 	    // new sources need to be validated
 	    if (!_.has(srcMap, srcKey)) {
@@ -219,7 +214,6 @@ ClueManager.prototype.addKnownCompoundClues = function (clueList, clueCount, val
 	}
 	this.addKnownClue(clueCount, clue.name, srcKey);
     }, this);
-
     return this;
 }
 
@@ -257,24 +251,20 @@ ClueManager.prototype.addKnownClue = function (count, name, source, noThrow) {
     Expect(count).to.be.a('number');
     Expect(name).to.be.a('string');
     Expect(source).to.be.a('string');
-
     let clueMap = this.knownClueMapArray[count];
     if (!_.has(clueMap, name)) {
 	clueMap[name] = [ source ];
-    }
-    else if (!clueMap[name].includes(source)) {
+    } else if (!clueMap[name].includes(source)) {
 	if (this.logging) {
 	    this.log('addKnownClue(' + count + ') ' +
 		     name + ' : ' + source);
 	}
 	clueMap[name].push(source);
-    }
-    else if (!noThrow) {
+    } else if (!noThrow) {
 	throw new Error('duplicate clue name/source' + 
 			'(' + count + ') ' +
 			name + ' : ' + source);
-    }
-    else {
+    } else {
 	return false;
     }
     return true;
@@ -418,13 +408,9 @@ ClueManager.prototype.getSrcListMapForName = function (name) {
 
 ClueManager.prototype.makeSrcNameListArray = function (nc) {
     let srcNameListArray = [];
-
-//    console.log(nc.toJSON());
-//    console.log(this.getSrcListForNc(nc));
     this.getSrcListForNc(nc).forEach(src => {
 	srcNameListArray.push(src.split(','));
     });
-
     return srcNameListArray;
 }
 
@@ -483,7 +469,6 @@ ClueManager.prototype.getClueSourceListArray = function (args) {
 
 ClueManager.prototype.filterAddends = function (addends, sizes) {
     let filtered = [];
-
     addends.forEach(list => {
 	if (sizes.every(size => {
 	    return list.indexOf(Number(size)) > -1;
@@ -502,7 +487,6 @@ ClueManager.prototype.filter = function (srcCsvList, clueCount) {
     let reject = 0;
     let duplicate = 0;
     let map = {};
-
     srcCsvList.forEach(srcCsv => {
 	if (this.isKnownSource(srcCsv, clueCount)) {
 	    if (this.logging) {
@@ -551,8 +535,8 @@ ClueManager.prototype.getKnownClues = function (wordList) {
     return resultList;
 }
 
-
 //
+
 ClueManager.prototype.getClueCountListArray = function (nameList) {
     Expect(nameList.length).to.be.not.empty;
     // each count list contains the clueMapArray indexes in which
@@ -570,8 +554,8 @@ ClueManager.prototype.getClueCountListArray = function (nameList) {
     return countListArray;
 }
 
-
 //
+
 ClueManager.prototype.getValidCounts = function (nameList, countListArray) {
     if ((nameList.length === 1) || this.isRejectSource(nameList)) return [];
 

@@ -164,8 +164,9 @@ function loadFilteredUrls (dir, wordList, options) {
 //
 
 function hasRemaining (wordListArray, remaining) {
-    Expect(wordListArray).is.an('array');
-    Expect(remaining).is.an('array').that.is.not.empty;
+    // commented out because chai is so damn slow
+    //Expect(wordListArray).is.an('array');
+    //Expect(remaining).is.an('array').that.is.not.empty;
     for (const wordList of wordListArray) {
 	if (wordList.length !== remaining.length) continue;
 	if (remaining.some(word => _.includes(wordList, word))) {
@@ -178,8 +179,9 @@ function hasRemaining (wordListArray, remaining) {
 //
 
 function isInNameMap (nameMap, wordList) {
-    Expect(nameMap).to.be.an('object');       // must be object if defined
-    Expect(wordList).to.be.an('array').with.length.of.at.least(1);
+    // commented out because chai is so damn slow
+    //Expect(nameMap).to.be.an('object');       // must be object if defined
+    //Expect(wordList).to.be.an('array').with.length.of.at.least(1);
     let word = wordList[0];
     if (!_.has(nameMap, word)) return false;
     return hasRemaining(nameMap[word], wordList.slice(1, wordList.length));
@@ -249,6 +251,98 @@ function filterSearchResultDir (dir, fileMatch, options) {
     });
 }
 
+// for each search result filename that matches fileMatch in dir 
+//   filter out rejected word combinations
+//   load the file, build filtered URL list
+//   load the _filtered.json file, filter out known/reject URLs
+//   if any URLs remain, add result to filteredList.
+//
+// NOTE that for convenience, this function currently loads all
+// files that match fileMatch, even if the file's word-combo is
+// a rejected combo. 
+// 
+async function filterPathList (pathList, dir, options) {
+    Expect(pathList).to.be.an('array');
+    Expect(options).to.be.an('object');
+
+    let filteredList = [];
+    let rejectList = [];
+
+    let promiseList = [];
+    for (const path of pathList) {
+	let filename = Path.basename(path);
+	if (options.verbose) {
+	    console.log(`filename: ${filename}`);
+	}
+	let wordList = Result.makeWordlist(filename);
+	let fileContent;
+	promiseList.push(fsReadFile(path, 'utf8')
+	    .then(content => {
+		fileContent = content;
+  		return loadFilteredUrls(dir, wordList, options);
+	    }).then(filteredUrls => {
+		options.filepath = path;
+		return filterSearchResultList(JSON.parse(fileContent), wordList, filteredUrls, options);
+	    }).then(filterResult => {
+		// TODO: I question this logic at the moment
+		if (_.isEmpty(filterResult.urlList)) {
+		    rejectList.push(filterResult);
+		} else {
+		    filteredList.push(filterResult);
+		}
+		return undefined;
+	    }).catch(err => {
+		// report & eat all errors
+		console.log(`filterSearchResultFiles, path: ${path}, error; ${err}`);
+	    }));
+    };
+    await Promise.all(promiseList);
+    return {
+	filtered: filteredList,
+	rejects:  rejectList
+    };
+}
+
+//
+
+function filterPathList2 (pathList, dir, options) {
+    Expect(pathList).to.be.an('array');
+    Expect(options).to.be.an('object');
+
+    let filteredList = [];
+    let rejectList = [];
+    return Promise.map(pathList, path => {
+	let filename = Path.basename(path);
+	if (options.verbose) {
+	    console.log(`filename: ${filename}`);
+	}
+	let wordList = Result.makeWordlist(filename);
+	return fsReadFile(path, 'utf8')
+	    .then(content => {
+  		return [content, loadFilteredUrls(dir, wordList, options)];
+	    }).then(([content, filteredUrls]) => {
+		options.filepath = path;
+		return filterSearchResultList(JSON.parse(content), wordList, filteredUrls, options);
+	    }).then(filterResult => {
+		// TODO: this is probably wrong for rejects
+		if (_.isEmpty(filterResult.urlList)) {
+		    rejectList.push(filterResult);
+		} else {
+		    filteredList.push(filterResult);
+		}
+		return undefined;
+	    }).catch(err => {
+		// report & eat all errors
+		console.log(`filterSearchResultFiles, path: ${path}, error; ${err}`);
+	    });
+    }).then(() => {
+	return {
+	    filtered: filteredList,
+	    rejects:  rejectList
+	};
+    });
+}
+
 //
 
 function displayFilterResults (resultList) {
@@ -299,6 +393,29 @@ function buildNameMap (wordListArray) {
 }
 
 //
+
+function getPathList (dir, fileMatch, nameMap) {
+    Expect(dir).to.be.a('string');
+    Expect(fileMatch).to.be.an('string');
+    return new Promise((resolve, reject) => {
+	Dir.files(dir, (err, pathList) => {
+	    if (err) throw err;
+	    let match = new RegExp(fileMatch);
+	    let filtered = _.filter(pathList, path => {
+		let filename = Path.basename(path)
+		let wordList = Result.makeWordlist(filename);
+		// filter out rejected word combos
+		if (ClueManager.isRejectSource(wordList)) return false;
+		if (!_.isUndefined(nameMap) && !isInNameMap(nameMap, wordList)) return false;
+		return match.test(filename);
+	    });
+	    console.log(`pathList(${pathList.length}), filtered(${filtered.length})`);
+	    resolve(filtered);
+	});
+    });
+}
+
+//
 //
 //
 async function main () {
@@ -324,17 +441,20 @@ async function main () {
 	filterTitle:   Opt.options.title,
 	filterRejects: Opt.options.rejects,
 	verbose:       Opt.options.verbose,
-	xfactor:       _.toNumber(Opt.options.xfactor),
-	nameMap
+	xfactor:       _.toNumber(Opt.options.xfactor)
     };
     let start = new Date();
-    let result = await filterSearchResultDir(dir, Result.getFileMatch(Opt.options.match), filterOptions);
+    let pathList = await getPathList(dir, Result.getFileMatch(Opt.options.match), nameMap)
+    let getDuration = new Duration(start, new Date()).milliseconds;
+    start = new Date();
+    let result = await filterPathList2(pathList, dir, filterOptions);
     let d = new Duration(start, new Date()).milliseconds;
     if (Opt.options.count) {
 	console.log(`Results: ${_.size(result.filtered)}` +
 		    `, Urls: ${getUrlCount(result.filtered)}` +
 		    `, Rejects: ${_.size(result.rejects)}` +
-		    `, duration, ${PrettyMs(d)}`);
+		    `, get(${PrettyMs(getDuration)})` +
+		    `, filter(${PrettyMs(d)})`);
     }
     else {
 	displayFilterResults(Opt.options.rejects ? result.rejects : result.filtered);
