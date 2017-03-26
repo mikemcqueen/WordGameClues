@@ -96,15 +96,20 @@ function isXFactor (result, options) {
 function filterSearchResultList (resultList, wordList, filteredUrls, options) {
     Expect(resultList).to.be.an('array');
     Expect(wordList).to.be.an('array').that.is.not.empty;
-    // filteredUrls can be undefined or array
     Expect(options).to.be.an('object');
+    // filteredUrls can be undefined or array
     let urlList = [];
     let loggedXFactor = false;
     // make any clue words with a space into multiple words.
     let wordCount = _.chain(wordList).map(word => word.split(' ')).flatten().size().value();
+    
+    if (options.verbose) {
+	console.log(`fSRL: filteredUrls(${_.size(filteredUrls)})\n${JSON.stringify(filteredUrls)}`);
+    }
+
     return Promise.map(resultList, result => {
 	if (options.verbose) {
-	    console.log(`result: ${_.entries(result)}`);
+	    //console.log(`result: ${_.entries(result)}`);
 	}
 	if (options.xfactor && isXFactor(result, options)) {
 	    if (!loggedXFactor) {
@@ -154,7 +159,7 @@ function loadFilteredUrls (dir, wordList, options) {
     return fsReadFile(Path.format({ dir, base: filteredFilename }), 'utf8')
 	.then(content => {
 	    if (options.verbose) {
-		console.log(`resolving filtered urls, ${wordList}`);
+		console.log(`resolving filtered urls for: ${wordList}`);
 	    }
 	    return JSON.parse(content);
 	}).catch(err => {
@@ -325,7 +330,7 @@ function filterPathList2 (pathList, dir, options) {
 	// big ugly nested promise chain because of local vars used below
 	return fsReadFile(path, 'utf8')
 	    .then(content => {
-  		return [content, loadFilteredUrls(dir, wordList, options)];
+  		return Promise.all([content, loadFilteredUrls(dir, wordList, options)]);
 	    }).then(([content, filteredUrls]) => {
 		options.filepath = path;
 		return filterSearchResultList(JSON.parse(content), wordList, filteredUrls, options);
@@ -339,7 +344,7 @@ function filterPathList2 (pathList, dir, options) {
 		return undefined;
 	    }).catch(err => {
 		// report & eat all errors
-		console.log(`filterSearchResultFiles, path: ${path}, error; ${err}`);
+		console.log(`filterSearchResultFiles, path: ${path}, error: ${err}`);
 	    });
     }).then(() => {
 	return {
@@ -412,7 +417,7 @@ function writeFilterResults (resultList, stream) {
 	}
 	const nameList = ClueManager.getKnownClues(result.src);
 	if (!_.isEmpty(nameList)) {
-	    My.logStream(stream, `${Result.KNOWN_PREFIX}known:`);
+	    My.logStream(stream, `\n${Result.KNOWN_PREFIX}known:`);
 	    for (const name of nameList) {
 		My.logStream(stream, `${Result.KNOWN_PREFIX}${name}`);
 	    }
@@ -421,7 +426,7 @@ function writeFilterResults (resultList, stream) {
     }
 }
 
-//
+// TODO: move to util.js
 
 function createTmpFile()  {
     return new Promise((resolve, reject) => {
@@ -434,7 +439,7 @@ function createTmpFile()  {
     });
 }
 
-//
+// TODO: move to util.js
 
 function mailTextFile(options) {
     let pipe = false;
@@ -455,7 +460,7 @@ function mailTextFile(options) {
     }
 }
 
-//
+// TODO: move to util.s, comment purpose
 
 function copyTextFile(path) {
     let fd = Fs.openSync(path, 'r');
@@ -478,7 +483,7 @@ async function main () {
     Expect(Opt.options.dir, 'option -d NAME is required').to.exist;
 
     ClueManager.loadAllClues({
-	baseDir: Opt.options.synth ? Clues.SYNTH.name : Clues.META.name
+	baseDir: Opt.options.synthesis ? Clues.SYNTH.name : Clues.META.name
     });
 
     // default to title filter if no filter specified

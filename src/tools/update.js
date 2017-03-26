@@ -354,7 +354,7 @@ function main() {
     expect(Opt.argv.length, 'exactly one FILE argument is required').to.equal(1);
     expect(Opt.options.dir, '-d DIR is required').to.exist;
 
-    let base = Opt.options.synth ? 'synth' : 'meta';
+    let base = Opt.options.synthesis ? 'synth' : 'meta';
     
     if (Opt.options.verbose) {
 	console.log('verbose: true');
