@@ -204,6 +204,13 @@ function gitRemoveCommitIfExists (filepath, message = 'removing test file') {
 
 //
 
+function logStream(stream, string) {
+    stream.write(string + '\n');
+    // TODO: inner function 'write()' that uses once('drain', write);
+}
+
+//
+
 module.exports = {
     between,
     checkIfFile,
@@ -214,5 +221,6 @@ module.exports = {
     gitRemove,
     gitRemoveCommit,
     gitRemoveCommitIfExists,
+    logStream,
     waitFor
 };
