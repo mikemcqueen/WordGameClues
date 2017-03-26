@@ -5,25 +5,30 @@
 'use strict';
 
 const _            = require('lodash');
-const ClueManager  = require('../clue_manager.js');
-const Clues        = require('../clue-types.js');
+const ChildProcess = require('child_process');
+const ClueManager  = require('../clue_manager');
+const Clues        = require('../clue-types');
 const Dir          = require('node-dir');
-const Fs           = require('fs');
 const Duration     = require('duration');
 const Expect       = require('chai').expect;
+const Fs           = require('fs');
+const My           = require('../misc/util');
 const Path         = require('path');
 const PrettyMs     = require('pretty-ms');
 const Promise      = require('bluebird');
 const Result       = require('./result-mod');
 const Score        = require('./score-mod');
+const Tmp          = require('tmp');
 
 const Opt          = require('node-getopt').create([
     ['a', 'article',             'filter results based on article word count'],
+    ['',  'copy',                'copy to clipboard as RTF'],
     ['d', 'dir=NAME',            'directory name'],
     //['f', 'final',             'use final clues'],
 //    ['k', 'known',               'filter known results'],  // easy!, call ClueManager.filter()
     ['m', 'match=EXPR',          'filename match expression' ],
     ['n', 'count',               'show result/url counts only'],
+    ['',  'note',                'mail results to evernote'], 
 //    ['r', 'rejects',             'show only results that fail all filters'],
     //['r', 'harmony',             'use harmony clues'],
     ['t', 'title',               'filter results based on title word count (default)'],
@@ -317,6 +322,7 @@ function filterPathList2 (pathList, dir, options) {
 	    console.log(`filename: ${filename}`);
 	}
 	let wordList = Result.makeWordlist(filename);
+	// big ugly nested promise chain because of local vars used below
 	return fsReadFile(path, 'utf8')
 	    .then(content => {
   		return [content, loadFilteredUrls(dir, wordList, options)];
@@ -341,29 +347,6 @@ function filterPathList2 (pathList, dir, options) {
 	    rejects:  rejectList
 	};
     });
-}
-
-//
-
-function displayFilterResults (resultList) {
-    Expect(resultList).to.be.an('array');
-    for (const result of resultList) {
-	if (_.isEmpty(result.urlList)) continue;
-	if (ClueManager.isRejectSource(result.src)) continue;
-
-	console.log(`${Result.SRC_PREFIX}${result.src}`);
-	for (const url of result.urlList) {
-	    console.log(url);
-	}
-	const nameList = ClueManager.getKnownClues(result.src);
-	if (!_.isEmpty(nameList)) {
-	    console.log(`${Result.KNOWN_PREFIX}known:`);
-	    for (const name of nameList) {
-		console.log(`${Result.KNOWN_PREFIX}${name}`);
-	    }
-	}
-	console.log();
-    }
 }
 
 // TODO: move to Util.js
@@ -416,6 +399,78 @@ function getPathList (dir, fileMatch, nameMap) {
 }
 
 //
+
+function writeFilterResults (resultList, stream) {
+    Expect(resultList).to.be.an('array');
+    for (const result of resultList) {
+	if (_.isEmpty(result.urlList)) continue;
+	if (ClueManager.isRejectSource(result.src)) continue;
+
+	My.logStream(stream, `${Result.SRC_PREFIX}${result.src}`);
+	for (const url of result.urlList) {
+	    My.logStream(stream, url);
+	}
+	const nameList = ClueManager.getKnownClues(result.src);
+	if (!_.isEmpty(nameList)) {
+	    My.logStream(stream, `${Result.KNOWN_PREFIX}known:`);
+	    for (const name of nameList) {
+		My.logStream(stream, `${Result.KNOWN_PREFIX}${name}`);
+	    }
+	}
+	My.logStream(stream, '');
+    }
+}
+
+//
+
+function createTmpFile()  {
+    return new Promise((resolve, reject) => {
+	Tmp.file((err, path, fd) => {
+	    if (err) throw err;
+	    console.log("File: ", path);
+	    console.log("Filedescriptor: ", fd);
+	    resolve([path, fd]);
+	});
+    });
+}
+
+//
+
+function mailTextFile(options) {
+    let pipe = false;
+    let fd = Fs.openSync(options.path, 'r');
+    let child = ChildProcess.spawn('mail', ['-s', `${options.subject}`, `${options.to}`], {
+	stdio: [pipe ? 'pipe' : fd, 1, 2]
+    });
+    if (pipe) {
+	let s = Fs.createReadStream(null, { fd });
+	s.pipe(child.stdin);
+	s.on('data', (data) => {
+	    console.log('s.data');
+	});
+	s.on('end', () => {
+	    console.log('s.end');
+	    child.stdin.end();
+	});
+    }
+}
+
+//
+
+function copyTextFile(path) {
+    let fd = Fs.openSync(path, 'r');
+    let textutil = ChildProcess.spawn(
+	'textutil', ['-format', 'txt', '-convert', 'rtf', '-stdout', `${path}`],
+	{ stdio: [fd, 'pipe', 2] });	
+    let pbcopy = ChildProcess.spawn('pbcopy', ['-Prefer', 'rtf']);
+    textutil.stdout.pipe(pbcopy.stdin);
+    textutil.stdout.on('end', () => {
+	console.log('textutil.end');
+	Fs.closeSync(fd);
+    });
+}
+
+//
 //
 //
 async function main () {
@@ -444,7 +499,7 @@ async function main () {
 	xfactor:       _.toNumber(Opt.options.xfactor)
     };
     let start = new Date();
-    let pathList = await getPathList(dir, Result.getFileMatch(Opt.options.match), nameMap)
+    let pathList = await getPathList(dir, Result.getFileMatch(Opt.options.match), nameMap);
     let getDuration = new Duration(start, new Date()).milliseconds;
     start = new Date();
     let result = await filterPathList2(pathList, dir, filterOptions);
@@ -455,10 +510,32 @@ async function main () {
 		    `, Rejects: ${_.size(result.rejects)}` +
 		    `, get(${PrettyMs(getDuration)})` +
 		    `, filter(${PrettyMs(d)})`);
+	return undefined;
     }
-    else {
-	displayFilterResults(Opt.options.rejects ? result.rejects : result.filtered);
-    }
+    let useTmpFile = Opt.options.note || Opt.options.copy;
+    return Promise.resolve().then(() => {
+	if (useTmpFile) {
+	    return createTmpFile().then(([path, fd]) =>  {
+		return [path, Fs.createWriteStream(null, { fd })];
+	    });
+	}
+	return [null, process.stdout];
+    }).then(([path, stream]) => {
+	writeFilterResults(Opt.options.rejects ? result.rejects : result.filtered, stream);
+	if (useTmpFile) {
+	    stream && stream.end();
+	    if (Opt.options.mail) {
+		mailTextFile({
+		    to:      'mmcqueen112.ba110c6@m.evernote.com',
+		    subject: `filtered @Worksheets.new`,
+		    path:    path
+		});
+	    } else if (Opt.options.copy) {
+		copyTextFile(path);
+	    }
+	}
+	return undefined;
+    });
 }
 
 //

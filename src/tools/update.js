@@ -15,10 +15,10 @@ const Readlines    = require('n-readlines');
 const Result       = require('./result-mod');
 
 const Opt          = require('node-getopt').create([
-    ['c', 'count',               'show result/url counts only'],
     ['d', 'dir=NAME',            'directory name'],
-    ['s', 'synthesis',           'use synth clues'],
-//    ['v', 'verbose',             'show logging']
+    ['',  'save',                'save clues'],
+    ['y', 'synthesis',           'use synthesis clues'],
+    ['v', 'verbose',             'show logging'],
     ['h', 'help',                'this screen']
 ]).bindHelp().parseSystem();
 
@@ -228,7 +228,10 @@ function processClue(line, args, options) {
 	if (line.length > firstComma + 1) {
 	    note = line.slice(firstComma + 1, line.length);
 	}
+    } else {
+	name = line.trim();
     }
+    
     // we're about to update known clues. double-sanity check.
     expect(ClueManager.isRejectSource(args.nameList)).to.be.false;
     let countList = addClues(ClueManager.getCountList(args.nameList), name,
@@ -330,7 +333,7 @@ function updateResults(inputFilename, dir, options) {
 	// TODO: should be nextState = getNextState
 	let { line, lineType } = getLineType(inputLine);
 	if (!SM[state].next.includes(lineType)) {
-	    throw new Error(`Cannot transition from ${state} to ${lineType}, line ${inputLine}`);
+	    throw new Error(`Cannot transition from ${state.toString()} to ${lineType.toString()}, line ${inputLine}`);
 	}
 	state = lineType;
 	if (skipState(state, result, options)) {
@@ -340,7 +343,6 @@ function updateResults(inputFilename, dir, options) {
 	// TODO: try/catch block
 	result = SM[state].func(line, args, options);
     }
-    writeFilteredUrls(result);
     return result;
 }
 
@@ -353,10 +355,8 @@ function main() {
     expect(Opt.options.dir, '-d DIR is required').to.exist;
 
     let base = Opt.options.synth ? 'synth' : 'meta';
-    let saveClues = Opt.options.dir !== 'tmp';
-    let verbose = !saveClues;
     
-    if (verbose) {
+    if (Opt.options.verbose) {
 	console.log('verbose: true');
     }
 
@@ -367,9 +367,10 @@ function main() {
     let inputFilename = Opt.argv[0];
     console.log(`file: ${inputFilename}`);
     let result = updateResults(inputFilename, Opt.options.dir, {
-	verbose: verbose
+	verbose: Opt.options.verbose
     });
-    if (saveClues) {
+    if (Opt.options.save) {
+	writeFilteredUrls(result);
 	if (result.count.knownClues > 0) {
 	    // save clues
 	    let countList = Array.from(result.count.knownCountSet);

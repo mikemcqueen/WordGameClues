@@ -100,6 +100,7 @@ function get (text, pages, cb) {
 	Expect(result.next).to.exist;
 	let msDelay = My.between(Ms('30s'), Ms('60s'));
 	console.log(`Delaying ${PrettyMs(msDelay)} for next page of results...`);
+	// TODO async function, use await My.delay
 	setTimeout(result.next, msDelay);
 	return undefined;
     });
