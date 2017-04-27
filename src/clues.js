@@ -4,58 +4,60 @@
 
 'use strict';
 
-var _           = require('lodash');
-var Duration    = require('duration');
-var Np          = require('named-parameters');
-var expect      = require('chai').expect;
+let _           = require('lodash');
+let ClueList    = require('./clue_list');
+let ClueManager = require('./clue_manager');
+let Clues       = require('./clue-types');
+let ComboMaker  = require('./combo_maker');
+let ComboSearch = require('./combo_search');
+let Duration    = require('duration');
+let Expect      = require('chai').expect;
 
-var ClueManager = require('./clue_manager');
-var ComboMaker  = require('./combo_maker');
-var AltSources  = require('./alt_sources');
-var ComboSearch = require('./combo_search');
-var Validator   = require('./validator');
-var ClueList    = require('./clue_list');
-var NameCount   = require('./name_count');
-var Peco        = require('./peco');
-var Show        = require('./show');
-var ResultMap   = require('./resultmap');
+let AltSources  = require('./alt_sources');
+let Validator   = require('./validator');
+let NameCount   = require('./name_count');
+let Np          = require('named-parameters');
+let Peco        = require('./peco');
+let Show        = require('./show');
+let ResultMap   = require('./resultmap');
 
 // initialize command line options.  do this before logger.
 //
 
 // metamorphois -> synthesis -> harmonize -> finalize
 
-var Opt = require('node-getopt')
-    .create([
+// TODO:
+// solve the -p/-y problem: standardize how to set/initialize state based on target clues
+// 
+
+let Opt = require('node-getopt')
+    .create(_.concat(Clues.Options, [
 	['a', 'alt-sources=NAME',            'show alternate sources for the specified clue' ],
 	['A', 'all-alt-sources',             'show alternate sources for all clues' ],
 	['o', 'output',                      '  output json -or- clues(huh?)' ],
-	['c', 'count=COUNT',                 '# of primary clues to combine' ],
+	['c', 'count=COUNT[LO,COUNTHI]',     '# of primary clues to combine; or range if COUNTHI is specified' ],
 	['d', 'allow-dupe-source',           'allow duplicate source, override default behavior of --meta' ],
-	['f', 'final',                       'use final clues' ],
+	['i', 'primary-sources=SOURCE[,SOURCE,...]', 'limit results to the specified primary source(s)' ],
 	['k', 'show-known',                  'show compatible known clues; -u <clue> required' ],
 	['',  'csv',                         '  output in search-term csv format' ],
-	['p', 'primary-sources=SOURCE[,SOURCE,...]', 'limit results to the specified primary source(s)' ],
 	['q', 'require-counts=COUNT+',       'require clue(s) of specified count(s)' ],
-	['r', 'harmony'            ,         'use harmony clues' ],
 	['s', 'show-sources=NAME[:COUNT][,v]', 'show primary source combinations for the specified name[:count]' ],
 	['t', 'test=SOURCE[,SOURCE,...]',    'test the specified source list, e.g. blue,fish' ],
 	['',  'add=NAME',                    '  add combination to known list as NAME; use with --test' ],
 	['',  'reject',                      '  add combination to reject list; use with --test' ],
 	['u', 'use=NAME[:COUNT]+',           'use the specified name[:count](s)' ],
 	['x', 'max=COUNT',                   'specify maximum # of components to combine'],
-	['y', 'synthesis',                   'use synthesis clues' ],
 	['z', 'flags=OPTION+',               'flags: 1=validateAllOnLoad,2=ignoreLoadErrors' ],
 
 	['v', 'verbose=OPTION+',             'show logging. OPTION=load' ],
 	['h', 'help',                        'this screen']
-    ])
+    ]))
     .bindHelp().parseSystem();
 
 //
 
-var LOGGING = false;
-var QUIET = false;
+let LOGGING = false;
+let QUIET = false;
 
 //
 
@@ -64,15 +66,15 @@ const VERBOSE_FLAG_LOAD     = 'load';
 //
 //
 
-function main() {
-    var needCount;
-    var validateAllOnLoad;
-    var ignoreLoadErrors;
+function main () {
+    let needCount;
+    let validateAllOnLoad;
+    let ignoreLoadErrors;
 
     // options
 
     // TODO: get rid of this, just pass Opt.options around
-    let countArg = _.toNumber(Opt.options.count);
+    let countArg = Opt.options.count;
     let maxArg = _.toNumber(Opt.options.max);
     let useClueList = Opt.options.use;
     let verboseArg = Opt.options['verbose'];
@@ -81,7 +83,6 @@ function main() {
     let allAltSourcesFlag = Opt.options['all-alt-sources'];
     let allowDupeSrcFlag = Opt.options['allow-dupe-source'];
     let showKnownArg = Opt.options['show-known'];
-    let synthFlag = Opt.options['synthesis'];
     let flagsArg = Opt.options.flags;
 
     if (!maxArg) {
@@ -109,14 +110,10 @@ function main() {
 	QUIET = true;
     }
 
-    Validator.setAllowDupeFlags(synthFlag ? {
-	allowDupeNameSrc: false,
-	allowDupeSrc:     false, // NOTE: was true, i changed to false
-	allowDupeName:    true,
-    } : {
+    Validator.setAllowDupeFlags({
 	allowDupeNameSrc: false,
 	allowDupeSrc:     (allowDupeSrcFlag ? true : false),
-	allowDupeName:    true,
+	allowDupeName:    true
     });
 
     if (_.includes(flagsArg, '1')) {
@@ -128,17 +125,13 @@ function main() {
 	console.log('ignoreLoadErrors=true');
     }
 
+    let clueSource = Clues.getByOptions(Opt.options);
+
     setLogging(_.includes(verboseArg, VERBOSE_FLAG_LOAD));
-    if (!loadClues(synthFlag, validateAllOnLoad, ignoreLoadErrors)) {
+    if (!loadClues(clueSource, validateAllOnLoad, ignoreLoadErrors)) {
 	return 1;
     }
     setLogging(verboseArg);
-
-    // hacky.  fix this
-    let metaFlag;
-    if (!synthFlag) {
-	metaFlag = true;
-    }
 
     log('count=' + countArg + ', max=' + maxArg);
 
@@ -160,7 +153,7 @@ function main() {
 	}
 	Show.compatibleKnownClues({
 	    nameList: useClueList,
-	    max:      countArg,
+	    max:      _.toNumber(Opt.options.count),
 	    asCsv:    Opt.options.csv
 	});
     }
@@ -174,7 +167,7 @@ function main() {
 	AltSources.show(allAltSourcesFlag ? {
 	    all    : true,
 	    output : Opt.options.output,
-	    count  : countArg
+	    count  : _.toNumber(Opt.options.count)
 	} : {
 	    all    : false,
 	    name   : altSourcesArg,
@@ -183,7 +176,7 @@ function main() {
     }
     else {
 	doCombos({
-	    sum:     countArg,
+	    sum:     Opt.options.count,
 	    max:     maxArg,
 	    require: Opt.options['require-counts'],
 	    sources: Opt.options['primary-sources'],
@@ -194,14 +187,10 @@ function main() {
 
 //
 
-function loadClues (synthFlag, validateAllOnLoad, ignoreLoadErrors) {
-    let base = 'meta';
-    if (synthFlag) {
-	base = 'synth';
-    }
+function loadClues (clues, validateAllOnLoad, ignoreLoadErrors) {
     log('loading all clues...');
     ClueManager.loadAllClues({
-	baseDir:      base,
+	clues,
 	validateAll:  validateAllOnLoad,
 	ignoreErrors: ignoreLoadErrors
     });
@@ -213,9 +202,9 @@ function loadClues (synthFlag, validateAllOnLoad, ignoreLoadErrors) {
 //
 
 function showValidSrcListCounts(options) {
-    expect(options.test, 'options.test').to.be.a('string');
+    Expect(options.test, 'options.test').to.be.a('string');
     if (options.reject) {
-	expect(options.add, 'cannot specify both --add and --reject').to.be.undefined;
+	Expect(options.add, 'cannot specify both --add and --reject').to.be.undefined;
     }
 
     let nameList = options.test.split(',').sort();
@@ -245,7 +234,7 @@ function showValidSrcListCounts(options) {
 
     // verify that all names were found
     nameList.forEach((name, index) => {
-	expect(countListArray[index], `cannot find clue, ${name}`).to.exit;
+	Expect(countListArray[index], `cannot find clue, ${name}`).to.exit;
     });
 
     console.log(countListArray);
@@ -343,9 +332,9 @@ function showValidSrcListCounts(options) {
 //
 
 function addClues(countSet, name, src) {
-    expect(countSet).to.be.a('Set');
-    expect(name).to.be.a('string');
-    expect(src).to.be.a('string');
+    Expect(countSet).to.be.a('Set');
+    Expect(name).to.be.a('string');
+    Expect(src).to.be.a('string');
     countSet.forEach(count => {
 	if (ClueManager.addClue(count, {
 	    name: name,
@@ -386,30 +375,47 @@ function doCombos(args) {
     if (!_.isUndefined(args.require)) {
 	args.require = _.chain(args.require).split(',').map(_.toNumber).value();
     }
-
+    let sumRange;
+    if (!_.isUndefined(args.sum)) {
+	sumRange = _.chain(args.sum).split(',').map(_.toNumber).value();
+    }
+    Expect(sumRange, 'invalid sumRange').to.be.an('array').with.length.of.at.most(2);
     console.log('++combos' +
-		', sum: ' + args.sum +
-		', max: ' + args.max +
-		', require: ' + args.require +
-		', sources: ' + args.sources +
-		', use: ' + args.use);
+		`, sum: ${sumRange}` +
+		`, max: ${args.max}` +
+		`, require: ${args.require}` +
+		`, sources: ${args.sources}` +
+		`, use: ${args.use}`);
 
+    let total = 0;
+    let known = 0;
+    let reject = 0;
+    let duplicate  = 0;
+    let comboMap = {};
     let beginDate = new Date();
-    let nameCsvList = ComboMaker.makeCombos(args);
+    let lastSum = sumRange.length > 1 ? sumRange[1] : sumRange[0];
+    for (let sum = sumRange[0]; sum <= lastSum; ++sum) {
+	args.sum = sum;
+	let max = args.max;
+	if (args.max > args.sum) args.max = args.sum;
+	const comboList = ComboMaker.makeCombos(args);
+	args.max = max;
+	total += comboList.length;
+	const filterResult = ClueManager.filter(comboList, args.sum, comboMap);
+	known += filterResult.known;
+	reject += filterResult.reject;
+	duplicate += filterResult.duplicate;
+    }
     log('--combos: ' + (new Duration(beginDate, new Date())).seconds + ' seconds');
-
-    let total = nameCsvList.length;
-    let result = ClueManager.filter(nameCsvList, args.sum);
-
-    _.keys(result.set).forEach(nameCsv => console.log(nameCsv));
+    _.keys(comboMap).forEach(nameCsv => console.log(nameCsv));
 
     console.log(`total: ${total}` +
-		', filtered: ' + _.size(result.set) +
-		', known: ' + result.known +
-		', reject: ' + result.reject +
-		', duplicate: ' + result.duplicate);
+		', filtered: ' + _.size(comboMap) +
+		', known: ' + known +
+		', reject: ' + reject +
+		', duplicate: ' + duplicate);
 
-    if (nameCsvList.length !== _.size(result.set) + result.known + result.reject + result.duplicate) {
+    if (total !== _.size(comboMap) + known + reject + duplicate) {
 	console.log('WARNING: amounts to not add up!');
     }
 }
@@ -418,10 +424,10 @@ function doCombos(args) {
 //
 
 function showSources(clueName) {
-    var result;
-    var nc;
-    var verbose;
-    var clueSplitList = clueName.split(',');
+    let result;
+    let nc;
+    let verbose;
+    let clueSplitList = clueName.split(',');
 
     clueName = clueSplitList[0];
     nc = NameCount.makeNew(clueName);
@@ -479,7 +485,7 @@ function log(text) {
 //
 //
 
-var appBegin
+let appBegin;
 
 
 try {

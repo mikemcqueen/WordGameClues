@@ -37,8 +37,7 @@ function Validator() {
     if (0) {
 	this.freezeLogging    = true;
 	this.logging          = true;
-    }
-    else {
+    } else {
 	this.freezeLogging    = false;
 	this.logging          = false;
     }
@@ -144,8 +143,8 @@ Validator.prototype.validateSources = function(args) {
     }
     return {
 	success:     found,
-	list:        (found ? resultList : undefined)
-    }
+	list:        found ? resultList : undefined
+    };
 }
 
 // args:
@@ -414,8 +413,7 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 		    ncList:    buildResult.primaryNcList,
 		    resultMap: buildResult.resultMap // no need to merge?
 		}];
-	    }
-	    else {
+	    } else {
 		// call validateSources recursively with compound clues
 		let vsResult = this.validateSources({
 		    sum:            buildResult.count,
@@ -439,9 +437,9 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 			this.log('   -----------');
 		    });
 		}
-		// we only sent compound clues to validateSources, so add the
-		// primary clues that build filtered out to make a complete list.
-		// also merge buildResults data into resultMap
+		// we only sent compound clues to validateSources, so add the primary
+		// clues that were filtered out by build(), to make a complete list.
+		// also merge buildResults data into resultMap.
 		candidateResultList = vsResult.list.map(result => Object({
 		    ncList:    _.concat(result.ncList, buildResult.primaryNcList),
 		    resultMap: _.cloneDeep(buildResult.resultMap).merge(result.resultMap, buildResult.compoundNcList)
@@ -475,6 +473,7 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 		    //resultList = _.concat(resultList, compatList);
 		    return !args.validateAll; // some.exit if !validateAll, else some.continue
 		}
+		return false; // some.continue;
 	    });
 	    if (!anyCandidate) {
 		break; // none of those results were good, try other combos
@@ -749,8 +748,7 @@ Validator.prototype.findPrimarySourceConflicts = function(args) {
 	// if name is in nameMap then it's a duplicate
 	if (_.has(nameMap, nc.name)) {
 	    duplicateName = nc.name;
-	}
-	else {
+	} else {
 	    nameMap[nc.name] = true;
 	}
 
@@ -934,8 +932,7 @@ Validator.prototype.evalFindDuplicateResult = function(result, logPrefix) {
     if (dupeType.length) {
 	if (this.logging) {
 	    this.log(logPrefix + ' duplicate primary ' + dupeType + ', ' + dupeValue);
-	}
-	else {
+	} else {
 	    //console.log(logPrefix + ' duplicate primary ' + dupeType + ', ' + dupeValue);
 	}
 	return false;
@@ -992,8 +989,7 @@ Validator.prototype.buildSrcNameList = function(args) {
 	let slIndex; // srcListIndex
 	if (args.allPrimary || (nc.count > 1)) {
 	    slIndex = this.getSrcListIndex(indexMap, nc, srcList);
-	}
-	else {
+	} else {
 	    slIndex = 0;
 	}
 	if (this.logging ) {
@@ -1064,8 +1060,7 @@ Validator.prototype.buildSrcNameList = function(args) {
 	    if (!_.isEmpty(resultMap.map())) {
 		this.log('resultMap:');
 		resultMap.dump();
-	    }
-	    else {
+	    } else {
 		this.log('resultMap: empty');
 	    }
 	}
@@ -1113,8 +1108,7 @@ Validator.prototype.getSrcListIndex = function(indexMap, nc, srcList) {
 		     ', length(' + indexMap[nc].length + ')' +
 		     ', actual length(' + srcList.length + ')');
 	}
-    }
-    else {
+    } else {
 	slIndex = 0;
 	indexMap[nc] = { index: 0, length: srcList.length };
 	if (this.logging) {
@@ -1148,7 +1142,7 @@ Validator.prototype.incrementIndexMap = function(indexMap) {
     while (indexObj.index >= indexObj.length) {
 	if(this.logging) {
 	    this.log('keyIndex ' + keyIndex + ': ' + indexObj.index +
-		     ' >= ' + indexObj.length + ', resetting')
+		     ' >= ' + indexObj.length + ', resetting');
 	}
 	indexObj.index = 0;
 	keyIndex -= 1;
@@ -1239,8 +1233,7 @@ Validator.prototype.chop = function(list, removeValue) {
     list.forEach(value => {
 	if (value == removeValue) {
 	    removeValue = undefined;
-	}
-	else {
+	} else {
 	    copy.push(value);
 	}
     });
@@ -1347,19 +1340,16 @@ Validator.prototype.dumpResultMap = function(seq, level) {
 	    seq.forEach(elem => {
 		if (typeof elem === 'object') {
 		    this.dumpResultMap(elem, level + 1);
-		}
-		else {
+		} else {
 		    console.log(this.indent() + spaces(2*level) + elem);
 		}
 	    }, this);
-	}
-	else {
+	} else {
 	    _.forOwn(seq, function(value, key) {
 		if (typeof value === 'object') {
 		    console.log(this.indent() + spaces(2 * level) + key + ':');
 		    this.dumpResultMap(value, level + 1);
-		}
-		else {
+		} else {
 		    console.log(this.indent() + spaces(2 * level) + key + ': ' + value);
 		}
 	    }.bind(this));

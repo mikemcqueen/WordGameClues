@@ -74,7 +74,7 @@ function Peco(args) {
 	    throw new Error('Peco: cannot specify both count -and- max');
 	}
 	if (this.count > this.sum) {
-	    throw new Error('Peco: count > sum');
+	    throw new Error(`Peco: count(${this.count}) > sum(${this.sum})`);
 	}
 	if (this.require && this.exclude &&
 	    _.intersection(this.require, this.exclude).length > 0)
@@ -119,8 +119,7 @@ Peco.prototype.getCombinations = function() {
     
     if (this.listArray) {
 	return this.getListCombinations(this.listArray);
-    }
-    else {
+    } else {
 	return this.getAllAddends(true);
     }
 }
@@ -131,8 +130,7 @@ Peco.prototype.getAllAddends = function(combFlag) {
     let list;
     if (this.count) {
 	list = this.getAddendsForCount(this.count, combFlag);
-    }
-    else {
+    } else {
 	for (let count = 2; count <= this.max; ++count) {
 	    list = this.getAddendsForCount(count, combFlag, list);
 	}
@@ -146,7 +144,7 @@ Peco.prototype.getAddendsForCount = function(count, combFlag, pecoList, quiet) {
     var last = this.sum - (count - 1);
     
     if (count > this.sum) {
-	throw new Error('Peco: count > sum');
+	throw new Error(`Peco: count(${count}) > sum(${this.sum})`);
     }
 
     if (LOGGING) {
@@ -188,11 +186,9 @@ Peco.prototype.buildResult = function(args) {
 
     if (args.listArray) {
 	list = this.listFirst(args.listArray, args.combFlag);
-    }
-    else if (args.count) {
+    } else if (args.count) {
 	list = this.first(args.count, args.combFlag);
-    }
-    else {
+    } else {
 	throw new Error('missing arg, count: ' + args.count +
 			', listArray: ' + args.listArray);
     }
@@ -209,8 +205,7 @@ Peco.prototype.buildResult = function(args) {
 	args.pecoList.push(list);
 	if (args.listArray) {
 	    list = this.listNext(args.listArray, args.combFlag);
-	}
-	else {
+	} else {
 	    list = this.next(args.combFlag);
 	}
     } while (list);
@@ -253,8 +248,7 @@ Peco.prototype.listFirst = function(listArray, combFlag) {
 
     if (this.getIndexSum() <= this.max) {
 	list = this.getPecoList();
-    }
-    else {
+    } else {
 	list = this.next(combFlag);
     }
     return list;
@@ -340,8 +334,7 @@ Peco.prototype.first = function(srcCount, combFlag) {
 
     if (this.isValidIndex()) {
 	list = this.getPecoList();
-    }
-    else {
+    } else {
 	list = this.next(combFlag);
     }
     return list;
@@ -422,8 +415,7 @@ Peco.prototype.getIndexSum = function() {
     this.indexList.forEach((indexObj, index) => {
 	if (this.listArray) {
 	    sum += this.listArray[index][indexObj.index];
-	}
-	else {
+	} else {
 	    sum += indexObj.index;
 	}
     });
@@ -442,8 +434,7 @@ Peco.prototype.indexListToJSON = function() {
 	}
 	if (this.listArray) {
 	    s += this.listArray[index][indexObj.index];
-	}
-	else {
+	} else {
 	    s += indexObj.index;
 	}
     });
@@ -470,8 +461,7 @@ Peco.prototype.getPecoList = function() {
     this.indexList.forEach((indexObj, index) => {
 	if (this.listArray) {
 	    list.push(this.listArray[index][indexObj.index]);
-	}
-	else {
+	} else {
 	    list.push(indexObj.index);
 	}
     });

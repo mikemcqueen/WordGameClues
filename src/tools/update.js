@@ -7,8 +7,8 @@
 const _            = require('lodash');
 const ClueManager  = require('../clue_manager');
 const Dir          = require('node-dir');
-const expect       = require('chai').expect;
-const fs           = require('fs');
+const Expect       = require('chai').expect;
+const Fs           = require('fs');
 const Path         = require('path');
 const Promise      = require('bluebird');
 const Readlines    = require('n-readlines');
@@ -49,7 +49,7 @@ const SM = {
 
 //
 function getLineType(line) {
-    expect(line.length).to.be.at.least(1);
+    Expect(line.length).to.be.at.least(1);
     let lineType;
     if (line[0] === Result.SRC_PREFIX) lineType = Src;
     if (line[0] === Result.MAYBE_PREFIX) lineType = Maybe;
@@ -72,8 +72,8 @@ function getLineType(line) {
 
 //
 function processSrc(line, args, options) {
-    expect(line).to.be.a('string');
-    expect(args.dir).to.be.a('string');
+    Expect(line).to.be.a('string');
+    Expect(args.dir).to.be.a('string');
 
     // process ,x suffix
     let rejected = false;
@@ -86,7 +86,7 @@ function processSrc(line, args, options) {
     }
     console.log(`src: ${line}`);
     let nameList = line.split(',');
-    expect(nameList.length).to.be.at.least(2);
+    Expect(nameList.length).to.be.at.least(2);
     if (rejectSuffix) {
 	if (ClueManager.addReject(nameList)) {
 	    args.count.rejectClues += 1;
@@ -104,7 +104,7 @@ function processSrc(line, args, options) {
     let path = `${dir}/${Result.makeFilteredFilename(nameList)}`;
     let content;
     try {
-	content = fs.readFileSync(path, 'utf8');
+	content = Fs.readFileSync(path, 'utf8');
     } catch(err) {
 	// file not existing is OK.
 	if (options.verbose) {
@@ -120,7 +120,8 @@ function processSrc(line, args, options) {
     else {
 	filteredUrls = {
 	    knownUrls:  [],
-	    rejectUrls: []
+	    rejectUrls: [],
+	    maybeUrls: []
 	};
     }
     return { 
@@ -145,7 +146,7 @@ function getUrlSuffix(line, options) {
 	    if (options.verbose) {
 		console.log(`suffix: ${suffix}`);
 	    }
-	    expect(ValidSuffixes.includes(suffix), `bad url suffix, ${line}`).to.be.true;
+	    Expect(ValidSuffixes.includes(suffix), `bad url suffix, ${line}`).to.be.true;
 	}
     }
     return {
@@ -156,8 +157,8 @@ function getUrlSuffix(line, options) {
 
 //
 function addUrl(urlList, url) {
-    expect(urlList).to.be.an('array');
-    expect(url).to.be.a('string');
+    Expect(urlList).to.be.an('array');
+    Expect(url).to.be.a('string');
 
     if (!urlList.includes(url)) {
 	urlList.push(url);
@@ -168,8 +169,8 @@ function addUrl(urlList, url) {
 
 //
 function processUrl(line, args, options) {
-    expect(line).to.be.a('string');
-    expect(args.filteredUrls).to.be.an('object');
+    Expect(line).to.be.a('string');
+    Expect(args.filteredUrls).to.be.an('object');
 
     // for clue suffix or undefined suffix, save the URL
     args.url = undefined;
@@ -178,7 +179,7 @@ function processUrl(line, args, options) {
 	if (addUrl(args.filteredUrls.knownUrls, urlSuffix.url)) {
 	    console.log(`added clue url, ${urlSuffix.url}`);
 	    args.count.knownUrls += 1;
-	    args.urlChange = true;
+	    args.anyUrlListChanged = true;
 	}
 	args.url = urlSuffix.url; // save for ClueSuffix
 	args.urlAdded = true;
@@ -187,29 +188,25 @@ function processUrl(line, args, options) {
 	if (addUrl(args.filteredUrls.rejectUrls, urlSuffix.url)) {
 	    console.log(`added reject url, ${urlSuffix.url}`);
 	    args.count.rejectUrls += 1;
-	    args.urlChange = true;
+	    args.anyUrlListChanged = true;
 	}
     }
     else {
-	expect(urlSuffix.suffix).to.be.undefined;
+	Expect(urlSuffix.suffix).to.be.undefined;
 	args.url = urlSuffix.url; // save for undefined
     }
     return args;
 }
 
 //
-
-function addClues(countList, name, src) {
-    expect(countList).to.be.an('array');
-    expect(name).to.be.a('string');
-    expect(src).to.be.a('string');
+function addClues (countList, name, src, add = ClueManager.addClue) {
+    Expect(countList).to.be.an('array');
+    Expect(name).to.be.a('string');
+    Expect(src).to.be.a('string');
 
     let updatedCountList = [];
     countList.forEach(count => {
-	if (ClueManager.addClue(count, {
-	    name: name,
-	    src:  src
-	}, false, true)) { // save = false, nothrow = true
+	if (add(count, { name: name, src: src }, false, true)) { // save = false, nothrow = true
 	    updatedCountList.push(count);
 	}
     });
@@ -217,23 +214,28 @@ function addClues(countList, name, src) {
 }
 
 //
-function processClue(line, args, options) {
-    expect(line).to.be.a('string');
-
+function getNameNote (line) {
     let name;
     let note;
     let firstComma = line.indexOf(',');
-    if (firstComma !== -1) {
+    if (firstComma === -1) {
+	name = line.trim();
+    } else {
 	name = line.slice(0, firstComma);
 	if (line.length > firstComma + 1) {
 	    note = line.slice(firstComma + 1, line.length);
 	}
-    } else {
-	name = line.trim();
     }
-    
+    return [name, note];
+}
+
+//
+function processClue (line, args, options) {
+    Expect(line).to.be.a('string');
+
+    let [name, note] = getNameNote(line);
     // we're about to update known clues. double-sanity check.
-    expect(ClueManager.isRejectSource(args.nameList)).to.be.false;
+    Expect(ClueManager.isRejectSource(args.nameList)).to.be.false;
     let countList = addClues(ClueManager.getCountList(args.nameList), name,
 			     args.nameList.toString());
     if (!_.isEmpty(countList)) {
@@ -241,12 +243,12 @@ function processClue(line, args, options) {
 	countList.forEach(count => args.count.knownCountSet.add(count));
 	console.log(`added clue, ${name} : ${args.nameList} - ${note} : [${countList}]`);
     }
-    // we added a clue, add url to knownUrls if not already
+    // we added a clue. add url to knownUrls if not already
     if (!args.urlAdded) {
 	if (addUrl(args.filteredUrls.knownUrls, args.url, options)) {
 	    console.log(`added clue url, ${args.url}`);
 	    args.count.knownUrls += 1;
-	    args.urlChange = true;
+	    args.anyUrlListChanged = true;
 	}
 	args.urlAdded = true;
     }
@@ -255,32 +257,50 @@ function processClue(line, args, options) {
 
 //
 function processMaybe(line, args, options) {
-    expect(line).to.be.a('string');
+    Expect(line).to.be.a('string');
     if (options.verbose) {
 	console.log(`adding maybe clue, ${line}`);
+    }
+    Expect(ClueManager.isRejectSource(args.nameList)).to.be.false;
+    let [name, note] = getNameNote(line);
+    if (ClueManager.addMaybe(name, args.nameList, note)) {
+	args.count.maybeClues += 1;
+	args.count.maybeCountSet.add(args.nameList.length);
+	console.log(`added maybe clue, ${name} : ${args.nameList} - ${note}`);
+    }
+    // we added a maybe clue. add url to maybeUrls if not already
+    if (!args.maybeUrlAdded) {
+	if (addUrl(args.filteredUrls.maybeUrls, args.url, options)) {
+	    console.log(`added maybe url, ${args.url}`);
+	    args.count.maybeUrls += 1;
+	    args.anyUrlListChanged = true;
+	}
+	args.maybeUrlAdded = true;
     }
     return args;
 }
 
 //
 function processKnown(line, args, options) {
-    expect(line).to.be.a('string');
+    Expect(line).to.be.a('string');
     if (options.verbose) {
 	console.log(`skipping known clue, ${line}`);
     }
+    // TODO: if note present, and no note in known list, add note
     // do nothing
     return args;
 }
 
 //
 function writeFilteredUrls(result) {
-    if (result.urlChange) {
+    if (result.anyUrlListChanged) {
 	const fu = result.filteredUrls;
-	expect(fu).is.not.undefined;
+	Expect(fu).is.not.undefined;
 	fu.knownUrls = _.sortedUniq(fu.knownUrls.sort());
+	fu.maybeUrls = _.sortedUniq(fu.maybeUrls.sort());
 	fu.rejectUrls = _.sortedUniq(fu.rejectUrls.sort());
-	fs.writeFileSync(result.filteredUrlPath, JSON.stringify(fu));
-	result.urlChange = false; // shouldn't need to do this, but..
+	Fs.writeFileSync(result.filteredUrlPath, JSON.stringify(fu));
+	result.anyUrlListChanged = false; // shouldn't need to do this, but..
     }
 }
 
@@ -308,8 +328,8 @@ function skipState(state, result, options) {
 //
 //
 function updateResults(inputFilename, dir, options) {
-    expect(dir).to.be.a('string');
-    expect(inputFilename).to.be.a('string');
+    Expect(dir).to.be.a('string');
+    Expect(inputFilename).to.be.a('string');
 
     let readLines = new Readlines(inputFilename);
     let state = Start;
@@ -319,10 +339,13 @@ function updateResults(inputFilename, dir, options) {
 	count : {
 	    knownUrls      : 0,
 	    rejectUrls     : 0,
+	    maybeUrls     : 0,
 	    knownClues     : 0,
 	    rejectClues    : 0,
+	    maybeClues    : 0,
 	    knownCountSet  : new Set(),
-	    rejectCountSet : new Set()
+	    rejectCountSet : new Set(),
+	    maybeCountSet : new Set()
 	}
     };
     // TODO: result.requiredNextState = Src
@@ -351,8 +374,8 @@ function updateResults(inputFilename, dir, options) {
 //
 
 function main() {
-    expect(Opt.argv.length, 'exactly one FILE argument is required').to.equal(1);
-    expect(Opt.options.dir, '-d DIR is required').to.exist;
+    Expect(Opt.argv.length, 'exactly one FILE argument is required').to.equal(1);
+    Expect(Opt.options.dir, '-d DIR is required').to.exist;
 
     let base = Opt.options.synthesis ? 'synth' : 'meta';
     
@@ -374,19 +397,27 @@ function main() {
 	if (result.count.knownClues > 0) {
 	    // save clues
 	    let countList = Array.from(result.count.knownCountSet);
-	    expect(countList).to.be.not.empty;
+	    Expect(countList).to.be.not.empty;
 	    ClueManager.saveClues(countList);
 	}
+	if (result.count.maybeClues > 0) {
+	    // save maybes
+	    let countList = Array.from(result.count.maybeCountSet);
+	    Expect(countList).to.be.not.empty;
+	    ClueManager.saveMaybes(countList);
+	}	    
 	if (result.count.rejectClues > 0) {
 	    // save rejects
 	    let countList = Array.from(result.count.rejectCountSet);
-	    expect(countList).to.be.not.empty;
+	    Expect(countList).to.be.not.empty;
 	    ClueManager.saveRejects(countList);
 	}	    
     }
     console.log(`updated knownClues(${result.count.knownClues})` +
+		`, maybeClues(${result.count.maybeClues})` +
 		`, rejectClues(${result.count.rejectClues})` +
 		`, knownUrls(${result.count.knownUrls})` +
+		`, maybeUrls(${result.count.maybeUrls})` +
 		`, rejectUrls(${result.count.rejectUrls})`);
 }
 

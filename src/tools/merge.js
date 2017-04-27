@@ -16,10 +16,11 @@ const Readlines    = require('n-readlines');
 const Result       = require('./result-mod');
 
 const Opt          = require('node-getopt').create([
-    ['f', 'from=NAME',           'merge from: meta(m), synth(s), harm(h)'],
-    ['t', 'to=NAME',             'merge to: synth(s), harm(h), final(f)'],
+    ['f', 'from=BASEDIR',        'merge from: meta(m), synth(s), harmony(h)'],
+    ['t', 'to=BASEDIR',          'merge to: synth(s), harmony(h), final(f)'],
     ['',  'save',                'save to results'],
     ['',  'force',               'force merge, ignoring warnings. USE CAUTION.'],
+
 //  ['v', 'verbose',             'show logging'],
     ['h', 'help',                'this screen']
 ]).bindHelp().parseSystem();
@@ -29,21 +30,25 @@ const Opt          = require('node-getopt').create([
 const ValidFromList = [Clues.META, Clues.SYNTH, Clues.HARMONY];
 const ValidToList   = [Clues.SYNTH, Clues.HARMONY, Clues.FINAL];
 const ValidFromToMap = {
-    [Clues.META.name]:    Clues.SYNTH,
-    [Clues.SYNTH.name]:   Clues.HARMONY,
-    [Clues.HARMONY.name]: Clues.FINAL
+    [Clues.META.baseDir]:    Clues.SYNTH,
+    [Clues.SYNTH.baseDir]:   Clues.HARMONY,
+    [Clues.HARMONY.baseDir]: Clues.FINAL
 }
 
 // name: e.g., 'meta' or 'm'
 //
 function getFrom (name) {
-    return Clues.isValidName(name) ? _.find(ValidFromList, ['name', Clues.getFullName(name)]) : undefined;
+    return Clues.isValidBaseDirOption(name)
+	? _.find(ValidFromList, ['baseDir', Clues.getByBaseDirOption(name).baseDir])
+	: undefined;
 }
 
 // name: e.g., 'meta' or 'm'
 //
 function getTo (name) {
-    return Clues.isValidName(name) ? _.find(ValidToList, ['name', Clues.getFullName(name)]) : undefined;
+    return Clues.isValidBaseDirOption(name)
+	? _.find(ValidToList, ['baseDir', Clues.getByBaseDirOption(name)])
+	: undefined;
 }
 
 // from: e.g, Clues.META

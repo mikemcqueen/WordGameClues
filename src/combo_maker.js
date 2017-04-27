@@ -75,7 +75,7 @@ ComboMaker.prototype.makeCombos = function(args) {
     }
     let validateAll = false;
     if (!_.isUndefined(args.sources)) {
-	console.log('Valididating sources: ' + args.sources);
+	console.log('Validating sources: ' + args.sources);
 	validateAll = true;
     }
 

@@ -74,12 +74,12 @@ ClueManager.prototype.saveClueList = function (list, count, options = {}) {
 //  validateAll:
 //
 ClueManager.prototype.loadAllClues = function (args) {
-    this.dir = `${DATA_DIR}${args.baseDir}`;
+    this.dir = `${DATA_DIR}${args.clues.baseDir}`;
     if (args.ignoreErrors) {
 	this.ignoreLoadErrors = true;
     }
-    let result = this.getMaxRequired(args.baseDir);
-    this.maxClues = result.max; // need to set this before loading, used by validator
+    //let result = this.getMaxRequired(args.cluse);
+    this.maxClues = args.clues.MAX_CLUE_COUNT;
 
     for (let count = 1; count <= this.maxClues; ++count) {
 	let knownClueList = this.loadClueList(count);
@@ -116,8 +116,7 @@ ClueManager.prototype.loadAllClues = function (args) {
 //
 
 ClueManager.prototype.getMaxRequired = function (baseDir) {
-    let clues = Clues.META;
-    
+    let clues;
     switch (baseDir) {
     case Clues.SYNTH.name:
 	clues = Clues.SYNTH;
@@ -129,9 +128,22 @@ ClueManager.prototype.getMaxRequired = function (baseDir) {
 	clues = Clues.FINAL;
 	break;
     case Clues.META.name:
-	// default to meta
+	clues = Clues.META;
+	break;
     default:
-	this.log('defaulting to --meta clue counts for baseDir ' + baseDir);
+	// this is a hack.  clean this shit up
+	let sentence;
+	if (baseDir.slice(0, 5) === 'poem/') {
+	    sentence = _.toNumber(baseDir.slice(5, baseDir.length));
+	    switch (sentence) {
+	    case 1: clues = Clues.POEM_1; break;
+	    default: throw new Error('not supported');
+	    }
+	} else {
+	    throw new Error('would like tto avoid this');
+	    clues = Clues.META;
+	    this.log('defaulting to --meta clue counts for baseDir ' + baseDir);
+	}
 	break;
     }
     return {
@@ -233,8 +245,8 @@ ClueManager.prototype.saveClues = function (counts) {
 //
 //
 
-ClueManager.prototype.addClue = function (count, clue, save = false) {
-    if (this.addKnownClue(count, clue.name, clue.src, true)) {
+ClueManager.prototype.addClue = function (count, clue, save = false, nothrow = false) {
+    if (this.addKnownClue(count, clue.name, clue.src, nothrow)) {
 	this.clueListArray[count].push(clue);
 	if (save) {
 	    this.saveClues(count);
@@ -247,7 +259,7 @@ ClueManager.prototype.addClue = function (count, clue, save = false) {
 //
 //
 
-ClueManager.prototype.addKnownClue = function (count, name, source, noThrow) {
+ClueManager.prototype.addKnownClue = function (count, name, source, nothrow) {
     Expect(count).to.be.a('number');
     Expect(name).to.be.a('string');
     Expect(source).to.be.a('string');
@@ -260,15 +272,38 @@ ClueManager.prototype.addKnownClue = function (count, name, source, noThrow) {
 		     name + ' : ' + source);
 	}
 	clueMap[name].push(source);
-    } else if (!noThrow) {
+    } else {
+	if (nothrow) return false;
 	throw new Error('duplicate clue name/source' + 
 			'(' + count + ') ' +
 			name + ' : ' + source);
-    } else {
-	return false;
     }
     return true;
 }
+
+//
+
+ClueManager.prototype.addMaybe = function (name, srcNameList, note, save = false) {
+    if (_.isString(srcNameList)) {
+	srcNameList = srcNameList.split(',');
+    }
+    Expect(srcNameList).to.be.an('array');
+    let count = _.size(srcNameList);
+    Expect(count).to.be.at.least(2);
+    let clue = {
+	name: name,
+	src: _.toString(srcNameList)
+    };
+    if (!_.isUndefined(note)) {
+	clue.note = note;
+    }
+    this.maybeListArray[count].push(clue);
+    if (save) {
+	this.maybeListArray[count].save(this.getMaybeFilename(count));
+    }
+    return true;
+}
+
 
 //
 //
@@ -426,13 +461,13 @@ ClueManager.prototype.makeSrcNameListArray = function (nc) {
 // Given a sum, such as 3, retrieve the array of lists of addends
 // that add up to that sum, such as [1,2], and return an array of lists
 // of clueLists of the specified clue counts, such as [clues1,clues2].
-
+//
 ClueManager.prototype.getClueSourceListArray = function (args) {
     let clueSourceListArray = [];
 
     if (this.logging) {
 	this.log(`++clueSrcListArray` +
-		 `, sum: ${args.sum}, max: ${args.max}, require: {$args.require}`);
+		 `, sum: ${args.sum}, max: ${args.max}, require: ${args.require}`);
     }
     Peco.makeNew({
 	sum:     args.sum,
@@ -482,25 +517,22 @@ ClueManager.prototype.filterAddends = function (addends, sizes) {
 //
 //
 
-ClueManager.prototype.filter = function (srcCsvList, clueCount) {
+ClueManager.prototype.filter = function (srcCsvList, clueCount, map = {}) {
     let known = 0;
     let reject = 0;
     let duplicate = 0;
-    let map = {};
     srcCsvList.forEach(srcCsv => {
 	if (this.isKnownSource(srcCsv, clueCount)) {
 	    if (this.logging) {
 		this.log('isKnownSource(' + clueCount + ') ' + srcCsv);
 	    }
 	    ++known;
-	}
-	else if (this.isRejectSource(srcCsv)) {
+	} else if (this.isRejectSource(srcCsv)) {
 	    if (this.logging) {
 		this.log('isRejectSource(' + clueCount + ') ' + srcCsv);
 	    }
 	    ++reject;
-	}
-	else {
+	} else {
 	    if (_.has(map, srcCsv)) {
 		console.log(`duplicate: ${srcCsv}`);
 		++duplicate;
@@ -509,7 +541,7 @@ ClueManager.prototype.filter = function (srcCsvList, clueCount) {
 	}
     });
     return {
-	set:       map,
+	map:       map,
 	known:     known,
 	reject:    reject,
 	duplicate: duplicate

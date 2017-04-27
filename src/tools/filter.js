@@ -21,21 +21,21 @@ const Score        = require('./score-mod');
 const Tmp          = require('tmp');
 
 const Opt          = require('node-getopt').create([
+    //['f', 'final',             'use final clues'],
+    //['r', 'harmony',             'use harmony clues'],
+    //['y', 'synthesis',           'use synthesis clues'],
+
     ['a', 'article',             'filter results based on article word count'],
     ['',  'copy',                'copy to clipboard as RTF'],
     ['d', 'dir=NAME',            'directory name'],
-    //['f', 'final',             'use final clues'],
 //    ['k', 'known',               'filter known results'],  // easy!, call ClueManager.filter()
     ['m', 'match=EXPR',          'filename match expression' ],
     ['n', 'count',               'show result/url counts only'],
     ['',  'note',                'mail results to evernote'], 
 //    ['r', 'rejects',             'show only results that fail all filters'],
-    //['r', 'harmony',             'use harmony clues'],
     ['t', 'title',               'filter results based on title word count (default)'],
     ['x', 'xfactor=VALUE',       'show borked results, with 1) missing URL/title/summary 2) unscored URLs' +
                                    ' 3) article > summary'], 
-    ['y', 'synthesis',           'use synthesis clues'],
-
     ['v', 'verbose',             'show logging'],
     ['h', 'help',                'this screen']
 ]).bindHelp().parseSystem();
@@ -460,7 +460,7 @@ function mailTextFile(options) {
     }
 }
 
-// TODO: move to util.s, comment purpose
+// TODO: move to util.js, comment purpose
 
 function copyTextFile(path) {
     let fd = Fs.openSync(path, 'r');
