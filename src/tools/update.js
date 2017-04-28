@@ -6,6 +6,7 @@
 
 const _            = require('lodash');
 const ClueManager  = require('../clue_manager');
+const Clues        = require('../clue-types');
 const Dir          = require('node-dir');
 const Expect       = require('chai').expect;
 const Fs           = require('fs');
@@ -14,13 +15,13 @@ const Promise      = require('bluebird');
 const Readlines    = require('n-readlines');
 const Result       = require('./result-mod');
 
-const Opt          = require('node-getopt').create([
-    ['d', 'dir=NAME',            'directory name'],
-    ['',  'save',                'save clues'],
-    ['y', 'synthesis',           'use synthesis clues'],
-    ['v', 'verbose',             'show logging'],
-    ['h', 'help',                'this screen']
-]).bindHelp().parseSystem();
+const Opt          = require('node-getopt')
+    .create(_.concat(Clues.Options, [
+	['d', 'dir=NAME',            'directory name'],
+	['',  'save',                'save clues'],
+	['v', 'verbose',             'show logging'],
+	['h', 'help',                'this screen']
+    ])).bindHelp().parseSystem();
 
 //---------------------------------------------
 
@@ -377,15 +378,11 @@ function main() {
     Expect(Opt.argv.length, 'exactly one FILE argument is required').to.equal(1);
     Expect(Opt.options.dir, '-d DIR is required').to.exist;
 
-    let base = Opt.options.synthesis ? 'synth' : 'meta';
-    
     if (Opt.options.verbose) {
 	console.log('verbose: true');
     }
 
-    ClueManager.loadAllClues({
-	baseDir:  base
-    });
+    ClueManager.loadAllClues({ clues: Clues.getByOptions(Opt.options) });
 
     let inputFilename = Opt.argv[0];
     console.log(`file: ${inputFilename}`);

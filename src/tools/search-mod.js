@@ -14,7 +14,7 @@ const PrettyMs     = require('pretty-ms');
 const Promise      = require('bluebird');
 const Result       = require('./result-mod');
 
-const fsWriteFile  = Promise.promisify(Fs.writeFile);
+const FsWriteFile  = Promise.promisify(Fs.writeFile);
 
 // make a search term from a list of words and the supplied options
 //
@@ -55,7 +55,7 @@ function getOneResult (wordList, pages, options = {}) {
 // root          : root results directory (optional; default: Results.dir)
 // dir           : directory within root to store results (optional, default: wordList.length)
 //
-// optiosn:
+// options:
 //   force       : search even if results file already exists (overwrites. TODO: append new results, instead)
 //   forceNextError: test support, sets getOnePromise.options.reject one time
 //
@@ -82,7 +82,7 @@ async function getAllResultsLoop (args, options = {}) {
 		    console.log(`Skip: file exists, ${path}`); 
 		    return Promise.reject();
 		}
-		let oneResultOptions = { reject : options.forceNextError };
+		let oneResultOptions = { reject: options.forceNextError };
 		options.forceNextError = false;
 		// file does not already exist; do the search
 		return getOneResult(wordList, args.pages, oneResultOptions);
@@ -90,11 +90,12 @@ async function getAllResultsLoop (args, options = {}) {
 		// we successfully searched. set delay for next search
 		nextDelay = My.between(args.delay.low, args.delay.high);
 		if (_.isEmpty(oneResult)) {
+		    // TODO: shorter delay here? like 30 sec?
 		    result.empty += 1;
 		    return Promise.reject();
 		}
 		result.data += 1;
-		return fsWriteFile(path, JSON.stringify(oneResult)).then(() => {
+		return FsWriteFile(path, JSON.stringify(oneResult)).then(() => {
 		    console.log(`Saved: ${path}`);
 		    return true; // saved
 		});

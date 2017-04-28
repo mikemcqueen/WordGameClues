@@ -20,25 +20,21 @@ const Result       = require('./result-mod');
 const Score        = require('./score-mod');
 const Tmp          = require('tmp');
 
-const Opt          = require('node-getopt').create([
-    //['f', 'final',             'use final clues'],
-    //['r', 'harmony',             'use harmony clues'],
-    //['y', 'synthesis',           'use synthesis clues'],
-
-    ['a', 'article',             'filter results based on article word count'],
-    ['',  'copy',                'copy to clipboard as RTF'],
-    ['d', 'dir=NAME',            'directory name'],
-//    ['k', 'known',               'filter known results'],  // easy!, call ClueManager.filter()
-    ['m', 'match=EXPR',          'filename match expression' ],
-    ['n', 'count',               'show result/url counts only'],
-    ['',  'note',                'mail results to evernote'], 
-//    ['r', 'rejects',             'show only results that fail all filters'],
-    ['t', 'title',               'filter results based on title word count (default)'],
-    ['x', 'xfactor=VALUE',       'show borked results, with 1) missing URL/title/summary 2) unscored URLs' +
-                                   ' 3) article > summary'], 
-    ['v', 'verbose',             'show logging'],
-    ['h', 'help',                'this screen']
-]).bindHelp().parseSystem();
+const Opt          = require('node-getopt')
+    .create(_.concat(Clues.Options, [
+	['a', 'article',             'filter results based on article word count'],
+	['',  'copy',                'copy to clipboard as RTF'],
+	['d', 'dir=NAME',            'directory name'],
+	//    ['k', 'known',               'filter known results'],  // easy!, call ClueManager.filter()
+	['m', 'match=EXPR',          'filename match expression' ],
+	['n', 'count',               'show result/url counts only'],
+	['',  'note',                'mail results to evernote'], 
+	//    ['r', 'rejects',             'show only results that fail all filters'],
+	['t', 'title',               'filter results based on title word count (default)'],
+	['x', 'xfactor=VALUE',       'show 1) missing URL/title/summary 2) unscored URLs 3) article > summary'], 
+	['v', 'verbose',             'show logging'],
+	['h', 'help',                'this screen']
+    ])).bindHelp().parseSystem();
 
 //
 
@@ -482,9 +478,7 @@ async function main () {
     Expect(Opt.argv.length, 'only one non-switch FILE argument allowed').is.at.most(1);
     Expect(Opt.options.dir, 'option -d NAME is required').to.exist;
 
-    ClueManager.loadAllClues({
-	baseDir: Opt.options.synthesis ? Clues.SYNTH.name : Clues.META.name
-    });
+    ClueManager.loadAllClues({ clues: Clues.getByOptions(Opt.options) });
 
     // default to title filter if no filter specified
     if (!Opt.options.article && !Opt.options.title) {

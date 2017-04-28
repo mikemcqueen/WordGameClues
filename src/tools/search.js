@@ -19,8 +19,8 @@ const Opt          = require('node-getopt')
 
 //
 
-const csvParse     = Promise.promisify(require('csv-parse'));
-const fsReadFile   = Promise.promisify(Fs.readFile);
+const CsvParse     = Promise.promisify(require('csv-parse'));
+const FsReadFile   = Promise.promisify(Fs.readFile);
 
 //
 
@@ -64,8 +64,8 @@ function main() {
 	low:   Ms(`${delayLow}m`),
 	high:  Ms(`${delayHigh}m`)
     };
-    fsReadFile(filename, 'utf8')
-	.then(csvContent => csvParse(csvContent, null))
+    FsReadFile(filename, 'utf8')
+	.then(csvContent => CsvParse(csvContent, null))
 	.then(wordListArray => Search.getAllResults({
 	    // NOTE: use default dir
 	    wordListArray: wordListArray,
