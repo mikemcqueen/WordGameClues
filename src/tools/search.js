@@ -10,14 +10,6 @@ const Fs           = require('fs');
 const Ms           = require('ms');
 const Promise      = require('bluebird');
 const Search       = require('./search-mod');
-const Opt          = require('node-getopt')
-      .create([
-	  ['d', 'dir=NAME',            'directory name'],
-	  ['h', 'help',                'this screen' ]
-      ])
-      .bindHelp().parseSystem();
-
-//
 
 const CsvParse     = Promise.promisify(require('csv-parse'));
 const FsReadFile   = Promise.promisify(Fs.readFile);
@@ -29,16 +21,26 @@ const DEFAULT_DELAY_LOW  = 8;
 const DEFAULT_DELAY_HIGH = 12;
 
 //
+
+const Opt          = require('node-getopt')
+      .create([
+/*	  ['d', 'dir=NAME',            'directory name'],*/
+	  ['h', 'help',                'this screen' ]
+      ])
+      .bindHelp(
+	  'Usage: node search pairs-file [delay-minutes-low delay-minutes-high]' +
+	      ' ex: node search file 4    ; delay 4 minutes between searches' +
+	      ' ex: node search file 4 5  ; delay 4 to 5 minutes between searches' +
+	  ` defaults, low: ${DEFAULT_DELAY_LOW}, high: ${DEFAULT_DELAY_HIGH}`
+      ).parseSystem();
+
+//
 //
 //
 
 function main() {
     if (Opt.argv.length < 1) {
-	console.log('Usage: node search pairs-file [delay-minutes-low delay-minutes-high]');
-	console.log(' ex: node search file 4    ; delay 4 minutes between searches');
-	console.log(' ex: node search file 4 5  ; delay 4 to 5 minutes between searches');
-	console.log(` defaults, low: ${DEFAULT_DELAY_LOW}, high: ${DEFAULT_DELAY_HIGH}`);
-	console.log(Opt);
+	Opt.showHelp();
 	return 1;
     }
 
@@ -65,7 +67,15 @@ function main() {
 	high:  Ms(`${delayHigh}m`)
     };
     FsReadFile(filename, 'utf8')
-	.then(csvContent => CsvParse(csvContent, null))
+	.then(csvContent => CsvParse(csvContent, { relax_column_count: true } ))
+    /* testing CsvParse option.relax_column_count
+	.then(wordListArray => {
+	    wordListArray.forEach(wordList => {
+		console.log(wordList.join(','));
+	    });
+	    return Promise.reject();
+	})
+     */
 	.then(wordListArray => Search.getAllResults({
 	    // NOTE: use default dir
 	    wordListArray: wordListArray,
@@ -73,7 +83,7 @@ function main() {
 	    delay:         delay
 	})).catch(err => {
 	    console.log(`error caught in main, ${err}`);
-	    console.log(err.stack);
+	    if (err) console.log(err.stack);
 	});
 }
 

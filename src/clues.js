@@ -133,7 +133,7 @@ function main () {
     }
     setLogging(verboseArg);
 
-    log('count=' + countArg + ', max=' + maxArg);
+    log(`count=${Opt.options.count}, max=${maxArg}`);
 
     // TODO: add "show.js" with these exports
     if (showKnownArg) {
@@ -148,12 +148,11 @@ function main () {
 	    return 1;
 	}
 	 */
-	if (!countArg) {
-	    countArg = ClueManager.maxClues;
-	}
 	Show.compatibleKnownClues({
 	    nameList: useClueList,
-	    max:      _.toNumber(Opt.options.count),
+	    max:      _.isUndefined(Opt.options.count)
+		? ClueManager.maxClues
+		: _.toNumber(Opt.options.count),
 	    asCsv:    Opt.options.csv
 	});
     }

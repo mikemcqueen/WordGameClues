@@ -31,10 +31,13 @@ const Opt          = require('node-getopt')
 	['',  'note',                'mail results to evernote'], 
 	//    ['r', 'rejects',             'show only results that fail all filters'],
 	['t', 'title',               'filter results based on title word count (default)'],
-	['x', 'xfactor=VALUE',       'show 1) missing URL/title/summary 2) unscored URLs 3) article > summary'], 
+	['x', 'xfactor=VALUE',       'show 1) missing URL/title/summary 2) unscored URLs 3) article < summary'], 
 	['v', 'verbose',             'show logging'],
 	['h', 'help',                'this screen']
-    ])).bindHelp().parseSystem();
+    ])).bindHelp(
+	"Usage: node filter <options> [wordListFile]\n\n" +
+	    "[[OPTIONS]]\n"
+    ).parseSystem();
 
 //
 
@@ -109,7 +112,7 @@ function filterSearchResultList (resultList, wordList, filteredUrls, options) {
 	}
 	if (options.xfactor && isXFactor(result, options)) {
 	    if (!loggedXFactor) {
-		console.log(options.filepath);
+		console.log(`x: ${options.filepath}`);
 		loggedXFactor = true;
 	    }
 	    return undefined;
@@ -257,16 +260,8 @@ function filterSearchResultDir (dir, fileMatch, options) {
     });
 }
 
-// for each search result filename that matches fileMatch in dir 
-//   filter out rejected word combinations
-//   load the file, build filtered URL list
-//   load the _filtered.json file, filter out known/reject URLs
-//   if any URLs remain, add result to filteredList.
-//
-// NOTE that for convenience, this function currently loads all
-// files that match fileMatch, even if the file's word-combo is
-// a rejected combo. 
 // 
+
 async function filterPathList (pathList, dir, options) {
     Expect(pathList).to.be.an('array');
     Expect(options).to.be.an('object');
@@ -354,7 +349,7 @@ function filterPathList2 (pathList, dir, options) {
 
 function loadCsv (filename) {
     return fsReadFile(filename, 'utf8')
-	.then(csvContent => csvParse(csvContent, null));
+	.then(csvContent => csvParse(csvContent, { relax_column_count: true }));
 }
 
 //
@@ -380,7 +375,7 @@ function buildNameMap (wordListArray) {
 
 function getPathList (dir, fileMatch, nameMap) {
     Expect(dir).to.be.a('string');
-    Expect(fileMatch).to.be.an('string');
+    Expect(fileMatch).to.be.a('string');
     return new Promise((resolve, reject) => {
 	Dir.files(dir, (err, pathList) => {
 	    if (err) throw err;
@@ -514,7 +509,7 @@ async function main () {
     let useTmpFile = Opt.options.note || Opt.options.copy;
     return Promise.resolve().then(() => {
 	if (useTmpFile) {
-	    return createTmpFile().then(([path, fd]) =>  {
+	    return createTmpFile().then(([path, fd]) => {
 		return [path, Fs.createWriteStream(null, { fd })];
 	    });
 	}

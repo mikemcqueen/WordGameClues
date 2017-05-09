@@ -57,10 +57,9 @@ function compatibleKnownClues(args) {
     // first, make sure the supplied nameList:sum by itself is a valid clue
     // combination, and find out how many primary-clue variations there
     // are in which the clue names in args.nameList exist.
-    let realNameList = ncList.map(nc => nc.name);
     let vsResult = Validator.validateSources({
 	sum:         sum,
-	nameList:    realNameList,
+	nameList:    ncList.map(nc => nc.name),
 	count:       args.nameList.length,
 	validateAll: true
     });
@@ -71,7 +70,7 @@ function compatibleKnownClues(args) {
 
     // for each primary-clue variation from validateResults
     vsResult.list.forEach(result => {
-	log(`final result: ${result.nameSrcList}`);
+	console.log(`final result: ${result.nameSrcList}`);
 	let primarySrcList = result.nameSrcList.map(nc => _.toNumber(nc.count));
 
 	// for each clue in each clueListArray[count] where count is

@@ -57,7 +57,13 @@ function gitAdd (filepath) {
     Expect(filepath).to.be.a('string');
     return new Promise((resolve, reject) => {
 	Git(Path.dirname(filepath))
-	    .add(Path.basename(filepath), err => err ? reject(err) : resolve());
+	    .add(Path.basename(filepath), err => {
+		if (err) {
+		    console.log('ADD FAILED!');
+		    return reject(err);
+		}
+		return resolve();
+	    });
     });
 }
 
