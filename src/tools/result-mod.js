@@ -123,6 +123,7 @@ function scoreSaveCommit (resultList, filepath, options = {}, wordList = undefin
     ).then(list => {
 	if (_.isEmpty(list)) {
 	    // if list is empty, all the results in this file were already scored
+	    console.log('empty list, already scored?');
 	    return Promise.reject(); // skip save/commit
 	}
 	return fsWriteFile(filepath, JSON.stringify(list))
@@ -157,6 +158,7 @@ module.exports = {
     pathFormat,
     scoreSaveCommit,
 
+    EXT_JSON,
     SRC_PREFIX,
     MAYBE_PREFIX,
     KNOWN_PREFIX,

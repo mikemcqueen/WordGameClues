@@ -33,6 +33,14 @@ const POEM_3 = {
     REQ_CLUE_COUNT: 4
 };
 
+const POEM_5 = {
+    sentence:       5,
+    baseDir:        'poem/5',
+    resultDir:      'poem',
+    MAX_CLUE_COUNT: 15,
+    REQ_CLUE_COUNT: 15
+};
+
 const META = {
     baseDir:        'meta',
     MAX_CLUE_COUNT: 9,
@@ -73,7 +81,7 @@ function getByOptions(options) {
 	//case 2: src = POEM_2; break;
 	case 3: src = POEM_3; break;
 	//case 4: src = POEM_4; break;
-	//case 5: src = POEM_5; break;
+	case 5: src = POEM_5; break;
 	//case 6: src = POEM_6; break;
 	//case 7: src = POEM_7; break;
 	//case 8: src = POEM_8; break;

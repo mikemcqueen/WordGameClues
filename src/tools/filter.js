@@ -65,7 +65,7 @@ function getUrlCount (resultList) {
 //
 
 function isFilteredUrl (url, filteredUrls) {
-    Expect(url).to.be.a('string');
+    Expect(url, 'iFU, url').to.be.a('string');
     if (_.isUndefined(filteredUrls)) return false; 
     Expect(filteredUrls).to.be.an('object');
     let reject = _.isArray(filteredUrls.rejectUrls) && filteredUrls.rejectUrls.includes(url);
@@ -148,7 +148,7 @@ function filterSearchResultList (resultList, wordList, filteredUrls, options) {
 //
 
 function loadFilteredUrls (dir, wordList, options) {
-    Expect(dir).to.be.a('string');
+    Expect(dir, 'lFU dir').to.be.a('string');
     Expect(wordList).to.be.an('array');
     Expect(options).to.be.an('object');
     let filteredFilename = Result.makeFilteredFilename(wordList);
@@ -207,8 +207,8 @@ function isInNameMap (nameMap, wordList) {
 // a rejected combo. 
 // 
 function filterSearchResultDir (dir, fileMatch, options) {
-    Expect(dir).to.be.a('string');
-    Expect(fileMatch).to.be.an('string');
+    Expect(dir, 'fSRD dir').to.be.a('string');
+    Expect(fileMatch, 'fSRD filematch').to.be.an('string');
     Expect(options).to.be.an('object');
     return new Promise((resolve, reject) => {
 	let filteredList = [];
@@ -258,50 +258,6 @@ function filterSearchResultDir (dir, fileMatch, options) {
 	    });
 	});
     });
-}
-
-// 
-
-async function filterPathList (pathList, dir, options) {
-    Expect(pathList).to.be.an('array');
-    Expect(options).to.be.an('object');
-
-    let filteredList = [];
-    let rejectList = [];
-
-    let promiseList = [];
-    for (const path of pathList) {
-	let filename = Path.basename(path);
-	if (options.verbose) {
-	    console.log(`filename: ${filename}`);
-	}
-	let wordList = Result.makeWordlist(filename);
-	let fileContent;
-	promiseList.push(fsReadFile(path, 'utf8')
-	    .then(content => {
-		fileContent = content;
-  		return loadFilteredUrls(dir, wordList, options);
-	    }).then(filteredUrls => {
-		options.filepath = path;
-		return filterSearchResultList(JSON.parse(fileContent), wordList, filteredUrls, options);
-	    }).then(filterResult => {
-		// TODO: I question this logic at the moment
-		if (_.isEmpty(filterResult.urlList)) {
-		    rejectList.push(filterResult);
-		} else {
-		    filteredList.push(filterResult);
-		}
-		return undefined;
-	    }).catch(err => {
-		// report & eat all errors
-		console.log(`filterSearchResultFiles, path: ${path}, error; ${err}`);
-	    }));
-    };
-    await Promise.all(promiseList);
-    return {
-	filtered: filteredList,
-	rejects:  rejectList
-    };
 }
 
 //
@@ -374,8 +330,8 @@ function buildNameMap (wordListArray) {
 //
 
 function getPathList (dir, fileMatch, nameMap) {
-    Expect(dir).to.be.a('string');
-    Expect(fileMatch).to.be.a('string');
+    Expect(dir, 'gPL dir').to.be.a('string');
+    Expect(fileMatch, 'gPL filematch').to.be.a('string');
     return new Promise((resolve, reject) => {
 	Dir.files(dir, (err, pathList) => {
 	    if (err) throw err;

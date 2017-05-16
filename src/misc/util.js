@@ -17,7 +17,20 @@ const Retry          = require('retry');
 
 //
 
-const RETRY_TIMEOUTS = [ 6000, 12000, 18000, 24000, 48000, 54000, 60000 ];
+const DEFAULT_TIMEOUT_MS    = 6000;
+const DEFAULT_TIMEOUT_COUNT = 10;
+
+const RETRY_TIMEOUTS = (function(first, count) {
+    let timeouts = [];
+    // gotta bet a lodash function for this, like fillWith()
+    let to = first;
+    while (count > 0) {
+	timeouts.push(to);
+	to += first;
+	count -= 1;
+    }
+    return timeouts;
+})(DEFAULT_TIMEOUT_MS, DEFAULT_TIMEOUT_COUNT);
 
 //
 
@@ -64,6 +77,7 @@ function gitRetryAdd (filepath, cb) {
 	Git(Path.dirname(filepath))
 	    .add(Path.basename(filepath), err => {
 		if (op.retry(err)) {
+		    console.log('gitRetryAdd: error, retrying...');
 		    return;
 		}
 		cb(op.mainError());
@@ -76,9 +90,9 @@ function gitRetryAdd (filepath, cb) {
 function gitAdd (filepath) {
     Expect(filepath).to.be.a('string');
     return new Promise((resolve, reject) => {
-	let err = gitRetryAdd(filepath, err =>  {
+	gitRetryAdd(filepath, err =>  {
 	    if (err) {
-		console.log('ADD FAILED!');
+		console.log('gitAdd failed');
 		return reject(err);
 	    }
 	    return resolve();
@@ -171,8 +185,8 @@ function gitAddCommit (filepath, message) {
     Expect(filepath).to.be.a('string');
     Expect(message).to.be.a('string');
     return gitAdd(filepath)
-	.then(() => gitCommit(filepath, message))
-	.catch(err => console.log(`gitAddCommit error, ${err}`));// TODO: bad
+	.then(() => gitCommit(filepath, message));
+    //	.catch(err => console.log(`gitAddCommit error, ${err}`));// TODO: bad
 }
 
 //
@@ -181,11 +195,8 @@ function gitRemoveCommit (filepath, message) {
     Expect(filepath).to.be.a('string');
     Expect(message).to.be.a('string');
     return gitRemove(filepath)
-	.then(() => gitCommit(filepath, message))
-	.catch(err => {
-	    console.log(`gitRemoveCommit error, ${err}`)
-	    return undefined;
-	}); // TODO: bad
+	.then(() => gitCommit(filepath, message));
+    //	.catch(err =>  console.log(`gitRemoveCommit error, ${err}`)); // TODO: bad
 }
 
 //

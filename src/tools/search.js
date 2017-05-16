@@ -25,6 +25,7 @@ const DEFAULT_DELAY_HIGH = 12;
 const Opt          = require('node-getopt')
       .create([
 /*	  ['d', 'dir=NAME',            'directory name'],*/
+	  ['',  'force',               'force search even if results file exists'],
 	  ['h', 'help',                'this screen' ]
       ])
       .bindHelp(
@@ -52,7 +53,7 @@ function main() {
     let delayHigh = DEFAULT_DELAY_HIGH;
     if (Opt.argv.length > 1) {
 	delayLow = _.toNumber(Opt.argv[1]);
-	Expect(delayLow, 'delayLow').to.be.at.least(1);
+	Expect(delayLow, 'delayLow').to.be.at.least(0);
 	delayHigh = delayLow;
     }
     // arg2
@@ -76,12 +77,17 @@ function main() {
 	    return Promise.reject();
 	})
      */
-	.then(wordListArray => Search.getAllResults({
-	    // NOTE: use default dir
-	    wordListArray: wordListArray,
-	    pages:         DEFAULT_PAGE_COUNT,
-	    delay:         delay
-	})).catch(err => {
+	.then(wordListArray => Search.getAllResults(
+	    {
+		// NOTE: use default dir
+		wordListArray: wordListArray,
+		pages:         DEFAULT_PAGE_COUNT,
+		delay:         delay
+	    },
+	    {
+		force:         Opt.options.force
+	    }
+	)).catch(err => {
 	    console.log(`error caught in main, ${err}`);
 	    if (err) console.log(err.stack);
 	});

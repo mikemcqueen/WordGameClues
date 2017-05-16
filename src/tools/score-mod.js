@@ -126,7 +126,7 @@ function getWikiContent (title) {
 	    if (err) throw err;
 	});
     }).catch(err => {
-	console.log(`getWikiContent Wiki.page error, ${err}`);
+	console.log(`getWikiContent Wiki.page, title: ${title}, error: ${err}`);
 	if (err) throw err;
     });
 }
@@ -162,11 +162,23 @@ function getScore (wordList, result, options = {}) {
 
 //
 
+function filterBadResults (resultList) {
+    return _.filter(resultList, result => {
+	return !_.isEmpty(result.url);
+    });
+}
+
+//
+
 function scoreResultList (wordList, resultList, options = {}) {
     Expect(wordList, 'wordList').to.be.an('array').that.is.not.empty;
     Expect(resultList, 'resultList').to.be.an('array');
+
+    // remove empty URLs
+    resultList = filterBadResults(resultList);
+
     // convert space-separated words to separate words
-    wordList = _.chain(wordList).map(word => word.split(' ')).flatten().value();
+    wordList = _.flatten(_.map(wordList, word => word.split(' ')));
     console.log('wordList: ' + wordList);
     let any = false;
     return Promise.mapSeries(resultList, (result, index) => {

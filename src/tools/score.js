@@ -5,26 +5,27 @@
 'use strict';
 
 const _            = require('lodash');
-const Promise      = require('bluebird');
-const fs           = require('fs');
-const Readlines    = require('n-readlines');
 const Dir          = require('node-dir');
-const Path         = require('path');
 const Expect       = require('chai').expect;
-const Score        = require('./score-mod');
+const fs           = require('fs');
+const Linebyline   = require('linebyline');
+const Path         = require('path');
+const Promise      = require('bluebird');
+const Readlines    = require('n-readlines');
 const Result       = require('./result-mod');
-const Opt          = require('node-getopt')
-      .create([
-	  ['d', 'dir=NAME',            'directory name'],
-	  ['f', 'force',               'force re-score'],
-	  ['m', 'match=EXPR',          'filename match expression' ],
-	  ['s', 'synth',               'use synth clues'],
-	  ['v', 'verbose',             'extra logging'],
-	  ['h', 'help',                'this screen']
-      ]).bindHelp().parseSystem();
+const Score        = require('./score-mod');
 
 const fsReadFile   = Promise.promisify(fs.readFile);
 const fsWriteFile  = Promise.promisify(fs.writeFile);
+
+const Opt          = require('node-getopt')
+      .create([
+	  ['d', 'dir=NAME',            'directory name'],
+	  ['',  'force',               'force re-score'],
+	  ['m', 'match=EXPR',          'filename match expression' ],
+	  ['v', 'verbose',             'extra logging'],
+	  ['h', 'help',                'this screen']
+      ]).bindHelp().parseSystem();
 
 //
 
@@ -36,8 +37,8 @@ function scoreSearchResultDir (dir, fileMatch, options = {}) {
     let path = Result.DIR + dir;
     console.log('dir: ' + path);
     Dir.readFiles(path, {
-	match:   new RegExp(fileMatch),
-	exclude: /^\./,
+	match:     new RegExp(fileMatch),
+	exclude:   /^\./,
 	recursive: false
     }, function(err, content, filepath, next) {
 	if (err) throw err; // TODO: test this
@@ -61,41 +62,75 @@ function scoreSaveFile (filepath, options) {
     Expect(options).to.be.an('object');
 
     // TODO: Path.format()
-    fsReadFile(filepath, 'utf8')
+    return fsReadFile(filepath, 'utf8')
 	.then(content => Score.scoreResultList(
-	    Result.makeWordList(filepath),
+	    Result.makeWordlist(filepath),
 	    JSON.parse(content),
 	    options
 	).then(scoreResult => {
-	    if (_.isEmpty(scoreResult)) {
-		console.log('empty score result');
-		return undefined;
-	    }
+	    if (_.isEmpty(scoreResult)) return false;
 	    return fsWriteFile(filepath, JSON.stringify(scoreResult));
 	}));
 }
 
 //
 
+/*
 async function scoreSearchResultFiles (dir, inputFilename, options = {}) {
-    Expect(dir).to.be.a('string');
+    //Expect(dir).to.be.a('string');
     Expect(inputFilename).to.be.a('string');
     Expect(options).to.be.an('object');
-
-    dir = Result.DIR + dir;
-    console.log('dir: ' + dir);
+    
+    // ignore dir for now, add it to options later
+    console.log(`dir: ${options.dir}`);
     let readLines = new Readlines(inputFilename);
     while (true) {
-	let filename = readLines.next();
-	if (filename === false) return;
-	filename = filename.toString().trim();
-	let filepath = Path.format({ dir, base: filename });
-	console.log('filepath: ' + filepath);
+	let nextLine = readLines.next(); 
+	if (nextLine  === false) return;
+	let wordList = nextLine.toString().trim().split(',');
+	let filepath = Path.format({
+	    dir:  Result.DIR + options.dir || _.toString(wordList.length),
+	    base: Result.makeFilename(wordList)
+	});
+	console.log(`filepath: ${filepath}`);
 	await scoreSaveFile(filepath, options)
-	    .then(() => console.log('updated'))
-	    .catch(err => {
-		console.log(`scoreSaveFile error, ${err.message}`);
-		if (err) throw err;
+	    .then(() => {
+		console.log('updated');
+	    }).catch(err => {
+		console.log(`scoreSaveFile error, ${err}`);
+	    });
+    }
+}
+*/
+
+//
+
+async function scoreSearchResultFiles2 (dir, inputFilename, options = {}) {
+    //Expect(dir).to.be.a('string');
+    Expect(inputFilename).to.be.a('string');
+    Expect(options).to.be.an('object');
+    
+    // ignore dir for now, add it to options later
+    console.log(`dir: ${options.dir}`);
+    let readLines = new Readlines(inputFilename);
+    while (true) {
+	let nextLine = readLines.next(); 
+	if (nextLine  === false) return;
+	let wordList = nextLine.toString().trim().split(',');
+	let filepath = Path.format({
+	    dir:  Result.DIR + (options.dir || _.toString(wordList.length)),
+	    base: Result.makeFilename(wordList)
+	});
+	console.log(`filepath: ${filepath}`);
+	await scoreSaveFile(filepath, options)
+	    .then(scoreResult => {
+		if (scoreResult === false) {
+		    console.log('empty, not updated');
+		} else {
+		    console.log('updated');
+		}
+	    }).catch(err => {
+		console.log(`scoreSaveFile error, ${err}`);
 	    });
     }
 }
@@ -104,16 +139,15 @@ async function scoreSearchResultFiles (dir, inputFilename, options = {}) {
 //
 //
 
-function main () {
+async function main () {
     Expect(Opt.argv.length, 'only one optional FILE parameter is allowed')
 	.to.be.at.most(1);
-    Expect(Opt.options.dir, 'option -d NAME is required').to.exist;
 
     let inputFile;
     if (Opt.argv.length === 1) {
+	Expect(Opt.options.match, 'option -m EXPR not allowed with FILE').to.be.undefined;
 	inputFile = Opt.argv[0];
 	console.log(`file: ${inputFile}`);
-	Expect(Opt.options.match, 'option -m EXPR not allowed with FILE').to.be.undefined;
     }
     if (Opt.options.force === true) {
 	console.log('force: ' + Opt.options.force);
@@ -123,9 +157,9 @@ function main () {
 	verbose: Opt.options.verbose
     };
     if (!_.isUndefined(inputFile)) {
-	scoreSearchResultFiles(Opt.options.dir, inputFile, scoreOptions);
-    }
-    else {
+	scoreSearchResultFiles2(Opt.options.dir, inputFile, scoreOptions);
+    } else {
+	Expect(Opt.options.dir, 'option -d NAME is required').to.exist;
 	let fileMatch = Result.getFileMatch(Opt.options.match);
 	console.log(`fileMatch: ${fileMatch}`);
 	scoreSearchResultDir(Opt.options.dir, fileMatch, scoreOptions);
@@ -134,11 +168,6 @@ function main () {
 
 //
 
-try {
-    main();
-}
-catch(e) {
-    console.log(e.stack);
-}
-finally {
-}
+main().catch(err => {
+    console.log(err.stack);
+});
