@@ -39,7 +39,7 @@ const Opt          = require('node-getopt')
 //
 //
 
-function main() {
+async function main() {
     if (Opt.argv.length < 1) {
 	Opt.showHelp();
 	return 1;
@@ -67,7 +67,7 @@ function main() {
 	low:   Ms(`${delayLow}m`),
 	high:  Ms(`${delayHigh}m`)
     };
-    FsReadFile(filename, 'utf8')
+    return FsReadFile(filename, 'utf8')
 	.then(csvContent => CsvParse(csvContent, { relax_column_count: true } ))
     /* testing CsvParse option.relax_column_count
 	.then(wordListArray => {
@@ -87,20 +87,16 @@ function main() {
 	    {
 		force:         Opt.options.force
 	    }
-	)).catch(err => {
+	)); /*
+	.catch(err => {
 	    console.log(`error caught in main, ${err}`);
 	    if (err) console.log(err.stack);
-	});
+	});*/
 }
 
 //
 
-try {
-    main();
-}
-catch(err) {
-    console.log(`error caught in try/catch, ${err}`);
+main().catch(err =>  {
+    console.log(`error, ${err}`);
     console.log(err.stack);
-}
-finally {
-}
+});

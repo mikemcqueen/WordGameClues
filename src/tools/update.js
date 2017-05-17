@@ -22,6 +22,12 @@ const Opt          = require('node-getopt')
 	['v', 'verbose',             'show logging'],
 	['h', 'help',                'this screen']
     ])).bindHelp().parseSystem();
+/*
+    ])).bindHelp(
+	"Usage: node filter <options> [wordListFile]\n\n" +
+	    "[[OPTIONS]]\n"
+    )
+ */
 
 //---------------------------------------------
 
@@ -31,6 +37,7 @@ const Url =     Symbol('url');
 const Clue =    Symbol('clue');
 const Maybe =   Symbol('maybe');
 const Known =   Symbol('known');
+const Done =    Symbol('done');
 
 const ClueSuffix =    'c';
 const RejectSuffix =  'x';
@@ -39,40 +46,38 @@ const ValidSuffixes = [ ClueSuffix, RejectSuffix ];
 // state machine
 const SM = {
     [Start] : { next: [ Src ] },
-    [Src]   : { next: [ Url ],                             func: processSrc },      
+    [Src]   : { next: [ Url,   Clue,  Maybe, Known/*, Src should test this*/ ], func: processSrc },
     [Url]   : { next: [ Url,   Clue,  Maybe, Known, Src ], func: processUrl },
     [Clue]  : { next: [ Url,   Clue,  Maybe, Known, Src ], func: processClue },
-    [Maybe] : { next: [ Url,  /*no*/  Maybe, Known, Src ], func: processMaybe },
+    [Maybe] : { next: [ Url,   Clue,  Maybe, Known, Src ], func: processMaybe },
     [Known] : { next: [ Known, Src ],                      func: processKnown }
 }
 
 //---------------------------------------------
 
 //
-function getLineType(line) {
+function getLineState (line) {
     Expect(line.length).to.be.at.least(1);
-    let lineType;
-    if (line[0] === Result.SRC_PREFIX) lineType = Src;
-    if (line[0] === Result.MAYBE_PREFIX) lineType = Maybe;
-    if (line[0] === Result.KNOWN_PREFIX) lineType = Known;
+    let state;
+    if (line[0] === Result.SRC_PREFIX) state = Src;
+    if (line[0] === Result.MAYBE_PREFIX) state = Maybe;
+    if (line[0] === Result.KNOWN_PREFIX) state = Known;
     // all of the above get first char sliced off
-    if (!_.isUndefined(lineType)) {
+    if (state) {
 	line = line.slice(1);
-    }
-
-    if (line.startsWith('http')) lineType = Url;
-    if (_.isUndefined(lineType)) {
+    } else if (line.startsWith('http')) {
+	state = Url;
+    } else {
 	// else, probably a clue
-	lineType = Clue;
+	state = Clue;
     }
-    return {
-	line:     line,
-	lineType: lineType
-    };
+    return [line, state];
 }
 
-//
-function processSrc(line, args, options) {
+// process a line beginning with '@' that represents
+// a comma-separated list of words
+
+function processSrc (line, args, options) {
     Expect(line).to.be.a('string');
     Expect(args.dir).to.be.a('string');
 
@@ -112,11 +117,13 @@ function processSrc(line, args, options) {
 	    console.log('filtered file not found');
 	}
     }
-    // if file exists, notify if it doesn't parse correctly.
+    let flags = {};
     let filteredUrls;
     if (!_.isUndefined(content)) {
 	filteredUrls = JSON.parse(content);
 	console.log(`loaded: ${path}`);
+	// maybe were added later, some files don't have it
+	if (!filteredUrls.maybeUrls) filteredUrls.maybeUrls = [];
     }
     else {
 	filteredUrls = {
@@ -129,12 +136,14 @@ function processSrc(line, args, options) {
 	count:           args.count,
 	nameList:        nameList,
 	filteredUrlPath: path,
-	filteredUrls:    filteredUrls
+	filteredUrls,
+	flags
     };
 }
 
 //
-function getUrlSuffix(line, options) {
+
+function getUrlSuffix (line, options) {
     let url = line;
     let suffix;
 
@@ -150,64 +159,39 @@ function getUrlSuffix(line, options) {
 	    Expect(ValidSuffixes.includes(suffix), `bad url suffix, ${line}`).to.be.true;
 	}
     }
-    return {
-	url:    url,
-	suffix: suffix
-    };
+    return [url, suffix];
 }
 
 //
-function addUrl(urlList, url) {
-    Expect(urlList).to.be.an('array');
-    Expect(url).to.be.a('string');
 
-    if (!urlList.includes(url)) {
-	urlList.push(url);
-	return true;
-    }
-    return false;
-}
-
-//
-function processUrl(line, args, options) {
+function processUrl (line, args, options) {
     Expect(line).to.be.a('string');
     Expect(args.filteredUrls).to.be.an('object');
 
-    // for clue suffix or undefined suffix, save the URL
-    args.url = undefined;
-    let urlSuffix = getUrlSuffix(line, options);
-    if (urlSuffix.suffix === ClueSuffix) {
-	if (addUrl(args.filteredUrls.knownUrls, urlSuffix.url)) {
-	    console.log(`added clue url, ${urlSuffix.url}`);
-	    args.count.knownUrls += 1;
-	    args.anyUrlListChanged = true;
-	}
-	args.url = urlSuffix.url; // save for ClueSuffix
-	args.urlAdded = true;
+    let [url, suffix] = getUrlSuffix(line, options);
+    args.url = url;
+    if (suffix === ClueSuffix) {
+	args.flags.clue = true;
     }
-    else if (urlSuffix.suffix === RejectSuffix) {
-	if (addUrl(args.filteredUrls.rejectUrls, urlSuffix.url)) {
-	    console.log(`added reject url, ${urlSuffix.url}`);
-	    args.count.rejectUrls += 1;
-	    args.anyUrlListChanged = true;
-	}
+    else if (suffix === RejectSuffix) {
+	args.flags.reject = true;
     }
     else {
-	Expect(urlSuffix.suffix).to.be.undefined;
-	args.url = urlSuffix.url; // save for undefined
+	Expect(suffix).to.be.undefined;
     }
     return args;
 }
 
 //
-function addClues (countList, name, src, add = ClueManager.addClue) {
+
+function addClues (countList, name, src) { // , add = ClueManager.addClue) {
     Expect(countList).to.be.an('array');
     Expect(name).to.be.a('string');
     Expect(src).to.be.a('string');
 
     let updatedCountList = [];
     countList.forEach(count => {
-	if (add(count, { name: name, src: src }, false, true)) { // save = false, nothrow = true
+	if (ClueManager.addClue(count, { name, src }, false, true)) { // save = false, nothrow = true
 	    updatedCountList.push(count);
 	}
     });
@@ -215,6 +199,7 @@ function addClues (countList, name, src, add = ClueManager.addClue) {
 }
 
 //
+
 function getNameNote (line) {
     let name;
     let note;
@@ -231,33 +216,28 @@ function getNameNote (line) {
 }
 
 //
+
 function processClue (line, args, options) {
     Expect(line).to.be.a('string');
 
     let [name, note] = getNameNote(line);
     // we're about to update known clues. double-sanity check.
     Expect(ClueManager.isRejectSource(args.nameList)).to.be.false;
-    let countList = addClues(ClueManager.getCountList(args.nameList), name,
-			     args.nameList.toString());
+    let countList = ClueManager.getCountList(args.nameList);
+    console.log(`countList: ${_.isEmpty(countList) ? "empty" : countList}`) ;
+    countList = addClues(countList, name, args.nameList.toString());
     if (!_.isEmpty(countList)) {
 	args.count.knownClues += 1;
 	countList.forEach(count => args.count.knownCountSet.add(count));
 	console.log(`added clue, ${name} : ${args.nameList} - ${note} : [${countList}]`);
     }
-    // we added a clue. add url to knownUrls if not already
-    if (!args.urlAdded) {
-	if (addUrl(args.filteredUrls.knownUrls, args.url, options)) {
-	    console.log(`added clue url, ${args.url}`);
-	    args.count.knownUrls += 1;
-	    args.anyUrlListChanged = true;
-	}
-	args.urlAdded = true;
-    }
+    args.flags.clue = true;
     return args;
 }
 
 //
-function processMaybe(line, args, options) {
+
+function processMaybe (line, args, options) {
     Expect(line).to.be.a('string');
     if (options.verbose) {
 	console.log(`adding maybe clue, ${line}`);
@@ -269,20 +249,13 @@ function processMaybe(line, args, options) {
 	args.count.maybeCountSet.add(args.nameList.length);
 	console.log(`added maybe clue, ${name} : ${args.nameList} - ${note}`);
     }
-    // we added a maybe clue. add url to maybeUrls if not already
-    if (!args.maybeUrlAdded) {
-	if (addUrl(args.filteredUrls.maybeUrls, args.url, options)) {
-	    console.log(`added maybe url, ${args.url}`);
-	    args.count.maybeUrls += 1;
-	    args.anyUrlListChanged = true;
-	}
-	args.maybeUrlAdded = true;
-    }
+    args.flags.maybe = true;
     return args;
 }
 
 //
-function processKnown(line, args, options) {
+
+function processKnown (line, args, options) {
     Expect(line).to.be.a('string');
     if (options.verbose) {
 	console.log(`skipping known clue, ${line}`);
@@ -293,33 +266,101 @@ function processKnown(line, args, options) {
 }
 
 //
-function writeFilteredUrls(result) {
-    if (result.anyUrlListChanged) {
+
+function addUrl (urlList, url) {
+    Expect(urlList).to.be.an('array');
+    Expect(url).to.be.a('string');
+
+    if (!urlList.includes(url)) {
+	urlList.push(url);
+	return true;
+    }
+    return false;
+}
+
+//
+
+function updateFilteredUrls (args) {
+    if (!args.flags || !args.url) return args;
+    if (args.flags.clue) {
+	// we added a clue. add url to knownUrls if not already
+	if (addUrl(args.filteredUrls.knownUrls, args.url)) {
+	    console.log(`added clue url, ${args.url}`);
+	    args.count.knownUrls += 1;
+	    args.filteredUrls.anyChange = true;
+	}
+    }
+    // note that, we add maybe even if already added as known; a bit strange
+    if (args.flags.maybe) {
+	// we added a maybe clue. add url to maybeUrls if not already
+	if (addUrl(args.filteredUrls.maybeUrls, args.url)) {
+	    console.log(`added maybe url, ${args.url}`);
+	    args.count.maybeUrls += 1;
+	    args.filteredUrls.anyChange = true;
+	}
+    }
+    if (args.flags.reject) {
+	if (addUrl(args.filteredUrls.rejectUrls, args.url)) {
+	    console.log(`added reject url, ${args.url}`);
+	    args.count.rejectUrls += 1;
+	    args.filteredUrls.anyChange = true;
+	}
+    }
+    return args;
+}
+
+//
+
+function writeFilteredUrls (result) {
+    if (result.filteredUrls && result.filteredUrls.anyChange) {
 	const fu = result.filteredUrls;
-	Expect(fu).is.not.undefined;
+	Expect(fu).to.exist;
 	fu.knownUrls = _.sortedUniq(fu.knownUrls.sort());
 	fu.maybeUrls = _.sortedUniq(fu.maybeUrls.sort());
 	fu.rejectUrls = _.sortedUniq(fu.rejectUrls.sort());
 	Fs.writeFileSync(result.filteredUrlPath, JSON.stringify(fu));
-	result.anyUrlListChanged = false; // shouldn't need to do this, but..
+	result.filteredUrls.anyChange = false;
     }
 }
 
 //
-function preProcess(state, dir, result) {
-    if (state === Src) {
-	writeFilteredUrls(result);
-	return {
-	    count : result.count,
-	    dir   : dir
+
+function preProcess (state, dir, args) {
+    switch (state) {
+    case Src:
+    case Url:
+    case Done:
+	writeFilteredUrls(updateFilteredUrls(args));
+	break;
+
+    default:
+	break;
+    }
+    switch (state) {
+    case Src:
+	// clear everything but counts and dir for each new word list
+	args = {
+	    count : args.count,
+	    dir
 	};
+	break;
+
+    case Url:
+	// clear flags for each new URL
+	args.flags = {};
+	break;
+
+    default:
+	// default case, pass through all values
+	break;
     }
-    return result;
+    return args;
 }
 
 //
-function skipState(state, result, options) {
-    let skip = (!_.isUndefined(result.nextState) && (result.nextState !== state)) 
+
+function skipState (state, result, options) {
+    let skip = _.isUndefined(result.nextState) ? false : result.nextState !== state;
     if (skip && options.verbose) {
 	console.log(`skipping line: ${state.toString()}`);
     }
@@ -328,6 +369,7 @@ function skipState(state, result, options) {
 
 //
 //
+
 function updateResults(inputFilename, dir, options) {
     Expect(dir).to.be.a('string');
     Expect(inputFilename).to.be.a('string');
@@ -353,16 +395,15 @@ function updateResults(inputFilename, dir, options) {
 
     while ((inputLine = readLines.next()) !== false) {
 	lineNumber += 1;
-	if ((inputLine = inputLine.toString().trim()) === '') continue;
-	// TODO: should be nextState = getNextState
-	let { line, lineType } = getLineType(inputLine);
-	if (!SM[state].next.includes(lineType)) {
-	    throw new Error(`Cannot transition from ${state.toString()} to ${lineType.toString()}, line ${inputLine}`);
+	inputLine = inputLine.toString().trim();
+	if (_.isEmpty(inputLine)) continue;
+	let [ line, nextState ] = getLineState(inputLine);
+	if (!SM[state].next.includes(nextState)) {
+	    throw new Error(`Cannot transition from ${state.toString()} to ${nextState.toString()}` +
+			    `, line ${inputLine}`);
 	}
-	state = lineType;
-	if (skipState(state, result, options)) {
-	    continue;
-	}
+	state = nextState;
+	if (skipState(state, result, options)) continue;
 	const args = preProcess(state, dir, result);
 	// TODO: try/catch block
 	result = SM[state].func(line, args, options);
@@ -389,8 +430,9 @@ function main() {
     let result = updateResults(inputFilename, Opt.options.dir, {
 	verbose: Opt.options.verbose
     });
+    // hacky !?
+    preProcess(Done, Opt.options.dir, result);
     if (Opt.options.save) {
-	writeFilteredUrls(result);
 	if (result.count.knownClues > 0) {
 	    // save clues
 	    let countList = Array.from(result.count.knownCountSet);

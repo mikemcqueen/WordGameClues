@@ -68,8 +68,10 @@ const FINAL = {
 //
 
 function getByOptions(options) {
-    let src = META;
-    if (options.synthesis) {
+    let src;
+    if (options.meta) {
+	src = META;
+    } else if (options.synthesis) {
 	src = SYNTH;
     } else if (options.harmony) {
 	src = HARMONY;
@@ -87,8 +89,10 @@ function getByOptions(options) {
 	//case 8: src = POEM_8; break;
 	//case 9: src = POEM_9; break;
 	default:
-	    throw Error(`POEM_${src} not supported`);
+	    throw new Error(`POEM_${src} not supported`);
 	}
+    } else {
+	throw new Error('No clue option supplied');
     }
     return src;
 }

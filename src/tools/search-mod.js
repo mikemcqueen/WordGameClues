@@ -48,6 +48,50 @@ function getOneResult (wordList, pages, options = {}) {
     });
 }
 
+// get, then save, a search result
+
+function getSaveResult(args, options) {
+    let nextDelay = 0;
+
+    return My.checkIfFile(args.path)
+	.then(checkResult => {
+	    // skip this file if it already exists, unless force flag set
+	    if (checkResult.exists && !options.force) { 
+		args.count.skip += 1;
+		console.log(`Skip: file exists, ${args.path}`); 
+		return Promise.reject();
+	    }
+	    let oneResultOptions = { reject: options.forceNextError };
+	    options.forceNextError = false;
+	    // file does not already exist; do the search
+	    return getOneResult(args.wordList, args.pages, oneResultOptions);
+	}).then(oneResult => {
+	    if (_.isEmpty(oneResult)) {
+		// empty search result. lower delay for next search, and
+		// save an empty result so we don't do this search again
+		nextDelay = Ms('30s');
+		args.count.empty += 1;
+		oneResult = [];
+	    } else {
+		// we successfully searched. set delay for next search
+		nextDelay = My.between(args.delay.low, args.delay.high);
+		args.count.data += 1;
+	    }
+	    return FsWriteFile(args.path, JSON.stringify(oneResult))
+		.then(() => {
+		    console.log(`Saved: ${args.path}`);
+		    return [!_.isEmpty(oneResult), nextDelay]; // true if not empty
+		});
+	}).catch(err => {
+	    // log & eat all errors (err might be undefined from Promise.reject())
+	    if (err) {
+		console.log(`getSaveResult error, ${err}`);
+		args.count.error += 1;
+	    }
+	    return [false, nextDelay];
+	});
+}
+
 //args:
 // wordListArray : array of array of strings
 // pages         : # of pages of results to retrieve for each wordlist
@@ -63,51 +107,26 @@ async function getAllResultsLoop (args, options = {}) {
     Expect(args).to.exist;
     Expect(args.wordListArray).to.be.an('array').that.is.not.empty;
     Expect(options).to.be.an('object');
-    let result = { skip: 0, empty: 0, data: 0, error: 0 }; // test support
+    let count = { skip: 0, empty: 0, data: 0, error: 0 }; // test support
     for (const [index, wordList] of args.wordListArray.entries()) {
 	let filename = Result.makeFilename(wordList);
 	console.log(`list: ${wordList}`);
 	console.log(`file: ${filename}`);
 	let path = Result.pathFormat({
 	    root:  args.root,
-	    dir:  _.isUndefined(args.dir) ? _.toString(wordList.length) : args.dir,
+	    dir:  args.dir || _.toString(wordList.length),
 	    base: filename
 	});
-	let nextDelay = 0;
-	let saved = await My.checkIfFile(path)
-	    .then(checkResult => {
-		// skip this file if it already exists, unless force flag set
-		if (checkResult.exists && !options.force) { 
-		    result.skip += 1;
-		    console.log(`Skip: file exists, ${path}`); 
-		    return Promise.reject();
-		}
-		let oneResultOptions = { reject: options.forceNextError };
-		options.forceNextError = false;
-		// file does not already exist; do the search
-		return getOneResult(wordList, args.pages, oneResultOptions);
-	    }).then(oneResult => {
-		// we successfully searched. set delay for next search
-		nextDelay = My.between(args.delay.low, args.delay.high);
-		if (_.isEmpty(oneResult)) {
-		    // TODO: shorter delay here? like 30 sec?
-		    result.empty += 1;
-		    return Promise.reject();
-		}
-		result.data += 1;
-		return FsWriteFile(path, JSON.stringify(oneResult)).then(() => {
-		    console.log(`Saved: ${path}`);
-		    return true; // saved
-		});
-	    }).catch(err => {
-		// log & eat all errors (err might be undefined from Promise.reject())
-		if (err) {
-		    console.log(`getAllResultsLoop error, ${err}`);
-		    result.error += 1;
-		}
-	    });
 
-	if (saved === true) {
+	let [notEmpty, nextDelay] = await getSaveResult({
+	    wordList,
+	    path,
+	    count,
+	    pages: args.pages,
+	    delay: My.between(args.delay.low, args.delay.high)
+	}, options);
+
+	if (notEmpty === true) {
 	    // NOTE: we intentionally do NOT await completion of the following
 	    // add-commit-score-commit operations. they can be executed asynchronously
 	    // with the execution of this loop. makes logs a little messier though.
@@ -130,7 +149,7 @@ async function getAllResultsLoop (args, options = {}) {
 	    }
 	}
     }
-    return result;
+    return count;
 }
 
 //

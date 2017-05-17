@@ -27,6 +27,7 @@ const REJECTS_DIR           = 'rejects';
 
 function ClueManager () {
     this.clueListArray = [];         // the JSON clue files in an array
+    this.maybeListArray = [];        // the JSON maybe files in an array
     this.rejectListArray = [];       // the JSON reject files in an array
     this.knownClueMapArray = [];     // map clue name to clue src
     this.knownSourceMapArray = [];   // map known source to list of clues
@@ -39,6 +40,8 @@ function ClueManager () {
     this.maxClues = 0;
 
     this.logging = false;
+    this.logging = true;
+
     this.logLevel = 0;
 }
 
@@ -232,33 +235,6 @@ ClueManager.prototype.addKnownCompoundClues = function (clueList, clueCount, val
 //
 //
 
-ClueManager.prototype.saveClues = function (counts) {
-    if (_.isNumber(counts)) {
-	counts = [ counts ];
-    }
-    Expect(counts).to.be.an('array');
-    for (const count of counts) {
-	this.saveClueList(this.clueListArray[count], count);
-    }
-}
-
-//
-//
-
-ClueManager.prototype.addClue = function (count, clue, save = false, nothrow = false) {
-    if (this.addKnownClue(count, clue.name, clue.src, nothrow)) {
-	this.clueListArray[count].push(clue);
-	if (save) {
-	    this.saveClues(count);
-	}
-	return true;
-    }
-    return false;
-}
-
-//
-//
-
 ClueManager.prototype.addKnownClue = function (count, name, source, nothrow) {
     Expect(count).to.be.a('number');
     Expect(name).to.be.a('string');
@@ -267,6 +243,7 @@ ClueManager.prototype.addKnownClue = function (count, name, source, nothrow) {
     if (!_.has(clueMap, name)) {
 	clueMap[name] = [ source ];
     } else if (!clueMap[name].includes(source)) {
+	console.log(`clueMap[${name}] = ${clueMap[name]}`);
 	if (this.logging) {
 	    this.log('addKnownClue(' + count + ') ' +
 		     name + ' : ' + source);
@@ -282,8 +259,38 @@ ClueManager.prototype.addKnownClue = function (count, name, source, nothrow) {
 }
 
 //
+//
+
+ClueManager.prototype.saveClues = function (counts) {
+    if (_.isNumber(counts)) {
+	counts = [ counts ];
+    }
+    Expect(counts).to.be.an('array');
+    for (const count of counts) {
+	this.saveClueList(this.clueListArray[count], count);
+    }
+}
+
+//
+//
+
+ClueManager.prototype.addClue = function (count, clue, save = false, nothrow = false) {
+    // sort src
+    clue.src = clue.src.split(',').sort().toString();
+    if (this.addKnownClue(count, clue.name, clue.src, nothrow)) {
+	this.clueListArray[count].push(clue);
+	if (save) {
+	    this.saveClues(count);
+	}
+	return true;
+    }
+    return false;
+}
+
+//
 
 ClueManager.prototype.addMaybe = function (name, srcNameList, note, save = false) {
+    return false;
     if (_.isString(srcNameList)) {
 	srcNameList = srcNameList.split(',');
     }
