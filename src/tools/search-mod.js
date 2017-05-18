@@ -48,9 +48,9 @@ function getOneResult (wordList, pages, options = {}) {
     });
 }
 
-// get, then save, a search result
+// check if file exists; if not, get, then save, a search result
 
-function getSaveResult(args, options) {
+function checkGetSaveResult(args, options) {
     let nextDelay = 0;
 
     return My.checkIfFile(args.path)
@@ -61,6 +61,13 @@ function getSaveResult(args, options) {
 		console.log(`Skip: file exists, ${args.path}`); 
 		return Promise.reject();
 	    }
+
+	    // we are going to do a search; set delay for next search.
+	    // NOTE: need to set this here, rather than on successful
+	    // search, because we may get robot warning
+	    // TODO: add retry to getOneResult; check for robot result
+	    nextDelay = args.delay; // My.between(args.delay.low, args.delay.high);
+
 	    let oneResultOptions = { reject: options.forceNextError };
 	    options.forceNextError = false;
 	    // file does not already exist; do the search
@@ -69,26 +76,23 @@ function getSaveResult(args, options) {
 	    if (_.isEmpty(oneResult)) {
 		// empty search result. lower delay for next search, and
 		// save an empty result so we don't do this search again
-		nextDelay = Ms('30s');
 		args.count.empty += 1;
 		oneResult = [];
 	    } else {
-		// we successfully searched. set delay for next search
-		nextDelay = My.between(args.delay.low, args.delay.high);
 		args.count.data += 1;
 	    }
 	    return FsWriteFile(args.path, JSON.stringify(oneResult))
 		.then(() => {
 		    console.log(`Saved: ${args.path}`);
-		    return [!_.isEmpty(oneResult), nextDelay]; // true if not empty
+		    return [oneResult, nextDelay];
 		});
 	}).catch(err => {
 	    // log & eat all errors (err might be undefined from Promise.reject())
 	    if (err) {
-		console.log(`getSaveResult error, ${err}`);
+		console.log(`checkGetSaveResult error, ${err}`);
 		args.count.error += 1;
 	    }
-	    return [false, nextDelay];
+	    return [null, nextDelay];
 	});
 }
 
@@ -112,13 +116,14 @@ async function getAllResultsLoop (args, options = {}) {
 	let filename = Result.makeFilename(wordList);
 	console.log(`list: ${wordList}`);
 	console.log(`file: ${filename}`);
+
 	let path = Result.pathFormat({
 	    root:  args.root,
 	    dir:  args.dir || _.toString(wordList.length),
 	    base: filename
 	});
 
-	let [notEmpty, nextDelay] = await getSaveResult({
+	let [result, nextDelay] = await checkGetSaveResult({
 	    wordList,
 	    path,
 	    count,
@@ -126,14 +131,14 @@ async function getAllResultsLoop (args, options = {}) {
 	    delay: My.between(args.delay.low, args.delay.high)
 	}, options);
 
-	if (notEmpty === true) {
+	if (result) {
 	    // NOTE: we intentionally do NOT await completion of the following
 	    // add-commit-score-commit operations. they can be executed asynchronously
 	    // with the execution of this loop. makes logs a little messier though.
 	    My.gitAddCommit(path, 'new result')
 		.then(() => {
 		    console.log(`Committed: ${path}`);
-		    return Result.fileScoreSaveCommit(path);
+		    return !_.isEmpty(result) && Result.fileScoreSaveCommit(path);
 		}).catch(err => {
 		    // log & eat all errors
 		    console.log(`getAllResultsLoop commit error, ${err}`);
