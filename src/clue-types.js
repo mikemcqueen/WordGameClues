@@ -17,28 +17,46 @@ const Options = [
     ['f', 'final',      'use final clues' ]
 ];
 
-const POEM_1 = {
-    sentence:       1,
-    baseDir:        'poem/1',
-    resultDir:      'poem',
-    MAX_CLUE_COUNT: 12,
-    REQ_CLUE_COUNT: 12
-};
+const POEM = {
+    "1" : {
+	sentence:       1,
+	baseDir:        'poem/1',
+	resultDir:      'poem',
+	MAX_CLUE_COUNT: 12,
+	REQ_CLUE_COUNT: 12
+    },
 
-const POEM_3 = {
-    sentence:       3,
-    baseDir:        'poem/3',
-    resultDir:      'poem',
-    MAX_CLUE_COUNT: 4,
-    REQ_CLUE_COUNT: 4
-};
+    "2": {
+	sentence:       2,
+	baseDir:        'poem/2',
+	resultDir:      'poem',
+	MAX_CLUE_COUNT: 9,
+	REQ_CLUE_COUNT: 9
+    },
 
-const POEM_5 = {
-    sentence:       5,
-    baseDir:        'poem/5',
-    resultDir:      'poem',
-    MAX_CLUE_COUNT: 15,
-    REQ_CLUE_COUNT: 15
+    "3": {
+	sentence:       3,
+	baseDir:        'poem/3',
+	resultDir:      'poem',
+	MAX_CLUE_COUNT: 4,
+	REQ_CLUE_COUNT: 4
+    },
+
+    "5": {
+	sentence:       5,
+	baseDir:        'poem/5',
+	resultDir:      'poem',
+	MAX_CLUE_COUNT: 15,
+	REQ_CLUE_COUNT: 15
+    },
+
+    "6": {
+	sentence:       6,
+	baseDir:        'poem/6',
+	resultDir:      'poem',
+	MAX_CLUE_COUNT: 8,
+	REQ_CLUE_COUNT: 8
+    }
 };
 
 const META = {
@@ -78,19 +96,8 @@ function getByOptions(options) {
     } else if (options.final) {
 	src = FINAL;
     } else if (!_.isUndefined(options.poem)) {
-	switch(_.toNumber(options.poem)) {
-	case 1: src = POEM_1; break;
-	//case 2: src = POEM_2; break;
-	case 3: src = POEM_3; break;
-	//case 4: src = POEM_4; break;
-	case 5: src = POEM_5; break;
-	//case 6: src = POEM_6; break;
-	//case 7: src = POEM_7; break;
-	//case 8: src = POEM_8; break;
-	//case 9: src = POEM_9; break;
-	default:
-	    throw new Error(`POEM_${src} not supported`);
-	}
+	src = POEM[options.poem];
+	if (_.isUndefined(src)) throw new Error(`POEM[${options.poem}] not supported`);
     } else {
 	throw new Error('No clue option supplied');
     }
@@ -159,8 +166,7 @@ module.exports = {
     isValidBaseDirOption,
     Options,
 
-    POEM_1,
-    POEM_3,
+    POEM,
     META,
     SYNTH,
     HARMONY,

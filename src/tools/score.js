@@ -156,7 +156,7 @@ async function main () {
 	force:   Opt.options.force,
 	verbose: Opt.options.verbose
     };
-    if (!_.isUndefined(inputFile)) {
+    if (inputFile) {
 	scoreSearchResultFiles2(Opt.options.dir, inputFile, scoreOptions);
     } else {
 	Expect(Opt.options.dir, 'option -d NAME is required').to.exist;

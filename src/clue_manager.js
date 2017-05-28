@@ -40,7 +40,7 @@ function ClueManager () {
     this.maxClues = 0;
 
     this.logging = false;
-    this.logging = true;
+//    this.logging = true;
 
     this.logLevel = 0;
 }
@@ -81,7 +81,6 @@ ClueManager.prototype.loadAllClues = function (args) {
     if (args.ignoreErrors) {
 	this.ignoreLoadErrors = true;
     }
-    //let result = this.getMaxRequired(args.cluse);
     this.maxClues = args.clues.MAX_CLUE_COUNT;
 
     for (let count = 1; count <= this.maxClues; ++count) {
@@ -114,45 +113,6 @@ ClueManager.prototype.loadAllClues = function (args) {
     this.loaded = true;
 
     return this;
-}
-
-//
-
-ClueManager.prototype.getMaxRequired = function (baseDir) {
-    let clues;
-    switch (baseDir) {
-    case Clues.SYNTH.name:
-	clues = Clues.SYNTH;
-	break;
-    case Clues.HARMONY.name: 
-	clues = Clues.HARMONY;
-	break;
-    case Clues.FINAL.name:
-	clues = Clues.FINAL;
-	break;
-    case Clues.META.name:
-	clues = Clues.META;
-	break;
-    default:
-	// this is a hack.  clean this shit up
-	let sentence;
-	if (baseDir.slice(0, 5) === 'poem/') {
-	    sentence = _.toNumber(baseDir.slice(5, baseDir.length));
-	    switch (sentence) {
-	    case 1: clues = Clues.POEM_1; break;
-	    default: throw new Error('not supported');
-	    }
-	} else {
-	    throw new Error('would like tto avoid this');
-	    clues = Clues.META;
-	    this.log('defaulting to --meta clue counts for baseDir ' + baseDir);
-	}
-	break;
-    }
-    return {
-	max :     clues.MAX_CLUE_COUNT,
-	required: clues.REQUIRED_CLUE_COUNT
-    };
 }
 
 //
@@ -243,8 +203,8 @@ ClueManager.prototype.addKnownClue = function (count, name, source, nothrow) {
     if (!_.has(clueMap, name)) {
 	clueMap[name] = [ source ];
     } else if (!clueMap[name].includes(source)) {
-	console.log(`clueMap[${name}] = ${clueMap[name]}`);
 	if (this.logging) {
+	    this.log(`clueMap[${name}] = ${clueMap[name]}`);
 	    this.log('addKnownClue(' + count + ') ' +
 		     name + ' : ' + source);
 	}
@@ -530,18 +490,14 @@ ClueManager.prototype.filter = function (srcCsvList, clueCount, map = {}) {
     let duplicate = 0;
     srcCsvList.forEach(srcCsv => {
 	if (this.isKnownSource(srcCsv, clueCount)) {
-	    if (this.logging) {
-		this.log('isKnownSource(' + clueCount + ') ' + srcCsv);
-	    }
+	    if (this.logging) this.log(`isKnownSource(${clueCount}) ${srcCsv}`);
 	    ++known;
 	} else if (this.isRejectSource(srcCsv)) {
-	    if (this.logging) {
-		this.log('isRejectSource(' + clueCount + ') ' + srcCsv);
-	    }
+	    if (this.logging) this.log(`isRejectSource(${clueCount}) ${srcCsv}`);
 	    ++reject;
 	} else {
 	    if (_.has(map, srcCsv)) {
-		console.log(`duplicate: ${srcCsv}`);
+		if (this.logging) this.log(`duplicate: ${srcCsv}`);
 		++duplicate;
 	    }
 	    map[srcCsv] = true;

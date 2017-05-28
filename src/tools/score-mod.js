@@ -160,7 +160,7 @@ function getScore (wordList, result, options = {}) {
 	}).then(() => score);
 }
 
-//
+// remove empty URLs
 
 function filterBadResults (resultList) {
     return _.filter(resultList, result => {
@@ -174,13 +174,13 @@ function scoreResultList (wordList, resultList, options = {}) {
     Expect(wordList, 'wordList').to.be.an('array').that.is.not.empty;
     Expect(resultList, 'resultList').to.be.an('array');
 
-    // remove empty URLs
+    let resultCount = _.size(resultList);
     resultList = filterBadResults(resultList);
+    let anyChange = _.size(resultList) !== resultCount;
 
     // convert space-separated words to separate words
     wordList = _.flatten(_.map(wordList, word => word.split(' ')));
     console.log('wordList: ' + wordList);
-    let any = false;
     return Promise.mapSeries(resultList, (result, index) => {
 	// skip scoring if score already present, unless force flag set
 	if (!_.isUndefined(result.score) && !options.force) {
@@ -190,10 +190,10 @@ function scoreResultList (wordList, resultList, options = {}) {
 	    .then(score => {
 		// TODO: result.score = score; ?
 		resultList[index].score = score;
-		any = true;
+		anyChange = true;
 	    });
 	// TODO: no .catch()
-    }).then(() => any ? resultList : []);
+    }).then(() => anyChange ? resultList : []);
     // TODO: no .catch()
 }
 

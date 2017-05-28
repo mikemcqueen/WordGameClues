@@ -5,6 +5,7 @@
 'use strict';
 
 let _           = require('lodash');
+let AltSources  = require('./alt_sources');
 let ClueList    = require('./clue_list');
 let ClueManager = require('./clue_manager');
 let Clues       = require('./clue-types');
@@ -12,14 +13,12 @@ let ComboMaker  = require('./combo_maker');
 let ComboSearch = require('./combo_search');
 let Duration    = require('duration');
 let Expect      = require('chai').expect;
-
-let AltSources  = require('./alt_sources');
-let Validator   = require('./validator');
 let NameCount   = require('./name_count');
-let Np          = require('named-parameters');
 let Peco        = require('./peco');
+let PrettyMs    = require('pretty-ms');
 let Show        = require('./show');
 let ResultMap   = require('./resultmap');
+let Validator   = require('./validator');
 
 // initialize command line options.  do this before logger.
 //
@@ -405,14 +404,14 @@ function doCombos(args) {
 	reject += filterResult.reject;
 	duplicate += filterResult.duplicate;
     }
-    log('--combos: ' + (new Duration(beginDate, new Date())).seconds + ' seconds');
+    let d = new Duration(beginDate, new Date()).milliseconds;
     _.keys(comboMap).forEach(nameCsv => console.log(nameCsv));
-
     console.log(`total: ${total}` +
 		', filtered: ' + _.size(comboMap) +
 		', known: ' + known +
 		', reject: ' + reject +
 		', duplicate: ' + duplicate);
+    console.log(`--combos: ${PrettyMs(d)}`);
 
     if (total !== _.size(comboMap) + known + reject + duplicate) {
 	console.log('WARNING: amounts to not add up!');
