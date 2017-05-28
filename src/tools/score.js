@@ -42,10 +42,14 @@ function scoreSearchResultDir (dir, fileMatch, options = {}) {
 	recursive: false
     }, function(err, content, filepath, next) {
 	if (err) throw err; // TODO: test this
-	Result.scoreSaveCommit(JSON.parse(content), filepath, options)
+	Promise.resolve(JSON.parse(content))
+	    .then(resultList => {
+		if (_.isEmpty(resultList)) return undefined;
+		return Result.scoreSaveCommit(resultList, filepath, options);
+	    })
 	    .catch(err => {
 		if (err) {
-		    console.error(`scoreSaveCommit error, ${err}`);
+		    console.error(`scoreSearchResultsDir error, ${err}`);
 		}
 	    }).then(() => {
 		return next();
