@@ -302,7 +302,7 @@ ComboMaker.prototype.next = function(clueSourceList, sourceIndexes) {
 	    continue;
 	}
 
-	// skip combinations that duplicate duplicate names
+	// skip combinations that have duplicate names
 	if (_.sortedUniq(nameList).length !== nameList.length) {
 	    if (this.logging) {
 		this.log('skipping duplicate clue name: ' + nameList);

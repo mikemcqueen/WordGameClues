@@ -1001,6 +1001,7 @@ Validator.prototype.buildSrcNameList = function(args) {
 
     args.ncList.forEach((nc, ncIndex) => {
 	let src = args.allPrimary ? 1 : nc.count;
+	// i.e. srcNameCsvArray
 	let srcList = ClueManager.knownClueMapArray[src][nc.name]; // e.g. [ 'src1,src2,src3', 'src2,src3,src4' ]
 	if (!srcList) {
 	    throw new Error('kind of impossible but missing clue!');
