@@ -7,30 +7,66 @@
 //
 
 const _              = require('lodash');
+const Debug          = require('debug')('util');
 const Expect         = require('chai').expect;
 const Fs             = require('fs');
 const Path           = require('path');
 const Git            = require('simple-git');
-//const Ms             = require('ms');
 const PrettyMs       = require('pretty-ms');
 const Retry          = require('retry');
 
 //
 
-const DEFAULT_TIMEOUT_MS    = 6000;
-const DEFAULT_TIMEOUT_COUNT = 10;
+//
 
-const RETRY_TIMEOUTS = (function(first, count) {
+const RETRY_DELAY_LOW     = 1000;
+const RETRY_DELAY_HIGH    = 5000;
+
+const DEFAULT_RETRY_COUNT = 5;
+
+const RETRY_EXPO_START_MS      = 1000;
+const RETRY_EXPO_COUNT         = 7;  // 64s
+const RETRY_LINEAR_DELAY_MS    = 5000;
+const RETRY_LINEAR_DELAY_LO_MS = 1000;
+const RETRY_LINEAR_DELAY_HI_MS = 5000;
+const RETRY_LINEAR_COUNT       = 10; // 50s
+
+
+const RETRY_TIMEOUTS_LINEAR        = linearTimeouts(RETRY_LINEAR_DELAY_MS,
+						    RETRY_LINEAR_DELAY_MS,
+						    RETRY_LINEAR_COUNT);
+const RETRY_TIMEOUTS_RANDOM_LINEAR = linearTimeouts(RETRY_LINEAR_DELAY_LO_MS,
+						    RETRY_LINEAR_DELAY_HI_MS,
+						    RETRY_LINEAR_COUNT);
+const RETRY_TIMEOUTS_EXPO          = expoTimeouts(RETRY_EXPO_START_MS, RETRY_EXPO_COUNT);
+
+//
+
+function linearTimeouts(low, high, count) {
+    let timeouts = [];
+    // gotta bet a lodash function for this, like fillWith()
+    let to = between(low, high);
+    while (count > 0) {
+	timeouts.push(to);
+	to += between(low, high);
+	count -= 1;
+    }
+    return timeouts;
+};
+
+//
+
+function expoTimeouts(first, count) {
     let timeouts = [];
     // gotta bet a lodash function for this, like fillWith()
     let to = first;
     while (count > 0) {
 	timeouts.push(to);
-	to += first;
+	to *= 2;
 	count -= 1;
     }
     return timeouts;
-})(DEFAULT_TIMEOUT_MS, DEFAULT_TIMEOUT_COUNT);
+};
 
 //
 
@@ -61,7 +97,7 @@ function checkIfFile (path) {
 	    } else {
 		exists = true;
 	    }
-	    resolve ({
+	    return resolve ({
 		exists,
 		isFile: exists ? stats.isFile() : false
 	    });
@@ -71,16 +107,22 @@ function checkIfFile (path) {
 
 //
 
-function gitRetryAdd (filepath, cb) {
-    let op = Retry.operation(RETRY_TIMEOUTS);
+function gitRetryAdd (filepath, callback) {
+    let op = Retry.operation(
+	linearTimeouts(RETRY_LINEAR_DELAY_LO_MS,
+		       RETRY_LINEAR_DELAY_HI_MS,
+		       RETRY_LINEAR_COUNT));
     op.attempt(num => {
+	if (num > 1) {
+	    console.log(`gitRetryAdd #${num} @ ${PrettyMs(Date.now())}`);
+	}
 	Git(Path.dirname(filepath))
 	    .add(Path.basename(filepath), err => {
 		if (op.retry(err)) {
 		    console.log('gitRetryAdd: error, retrying...');
 		    return;
 		}
-		cb(op.mainError());
+		callback(err ? op.mainError() : null);
 	    });
     });
 }
@@ -135,11 +177,6 @@ function isGitLockError (err) {
     return _.isString(err) && _.includes(err, 'index.lock');
 }
 
-//
-
-const RETRY_DELAY_LOW     = 1000;
-const RETRY_DELAY_HIGH    = 5000;
-const DEFAULT_RETRY_COUNT = 5;
 
 async function gitRetryCommit (filepath, message, retryCount = DEFAULT_RETRY_COUNT) {
     Expect(filepath).to.be.a('string');
@@ -158,7 +195,9 @@ async function gitRetryCommit (filepath, message, retryCount = DEFAULT_RETRY_COU
 		    return false;
 		});
 	console.log(`commitResult: ${result}`);
-	if (result !== false) return Promise.resolve(result);
+	// success: resolve
+	if (result !== false) return result; // Promise.resolve(result);
+	// failure: retry logic
 	if (retryCount < 1) {
 	    console.log('rejecting');
 	    return Promise.reject(lastError);
