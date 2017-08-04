@@ -444,7 +444,7 @@ ClueManager.prototype.getClueSourceListArray = function (args) {
 	let clueSourceList = [];
 	if (clueCountList.every(count => {
 	    // empty lists not allowed
-	    if (!this.clueListArray[count].length) {
+	    if (_.isEmpty(this.clueListArray[count])) {
 		return false;
 	    }
 	    clueSourceList.push({ 

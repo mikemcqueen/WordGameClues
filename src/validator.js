@@ -411,7 +411,6 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 	    // break down all compound clues into source components
 	    buildArgs.ncList = nameCountList;
 	    buildResult = this.buildSrcNameList(buildArgs);
-//	    if (xp) Expect(buildResult.count).to.be.at.most(ClueManager.maxClues);
 	    if (xp) Expect(buildResult.count).is.belowOrEqual(ClueManager.maxClues);
 
 	    // skip recursive call to validateSources if we have all primary clues

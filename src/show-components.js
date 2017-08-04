@@ -5,45 +5,32 @@
 'use strict';
 
 let _           = require('lodash');
-//let AltSources  = require('./alt_sources');
-//let ClueList    = require('./clue_list');
 let ClueManager = require('./clue_manager');
-//let Clues       = require('./clue-types');
-//let ComboMaker  = require('./combo_maker');
-//let ComboSearch = require('./combo_search');
-//let Components  = require('./show-components');
-//let Duration    = require('duration');
-let Expect      = require('chai').expect;
-//let NameCount   = require('./name_count');
+let Expect      = require('should'); // require('chai').expect;
 let Peco        = require('./peco');
-//let PrettyMs    = require('pretty-ms');
-//let Show        = require('./show');
-//let ResultMap   = require('./resultmap');
 let Validator   = require('./validator');
-
 
 //
 
-function addClues(countSet, name, src) {
-    Expect(countSet).to.be.a('Set');
-    Expect(name).to.be.a('string');
-    Expect(src).to.be.a('string');
+function addClues (countSet, name, src) {
+    Expect(countSet).is.instanceof(Set);
+    Expect(name).is.a.String();
+    Expect(src).is.a.String();
     countSet.forEach(count => {
 	if (ClueManager.addClue(count, {
 	    name: name,
 	    src:  src
-	}, true)) {
-	    console.log('updated ' + count);
-	}
-	else {
-	    console.log('update of ' + count + ' failed.');
+	}, true, true)) { // save, nothrow
+	    console.log(`${count}: updated`);
+	} else {
+	    console.log(`${count}: already present`);
 	}
     });
 }
 
 //
 
-function addReject(nameList) {
+function addReject (nameList) {
     if (ClueManager.addReject(nameList, true)) {
 	console.log('updated');
     }
@@ -74,7 +61,7 @@ function getKnownClueIndexLists (nameList) {
     }
     // verify that all names were found
     nameList.forEach((name, index) => {
-	Expect(countListArray[index], `cannot find clue, ${name}`).to.exist;
+	Expect(countListArray[index], `cannot find clue, ${name}`).exists;
     });
     return countListArray;
 }
@@ -82,11 +69,11 @@ function getKnownClueIndexLists (nameList) {
 //
 //
 
-function show(options) {
-    Expect(options, 'options').to.be.an('object');
-    Expect(options.test, 'options.test').to.be.a('string');
+function show (options) {
+    Expect(options, 'options').is.an.Object();
+    Expect(options.test, 'options.test').is.a.String();
     if (options.reject) {
-	Expect(options.add, 'cannot specify both --add and --reject').to.be.undefined;
+	Expect(options.add, 'cannot specify both --add and --reject').is.undefined;
     }
 
     let nameList = options.test.split(',').sort();

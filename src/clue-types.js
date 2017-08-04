@@ -1,10 +1,10 @@
 //
-// CLUE-TYPES.JS
+// clue-types.js
 //
 
 'use strict';
 
-// export a singleton
+//
 
 const _              = require('lodash');
 const expect         = require('chai').expect;
@@ -96,8 +96,14 @@ function getByOptions(options) {
     } else if (options.final) {
 	src = FINAL;
     } else if (!_.isUndefined(options.poem)) {
-	src = POEM[options.poem];
+	src = POEM[options.poem[0]];
 	if (_.isUndefined(src)) throw new Error(`POEM[${options.poem}] not supported`);
+	if (options.poem.slice(1, options.poem.length) === 's') {
+	    src = _.clone(src);
+	    src.baseDir += '/synth';
+	    src.MAX_CLUE_COUNT = 2;
+	    src.REQ_CLUE_COUNT = 2;
+	}
     } else {
 	throw new Error('No clue option supplied');
     }
