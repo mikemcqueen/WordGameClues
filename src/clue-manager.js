@@ -1,5 +1,5 @@
 //
-// CLUE_MANAGER.JS
+// clue-manager.js
 //
 
 'use strict';
@@ -9,10 +9,10 @@
 module.exports = exports = new ClueManager();
 
 const _              = require('lodash');
-const ClueList       = require('./clue_list');
+const ClueList       = require('./clue-list');
 const Clues          = require('./clue-types');
 const Expect         = require('chai').expect;
-const NameCount      = require('./name_count');
+const NameCount      = require('./name-count');
 const Path           = require('path');
 const Peco           = require('./peco');
 const Validator      = require('./validator');

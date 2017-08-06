@@ -1,11 +1,11 @@
 //
-// UPDATE.JS
+// update.js
 //
 
 'use strict';
 
 const _            = require('lodash');
-const ClueManager  = require('../clue_manager');
+const ClueManager  = require('../clue-manager');
 const Clues        = require('../clue-types');
 const Dir          = require('node-dir');
 const Expect       = require('chai').expect;

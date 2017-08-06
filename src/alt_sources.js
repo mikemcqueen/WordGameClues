@@ -1,3 +1,7 @@
+//
+// alt_sources.js
+//
+    
 'use strict';
 
 // export a singleton
@@ -6,15 +10,11 @@ module.exports = exports = new AltSources();
 
 //
 
-var _           = require('lodash');
-var Np          = require('named-parameters');
-
-//
-
-var ClueManager           = require('./clue_manager');
+var _                     = require('lodash');
+var ClueManager           = require('./clue-manager');
 var ComboSearch           = require('./combo_search');
+var NameCount             = require('./name-count');
 var Validator             = require('./validator');
-var NameCount             = require('./name_count');
 
 var FIRST_COLUMN_WIDTH    = 15;
 var SECOND_COLUMN_WIDTH   = 25;

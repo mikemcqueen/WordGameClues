@@ -1,5 +1,5 @@
 //
-// VALIDATOR.JS
+// validator.js
 //
 
 'use strict';
@@ -11,11 +11,11 @@ module.exports = exports = new Validator();
 //
 
 const _             = require('lodash');
-const ClueList      = require('./clue_list');
-const ClueManager   = require('./clue_manager');
+const ClueList      = require('./clue-list');
+const ClueManager   = require('./clue-manager');
 //const Expect        = require('chai').expect;
 const Expect        = require('should/as-function')
-const NameCount     = require('./name_count');
+const NameCount     = require('./name-count');
 const Peco          = require('./peco');
 const ResultMap     = require('./resultmap');
 

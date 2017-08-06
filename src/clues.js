@@ -1,20 +1,20 @@
 //
-// CLUES.JS
+// clues.js
 //
 
 'use strict';
 
 let _           = require('lodash');
 let AltSources  = require('./alt_sources');
-let ClueList    = require('./clue_list');
-let ClueManager = require('./clue_manager');
+let ClueList    = require('./clue-list');
+let ClueManager = require('./clue-manager');
 let Clues       = require('./clue-types');
 let ComboMaker  = require('./combo_maker');
 let ComboSearch = require('./combo_search');
 let Components  = require('./show-components');
 let Duration    = require('duration');
 let Expect      = require('chai').expect;
-let NameCount   = require('./name_count');
+let NameCount   = require('./name-count');
 let Peco        = require('./peco');
 let PrettyMs    = require('pretty-ms');
 let Show        = require('./show');

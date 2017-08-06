@@ -3,9 +3,9 @@
 var _              = require('lodash');
 var expect         = require('chai').expect;
 
-var ClueManager    = require('./clue_manager');
+var ClueManager    = require('./clue-manager');
 var Validator      = require('./validator');
-var NameCount      = require('./name_count');
+var NameCount      = require('./name-count');
 
 var FIRST_COLUMN_WIDTH    = 15;
 var SECOND_COLUMN_WIDTH   = 25;

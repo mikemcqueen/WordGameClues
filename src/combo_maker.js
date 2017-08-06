@@ -1,5 +1,5 @@
 //
-// COMBO_MAKER.JS
+// combo_maker.js
 //
 
 'use strict';
@@ -16,10 +16,10 @@ var expect      = require('chai').expect;
 
 //
 
-var ClueManager = require('./clue_manager');
-var ClueList    = require('./clue_list');
+var ClueManager = require('./clue-manager');
+var ClueList    = require('./clue-list');
 var Validator   = require('./validator');
-var NameCount   = require('./name_count');
+var NameCount   = require('./name-count');
 var Peco        = require('./peco'); // use this at some point
 
 //

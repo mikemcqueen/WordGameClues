@@ -1,5 +1,5 @@
 //
-// PECO.JS
+// peco.js
 //
 // PErmutations/COmbinations
 //

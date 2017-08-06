@@ -1,5 +1,5 @@
 //
-// RESULTMAP.JS
+// resultmap.js
 //
 
 'use strict';
@@ -15,8 +15,7 @@ module.exports = ResultMapExports;
 //
 
 var _               = require('lodash');
-
-var NameCount       = require('./name_count');
+var NameCount       = require('./name-count');
 
 //
 

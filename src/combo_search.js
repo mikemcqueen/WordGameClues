@@ -1,5 +1,5 @@
 //
-// COMBO_SEARCH.JS
+// combo_search.js
 //
 
 'use strict';
@@ -11,10 +11,10 @@ module.exports = exports = new ComboSearch();
 
 var _              = require('lodash');
 
-var ClueManager    = require('./clue_manager');
+var ClueManager    = require('./clue-manager');
 var Validator      = require('./validator');
-var ClueList       = require('./clue_list');
-var NameCount      = require('./name_count');
+var ClueList       = require('./clue-list');
+var NameCount      = require('./name-count');
 var Peco           = require('./peco');
 
 //

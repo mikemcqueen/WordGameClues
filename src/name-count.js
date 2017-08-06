@@ -1,21 +1,8 @@
+//
+// name-list.js
+//
+
 'use strict';
-
-var nameCountExports = {
-    makeNew              : makeNew,
-    makeCopy             : makeCopy,
-    makeNameList         : makeNameList,
-    makeCountList        : makeCountList,
-    makeListFromNameList : makeListFromNameList,
-    makeListFromCsv      : makeListFromCsv,
-    makeCanonicalName    : makeCanonicalName,
-    makeNameMap          : makeNameMap,
-    makeCountMap         : makeCountMap,
-    listToJSON           : listToJSON,
-    listContains         : listContains,
-    listContainsAll      : listContainsAll
-};
-
-module.exports = nameCountExports;
 
 //
 
@@ -218,4 +205,19 @@ NameCount.prototype.logList = function(list) {
     console.log(str);
 }
 
+//
 
+module.exports = {
+    makeNew              : makeNew,
+    makeCopy             : makeCopy,
+    makeNameList         : makeNameList,
+    makeCountList        : makeCountList,
+    makeListFromNameList : makeListFromNameList,
+    makeListFromCsv      : makeListFromCsv,
+    makeCanonicalName    : makeCanonicalName,
+    makeNameMap          : makeNameMap,
+    makeCountMap         : makeCountMap,
+    listToJSON           : listToJSON,
+    listContains         : listContains,
+    listContainsAll      : listContainsAll
+};

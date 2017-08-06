@@ -6,7 +6,7 @@
 
 const _            = require('lodash');
 const ChildProcess = require('child_process');
-const ClueManager  = require('../clue_manager');
+const ClueManager  = require('../clue-manager');
 const Clues        = require('../clue-types');
 const Dir          = require('node-dir');
 const Duration     = require('duration');

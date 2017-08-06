@@ -5,7 +5,7 @@
 'use strict';
 
 let _           = require('lodash');
-let ClueManager = require('./clue_manager');
+let ClueManager = require('./clue-manager');
 let Expect      = require('should'); // require('chai').expect;
 let Peco        = require('./peco');
 let Validator   = require('./validator');
