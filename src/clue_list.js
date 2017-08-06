@@ -123,15 +123,16 @@ function sortSources () {
 //
 
 function getSameSrcList (startIndex, options = {}) {
+    Expect(startIndex).is.a('number');
     let list = makeNew();
-    let mismatch;
-    if (!_.isUndefined(startIndex) && startIndex >=0 && startIndex < this.length) {
+    let mismatch = -1;
+    if (startIndex >=0 && startIndex < this.length) {
 	let src = this[startIndex].src;
-	list.push(..._.filter(this, (value, index) => {
+	list.push(..._.filter(this, (clue, index) => {
 	    if (index < startIndex) return false;
-	    if (!_.isUndefined(mismatch) && !options.allowMismatch) return false;
-	    if (this[index].src === src) return true;
-	    if (_.isUndefined(mismatch)) mismatch = index;
+	    if (mismatch >= 0 && !options.allowMismatch) return false;
+	    if (clue.src === src) return true;
+	    if (mismatch < 0) mismatch = index;
 	    return false;
 	}));
     }
@@ -160,6 +161,7 @@ function sortedBySrc () {
 function clueSetActual (clue, actualClue) {
     Expect(actualClue.src).to.exist;
     clue.actual = actualClue.src;
+    return clue;
 }
 
 //
@@ -214,7 +216,7 @@ function sameSrcMergeFrom (fromList, options = {}) {
     Expect(fromList.length, 'fromList.length < this.length').is.at.least(this.length);
     let warnings = 0;
     for (let [index, clue] of this.entries()) {
-	Expect(clue.name, `name mismatch, ${clue.name} vs ${fromList[index].name}`)
+	Expect(clue.name, `name mismatch, from ${fromList[index].name} to ${clue.name}`)
 	    .to.equal(fromList[index].name);
 	warnings += clueMergeFrom(clue, fromList[index], options);
 	this[index] = clue;
@@ -224,7 +226,7 @@ function sameSrcMergeFrom (fromList, options = {}) {
 	// check if clue.name already exists in this list
 	Expect(_.find(this, ['name', clue.name])).to.be.undefined; // TODO: define/use Clue.NAME
 	Expect(options.src).to.be.a('string');
-	clueSetActual(clue, clue);
+	clue = clueSetActual(_.clone(clue), clue);
 	clue.src = options.src;
 	this.push(clue);
     }
@@ -239,8 +241,9 @@ function mergeFrom (fromList, options = {}) {
     let fromIndex = 0;
     let warnings = 0;
     let srcNum = 0;
-    while (!_.isUndefined(toIndex) || !_.isUndefined(fromIndex)) {
+    while (toIndex >= 0 || fromIndex >= 0) {
 	let [sameSrcFromList, nextFromIndex] = fromList.getSameSrcList(fromIndex, options);
+	console.log(`from: ${sameSrcFromList.map(o => o.name)}`);
 	let [sameSrcToList, nextToIndex] = this.getSameSrcList(toIndex, options);
 	// use the src from TO list if available
 	if (!_.isEmpty(sameSrcToList)) {
@@ -258,8 +261,8 @@ function mergeFrom (fromList, options = {}) {
 	toIndex = nextToIndex;
 	fromIndex = nextFromIndex;
     }
-    Expect(toIndex, 'looks like toList is bigger than fromlist, manually fix it').to.be.undefined;
-    Expect(fromIndex, 'pigs fly').to.be.undefined;
+    Expect(toIndex, 'looks like toList is bigger than fromlist, manually fix it').is.equal(-1);
+    Expect(fromIndex, 'pigs fly').to.equal(-1);
     return [merged, warnings];
 }
 
@@ -289,7 +292,12 @@ function objectFrom (args) {
     let clueList = [];
 
     if (args.filename) {
-	clueList = JSON.parse(Fs.readFileSync(args.filename, 'utf8'));
+	try {
+	    clueList = JSON.parse(Fs.readFileSync(args.filename, 'utf8'));
+	}
+	catch(e) {
+	    throw new Error(`${args.filename}, ${e}`);
+	}
     }
     else if (args.array) {
 	if (!Array.isArray(args.array)) {

@@ -99,15 +99,22 @@ function getByOptions(options) {
 	src = POEM[options.poem[0]];
 	if (_.isUndefined(src)) throw new Error(`POEM[${options.poem}] not supported`);
 	if (options.poem.slice(1, options.poem.length) === 's') {
-	    src = _.clone(src);
-	    src.baseDir += '/synth';
-	    src.MAX_CLUE_COUNT = 2;
-	    src.REQ_CLUE_COUNT = 2;
+	    src = cloneAsSynth(src);
 	}
     } else {
 	throw new Error('No clue option supplied');
     }
     return src;
+}
+
+//
+
+function cloneAsSynth (config) {
+    config = _.clone(config);
+    config.baseDir += '/synth';
+    config.MAX_CLUE_COUNT = 2;
+    config.REQ_CLUE_COUNT = 2;
+    return config;
 }
 
 const ALL_TYPES = [ META, SYNTH, HARMONY, FINAL ];
@@ -159,6 +166,7 @@ function isFinal (name) {
 */
 
 module.exports = {
+    cloneAsSynth,
     getByBaseDirOption,
     getByOptions,
 
