@@ -1,5 +1,5 @@
 //
-// combo_maker.js
+// combo-maker.js
 //
 
 'use strict';
@@ -11,13 +11,10 @@ module.exports = exports = new ComboMaker();
 //
 
 var _           = require('lodash');
-var Duration    = require('duration');
-var expect      = require('chai').expect;
-
-//
-
 var ClueManager = require('./clue-manager');
 var ClueList    = require('./clue-list');
+var Duration    = require('duration');
+var expect      = require('chai').expect;
 var Validator   = require('./validator');
 var NameCount   = require('./name-count');
 var Peco        = require('./peco'); // use this at some point
@@ -180,7 +177,7 @@ ComboMaker.prototype.makeCombos = function(args) {
 
 // As long as one final result has only primary sources from 'sources'
 // array, we're good.
-//
+
 ComboMaker.prototype.checkPrimarySources = function(resultList, sources) {
     return resultList.some(result => {
 	return NameCount.makeCountList(result.nameSrcList).
@@ -191,7 +188,7 @@ ComboMaker.prototype.checkPrimarySources = function(resultList, sources) {
 }
 
 //
-//
+
 ComboMaker.prototype.buildUseNcList = function(nameList) {
     let ncList = [];
     let countList = [];
@@ -217,33 +214,30 @@ ComboMaker.prototype.buildUseNcList = function(nameList) {
 //
 ComboMaker.prototype.hasUniqueClues = function(clueList) {
     let sourceMap = {};
-    clueList.forEach(function(clue) {
+    for (let clue of clueList) {
 	if (isNaN(clue.count)) {
 	    throw new Error('bad clue count');
 	}
 	else if (clue.count > 1) {
-
+	    // nothing?
 	}
 	else if (!this.testSetKey(sourceMap, clue.src)) {
-	    return false;
+	    return false; // forEach.continue... ..why?
 	}
-    }, this);
-
+    }
     return true;
 }
 
 //
-//
+
 ComboMaker.prototype.testSetKey = function(map, key, value = true) {
-    if (!_.has(map, key)) {
-	map[key] = value;
-	return true;
-    }
-    return false;
+    if (_.has(map, key)) return false;
+    map[key] = value;
+    return true;
 }
 
 //
-//
+
 ComboMaker.prototype.displaySourceListArray = function(sourceListArray) {
     console.log('-----\n');
     sourceListArray.forEach(function(sourceList) {
@@ -256,7 +250,7 @@ ComboMaker.prototype.displaySourceListArray = function(sourceListArray) {
 }
 
 //
-//
+
 ComboMaker.prototype.first = function(clueSourceList, sourceIndexes) {
     for (let index = 0; index < clueSourceList.length; ++index) {
 	sourceIndexes[index] = 0;
@@ -266,7 +260,7 @@ ComboMaker.prototype.first = function(clueSourceList, sourceIndexes) {
 }
 
 //
-//
+
 ComboMaker.prototype.next = function(clueSourceList, sourceIndexes) {
     for (;;) {
 	if (!this.nextIndex(clueSourceList, sourceIndexes)) {

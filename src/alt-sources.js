@@ -1,5 +1,5 @@
 //
-// alt_sources.js
+// alt-sources.js
 //
     
 'use strict';
@@ -12,15 +12,17 @@ module.exports = exports = new AltSources();
 
 var _                     = require('lodash');
 var ClueManager           = require('./clue-manager');
-var ComboSearch           = require('./combo_search');
+var ComboSearch           = require('./combo-search');
 var NameCount             = require('./name-count');
 var Validator             = require('./validator');
+
+//
 
 var FIRST_COLUMN_WIDTH    = 15;
 var SECOND_COLUMN_WIDTH   = 25;
 
-//
-//
+// constructor
+// 
 
 function AltSources() {
     this.logging = false;

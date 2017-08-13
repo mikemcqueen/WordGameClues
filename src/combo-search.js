@@ -1,5 +1,5 @@
 //
-// combo_search.js
+// combo-search.js
 //
 
 'use strict';

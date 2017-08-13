@@ -23,7 +23,7 @@ const DATA_DIR              =  Path.normalize(`${Path.dirname(module.filename)}/
 const REJECTS_DIR           = 'rejects';
 
 //
-//
+// constructor
 
 function ClueManager () {
     this.clueListArray = [];         // the JSON clue files in an array

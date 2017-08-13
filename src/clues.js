@@ -5,12 +5,12 @@
 'use strict';
 
 let _           = require('lodash');
-let AltSources  = require('./alt_sources');
+let AltSources  = require('./alt-sources');
 let ClueList    = require('./clue-list');
 let ClueManager = require('./clue-manager');
 let Clues       = require('./clue-types');
-let ComboMaker  = require('./combo_maker');
-let ComboSearch = require('./combo_search');
+let ComboMaker  = require('./combo-maker');
+let ComboSearch = require('./combo-search');
 let Components  = require('./show-components');
 let Duration    = require('duration');
 let Expect      = require('chai').expect;
@@ -18,7 +18,7 @@ let NameCount   = require('./name-count');
 let Peco        = require('./peco');
 let PrettyMs    = require('pretty-ms');
 let Show        = require('./show');
-let ResultMap   = require('./resultmap');
+let ResultMap   = require('./result-map');
 let Validator   = require('./validator');
 
 // initialize command line options.  do this before logger.
@@ -303,7 +303,6 @@ function showSources(clueName) {
 function setLogging(flag) {
     ClueManager.logging = flag;
     ComboMaker.logging  = flag;
-    Validator.setLogging(flag);
     AltSources.logging  = flag;
     ComboSearch.logging = flag;
     ResultMap.setLogging(flag);

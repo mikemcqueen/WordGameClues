@@ -29,14 +29,14 @@ var LOGGING = false;
 
 //
 
-function makeNew() {
+function makeNew () {
     return new ResultMap(); //assignMethods(Object({}));
 }
 
 //
 //
 
-function ResultMap() {
+function ResultMap () {
     var obj = assignMethods(Object({}));
 
     obj.internal_map = {};
@@ -48,7 +48,7 @@ function ResultMap() {
 //
 //
 
-function assignMethods(obj) {
+function assignMethods (obj) {
     obj.addPrimaryLists             = addPrimaryLists;
     obj.addResult                   = addResult;
     obj.addResultAtNcList           = addResultAtNcList;
@@ -72,13 +72,13 @@ function assignMethods(obj) {
 
 //
 
-function setLogging(flag) {
+function setLogging (flag) {
     LOGGING = flag;
 }
 
 //
 
-function log(text) {
+function log (text) {
     if (LOGGING) {
 	console.log(/*this.indent() + */ text);
     }
@@ -86,14 +86,14 @@ function log(text) {
 
 //
 
-function map() {
+function map () {
     return this.internal_map;
 }
 
 //
 //
 
-function addPrimaryLists(ncList, nameSrcList) {
+function addPrimaryLists (ncList, nameSrcList) {
     nameSrcList = _.clone(nameSrcList);
     ncList.forEach(nc => {
 	var index;
@@ -120,7 +120,7 @@ function addPrimaryLists(ncList, nameSrcList) {
 //nameSrcList:    nameSrcList
 //ncNameListPairs:buildResult.ncNameListPairs
 //
-function addResult(args) {
+function addResult (args) {
     var primaryNcList;
     var nameSrcList;
     var result;
@@ -179,7 +179,7 @@ function addResult(args) {
 //nameSrcList:    nameSrcList
 //ncNameListPairs:buildResult.ncNameListPairs
 //
-function addResultAtNcList(args) {
+function addResultAtNcList (args) {
     var pathList;
 
     if (LOGGING) {
@@ -238,7 +238,7 @@ function addResultAtNcList(args) {
 //
 //
 
-function addSourcesToPathList(pathList, nameSrcList, ncNameListPairs) {
+function addSourcesToPathList (pathList, nameSrcList, ncNameListPairs) {
     var passTwo = false;
 
     nameSrcList = _.clone(nameSrcList);
@@ -289,7 +289,7 @@ function addSourcesToPathList(pathList, nameSrcList, ncNameListPairs) {
 //
 //
 
-function getPrimaryPathList(primaryNcList, ncNameListPairs) {
+function getPrimaryPathList (primaryNcList, ncNameListPairs) {
     var pathList;
     pathList = [];
     _.keys(this.map()).forEach(key => {
@@ -326,7 +326,7 @@ function getPrimaryPathList(primaryNcList, ncNameListPairs) {
 //
 //
 
-function allInAnyNameList(ncList, ncNameListPairs) {
+function allInAnyNameList (ncList, ncNameListPairs) {
     if (LOGGING) {
 	this.log('++allInAnyNameList ncList: ' + ncList);
     }
@@ -344,7 +344,7 @@ function allInAnyNameList(ncList, ncNameListPairs) {
 //
 //
 
-function recursiveGetPrimaryPathList(primaryNcList, path, map) {
+function recursiveGetPrimaryPathList (primaryNcList, path, map) {
     var arrayFound = false;
     var pathList = [];
     var processLast = false;
@@ -397,7 +397,7 @@ function recursiveGetPrimaryPathList(primaryNcList, path, map) {
 //primaryNcList:
 //nameSrcList:
 //
-function addResultAtRoot(args) {
+function addResultAtRoot (args) {
     var map;
     var listKey;
     var list;
@@ -427,7 +427,7 @@ function addResultAtRoot(args) {
 //
 //
 
-function addAllPrimary(origNcList, mutatingPrimaryNcList, mutatingNameSrcList) {
+function addAllPrimary (origNcList, mutatingPrimaryNcList, mutatingNameSrcList) {
     if (LOGGING) {
 	this.log('++addAllPrimary' +
 		 ', origNcList: ' + origNcList +
@@ -479,7 +479,7 @@ function addAllPrimary(origNcList, mutatingPrimaryNcList, mutatingNameSrcList) {
 //
 //
 
-function addPrimary(ncPrimaryStr, nameSrcStr) {
+function addPrimary (ncPrimaryStr, nameSrcStr) {
     var list;
 
     if (!this.map()[ncPrimaryStr]) {
@@ -504,7 +504,7 @@ function addPrimary(ncPrimaryStr, nameSrcStr) {
 //
 //
 
-function resolvePrimary(ncPrimaryStr) {
+function resolvePrimary (ncPrimaryStr) {
     var primaryNcStrList;
     var index;
 
@@ -542,7 +542,7 @@ function resolvePrimary(ncPrimaryStr) {
 //
 //
 
-function merge(fromMap, ncList) {
+function merge (fromMap, ncList) {
     var rootKey;
     var subKey;
     var key;
@@ -575,7 +575,7 @@ function merge(fromMap, ncList) {
 //
 //
 
-function mergeNcList(fromMap, ncList) {
+function mergeNcList (fromMap, ncList) {
     if (LOGGING) {
 	this.log('++mergeNcList' +
 		 ', this.keys: ' + _.keys(this.map()) +
@@ -632,7 +632,7 @@ function mergeNcList(fromMap, ncList) {
 //
 //
 
-function recursiveMergeMaps(toSeq, fromSeq) {
+function recursiveMergeMaps (toSeq, fromSeq) {
     // empty resultSeq, add everything from pendingSeq
     if (_.isEmpty(toSeq)) {
 	_.forEach(fromSeq, (value, key) => {
@@ -663,7 +663,7 @@ function recursiveMergeMaps(toSeq, fromSeq) {
 //
 //
 
-function ensureUniquePrimaryLists() {
+function ensureUniquePrimaryLists () {
     var pathList;
     pathList = this.getPrimaryPathList();
     pathList.forEach(path => {
@@ -686,7 +686,7 @@ function ensureUniquePrimaryLists() {
 //
 //
 
-function dump() {
+function dump () {
     dumpMap(this.map());
     return this;
 }
@@ -697,7 +697,7 @@ function dump() {
 //  primary:  t/f
 //  compound: t/f
 //
-function dumpMap(seq, level) {
+function dumpMap (seq, level) {
 //    console.log(_(seq).toJSON());
 //    return;
     if (!level) level = 0;
@@ -732,15 +732,15 @@ function dumpMap(seq, level) {
     }
 }
 
-function indent() {
+function indent () {
     return ' '; //spaces(this.logLevel);
 }
 
-function indentNewline() {
+function indentNewline () {
     return '\n' + indent()
 }
 
-function spaces(length) {
+function spaces (length) {
     var count;
     var result = '';
     for (count = 0; count < length; result += ' ', count++);
