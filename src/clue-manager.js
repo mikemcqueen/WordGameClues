@@ -81,7 +81,7 @@ ClueManager.prototype.loadAllClues = function (args) {
     if (args.ignoreErrors) {
 	this.ignoreLoadErrors = true;
     }
-    this.maxClues = args.clues.MAX_CLUE_COUNT;
+    this.maxClues = args.clues.clueCount;
 
     for (let count = 1; count <= this.maxClues; ++count) {
 	let knownClueList = this.loadClueList(count);

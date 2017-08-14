@@ -305,7 +305,6 @@ function setLogging(flag) {
     ComboMaker.logging  = flag;
     AltSources.logging  = flag;
     ComboSearch.logging = flag;
-    ResultMap.setLogging(flag);
     //Peco.setLogging(flag);
 
     LOGGING = flag;

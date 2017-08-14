@@ -1,20 +1,13 @@
 //
-// resultmap.js
+// result-map.js
 //
 
 'use strict';
 
-var ResultMapExports = {
-    makeNew                : makeNew,
-    dumpMap                : dumpMap,
-    setLogging             : setLogging
-};
-
-module.exports = ResultMapExports;
-
 //
 
 var _               = require('lodash');
+var Debug           = require('debug')('result-map');
 var NameCount       = require('./name-count');
 
 //
@@ -22,10 +15,6 @@ var NameCount       = require('./name-count');
 const PRIMARY_KEY   = '__primary';
 const SOURCES_KEY   = '__sources';
 const FINAL_KEY     = '__final';
-
-//
-
-var LOGGING = false;
 
 //
 
@@ -64,24 +53,9 @@ function assignMethods (obj) {
     obj.recursiveMergeMaps          = recursiveMergeMaps;
     obj.ensureUniquePrimaryLists    = ensureUniquePrimaryLists;
     obj.dump                        = dump;
-    obj.log                         = log;
     obj.map                         = map;
 
     return obj;
-}
-
-//
-
-function setLogging (flag) {
-    LOGGING = flag;
-}
-
-//
-
-function log (text) {
-    if (LOGGING) {
-	console.log(/*this.indent() + */ text);
-    }
 }
 
 //
@@ -128,15 +102,13 @@ function addResult (args) {
     primaryNcList = _.clone(args.primaryNcList);
     nameSrcList = _.clone(args.nameSrcList);
 
-    if (LOGGING) {
-	this.log('++addResult' +
-		 ', this.map.size: ' + _.size(this.map()) +
-		 ', rootKey: ' + args.rootKey +
-		 ', origNcList: ' + args.origNcList +
-		 indentNewline() + '  primaryNcList: ' + primaryNcList +
-		 indentNewline() + '  nameSrcList: ' + nameSrcList);
-	this.dump();
-    }
+    Debug('++addResult' +
+	  ', this.map.size: ' + _.size(this.map()) +
+	  ', rootKey: ' + args.rootKey +
+	  ', origNcList: ' + args.origNcList +
+	  indentNewline() + '  primaryNcList: ' + primaryNcList +
+	  indentNewline() + '  nameSrcList: ' + nameSrcList);
+//    this.dump();
 
     if (_.size(primaryNcList) != _.size(nameSrcList)) {
 	throw new Error('mismatched list sizes');
@@ -166,10 +138,9 @@ function addResult (args) {
 	});
     }
 
-    if (LOGGING) {
-	this.log('--addResult');
-	this.dump();
-    }
+    Debug('--addResult');
+    //this.dump();
+
     return this;
 }
 
@@ -182,13 +153,11 @@ function addResult (args) {
 function addResultAtNcList (args) {
     var pathList;
 
-    if (LOGGING) {
-	this.log('++addResultAtNcList' +
-		 ', ncList: ' + args.ncList +
-		 indentNewline() + '  ncNameListPairs: ' + args.ncNameListPairs +
-		 indentNewline() + '  primaryNcList: ' + args.primaryNcList +
-		 indentNewline() + '  nameSrcList: ' + args.nameSrcList);
-    }
+    Debug('++addResultAtNcList' +
+	     ', ncList: ' + args.ncList +
+	     indentNewline() + '  ncNameListPairs: ' + args.ncNameListPairs +
+	     indentNewline() + '  primaryNcList: ' + args.primaryNcList +
+	     indentNewline() + '  nameSrcList: ' + args.nameSrcList);
 
     pathList = this.getPrimaryPathList(args.primaryNcList, args.ncNameListPairs);
 
@@ -196,23 +165,19 @@ function addResultAtNcList (args) {
 	throw new Error('empty pathList');
     }
 
-    if (LOGGING) {
-	pathList.forEach(path => {
-	    this.log('path: ' + path.path +
-		     ', primary: ' + path.primaryNcCsv + 
-		     ', processLast: ' + path.processLast);
-	});
-    }
+    pathList.forEach(path => {
+	Debug('path: ' + path.path +
+		 ', primary: ' + path.primaryNcCsv + 
+		 ', processLast: ' + path.processLast);
+    });
 
     this.addSourcesToPathList(pathList, args.nameSrcList, args.ncNameListPairs);
 
-    if (LOGGING) {
-	pathList.forEach(path => {
-	    this.log('path: ' + path.path +
-		     ', primary: ' + path.primaryNcCsv +
-		     ', nameSrcList: ' + path.nameSrcList);
-	});
-    }
+    pathList.forEach(path => {
+	Debug('path: ' + path.path +
+		 ', primary: ' + path.primaryNcCsv +
+		 ', nameSrcList: ' + path.nameSrcList);
+    });
 
     // sources are in the pathLst, now add the items at those paths
     pathList.forEach(path => {
@@ -224,10 +189,8 @@ function addResultAtNcList (args) {
 	    throw new Error('too much at');
 	}
 	at = at[0];
-	if (LOGGING) {
-	    this.log('at: ' + at + '(' + _.size(at) + '), typeof ' + (typeof at));
-	    this.log('at.keys: ' + _.keys(at));
-	}
+	Debug('at: ' + at + '(' + _.size(at) + '), typeof ' + (typeof at));
+	Debug('at.keys: ' + _.keys(at));
 	list = at[path.primaryNcCsv];
 	list.push(_.toString(path.nameSrcList));
     });
@@ -255,16 +218,12 @@ function addSourcesToPathList (pathList, nameSrcList, ncNameListPairs) {
 	    if (!NameCount.makeListFromCsv(path.primaryNcCsv).every(nc => {
 		index = _.findIndex(nameSrcList, { name: nc.name });
 		if (index === -1) {
-		    if (this.log ) {
-			this.log('reverting, primary clue not in nameSrcList, ' + nc.name +
-				 ', list: ' + nameSrcList);
-		    }
+		    Debug('reverting, primary clue not in nameSrcList, ' + nc.name +
+			  ', list: ' + nameSrcList);
 		    return false; // every.exit
 		}
-		if (LOGGING) {
-		    this.log('addSources: adding ' + nameSrcList[index] +
-			     ' to ' + nc);
-		}
+		Debug('addSources: adding ' + nameSrcList[index] +
+			 ' to ' + nc);
 		path.nameSrcList.push(nameSrcList[index]);
 		_.pullAt(nameSrcList, [ index ]);
 		return true;  // every.continue
@@ -327,9 +286,7 @@ function getPrimaryPathList (primaryNcList, ncNameListPairs) {
 //
 
 function allInAnyNameList (ncList, ncNameListPairs) {
-    if (LOGGING) {
-	this.log('++allInAnyNameList ncList: ' + ncList);
-    }
+    Debug('++allInAnyNameList ncList: ' + ncList);
     return ncNameListPairs.some(ncNameListPair => {
 	var nameList = ncNameListPair[1];
 	if (_.size(nameList) != _.size(ncList)) {
@@ -428,12 +385,10 @@ function addResultAtRoot (args) {
 //
 
 function addAllPrimary (origNcList, mutatingPrimaryNcList, mutatingNameSrcList) {
-    if (LOGGING) {
-	this.log('++addAllPrimary' +
-		 ', origNcList: ' + origNcList +
-		 indentNewline() + '  mutatingPrimaryNcList: ' + mutatingPrimaryNcList +
-		 indentNewline() + '  mutatingNameSrcList: ' + mutatingNameSrcList);
-    }
+    Debug('++addAllPrimary' +
+	     ', origNcList: ' + origNcList +
+	     indentNewline() + '  mutatingPrimaryNcList: ' + mutatingPrimaryNcList +
+	     indentNewline() + '  mutatingNameSrcList: ' + mutatingNameSrcList);
 
     // find primary NCs in the orignal NC list
     origNcList.forEach((nc, ncIndex) => {
@@ -467,12 +422,11 @@ function addAllPrimary (origNcList, mutatingPrimaryNcList, mutatingNameSrcList) 
 	_.pullAt(mutatingNameSrcList, _.indexOf(mutatingNameSrcList, nameSrc));
     });
 
-    if (LOGGING) {
-	this.log('--addAllPrimary' +
-		 indentNewline() + '  primaryNcList: ' + mutatingPrimaryNcList +
-		 indentNewline() + '  nameSrcList: ' + mutatingNameSrcList);
-	this.dump();
-    }
+    Debug('--addAllPrimary' +
+	     indentNewline() + '  primaryNcList: ' + mutatingPrimaryNcList +
+	     indentNewline() + '  nameSrcList: ' + mutatingNameSrcList);
+    //this.dump();
+
     return this;
 }
 
@@ -493,10 +447,8 @@ function addPrimary (ncPrimaryStr, nameSrcStr) {
 	throw new Error('pending primary list, ' + list +
 			' is not an array, type: ' + (typeof list));
     }
-    if (LOGGING) {
-	this.log('addPrimary: adding ' + nameSrcStr +
-		 ' to ' + ncPrimaryStr);
-    }
+    Debug('addPrimary: adding ' + nameSrcStr +
+	  ' to ' + ncPrimaryStr);
     list.push(nameSrcStr);
     return this;
 }
@@ -510,27 +462,21 @@ function resolvePrimary (ncPrimaryStr) {
 
     primaryNcStrList = this.map()[PRIMARY_KEY];
     if (!primaryNcStrList || _.isEmpty(primaryNcStrList)) {
-	if (LOGGING) {
-	    this.log('missing or empty unresolved primary list, ' + primaryNcStrList +
-		     ', for nc: ' + ncPrimaryStr);
-	    this.log('keys: ' + _.keys(this.map()));
-	}
+	Debug('missing or empty unresolved primary list, ' + primaryNcStrList +
+		 ', for nc: ' + ncPrimaryStr);
+	Debug('keys: ' + _.keys(this.map()));
 	return false;
     }
 
     index = _.indexOf(primaryNcStrList, ncPrimaryStr);
     if (index === -1) {
-	if (LOGGING) {
-	    this.log('nc not in unresolved list, ' + ncPrimaryStr +
-		     ', list: ' + primaryNcStrList);
-	}
+	Debug('nc not in unresolved list, ' + ncPrimaryStr +
+		 ', list: ' + primaryNcStrList);
 	return false;
     }
 
-    if (LOGGING) {
-	this.log('found unresolved pending primary nc: ' + ncPrimaryStr +
-		 ', at index: ' + index);
-    }
+    Debug('found unresolved pending primary nc: ' + ncPrimaryStr +
+	     ', at index: ' + index);
 
     _.pullAt(primaryNcStrList, [ index ]);
     if (_.isEmpty(primaryNcStrList)) {
@@ -549,13 +495,11 @@ function merge (fromMap, ncList) {
     var map;
     var list;
 
-    if (LOGGING) {
-	this.log('++merge' + ', ncList: ' + ncList);
-	this.log('before resultMap:');
-	this.dump();
-	this.log('before fromMap:');
-	fromMap.dump();
-    }
+    Debug('++merge' + ', ncList: ' + ncList);
+    Debug('before resultMap:');
+    //this.dump();
+    Debug('before fromMap:');
+    //fromMap.dump();
 
     if (ncList) {
 	this.mergeNcList(fromMap, ncList);
@@ -564,11 +508,10 @@ function merge (fromMap, ncList) {
 	this.recursiveMergeMaps(this.map(), fromMap.map());
     }
 
-    if (LOGGING) {
-	this.log('--merge');
-	this.log('  after resultMap:');
-	this.dump();
-    }
+    Debug('--merge');
+    Debug('  after resultMap:');
+//    this.dump();
+
     return this;
 }
 
@@ -576,12 +519,10 @@ function merge (fromMap, ncList) {
 //
 
 function mergeNcList (fromMap, ncList) {
-    if (LOGGING) {
-	this.log('++mergeNcList' +
-		 ', this.keys: ' + _.keys(this.map()) +
-		 ', fromMap.keys: ' + _.keys(fromMap.map()) +
-		 ', ncList: ' + ncList);
-    }
+    Debug('++mergeNcList' +
+	     ', this.keys: ' + _.keys(this.map()) +
+	     ', fromMap.keys: ' + _.keys(fromMap.map()) +
+	     ', ncList: ' + ncList);
 
     ncList.forEach(nc => {
 	var map;
@@ -673,10 +614,10 @@ function ensureUniquePrimaryLists () {
 	    throw new Error('too much at, ');
 	}
 	at = at[0];
-	if (LOGGING) {
-	    this.log('at: ' + at + '(' + _.size(at) + '), typeof ' + (typeof at));
-	    this.log('at.keys: ' + _.keys(at));
-	}
+
+	Debug('at: ' + at + '(' + _.size(at) + '), typeof ' + (typeof at));
+	Debug('at.keys: ' + _.keys(at));
+
 	list = at[path.primaryNcCsv];
 	at[path.primaryNcCsv] = _.uniq(list);
     });
@@ -737,7 +678,7 @@ function indent () {
 }
 
 function indentNewline () {
-    return '\n' + indent()
+    return '\n' + indent();
 }
 
 function spaces (length) {
@@ -746,3 +687,11 @@ function spaces (length) {
     for (count = 0; count < length; result += ' ', count++);
     return result;
 }
+
+var ResultMapExports = {
+    makeNew                : makeNew,
+    dumpMap                : dumpMap
+};
+
+module.exports = ResultMapExports;
+

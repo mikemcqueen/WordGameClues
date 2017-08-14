@@ -22,7 +22,7 @@ const POEM = {
 	sentence:       1,
 	baseDir:        'poem/1',
 	resultDir:      'poem',
-	MAX_CLUE_COUNT: 12,
+	clueCount:      12,
 	REQ_CLUE_COUNT: 12
     },
 
@@ -30,7 +30,7 @@ const POEM = {
 	sentence:       2,
 	baseDir:        'poem/2',
 	resultDir:      'poem',
-	MAX_CLUE_COUNT: 9,
+	clueCount:      9,
 	REQ_CLUE_COUNT: 9
     },
 
@@ -38,7 +38,8 @@ const POEM = {
 	sentence:       3,
 	baseDir:        'poem/3',
 	resultDir:      'poem',
-	MAX_CLUE_COUNT: 4,
+	clueCount:      4,
+	synthClueCount: 9,
 	REQ_CLUE_COUNT: 4
     },
 
@@ -46,7 +47,7 @@ const POEM = {
 	sentence:       5,
 	baseDir:        'poem/5',
 	resultDir:      'poem',
-	MAX_CLUE_COUNT: 15,
+	clueCount:      15,
 	REQ_CLUE_COUNT: 15
     },
 
@@ -54,32 +55,32 @@ const POEM = {
 	sentence:       6,
 	baseDir:        'poem/6',
 	resultDir:      'poem',
-	MAX_CLUE_COUNT: 8,
+	clueCount:      8,
 	REQ_CLUE_COUNT: 8
     }
 };
 
 const META = {
     baseDir:        'meta',
-    MAX_CLUE_COUNT: 9,
+    clueCount: 9,
     REQ_CLUE_COUNT: 9
 };
 
 const SYNTH = {
     baseDir:        'synth',
-    MAX_CLUE_COUNT: 4,
+    clueCount: 4,
     REQ_CLUE_COUNT: 4
 };
 
 const HARMONY = {
     baseDir:        'harmony',
-    MAX_CLUE_COUNT: 3,
+    clueCount: 3,
     REQ_CLUE_COUNT: 3
 };
 
 const FINAL = {
     baseDir:        'final',
-    MAX_CLUE_COUNT: 2,
+    clueCount: 2,
     REQ_CLUE_COUNT: 2
 };
 
@@ -112,7 +113,7 @@ function getByOptions(options) {
 function cloneAsSynth (config) {
     config = _.clone(config);
     config.baseDir += '/synth';
-    config.MAX_CLUE_COUNT = 2;
+    config.clueCount = config.synthClueCount || 9; // hax
     config.REQ_CLUE_COUNT = 2;
     return config;
 }

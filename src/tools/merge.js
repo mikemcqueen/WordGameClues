@@ -27,8 +27,8 @@ const Opt          = require('node-getopt')
 //
 
 function loadClueLists (from, to) {
-    return [ClueManager.loadClueList(from.MAX_CLUE_COUNT, { dir: from.baseDir }),
-	     ClueManager.loadClueList(1, { dir: to.baseDir })];
+    return [ClueManager.loadClueList(from.clueCount, { dir: from.baseDir }),
+	    ClueManager.loadClueList(1, { dir: to.baseDir })];
 }
 
 //
@@ -62,7 +62,7 @@ function main () {
 	if (warnings > 0 && !Opt.options.force) {
 	    console.log('warnings found, save aborted. use --force to override');
 	} else {
-	    ClueManager.saveClueList(fromClueList, from.MAX_CLUE_COUNT, { dir: from.baseDir });
+	    ClueManager.saveClueList(fromClueList, from.clueCount, { dir: from.baseDir });
 	    ClueManager.saveClueList(merged, 1, { dir: to.baseDir });
 	}
     }
