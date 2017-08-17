@@ -8,6 +8,7 @@
 
 var _               = require('lodash');
 var Debug           = require('debug')('result-map');
+var Expect          = require('should/as-function');
 var NameCount       = require('./name-count');
 
 //
@@ -108,18 +109,11 @@ function addResult (args) {
 	  ', origNcList: ' + args.origNcList +
 	  indentNewline() + '  primaryNcList: ' + primaryNcList +
 	  indentNewline() + '  nameSrcList: ' + nameSrcList);
-//    this.dump();
+    this.dump();
 
-    if (_.size(primaryNcList) != _.size(nameSrcList)) {
-	throw new Error('mismatched list sizes');
-    }
-
+    Expect(_.size(primaryNcList)).is.equal(_.size(nameSrcList));
     this.addAllPrimary(args.origNcList, primaryNcList, nameSrcList);
-
-    if (_.size(primaryNcList) != _.size(nameSrcList)) {
-	throw new Error('mismatched list sizes');
-    }
-
+    Expect(_.size(primaryNcList)).is.equal(_.size(nameSrcList));
     /*
     if (args.rootKey) {
 	this.addResultAtRoot({
@@ -139,7 +133,7 @@ function addResult (args) {
     }
 
     Debug('--addResult');
-    //this.dump();
+    this.dump();
 
     return this;
 }
@@ -425,7 +419,7 @@ function addAllPrimary (origNcList, mutatingPrimaryNcList, mutatingNameSrcList) 
     Debug('--addAllPrimary' +
 	     indentNewline() + '  primaryNcList: ' + mutatingPrimaryNcList +
 	     indentNewline() + '  nameSrcList: ' + mutatingNameSrcList);
-    //this.dump();
+    this.dump();
 
     return this;
 }
@@ -497,9 +491,9 @@ function merge (fromMap, ncList) {
 
     Debug('++merge' + ', ncList: ' + ncList);
     Debug('before resultMap:');
-    //this.dump();
+    this.dump();
     Debug('before fromMap:');
-    //fromMap.dump();
+    fromMap.dump();
 
     if (ncList) {
 	this.mergeNcList(fromMap, ncList);
@@ -510,7 +504,7 @@ function merge (fromMap, ncList) {
 
     Debug('--merge');
     Debug('  after resultMap:');
-//    this.dump();
+    this.dump();
 
     return this;
 }
@@ -643,7 +637,7 @@ function dumpMap (seq, level) {
 //    return;
     if (!level) level = 0;
     if (typeof seq === 'object') {
-	console.log(indent() + spaces(2 * level) + (_.isArray(seq) ? '[' : '{'));
+	Debug('' + indent() + spaces(2 * level) + (_.isArray(seq) ? '[' : '{'));
 	++level;
 
 	if (_.isArray(seq)) {
@@ -652,24 +646,23 @@ function dumpMap (seq, level) {
 		    dumpMap(elem, level + 1);
 		}
 		else {
-		    console.log(indent() + spaces(2*level) + elem);
+		    Debug('' + indent() + spaces(2*level) + elem);
 		}
 	    });
 	}
 	else {
 	    _.forOwn(seq, function(value, key) {
 		if (typeof value === 'object') {
-		    console.log(indent() + spaces(2 * level) + key + ':');
+		    Debug('' + indent() + spaces(2 * level) + key + ':');
 		    dumpMap(value, level + 1);
 		}
 		else {
-		    console.log(indent() + spaces(2 * level) + key + ': ' + value);
+		    Debug('' + indent() + spaces(2 * level) + key + ': ' + value);
 		}
 	    });
 	}
-
 	--level;
-	console.log(indent() + spaces(2 * level) + (_.isArray(seq) ? ']' : '}'));
+	Debug('' + indent() + spaces(2 * level) + (_.isArray(seq) ? ']' : '}'));
     }
 }
 

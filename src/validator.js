@@ -82,13 +82,13 @@ Validator.prototype.setAllowDupeFlags = function (args) {
 
 Validator.prototype.validateSources = function(args) {
     Debug('++validateSources' +
-		 `${this.indentNewline()}  nameList(${args.nameList.length}): ${args.nameList}` +
-		 `, sum(${args.sum})` +
-		 `, count(${args.count})` +
-		 `, excludeSrcList: ${args.excludeSrcList}` +
-		 `${this.indentNewline()}  require: ${args.require}` +
-		 `, exclude: ${args.exclude}` +
-		 `, validateAll: ${args.validateAll}`);
+	  `${this.indentNewline()}  nameList(${args.nameList.length}): ${args.nameList}` +
+	  `, sum(${args.sum})` +
+	  `, count(${args.count})` +
+	  `, excludeSrcList: ${args.excludeSrcList}` +
+	  `${this.indentNewline()}  require: ${args.require}` +
+	  `, exclude: ${args.exclude}` +
+	  `, validateAll: ${args.validateAll}`);
 
     let found = false;
     let resultList = [];
@@ -497,14 +497,9 @@ Validator.prototype.getCompatibleResults = function(args) {
 //
 Validator.prototype.addCompatibleResult = function(resultList, nameSrcList, args) {
     if (xp) {
-	Expect(resultList).is.Array();
-	Expect(nameSrcList).is.Array();
-	Expect(args.ncList).is.Array();
-/*
-	Expect(resultList).to.be.an('array');
-	Expect(nameSrcList).to.be.an('array');
-	Expect(args.ncList).to.be.an('array');
-*/
+	Expect(resultList).is.a.Array();
+	Expect(nameSrcList).is.a.Array();
+	Expect(args.ncList).is.a.Array();
     }
 
     resultList.push({

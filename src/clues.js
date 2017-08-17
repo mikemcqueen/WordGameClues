@@ -18,6 +18,7 @@ let NameCount   = require('./name-count');
 let Peco        = require('./peco');
 let PrettyMs    = require('pretty-ms');
 let Show        = require('./show');
+let StringifyObject = require('stringify-object');
 let ResultMap   = require('./result-map');
 let Validator   = require('./validator');
 
@@ -286,6 +287,8 @@ function showSources(clueName) {
     });
     if (result.success) {
 	result.list.forEach(result => {
+//	    result.resultMap.dump();
+	    console.log(StringifyObject(result.resultMap.map(), { indent: '  ' }));
 	    console.log('nameSrcList: ' + result.nameSrcList);
 	    if (verbose) {
 		console.log('ncList:      ' + result.ncList);

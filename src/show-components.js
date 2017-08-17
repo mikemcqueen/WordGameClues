@@ -6,7 +6,7 @@
 
 let _           = require('lodash');
 let ClueManager = require('./clue-manager');
-let Expect      = require('should'); // require('chai').expect;
+let Expect      = require('should/as-function');
 let Peco        = require('./peco');
 let Validator   = require('./validator');
 
@@ -67,6 +67,28 @@ function getKnownClueIndexLists (nameList) {
 }
 
 //
+
+function addOrReject (args, nameList, addCountSet) {
+    if (args.add) {
+	if (nameList.length === 1) {
+	    console.log('WARNING! ignoring --add due to single source');
+	} else if (args.isReject) {
+	    console.log('WARNING! cannot add known clue: already rejected, ' + nameList);
+	} else {
+	    addClues(addCountSet, args.add, nameList.toString());
+	}
+    } else if (args.reject) {
+	if (nameList.length === 1) {
+	    console.log('WARNING! ignoring --reject due to single source');
+	} else if (args.isKnown) {
+	    console.log('WARNING! cannot add reject clue: already known, ' + nameList);
+	} else {
+	    addReject(nameList.toString());
+	}
+    }
+}
+
+//
 //
 
 function show (options) {
@@ -96,76 +118,66 @@ function show (options) {
     }
 
     let addCountSet = new Set();
-    let known = false;
-    let reject = false;
-    resultList.forEach(clueCountList => {
-	let sum = clueCountList.reduce((a, b) => a + b);
-	let result = Validator.validateSources({
-	    sum:      sum,
-	    nameList: nameList,
-	    count:    nameList.length,
+    let isKnown = false;
+    let isReject = false;
+    for (const clueCountList of resultList) {
+	const sum = clueCountList.reduce((a, b) => a + b);
+	const result = Validator.validateSources({
+	    sum:         sum,
+	    nameList:    nameList,
+	    count:       nameList.length,
 	    validateAll: true
 	});
+	
 	//console.log('validate [' + nameList + ']: ' + result);
 	let msg = clueCountList.toString();
 	if (!result.success) {
 	    msg += ': INVALID';
-	} else if (ClueManager.isRejectSource(nameList)) {
+	    continue;
+	}
+	if (ClueManager.isRejectSource(nameList)) {
 	    msg += ': REJECTED';
-	    reject = true;
-	} else {
-	    if (nameList.length === 1) {
-		let name = nameList[0];
-		let nameSrcList = ClueManager.clueListArray[sum]
+	    isReject = true;
+	    continue;
+	}
+	if (nameList.length === 1) {
+	    let name = nameList[0];
+	    let nameSrcList = ClueManager.clueListArray[sum]
 		    .filter(clue => clue.name === name)
 		    .map(clue => clue.src);
-
-		if (nameSrcList.length > 0) {
-
+	    
+	    if (nameSrcList.length > 0) {
 		//let clueNameList = ClueManager.clueListArray[sum].map(clue => clue.name);
 		//if (clueNameList.includes(name)) {
 		//
-		    
-		    /*
-		    ClueManager.clueListArray[sum].forEach(clue => {
-			if (clue.name === name) {
-			    clueSrcList.push(`"${clue.src}"`);
-			}
-		    });
-		    */
-		    msg += ': PRESENT as clue with sources: ' + nameSrcList.join(' - ');
-		}
-	    } else {
-		let clueList = ClueManager.knownSourceMapArray[sum][nameList];
-		if (!_.isUndefined(clueList)) {
-		    msg += ': PRESENT as ' + clueList.map(clue => clue.name);
-		    known = true;
-		}
-		if (options.add) {
-		    addCountSet.add(sum);
-		}
+		
+		/*
+		 ClueManager.clueListArray[sum].forEach(clue => {
+		 if (clue.name === name) {
+		 clueSrcList.push(`"${clue.src}"`);
+		 }
+		 });
+		 */
+		msg += ': PRESENT as clue with sources: ' + nameSrcList.join(' - ');
+	    }
+	} else {
+	    let clueList = ClueManager.knownSourceMapArray[sum][nameList];
+	    if (clueList) {
+		msg += ': PRESENT as ' + clueList.map(clue => clue.name);
+		isKnown = true;
+	    }
+	    if (options.add) {
+		addCountSet.add(sum);
 	    }
 	}
 	console.log(msg);
-    });
-
-    if (!_.isUndefined(options.add)) {
-	if (nameList.length === 1) {
-	    console.log('WARNING! ignoring --add due to single source');
-	} else if (reject) {
-	    console.log('WARNING! cannot add known clue: already rejected, ' + nameList);
-	} else {
-	    addClues(addCountSet, options.add, nameList.toString());
-	}
-    } else if (options.reject) {
-	if (nameList.length === 1) {
-	    console.log('WARNING! ignoring --reject due to single source');
-	} else if (known) {
-	    console.log('WARNING! cannot add reject clue: already known, ' + nameList);
-	} else {
-	    addReject(nameList.toString());
-	}
     }
+    addOrReject({
+	add:    options.add,
+	reject: options.reject,
+	isKnown,
+	isReject
+    }, nameList, addCountSet);
 }
 
 //
