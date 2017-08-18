@@ -133,14 +133,10 @@ function show (options) {
 	let msg = clueCountList.toString();
 	if (!result.success) {
 	    msg += ': INVALID';
-	    continue;
-	}
-	if (ClueManager.isRejectSource(nameList)) {
+	} else if (ClueManager.isRejectSource(nameList)) {
 	    msg += ': REJECTED';
 	    isReject = true;
-	    continue;
-	}
-	if (nameList.length === 1) {
+	} else if (nameList.length === 1) {
 	    let name = nameList[0];
 	    let nameSrcList = ClueManager.clueListArray[sum]
 		    .filter(clue => clue.name === name)

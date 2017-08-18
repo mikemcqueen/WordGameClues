@@ -510,7 +510,7 @@ Validator.prototype.addCompatibleResult = function(resultList, nameSrcList, args
 	    primaryNcList:   args.ncList,
 	    nameSrcList:     nameSrcList,
 	    ncNameListPairs: args.ncNameListPairs
-	})
+	}).ensureUniquePrimaryLists()
     });
 }
 
