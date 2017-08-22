@@ -582,3 +582,27 @@ ClueManager.prototype.getCountList = function (nameOrList) {
 	: this.getValidCounts(nameOrList, this.getClueCountListArray(nameOrList));
 }
 
+//
+
+ClueManager.prototype.getPrimarySources = function () {
+    let primarySources = [];
+    let hash = {};
+    for (const clue of this.clueListArray[1]) {
+	if (_.has(hash, clue.src)) continue;
+	primarySources.push(clue.src);
+	hash[clue.src] = true;
+    }
+    return primarySources;
+}
+
+//
+
+ClueManager.prototype.getInversePrimarySources = function (sources) {
+    Expect(sources).is.a('array');
+    let inverseSources = [];
+    for (const src of this.getPrimarySources()) {
+	if (_.includes(sources, src)) continue;
+	inverseSources.push(src);
+    }
+    return inverseSources;
+}

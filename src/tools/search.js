@@ -77,21 +77,18 @@ async function main() {
 	    return Promise.reject();
 	})
      */
-	.then(wordListArray => Search.getAllResults(
-	    {
-		// NOTE: use default dir
-		wordListArray: wordListArray,
-		pages:         DEFAULT_PAGE_COUNT,
-		delay:         delay
-	    },
-	    {
-		force:         Opt.options.force
-	    }
-	)); /*
+	.then(wordListArray => Search.getAllResults({
+	    // NOTE: use default dir
+	    wordListArray: wordListArray,
+	    pages:         DEFAULT_PAGE_COUNT,
+	    delay:         delay
+	}, { force: Opt.options.force }));
+        /*
 	.catch(err => {
 	    console.log(`error caught in main, ${err}`);
 	    if (err) console.log(err.stack);
-	});*/
+	});
+	*/
 }
 
 //

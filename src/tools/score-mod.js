@@ -7,7 +7,7 @@
 const _       = require('lodash');
 const Promise = require('bluebird');
 const Wiki    = require('wikijs').default;
-const Expect  = require('chai').expect;
+const Expect  = require('should/as-function'); // ('chai').expect;
 
 //
 
@@ -17,9 +17,9 @@ const WIKIPEDIA_DISAMBIGUATION = 'disambiguation';
 //
 
 function wordCountFilter (score, wordCount, options) {
-    Expect(score).to.be.an('object');
-    Expect(wordCount).to.be.a('number');
-    Expect(options).to.be.an('object');
+    Expect(score).is.a.Object();
+    Expect(wordCount).is.a.Number();
+    Expect(options).is.a.Object();
     let passTitle = false;
     let passArticle = false;
     if (options.filterTitle) {
@@ -74,11 +74,11 @@ function getWordCountV2 () {
 
 function getWordCount (wordList, text, options = {}) {
     if (_.isString(wordList)) {
-	Expect(_.includes(wordList, ',')).to.be.false; // easy to support, but no need yet
+	Expect(_.includes(wordList, ',')).is.false; // easy to support, but no need yet
 	wordList = [ wordList ];  // or .split(',')
     }
-    Expect(wordList).to.be.an('array').that.is.not.empty; // can be 1, e.g. disambiguation
-    Expect(text).to.be.a('string');
+    Expect(wordList).is.a.Array().which.is.not.empty(); // can be 1, e.g. disambiguation
+    Expect(text).is.a.String();
     let textWordList = _.words(text.toLowerCase());
     return _(wordList).map(word => _.includes(textWordList, word))
 	.tap(foundList => {
@@ -97,14 +97,14 @@ function getWordCount (wordList, text, options = {}) {
 //
 
 function getDisambiguation (result, options) {
-    Expect(result).to.be.an('object');
+    Expect(result).is.a.Object();
     return _.isString(result.title) ? (getWordCount(WIKIPEDIA_DISAMBIGUATION, result.title, options) > 0) : false;
 }
 
 //
 
 function removeWikipediaSuffix (title) {
-    Expect(title).to.be.a('string');
+    Expect(title).is.a.String();
     const index = title.lastIndexOf(WIKIPEDIA_SUFFIX);
     return (index !== -1) ? title.substr(0, index) : title;
 }
@@ -112,7 +112,7 @@ function removeWikipediaSuffix (title) {
 //
 
 function getWikiContent (title) {
-    Expect(title).to.be.a('string');
+    Expect(title).is.a.String();
     return Wiki().page(removeWikipediaSuffix(title)).then(page => {
 	return Promise.all([
 	    Promise.resolve(page.content()).reflect(),
@@ -134,20 +134,20 @@ function getWikiContent (title) {
 //
 
 function getScore (wordList, result, options = {}) {
-    Expect(wordList).to.be.an('array').that.is.not.empty;
-    Expect(result).to.be.an('object');
+    Expect(wordList).is.a.Array().not.empty();
+    Expect(result).is.a.Object();
     // TODO: some conditions may warrant a re-fetch of either the
     // Google search results (null title or summary). then we could 
     // expect valid entries here.
-    //Expect(result.title).to.be.a('string').that.is.not.empty;
-    //Expect(result.summary).to.be.a('string').that.is.not.empty;
+    //Expect(result.title).is.a.String().that.is.not.empty;
+    //Expect(result.summary).is.a.String().that.is.not.empty;
 
     let score = {
 	wordsInTitle   : _.isString(result.title)   ? getWordCount(wordList, result.title, options)   : 0,
 	wordsInSummary : _.isString(result.summary) ? getWordCount(wordList, result.summary, options) : 0,
 	disambiguation : getDisambiguation(result, options)
     };
-    Expect(score.wordsInTitle).to.be.a('number');
+    Expect(score.wordsInTitle).is.a.Number();
 
     return getWikiContent(result.title)
 	.then(content => {
@@ -171,8 +171,8 @@ function filterBadResults (resultList) {
 //
 
 function scoreResultList (wordList, resultList, options = {}) {
-    Expect(wordList, 'wordList').to.be.an('array').that.is.not.empty;
-    Expect(resultList, 'resultList').to.be.an('array');
+    Expect(wordList).is.a.Array().which.is.not.empty();
+    Expect(resultList).is.a.Array();
 
     let resultCount = _.size(resultList);
     resultList = filterBadResults(resultList);

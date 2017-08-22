@@ -4,23 +4,23 @@
 
 'use strict';
 
-let _           = require('lodash');
-let AltSources  = require('./alt-sources');
-let ClueList    = require('./clue-list');
-let ClueManager = require('./clue-manager');
-let Clues       = require('./clue-types');
-let ComboMaker  = require('./combo-maker');
-let ComboSearch = require('./combo-search');
-let Components  = require('./show-components');
-let Duration    = require('duration');
-let Expect      = require('chai').expect;
-let NameCount   = require('./name-count');
-let Peco        = require('./peco');
-let PrettyMs    = require('pretty-ms');
-let Show        = require('./show');
-let StringifyObject = require('stringify-object');
-let ResultMap   = require('./result-map');
-let Validator   = require('./validator');
+const _           = require('lodash');
+const AltSources  = require('./alt-sources');
+const ClueList    = require('./clue-list');
+const ClueManager = require('./clue-manager');
+const Clues       = require('./clue-types');
+const ComboMaker  = require('./combo-maker');
+const ComboSearch = require('./combo-search');
+const Components  = require('./show-components');
+const Duration    = require('duration');
+const Expect      = require('chai').expect;
+const NameCount   = require('./name-count');
+const Peco        = require('./peco');
+const PrettyMs    = require('pretty-ms');
+const Show        = require('./show');
+const StringifyObject = require('stringify-object');
+const ResultMap   = require('./result-map');
+const Validator   = require('./validator');
 
 // initialize command line options.  do this before logger.
 //
@@ -31,18 +31,20 @@ let Validator   = require('./validator');
 // solve the -p/-y problem: standardize how to set/initialize state based on target clues
 // 
 
-let Opt = require('node-getopt')
+const Opt = require('node-getopt')
     .create(_.concat(Clues.Options, [
-	['a', 'alt-sources=NAME',            'show alternate sources for the specified clue' ],
-	['A', 'all-alt-sources',             'show alternate sources for all clues' ],
-	['o', 'output',                      '  output json -or- clues(huh?)' ],
-	['c', 'count=COUNT[LO,COUNTHI]',     '# of primary clues to combine; or range if COUNTHI is specified' ],
-	['d', 'allow-dupe-source',           'allow duplicate source, override default behavior of --meta' ],
-	['i', 'primary-sources=SOURCE[,SOURCE,...]', 'limit results to the specified primary source(s)' ],
-	['k', 'show-known',                  'show compatible known clues; -u <clue> required' ],
-	['',  'csv',                         '  output in search-term csv format' ],
-	['q', 'require-counts=COUNT+',       'require clue(s) of specified count(s)' ],
-	['s', 'show-sources=NAME[:COUNT][,v]', 'show primary source combinations for the specified name[:count]' ],
+	['a', 'alt-sources=NAME',                    'show alternate sources for the specified clue'],
+	['A', 'all-alt-sources',                     'show alternate sources for all clues'],
+	['o', 'output',                              '  output json -or- clues(huh?)'],
+	['c', 'count=COUNT[LO,COUNTHI]',             '# of primary clues to combine; or range if COUNTHI is specified'],
+	['d', 'allow-dupe-source',                   'allow duplicate source, override default behavior of --meta'],
+	['i', 'primary-sources=SOURCE[,SOURCE,...]', 'limit results to the specified primary source(s)'],
+	['',  'inverse',                             '  or the inverse of those source(s); use with -i'],
+	['k', 'show-known',                          'show compatible known clues; -u <clue> required' ],
+	['',  'csv',                                 '  output in search-term csv format' ],
+	['',  'files',                               '  output in result file full-path format' ],
+	['q', 'require-counts=COUNT+',               'require clue(s) of specified count(s)' ],
+	['s', 'show-sources=NAME[:COUNT][,v]',       'show primary source combinations for the specified name[:count]' ],
 	['t', 'test=SOURCE[,SOURCE,...]',    'test the specified source list, e.g. blue,fish' ],
 	['',  'add=NAME',                    '  add combination to known list as NAME; use with --test' ],
 	['',  'reject',                      '  add combination to reject list; use with --test' ],
@@ -72,31 +74,29 @@ function main () {
     let validateAllOnLoad;
     let ignoreLoadErrors;
 
-    // options
+    const options = Opt.options;
 
     // TODO: get rid of this, just pass Opt.options around
-    let countArg = Opt.options.count;
-    let maxArg = _.toNumber(Opt.options.max);
-    let useClueList = Opt.options.use;
-    let verboseArg = Opt.options['verbose'];
-    let showSourcesClueName = Opt.options['show-sources'];
-    let altSourcesArg = Opt.options['alt-sources'];
-    let allAltSourcesFlag = Opt.options['all-alt-sources'];
-    let allowDupeSrcFlag = Opt.options['allow-dupe-source'];
-    let showKnownArg = Opt.options['show-known'];
-    let flagsArg = Opt.options.flags;
+    let countArg = options.count;
+    let maxArg = _.toNumber(options.max);
+    let useClueList = options.use;
+    let showSourcesClueName = options['show-sources'];
+    let altSourcesArg = options['alt-sources'];
+    let allAltSourcesFlag = options['all-alt-sources'];
+    let allowDupeSrcFlag = options['allow-dupe-source'];
+    let showKnownArg = options['show-known'];
 
     if (!maxArg) {
 	maxArg = 2; // TODO: default values in opt
     }
-    if (_.isUndefined(Opt.options.count)) {
+    if (_.isUndefined(options.count)) {
 	needCount = true;
 
 	if (showSourcesClueName ||
 	    altSourcesArg ||
 	    allAltSourcesFlag ||
 	    showKnownArg ||
-	    Opt.options.test ||
+	    options.test ||
 	    useClueList
 	   ) {
 	    needCount = false;
@@ -107,7 +107,7 @@ function main () {
 	}
     }
 
-    if (Opt.options.output) {
+    if (options.output) {
 	QUIET = true;
     }
 
@@ -117,24 +117,24 @@ function main () {
 	allowDupeName:    true
     });
 
-    if (_.includes(flagsArg, '1')) {
+    if (_.includes(options.flags, '1')) {
 	validateAllOnLoad = true;
 	console.log('validateAllOnLoad=true');
     }
-    if (_.includes(flagsArg, '2')) {
+    if (_.includes(options.flags, '2')) {
 	ignoreLoadErrors = true;
 	console.log('ignoreLoadErrors=true');
     }
 
-    let clueSource = Clues.getByOptions(Opt.options);
+    let clueSource = Clues.getByOptions(options);
 
-    setLogging(_.includes(verboseArg, VERBOSE_FLAG_LOAD));
+    setLogging(_.includes(options.verbose, VERBOSE_FLAG_LOAD));
     if (!loadClues(clueSource, validateAllOnLoad, ignoreLoadErrors)) {
 	return 1;
     }
-    setLogging(verboseArg);
+    setLogging(options.verbose);
 
-    log(`count=${Opt.options.count}, max=${maxArg}`);
+    log(`count=${options.count}, max=${maxArg}`);
 
     // TODO: add "show.js" with these exports
     if (showKnownArg) {
@@ -148,17 +148,19 @@ function main () {
 	    console.log('--meta required with that option');
 	    return 1;
 	}
-	 */
+	*/
 	Show.compatibleKnownClues({
 	    nameList: useClueList,
-	    max:      _.isUndefined(Opt.options.count)
-		? ClueManager.maxClues
-		: _.toNumber(Opt.options.count),
-	    asCsv:    Opt.options.csv
+	    max:      options.count ? _.toNumber(options.count) : ClueManager.maxClues,
+	    root:     '../data/results/',
+	    format:   {
+		csv:   options.csv,
+		files: options.files
+	    }
 	});
     }
-    else if (Opt.options.test) {
-	Components.show(Opt.options);
+    else if (options.test) {
+	Components.show(options);
     }
     else if (showSourcesClueName) {
 	showSources(showSourcesClueName);
@@ -166,20 +168,25 @@ function main () {
     else if (altSourcesArg || allAltSourcesFlag) {
 	AltSources.show(allAltSourcesFlag ? {
 	    all    : true,
-	    output : Opt.options.output,
-	    count  : _.toNumber(Opt.options.count)
+	    output : options.output,
+	    count  : _.toNumber(options.count)
 	} : {
 	    all    : false,
 	    name   : altSourcesArg,
-	    output : Opt.options.output
+	    output : options.output
 	});
     }
     else {
+	let sources = options['primary-sources'];
+	if (options.inverse) {
+	    sources = ClueManager.getInversePrimarySources(sources.split(',')).join(',');
+	    console.log(`inverse sources: ${sources}`);
+	}
 	doCombos({
-	    sum:     Opt.options.count,
+	    sum:     options.count,
 	    max:     maxArg,
-	    require: Opt.options['require-counts'],
-	    sources: Opt.options['primary-sources'],
+	    require: options['require-counts'],
+	    sources,
 	    use:     useClueList
 	});
     }

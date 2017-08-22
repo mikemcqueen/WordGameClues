@@ -118,7 +118,7 @@ async function getAllResultsLoop (args, options = {}) {
 	console.log(`file: ${filename}`);
 
 	let path = Result.pathFormat({
-	    root:  args.root,
+	    root: args.root,
 	    dir:  args.dir || _.toString(wordList.length),
 	    base: filename
 	});
@@ -141,7 +141,7 @@ async function getAllResultsLoop (args, options = {}) {
 		    return !_.isEmpty(result) && Result.fileScoreSaveCommit(path);
 		}).catch(err => {
 		    // log & eat all errors
-		    console.log(`getAllResultsLoop commit error, ${err}`);
+		    console.log(`getAllResultsLoop commit error`, err, err.stack);
 		});
 	}
 

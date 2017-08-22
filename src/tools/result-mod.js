@@ -18,7 +18,8 @@ const fsWriteFile  = Promise.promisify(Fs.writeFile);
 
 //
 
-const RESULT_DIR      = '../../data/results/';
+const RESULT_DIR      =  Path.normalize(`${Path.dirname(module.filename)}/../../data/results/`);
+//const RESULT_DIR    = '../../data/results/';
 const FILTERED_SUFFIX = '_filtered';
 const EXT_JSON        = '.json';
 
@@ -47,7 +48,7 @@ function getFileMatch (match = undefined) {
 function makeFilename (wordList, suffix = undefined) {
     Expect(wordList.length, `wordList: ${wordList}`).to.be.at.least(2);
     let filename = wordList.join('-');
-    if (!_.isUndefined(suffix)) {
+    if (suffix) { // necessary?
 	filename += suffix;
     }
     return Path.format({

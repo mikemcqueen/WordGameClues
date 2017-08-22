@@ -1,11 +1,14 @@
 'use strict';
 
 var _              = require('lodash');
-var expect         = require('chai').expect;
-
 var ClueManager    = require('./clue-manager');
-var Validator      = require('./validator');
+var Clues          = require('./clue-types');
+var Debug          = require('debug')('show');
+var Expect         = require('chai').expect;
 var NameCount      = require('./name-count');
+var Result         = require('./tools/result-mod');
+var Validator      = require('./validator');
+
 
 var FIRST_COLUMN_WIDTH    = 15;
 var SECOND_COLUMN_WIDTH   = 25;
@@ -13,22 +16,14 @@ var SECOND_COLUMN_WIDTH   = 25;
 //
 //
 
-var LOGGING = false;
-
-function log(text) {
-    if (LOGGING) {
-	console.log(text);
-    }
-}
-
 //
 // Show.compatibleKnownClues()
 //
 // TODO: take an ncList as an arg, not a nameList
 //
 function compatibleKnownClues(args) {
-    expect(args.nameList).to.be.an('array'); // this is actually a NAME:COUNT string (ncStr) list
-    expect(args.max).to.be.a('number');
+    Expect(args.nameList).to.be.an('array'); // this is actually a NAME:COUNT string (ncStr) list
+    Expect(args.max).to.be.a('number');
 
     // build ncList of supplied name:counts
     let ncList = args.nameList.map(name => NameCount.makeNew(name));
@@ -50,9 +45,8 @@ function compatibleKnownClues(args) {
 	return;
     }
     
-    console.log('Show.compatibleKnownClues, ' + args.nameList + 
-		', sum: ' + sum +
-		', remain: ' + remain);
+    Debug('Show.compatibleKnownClues, ' + args.nameList + 
+		', sum: ' + sum + ', remain: ' + remain);
 
     // first, make sure the supplied nameList:sum by itself is a valid clue
     // combination, and find out how many primary-clue variations there
@@ -64,13 +58,13 @@ function compatibleKnownClues(args) {
 	validateAll: true
     });
     if (!vsResult.success) {
-	console.log(`The nameList [ ${args.nameList} ] is not a valid clue combination`);
+	console.log(`The nameList [${args.nameList}] is not a valid clue combination`);
 	return;
     }
 
     // for each primary-clue variation from validateResults
     vsResult.list.forEach(result => {
-	console.log(`final result: ${result.nameSrcList}`);
+	Debug(`final result: ${result.nameSrcList}`);
 	let primarySrcList = result.nameSrcList.map(nc => _.toNumber(nc.count));
 
 	// for each clue in each clueListArray[count] where count is
@@ -84,10 +78,10 @@ function compatibleKnownClues(args) {
 	    _.uniqWith(ClueManager.clueListArray[count], (c1, c2) => c1.name === c2.name)
 		.forEach(clue => {
 		    let nc = NameCount.makeNew(clue.name, count);
-		    log(`checking: ${nc}`);
+		    Debug(`checking: ${nc}`);
 		    let resultList = getCompatibleResults(nc, primarySrcList);
 		    if (!_.isEmpty(resultList)) {
-			log('success, adding ' + clue.name);
+			Debug('success, adding ' + clue.name);
 			addToCompatibleMap({
 			    nameCount:      nc,
 			    resultList:     resultList,
@@ -96,7 +90,7 @@ function compatibleKnownClues(args) {
 			});
 		    }
 		    else {
-			log('not compatible: ' + clue.name);
+			Debug('not compatible: ' + clue.name);
 		    }
 		});
 	}
@@ -104,7 +98,8 @@ function compatibleKnownClues(args) {
 	    nameList:     args.nameList,
 	    srcList:      primarySrcList,
 	    nameMapArray: matchNameMapArray,
-	    asCsv:        args.asCsv
+	    format:       args.format,
+	    root:         args.root
 	});
     });
 }
@@ -114,10 +109,10 @@ function compatibleKnownClues(args) {
 //  excludeSrcList:
 //
 function getCompatibleResults(nameCount, excludeSrcList) {
-    expect(nameCount).to.be.an('object');
-    expect(excludeSrcList).to.be.an('array');
+    Expect(nameCount).to.be.an('object');
+    Expect(excludeSrcList).to.be.an('array');
 
-    log(`Validating ${nameCount}`);
+    Debug(`Validating ${nameCount}`);
     let result = Validator.validateSources({
 	sum:            nameCount.count,
 	nameList:       [ nameCount.name ],
@@ -125,7 +120,7 @@ function getCompatibleResults(nameCount, excludeSrcList) {
 	excludeSrcList: excludeSrcList,
 	validateAll:    true
     });
-    log(`isCompatible: ${nameCount}, ${result.success}`);
+    Debug(`isCompatible: ${nameCount}, ${result.success}`);
     return result.success ? result.list : [];
 }
 
@@ -136,14 +131,12 @@ function getCompatibleResults(nameCount, excludeSrcList) {
 //  nameMapArray
 //
 function addToCompatibleMap(args) {
-    expect(args.nameCount).to.be.an('object');
-    expect(args.resultList).to.be.an('array').that.is.not.empty;
-    expect(args.excludeSrcList).to.be.an('array');//.that.is.not.empty;
-    expect(args.nameMapArray).to.be.an('array');//.that.is.not.empty;
+    Expect(args.nameCount).to.be.an('object');
+    Expect(args.resultList).to.be.an('array').that.is.not.empty;
+    Expect(args.excludeSrcList).to.be.an('array');//.that.is.not.empty;
+    Expect(args.nameMapArray).to.be.an('array');//.that.is.not.empty;
 
-    if (LOGGING) {
-	log(`++addToCompatibleMap, clue: ${args.nameCount.name}, resultList(${args.resultList.length})`);
-    }
+    Debug(`++addToCompatibleMap, clue: ${args.nameCount.name}, resultList(${args.resultList.length})`);
     let map = args.nameMapArray[args.nameCount.count];
     if (_.isUndefined(map)) {
 	map = args.nameMapArray[args.nameCount.count] = {};
@@ -152,17 +145,17 @@ function addToCompatibleMap(args) {
 	let primarySrcList = _.chain(result.nameSrcList) // from array of name:source
 	    .map(nc => _.toNumber(nc.count))             // to array of sources
 	    .without(args.excludeSrcList).value();       // to array of non-excluded sources
-	expect(primarySrcList.length).to.be.at.least(1);
+	Expect(primarySrcList.length).to.be.at.least(1);
 	// TODO: shouldn't this be name:nameCount.count (maybe not)
 	let key = args.nameCount.name + ':' + primarySrcList.sort();
 	if (!_.has(map, key)) {
 	    map[key] = [];
 	}
-	if (LOGGING) {
+	if (false) {
 	    result.resultMap.dump();
 	}
 	// the root resultMap property should be args.nameCount
-	expect(result.resultMap.map(), args.nameCount).to.have.property(args.nameCount.toString());
+	Expect(result.resultMap.map(), args.nameCount).to.have.property(args.nameCount.toString());
 	// inner = the inner object (value) of the root object
 	let inner = result.resultMap.map()[args.nameCount.toString()];
 	let csvNames;
@@ -175,14 +168,12 @@ function addToCompatibleMap(args) {
 		.map(ncStr => NameCount.makeNew(ncStr).name) // to array of names
 		.sort().value().toString();                  // to sorted csv names
 	}
-	expect(csvNames).to.be.a('string');
+	Expect(csvNames).to.be.a('string');
 	map[key].push({
 	    src:            csvNames,
 	    primarySrcList: primarySrcList
 	});
-	if (LOGGING) {
-	    log(`adding: ${primarySrcList} - ${csvNames}`);
-	}
+	Debug(`adding: ${primarySrcList} - ${csvNames}`);
     });
 }
 
@@ -203,10 +194,9 @@ function dumpCompatibleClues(args) {
 	sources += ClueManager.knownClueMapArray[nc.count][nc.name][0];
     });
 
-    console.log(args.srcList + format2(args.srcList, FIRST_COLUMN_WIDTH) +
+    Debug(args.srcList + format2(args.srcList, FIRST_COLUMN_WIDTH) +
 		' ' + sources + format2(sources, SECOND_COLUMN_WIDTH) +
-		' ' + args.nameList +
-		'\n');
+		' ' + args.nameList + '\n');
 
     // strip ":COUNT" suffix from names in nameList
     let rawNameList = args.nameList.map(name => NameCount.makeNew(name)).map(nc => nc.name);
@@ -224,23 +214,32 @@ function dumpCompatibleClues(args) {
 	    dumpList.sort((a, b) => {
 		return a.primarySrcList.toString().localeCompare(b.primarySrcList.toString());
 	    });
-	    dumpCompatibleClueList(dumpList, args.asCsv ? rawNameList : undefined);
+	    dumpCompatibleClueList(dumpList, args, rawNameList);
 	}
     }
-    console.log('');
+//    console.log('');
 }
 
 //
 
-function dumpCompatibleClueList(list, nameList = undefined) {
+function dumpCompatibleClueList (list, args, nameList = undefined) {
     list.forEach(elem => {
-	if (_.isUndefined(nameList)) {
+	if (args.format.csv) {
+	    Expect(nameList).is.a('array');
+	    console.log(_.concat(nameList, elem.name).sort().toString());
+	} else if (args.format.files) {
+	    Expect(nameList).is.a('array');
+	    const nl = _.concat(nameList, elem.name);
+	    let path = Result.pathFormat({
+		//root:  args.root,
+		dir:  _.toString(nl.length), // args.dir ||
+		base: Result.makeFilename(nl.sort())
+	    });
+	    console.log(`'${path}'`);
+	} else {
 	    console.log(elem.primarySrcList + format2(elem.primarySrcList, FIRST_COLUMN_WIDTH) +
 			' ' + elem.src + format2(elem.src, SECOND_COLUMN_WIDTH) + 
 			' ' + elem.name);
-	}
-	else {
-	    console.log(_.concat(nameList, elem.name).sort().toString());
 	}
     });
 }

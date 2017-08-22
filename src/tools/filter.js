@@ -1,5 +1,5 @@
 //
-// FILTER.JS
+// filter.js
 //
 
 'use strict';
@@ -8,6 +8,7 @@ const _            = require('lodash');
 const ChildProcess = require('child_process');
 const ClueManager  = require('../clue-manager');
 const Clues        = require('../clue-types');
+const Debug        = require('debug')('filter');
 const Dir          = require('node-dir');
 const Duration     = require('duration');
 const Expect       = require('chai').expect;
@@ -33,6 +34,7 @@ const Opt          = require('node-getopt')
 	['t', 'title',               'filter results based on title word count (default)'],
 	['x', 'xfactor=VALUE',       'show 1) missing URL/title/summary 2) unscored URLs 3) article < summary'], 
 	['v', 'verbose',             'show logging'],
+	['w', 'word',                'search for additional word'],
 	['h', 'help',                'this screen']
     ])).bindHelp(
 	"Usage: node filter <options> [wordListFile]\n\n" +
@@ -102,14 +104,10 @@ function filterSearchResultList (resultList, wordList, filteredUrls, options) {
     // make any clue words with a space into multiple words.
     let wordCount = _.chain(wordList).map(word => word.split(' ')).flatten().size().value();
     
-    if (options.verbose) {
-	console.log(`fSRL: filteredUrls(${_.size(filteredUrls)})\n${JSON.stringify(filteredUrls)}`);
-    }
+    Debug(`fSRL: filteredUrls(${_.size(filteredUrls)})\n${JSON.stringify(filteredUrls)}`);
 
     return Promise.map(resultList, result => {
-	if (options.verbose) {
-	    //console.log(`result: ${_.entries(result)}`);
-	}
+	//Debug(`result: ${_.entries(result)}`);
 	if (options.xfactor && isXFactor(result, options)) {
 	    if (!loggedXFactor) {
 		console.log(`x: ${options.filepath}`);
@@ -118,24 +116,18 @@ function filterSearchResultList (resultList, wordList, filteredUrls, options) {
 	    return undefined;
 	}
 	if (isFilteredUrl(result.url, filteredUrls) || _.isUndefined(result.score)) {
-	    if (options.verbose) {
-		console.log(`filtered or unscored url, ${result.url}`);
-	    }
+	    Debug(`filtered or unscored url, ${result.url}`);
 	    return undefined;
 	}
 	return Score.wordCountFilter(result.score, wordCount, options) ? result : undefined;
     }).each(filterResult => {
-	if (!_.isUndefined(filterResult)) {
-	    if (options.verbose) {
-		console.log(`url: ${filterResult.url}`);
-	    }
+	if (filterResult) {
+	    Debug(`url: ${filterResult.url}`);
 	    urlList.push(filterResult.url);
 	}
 	return undefined;
     }).then(() => {
-	if (options.verbose) {
-	    console.log(`urlList.size = ${_.size(urlList)}`);
-	}
+	Debug(`urlList.size = ${_.size(urlList)}`);
 	return {
 	    src:     wordList.toString(),
 	    urlList: urlList,
@@ -152,20 +144,14 @@ function loadFilteredUrls (dir, wordList, options) {
     Expect(wordList).to.be.an('array');
     Expect(options).to.be.an('object');
     let filteredFilename = Result.makeFilteredFilename(wordList);
-    if (options.verbose) {
-	console.log(`filtered filename: ${filteredFilename}`);
-    }
+    Debug(`filtered filename: ${filteredFilename}`);
     return fsReadFile(Path.format({ dir, base: filteredFilename }), 'utf8')
 	.then(content => {
-	    if (options.verbose) {
-		console.log(`resolving filtered urls for: ${wordList}`);
-	    }
+	    Debug(`resolving filtered urls for: ${wordList}`);
 	    return JSON.parse(content);
 	}).catch(err => {
 	    if (err && err.code !== 'ENOENT') throw err;
-	    if (options.verbose) {
-		console.log(`no filtered urls, ${wordList}, ${err}`);
-	    }
+	    Debug(`no filtered urls, ${wordList}, ${err}`);
 	    return undefined;
 	});
 }
@@ -219,9 +205,7 @@ function filterSearchResultDir (dir, fileMatch, options) {
 	    recursive: false
 	}, function(err, content, filepath, next) {
 	    if (err) throw err; // TODO: test
-	    if (options.verbose) {
-		console.log(`filename: ${filepath}`);
-	    }
+	    Debug(`filename: ${filepath}`);
 	    let wordList = Result.makeWordlist(filepath);
 	    // filter out rejected word combos
 	    if (ClueManager.isRejectSource(wordList)) return next();
@@ -247,7 +231,7 @@ function filterSearchResultDir (dir, fileMatch, options) {
 		    return undefined;
 		}).catch(err => {
 		    // report & eat all errors
-		    console.log(`filterSearchResultFiles, path: ${filepath}, error; ${err}`);
+		    console.log(`filterSearchResultFiles, path: ${filepath}`, err, err.stack);
 		});//.then(() => next()); // process files synchronously
 	    return next(); // process files asynchronously
 	}, function(err, files) {
@@ -260,9 +244,13 @@ function filterSearchResultDir (dir, fileMatch, options) {
     });
 }
 
-//
+// for each result file path in pathlist
+//   load result file
+//   make word list from filename
+//   
 
-function filterPathList2 (pathList, dir, options) {
+
+function filterPathList (pathList, dir, options) {
     Expect(pathList).to.be.an('array');
     Expect(options).to.be.an('object');
 
@@ -270,11 +258,8 @@ function filterPathList2 (pathList, dir, options) {
     let rejectList = [];
     return Promise.map(pathList, path => {
 	let filename = Path.basename(path);
-	if (options.verbose) {
-	    console.log(`filename: ${filename}`);
-	}
+	Debug(`filename: ${filename}`);
 	let wordList = Result.makeWordlist(filename);
-	// big ugly nested promise chain because of local vars used below
 	return fsReadFile(path, 'utf8')
 	    .then(content => {
   		return Promise.all([content, loadFilteredUrls(dir, wordList, options)]);
@@ -291,7 +276,7 @@ function filterPathList2 (pathList, dir, options) {
 		return undefined;
 	    }).catch(err => {
 		// report & eat all errors
-		console.log(`filterSearchResultFiles, path: ${path}, error: ${err}`);
+		console.log(`filterSearchResultFiles, path: ${path}`, err, err.stack);
 	    });
     }).then(() => {
 	return {
@@ -426,35 +411,36 @@ function copyTextFile(path) {
 //
 //
 async function main () {
-    Expect(Opt.argv.length, 'only one non-switch FILE argument allowed').is.at.most(1);
-    Expect(Opt.options.dir, 'option -d NAME is required').to.exist;
+    const options = Opt.options;
 
-    ClueManager.loadAllClues({ clues: Clues.getByOptions(Opt.options) });
+    Expect(Opt.argv.length, 'only one non-switch FILE argument allowed').is.at.most(1);
+    Expect(options.dir, 'option -d NAME is required').to.exist;
+
+    ClueManager.loadAllClues({ clues: Clues.getByOptions(options) });
 
     // default to title filter if no filter specified
-    if (!Opt.options.article && !Opt.options.title) {
-	Opt.options.title = true;
+    if (!options.article && !options.title) {
+	options.title = true;
     }
     let nameMap;
     if (Opt.argv.length > 0) {
 	let wordListArray = await loadCsv(Opt.argv[0]);
 	nameMap = buildNameMap(wordListArray);
     }
-    let dir = Result.DIR + Opt.options.dir;
+    let dir = Result.DIR + options.dir;
     let filterOptions = {
-	filterArticle: Opt.options.article,
-	filterTitle:   Opt.options.title,
-	filterRejects: Opt.options.rejects,
-	verbose:       Opt.options.verbose,
-	xfactor:       _.toNumber(Opt.options.xfactor)
+	filterArticle: options.article,
+	filterTitle:   options.title,
+	filterRejects: options.rejects,
+	xfactor:       _.toNumber(options.xfactor)
     };
     let start = new Date();
-    let pathList = await getPathList(dir, Result.getFileMatch(Opt.options.match), nameMap);
+    let pathList = await getPathList(dir, Result.getFileMatch(options.match), nameMap);
     let getDuration = new Duration(start, new Date()).milliseconds;
     start = new Date();
-    let result = await filterPathList2(pathList, dir, filterOptions);
+    let result = await filterPathList(pathList, dir, filterOptions);
     let d = new Duration(start, new Date()).milliseconds;
-    if (Opt.options.count) {
+    if (options.count) {
 	console.log(`Results: ${_.size(result.filtered)}` +
 		    `, Urls: ${getUrlCount(result.filtered)}` +
 		    `, Rejects: ${_.size(result.rejects)}` +
@@ -462,7 +448,33 @@ async function main () {
 		    `, filter(${PrettyMs(d)})`);
 	return undefined;
     }
-    let useTmpFile = Opt.options.note || Opt.options.copy;
+
+    // result.filtered is a list of result objects,
+    //   which contain urlLists
+    // if options.word, we want to re-score all of those
+    //   urls using only options.word
+    // re-scoring should give us a list of "scored results"
+    //   similar to what is saved in result dir. but we don't
+    //   need to save those results this time.
+    // then we want to call something similar to filterSearchResultList
+    //   which just calls score.wordCountFilter() on those
+    //   re-scored results, and without filtering "filtered" URLs
+    // now we have two result.filtered lists. one contains the
+    //   original URLs that matched the filename words,
+    //   and one contains the URLS that match options.word
+    // so the second one we can just use, right?
+    //
+    // other considerations:
+    //
+    // maybe we want to save the score data for the --word in the
+    //   original results file. that way a subsequent --word filter
+    //   woudln't have to do the wikipedia search.
+    //
+    // of course, we could just save the wikipedia download data as well.
+    //   is there a database that auto-indexes all words in a document?
+    //
+
+    let useTmpFile = options.note || options.copy;
     return Promise.resolve().then(() => {
 	if (useTmpFile) {
 	    return createTmpFile().then(([path, fd]) => {
@@ -471,16 +483,16 @@ async function main () {
 	}
 	return [null, process.stdout];
     }).then(([path, stream]) => {
-	writeFilterResults(Opt.options.rejects ? result.rejects : result.filtered, stream);
+	writeFilterResults(options.rejects ? result.rejects : result.filtered, stream);
 	if (useTmpFile) {
 	    stream && stream.end();
-	    if (Opt.options.mail) {
+	    if (options.mail) {
 		mailTextFile({
 		    to:      'mmcqueen112.ba110c6@m.evernote.com',
 		    subject: `filtered @Worksheets.new`,
 		    path:    path
 		});
-	    } else if (Opt.options.copy) {
+	    } else if (options.copy) {
 		copyTextFile(path);
 	    }
 	}
@@ -492,6 +504,6 @@ async function main () {
 
 main()
 .catch(err => {
-    console.log(err.stack);
+    console.log(err, err.stack);
 });
 

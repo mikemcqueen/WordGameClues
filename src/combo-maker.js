@@ -71,7 +71,7 @@ ComboMaker.prototype.makeCombos = function(args) {
 	require.push(...buildResult.countList);
     }
     let validateAll = false;
-    if (!_.isUndefined(args.sources)) {
+    if (args.sources) {
 	console.log('Validating sources: ' + args.sources);
 	validateAll = true;
     }
@@ -84,7 +84,7 @@ ComboMaker.prototype.makeCombos = function(args) {
     ClueManager.getClueSourceListArray({
 	sum:     args.sum,
 	max:     args.max,
-	require: require,
+	require: require
     }).forEach(clueSourceList => {
 	let sourceIndexes = [];
 
@@ -180,8 +180,8 @@ ComboMaker.prototype.makeCombos = function(args) {
 
 ComboMaker.prototype.checkPrimarySources = function(resultList, sources) {
     return resultList.some(result => {
-	return NameCount.makeCountList(result.nameSrcList).
-	    every(source => {
+	return NameCount.makeCountList(result.nameSrcList)
+	    .every(source => {
 		return _.includes(sources, source);
 	    });
     });
