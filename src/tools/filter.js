@@ -17,8 +17,8 @@ const My           = require('../misc/util');
 const Path         = require('path');
 const PrettyMs     = require('pretty-ms');
 const Promise      = require('bluebird');
-const Result       = require('./result-mod');
-const Score        = require('./score-mod');
+const Score        = require('../modules/score');
+const SearchResult = require('../modules/search-result');
 const Tmp          = require('tmp');
 
 const Opt          = require('node-getopt')
@@ -143,7 +143,7 @@ function loadFilteredUrls (dir, wordList, options) {
     Expect(dir, 'lFU dir').to.be.a('string');
     Expect(wordList).to.be.an('array');
     Expect(options).to.be.an('object');
-    let filteredFilename = Result.makeFilteredFilename(wordList);
+    let filteredFilename = SearchResult.makeFilteredFilename(wordList);
     Debug(`filtered filename: ${filteredFilename}`);
     return fsReadFile(Path.format({ dir, base: filteredFilename }), 'utf8')
 	.then(content => {
@@ -206,7 +206,7 @@ function filterSearchResultDir (dir, fileMatch, options) {
 	}, function(err, content, filepath, next) {
 	    if (err) throw err; // TODO: test
 	    Debug(`filename: ${filepath}`);
-	    let wordList = Result.makeWordlist(filepath);
+	    let wordList = SearchResult.makeWordlist(filepath);
 	    // filter out rejected word combos
 	    if (ClueManager.isRejectSource(wordList)) return next();
 	    if (!_.isUndefined(options.nameMap) && !isInNameMap(options.nameMap, wordList)) return next();
@@ -259,7 +259,7 @@ function filterPathList (pathList, dir, options) {
     return Promise.map(pathList, path => {
 	let filename = Path.basename(path);
 	Debug(`filename: ${filename}`);
-	let wordList = Result.makeWordlist(filename);
+	let wordList = SearchResult.makeWordlist(filename);
 	return fsReadFile(path, 'utf8')
 	    .then(content => {
   		return Promise.all([content, loadFilteredUrls(dir, wordList, options)]);
@@ -323,7 +323,7 @@ function getPathList (dir, fileMatch, nameMap) {
 	    let match = new RegExp(fileMatch);
 	    let filtered = _.filter(pathList, path => {
 		let filename = Path.basename(path)
-		let wordList = Result.makeWordlist(filename);
+		let wordList = SearchResult.makeWordlist(filename);
 		// filter out rejected word combos
 		if (ClueManager.isRejectSource(wordList)) return false;
 		if (!_.isUndefined(nameMap) && !isInNameMap(nameMap, wordList)) return false;
@@ -343,15 +343,15 @@ function writeFilterResults (resultList, stream) {
 	if (_.isEmpty(result.urlList)) continue;
 	if (ClueManager.isRejectSource(result.src)) continue;
 
-	My.logStream(stream, `${Result.SRC_PREFIX}${result.src}`);
+	My.logStream(stream, `${SearchResult.SRC_PREFIX}${result.src}`);
 	for (const url of result.urlList) {
 	    My.logStream(stream, url);
 	}
 	const nameList = ClueManager.getKnownClues(result.src);
 	if (!_.isEmpty(nameList)) {
-	    My.logStream(stream, `\n${Result.KNOWN_PREFIX}known:`);
+	    My.logStream(stream, `\n${SearchResult.KNOWN_PREFIX}known:`);
 	    for (const name of nameList) {
-		My.logStream(stream, `${Result.KNOWN_PREFIX}${name}`);
+		My.logStream(stream, `${SearchResult.KNOWN_PREFIX}${name}`);
 	    }
 	}
 	My.logStream(stream, '');
@@ -427,7 +427,7 @@ async function main () {
 	let wordListArray = await loadCsv(Opt.argv[0]);
 	nameMap = buildNameMap(wordListArray);
     }
-    let dir = Result.DIR + options.dir;
+    let dir = SearchResult.DIR + options.dir;
     let filterOptions = {
 	filterArticle: options.article,
 	filterTitle:   options.title,
@@ -435,7 +435,7 @@ async function main () {
 	xfactor:       _.toNumber(options.xfactor)
     };
     let start = new Date();
-    let pathList = await getPathList(dir, Result.getFileMatch(options.match), nameMap);
+    let pathList = await getPathList(dir, SearchResult.getFileMatch(options.match), nameMap);
     let getDuration = new Duration(start, new Date()).milliseconds;
     start = new Date();
     let result = await filterPathList(pathList, dir, filterOptions);

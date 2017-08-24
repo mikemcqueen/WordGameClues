@@ -12,8 +12,8 @@ const Linebyline   = require('linebyline');
 const Path         = require('path');
 const Promise      = require('bluebird');
 const Readlines    = require('n-readlines');
-const Result       = require('./result-mod');
-const Score        = require('./score-mod');
+const Score        = require('../modules/score');
+const SearchResult = require('../modules/search-result');
 
 const fsReadFile   = Promise.promisify(fs.readFile);
 const fsWriteFile  = Promise.promisify(fs.writeFile);
@@ -34,7 +34,7 @@ function scoreSearchResultDir (dir, fileMatch, options = {}) {
     Expect(fileMatch).to.be.a('string');
     Expect(options).to.be.an('object');
 
-    let path = Result.DIR + dir;
+    let path = SearchResult.DIR + dir;
     console.log('dir: ' + path);
     Dir.readFiles(path, {
 	match:     new RegExp(fileMatch),
@@ -45,7 +45,7 @@ function scoreSearchResultDir (dir, fileMatch, options = {}) {
 	Promise.resolve(JSON.parse(content))
 	    .then(resultList => {
 		if (_.isEmpty(resultList)) return undefined;
-		return Result.scoreSaveCommit(resultList, filepath, options);
+		return SearchResult.scoreSaveCommit(resultList, filepath, options);
 	    })
 	    .catch(err => {
 		if (err) {
@@ -68,7 +68,7 @@ function scoreSaveFile (filepath, options) {
     // TODO: Path.format()
     return fsReadFile(filepath, 'utf8')
 	.then(content => Score.scoreResultList(
-	    Result.makeWordlist(filepath),
+	    SearchResult.makeWordlist(filepath),
 	    JSON.parse(content),
 	    options
 	).then(scoreResult => {
@@ -93,8 +93,8 @@ async function scoreSearchResultFiles (dir, inputFilename, options = {}) {
 	if (nextLine  === false) return;
 	let wordList = nextLine.toString().trim().split(',');
 	let filepath = Path.format({
-	    dir:  Result.DIR + options.dir || _.toString(wordList.length),
-	    base: Result.makeFilename(wordList)
+	    dir:  SearchResult.DIR + options.dir || _.toString(wordList.length),
+	    base: SearchResult.makeFilename(wordList)
 	});
 	console.log(`filepath: ${filepath}`);
 	await scoreSaveFile(filepath, options)
@@ -122,8 +122,8 @@ async function scoreSearchResultFiles2 (dir, inputFilename, options = {}) {
 	if (nextLine  === false) return;
 	let wordList = nextLine.toString().trim().split(',');
 	let filepath = Path.format({
-	    dir:  Result.DIR + (options.dir || _.toString(wordList.length)),
-	    base: Result.makeFilename(wordList)
+	    dir:  SearchResult.DIR + (options.dir || _.toString(wordList.length)),
+	    base: SearchResult.makeFilename(wordList)
 	});
 	console.log(`filepath: ${filepath}`);
 	await scoreSaveFile(filepath, options)
@@ -164,7 +164,7 @@ async function main () {
 	scoreSearchResultFiles2(Opt.options.dir, inputFile, scoreOptions);
     } else {
 	Expect(Opt.options.dir, 'option -d NAME is required').to.exist;
-	let fileMatch = Result.getFileMatch(Opt.options.match);
+	let fileMatch = SearchResult.getFileMatch(Opt.options.match);
 	console.log(`fileMatch: ${fileMatch}`);
 	scoreSearchResultDir(Opt.options.dir, fileMatch, scoreOptions);
     }

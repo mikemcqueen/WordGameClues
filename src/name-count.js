@@ -1,5 +1,5 @@
 //
-// name-list.js
+// name-count.js
 //
 
 'use strict';
@@ -91,8 +91,7 @@ function makeCanonicalName(name, count, index) {
 //
 
 function makeNameMap(ncList) {
-    var nameMap;
-    nameMap = {};
+    let nameMap = {};
     ncList.forEach(nc => {
 	if (!nameMap[nc.name]) {
 	    nameMap[nc.name] = [ nc.src ]; 
@@ -107,8 +106,7 @@ function makeNameMap(ncList) {
 //
 
 function makeCountMap(ncList) {
-    var countMap;
-    countMap = {};
+    let countMap = {};
     ncList.forEach(nc => {
 	if (!countMap[nc.src]) {
 	    countMap[nc.src] = [ nc.name ]; 

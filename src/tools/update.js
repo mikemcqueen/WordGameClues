@@ -13,7 +13,7 @@ const Fs           = require('fs');
 const Path         = require('path');
 const Promise      = require('bluebird');
 const Readlines    = require('n-readlines');
-const Result       = require('./result-mod');
+const SearchResult = require('../modules/search-result');
 
 const Opt          = require('node-getopt')
     .create(_.concat(Clues.Options, [
@@ -29,7 +29,7 @@ const Opt          = require('node-getopt')
     )
  */
 
-//---------------------------------------------
+//
 
 const Start =   Symbol('start');
 const Src =     Symbol('src');
@@ -53,15 +53,13 @@ const SM = {
     [Known] : { next: [ Known, Src ],                      func: processKnown }
 }
 
-//---------------------------------------------
-
 //
 function getLineState (line) {
     Expect(line.length).to.be.at.least(1);
     let state;
-    if (line[0] === Result.SRC_PREFIX) state = Src;
-    if (line[0] === Result.MAYBE_PREFIX) state = Maybe;
-    if (line[0] === Result.KNOWN_PREFIX) state = Known;
+    if (line[0] === SearchResult.SRC_PREFIX) state = Src;
+    if (line[0] === SearchResult.MAYBE_PREFIX) state = Maybe;
+    if (line[0] === SearchResult.KNOWN_PREFIX) state = Known;
     // all of the above get first char sliced off
     if (state) {
 	line = line.slice(1);
@@ -106,8 +104,8 @@ function processSrc (line, args, options) {
 	};
     }
 
-    let dir = `${Result.DIR}${args.dir}`;
-    let path = `${dir}/${Result.makeFilteredFilename(nameList)}`;
+    let dir = `${SearchResult.DIR}${args.dir}`;
+    let path = `${dir}/${SearchResult.makeFilteredFilename(nameList)}`;
     let content;
     try {
 	content = Fs.readFileSync(path, 'utf8');

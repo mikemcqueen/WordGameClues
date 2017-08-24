@@ -9,7 +9,7 @@ const Expect       = require('chai').expect;
 const Fs           = require('fs');
 const Ms           = require('ms');
 const Promise      = require('bluebird');
-const Search       = require('./search-mod');
+const Search       = require('../modules/search');
 
 const CsvParse     = Promise.promisify(require('csv-parse'));
 const FsReadFile   = Promise.promisify(Fs.readFile);

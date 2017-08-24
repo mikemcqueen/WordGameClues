@@ -1,17 +1,18 @@
 'use strict';
 
-var _              = require('lodash');
-var ClueManager    = require('./clue-manager');
-var Clues          = require('./clue-types');
-var Debug          = require('debug')('show');
-var Expect         = require('chai').expect;
-var NameCount      = require('./name-count');
-var Result         = require('./tools/result-mod');
-var Validator      = require('./validator');
+const _              = require('lodash');
+const ClueManager    = require('./clue-manager');
+const Clues          = require('./clue-types');
+const Debug          = require('debug')('show');
+const Expect         = require('chai').expect;
+const NameCount      = require('./name-count');
+const SearchResult   = require('./modules/search-result');
+const Validator      = require('./validator');
 
+//
 
-var FIRST_COLUMN_WIDTH    = 15;
-var SECOND_COLUMN_WIDTH   = 25;
+const FIRST_COLUMN_WIDTH    = 15;
+const SECOND_COLUMN_WIDTH   = 25;
 
 //
 //
@@ -250,14 +251,16 @@ function format2(text, span) {
     if (text === undefined) {
 	text = 'undefined'
     }
-    var result = "";
-    for (var len = text.toString().length; len < span; ++len) { result += " "; }
+    var result = '';
+    for (var len = text.toString().length; len < span; ++len) { result += ' '; }
     return result;
 }
 
-var showExports = {
+//
+
+module.exports = {
     compatibleKnownClues : compatibleKnownClues
 };
 
-module.exports = showExports;
+
 
