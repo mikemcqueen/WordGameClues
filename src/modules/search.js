@@ -1,5 +1,5 @@
 //
-// SEARCH-MOD.JS
+// search.js
 //
 
 'use strict';
@@ -12,7 +12,7 @@ const My           = require('../misc/util');
 const Path         = require('path');
 const PrettyMs     = require('pretty-ms');
 const Promise      = require('bluebird');
-const Result       = require('./result-mod');
+const SearchResult = require('./search-result');
 
 const FsWriteFile  = Promise.promisify(Fs.writeFile);
 
@@ -34,7 +34,7 @@ function getOneResult (wordList, pages, options = {}) {
     return new Promise((resolve, reject) => {
 	let term = makeSearchTerm(wordList, { wikipedia: true });
 	console.log(`term: ${term}, pages: ${pages}`);
-	Result.get(term, pages, (err, data) => {
+	SearchResult.get(term, pages, (err, data) => {
 	    if (!err && options.reject) {
 		err = new Error('getOneResult: forced rejection');
 	    }
@@ -113,11 +113,11 @@ async function getAllResultsLoop (args, options = {}) {
     Expect(options).to.be.an('object');
     let count = { skip: 0, empty: 0, data: 0, error: 0 }; // test support
     for (const [index, wordList] of args.wordListArray.entries()) {
-	let filename = Result.makeFilename(wordList);
+	let filename = SearchResult.makeFilename(wordList);
 	console.log(`list: ${wordList}`);
 	console.log(`file: ${filename}`);
 
-	let path = Result.pathFormat({
+	let path = SearchResult.pathFormat({
 	    root: args.root,
 	    dir:  args.dir || _.toString(wordList.length),
 	    base: filename
@@ -138,7 +138,7 @@ async function getAllResultsLoop (args, options = {}) {
 	    My.gitAddCommit(path, 'new result')
 		.then(() => {
 		    console.log(`Committed: ${path}`);
-		    return !_.isEmpty(result) && Result.fileScoreSaveCommit(path);
+		    return !_.isEmpty(result) && SearchResult.fileScoreSaveCommit(path);
 		}).catch(err => {
 		    // log & eat all errors
 		    console.log(`getAllResultsLoop commit error`, err, err.stack);
@@ -146,10 +146,11 @@ async function getAllResultsLoop (args, options = {}) {
 	}
 
 	// if there are more wordlists to process
-	if (index < args.wordListArray.length - 1) {
+	const remaining = args.wordListArray.length - index - 1;
+	if (remaining > 0) { // index < args.wordListArray.length - 1) {
 	    // if nextDelay is specified, delay before next search
 	    if (nextDelay > 0) {
-		console.log(`Delaying ${PrettyMs(nextDelay)} for next search...`);
+		console.log(`Delaying ${PrettyMs(nextDelay)}, ${remaining} remaining...`);
 		await My.waitFor(nextDelay);
 	    }
 	}

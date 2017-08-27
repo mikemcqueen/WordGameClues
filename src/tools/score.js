@@ -6,8 +6,8 @@
 
 const _            = require('lodash');
 const Dir          = require('node-dir');
-const Expect       = require('chai').expect;
-const fs           = require('fs');
+const Expect       = require('should/as-number');
+const Fs           = require('fs');
 const Linebyline   = require('linebyline');
 const Path         = require('path');
 const Promise      = require('bluebird');
@@ -15,8 +15,8 @@ const Readlines    = require('n-readlines');
 const Score        = require('../modules/score');
 const SearchResult = require('../modules/search-result');
 
-const fsReadFile   = Promise.promisify(fs.readFile);
-const fsWriteFile  = Promise.promisify(fs.writeFile);
+const FsReadFile   = Promise.promisify(Fs.readFile);
+const FsWriteFile  = Promise.promisify(Fs.writeFile);
 
 const Opt          = require('node-getopt')
       .create([
@@ -30,9 +30,9 @@ const Opt          = require('node-getopt')
 //
 
 function scoreSearchResultDir (dir, fileMatch, options = {}) {
-    Expect(dir).to.be.a('string');
-    Expect(fileMatch).to.be.a('string');
-    Expect(options).to.be.an('object');
+    Expect(dir).is.a('string');
+    Expect(fileMatch).is.a('string');
+    Expect(options).is.an('object');
 
     let path = SearchResult.DIR + dir;
     console.log('dir: ' + path);
@@ -62,18 +62,18 @@ function scoreSearchResultDir (dir, fileMatch, options = {}) {
 //
 
 function scoreSaveFile (filepath, options) {
-    Expect(filepath).to.be.a('string');
-    Expect(options).to.be.an('object');
+    Expect(filepath).is.a('string');
+    Expect(options).is.an('object');
 
     // TODO: Path.format()
-    return fsReadFile(filepath, 'utf8')
+    return FsReadFile(filepath, 'utf8')
 	.then(content => Score.scoreResultList(
 	    SearchResult.makeWordlist(filepath),
 	    JSON.parse(content),
 	    options
 	).then(scoreResult => {
 	    if (_.isEmpty(scoreResult)) return false;
-	    return fsWriteFile(filepath, JSON.stringify(scoreResult));
+	    return FsWriteFile(filepath, JSON.stringify(scoreResult));
 	}));
 }
 
@@ -81,9 +81,9 @@ function scoreSaveFile (filepath, options) {
 
 /*
 async function scoreSearchResultFiles (dir, inputFilename, options = {}) {
-    //Expect(dir).to.be.a('string');
-    Expect(inputFilename).to.be.a('string');
-    Expect(options).to.be.an('object');
+    //Expect(dir).is.a('string');
+    Expect(inputFilename).is.a('string');
+    Expect(options).is.an('object');
     
     // ignore dir for now, add it to options later
     console.log(`dir: ${options.dir}`);
@@ -110,9 +110,9 @@ async function scoreSearchResultFiles (dir, inputFilename, options = {}) {
 //
 
 async function scoreSearchResultFiles2 (dir, inputFilename, options = {}) {
-    //Expect(dir).to.be.a('string');
-    Expect(inputFilename).to.be.a('string');
-    Expect(options).to.be.an('object');
+    //Expect(dir).is.a('string');
+    Expect(inputFilename).is.a('string');
+    Expect(options).is.an('object');
     
     // ignore dir for now, add it to options later
     console.log(`dir: ${options.dir}`);
@@ -144,12 +144,17 @@ async function scoreSearchResultFiles2 (dir, inputFilename, options = {}) {
 //
 
 async function main () {
-    Expect(Opt.argv.length, 'only one optional FILE parameter is allowed')
-	.to.be.at.most(1);
+    if (Opt.argv.length > 1) {
+	console.log('only one optional FILE parameter is allowed');
+	process.exit(-1);
+    }
 
     let inputFile;
     if (Opt.argv.length === 1) {
-	Expect(Opt.options.match, 'option -m EXPR not allowed with FILE').to.be.undefined;
+	if (Opt.options.match) {
+	    console.log('option -m EXPR not allowed with FILE');
+	    process.exit(-1);
+	}
 	inputFile = Opt.argv[0];
 	console.log(`file: ${inputFile}`);
     }
@@ -163,7 +168,10 @@ async function main () {
     if (inputFile) {
 	scoreSearchResultFiles2(Opt.options.dir, inputFile, scoreOptions);
     } else {
-	Expect(Opt.options.dir, 'option -d NAME is required').to.exist;
+	if (!Opt.options.dir) {
+	    console.log('option -d NAME is required');
+	    process.exit(-1);
+	}
 	let fileMatch = SearchResult.getFileMatch(Opt.options.match);
 	console.log(`fileMatch: ${fileMatch}`);
 	scoreSearchResultDir(Opt.options.dir, fileMatch, scoreOptions);

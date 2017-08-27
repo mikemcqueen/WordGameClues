@@ -5,7 +5,7 @@
 'use strict';
 
 const _            = require('lodash');
-const Expect       = require('chai').expect;
+const Expect       = require('should/as-function');
 const Fs           = require('fs');
 const Ms           = require('ms');
 const Promise      = require('bluebird');
@@ -53,13 +53,13 @@ async function main() {
     let delayHigh = DEFAULT_DELAY_HIGH;
     if (Opt.argv.length > 1) {
 	delayLow = _.toNumber(Opt.argv[1]);
-	Expect(delayLow, 'delayLow').to.be.at.least(0);
+	Expect(delayLow).is.above(-1);
 	delayHigh = delayLow;
     }
     // arg2
     if (Opt.argv.length > 2) {
 	delayHigh = _.toNumber(Opt.argv[2]);
-	Expect(delayHigh, 'delayHigh').to.be.at.least(delayLow);
+	Expect(delayHigh >= delayLow).is.true();
     }
     console.log(`Delaying ${delayLow} to ${delayHigh} minutes between searches`);
     

@@ -1,13 +1,13 @@
 //
-// SCORE-MOD.JS
+// score.js
 //
 
 'use strict';
 
 const _       = require('lodash');
+const Expect  = require('should/as-function');
 const Promise = require('bluebird');
 const Wiki    = require('wikijs').default;
-const Expect  = require('should/as-function'); // ('chai').expect;
 
 //
 

@@ -11,8 +11,9 @@ const Clues        = require('../clue-types');
 const Debug        = require('debug')('filter');
 const Dir          = require('node-dir');
 const Duration     = require('duration');
-const Expect       = require('chai').expect;
+const Expect       = require('should/as-function');
 const Fs           = require('fs');
+const Getopt       = require('node-getopt');
 const My           = require('../misc/util');
 const Path         = require('path');
 const PrettyMs     = require('pretty-ms');
@@ -21,8 +22,10 @@ const Score        = require('../modules/score');
 const SearchResult = require('../modules/search-result');
 const Tmp          = require('tmp');
 
-const Opt          = require('node-getopt')
-    .create(_.concat(Clues.Options, [
+//
+
+const Options = new Getopt(_.concat(Clues.Options, [
+	//.create(
 	['a', 'article',             'filter results based on article word count'],
 	['',  'copy',                'copy to clipboard as RTF'],
 	['d', 'dir=NAME',            'directory name'],
@@ -37,9 +40,8 @@ const Opt          = require('node-getopt')
 	['w', 'word',                'search for additional word'],
 	['h', 'help',                'this screen']
     ])).bindHelp(
-	"Usage: node filter <options> [wordListFile]\n\n" +
-	    "[[OPTIONS]]\n"
-    ).parseSystem();
+	"Usage: node filter <options> [wordListFile]\n\n[[OPTIONS]]\n"
+    );
 
 //
 
@@ -54,8 +56,18 @@ const XFACTOR_BADSCORE = 3;
 
 //
 
+function usage (msg) {
+    if (msg) {
+	console.log(`\n${msg}\n`);
+    }
+    Options.showHelp();
+    process.exit(-1);
+}
+
+//
+
 function getUrlCount (resultList) {
-    Expect(resultList).to.be.an('array');
+    Expect(resultList).is.an.Array();
     // TODO _.reduce()
     let urlCount = 0;
     for (const result of resultList) {
@@ -67,9 +79,9 @@ function getUrlCount (resultList) {
 //
 
 function isFilteredUrl (url, filteredUrls) {
-    Expect(url, 'iFU, url').to.be.a('string');
+    Expect(url).is.a.String('iFU, url');
     if (_.isUndefined(filteredUrls)) return false; 
-    Expect(filteredUrls).to.be.an('object');
+    Expect(filteredUrls).is.an.Object();
     let reject = _.isArray(filteredUrls.rejectUrls) && filteredUrls.rejectUrls.includes(url);
     let known = _.isArray(filteredUrls.knownUrls) && filteredUrls.knownUrls.includes(url);
     return known || reject;
@@ -78,8 +90,8 @@ function isFilteredUrl (url, filteredUrls) {
 // check for broken results if xfactor option specified
 
 function isXFactor (result, options) {
-    Expect(result).to.be.an('object');
-    Expect(options).to.be.an('object');
+    Expect(result).is.an.Object();
+    Expect(options).is.an.Object();
     if (options.xfactor === XFACTOR_MISSING) { 
 	return _.isEmpty(result.url) || _.isEmpty(result.title) || _.isEmpty(result.summary);
     }
@@ -95,9 +107,9 @@ function isXFactor (result, options) {
 //
 
 function filterSearchResultList (resultList, wordList, filteredUrls, options) {
-    Expect(resultList).to.be.an('array');
-    Expect(wordList).to.be.an('array').that.is.not.empty;
-    Expect(options).to.be.an('object');
+    Expect(resultList).is.an.Array();
+    Expect(wordList).is.an.Array().and.not.empty();
+    Expect(options).is.an.Object();
     // filteredUrls can be undefined or array
     let urlList = [];
     let loggedXFactor = false;
@@ -140,9 +152,9 @@ function filterSearchResultList (resultList, wordList, filteredUrls, options) {
 //
 
 function loadFilteredUrls (dir, wordList, options) {
-    Expect(dir, 'lFU dir').to.be.a('string');
-    Expect(wordList).to.be.an('array');
-    Expect(options).to.be.an('object');
+    Expect(dir).is.a.String('lFU dir');
+    Expect(wordList).is.an.Array();
+    Expect(options).is.an.Object();
     let filteredFilename = SearchResult.makeFilteredFilename(wordList);
     Debug(`filtered filename: ${filteredFilename}`);
     return fsReadFile(Path.format({ dir, base: filteredFilename }), 'utf8')
@@ -159,9 +171,8 @@ function loadFilteredUrls (dir, wordList, options) {
 //
 
 function hasRemaining (wordListArray, remaining) {
-    // commented out because chai is so damn slow
-    //Expect(wordListArray).is.an('array');
-    //Expect(remaining).is.an('array').that.is.not.empty;
+    Expect(wordListArray).is.an.Array();
+    Expect(remaining).is.an.Array().and.not.empty();
     for (const wordList of wordListArray) {
 	if (wordList.length !== remaining.length) continue;
 	if (remaining.some(word => _.includes(wordList, word))) {
@@ -174,9 +185,8 @@ function hasRemaining (wordListArray, remaining) {
 //
 
 function isInNameMap (nameMap, wordList) {
-    // commented out because chai is so damn slow
-    //Expect(nameMap).to.be.an('object');       // must be object if defined
-    //Expect(wordList).to.be.an('array').with.length.of.at.least(1);
+    Expect(nameMap).is.an.Object();       // must be object if defined
+    Expect(wordList).is.an.Array().with.property('length').above(0); // at.least(1)
     let word = wordList[0];
     if (!_.has(nameMap, word)) return false;
     return hasRemaining(nameMap[word], wordList.slice(1, wordList.length));
@@ -193,9 +203,9 @@ function isInNameMap (nameMap, wordList) {
 // a rejected combo. 
 // 
 function filterSearchResultDir (dir, fileMatch, options) {
-    Expect(dir, 'fSRD dir').to.be.a('string');
-    Expect(fileMatch, 'fSRD filematch').to.be.an('string');
-    Expect(options).to.be.an('object');
+    Expect(dir).is.a.String('fSRD dir');
+    Expect(fileMatch).is.a.String('fSRD filematch');
+    Expect(options).is.an.Object();
     return new Promise((resolve, reject) => {
 	let filteredList = [];
 	let rejectList = [];
@@ -251,8 +261,8 @@ function filterSearchResultDir (dir, fileMatch, options) {
 
 
 function filterPathList (pathList, dir, options) {
-    Expect(pathList).to.be.an('array');
-    Expect(options).to.be.an('object');
+    Expect(pathList).is.an.Array();
+    Expect(options).is.an.Object();
 
     let filteredList = [];
     let rejectList = [];
@@ -300,7 +310,7 @@ function buildNameMap (wordListArray) {
     for (const wordList of wordListArray) {
 	for (const word of wordList) {
 	    let remaining = _.difference(wordList, [word]);
-	    Expect(remaining.length, 'remaining').is.at.least(1);
+	    Expect(remaining.length).is.above(0, `${wordList}, ${word}`); // at.least(1)
 	    if (!_.has(map, word)) {
 		map[word] = [];
 	    }
@@ -315,8 +325,8 @@ function buildNameMap (wordListArray) {
 //
 
 function getPathList (dir, fileMatch, nameMap) {
-    Expect(dir, 'gPL dir').to.be.a('string');
-    Expect(fileMatch, 'gPL filematch').to.be.a('string');
+    Expect(dir).is.a.String('gPL dir');
+    Expect(fileMatch).is.a.String('gPL filematch');
     return new Promise((resolve, reject) => {
 	Dir.files(dir, (err, pathList) => {
 	    if (err) throw err;
@@ -338,7 +348,7 @@ function getPathList (dir, fileMatch, nameMap) {
 //
 
 function writeFilterResults (resultList, stream) {
-    Expect(resultList).to.be.an('array');
+    Expect(resultList).is.an.Array();
     for (const result of resultList) {
 	if (_.isEmpty(result.urlList)) continue;
 	if (ClueManager.isRejectSource(result.src)) continue;
@@ -411,10 +421,15 @@ function copyTextFile(path) {
 //
 //
 async function main () {
-    const options = Opt.options;
+    const opt = Options.parseSystem();
+    const options = opt.options;
 
-    Expect(Opt.argv.length, 'only one non-switch FILE argument allowed').is.at.most(1);
-    Expect(options.dir, 'option -d NAME is required').to.exist;
+    if (opt.argv.length > 1) {
+	usage('only one non-switch FILE argument allowed');
+    }
+    if (!options.dir) {
+	usage('option -d NAME is required');
+    }
 
     ClueManager.loadAllClues({ clues: Clues.getByOptions(options) });
 
@@ -423,8 +438,8 @@ async function main () {
 	options.title = true;
     }
     let nameMap;
-    if (Opt.argv.length > 0) {
-	let wordListArray = await loadCsv(Opt.argv[0]);
+    if (opt.argv.length > 0) {
+	let wordListArray = await loadCsv(opt.argv[0]);
 	nameMap = buildNameMap(wordListArray);
     }
     let dir = SearchResult.DIR + options.dir;

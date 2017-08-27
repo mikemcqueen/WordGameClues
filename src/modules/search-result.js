@@ -1,9 +1,9 @@
 //
-// RESULT-MOD.JS
+// search-result.js
 //
 
 const _            = require('lodash');
-const Expect       = require('chai').expect;
+const Expect       = require('should/as-function');
 const Fs           = require('fs');
 const Google       = require('google');
 const Ms           = require('ms');
@@ -11,10 +11,10 @@ const My           = require('../misc/util');
 const Path         = require('path');
 const PrettyMs     = require('pretty-ms');
 const Promise      = require('bluebird');
-const Score        = require('./score-mod');
+const Score        = require('./score');
 
-const fsReadFile   = Promise.promisify(Fs.readFile);
-const fsWriteFile  = Promise.promisify(Fs.writeFile);
+const FsReadFile   = Promise.promisify(Fs.readFile);
+const FsWriteFile  = Promise.promisify(Fs.writeFile);
 
 //
 
@@ -30,7 +30,7 @@ const KNOWN_PREFIX    = '#';
 // '../../file-path.json' => [ 'file', 'path' ]
 //
 function makeWordlist (filepath) {
-    Expect(filepath).to.be.a('string');
+    Expect(filepath).is.a.String();
     return _.split(Path.basename(filepath, EXT_JSON), '-');
 }
 
@@ -46,7 +46,7 @@ function getFileMatch (match = undefined) {
 // ([ 'word', 'list' ], '_suffix' ) => 'word-list_suffix.json'
 //
 function makeFilename (wordList, suffix = undefined) {
-    Expect(wordList.length, `wordList: ${wordList}`).to.be.at.least(2);
+    Expect(wordList.length).is.aboveOrEqual(2);
     let filename = wordList.join('-');
     if (suffix) { // necessary?
 	filename += suffix;
@@ -60,15 +60,15 @@ function makeFilename (wordList, suffix = undefined) {
 //
 
 function makeFilteredFilename (wordList) {
-    Expect(wordList).to.be.an('array').that.is.not.empty;
+    Expect(wordList).is.an.Array().and.not.empty();
     return makeFilename(wordList, FILTERED_SUFFIX);
 }
 
 //
 
 function pathFormat (args) {
-    Expect(args, 'args').to.exist;
-    Expect(args.dir, 'args.dir').to.be.a('string');
+    Expect(args).is.an.Object()
+    Expect(args.dir).is.a.String();
     let root = _.isUndefined(args.root) ? RESULT_DIR : args.root;
     args.dir = root + args.dir; 
     // Path.format ignores args.root if args.dir is set
@@ -78,9 +78,9 @@ function pathFormat (args) {
 //
 
 function get (text, pages, cb) {
-    Expect(text, 'text').to.be.a('string');
-    Expect(pages, 'pages').to.be.a('number').that.is.at.least(1);
-    Expect(cb, 'callback').to.be.a('function');
+    Expect(text).is.a.String();
+    Expect(pages).is.a.Number().above(0);
+    Expect(cb).is.a.Function();
     let resultList = [];
     let count = 0;
     Google(text, function (err, result) {
@@ -97,8 +97,8 @@ function get (text, pages, cb) {
 	if (count === pages || !result.next) {
 	    return cb(null, resultList);
 	}
-	Expect(count).to.be.below(pages);
-	Expect(result.next).to.exist;
+	Expect(count).is.below(pages);
+	Expect(result.next).is.ok();
 	let msDelay = My.between(Ms('30s'), Ms('60s'));
 	console.log(`Delaying ${PrettyMs(msDelay)} for next page of results...`);
 	// TODO async function, use await My.delay(msDelay)
@@ -110,11 +110,11 @@ function get (text, pages, cb) {
 //
 
 function scoreSaveCommit (resultList, filepath, options = {}, wordList = undefined) {
-    Expect(resultList).to.be.an('array').that.is.not.empty;
-    Expect(filepath).to.be.a('string');
-    Expect(options).to.be.an('object');
+    Expect(resultList).is.an.Array().and.not.empty();
+    Expect(filepath).is.a.String();
+    Expect(options).is.a.Object();
     if (!_.isUndefined(wordList)) {
-	Expect(wordList).to.be.an('array').with.length.of.at.least(2);
+	Expect(wordList).is.an.Array().with.property('length').above(1); // at.least(2);
     }
     console.log(`scoreSaveCommit, ${filepath} (${_.size(resultList)})`);
     return Score.scoreResultList(
@@ -127,7 +127,7 @@ function scoreSaveCommit (resultList, filepath, options = {}, wordList = undefin
 	    console.log('empty list, already scored?');
 	    return Promise.reject(); // skip save/commit
 	}
-	return fsWriteFile(filepath, JSON.stringify(list))
+	return FsWriteFile(filepath, JSON.stringify(list))
 	    .then(() => console.log(' updated'));
     }).then(() => {
 	return My.gitCommit(filepath, 'updated score')
@@ -138,12 +138,12 @@ function scoreSaveCommit (resultList, filepath, options = {}, wordList = undefin
 //
 
 function fileScoreSaveCommit (filepath, options = {}, wordList = undefined) {
-    Expect(filepath).to.be.a('string');
-    Expect(options).to.be.an('object');
+    Expect(filepath).is.a.String();
+    Expect(options).is.a.Object();
     if (!_.isUndefined(wordList)) {
-	Expect(wordList).to.be.an('array').with.length.of.at.least(2);
+	Expect(wordList).is.an.Array().with.property('length').above(1); // at.least(2)
     }
-    return fsReadFile(filepath, 'utf8')
+    return FsReadFile(filepath, 'utf8')
 	.then(data => scoreSaveCommit(JSON.parse(data), filepath, options, wordList));
 }
 

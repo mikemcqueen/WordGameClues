@@ -4,9 +4,9 @@
 
 'use strict';
 
-// export a singleton
+// export a singleton. proud i am not.
 
-module.exports = exports = new Validator();
+module.exports = new Validator();
 
 //
 
