@@ -66,13 +66,32 @@ function makeFilteredFilename (wordList) {
 
 //
 
-function pathFormat (args) {
+function old_pathFormat (args) {
     Expect(args).is.an.Object()
     Expect(args.dir).is.a.String();
     let root = _.isUndefined(args.root) ? RESULT_DIR : args.root;
     args.dir = root + args.dir; 
     // Path.format ignores args.root if args.dir is set
     return Path.format(args);
+}
+
+//
+
+function makeResultDir (args) {
+    const root = args.root || RESULT_DIR;
+    const baseDir = args.base.slice(0, 1);
+    return `${root}${args.dir}/${baseDir}`;
+}
+
+//
+
+function pathFormat (args) {
+    Expect(args).is.an.Object()
+    Expect(args.dir).is.a.String();
+    let formatArgs = _.clone(args);
+    formatArgs.dir = makeResultDir(args);
+    // Path.format ignores args.root if args.dir is set
+    return Path.format(formatArgs);
 }
 
 //
