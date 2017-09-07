@@ -93,7 +93,11 @@ function isXFactor (result, options) {
     Expect(result).is.an.Object();
     Expect(options).is.an.Object();
     if (options.xfactor === XFACTOR_MISSING) { 
-	return _.isEmpty(result.url) || _.isEmpty(result.title) || _.isEmpty(result.summary);
+	const missing = _.isEmpty(result.url) || _.isEmpty(result.title) || _.isEmpty(result.summary);
+	if (missing) {
+	    console.log(`${JSON.stringify(result)}`);
+	}
+	return missing;
     }
     if (options.xfactor === XFACTOR_UNSCORED) {
 	return _.isEmpty(result.score);
@@ -106,7 +110,7 @@ function isXFactor (result, options) {
 
 //
 
-function filterSearchResultList (resultList, wordList, filteredUrls, options) {
+function filterSearchResultList (resultList, wordList, filteredUrls, options, filepath) {
     Expect(resultList).is.an.Array();
     Expect(wordList).is.an.Array().and.not.empty();
     Expect(options).is.an.Object();
@@ -122,7 +126,7 @@ function filterSearchResultList (resultList, wordList, filteredUrls, options) {
 	//Debug(`result: ${_.entries(result)}`);
 	if (options.xfactor && isXFactor(result, options)) {
 	    if (!loggedXFactor) {
-		console.log(`x: ${options.filepath}`);
+		console.log(`x: ${filepath}`);
 		loggedXFactor = true;
 	    }
 	    return undefined;
@@ -221,6 +225,7 @@ function filterSearchResultDir (dir, fileMatch, options) {
 	    if (ClueManager.isRejectSource(wordList)) return next();
 	    if (!_.isUndefined(options.nameMap) && !isInNameMap(options.nameMap, wordList)) return next();
 	    // temp
+
 	    /*
 	    if (!_.isUndefined(options.nameMap)) {
 		console.log(`filename: ${filepath}`);
@@ -229,8 +234,7 @@ function filterSearchResultDir (dir, fileMatch, options) {
 	     */
   	    loadFilteredUrls(dir, wordList, options)
 		.then(filteredUrls => {
-		    options.filepath = filepath;
-		    return filterSearchResultList(JSON.parse(content), wordList, filteredUrls, options);
+		    return filterSearchResultList(JSON.parse(content), wordList, filteredUrls, options, filepath);
 		}).then(filterResult => {
 		    // TODO: I question this logic at the moment
 		    if (_.isEmpty(filterResult.urlList)) {
@@ -241,7 +245,7 @@ function filterSearchResultDir (dir, fileMatch, options) {
 		    return undefined;
 		}).catch(err => {
 		    // report & eat all errors
-		    console.log(`filterSearchResultFiles, path: ${filepath}`, err, err.stack);
+		    console.log(`filterSearchResultDir, path: ${filepath}`, err, err.stack);
 		});//.then(() => next()); // process files synchronously
 	    return next(); // process files asynchronously
 	}, function(err, files) {
@@ -259,7 +263,6 @@ function filterSearchResultDir (dir, fileMatch, options) {
 //   make word list from filename
 //   
 
-
 function filterPathList (pathList, dir, options) {
     Expect(pathList).is.an.Array();
     Expect(options).is.an.Object();
@@ -270,12 +273,9 @@ function filterPathList (pathList, dir, options) {
 	let filename = Path.basename(path);
 	Debug(`filename: ${filename}`);
 	let wordList = SearchResult.makeWordlist(filename);
-	return fsReadFile(path, 'utf8')
-	    .then(content => {
-  		return Promise.all([content, loadFilteredUrls(dir, wordList, options)]);
-	    }).then(([content, filteredUrls]) => {
-		options.filepath = path;
-		return filterSearchResultList(JSON.parse(content), wordList, filteredUrls, options);
+  	return Promise.all([fsReadFile(path, 'utf8'), loadFilteredUrls(dir, wordList, options)])
+	    .then(([content, filteredUrls]) => {
+		return filterSearchResultList(JSON.parse(content), wordList, filteredUrls, options, path);
 	    }).then(filterResult => {
 		// TODO: this is probably wrong for rejects
 		if (_.isEmpty(filterResult.urlList)) {
@@ -463,6 +463,8 @@ async function main () {
 		    `, filter(${PrettyMs(d)})`);
 	return undefined;
     }
+
+    if (options.xfactor) return undefined;
 
     // result.filtered is a list of result objects,
     //   which contain urlLists

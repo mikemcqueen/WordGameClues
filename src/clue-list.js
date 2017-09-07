@@ -7,13 +7,13 @@
 //
 
 const _       = require('lodash');
-const Expect  = require('chai').expect;
+const Expect  = require('should/as-function');
 const Fs      = require('fs');
 
 //
 //
 
-function display() {
+function display () {
     var arr = [];
     
     this.forEach(function(clue) {
@@ -127,7 +127,7 @@ function sortSources () {
 //
 
 function getSameSrcList (startIndex, options = {}) {
-    Expect(startIndex).is.a('number');
+    Expect(startIndex).is.a.Number();
     let list = makeNew();
     let mismatch = -1;
     if (startIndex >=0 && startIndex < this.length) {
@@ -163,7 +163,7 @@ function sortedBySrc () {
 //
 
 function clueSetActual (clue, actualClue) {
-    Expect(actualClue.src).to.exist;
+    Expect(actualClue.src).is.a.String();
     clue.actual = actualClue.src;
     return clue;
 }
@@ -217,19 +217,19 @@ function clueMergeFrom (toClue, fromClue, options) {
 //
 
 function sameSrcMergeFrom (fromList, options = {}) {
-    Expect(fromList.length, 'fromList.length < this.length').is.at.least(this.length);
+    Expect(fromList.length >= this.length).is.true(); // at.least()
     let warnings = 0;
     for (let [index, clue] of this.entries()) {
-	Expect(clue.name, `name mismatch, from ${fromList[index].name} to ${clue.name}`)
-	    .to.equal(fromList[index].name);
+	Expect(clue.name)//, `name mismatch, from ${fromList[index].name} to ${clue.name}`)
+	    .is.equal(fromList[index].name);
 	warnings += clueMergeFrom(clue, fromList[index], options);
 	this[index] = clue;
     }
     // append remaing non-matching-name clues, but don' allow duplicate names
     for (let clue of fromList.slice(this.length, fromList.length)) {
 	// check if clue.name already exists in this list
-	Expect(_.find(this, ['name', clue.name])).to.be.undefined; // TODO: define/use Clue.NAME
-	Expect(options.src).to.be.a('string');
+	Expect(_.find(this, ['name', clue.name])).is.undefined(); // TODO: define/use Clue.NAME
+	Expect(options.src).is.a.String();
 	clue = clueSetActual(_.clone(clue), clue);
 	clue.src = options.src;
 	this.push(clue);
@@ -255,7 +255,7 @@ function mergeFrom (fromList, options = {}) {
 	} else {
 	    srcNum += 1;
 	}
-	Expect(srcNum).to.be.above(0);
+	Expect(srcNum).is.above(0);
 	//console.log(`to: ${sameSrcToList.toJSON()}`);
 	let mergeOptions = { src: srcNum.toString() };
 	let [sameSrcMerged, mergeWarnings] = sameSrcToList.sameSrcMergeFrom(sameSrcFromList, mergeOptions);
@@ -265,8 +265,8 @@ function mergeFrom (fromList, options = {}) {
 	toIndex = nextToIndex;
 	fromIndex = nextFromIndex;
     }
-    Expect(toIndex, 'looks like toList is bigger than fromlist, manually fix it').is.equal(-1);
-    Expect(fromIndex, 'pigs fly').to.equal(-1);
+    Expect(toIndex).is.equal(-1); // looks like toList is bigger than fromlist, manually fix it
+    Expect(fromIndex).is.equal(-1); // pigs fly
     return [merged, warnings];
 }
 
@@ -317,7 +317,7 @@ function objectFrom (args) {
 	throw new Error('missing argument');
     }
     
-    return clueList;
+    return Object(clueList);
 }
 
 //

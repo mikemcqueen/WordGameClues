@@ -6,7 +6,7 @@
 
 const _            = require('lodash');
 const Dir          = require('node-dir');
-const Expect       = require('should/as-number');
+const Expect       = require('should/as-function');
 const Fs           = require('fs');
 const Linebyline   = require('linebyline');
 const Path         = require('path');
@@ -30,9 +30,9 @@ const Opt          = require('node-getopt')
 //
 
 function scoreSearchResultDir (dir, fileMatch, options = {}) {
-    Expect(dir).is.a('string');
-    Expect(fileMatch).is.a('string');
-    Expect(options).is.an('object');
+    Expect(dir).is.a.String();
+    Expect(fileMatch).is.a.String();
+    Expect(options).is.an.Object();
 
     let path = SearchResult.DIR + dir;
     console.log('dir: ' + path);
@@ -62,8 +62,8 @@ function scoreSearchResultDir (dir, fileMatch, options = {}) {
 //
 
 function scoreSaveFile (filepath, options) {
-    Expect(filepath).is.a('string');
-    Expect(options).is.an('object');
+    Expect(filepath).is.a.String();
+    Expect(options).is.an.Object();
 
     // TODO: Path.format()
     return FsReadFile(filepath, 'utf8')
@@ -81,9 +81,9 @@ function scoreSaveFile (filepath, options) {
 
 /*
 async function scoreSearchResultFiles (dir, inputFilename, options = {}) {
-    //Expect(dir).is.a('string');
-    Expect(inputFilename).is.a('string');
-    Expect(options).is.an('object');
+    //Expect(dir).is.a.String();
+    Expect(inputFilename).is.a.String();
+    Expect(options).is.an.Object();
     
     // ignore dir for now, add it to options later
     console.log(`dir: ${options.dir}`);
@@ -110,16 +110,17 @@ async function scoreSearchResultFiles (dir, inputFilename, options = {}) {
 //
 
 async function scoreSearchResultFiles2 (dir, inputFilename, options = {}) {
-    //Expect(dir).is.a('string');
-    Expect(inputFilename).is.a('string');
-    Expect(options).is.an('object');
+    //Expect(dir).is.a.String();
+    Expect(inputFilename).is.a.String();
+    Expect(options).is.an.Object();
     
     // ignore dir for now, add it to options later
     console.log(`dir: ${options.dir}`);
     let readLines = new Readlines(inputFilename);
     while (true) {
 	let nextLine = readLines.next(); 
-	if (nextLine  === false) return;
+	if (nextLine === false) return;
+	if (_.isEmpty(nextLine)) continue;
 	let wordList = nextLine.toString().trim().split(',');
 	let filepath = Path.format({
 	    dir:  SearchResult.DIR + (options.dir || _.toString(wordList.length)),
@@ -166,7 +167,7 @@ async function main () {
 	verbose: Opt.options.verbose
     };
     if (inputFile) {
-	scoreSearchResultFiles2(Opt.options.dir, inputFile, scoreOptions);
+	return scoreSearchResultFiles2(Opt.options.dir, inputFile, scoreOptions);
     } else {
 	if (!Opt.options.dir) {
 	    console.log('option -d NAME is required');
@@ -174,12 +175,12 @@ async function main () {
 	}
 	let fileMatch = SearchResult.getFileMatch(Opt.options.match);
 	console.log(`fileMatch: ${fileMatch}`);
-	scoreSearchResultDir(Opt.options.dir, fileMatch, scoreOptions);
+	return scoreSearchResultDir(Opt.options.dir, fileMatch, scoreOptions);
     }
 }
 
 //
 
 main().catch(err => {
-    console.log(err.stack);
+    console.log(err, err.stack);
 });
