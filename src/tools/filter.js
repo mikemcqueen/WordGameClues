@@ -329,7 +329,7 @@ function getPathList (dir, fileMatch, nameMap) {
     Expect(fileMatch).is.a.String('gPL filematch');
     return new Promise((resolve, reject) => {
 	Dir.files(dir, (err, pathList) => {
-	    if (err) throw err;
+	    if (err) reject(err);
 	    let match = new RegExp(fileMatch);
 	    let filtered = _.filter(pathList, path => {
 		let filename = Path.basename(path)
@@ -428,7 +428,7 @@ async function main () {
 	usage('only one non-switch FILE argument allowed');
     }
     if (!options.dir) {
-	usage('option -d NAME is required');
+	options.dir = '2';
     }
 
     ClueManager.loadAllClues({ clues: Clues.getByOptions(options) });
