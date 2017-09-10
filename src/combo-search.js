@@ -9,13 +9,12 @@
 module.exports = exports = new ComboSearch();
 
 
-var _              = require('lodash');
-
-var ClueManager    = require('./clue-manager');
-var Validator      = require('./validator');
-var ClueList       = require('./clue-list');
-var NameCount      = require('./name-count');
-var Peco           = require('./peco');
+const _              = require('lodash');
+const ClueManager    = require('./clue-manager');
+const Validator      = require('./validator');
+const ClueList       = require('./clue-list');
+const NameCount      = require('./name-count');
+const Peco           = require('./peco');
 
 //
 
@@ -27,11 +26,11 @@ function ComboSearch() {
 //
 
 ComboSearch.prototype.log = function(text) {
-    var pad;
-    var index;
+    let pad;
+    let index;
     if (this.logging) {
 	pad = '';
-	for (var index=0; index<this.logLevel; ++index) {
+	for (let index=0; index<this.logLevel; ++index) {
 	    pad += ' ';
 	}
 	console.log(pad + text);
@@ -42,18 +41,18 @@ ComboSearch.prototype.log = function(text) {
 //
 
 ComboSearch.prototype.findAlternateSourcesForName = function(name, count) {
-    var nc;
-    var srcNameListArray;
-    var resultNcListArray = [];
-    var peco;
+    let nc;
+    let srcNameListArray;
+    let resultNcListArray = [];
+    let peco;
 
     nc = NameCount.makeNew(name);
     srcNameListArray = ClueManager.makeSrcNameListArray(nc);
     srcNameListArray.forEach(srcNameList => {
-	var curCount;
-	var maxCount;
-	var countListArray;
-	var matchCountListArray = [];
+	let curCount;
+	let maxCount;
+	let countListArray;
+	let matchCountListArray = [];
 
 	if (this.logging) {
 	    this.log('looking for source list ' + srcNameList);
@@ -116,11 +115,11 @@ ComboSearch.prototype.findAlternateSourcesForName = function(name, count) {
 
 	// really: countListArrayArray
 	matchCountListArray.forEach((countListArray, claaIndex) => {
-	    var ncListArray = [];
+	    let ncListArray = [];
 	    countListArray.forEach((countList, claIndex) => {
-		var ncList = [];
-		var sum = 0;
-		var result;
+		let ncList = [];
+		let sum = 0;
+		let result;
 		countList.forEach((count, clIndex) => {
 		    sum += count;
 		    ncList.push(NameCount.makeNew(srcNameList[clIndex], count));
@@ -149,9 +148,9 @@ ComboSearch.prototype.findAlternateSourcesForName = function(name, count) {
 ComboSearch.prototype.findCountListInCountListArray =
     function(countList, countListArray)
 {
-    var indexLengthList;
-    var index;
-    var resultCountList;
+    let indexLengthList;
+    let index;
+    let resultCountList;
 
     if (countList.length != countListArray.length) {
 	throw new Error('mismatched lengths');
@@ -186,16 +185,13 @@ ComboSearch.prototype.findCountListInCountListArray =
 ComboSearch.prototype.findNameListInCountList =
     function(nameList, countList)
 {
-    var ncList;
-    var countListArray = [];
-    var countList;
-    var count;
+    let ncList;
+    let countListArray = [];
+    let count;
 
     if (nameList.length != countList.length) {
 	throw new Error('mismatched list lengths');
     }
-
-
     return ncList;
 }
 
@@ -205,7 +201,7 @@ ComboSearch.prototype.findNameListInCountList =
 ComboSearch.prototype.first =
     function(clueSourceList, sourceIndexes)
 {
-    var index;
+    let index;
 
     this.hash = {};
     for (index = 0; index < clueSourceList.length; ++index) {
@@ -222,7 +218,7 @@ ComboSearch.prototype.first =
 ComboSearch.prototype.nextIndexLength =
     function(indexLengthList)
 {
-    var index = indexLengthList.length - 1;
+    let index = indexLengthList.length - 1;
 
     // increment last index
     ++indexLengthList[index].index;

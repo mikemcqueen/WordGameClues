@@ -4,9 +4,8 @@
 
 'use strict';
 
-var FS           = require('fs');
-
-var Opt          = require('node-getopt')
+const Fs           = require('fs');
+const Opt          = require('node-getopt')
     .create([
 	['h', 'help',                'this screen']
     ])
@@ -23,7 +22,7 @@ function main() {
     }
 
     //buffer = 	fsReadFileSync(Opt.argv[0], 'utf8');
-    console.log(JSON.parse(FS.readFileSync(Opt.argv[0], 'utf8')).length);
+    console.log(JSON.parse(Fs.readFileSync(Opt.argv[0], 'utf8')).length);
 }
 
 //
@@ -32,7 +31,5 @@ try {
     main();
 }
 catch(e) {
-    console.error(e.stack);
-}
-finally {
+    console.error(e, e.stack);
 }

@@ -10,16 +10,16 @@ module.exports = exports = new AltSources();
 
 //
 
-var _                     = require('lodash');
-var ClueManager           = require('./clue-manager');
-var ComboSearch           = require('./combo-search');
-var NameCount             = require('./name-count');
-var Validator             = require('./validator');
+const _                     = require('lodash');
+const ClueManager           = require('./clue-manager');
+const ComboSearch           = require('./combo-search');
+const NameCount             = require('./name-count');
+const Validator             = require('./validator');
 
 //
 
-var FIRST_COLUMN_WIDTH    = 15;
-var SECOND_COLUMN_WIDTH   = 25;
+const FIRST_COLUMN_WIDTH    = 15;
+const SECOND_COLUMN_WIDTH   = 25;
 
 // constructor
 // 
@@ -87,9 +87,9 @@ AltSources.prototype.showAllAlternates = function(args) {
 // 
 
 AltSources.prototype.showAllAlternatesForNc = function(nc, count, output) {
-    var ncLstAryAry;
-    var clue;
-    var added = false;
+    let ncLstAryAry;
+    let clue;
+    let added = false;
 
     if (this.logging) {
 	console.log(name + ':' + index);
@@ -140,12 +140,12 @@ AltSources.prototype.showAllAlternatesForNc = function(nc, count, output) {
 //
 
 AltSources.prototype.showAlternates = function(args) {
-    var argList;
-    var count;
-    var name;
-    var nc;
-    var ncLstAryAry;
-    var ncLstAry;
+    let argList;
+    let count;
+    let name;
+    let nc;
+    let ncLstAryAry;
+    let ncLstAry;
 
     argList = args.name.split(','); // 'name:N,C' -> [ 'name:N', 'C' ]
     if (argList.length > 1) {
@@ -193,9 +193,9 @@ AltSources.prototype.showAlternates = function(args) {
 //
 
 function displayAlternate(name, count, ncListArray) {
-    var s;
-    var nameList;
-    var found = false;
+    let s;
+    let nameList;
+    let found = false;
 
     s = name + '[' + count + '] ';
     s += format2(s, 20) + ' ';
@@ -230,15 +230,15 @@ function displayAlternate(name, count, ncListArray) {
 
 function format2(text, span)
 {
-    var result = "";
-    for (var len = text.toString().length; len < span; ++len) { result += " "; }
+    let result = "";
+    for (let len = text.toString().length; len < span; ++len) { result += " "; }
     return result;
 }
 
 //
 
 function displayModifiedClueList(count, clue) {
-    var clueList = ClueManager.clueListArray[count];
+    let clueList = ClueManager.clueListArray[count];
     
     clueList.push(clue);
     
@@ -248,7 +248,7 @@ function displayModifiedClueList(count, clue) {
 //
 
 function getAlternateClue(name,  ncListArray) {
-    var srcList;
+    let srcList;
     srcList = [];
     // no loop here because entries will always have the
     // same sources, so just add the first one

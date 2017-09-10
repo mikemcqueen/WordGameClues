@@ -6,22 +6,14 @@
 
 'use strict';
 
-var PecoExports = {
-    makeNew              : makeNew,
-    logging              : LOGGING,
-    setLogging           : setLogging
-};
+//
 
-module.exports = PecoExports;
+const _           = require('lodash');
 
 //
 
-var _           = require('lodash');
-
-//
-
-var FORCE_QUIET = false;
-var LOGGING = false;
+const FORCE_QUIET = false;
+const LOGGING = false;
 
 function makeNew(args) {
     return new Peco(args);
@@ -115,7 +107,7 @@ Peco.prototype.getPermutations = function() {
 //
 
 Peco.prototype.getCombinations = function() {
-    var count;
+    let count;
     
     if (this.listArray) {
 	return this.getListCombinations(this.listArray);
@@ -141,7 +133,7 @@ Peco.prototype.getAllAddends = function(combFlag) {
 //
 
 Peco.prototype.getAddendsForCount = function(count, combFlag, pecoList, quiet) {
-    var last = this.sum - (count - 1);
+    let last = this.sum - (count - 1);
     
     if (count > this.sum) {
 	throw new Error(`Peco: count(${count}) > sum(${this.sum})`);
@@ -178,7 +170,7 @@ Peco.prototype.getListCombinations = function(listArray) {
 //
 
 Peco.prototype.buildResult = function(args) {
-    var list;
+    let list;
 
     if (!args.pecoList) {
 	args.pecoList = [];
@@ -216,11 +208,11 @@ Peco.prototype.buildResult = function(args) {
 //
 
 Peco.prototype.listFirst = function(listArray, combFlag) {
-    var last;
-    var start;
-    var srcCount;
-    var index;
-    var list;
+    let last;
+    let start;
+    let srcCount;
+    let index;
+    let list;
     
     if (!listArray) {
 	throw new Error('invalid countListArray, ' + listArray);
@@ -259,11 +251,11 @@ Peco.prototype.listFirst = function(listArray, combFlag) {
 
 Peco.prototype.listNext = function(combFlag)
 {
-    var lastIndex = this.indexList.length - 1;
-    var index;
-    var start;
-    var sum;
-    var inner;
+    let lastIndex = this.indexList.length - 1;
+    let index;
+    let start;
+    let sum;
+    let inner;
 
     // if last index is maxed reset to zero, increment next-to-last index, etc.
     for (;;) {
@@ -304,10 +296,10 @@ Peco.prototype.listNext = function(combFlag)
 //
 
 Peco.prototype.first = function(srcCount, combFlag) {
-    var start;
-    var last;
-    var list;
-    var index;
+    let start;
+    let last;
+    let list;
+    let index;
 
     if ((srcCount < 1) || (srcCount > this.sum)) {
 	throw new Error('invalid srcCount, ' + srcCount);
@@ -345,11 +337,11 @@ Peco.prototype.first = function(srcCount, combFlag) {
 
 Peco.prototype.next = function(combFlag)
 {
-    var lastIndex = this.indexList.length - 1;
-    var index;
-    var start;
-    var sum;
-    var inner;
+    let lastIndex = this.indexList.length - 1;
+    let index;
+    let start;
+    let sum;
+    let inner;
 
     // if last index is maxed reset to zero, increment next-to-last index, etc.
     do {
@@ -410,7 +402,7 @@ Peco.prototype.isValidIndex = function() {
 // NOTE: this is basically getPecoList().getSum()
 
 Peco.prototype.getIndexSum = function() {
-    var sum;
+    let sum;
     sum = 0;
     this.indexList.forEach((indexObj, index) => {
 	if (this.listArray) {
@@ -426,7 +418,7 @@ Peco.prototype.getIndexSum = function() {
 //
 
 Peco.prototype.indexListToJSON = function() {
-    var s;
+    let s;
     s = '';
     this.indexList.forEach((indexObj, index) => {
 	if (s.length > 0) {
@@ -457,7 +449,7 @@ Peco.prototype.indexContainsAny = function(list) {
 //
 
 Peco.prototype.getPecoList = function() {
-    var list = [];
+    let list = [];
     this.indexList.forEach((indexObj, index) => {
 	if (this.listArray) {
 	    list.push(this.listArray[index][indexObj.index]);
@@ -471,7 +463,7 @@ Peco.prototype.getPecoList = function() {
 //
 
 function display(prefix, pecoList) {
-    var s = '';
+    let s = '';
     pecoList.forEach(peco => {
 	if (s.length > 0) {
 	    s += ',';
@@ -481,3 +473,9 @@ function display(prefix, pecoList) {
     console.log(prefix + s);
 }
 
+
+module.exports = {
+    makeNew              : makeNew,
+    logging              : LOGGING,
+    setLogging           : setLogging
+};

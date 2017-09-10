@@ -6,10 +6,10 @@
 
 //
 
-var _               = require('lodash');
-var Debug           = require('debug')('result-map');
-var Expect          = require('should/as-function');
-var NameCount       = require('./name-count');
+const _               = require('lodash');
+const Debug           = require('debug')('result-map');
+const Expect          = require('should/as-function');
+const NameCount       = require('./name-count');
 
 //
 
@@ -27,7 +27,7 @@ function makeNew () {
 //
 
 function ResultMap () {
-    var obj = assignMethods(Object({}));
+    let obj = assignMethods(Object({}));
 
     obj.internal_map = {};
     
@@ -71,7 +71,7 @@ function map () {
 function addPrimaryLists (ncList, nameSrcList) {
     nameSrcList = _.clone(nameSrcList);
     ncList.forEach(nc => {
-	var index;
+	let index;
     
 	index = _.findIndex(nameSrcList, { name: nc.name });
 	if (index === -1) {
@@ -96,9 +96,9 @@ function addPrimaryLists (ncList, nameSrcList) {
 //ncNameListPairs:buildResult.ncNameListPairs
 //
 function addResult (args) {
-    var primaryNcList;
-    var nameSrcList;
-    var result;
+    let primaryNcList;
+    let nameSrcList;
+    let result;
     
     primaryNcList = _.clone(args.primaryNcList);
     nameSrcList = _.clone(args.nameSrcList);
@@ -145,7 +145,7 @@ function addResult (args) {
 //ncNameListPairs:buildResult.ncNameListPairs
 //
 function addResultAtNcList (args) {
-    var pathList;
+    let pathList;
 
     Debug('++addResultAtNcList' +
 	     ', ncList: ' + args.ncList +
@@ -175,10 +175,10 @@ function addResultAtNcList (args) {
 
     // sources are in the pathLst, now add the items at those paths
     pathList.forEach(path => {
-	var at = path.path ? 
+	let at = path.path ? 
 	    _.at(this.map(), path.path) :
 	    [ this.map() ];
-	var list;
+	let list;
 	if (_.size(at) != 1) {
 	    throw new Error('too much at');
 	}
@@ -196,13 +196,13 @@ function addResultAtNcList (args) {
 //
 
 function addSourcesToPathList (pathList, nameSrcList, ncNameListPairs) {
-    var passTwo = false;
+    let passTwo = false;
 
     nameSrcList = _.clone(nameSrcList);
 
     for (;;) {
 	pathList.forEach(path => {
-	    var index;
+	    let index;
 	    if ((path.processLast && !passTwo) ||
 		(!path.processLast && passTwo))
 	    {
@@ -243,11 +243,11 @@ function addSourcesToPathList (pathList, nameSrcList, ncNameListPairs) {
 //
 
 function getPrimaryPathList (primaryNcList, ncNameListPairs) {
-    var pathList;
+    let pathList;
     pathList = [];
     _.keys(this.map()).forEach(key => {
-	var nc;
-	var valid = false;
+	let nc;
+	let valid = false;
 	if (_.isArray(this.map()[key])) {
 	    // this does a better job at filtering valid lists
 	    if (ncNameListPairs) {
@@ -282,7 +282,7 @@ function getPrimaryPathList (primaryNcList, ncNameListPairs) {
 function allInAnyNameList (ncList, ncNameListPairs) {
     Debug('++allInAnyNameList ncList: ' + ncList);
     return ncNameListPairs.some(ncNameListPair => {
-	var nameList = ncNameListPair[1];
+	let nameList = ncNameListPair[1];
 	if (_.size(nameList) != _.size(ncList)) {
 	    return false;
 	}
@@ -296,9 +296,9 @@ function allInAnyNameList (ncList, ncNameListPairs) {
 //
 
 function recursiveGetPrimaryPathList (primaryNcList, path, map) {
-    var arrayFound = false;
-    var pathList = [];
-    var processLast = false;
+    let arrayFound = false;
+    let pathList = [];
+    let processLast = false;
 
     // first pass, check for multiple array keys that match primaryNcList
     if (primaryNcList) {
@@ -349,9 +349,9 @@ function recursiveGetPrimaryPathList (primaryNcList, path, map) {
 //nameSrcList:
 //
 function addResultAtRoot (args) {
-    var map;
-    var listKey;
-    var list;
+    let map;
+    let listKey;
+    let list;
 
     // ensure root key exists
     if (!this.map()[args.rootKey]) {
@@ -386,8 +386,8 @@ function addAllPrimary (origNcList, mutatingPrimaryNcList, mutatingNameSrcList) 
 
     // find primary NCs in the orignal NC list
     origNcList.forEach((nc, ncIndex) => {
-	var primaryIndex;
-	var nameSrc;
+	let primaryIndex;
+	let nameSrc;
 
 	if (nc.count > 1) {
 	    return; // forEach.continue
@@ -428,7 +428,7 @@ function addAllPrimary (origNcList, mutatingPrimaryNcList, mutatingNameSrcList) 
 //
 
 function addPrimary (ncPrimaryStr, nameSrcStr) {
-    var list;
+    let list;
 
     if (!this.map()[ncPrimaryStr]) {
 	if (!this.resolvePrimary(ncPrimaryStr)) {
@@ -451,8 +451,8 @@ function addPrimary (ncPrimaryStr, nameSrcStr) {
 //
 
 function resolvePrimary (ncPrimaryStr) {
-    var primaryNcStrList;
-    var index;
+    let primaryNcStrList;
+    let index;
 
     primaryNcStrList = this.map()[PRIMARY_KEY];
     if (!primaryNcStrList || _.isEmpty(primaryNcStrList)) {
@@ -483,11 +483,11 @@ function resolvePrimary (ncPrimaryStr) {
 //
 
 function merge (fromMap, ncList) {
-    var rootKey;
-    var subKey;
-    var key;
-    var map;
-    var list;
+    let rootKey;
+    let subKey;
+    let key;
+    let map;
+    let list;
 
     Debug('++merge' + ', ncList: ' + ncList);
     Debug('before resultMap:');
@@ -519,9 +519,9 @@ function mergeNcList (fromMap, ncList) {
 	     ', ncList: ' + ncList);
 
     ncList.forEach(nc => {
-	var map;
-	var srcNameList;
-	var keys;
+	let map;
+	let srcNameList;
+	let keys;
 
 	map = this.map()[nc];
 	if (!map) {
@@ -536,8 +536,8 @@ function mergeNcList (fromMap, ncList) {
 	    throw new Error('empty keys');
 	}
 	keys.forEach(ncStr => {
-	    var keyNc = NameCount.makeNew(ncStr);
-	    var index;
+	    let keyNc = NameCount.makeNew(ncStr);
+	    let index;
 	    index = _.indexOf(srcNameList, keyNc.name);
 	    if (index > -1) {
 		// copy sub-map from fromMap to resultMap
@@ -599,11 +599,11 @@ function recursiveMergeMaps (toSeq, fromSeq) {
 //
 
 function ensureUniquePrimaryLists () {
-    var pathList;
+    let pathList;
     pathList = this.getPrimaryPathList();
     pathList.forEach(path => {
-	var at = path.path ? _.at(this.map(), path.path) : [ this.map() ];
-	var list;
+	let at = path.path ? _.at(this.map(), path.path) : [ this.map() ];
+	let list;
 	if (_.size(at) !== 1) {
 	    throw new Error('too much at, ');
 	}
@@ -675,16 +675,13 @@ function indentNewline () {
 }
 
 function spaces (length) {
-    var count;
-    var result = '';
+    let count;
+    let result = '';
     for (count = 0; count < length; result += ' ', count++);
     return result;
 }
 
-var ResultMapExports = {
+module.exports = {
     makeNew                : makeNew,
     dumpMap                : dumpMap
 };
-
-module.exports = ResultMapExports;
-

@@ -1,11 +1,11 @@
 'use strict';
 
-var _           = require('lodash');
-var Duration    = require('duration');
-var Peco        = require('./peco');
+const _           = require('lodash');
+const Duration    = require('duration');
+const Peco        = require('./peco');
 
 
-var Opt = require('node-getopt')
+const Opt = require('node-getopt')
     .create([
 	['c' , 'count=ARG'            , 'primary clue count'],
 	['e' , 'exclude=ARG+'         , 'exclude #s'],
@@ -19,15 +19,15 @@ var Opt = require('node-getopt')
 
 
 function main() {
-    var sum;
-    var count;
-    var max;
-    var permFlag;
-    var require;
-    var exclude;
-    var list;
-    var listArray;
-    var verbose;
+    let sum;
+    let count;
+    let max;
+    let permFlag;
+    let require;
+    let exclude;
+    let list;
+    let listArray;
+    let verbose;
 
     if (Opt.argv.length < 1) {
 	console.log('Usage: node add.js SUM');
@@ -91,11 +91,11 @@ function main() {
 //
 
 function makeListArray(list) {
-    var listArray;
+    let listArray;
     listArray = [];
     list.forEach(str => {
 	console.log('list: ' + str);
-	var countList = str.split(',');
+	let countList = str.split(',');
 	countList.forEach((count,index) => {
 	    countList[index] = Number(count);
 	});
@@ -107,8 +107,8 @@ function makeListArray(list) {
 //
 
 function showAddends(listArray, sum, count, max, permFlag, require, exclude) {
-    var peco;
-    var result;
+    let peco;
+    let result;
 
     peco = Peco.makeNew(listArray ? {
 	listArray: listArray,

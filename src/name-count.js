@@ -6,7 +6,7 @@
 
 //
 
-var _           = require('lodash');
+const _           = require('lodash');
 
 //
 
@@ -19,7 +19,7 @@ function makeCopy(nc) {
 }
 
 function NameCount(name, count, index) {
-    var splitList;
+    let splitList;
     
     if (!name) return;
 
@@ -49,7 +49,7 @@ function makeListFromCsv(csv) {
 //
 
 function makeListFromNameList(nameList) {
-    var ncList;
+    let ncList;
     ncList = [];
     nameList.forEach(name => {
 	ncList.push(new NameCount(name));
@@ -60,7 +60,7 @@ function makeListFromNameList(nameList) {
 //
 
 function makeCountList(ncList) {
-    var countList;
+    let countList;
     countList = [];
     ncList.forEach(nc => countList.push(_.toNumber(nc.count)));
     return countList;
@@ -69,7 +69,7 @@ function makeCountList(ncList) {
 //
 
 function makeNameList(ncList) {
-    var nameList;
+    let nameList;
     nameList = [];
     ncList.forEach(nc => nameList.push(nc.name));
     return nameList;
@@ -78,7 +78,7 @@ function makeNameList(ncList) {
 //
 
 function makeCanonicalName(name, count, index) {
-    var s = name;
+    let s = name;
     if (count) {
 	s += ':' + count;
 	if (index) {
@@ -120,7 +120,7 @@ function makeCountMap(ncList) {
 //
 
 function listToJSON(ncList) {
-    var s;
+    let s;
 
     if (!ncList.length) { return '[]'; }
 
@@ -192,7 +192,7 @@ NameCount.prototype.toJSON = function() {
 //
 
 NameCount.prototype.logList = function(list) {
-    var str;
+    let str;
 
     list.forEach(nc => {
 	if (str.length > 0) {
