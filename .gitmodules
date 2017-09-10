@@ -1,3 +1,4 @@
 [submodule "data"]
 	path = data
-	url = ../cluedata.git
+	url = mike@192.168.0.99:/home/mike/code/cluedata.git
+
