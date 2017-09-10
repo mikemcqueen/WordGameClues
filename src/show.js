@@ -4,7 +4,7 @@ const _              = require('lodash');
 const ClueManager    = require('./clue-manager');
 const Clues          = require('./clue-types');
 const Debug          = require('debug')('show');
-const Expect         = require('chai').expect;
+const Expect         = require('should/as-function');
 const NameCount      = require('./name-count');
 const SearchResult   = require('./modules/search-result');
 const Validator      = require('./validator');
@@ -23,8 +23,8 @@ const SECOND_COLUMN_WIDTH   = 25;
 // TODO: take an ncList as an arg, not a nameList
 //
 function compatibleKnownClues(args) {
-    Expect(args.nameList).to.be.an('array'); // this is actually a NAME:COUNT string (ncStr) list
-    Expect(args.max).to.be.a('number');
+    Expect(args.nameList).is.an.Array(); // this is actually a NAME:COUNT string (ncStr) list
+    Expect(args.max).is.a.Number();
 
     // build ncList of supplied name:counts
     let ncList = args.nameList.map(name => NameCount.makeNew(name));
@@ -110,8 +110,8 @@ function compatibleKnownClues(args) {
 //  excludeSrcList:
 //
 function getCompatibleResults(nameCount, excludeSrcList) {
-    Expect(nameCount).to.be.an('object');
-    Expect(excludeSrcList).to.be.an('array');
+    Expect(nameCount).is.an.Object();
+    Expect(excludeSrcList).is.an.Array();
 
     Debug(`Validating ${nameCount}`);
     let result = Validator.validateSources({
@@ -132,10 +132,10 @@ function getCompatibleResults(nameCount, excludeSrcList) {
 //  nameMapArray
 //
 function addToCompatibleMap(args) {
-    Expect(args.nameCount).to.be.an('object');
-    Expect(args.resultList).to.be.an('array').that.is.not.empty;
-    Expect(args.excludeSrcList).to.be.an('array');//.that.is.not.empty;
-    Expect(args.nameMapArray).to.be.an('array');//.that.is.not.empty;
+    Expect(args.nameCount).is.an.Object();
+    Expect(args.resultList).is.an.Array().and.not.empty();
+    Expect(args.excludeSrcList).is.an.Array();//.and.not.empty();
+    Expect(args.nameMapArray).is.an.Array();//.and.not.empty();
 
     Debug(`++addToCompatibleMap, clue: ${args.nameCount.name}, resultList(${args.resultList.length})`);
     let map = args.nameMapArray[args.nameCount.count];
@@ -146,7 +146,7 @@ function addToCompatibleMap(args) {
 	let primarySrcList = _.chain(result.nameSrcList) // from array of name:source
 	    .map(nc => _.toNumber(nc.count))             // to array of sources
 	    .without(args.excludeSrcList).value();       // to array of non-excluded sources
-	Expect(primarySrcList.length).to.be.at.least(1);
+	Expect(primarySrcList.length).is.above(0); // is.at.least(1);
 	// TODO: shouldn't this be name:nameCount.count (maybe not)
 	let key = args.nameCount.name + ':' + primarySrcList.sort();
 	if (!_.has(map, key)) {
@@ -156,7 +156,7 @@ function addToCompatibleMap(args) {
 	    result.resultMap.dump();
 	}
 	// the root resultMap property should be args.nameCount
-	Expect(result.resultMap.map(), args.nameCount).to.have.property(args.nameCount.toString());
+	Expect(result.resultMap.map()).has.property(args.nameCount.toString());
 	// inner = the inner object (value) of the root object
 	let inner = result.resultMap.map()[args.nameCount.toString()];
 	let csvNames;
@@ -169,7 +169,7 @@ function addToCompatibleMap(args) {
 		.map(ncStr => NameCount.makeNew(ncStr).name) // to array of names
 		.sort().value().toString();                  // to sorted csv names
 	}
-	Expect(csvNames).to.be.a('string');
+	Expect(csvNames).is.a.String();
 	map[key].push({
 	    src:            csvNames,
 	    primarySrcList: primarySrcList
@@ -226,10 +226,10 @@ function dumpCompatibleClues(args) {
 function dumpCompatibleClueList (list, args, nameList = undefined) {
     list.forEach(elem => {
 	if (args.format.csv) {
-	    Expect(nameList).is.a('array');
+	    Expect(nameList).is.an.Array();
 	    console.log(_.concat(nameList, elem.name).sort().toString());
 	} else if (args.format.files) {
-	    Expect(nameList).is.a('array');
+	    Expect(nameList).is.an.Array();
 	    const nl = _.concat(nameList, elem.name);
 	    let path = Result.pathFormat({
 		//root:  args.root,

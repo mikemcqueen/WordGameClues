@@ -6,7 +6,7 @@
 
 const _      = require('lodash');
 const Expect = require('chai').expect;
-const Score  = require('../score-mod.js');
+const Score  = require('../score.js');
 
 //
 

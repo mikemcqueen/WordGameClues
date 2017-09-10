@@ -10,14 +10,14 @@ module.exports = exports = new ComboMaker();
 
 //
 
-var _           = require('lodash');
-var ClueManager = require('./clue-manager');
-var ClueList    = require('./clue-list');
-var Duration    = require('duration');
-var expect      = require('chai').expect;
-var Validator   = require('./validator');
-var NameCount   = require('./name-count');
-var Peco        = require('./peco'); // use this at some point
+const _           = require('lodash');
+const ClueManager = require('./clue-manager');
+const ClueList    = require('./clue-list');
+const Duration    = require('duration');
+const Expect      = require('should/as-function');
+const Validator   = require('./validator');
+const NameCount   = require('./name-count');
+//const Peco        = require('./peco'); // use this at some point
 
 //
 //
@@ -49,9 +49,9 @@ ComboMaker.prototype.log = function(text) {
 // [ { list:clues1, count:1 },{ list:clues2, count:2 }].
 //
 ComboMaker.prototype.makeCombos = function(args) {
-    var successDuration = 0;
-    var failDuration = 0;
-    var nextDuration = 0;
+    let successDuration = 0;
+    let failDuration = 0;
+    let nextDuration = 0;
 
     this.nextDupeClue = 0;
     this.nextDupeSrc = 0;
@@ -115,7 +115,7 @@ ComboMaker.prototype.makeCombos = function(args) {
 
 	    // DUBIOUS! filter out clue lists with duplicate clue names.
 	    if (_.uniq(clueNameList).length !== clueNameList.length) {
-		expect(true).to.be.false; // because we filter these out in next()
+	        Expect(true).is.false(); // because we filter these out in next()
 		continue;
 	    }
 	    */

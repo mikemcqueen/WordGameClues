@@ -7,9 +7,9 @@
 const _            = require('lodash');
 const Expect       = require('chai').expect;
 const Fs           = require('fs');
-const My           = require('../../misc/util');
-const Search       = require('../search-mod');
-const Result       = require('../result-mod');
+const My           = require('../util');
+const Search       = require('../search');
+const Result       = require('../search-result');
 
 //
 

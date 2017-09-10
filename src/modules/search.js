@@ -5,10 +5,10 @@
 'use strict';
 
 const _            = require('lodash');
-const Expect       = require('chai').expect;
+const Expect       = require('should/as-function');
 const Fs           = require('fs');
 const Ms           = require('ms');
-const My           = require('../misc/util');
+const My           = require('./util');
 const Path         = require('path');
 const PrettyMs     = require('pretty-ms');
 const Promise      = require('bluebird');
@@ -19,7 +19,7 @@ const FsWriteFile  = Promise.promisify(Fs.writeFile);
 // make a search term from a list of words and the supplied options
 //
 function makeSearchTerm (wordList, options = {}) {
-    Expect(options).is.an('object');
+    Expect(options).is.an.Object();
     let term = wordList.join(' ');
     if (options.wikipedia) {
 	term += ' site:en.wikipedia.org';
@@ -30,7 +30,7 @@ function makeSearchTerm (wordList, options = {}) {
 // 
 //
 function getOneResult (wordList, pages, options = {}) {
-    Expect(options).is.an('object');
+    Expect(options).is.an.Object();
     return new Promise((resolve, reject) => {
 	let term = makeSearchTerm(wordList, { wikipedia: true });
 	console.log(`term: ${term}, pages: ${pages}`);
@@ -108,9 +108,9 @@ function checkGetSaveResult(args, options) {
 //   forceNextError: test support, sets getOnePromise.options.reject one time
 //
 async function getAllResultsLoop (args, options = {}) {
-    Expect(args).to.exist;
-    Expect(args.wordListArray).to.be.an('array').that.is.not.empty;
-    Expect(options).to.be.an('object');
+    Expect(args).is.an.Object();
+    Expect(args.wordListArray).is.an.Array().and.not.empty();
+    Expect(options).is.an.Object();
     let count = { skip: 0, empty: 0, data: 0, error: 0 }; // test support
     for (const [index, wordList] of args.wordListArray.entries()) {
 	let filename = SearchResult.makeFilename(wordList);
@@ -161,8 +161,8 @@ async function getAllResultsLoop (args, options = {}) {
 //
 //
 function getAllResults (args, options = {}) {
-    Expect(args).to.be.an('object');
-    Expect(args.wordListArray).to.be.an('array').that.is.not.empty;
+    Expect(args).is.an.Object();
+    Expect(args.wordListArray).is.an.Array().and.not.empty();
     return new Promise((resolve, reject) => {
 	getAllResultsLoop(args, options)
 	    .then(data => resolve(data))

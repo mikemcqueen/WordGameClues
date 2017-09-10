@@ -8,10 +8,10 @@ const _            = require('lodash');
 const Expect       = require('chai').expect;
 const Fs           = require('fs');
 const Git          = require('simple-git');
-const My           = require('../../misc/util');
+const My           = require('../util');
 const Path         = require('path');
 const Promise      = require('bluebird');
-const Result       = require('../result-mod');
+const Result       = require('../search-result');
 
 const fsReadFile   = Promise.promisify(Fs.readFile);
 const fsWriteFile  = Promise.promisify(Fs.writeFile);

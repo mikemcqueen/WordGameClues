@@ -8,7 +8,7 @@
 
 const _              = require('lodash');
 const Debug          = require('debug')('util');
-const Expect         = require('chai').expect;
+const Expect         = require('should/as-function');
 const Fs             = require('fs');
 const Path           = require('path');
 const Git            = require('simple-git');
@@ -79,16 +79,16 @@ function waitFor (delay) {
 //
 
 function between (lo, hi) {
-    Expect(lo, 'lo').to.be.a('number');
-    Expect(hi, 'hi').to.be.a('number');
-    Expect(hi, 'hi < lo').to.be.at.least(lo);
+    Expect(lo).is.a.Number();
+    Expect(hi).is.a.Number();
+    Expect(hi).is.above(lo - 1); // at.least(lo);
     return lo + Math.random() * (hi - lo);
 }
 
 // check if path exists, and whether it is a file.
 //
 function checkIfFile (path) {
-    Expect(path).to.be.a('string');
+    Expect(path).is.a.String();
     return new Promise((resolve, reject) => {
 	Fs.stat(path, (err, stats) => {
 	    let exists = false;
@@ -130,7 +130,7 @@ function gitRetryAdd (filepath, callback) {
 //
 
 function gitAdd (filepath) {
-    Expect(filepath).to.be.a('string');
+    Expect(filepath).is.a.String();
     return new Promise((resolve, reject) => {
 	gitRetryAdd(filepath, err =>  {
 	    if (err) {
@@ -145,7 +145,7 @@ function gitAdd (filepath) {
 //
 
 function gitRemove (filepath) {
-    Expect(filepath).to.be.a('string');
+    Expect(filepath).is.a.String();
     return new Promise((resolve, reject) => {
 	Git(Path.dirname(filepath))
 	    .rm(Path.basename(filepath), err => err ? reject(err) : resolve());
@@ -155,8 +155,8 @@ function gitRemove (filepath) {
 //
 
 function gitCommitOnce (filepath, message) {
-    Expect(filepath).to.be.a('string');
-    Expect(message).to.be.a('string');
+    Expect(filepath).is.a.String();
+    Expect(message).is.a.String();
     return new Promise((resolve, reject) => {
 	Git(Path.dirname(filepath))
 	    .commit(message, Path.basename(filepath), {}, err => err ? reject(err) : resolve(true));
@@ -179,9 +179,9 @@ function isGitLockError (err) {
 
 
 async function gitRetryCommit (filepath, message, retryCount = DEFAULT_RETRY_COUNT) {
-    Expect(filepath).to.be.a('string');
-    Expect(message).to.be.a('string');
-    Expect(retryCount).to.be.a('number');
+    Expect(filepath).is.a.String();
+    Expect(message).is.a.String();
+    Expect(retryCount).is.a.Number();
     let lastError;
     while (true) {
 	let result = await gitCommitOnce(filepath, message)
@@ -213,16 +213,16 @@ async function gitRetryCommit (filepath, message, retryCount = DEFAULT_RETRY_COU
 //
 
 function gitCommit (filepath, message) {
-    Expect(filepath).to.be.a('string');
-    Expect(message).to.be.a('string');
+    Expect(filepath).is.a.String();
+    Expect(message).is.a.String();
     return gitRetryCommit(filepath, message);
 }
 
 //
     
 function gitAddCommit (filepath, message) {
-    Expect(filepath).to.be.a('string');
-    Expect(message).to.be.a('string');
+    Expect(filepath).is.a.String();
+    Expect(message).is.a.String();
     return gitAdd(filepath)
 	.then(() => gitCommit(filepath, message));
     //	.catch(err => console.log(`gitAddCommit error, ${err}`));// TODO: bad
@@ -231,8 +231,8 @@ function gitAddCommit (filepath, message) {
 //
 
 function gitRemoveCommit (filepath, message) {
-    Expect(filepath).to.be.a('string');
-    Expect(message).to.be.a('string');
+    Expect(filepath).is.a.String();
+    Expect(message).is.a.String();
     return gitRemove(filepath)
 	.then(() => gitCommit(filepath, message));
     //	.catch(err =>  console.log(`gitRemoveCommit error, ${err}`)); // TODO: bad
@@ -241,8 +241,8 @@ function gitRemoveCommit (filepath, message) {
 //
 
 function gitForceAddCommit (filepath, message) {
-    Expect(filepath).to.be.a('string');
-    Expect(message).to.be.a('string');
+    Expect(filepath).is.a.String();
+    Expect(message).is.a.String();
     let basename = Path.basename(filepath);
     return new Promise((resolve, reject) => {
 	return Git(Path.dirname(filepath))
@@ -255,8 +255,8 @@ function gitForceAddCommit (filepath, message) {
 //
 
 function gitRemoveCommitIfExists (filepath, message = 'removing test file') {
-    Expect(filepath).to.be.a('string');
-    Expect(message).to.be.a('string');
+    Expect(filepath).is.a.String();
+    Expect(message).is.a.String();
     return checkIfFile(filepath)
 	.then(result => {
 	    if (!result.exists) return Promise.reject();
@@ -265,7 +265,7 @@ function gitRemoveCommitIfExists (filepath, message = 'removing test file') {
 	    return gitRemoveCommit(filepath, message);
 	}).then(() => checkIfFile(filepath))
 	.then(result => {
-	    Expect(result.exists).to.be.false;
+	    Expect(result.exists).is.false();
 	    console.log(`git-removed ${filepath}`);
 	    return undefined;
 	    // TODO: add "git reset HEAD -- filename" if we had git remove error or file

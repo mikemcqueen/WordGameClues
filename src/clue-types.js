@@ -7,7 +7,6 @@
 //
 
 const _              = require('lodash');
-const expect         = require('chai').expect;
 
 const Options = [
     ['p', 'poem=NUM',   'use poem clues, sentence NUM' ],
@@ -18,7 +17,7 @@ const Options = [
 ];
 
 const POEM = {
-    "1" : {
+    '1' : {
 	sentence:       1,
 	baseDir:        'poem/1',
 	resultDir:      'poem',
@@ -26,7 +25,7 @@ const POEM = {
 	REQ_CLUE_COUNT: 12
     },
 
-    "2": {
+    '2': {
 	sentence:       2,
 	baseDir:        'poem/2',
 	resultDir:      'poem',
@@ -34,7 +33,7 @@ const POEM = {
 	REQ_CLUE_COUNT: 9
     },
 
-    "3": {
+    '3': {
 	sentence:       3,
 	baseDir:        'poem/3',
 	resultDir:      'poem',
@@ -43,7 +42,7 @@ const POEM = {
 	REQ_CLUE_COUNT: 4
     },
 
-    "5": {
+    '5': {
 	sentence:       5,
 	baseDir:        'poem/5',
 	resultDir:      'poem',
@@ -51,7 +50,7 @@ const POEM = {
 	REQ_CLUE_COUNT: 15
     },
 
-    "6": {
+    '6': {
 	sentence:       6,
 	baseDir:        'poem/6',
 	resultDir:      'poem',

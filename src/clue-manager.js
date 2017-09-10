@@ -11,7 +11,7 @@ module.exports = exports = new ClueManager();
 const _              = require('lodash');
 const ClueList       = require('./clue-list');
 const Clues          = require('./clue-types');
-const Expect         = require('chai').expect;
+const Expect         = require('should/as-function');
 const NameCount      = require('./name-count');
 const Path           = require('path');
 const Peco           = require('./peco');
@@ -155,10 +155,10 @@ ClueManager.prototype.getRejectFilename = function (count) {
 
 ClueManager.prototype.addKnownCompoundClues = function (clueList, clueCount, validateAll) {
     // so this is currently only callable once per clueCount.
-    Expect(this.knownClueMapArray[clueCount]).to.be.undefined;
+    Expect(this.knownClueMapArray[clueCount]).is.undefined();
     this.knownClueMapArray[clueCount] = {};
     if (clueCount > 1) {
-	Expect(this.knownSourceMapArray[clueCount]).to.be.undefined;
+	Expect(this.knownSourceMapArray[clueCount]).is.undefined();
 	this.knownSourceMapArray[clueCount] = {};
     }
     let srcMap = this.knownSourceMapArray[clueCount];
@@ -181,7 +181,7 @@ ClueManager.prototype.addKnownCompoundClues = function (clueList, clueCount, val
 		    validateAll: validateAll
 		});
 		if (!this.ignoreLoadErrors) {
-		    Expect(vsResult.success, 'vsResult').to.be.true;
+		    Expect(vsResult.success).is.true;
 		}
 		srcMap[srcKey] = [];
 	    }
@@ -196,9 +196,9 @@ ClueManager.prototype.addKnownCompoundClues = function (clueList, clueCount, val
 //
 
 ClueManager.prototype.addKnownClue = function (count, name, source, nothrow) {
-    Expect(count).to.be.a('number');
-    Expect(name).to.be.a('string');
-    Expect(source).to.be.a('string');
+    Expect(count).is.a.Number();
+    Expect(name).is.a.String();
+    Expect(source).is.a.String();
     let clueMap = this.knownClueMapArray[count];
     if (!_.has(clueMap, name)) {
 	clueMap[name] = [ source ];
@@ -225,7 +225,7 @@ ClueManager.prototype.saveClues = function (counts) {
     if (_.isNumber(counts)) {
 	counts = [ counts ];
     }
-    Expect(counts).to.be.an('array');
+    Expect(counts).is.an.Array();
     for (const count of counts) {
 	this.saveClueList(this.clueListArray[count], count);
     }
@@ -254,9 +254,9 @@ ClueManager.prototype.addMaybe = function (name, srcNameList, note, save = false
     if (_.isString(srcNameList)) {
 	srcNameList = srcNameList.split(',');
     }
-    Expect(srcNameList).to.be.an('array');
+    Expect(srcNameList).is.an.Array();
     let count = _.size(srcNameList);
-    Expect(count).to.be.at.least(2);
+    Expect(count).is.above(1); // at.least(2);
     let clue = {
 	name: name,
 	src: _.toString(srcNameList)
@@ -294,7 +294,7 @@ ClueManager.prototype.saveRejects = function (counts) {
     if (_.isNumber(counts)) {
 	counts = [ counts ];
     }
-    Expect(counts).to.be.an('array');
+    Expect(counts).is.an.Array();
     counts.forEach(count => {
 	this.rejectListArray[count].save(this.getRejectFilename(count));
     });
@@ -306,9 +306,9 @@ ClueManager.prototype.addReject = function (srcNameList, save = false) {
     if (_.isString(srcNameList)) {
 	srcNameList = srcNameList.split(',');
     }
-    Expect(srcNameList).to.be.an('array');
+    Expect(srcNameList).is.an.Array();
     let count = _.size(srcNameList);
-    Expect(count).to.be.at.least(2);
+    Expect(count).is.above(1); // at.least(2);
     if (this.addRejectSource(srcNameList)) {
 	this.rejectListArray[count].push({
 	    src: _.toString(srcNameList)
@@ -327,7 +327,7 @@ ClueManager.prototype.addRejectSource = function (srcNameList) {
     if (_.isString(srcNameList)) {
 	srcNameList = srcNameList.split(',');
     }
-    Expect(srcNameList).to.be.an('array').that.is.not.empty;
+    Expect(srcNameList).is.an.Array().and.not.empty();
     srcNameList.sort();
     if (this.logging) {
 	this.log('addRejectSource: ' + srcNameList);
@@ -348,8 +348,8 @@ ClueManager.prototype.addRejectSource = function (srcNameList) {
 // source is string containing sorted, comma-separated clues
 //
 ClueManager.prototype.isKnownSource = function (source, count = 0) {
-    Expect(source).to.be.a('string');
-    Expect(count).to.be.a('number');
+    Expect(source).is.a.String();
+    Expect(count).is.a.Number();
 
     // check for supplied count
     if (count > 0) {
@@ -387,7 +387,7 @@ ClueManager.prototype.getCountListForName = function (name) {
 
 ClueManager.prototype.getSrcListForNc = function (nc) {
     let clueMap = this.knownClueMapArray[nc.count];
-    Expect(clueMap, `${nc}`).to.have.property(nc.name);
+    Expect(_.has(clueMap, nc.name)).is.true();
     return clueMap[nc.name];
 }
 
@@ -518,7 +518,7 @@ ClueManager.prototype.getKnownClues = function (wordList) {
     if (_.isString(wordList)) {
 	wordList = wordList.split(',');
     }
-    Expect(wordList).to.be.an('array');
+    Expect(wordList).is.an.Array();
     wordList = wordList.sort().toString();
     let resultList = [];
     this.knownSourceMapArray.forEach(srcMap => {
@@ -533,13 +533,13 @@ ClueManager.prototype.getKnownClues = function (wordList) {
 //
 
 ClueManager.prototype.getClueCountListArray = function (nameList) {
-    Expect(nameList.length).to.be.not.empty;
+    Expect(nameList).is.not.empty();
     // each count list contains the clueMapArray indexes in which
     // each name appears
     let countListArray = Array(_.size(nameList)).fill().map(() => []);
     for (let count = 1; count <= this.maxClues; ++count) {
 	let map = this.knownClueMapArray[count];
-	Expect(map).to.exist; // I know this will fail when I move to synth clues
+	Expect(map).is.ok(); // I know this will fail when I move to synth clues
 	nameList.forEach((name, index) => {
 	    if (_.has(map, name)) {
 		countListArray[index].push(count);
@@ -598,7 +598,7 @@ ClueManager.prototype.getPrimarySources = function () {
 //
 
 ClueManager.prototype.getInversePrimarySources = function (sources) {
-    Expect(sources).is.a('array');
+    Expect(sources).is.an.Array();
     let inverseSources = [];
     for (const src of this.getPrimarySources()) {
 	if (_.includes(sources, src)) continue;

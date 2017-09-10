@@ -1,4 +1,4 @@
-MODULES        = src src/tools src/misc
+MODULES        = src src/tools src/modules
 MODULE_FILES   = $(patsubst %,%/*.js,$(MODULES))
 MODULE_DEPEND  = $(MODULE_FILES)
 

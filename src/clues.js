@@ -13,7 +13,7 @@ const ComboMaker  = require('./combo-maker');
 const ComboSearch = require('./combo-search');
 const Components  = require('./show-components');
 const Duration    = require('duration');
-const Expect      = require('chai').expect;
+const Expect      = require('should/as-function');
 const NameCount   = require('./name-count');
 const Peco        = require('./peco');
 const PrettyMs    = require('pretty-ms');
@@ -225,7 +225,7 @@ function doCombos(args) {
     if (!_.isUndefined(args.sum)) {
 	sumRange = _.chain(args.sum).split(',').map(_.toNumber).value();
     }
-    Expect(sumRange, 'invalid sumRange').to.be.an('array').with.length.of.at.most(2);
+    Expect(sumRange).is.an.Array().with.property('length').below(3); // of.at.most(2);
     console.log('++combos' +
 		`, sum: ${sumRange}` +
 		`, max: ${args.max}` +

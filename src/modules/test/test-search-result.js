@@ -4,14 +4,7 @@
 
 const _            = require('lodash');
 const Expect       = require('should/as-function');
-//const Fs           = require('fs');
-//const Google       = require('google');
-//const Ms           = require('ms');
-//const My           = require('../misc/util');
 const Path         = require('path');
-//const PrettyMs     = require('pretty-ms');
-//const Promise      = require('bluebird');
-//const Score        = require('./score');
 const SearchResult   = require('../search-result');
 
 let wordList = [ 'one', 'two' ];

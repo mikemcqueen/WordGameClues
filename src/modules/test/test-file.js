@@ -1,5 +1,5 @@
 //
-// TEST-FILE.JS // TODO: TEST-RESULTFILE.JS
+// test-file.js // TODO: TEST-RESULTFILE.JS
 //
 
 'use strict';
@@ -7,8 +7,7 @@
 const _       = require('lodash');
 const Expect  = require('chai').expect;
 const Fs      = require('fs');
-//const Promise = require('bluebird');
-const Score   = require('../score-mod.js');
+const Score   = require('../score.js');
 
 //
 

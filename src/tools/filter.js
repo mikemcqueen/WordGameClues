@@ -14,7 +14,7 @@ const Duration     = require('duration');
 const Expect       = require('should/as-function');
 const Fs           = require('fs');
 const Getopt       = require('node-getopt');
-const My           = require('../misc/util');
+const My           = require('../modules/util');
 const Path         = require('path');
 const PrettyMs     = require('pretty-ms');
 const Promise      = require('bluebird');
@@ -505,7 +505,7 @@ async function main () {
 	    stream && stream.end();
 	    if (options.mail) {
 		mailTextFile({
-		    to:      'mmcqueen112.ba110c6@m.evernote.com',
+		    to:      'zippy@pinhead.com',
 		    subject: `filtered @Worksheets.new`,
 		    path:    path
 		});
