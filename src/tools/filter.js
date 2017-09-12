@@ -25,23 +25,24 @@ const Tmp          = require('tmp');
 //
 
 const Options = new Getopt(_.concat(Clues.Options, [
-	//.create(
-	['a', 'article',             'filter results based on article word count'],
-	['',  'copy',                'copy to clipboard as RTF'],
-	['d', 'dir=NAME',            'directory name'],
-	//    ['k', 'known',               'filter known results'],  // easy!, call ClueManager.filter()
-	['m', 'match=EXPR',          'filename match expression' ],
-	['n', 'count',               'show result/url counts only'],
-	['',  'note',                'mail results to evernote'], 
-	//    ['r', 'rejects',             'show only results that fail all filters'],
-	['t', 'title',               'filter results based on title word count (default)'],
-	['x', 'xfactor=VALUE',       'show 1) missing URL/title/summary 2) unscored URLs 3) article < summary'], 
-	['v', 'verbose',             'show logging'],
-	['w', 'word',                'search for additional word'],
-	['h', 'help',                'this screen']
-    ])).bindHelp(
-	"Usage: node filter <options> [wordListFile]\n\n[[OPTIONS]]\n"
-    );
+    //.create(
+    ['a', 'article',             'filter results based on article word count'],
+    ['',  'copy',                'copy to clipboard as RTF'],
+    ['d', 'dir=NAME',            'directory name'],
+    //    ['k', 'known',               'filter known results'],  // easy!, call ClueManager.filter()
+    ['', 'keep', 'keep tmp file'],
+    ['m', 'match=EXPR',          'filename match expression' ],
+    ['n', 'count',               'show result/url counts only'],
+    ['',  'note',                'mail results to evernote'], 
+    //    ['r', 'rejects',             'show only results that fail all filters'],
+    ['t', 'title',               'filter results based on title word count (default)'],
+    ['x', 'xfactor=VALUE',       'show 1) missing URL/title/summary 2) unscored URLs 3) article < summary'], 
+    ['v', 'verbose',             'show logging'],
+    ['w', 'word',                'search for additional word'],
+    ['h', 'help',                'this screen']
+])).bindHelp(
+    "Usage: node filter <options> [wordListFile]\n\n[[OPTIONS]]\n"
+);
 
 //
 
@@ -370,12 +371,12 @@ function writeFilterResults (resultList, stream) {
 
 // TODO: move to util.js
 
-function createTmpFile()  {
+function createTmpFile(keep)  {
     return new Promise((resolve, reject) => {
-	Tmp.file((err, path, fd) => {
+	Tmp.file({ keep }, (err, path, fd) => {
 	    if (err) throw err;
 	    console.log("File: ", path);
-	    console.log("Filedescriptor: ", fd);
+	    //console.log("Filedescriptor: ", fd);
 	    resolve([path, fd]);
 	});
     });
@@ -494,7 +495,7 @@ async function main () {
     let useTmpFile = options.note || options.copy;
     return Promise.resolve().then(() => {
 	if (useTmpFile) {
-	    return createTmpFile().then(([path, fd]) => {
+	    return createTmpFile(Boolean(options.keep)).then(([path, fd]) => {
 		return [path, Fs.createWriteStream(null, { fd })];
 	    });
 	}
