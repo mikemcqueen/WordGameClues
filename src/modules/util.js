@@ -14,6 +14,7 @@ const Path           = require('path');
 const Git            = require('simple-git');
 const PrettyMs       = require('pretty-ms');
 const Retry          = require('retry');
+const Tmp            = require('tmp');
 
 //
 
@@ -283,8 +284,22 @@ function gitRemoveCommitIfExists (filepath, message = 'removing test file') {
 //
 
 function logStream(stream, string) {
+    // is this async ? promise? return?
+    // answer: has a callback
     stream.write(string + '\n');
     // TODO: inner function 'write()' that uses once('drain', write);
+}
+
+// 
+
+function createTmpFile(keep)  {
+    return new Promise((resolve, reject) => {
+	Tmp.file({ keep }, (err, path, fd) => {
+	    if (err) reject(err);
+	    Debug(`File: ${path}, fd: ${fd}`);
+	    resolve([path, fd]);
+	});
+    });
 }
 
 //
@@ -292,6 +307,7 @@ function logStream(stream, string) {
 module.exports = {
     between,
     checkIfFile,
+    createTmpFile,
     gitAdd,
     gitAddCommit,
     gitCommit,

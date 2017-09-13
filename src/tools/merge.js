@@ -13,7 +13,6 @@ const Expect       = require('should/as-function');
 const Fs           = require('fs');
 const Path         = require('path');
 const Promise      = require('bluebird');
-const Readlines    = require('n-readlines');
 
 const Opt          = require('node-getopt')
    .create(_.concat(Clues.Options, [

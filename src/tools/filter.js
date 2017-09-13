@@ -20,7 +20,6 @@ const PrettyMs     = require('pretty-ms');
 const Promise      = require('bluebird');
 const Score        = require('../modules/score');
 const SearchResult = require('../modules/search-result');
-const Tmp          = require('tmp');
 
 //
 
@@ -371,19 +370,6 @@ function writeFilterResults (resultList, stream) {
 
 // TODO: move to util.js
 
-function createTmpFile(keep)  {
-    return new Promise((resolve, reject) => {
-	Tmp.file({ keep }, (err, path, fd) => {
-	    if (err) throw err;
-	    console.log("File: ", path);
-	    //console.log("Filedescriptor: ", fd);
-	    resolve([path, fd]);
-	});
-    });
-}
-
-// TODO: move to util.js
-
 function mailTextFile(options) {
     let pipe = false;
     let fd = Fs.openSync(options.path, 'r');
@@ -495,7 +481,7 @@ async function main () {
     let useTmpFile = options.note || options.copy;
     return Promise.resolve().then(() => {
 	if (useTmpFile) {
-	    return createTmpFile(Boolean(options.keep)).then(([path, fd]) => {
+	    return My.createTmpFile(Boolean(options.keep)).then(([path, fd]) => {
 		return [path, Fs.createWriteStream(null, { fd })];
 	    });
 	}
