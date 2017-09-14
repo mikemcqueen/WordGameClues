@@ -6,9 +6,7 @@
 
 //
 
-//const _                = require('lodash');
 const Debug            = require('debug')('make');
-//const Expect           = require('should/as-function');
 const NoteMake         = require('../modules/note-make');
  
 //
@@ -28,7 +26,7 @@ async function main () {
     Debug(`filename: ${filename}`);
     // TODO: streams = better here
     let stream = process.stdout.fd;
-    NoteMake.make(filename, stream);
+    NoteMake.make(filename, stream, { outerDiv: true });
 }
 
 //

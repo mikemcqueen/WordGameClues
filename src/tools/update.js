@@ -9,7 +9,8 @@ const ClueManager  = require('../clue-manager');
 const Clues        = require('../clue-types');
 const Dir          = require('node-dir');
 const Expect       = require('should/as-function');
-const Fs           = require('fs');
+const Fs           = require('fs-extra');
+const My           = require('../modules/util');
 const Path         = require('path');
 const Promise      = require('bluebird');
 const Readlines    = require('n-readlines');
@@ -79,25 +80,17 @@ function processSrc (line, args, options) {
     Expect(line).is.a.String();
     Expect(args.dir).is.a.String();
 
-    // process ,x suffix
-    let rejected = false;
-    let index = line.lastIndexOf(',');
-    let rejectSuffix = false;
-    if (index > -1) {
-	if (rejectSuffix = (line.slice(index + 1, line.length).trim() === RejectSuffix)) {
-	    line = line.slice(0, index);
-	}
-    }
+    const [reject, line] = My.hasCommaSuffix(line, RejectSuffix);
     console.log(`src: ${line}`);
     let nameList = line.split(',');
     Expect(nameList.length).is.above(1); // at.least(2)
-    if (rejectSuffix) {
+    if (reject) {
 	if (ClueManager.addReject(nameList)) {
 	    args.count.rejectClues += 1;
 	    args.count.rejectCountSet.add(nameList.length);
 	}
     }
-    if (rejectSuffix || ClueManager.isRejectSource(line)) {
+    if (reject || ClueManager.isRejectSource(line)) {
 	return {
 	    count     : args.count,
 	    nextState : Src

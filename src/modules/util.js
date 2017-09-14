@@ -9,7 +9,7 @@
 const _              = require('lodash');
 const Debug          = require('debug')('util');
 const Expect         = require('should/as-function');
-const Fs             = require('fs');
+const Fs             = require('fs-extra');
 const Path           = require('path');
 const Git            = require('simple-git');
 const PrettyMs       = require('pretty-ms');
@@ -43,7 +43,7 @@ const RETRY_TIMEOUTS_EXPO          = expoTimeouts(RETRY_EXPO_START_MS, RETRY_EXP
 
 //
 
-function linearTimeouts(low, high, count) {
+function linearTimeouts (low, high, count) {
     let timeouts = [];
     // gotta bet a lodash function for this, like fillWith()
     let to = between(low, high);
@@ -57,7 +57,7 @@ function linearTimeouts(low, high, count) {
 
 //
 
-function expoTimeouts(first, count) {
+function expoTimeouts (first, count) {
     let timeouts = [];
     // gotta bet a lodash function for this, like fillWith()
     let to = first;
@@ -283,7 +283,7 @@ function gitRemoveCommitIfExists (filepath, message = 'removing test file') {
 
 //
 
-function logStream(stream, string) {
+function logStream (stream, string) {
     // is this async ? promise? return?
     // answer: has a callback
     stream.write(string + '\n');
@@ -292,7 +292,7 @@ function logStream(stream, string) {
 
 // 
 
-function createTmpFile(keep)  {
+function createTmpFile (keep)  {
     return new Promise((resolve, reject) => {
 	Tmp.file({ keep }, (err, path, fd) => {
 	    if (err) reject(err);
@@ -300,6 +300,24 @@ function createTmpFile(keep)  {
 	    resolve([path, fd]);
 	});
     });
+}
+
+// process last comma suffix, e.g. ",x"
+
+function hasCommaSuffix (line, suffix) {
+    Expect(line).is.a.String();
+    Expect(suffix).is.a.String();
+
+    let match = false;
+    let index = line.lastIndexOf(',');
+    if (index > -1) {
+	const after = line.slice(index + 1, line.length).trim();
+	match = after === suffix;
+	if (match) {
+	    line = line.slice(0, index);
+	}
+    }
+    return [match, line];
 }
 
 //
@@ -315,6 +333,7 @@ module.exports = {
     gitRemove,
     gitRemoveCommit,
     gitRemoveCommitIfExists,
+    hasCommaSuffix,
     logStream,
     waitFor
 };

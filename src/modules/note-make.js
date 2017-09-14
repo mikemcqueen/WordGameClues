@@ -7,15 +7,9 @@
 const _                = require('lodash');
 const Debug            = require('debug')('note-make');
 const Expect           = require('should/as-function');
-const Fs               = require('fs');
+const Fs               = require('fs-extra');
 const He               = require('he');
-const Promise          = require('bluebird');
-const Querystring      = require('querystring');
 const Readlines        = require('n-readlines');
-
-//
-
-const FsWrite          = Promise.promisify(Fs.write);
 
 //
 
@@ -40,7 +34,7 @@ function url (line) {
 //
 
 function write (fd, text) {
-    return FsWrite(fd, `${text}\n`);
+    return Fs.write(fd, `${text}\n`);
 }
 
 //
@@ -63,14 +57,16 @@ function writeText (fd, line) {
 
 // TODO: outputFd support
 
-async function make (inputFilename, fd) {
+async function make (inputFilename, fd, options = {}) {
     Expect(inputFilename).is.a.String();
     Expect(fd).is.a.Number();
 
     Debug(`filename: ${inputFilename}, fd: ${fd}`);
 
     let readLines = new Readlines(inputFilename);
-    await write(fd, '<div>');
+    if (options.outerDiv) {
+	await write(fd, '<div>');
+    }
     while (true) {
 	let line = readLines.next();
 	if (line === false) break;
@@ -83,7 +79,9 @@ async function make (inputFilename, fd) {
 	    await writeText(fd, line);
 	}
     }
-    await write(fd, '</div>');
+    if (options.outerDiv) {
+	await write(fd, '</div>');
+    }
     await writeEmptyLine(fd);
 }
 
