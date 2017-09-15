@@ -27,7 +27,7 @@ async function main () {
     Debug(`filename: ${filename}`);
     // TODO: streams = better here
     let fd = process.stdout.fd;
-    const wordPairList = await NoteParse.parseFile(filename);
+    const wordPairList = await NoteParse.parseFile(filename, { urls: true });
     if (_.isEmpty(wordPairList)) {
 	console.log('no results');
 	return;
