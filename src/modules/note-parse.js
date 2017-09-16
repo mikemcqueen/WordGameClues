@@ -36,7 +36,7 @@ const RejectSuffix =  'x'; // copied from update.js :(
 function parse (text, options = {}) {
     Expect(options.clues).is.undefined('not yet supported');
 
-    const sourceExpr = />@([^<]+)</g;
+    const sourceExpr = />(@[^<]+)</g;
     const urlExpr =    />(http[s]?\:[^<]+)</g;
     const clueExpr =   />([^<]+)</g;
 

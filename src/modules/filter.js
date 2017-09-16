@@ -12,6 +12,7 @@ const Fs           = require('fs-extra');
 const My           = require('./util');
 const Path         = require('path');
 const Readlines    = require('n-readlines');
+const Stringify    = require('stringify-object');
 
 //
 
@@ -84,7 +85,7 @@ function parseFile(filename, options) {
 
 //
 
-function makeMap(list) {
+function makeSourceMap(list) {
     let map = {};
     for (let elem of list) {
 	let source = elem.source;
@@ -102,13 +103,14 @@ function makeMap(list) {
 function diff(listA, listB) {
     Expect(listA).is.an.Array();
     Expect(listB).is.an.Array();
-    const mapA = makeMap(listA);
+    const mapA = makeSourceMap(listA);
+    Debug(`mapA: ${Stringify(mapA)}`);
     let resultList = [];
     for (const elemB of listB) {
-	if (!_.has(mapA, elemB.source)) {
-	    // FYI: not a copy
-	    resultList.push(elemB);
-	}
+	if (_.has(mapA, elemB.source)) continue;
+	// FYI: not a copy
+	Debug(`${elemB.source} is not in mapA`);
+	resultList.push(elemB);
     }
     return resultList;
 }

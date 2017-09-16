@@ -7,7 +7,7 @@
 //
 
 //const _           = require('lodash');
-//const Debug       = require('debug')('make');
+const Debug       = require('debug')('create');
 const Expect      = require('should/as-function');
 const Fs          = require('fs-extra');
 const My          = require('../modules/util');
@@ -16,9 +16,9 @@ const NoteMake    = require('../modules/note-make');
 const Path        = require('path');
 const Tmp         = require('tmp');
  
-const Options = require('node-getopt')
+const Options     = require('node-getopt')
     .create([
-	['', 'notebook=NAME',   'specify notebook name']
+	['', 'notebook=NAME',   'specify notebook name'],
 	['', 'production',      'create note in production']
     ]).bindHelp(
 	"Usage: node create [options] FILE\n\n[[OPTIONS]]\n"
@@ -26,7 +26,8 @@ const Options = require('node-getopt')
 
 //
 
-function usage () {
+function usage (msg) {
+    console.log(msg + '\n');
     Options.showHelp();
     process.exit(-1);
 }
@@ -41,20 +42,27 @@ async function main () {
 	usage('exactly one FILE argument required');
     }
     const filename = opt.argv[0];
-    if (!filename) {
-	usage();
+    Debug(`filename: ${filename}`);
+
+    // if production && !default (notebook)
+    //   if --notebook specified, call getNotebook to get GUID
+    //   if --notebook not specified, get notebook name from filename
+    
+    if (options.production && !options.default) {
+	const nbName = options.notebook || Note.getNotebookName(Path.basename(filename));
+	const nb = await Note.getNotebook(nbName, options);
+	if (!nb) {
+	    usage(`Can't find notebook ${nbName}`);
+	}
+	options.notebookGuid = nb.guid;
     }
-    const [path, fd] = await My.createTmpFile(true).catch(err => { throw err; });
-
-    // todo: if --notebook specified, and production, do getNotebook to get GUID
-    // figure out how that fits into the async'ness below
-    // if not specified, and --production, get notebook name from filename
-    //   if notebook name from filename does exist, require --default
-
+    const keep = true; // <-- NOTE
+    const [path, fd] = await My.createTmpFile(keep).catch(err => { throw err; });
 
     // TODO: streams = better here
     return NoteMake.make(filename, fd)
 	.then(_ => {
+	    // a little weird. fseek(0) then read (then close)?
 	    Fs.closeSync(fd);
 	    return Fs.readFile(path);
 	}).then(content => {

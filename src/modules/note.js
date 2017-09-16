@@ -74,15 +74,20 @@ function getNotebookName (noteName) {
 
 //
 
-async function get (nbName, title, options = {}) {
-    const notebook = await getNotebook(nbName, options);
-    if (!notebook) {
-	throw new Error(`no notebook matches: ${nbName}`);
+async function get (title, options = {}) {
+    if (!options.notebookGuid) {
+	if (options.notebookName) {
+	    const nb = await getNotebook(options.notebookName, options);
+	    if (!nb) {
+		throw new Error(`no notebook matches: ${nbName}`);
+	    }
+	    options.notebookGuid = nb.guid;
+	}
     }
     //Debug(Stringify(notebook));
  
     let filter = {} ; // new Evernote.Types.NoteFilter();
-    filter.notebookGuid = notebook.guid;
+    filter.notebookGuid = options.notebookGuid;
 /*
 includeContent	bool
 includeResourcesData	bool
