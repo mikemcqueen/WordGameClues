@@ -1,5 +1,5 @@
 /*
- * note-parse.js
+ * note-merge.js
  */
 
 'use strict';
@@ -7,13 +7,13 @@
 //
 
 const _                = require('lodash');
-const Debug            = require('debug')('test-note-parse');
-const NoteParse        = require('../modules/note-parse');
+const Debug            = require('debug')('note-merge');
+const NoteMerge        = require('../modules/note-merge');
  
 //
 
 function usage () {
-    console.log('usage: note-parse <filename>');
+    console.log('usage: note-merge <filename>');
     process.exit(-1);
 }
 
@@ -25,13 +25,16 @@ async function main () {
 	usage();
     }
     Debug(`filename: ${filename}`);
+
     // TODO: streams = better here
-    let fd = process.stdout.fd;
-    const resultList = await NoteParse.parseFile(filename, { urls: true });
+    //let fd = process.stdout.fd;
+    const resultList = await NoteMerge.merge(filename);
     if (_.isEmpty(resultList)) {
 	console.log('no results');
 	return;
     }
+    // rather than dumping results, validate that the total sources + urls
+    // added is equal to result total 
     for (const result of resultList) {
 	console.log(result);
     }

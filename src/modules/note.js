@@ -48,8 +48,14 @@ function getNotebook (name, options = {}) {
     const noteStore = getNotestore(options.production);
     return noteStore.listNotebooks()
 	.then(nbList => {
+	    let match = false;
 	    for(const nb of nbList) {
-		if (_.includes(nb.name, name)) {
+		if (options.strict) {
+		    match = (nb.name === name);
+		} else {
+		    match = _.includes(nb.name, name);
+		}
+		if (match ) {
 		    Debug(`notebook match: ${nb.name}`);
 		    return nb;
 		}
@@ -60,11 +66,18 @@ function getNotebook (name, options = {}) {
 
 //
 
+function getNotebookName (noteName) {
+    Expect(noteName[0]).equals('p');
+    Expect(noteName[1]).is.a.Number();
+    return `Worksheets.${noteName.slice(0, 2)}`;
+}
+
+//
+
 async function get (nbName, title, options = {}) {
     const notebook = await getNotebook(nbName, options);
     if (!notebook) {
-	console.log(`no notebook matches: ${nbName}`);
-	return undefined;
+	throw new Error(`no notebook matches: ${nbName}`);
     }
     //Debug(Stringify(notebook));
  
@@ -83,21 +96,24 @@ includeAccountLimits
     const noteStore = getNotestore(options.production);
 
     let spec = {};
-    let result = await NoteStore.findNotesMetadata(filter, 0, 250, spec);
+    if (options.content) {
+	spec.includeContent = true;
+    }
+
+    let metaSpec = {};
+    let result = await NoteStore.findNotesMetadata(filter, 0, 250, metaSpec);
     //Debug(Stringify(result));
-    for (const note of result.notes) {
-	console.log(`GUID: ${note.guid}`);
-	// console.log(`Title: ${note.title}`);//  is null
-	let note2  = await noteStore.getNoteWithResultSpec(note.guid, spec)
+    for (const metaNote of result.notes) {
+	Debug(`GUID: ${metaNote.guid}`);
+	let note = await noteStore.getNoteWithResultSpec(metaNote.guid, spec)
 		.catch(err => {
 		    console.log(err, err.stack);
 		});
-	if (!note2) continue;
-	//console.log(`Title: ${note2.title}`);
-	//Debug(Stringify(note.content));
-	if (note2.title === title) {
-	    Debug(`note match: ${note2.title}`);
-	    return note2;
+	if (!note) continue;
+	// TODO: check for duplicate named notes (option)
+	if (note.title === title) {
+	    Debug(`note match: ${note.title}`);
+	    return note;
 	}
     }
     return undefined;
@@ -106,14 +122,16 @@ includeAccountLimits
 //
 
 function create (title, body, options = {}) {
-    const noteStore = getNotestore(options.production);
-
     Expect(title).is.a.String();
     Expect(body).is.a.String();
 
+    const noteStore = getNotestore(options.production);
     let note = {};
 
     note.title = title;
+    if (options.notebookGuid) {
+	note.notebookGuid = options.notebookGuid;
+    }
 
     let noteAttributes;
     //noteAttributes.author = author;
@@ -167,5 +185,6 @@ module.exports = {
     createFromFile,
     get,
     getNotebook,
+    getNotebookName,
     update
 };

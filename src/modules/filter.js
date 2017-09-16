@@ -84,13 +84,45 @@ function parseFile(filename, options) {
 
 //
 
+function makeMap(list) {
+    let map = {};
+    for (let elem of list) {
+	let source = elem.source;
+	Expect(source).is.ok();
+	Expect(_.has(map, source)).is.false();
+	map[source] = elem.urls;
+    }
+    return map;
+}
+
+//
+// Return elements in listB that are not in listA.
+//
+
+function diff(listA, listB) {
+    Expect(listA).is.an.Array();
+    Expect(listB).is.an.Array();
+    const mapA = makeMap(listA);
+    let resultList = [];
+    for (const elemB of listB) {
+	if (!_.has(mapA, elemB.source)) {
+	    // FYI: not a copy
+	    resultList.push(elemB);
+	}
+    }
+    return resultList;
+}
+
+//
+
+//
+
 module.exports = {
+    diff,
     isKnown,
     isMaybe,
     isSource,
-
     parseFile,
-
     SRC_PREFIX,
     MAYBE_PREFIX,
     KNOWN_PREFIX

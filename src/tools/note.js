@@ -10,11 +10,22 @@ const _                = require('lodash');
 const Debug            = require('debug')('note');
 const Evernote         = require('evernote');
 const EvernoteConfig   = require('../../data/evernote-config.json');
-const Fs = require('fs');
-const Path = require('path');
+const Fs               = require('fs-extra');
+const Getopt       = require('node-getopt');
+const Note             = require('../modules/note');
+const Path             = require('path');
 //const NodeNote         = require('node-note');
 const Stringify        = require('stringify-object');
- 
+
+//
+
+const Options = new Getopt([
+    ['', 'create=FILE',  'create note from filter result file']
+    ['', 'title=TITLE',  'note title']
+])).bindHelp(
+    "Usage: node note [--create|--update|--delete] <options>\n[[OPTIONS]]\n"
+);
+
 //
 
 const DATA_DIR      =  Path.normalize(`${Path.dirname(module.filename)}/../../data/`);
@@ -156,15 +167,24 @@ async function updateTestNote (guid) {
 //
 
 async function main () {
+    const opt = Options.parseSystem();
+    const options = opt.options;
+
+    if (opt.argv.length > 1) {
+	usage('only one non-switch FILE argument allowed');
+    }
+    const filename = opt.argv[0];
+
     let note;
-    note = await getNote('First', 'test');
+    note = await Note.get('First', 'test', { content: true });
     if (!note) {
 	console.log('note not found');
 	process.exit(-1);
     }
     //note = createTestNote();
-    note = await updateTestNote(note.guid);
+    //note = await updateTestNote(note.guid);
     console.log(`note.guid:${note.guid}`);
+    console.log(Stringify(note));
 }
 
 //
