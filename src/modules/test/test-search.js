@@ -9,13 +9,17 @@ const Expect       = require('chai').expect;
 const Fs           = require('fs');
 const My           = require('../util');
 const Search       = require('../search');
-const Result       = require('../search-result');
+const SearchResult = require('../search-result');
 
 //
 
-const TEST_ROOT    = `${__dirname}/`
+const TEST_ROOT    = `${__dirname}/`;
 const TMP_DIRNAME  = 'tmp';
 const TMP_DIR      = `${TEST_ROOT}${TMP_DIRNAME}/`;
+
+//
+
+const Flat = { flat: true }; // for SearchResult.pathFormat
 
 //
 
@@ -28,7 +32,7 @@ function createTmpFileSync (filename) {
 	base: filename
     };
     try {
-	Fs.writeFileSync(Result.pathFormat(args), '[]');
+	Fs.writeFileSync(SearchResult.pathFormat(args, Flat), '[]');
     } catch(err) {
 	throw err;
     }
@@ -45,7 +49,7 @@ function deleteTmpFileSync (filename) {
 	base: filename
     };
     try {
-	Fs.unlinkSync(Result.pathFormat(args));
+	Fs.unlinkSync(SearchResult.pathFormat(args, Flat));
     } catch(err) {
 	if (err.code !== 'ENOENT') {
 	    throw err;
@@ -88,16 +92,16 @@ describe ('search tests:', function() {
     // test skip-when-file-exists functionality
     it ('should skip [one,two] because file exists, then process [three,four]', function (done) {
 	let wla = getWordListArray();
-	createTmpFileSync(Result.makeFilename(wla[0]));	// create one-two.json
-	deleteTmpFileSync(Result.makeFilename(wla[1]));	// create three-four.json
+	createTmpFileSync(SearchResult.makeFilename(wla[0]));	// create one-two.json
+	deleteTmpFileSync(SearchResult.makeFilename(wla[1]));	// create three-four.json
 
 	Search.getAllResults({
 	    wordListArray: wla,
 	    pages:         1,
 	    delay:         delay,
 	    root:          TEST_ROOT,
-	    dir:           TMP_DIRNAME,
-	}).then(result => {
+	    dir:           TMP_DIRNAME
+	}, Flat).then(result => {
 	    Expect(result.skip, 'skip').to.equal(1);
 	    Expect(result.data, 'data').to.equal(1);
 	    Expect(result.error, 'error').to.equal(0);
@@ -111,8 +115,9 @@ describe ('search tests:', function() {
     it ('should skip [one,two] because of forced rejection, then process [three,four]', function (done) {
 	let wla = getWordListArray();
 	let options = {
-	    force: true,          // search even if file exists
-	    forceNextError: true  // reject in getOneResult
+	    force:          true,  // search even if file exists
+	    forceNextError: true,  // reject in getOneResult
+	    flat:           true   // flat directory structure
 	};
 	Search.getAllResults({
 	    wordListArray:  wla,
@@ -133,8 +138,8 @@ describe ('search tests:', function() {
     it ('should process both results successfully', function(done) {
 	let wla = getWordListArray();
 	// for testing wihtout --force, need to delete both files
-	deleteTmpFileSync(Result.makeFilename(wla[0]));	  // delete one-two.json
-	deleteTmpFileSync(Result.makeFilename(wla[1]));	  // delete three-four.json
+	deleteTmpFileSync(SearchResult.makeFilename(wla[0]));	  // delete one-two.json
+	deleteTmpFileSync(SearchResult.makeFilename(wla[1]));	  // delete three-four.json
 
 	Search.getAllResults({
 	    wordListArray:  wla,
@@ -142,7 +147,7 @@ describe ('search tests:', function() {
 	    delay:          delay,
 	    root:           TEST_ROOT,
 	    dir:            TMP_DIRNAME
-	}).then(result => {
+	}, Flat).then(result => {
 	    Expect(result.skip, 'skip').to.equal(0);
 	    Expect(result.data, 'data').to.equal(2);
 	    Expect(result.error, 'error').to.equal(0);

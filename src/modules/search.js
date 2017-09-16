@@ -5,16 +5,14 @@
 'use strict';
 
 const _            = require('lodash');
+const Debug        = require('debug')('search');
 const Expect       = require('should/as-function');
-const Fs           = require('fs');
+const Fs           = require('fs-extra');
 const Ms           = require('ms');
 const My           = require('./util');
 const Path         = require('path');
 const PrettyMs     = require('pretty-ms');
-const Promise      = require('bluebird');
 const SearchResult = require('./search-result');
-
-const FsWriteFile  = Promise.promisify(Fs.writeFile);
 
 // make a search term from a list of words and the supplied options
 //
@@ -81,7 +79,7 @@ function checkGetSaveResult(args, options) {
 	    } else {
 		args.count.data += 1;
 	    }
-	    return FsWriteFile(args.path, JSON.stringify(oneResult))
+	    return Fs.writeFile(args.path, JSON.stringify(oneResult))
 		.then(() => {
 		    console.log(`Saved: ${args.path}`);
 		    return [oneResult, nextDelay];
@@ -107,7 +105,7 @@ function checkGetSaveResult(args, options) {
 //   force       : search even if results file already exists (overwrites. TODO: append new results, instead)
 //   forceNextError: test support, sets getOnePromise.options.reject one time
 //
-async function getAllResultsLoop (args, options = {}) {
+async function getAllResultsLoop (args, options) {
     Expect(args).is.an.Object();
     Expect(args.wordListArray).is.an.Array().and.not.empty();
     Expect(options).is.an.Object();
@@ -120,8 +118,9 @@ async function getAllResultsLoop (args, options = {}) {
 	let path = SearchResult.pathFormat({
 	    root: args.root,
 	    dir:  args.dir || _.toString(wordList.length),
-	    base: filename
-	});
+	    base: filename,
+	}, options);
+	Debug(path);
 
 	let [result, nextDelay] = await checkGetSaveResult({
 	    wordList,
@@ -147,7 +146,7 @@ async function getAllResultsLoop (args, options = {}) {
 
 	// if there are more wordlists to process
 	const remaining = args.wordListArray.length - index - 1;
-	if (remaining > 0) { // index < args.wordListArray.length - 1) {
+	if (remaining > 0) {
 	    // if nextDelay is specified, delay before next search
 	    if (nextDelay > 0) {
 		console.log(`Delaying ${PrettyMs(nextDelay)}, ${remaining} remaining...`);

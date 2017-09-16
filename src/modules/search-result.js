@@ -3,6 +3,7 @@
 //
 
 const _            = require('lodash');
+const Debug        = require('debug')('search-result');
 const Expect       = require('should/as-function');
 const Fs           = require('fs-extra');
 const Google       = require('google');
@@ -16,7 +17,6 @@ const Score        = require('./score');
 //
 
 const RESULT_DIR      =  Path.normalize(`${Path.dirname(module.filename)}/../../data/results/`);
-//const RESULT_DIR    = '../../data/results/';
 const FILTERED_SUFFIX = '_filtered';
 const EXT_JSON        = '.json';
 
@@ -70,19 +70,24 @@ function old_pathFormat (args) {
 
 //
 
-function makeResultDir (args) {
+function makeResultDir (args, options) {
     const root = args.root || RESULT_DIR;
-    const baseDir = args.base.slice(0, 1);
-    return `${root}${args.dir}/${baseDir}`;
+    let resultDir = `${root}${args.dir}`;
+    if (!options.flat) {
+	const baseDir = args.base.slice(0, 1);
+	resultDir += `/${baseDir}`;
+    }
+    Debug(`flat: ${options.flat}, resultDir: ${resultDir}`);
+    return resultDir;
 }
 
 //
 
-function pathFormat (args) {
+function pathFormat (args, options = {}) {
     Expect(args).is.an.Object()
     Expect(args.dir).is.a.String();
     let formatArgs = _.clone(args);
-    formatArgs.dir = makeResultDir(args);
+    formatArgs.dir = makeResultDir(args, options);
     // Path.format ignores args.root if args.dir is set
     return Path.format(formatArgs);
 }
