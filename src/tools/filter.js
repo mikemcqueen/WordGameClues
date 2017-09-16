@@ -1,6 +1,9 @@
 //
 // filter.js
 //
+// TODO:
+//   move some methods to modules/filter
+//
 
 'use strict';
 
@@ -12,7 +15,8 @@ const Debug        = require('debug')('filter');
 const Dir          = require('node-dir');
 const Duration     = require('duration');
 const Expect       = require('should/as-function');
-const Fs           = require('fs');
+const Filter       = require('../modules/filter');
+const Fs           = require('fs-extra');
 const Getopt       = require('node-getopt');
 const My           = require('../modules/util');
 const Path         = require('path');
@@ -20,33 +24,30 @@ const PrettyMs     = require('pretty-ms');
 const Promise      = require('bluebird');
 const Score        = require('../modules/score');
 const SearchResult = require('../modules/search-result');
+const Stringify    = require('stringify-object');
 
 //
 
+const csvParse     = Promise.promisify(require('csv-parse'));
+
 const Options = new Getopt(_.concat(Clues.Options, [
-    //.create(
     ['a', 'article',             'filter results based on article word count'],
     ['',  'copy',                'copy to clipboard as RTF'],
     ['d', 'dir=NAME',            'directory name'],
-    //    ['k', 'known',               'filter known results'],  // easy!, call ClueManager.filter()
+    // ['k', 'known',               'filter known results'],  // easy!, call ClueManager.filter()
     ['', 'keep', 'keep tmp file'],
     ['m', 'match=EXPR',          'filename match expression' ],
     ['n', 'count',               'show result/url counts only'],
+    ['',  'parse',               'parse a filter output file'],
     ['',  'note',                'mail results to evernote'], 
-    //    ['r', 'rejects',             'show only results that fail all filters'],
+    // ['r', 'rejects',             'show only results that fail all filters'],
     ['t', 'title',               'filter results based on title word count (default)'],
     ['x', 'xfactor=VALUE',       'show 1) missing URL/title/summary 2) unscored URLs 3) article < summary'], 
-    ['v', 'verbose',             'show logging'],
     ['w', 'word',                'search for additional word'],
     ['h', 'help',                'this screen']
 ])).bindHelp(
     "Usage: node filter <options> [wordListFile]\n\n[[OPTIONS]]\n"
 );
-
-//
-
-const csvParse     = Promise.promisify(require('csv-parse'));
-const fsReadFile   = Promise.promisify(Fs.readFile);
 
 //
 
@@ -161,7 +162,7 @@ function loadFilteredUrls (dir, wordList, options) {
     Expect(options).is.an.Object();
     let filteredFilename = SearchResult.makeFilteredFilename(wordList);
     Debug(`filtered filename: ${filteredFilename}`);
-    return fsReadFile(Path.format({ dir, base: filteredFilename }), 'utf8')
+    return Fs.readFile(Path.format({ dir, base: filteredFilename }), 'utf8')
 	.then(content => {
 	    Debug(`resolving filtered urls for: ${wordList}`);
 	    return JSON.parse(content);
@@ -273,7 +274,7 @@ function filterPathList (pathList, dir, options) {
 	let filename = Path.basename(path);
 	Debug(`filename: ${filename}`);
 	let wordList = SearchResult.makeWordlist(filename);
-  	return Promise.all([fsReadFile(path, 'utf8'), loadFilteredUrls(dir, wordList, options)])
+  	return Promise.all([Fs.readFile(path, 'utf8'), loadFilteredUrls(dir, wordList, options)])
 	    .then(([content, filteredUrls]) => {
 		return filterSearchResultList(JSON.parse(content), wordList, filteredUrls, options, path);
 	    }).then(filterResult => {
@@ -299,7 +300,7 @@ function filterPathList (pathList, dir, options) {
 // TODO: move to Util.js
 
 function loadCsv (filename) {
-    return fsReadFile(filename, 'utf8')
+    return Fs.readFile(filename, 'utf8')
 	.then(csvContent => csvParse(csvContent, { relax_column_count: true }));
 }
 
@@ -339,7 +340,7 @@ function getPathList (dir, fileMatch, nameMap) {
 		if (!_.isUndefined(nameMap) && !isInNameMap(nameMap, wordList)) return false;
 		return match.test(filename);
 	    });
-	    console.log(`pathList(${pathList.length}), filtered(${filtered.length})`);
+	    Debug(`pathList(${pathList.length}), filtered(${filtered.length})`);
 	    resolve(filtered);
 	});
     });
@@ -353,15 +354,15 @@ function writeFilterResults (resultList, stream) {
 	if (_.isEmpty(result.urlList)) continue;
 	if (ClueManager.isRejectSource(result.src)) continue;
 
-	My.logStream(stream, `${SearchResult.SRC_PREFIX}${result.src}`);
+	My.logStream(stream, `${Filter.SRC_PREFIX}${result.src}`);
 	for (const url of result.urlList) {
 	    My.logStream(stream, url);
 	}
 	const nameList = ClueManager.getKnownClues(result.src);
 	if (!_.isEmpty(nameList)) {
-	    My.logStream(stream, `\n${SearchResult.KNOWN_PREFIX}known:`);
+	    My.logStream(stream, `\n${Filter.KNOWN_PREFIX}known:`);
 	    for (const name of nameList) {
-		My.logStream(stream, `${SearchResult.KNOWN_PREFIX}${name}`);
+		My.logStream(stream, `${Filter.KNOWN_PREFIX}${name}`);
 	    }
 	}
 	My.logStream(stream, '');
@@ -399,7 +400,7 @@ function copyTextFile(path) {
     let pbcopy = ChildProcess.spawn('pbcopy', ['-Prefer', 'rtf']);
     textutil.stdout.pipe(pbcopy.stdin);
     textutil.stdout.on('end', () => {
-	console.log('textutil.end');
+	Debug('textutil.end');
 	Fs.closeSync(fd);
     });
 }
@@ -414,6 +415,20 @@ async function main () {
     if (opt.argv.length > 1) {
 	usage('only one non-switch FILE argument allowed');
     }
+    const filename = opt.argv[0];
+
+    if (options.parse) {
+	const resultList = Filter.parseFile(filename, { urls: true, clues: true });
+	if (_.isEmpty(resultList)) {
+	    console.log('no results');
+	    return;
+	}
+	for (const result of resultList) {
+	    console.log(result);
+	}
+	return;
+    }
+
     if (!options.dir) {
 	options.dir = '2';
     }
@@ -426,7 +441,7 @@ async function main () {
     }
     let nameMap;
     if (opt.argv.length > 0) {
-	let wordListArray = await loadCsv(opt.argv[0]);
+	let wordListArray = await loadCsv(filename);
 	nameMap = buildNameMap(wordListArray);
     }
     let dir = SearchResult.DIR + options.dir;

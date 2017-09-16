@@ -7,8 +7,10 @@
 const _            = require('lodash');
 const ClueManager  = require('../clue-manager');
 const Clues        = require('../clue-types');
+const Debug        = require('debug')('update');
 const Dir          = require('node-dir');
 const Expect       = require('should/as-function');
+const Filter       = require('../modules/filter');
 const Fs           = require('fs-extra');
 const My           = require('../modules/util');
 const Path         = require('path');
@@ -58,9 +60,9 @@ const SM = {
 function getLineState (line) {
     Expect(line.length >= 1).is.true(); // at.least(1)
     let state;
-    if (line[0] === SearchResult.SRC_PREFIX) state = Src;
-    if (line[0] === SearchResult.MAYBE_PREFIX) state = Maybe;
-    if (line[0] === SearchResult.KNOWN_PREFIX) state = Known;
+    if (Filter.isSource(line)) state = Src;
+    if (Filter.isMaybe(line)) state = Maybe;
+    if (Filter.isKnown(line)) state = Known;
     // all of the above get first char sliced off
     if (state) {
 	line = line.slice(1);
@@ -81,7 +83,7 @@ function processSrc (line, args, options) {
     Expect(args.dir).is.a.String();
 
     const [reject, line] = My.hasCommaSuffix(line, RejectSuffix);
-    console.log(`src: ${line}`);
+    Debug(`src: ${line}`);
     let nameList = line.split(',');
     Expect(nameList.length).is.above(1); // at.least(2)
     if (reject) {

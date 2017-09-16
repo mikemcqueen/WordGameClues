@@ -4,7 +4,7 @@
 
 const _            = require('lodash');
 const Expect       = require('should/as-function');
-const Fs           = require('fs');
+const Fs           = require('fs-extra');
 const Google       = require('google');
 const Ms           = require('ms');
 const My           = require('./util');
@@ -13,19 +13,12 @@ const PrettyMs     = require('pretty-ms');
 const Promise      = require('bluebird');
 const Score        = require('./score');
 
-const FsReadFile   = Promise.promisify(Fs.readFile);
-const FsWriteFile  = Promise.promisify(Fs.writeFile);
-
 //
 
 const RESULT_DIR      =  Path.normalize(`${Path.dirname(module.filename)}/../../data/results/`);
 //const RESULT_DIR    = '../../data/results/';
 const FILTERED_SUFFIX = '_filtered';
 const EXT_JSON        = '.json';
-
-const SRC_PREFIX      = '@';
-const MAYBE_PREFIX    = ':';
-const KNOWN_PREFIX    = '#';
 
 // '../../file-path.json' => [ 'file', 'path' ]
 //
@@ -146,7 +139,7 @@ function scoreSaveCommit (resultList, filepath, options = {}, wordList = undefin
 	    console.log('empty list, already scored?');
 	    return Promise.reject(); // skip save/commit
 	}
-	return FsWriteFile(filepath, JSON.stringify(list))
+	return Fs.writeFile(filepath, JSON.stringify(list))
 	    .then(() => console.log(' updated'));
     }).then(() => {
 	return My.gitCommit(filepath, 'updated score')
@@ -162,7 +155,7 @@ function fileScoreSaveCommit (filepath, options = {}, wordList = undefined) {
     if (!_.isUndefined(wordList)) {
 	Expect(wordList).is.an.Array().with.property('length').above(1); // at.least(2)
     }
-    return FsReadFile(filepath, 'utf8')
+    return Fs.readFile(filepath, 'utf8')
 	.then(data => scoreSaveCommit(JSON.parse(data), filepath, options, wordList));
 }
 
@@ -179,8 +172,5 @@ module.exports = {
     scoreSaveCommit,
 
     EXT_JSON,
-    SRC_PREFIX,
-    MAYBE_PREFIX,
-    KNOWN_PREFIX,
     DIR: RESULT_DIR
 };

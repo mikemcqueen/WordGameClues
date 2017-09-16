@@ -27,13 +27,13 @@ async function main () {
     Debug(`filename: ${filename}`);
     // TODO: streams = better here
     let fd = process.stdout.fd;
-    const wordPairList = await NoteParse.parseFile(filename, { urls: true });
-    if (_.isEmpty(wordPairList)) {
+    const resultList = await NoteParse.parseFile(filename, { urls: true });
+    if (_.isEmpty(resultList)) {
 	console.log('no results');
 	return;
     }
-    for (const wordPair of wordPairList) {
-	console.log(wordPair);
+    for (const result of resultList) {
+	console.log(result);
     }
 }
 
