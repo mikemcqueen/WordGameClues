@@ -117,10 +117,35 @@ function diff (listA, listB) {
 
 //
 
+function dumpList (list, options) {
+    for (const [index, sourceElem] of list.entries()) {
+	if (index > 0) console.log();
+	if (options.json) {
+	    const prefix = (index === 0) ? '[' : ', ';
+	    const suffix = (index === list.length - 1) ? ']' : '';
+	    console.log(`${prefix}${Stringify(sourceElem)}${suffix}`);
+	}
+	else {
+	    const source = sourceElem.source || sourceElem;
+	    console.log(source);
+	    if (!_.isObject(sourceElem)) continue;
+	    for (const urlElem of sourceElem.urls) {
+		const url = urlElem.url || urlElem;
+		console.log(url);
+		if (!_.isObject(urlElem)) continue;
+		for (const clue of urlElem.clues) {
+		    console.log(clue);
+		}
+	    }
+	}
+    }
+}
+
 //
 
 module.exports = {
     diff,
+    dumpList,
     isKnown,
     isMaybe,
     isSource,

@@ -10,6 +10,7 @@ const _                = require('lodash');
 const Debug            = require('debug')('note');
 const Evernote         = require('evernote');
 const EvernoteConfig   = require('../../data/evernote-config.json');
+const Filter           = require('../modules/filter');
 const Fs               = require('fs-extra');
 const Getopt           = require('node-getopt');
 const Note             = require('../modules/note');
@@ -25,7 +26,8 @@ const Options = Getopt.create([
     ['', 'get=TITLE',     'get (display) a note'],
     ['', 'notebook=NAME', 'specify notebook name'],
     ['', 'parse=TITLE',   'parse note into filter file format'],
-    ['', 'parseFile=FILE','parse note file into filter file format'],
+//    ['', 'parse-file=FILE','parse note file into filter file format'],
+    ['', 'json',          '  output in json (parse, parse-file)'],
     ['', 'production',    'use production note store'],
     ['', 'title=TITLE',   'specify note title (used with --create, --parse)']
 ]).bindHelp(
@@ -203,6 +205,8 @@ function create (options) {
 //
 
 function parse (options) {
+    options.urls = true;
+    options.clues = true;
     options.content = true;
     return Note.get(options.parse, options)
 	.then(note => {
@@ -214,9 +218,7 @@ function parse (options) {
 		console.log('no results');
 		return;
 	    }
-	    for (const result of resultList) {
-		console.log(Stringify(result));
-	    }
+	    Filter.dumpList(resultList, options);
 	});
 }
 
@@ -233,8 +235,6 @@ async function main () {
 	return create(options);
     }
     if (options.parse) {
-	options.urls = true;
-	options.clues = true;
 	return parse(options);
     }
     usage('unsupported command');

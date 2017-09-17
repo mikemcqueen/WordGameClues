@@ -104,13 +104,13 @@ function parse (text, options = {}) {
 	    let count = 0;
 	    while ((clueResult !== null) && (clueResult.index < endClueIndex)) {
 		const clueLine = clueResult[1].trim();
-		Debug(`clueLine: ${clueLine}`);
+		let debugMsg;
 		if (_.startsWith(clueLine, 'http')) {
 		    // ignore if first
 		    if (count > 0) {
 			throw new Error(`encountered http where clue was expected, ${clueLine}, count ${count}`);
 		    }
-		    Debug(`ignoring url, ${clueLine}`);
+		    debugMsg = 'ignored';
 		} else if (clueLine[0] === ',') {
 		    if (count > 1) {
 			throw new Error(`encountered unexpected comma where clue was expected, ${clueLine}`);
@@ -120,7 +120,11 @@ function parse (text, options = {}) {
 		    throw new Error(`encountered unexpected source where clue was expected, ${clueLine}`);
 		} else if (!_.isEmpty(clueLine)) {
 		    clueList.push(clueLine);
+		    debugMsg = 'added';
+		} else {
+		    debugMsg = 'empty';
 		}
+		Debug(`clueLine: ${clueLine || ''} (${debugMsg || ''})`);
 		clueResult = clueExpr.exec(text);
 		count += 1;
 	    }
