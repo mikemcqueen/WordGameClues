@@ -72,30 +72,34 @@ function getNotebookName (noteName) {
 
 //
 
+async function getOptionsNotebookGuid (options) {
+    if (options.notebookGuid) return options.notebookGuid;
+    if (!options.notebookName) return undefined;
+    return getNotebook(options.notebookName, options)
+	.then(nb => {
+	    if (!nb) throw new Error(`no notebook matches: ${options.notebookName}`);
+	    return nb.guid;
+	});
+}
+
+//
+
 async function get (title, options = {}) {
-    if (!options.notebookGuid) {
-	if (options.notebookName) {
-	    const nb = await getNotebook(options.notebookName, options);
-	    if (!nb) {
-		throw new Error(`no notebook matches: ${nbName}`);
-	    }
-	    options.notebookGuid = nb.guid;
-	}
-    }
-    //Debug(Stringify(notebook));
- 
-    let filter = {} ; // new Evernote.Types.NoteFilter();
-    filter.notebookGuid = options.notebookGuid;
-/*
-includeContent	bool
-includeResourcesData	bool
-includeResourcesRecognition	bool
-includeResourcesAlternateData	bool
-includeSharedNotes	bool
-includeNoteAppDataValues	bool
-includeResourceAppDataValues	bool
-includeAccountLimits
-*/
+    let filter = {};
+    // todo: could combine a couple of these awaits into a chain
+
+    filter.notebookGuid = await getOptionsNotebookGuid(options).catch(err => { throw err; });
+    Debug(`notebookGuid: ${filter.notebookGuid}`);
+    /*
+     includeContent
+     includeResourcesData
+     includeResourcesRecognition
+     includeResourcesAlternateData
+     includeSharedNotes
+     includeNoteAppDataValues
+     includeResourceAppDataValues
+     includeAccountLimits
+     */
     const noteStore = getNotestore(options.production);
 
     let spec = {};
@@ -104,14 +108,11 @@ includeAccountLimits
     }
 
     let metaSpec = {};
-    let result = await noteStore.findNotesMetadata(filter, 0, 250, metaSpec);
+    let result = await noteStore.findNotesMetadata(filter, 0, 250, metaSpec).catch(err => { throw err; });
     //Debug(Stringify(result));
     for (const metaNote of result.notes) {
 	Debug(`GUID: ${metaNote.guid}`);
-	let note = await noteStore.getNoteWithResultSpec(metaNote.guid, spec)
-		.catch(err => {
-		    console.log(err, err.stack);
-		});
+	let note = await noteStore.getNoteWithResultSpec(metaNote.guid, spec).catch(err => { throw err; });
 	if (!note) continue;
 	// TODO: check for duplicate named notes (option)
 	if (note.title === title) {
@@ -124,29 +125,28 @@ includeAccountLimits
 
 //
 
-function create (title, body, options = {}) {
+async function create (title, body, options = {}) {
     Expect(title).is.a.String();
     Expect(body).is.a.String();
 
-    const noteStore = getNotestore(options.production);
     let note = {};
-
-    note.title = title;
-    if (options.notebookGuid) {
-	note.notebookGuid = options.notebookGuid;
-    }
-
-    let noteAttributes;
-    //noteAttributes.author = author;
-    //noteAttributes.sourceURL = sourceURL;
-    note.attributes = noteAttributes;
-    note.content = '<?xml version="1.0" encoding="UTF-8"?>';
-    note.content += '<!DOCTYPE en-note SYSTEM "http://xml.evernote.com/pub/enml2.dtd">';
-    note.content += '<en-note>';
-    note.content += body;
-    note.content += '</en-note>';
-
-    return noteStore.createNote(note);
+    return getOptionsNotebookGuid(options)
+	.then(guid => {
+	    note.title = title;
+	    note.notebookGuid = guid;
+	    /*
+	     let noteAttributes;
+	     noteAttributes.author = author;
+	     noteAttributes.sourceURL = sourceURL;
+	     note.attributes = noteAttributes;
+	     */
+	    note.content = '<?xml version="1.0" encoding="UTF-8"?>';
+	    note.content += '<!DOCTYPE en-note SYSTEM "http://xml.evernote.com/pub/enml2.dtd">';
+	    note.content += '<en-note>';
+	    note.content += body;
+	    note.content += '</en-note>';
+	    return getNotestore(options.production).createNote(note);
+	}).then(_ => note);
 }
 
 //
@@ -155,7 +155,7 @@ function createFromFile (filename, options = {}) {
     return Fs.readFile(filename)
 	.then(content => {
 	    // TODO: check if note exists
-	    // TODO: specify notebook?
+	    // TODO: specify notebook in options
 	    return create(Path.basename(filename), content.toString(), options);
 	});
 }
@@ -164,31 +164,13 @@ function createFromFile (filename, options = {}) {
 
 function update (note, options = {}) {
     const noteStore = getNotestore(options.production);
-
-    /*
-    let note = {};
-
-    note.guid = guid;
-    note.title = title;
-    let noteAttributes;
-    //noteAttributes.author = author;
-    //noteAttributes.sourceURL = sourceURL;
-    note.attributes = noteAttributes;
-    note.content = '<?xml version="1.0" encoding="UTF-8"?>';
-    note.content += '<!DOCTYPE en-note SYSTEM "http://xml.evernote.com/pub/enml2.dtd">';
-    note.content += '<en-note>';
-    note.content += body;
-    note.content += '</en-note>';
-     */
-
     return noteStore.updateNote(note);
 }
 
-// insertion point is between the last double-closing-divs
-// TODO: alternately, after the last closing div
+//
 
-function splitForAppend(content, options) {
-    const match = /<\/div>/g;
+function splitForAppend (content, options) {
+    const match = /<\/div>/g; // inserttion point is after the last closing div
     let prevResult;
     let result;
     do {
@@ -197,7 +179,7 @@ function splitForAppend(content, options) {
     } while (result != null);
     Expect(prevResult).is.ok();
     if (options.verbose) {
-	console.log(`split near:\n${content.slice(prevResult.index, content.length)}`);
+	console.log(`split at:\n${content.slice(prevResult.index, content.length)}`);
     }
     const pos = _.indexOf(content, '>', prevResult.index) + 1;
     return [content.slice(0, pos), content.slice(pos, content.length)];
@@ -206,11 +188,13 @@ function splitForAppend(content, options) {
 //
 
 function append (note, chunk, options = {}) {
+    // TODO: xml-validate chunk
     const [before, after] = splitForAppend(note.content, options);
     note.content = `${before}${chunk}${after}`;
     return update(note, options);
 }
 
+//
 
 module.exports = {
     append,

@@ -11,20 +11,23 @@ const Debug            = require('debug')('note');
 const Evernote         = require('evernote');
 const EvernoteConfig   = require('../../data/evernote-config.json');
 const Fs               = require('fs-extra');
-const Getopt       = require('node-getopt');
+const Getopt           = require('node-getopt');
 const Note             = require('../modules/note');
+const NoteMaker        = require('../modules/note-make');
+const NoteParser       = require('../modules/note-parse');
 const Path             = require('path');
-//const NodeNote         = require('node-note');
 const Stringify        = require('stringify-object');
 
 //
 
-const Options = new Getopt([
+const Options = Getopt.create([
     ['', 'create=FILE',   'create note from filter result file'],
     ['', 'get=TITLE',     'get (display) a note'],
     ['', 'notebook=NAME', 'specify notebook name'],
+    ['', 'parse=TITLE',   'parse note into filter file format'],
+    ['', 'parseFile=FILE','parse note file into filter file format'],
     ['', 'production',    'use production note store'],
-    ['', 'title=TITLE',   'specify note title (used with --create)']
+    ['', 'title=TITLE',   'specify note title (used with --create, --parse)']
 ]).bindHelp(
     'usage: node note <--command> [options]\n[[OPTIONS]]\n'
 );
@@ -177,27 +180,64 @@ async function updateTestNote (guid) {
 
 //
 
+function get (options) {
+    options.content = true;
+    return Note.get(options.get, options)
+	.then(note => {
+	    if (!note) usage(`note not found, ${options.get}`);
+	    console.log(note.content);
+	});
+}
+
+//
+
+function create (options) {
+    const title = options.title || Path.basename(filename);
+    return NoteMaker.makeFromFile(options.create, { outerDiv: true })
+	.then(body => Note.create(title, body))
+	.then(note => {
+	    console.log(Stringify(note));
+	});
+}
+
+//
+
+function parse (options) {
+    options.content = true;
+    return Note.get(options.parse, options)
+	.then(note => {
+	    if (!note) {
+		usage(`note not found, ${options.parse}`);
+	    }
+	    const resultList = NoteParser.parse(note.content, options);
+	    if (_.isEmpty(resultList)) {
+		console.log('no results');
+		return;
+	    }
+	    for (const result of resultList) {
+		console.log(Stringify(result));
+	    }
+	});
+}
+
+//
+
 async function main () {
     const opt = Options.parseSystem();
     const options = opt.options;
 
-    if (opt.argv.length > 1) {
-	usage('only one non-switch FILE argument allowed');
-    }
-    const filename = opt.argv[0];
-
     if (options.get) {
-	options.content = true;
-	return Note.get(options.get, options)
-	    .then(note => {
-		if (!note) usage(`note not found, ${options.get}`);
-		console.log(note.content);
-	    });
+	return get(options);
     }
-    //note = createTestNote();
-    //note = await updateTestNote(note.guid);
-    console.log(`note.guid:${note.guid}`);
-    console.log(Stringify(note));
+    if (options.create) {
+	return create(options);
+    }
+    if (options.parse) {
+	options.urls = true;
+	options.clues = true;
+	return parse(options);
+    }
+    usage('unsupported command');
 }
 
 //

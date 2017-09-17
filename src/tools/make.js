@@ -7,7 +7,7 @@
 //
 
 const Debug            = require('debug')('make');
-const NoteMake         = require('../modules/note-make');
+const NoteMaker        = require('../modules/note-make');
  
 //
 
@@ -24,9 +24,7 @@ async function main () {
 	usage();
     }
     Debug(`filename: ${filename}`);
-    // TODO: streams = better here
-    let stream = process.stdout.fd;
-    NoteMake.make(filename, stream, { outerDiv: true });
+    NoteMaker.makeFromFile(filename, { fd: process.stdout.fd, outerDiv: true });
 }
 
 //

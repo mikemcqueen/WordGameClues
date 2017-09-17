@@ -34,17 +34,17 @@ const RejectSuffix =  'x'; // copied from update.js :(
 //                                  { url: url2, clues: [clue1, .., clueN] }] } ]
 //
 function parse (text, options = {}) {
-    Expect(options.clues).is.undefined('not yet supported');
-
     const sourceExpr = />(@[^<]+)</g;
     const urlExpr =    />(http[s]?\:[^<]+)</g;
     const clueExpr =   />([^<]+)</g;
 
     let resultList = [];
     let sourceResult;
-    let urlResult = urlExpr.exec(text);
     let prevSourceResult;
+    let urlResult = urlExpr.exec(text);
     let prevUrlResult;
+    let clueResult = clueExpr.exec(text);
+    let prevClueResult;
     let sourceElement;
     let prevSourceElement;
     let done = false;
@@ -57,8 +57,8 @@ function parse (text, options = {}) {
 	if (sourceResult) {
 	    // result[1] = 1st capture group
 	    const [_, sourceLine] = My.hasCommaSuffix(sourceResult[1], RejectSuffix);
-	    Debug(sourceLine);
-	    sourceElement = (options.urls) ? { source: sourceLine } : sourceLine;
+	    Debug(`sourceLine: ${sourceLine}`);
+	    sourceElement = options.urls ? { source: sourceLine } : sourceLine;
 	    resultList.push(sourceElement);
 	    sourceIndex = sourceResult.index;
 	} else {
@@ -67,23 +67,64 @@ function parse (text, options = {}) {
 	}
 	if (!options.urls || !prevSourceElement) continue;
 	
-	// for each (previous) source, get list of urls
-	let urlList = [];
-	// move urlResult to a position past the previous sourceResult
+	// parse urls for previous source
+
+	// move urlExpr position to prevSourceResult
 	while ((urlResult !== null) && (urlResult.index < prevSourceResult.index)) {
-	    Debug('advancing urlResult');
-	    urlResult = urlExpr.exec(text);
+	    //urlExpr.lastIndex = prevSourceResult.index;
+	    //Debug(`advanced urlExpr.lastIndex to ${urlExpr.lastIndex}`);
+	    urlResult = urlExpr.exec(text); // for while loop
 	}
-	Debug(`url.index = ${urlResult.index}, sourceIndex = ${sourceIndex}`);
+	Debug(`urlResult.index = ${urlResult.index}, sourceIndex = ${sourceIndex}`);
+	let urlList = [];
 	// while urlResult is at a position before the current sourceResult
 	while ((urlResult !== null) && (urlResult.index < sourceIndex)) {
 	    const urlLine = urlResult[1];
-	    Debug(urlLine);
+	    Debug(`urlLine: ${urlLine}`);
+	    // NOTE: suffix on a uril inside a note is within a separate <div> block
 	    //const [_, urlLine] = My.hasCommaSuffix(urlResult[1], RejectSuffix); // ValidSuffixes
-	    let urlElement = (options.clues) ? { url: urlLine, clues: [] } : urlLine;
+	    let urlElement = options.clues ? { url: urlLine, clues: [] } : urlLine;
 	    urlList.push(urlElement);
 	    prevUrlResult = urlResult;
 	    urlResult = urlExpr.exec(text);
+	    if (!options.clues) continue;
+
+	    // parse clues for previous url
+
+	    // clue parsing ends at next url or next source, whichever is first
+	    let urlIndex = urlResult ? urlResult.index : Number.MAX_SAFE_INTEGER;
+	    let endClueIndex = urlIndex < sourceIndex ? urlIndex : sourceIndex;
+	    let clueList = [];
+	    // move clueExpr position to prevUrlResult
+	    while ((clueResult !== null) && (clueResult.index < prevUrlResult.index)) {
+		//clueExpr.lastIndex = prevUrlResult.index;
+		//Debug(`advanced clueExpr.lastIndex to ${clueExpr.lastIndex}`);
+		clueResult = clueExpr.exec(text);// for while loop
+	    }
+	    let count = 0;
+	    while ((clueResult !== null) && (clueResult.index < endClueIndex)) {
+		const clueLine = clueResult[1].trim();
+		Debug(`clueLine: ${clueLine}`);
+		if (_.startsWith(clueLine, 'http')) {
+		    // ignore if first
+		    if (count > 0) {
+			throw new Error(`encountered http where clue was expected, ${clueLine}, count ${count}`);
+		    }
+		    Debug(`ignoring url, ${clueLine}`);
+		} else if (clueLine[0] === ',') {
+		    if (count > 1) {
+			throw new Error(`encountered unexpected comma where clue was expected, ${clueLine}`);
+		    }
+		    urlElement.url += clueLine;
+		} else if (clueLine[0] === '@') {
+		    throw new Error(`encountered unexpected source where clue was expected, ${clueLine}`);
+		} else if (!_.isEmpty(clueLine)) {
+		    clueList.push(clueLine);
+		}
+		clueResult = clueExpr.exec(text);
+		count += 1;
+	    }
+	    urlElement.clues = clueList;
 	}
 	prevSourceElement.urls = urlList;
 	Debug(`found ${urlList.length} urls for ${prevSourceElement.source}`);

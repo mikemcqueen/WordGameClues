@@ -29,8 +29,8 @@ function url (line) {
 
 //
 
-function write (dest, text) {
-    const output = `${text}\n`;
+async function write (dest, text) {
+    const output = `${text}`; // + \n`;
     if (_.isString(dest)) {
 	return `${dest}${output}`;
     }
@@ -58,38 +58,44 @@ function writeText (dest, line) {
     return write(dest, `${Note.Open}${line}${Note.Close}`);
 }
 
-// TODO: outputFd support
+//
 
-async function makeFromFile (inputFilename, dest, options = {}) {
+async function makeFromFile (inputFilename, options = {}) {
     Expect(inputFilename).is.a.String();
-    Debug(`filename: ${inputFilename}, dest: ${dest}`);
+    Debug(`filename: ${inputFilename}`);
 
+    // write to fd if supplied; else build & return string
+    let dest = options.fd || '';
     let readLines = new Readlines(inputFilename);
     if (options.outerDiv) {
-	let result = await write(dest, '<div>');
-	if (_.isString(dest)) dest = result;
+	await write(dest, '<div>').then(result => {
+	    if (_.isString(dest)) dest = result;
+	});
     }
     while (true) {
+	let promise;
 	let line = readLines.next();
 	if (line === false) break;
 	line = line.toString();
 	if (_.isEmpty(line)) {
-	    let result = await writeEmptyLine(dest);
-	    if (_.isString(dest)) dest = result;
+	    promise = writeEmptyLine(dest);
 	} else if (_.startsWith(line, 'http')) {
-	    let result = await writeUrl(dest, line);
-	    if (_.isString(dest)) dest = result;
+	    promise = writeUrl(dest, line);
 	} else {
-	    let result = await writeText(dest, line);
-	    if (_.isString(dest)) dest = result;
+	    promise = writeText(dest, line);
 	}
+	await promise.then(result => {
+	    if (_.isString(dest)) dest = result;
+	});
     }
     if (options.outerDiv) {
-	let result = await write(dest, '</div>');
-	if (_.isString(dest)) dest = result;
+	await write(dest, '</div>').then(result => {
+	    if (_.isString(dest)) dest = result;
+	});
     }
-    let result = await writeEmptyLine(dest);
-    if (_.isString(dest)) dest = result;
+    await writeEmptyLine(dest).then(result => {
+	if (_.isString(dest)) dest = result;
+    });
     return dest;
 }
 

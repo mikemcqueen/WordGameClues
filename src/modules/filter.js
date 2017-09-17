@@ -54,7 +54,7 @@ function isKnown (line) {
 
 //
 
-function parseFile(filename, options) {
+function parseFile (filename, options) {
     let readLines = new Readlines(filename);
     let line;
     let resultList = [];
@@ -85,7 +85,7 @@ function parseFile(filename, options) {
 
 //
 
-function makeSourceMap(list) {
+function makeSourceMap (list) {
     let map = {};
     for (let elem of list) {
 	let source = elem.source;
@@ -100,7 +100,7 @@ function makeSourceMap(list) {
 // Return elements in listB that are not in listA.
 //
 
-function diff(listA, listB) {
+function diff (listA, listB) {
     Expect(listA).is.an.Array();
     Expect(listB).is.an.Array();
     const mapA = makeSourceMap(listA);

@@ -48,9 +48,9 @@ async function main () {
     const noteName = options.note || Path.basename(filename);
     if (options.production && !options.default) {
 	const nbName = options.notebook || Note.getNotebookName(noteName);
-	const nb = await Note.getNotebook(nbName, options);
+	const nb = await Note.getNotebook(nbName, options).catch(err => { throw err; });
 	if (!nb) {
-	    usage(`Can't find notebook ${nbName}`);
+	    usage(`notebook not found, ${nbName}`);
 	}
 	options.notebookGuid = nb.guid;
     }

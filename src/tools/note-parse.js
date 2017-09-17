@@ -27,14 +27,16 @@ async function main () {
     Debug(`filename: ${filename}`);
     // TODO: streams = better here
     let fd = process.stdout.fd;
-    const resultList = await NoteParse.parseFile(filename, { urls: true });
-    if (_.isEmpty(resultList)) {
-	console.log('no results');
-	return;
-    }
-    for (const result of resultList) {
-	console.log(result);
-    }
+    return NoteParse.parseFile(filename, { urls: true })
+	.then(resultList => {
+	    if (_.isEmpty(resultList)) {
+		console.log('no results');
+		return;
+	    }
+	    for (const result of resultList) {
+		console.log(result);
+	    }
+	});
 }
 
 //
