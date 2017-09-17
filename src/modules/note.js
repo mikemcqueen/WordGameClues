@@ -33,8 +33,6 @@ function NodeNote (options) {
 
 const Production = new NodeNote({ token: EvernoteConfig.production.token, sandbox: false });
 const Sandbox    = new NodeNote({ token: EvernoteConfig.develop.token, sandbox: true });
-//const Evernote = Production;
-const NoteStore = Sandbox.noteStore;
 
 //
 
@@ -106,7 +104,7 @@ includeAccountLimits
     }
 
     let metaSpec = {};
-    let result = await NoteStore.findNotesMetadata(filter, 0, 250, metaSpec);
+    let result = await noteStore.findNotesMetadata(filter, 0, 250, metaSpec);
     //Debug(Stringify(result));
     for (const metaNote of result.notes) {
 	Debug(`GUID: ${metaNote.guid}`);
@@ -164,14 +162,14 @@ function createFromFile (filename, options = {}) {
 
 //
 
-function update (guid, title, body, options = {}) {
+function update (note, options = {}) {
     const noteStore = getNotestore(options.production);
 
+    /*
     let note = {};
 
     note.guid = guid;
     note.title = title;
-
     let noteAttributes;
     //noteAttributes.author = author;
     //noteAttributes.sourceURL = sourceURL;
@@ -181,11 +179,41 @@ function update (guid, title, body, options = {}) {
     note.content += '<en-note>';
     note.content += body;
     note.content += '</en-note>';
+     */
 
     return noteStore.updateNote(note);
 }
 
+// insertion point is between the last double-closing-divs
+// TODO: alternately, after the last closing div
+
+function splitForAppend(content, options) {
+    const match = /<\/div>/g;
+    let prevResult;
+    let result;
+    do {
+	prevResult = result;
+	result = match.exec(content);
+    } while (result != null);
+    Expect(prevResult).is.ok();
+    if (options.verbose) {
+	console.log(`split near:\n${content.slice(prevResult.index, content.length)}`);
+    }
+    const pos = _.indexOf(content, '>', prevResult.index) + 1;
+    return [content.slice(0, pos), content.slice(pos, content.length)];
+}
+
+//
+
+function append (note, chunk, options = {}) {
+    const [before, after] = splitForAppend(note.content, options);
+    note.content = `${before}${chunk}${after}`;
+    return update(note, options);
+}
+
+
 module.exports = {
+    append,
     create,
     createFromFile,
     get,

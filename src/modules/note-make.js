@@ -13,15 +13,11 @@ const Readlines        = require('n-readlines');
 
 //
 
-function open () {
-    return '<div><span><font style="font-size: 12pt;">';
-}
-
-//
-
-function close () {
-    return '</font></span></div>';
-}
+const Note = {
+    Open:      '<div><span><font style="font-size: 12pt;">',
+    Close:     '</font></span></div>',
+    EmptyLine: '<div><br/></div>'
+};
 
 //
 
@@ -33,60 +29,99 @@ function url (line) {
 
 //
 
-function write (fd, text) {
-    return Fs.write(fd, `${text}\n`);
+function write (dest, text) {
+    const output = `${text}\n`;
+    if (_.isString(dest)) {
+	return `${dest}${output}`;
+    }
+    if (_.isNumber(dest)) {
+	return Fs.write(dest, output);
+    }
+    throw new Error(`bad dest, ${dest}`);
 }
 
 //
 
-function writeEmptyLine (fd) {
-    return write(fd, '<div><br/></div>');
+function writeEmptyLine (dest) {
+    return write(dest, Note.EmptyLine);
 }
 
 //
 
-function writeUrl (fd, line) {
-    return write(fd, `${open()}${url(line)}${close()}`);
+function writeUrl (dest, line) {
+    return write(dest, `${Note.Open}${url(line)}${Note.Close}`);
 }
 
 //
 
-function writeText (fd, line) {
-    return write(fd, `${open()}${line}${close()}`);
+function writeText (dest, line) {
+    return write(dest, `${Note.Open}${line}${Note.Close}`);
 }
 
 // TODO: outputFd support
 
-async function make (inputFilename, fd, options = {}) {
+async function makeFromFile (inputFilename, dest, options = {}) {
     Expect(inputFilename).is.a.String();
-    Expect(fd).is.a.Number();
-
-    Debug(`filename: ${inputFilename}, fd: ${fd}`);
+    Debug(`filename: ${inputFilename}, dest: ${dest}`);
 
     let readLines = new Readlines(inputFilename);
     if (options.outerDiv) {
-	await write(fd, '<div>');
+	let result = await write(dest, '<div>');
+	if (_.isString(dest)) dest = result;
     }
     while (true) {
 	let line = readLines.next();
 	if (line === false) break;
 	line = line.toString();
 	if (_.isEmpty(line)) {
-	    await writeEmptyLine(fd);
+	    let result = await writeEmptyLine(dest);
+	    if (_.isString(dest)) dest = result;
 	} else if (_.startsWith(line, 'http')) {
-	    await writeUrl(fd, line);
+	    let result = await writeUrl(dest, line);
+	    if (_.isString(dest)) dest = result;
 	} else {
-	    await writeText(fd, line);
+	    let result = await writeText(dest, line);
+	    if (_.isString(dest)) dest = result;
 	}
     }
     if (options.outerDiv) {
-	await write(fd, '</div>');
+	let result = await write(dest, '</div>');
+	if (_.isString(dest)) dest = result;
     }
-    await writeEmptyLine(fd);
+    let result = await writeEmptyLine(dest);
+    if (_.isString(dest)) dest = result;
+    return dest;
+}
+
+//
+
+function makeFromFilterList (list, options = {}) {
+    Expect(list).is.an.Array();
+
+    let result = '';
+    if (options.outerDiv) {
+	result = write(result, '<div>');
+    }
+    for (const sourceElem of list) {
+	result = writeText(result, sourceElem.source);
+	for (const urlElem of sourceElem.urls) {
+	    result = writeUrl(result, urlElem.url);
+	    for (const clue of urlElem.clues) {
+		result = writeText(result, clue);
+	    }
+	}
+	result = writeEmptyLine(result);
+    }
+    if (options.outerDiv) {
+	result = write(result, '</div>');
+	result = writeEmptyLine(result);
+    }
+    return result;
 }
 
 //
 
 module.exports = {
-    make
+    makeFromFile,
+    makeFromFilterList
 }

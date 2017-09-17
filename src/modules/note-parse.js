@@ -70,7 +70,7 @@ function parse (text, options = {}) {
 	// for each (previous) source, get list of urls
 	let urlList = [];
 	// move urlResult to a position past the previous sourceResult
-	while ((urlResult !== null) && (urlResult.index < prevSourceResult.lastIndex)) {
+	while ((urlResult !== null) && (urlResult.index < prevSourceResult.index)) {
 	    Debug('advancing urlResult');
 	    urlResult = urlExpr.exec(text);
 	}

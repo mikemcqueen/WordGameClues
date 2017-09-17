@@ -14,9 +14,10 @@ const Path             = require('path');
  
 const Options     = require('node-getopt')
     .create([
-	['', 'note=NAME',       'specify note name'],
-	['', 'notebook=NAME',   'specify notebook name'],
-	['', 'production',      'create note in production']
+	['',  'note=NAME',       'specify note name'],
+	['',  'notebook=NAME',   'specify notebook name'],
+	['',  'production',      'create note in production'],
+	['v', 'verbose',         'more logging']
     ]).bindHelp(
 	"Usage: node note-merge [options] FILE\n\n[[OPTIONS]]\n"
     );
@@ -41,12 +42,10 @@ async function main () {
     const filename = opt.argv[0];
     Debug(`filename: ${filename}`);
 
-    const noteName = options.note || Path.basename(filename);
-
     // if production && !default (notebook)
-    //   if --notebook specified, call getNotebook to get GUID
-    //   if --notebook not specified, get notebook name from filename
-    
+    //   if --notebook specified, use specified notebook name
+    //   else get notebook name from base filename
+    const noteName = options.note || Path.basename(filename);
     if (options.production && !options.default) {
 	const nbName = options.notebook || Note.getNotebookName(noteName);
 	const nb = await Note.getNotebook(nbName, options);
@@ -55,21 +54,7 @@ async function main () {
 	}
 	options.notebookGuid = nb.guid;
     }
-
-    // TODO: streams = better here
-    //let fd = process.stdout.fd;
-    return NoteMerge.mergeFilterFile(filename, noteName, options)
-	.then(resultList => {
-	    if (_.isEmpty(resultList)) {
-		console.log('no results');
-		return;
-	    }
-	    // rather than dumping results, validate that the total sources + urls
-	    // added is equal to result total 
-	    for (const result of resultList) {
-		console.log(result);
-	    }
-	});
+    return NoteMerge.mergeFilterFile(filename, noteName, options);
 }
 
 //

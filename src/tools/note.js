@@ -20,15 +20,26 @@ const Stringify        = require('stringify-object');
 //
 
 const Options = new Getopt([
-    ['', 'create=FILE',  'create note from filter result file']
-    ['', 'title=TITLE',  'note title']
-])).bindHelp(
-    "Usage: node note [--create|--update|--delete] <options>\n[[OPTIONS]]\n"
+    ['', 'create=FILE',   'create note from filter result file'],
+    ['', 'get=TITLE',     'get (display) a note'],
+    ['', 'notebook=NAME', 'specify notebook name'],
+    ['', 'production',    'use production note store'],
+    ['', 'title=TITLE',   'specify note title (used with --create)']
+]).bindHelp(
+    'usage: node note <--command> [options]\n[[OPTIONS]]\n'
 );
 
 //
 
 const DATA_DIR      =  Path.normalize(`${Path.dirname(module.filename)}/../../data/`);
+
+//
+
+function usage (msg) {
+    console.log(msg + '\n');
+    Options.showHelp();
+    process.exit(-1);
+}
 
 //
 
@@ -175,11 +186,13 @@ async function main () {
     }
     const filename = opt.argv[0];
 
-    let note;
-    note = await Note.get('First', 'test', { content: true });
-    if (!note) {
-	console.log('note not found');
-	process.exit(-1);
+    if (options.get) {
+	options.content = true;
+	return Note.get(options.get, options)
+	    .then(note => {
+		if (!note) usage(`note not found, ${options.get}`);
+		console.log(note.content);
+	    });
     }
     //note = createTestNote();
     //note = await updateTestNote(note.guid);
