@@ -7,6 +7,7 @@
 //
 
 const _                = require('lodash');
+const Clues            = require('../clue-types');
 const Debug            = require('debug')('note');
 const Evernote         = require('evernote');
 const EvernoteConfig   = require('../../data/evernote-config.json');
@@ -15,10 +16,6 @@ const Fs               = require('fs-extra');
 const Path             = require('path');
 const Stringify        = require('stringify-object');
  
-//
-
-const DATA_DIR      =  Path.normalize(`${Path.dirname(module.filename)}/../../data/`);
-
 //
 
 function NodeNote (options) {
@@ -43,41 +40,58 @@ function getNotestore (production) {
 //
 
 function getNotebook (name, options = {}) {
+    if (!name) return undefined;
     const noteStore = getNotestore(options.production);
     return noteStore.listNotebooks()
 	.then(nbList => {
 	    let match = false;
 	    for(const nb of nbList) {
-		if (options.strict) {
-		    match = (nb.name === name);
-		} else {
+		if (options.relaxed) {
 		    match = _.includes(nb.name, name);
+		} else {
+		    match = (nb.name === name);
 		}
 		if (match ) {
 		    Debug(`notebook match: ${nb.name}`);
 		    return nb;
+		} else {
+		    Debug(`not notebook: ${nb.name}`);
 		}
 	    }
+	    Debug(`notebook not found, ${name}`);
 	    return undefined;
 	});
 }
 
 //
 
-function getNotebookName (noteName) {
-    Expect(noteName[0]).equals('p');
-    Expect(noteName[1]).is.a.Number();
-    return `Worksheets.${noteName.slice(0, 2)}`;
+function getWorksheetName (noteNameOrClueType) {
+    let noteName = noteNameOrClueType;
+    if (_.isObject(noteName)) {
+	noteName = Clues.getShorthand(noteName); // noteName isa clueType
+    } else {
+	const appleExpr = /p[0-9]s?/;
+	const result = appleExpr.exec(noteName);
+	if (!result || (result.index !== 0)) return undefined;
+    }
+    Expect(noteName).is.a.String();
+    Expect(noteName.charAt(0)).is.equal('p');
+    Expect(_.toNumber(noteName.charAt(1))).is.above(0);
+    let count = 2;
+    if (noteName.charAt(2) === 's') count += 1;
+    const wsName = `Worksheets.${noteName.slice(0, count)}`;
+    Debug(`worksheet name: ${wsName}`);
+    return wsName;
 }
 
 //
 
-async function getOptionsNotebookGuid (options) {
+async function getNotebookGuidByOptions (options) {
     if (options.notebookGuid) return options.notebookGuid;
-    if (!options.notebookName) return undefined;
-    return getNotebook(options.notebookName, options)
+    if (!options.notebook) return undefined;
+    return getNotebook(options.notebook, options)
 	.then(nb => {
-	    if (!nb) throw new Error(`no notebook matches: ${options.notebookName}`);
+	    if (!nb) throw new Error(`no notebook matches: ${options.notebook}`);
 	    return nb.guid;
 	});
 }
@@ -88,7 +102,7 @@ async function get (title, options = {}) {
     let filter = {};
     // todo: could combine a couple of these awaits into a chain
 
-    filter.notebookGuid = await getOptionsNotebookGuid(options).catch(err => { throw err; });
+    filter.notebookGuid = await getNotebookGuidByOptions(options).catch(err => { throw err; });
     Debug(`notebookGuid: ${filter.notebookGuid}`);
     /*
      includeContent
@@ -118,9 +132,11 @@ async function get (title, options = {}) {
 	if (note.title === title) {
 	    Debug(`note match: ${note.title}`);
 	    return note;
+	} else {
+	    Debug(`not note: ${note.title}`);
 	}
     }
-    return undefined;
+    throw new Error(`note not found, ${title}`);
 }
 
 //
@@ -130,7 +146,7 @@ async function create (title, body, options = {}) {
     Expect(body).is.a.String();
 
     let note = {};
-    return getOptionsNotebookGuid(options)
+    return getNotebookGuidByOptions(options)
 	.then(guid => {
 	    note.title = title;
 	    note.notebookGuid = guid;
@@ -202,6 +218,6 @@ module.exports = {
     createFromFile,
     get,
     getNotebook,
-    getNotebookName,
+    getWorksheetName,
     update
 };

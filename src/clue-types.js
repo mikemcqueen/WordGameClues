@@ -7,6 +7,8 @@
 //
 
 const _              = require('lodash');
+const Expect         = require('should/as-function');
+const Path           = require('path');
 
 const Options = [
     ['p', 'apple=NUM',  'use apple clues, sentence NUM' ],
@@ -15,6 +17,8 @@ const Options = [
     ['r', 'harmony',    'use harmony clues' ],
     ['f', 'final',      'use final clues' ]
 ];
+
+const DATA_DIR              =  Path.normalize(`${Path.dirname(module.filename)}/../data/`);
 
 const APPLE = {
     '1' : {
@@ -77,7 +81,7 @@ const FINAL = {
 
 function metamorph (src) {
     const name = arguments.callee.name;
-    if (!src.resultDir) {
+    if (!src.baseDir) {
 	let dir = '';
 	let index = name.length - 2;
 	let next = 0;
@@ -86,15 +90,15 @@ function metamorph (src) {
 	    next = next === 0 ? 2 : next === 2 ? 4 : 1; 
 	    index -= next;
 	}
-	src.resultDir = dir;
+	//src.resultDir = dir;
 	src.baseDir = `${dir}/${src.sentence}`;
     }
     return src;
- }
+}
 
 //
 
-function getByOptions(options) {
+function getByOptions (options) {
     let src;
     if (options.meta) {
 	src = META;
@@ -111,7 +115,7 @@ function getByOptions(options) {
 	    src = cloneAsSynth(src);
 	}
     } else {
-	throw new Error('No clue option supplied');
+	throw new Error('No clue-type option supplied');
     }
     return src;
 }
@@ -120,6 +124,7 @@ function getByOptions(options) {
 
 function cloneAsSynth (config) {
     config = _.clone(config);
+    config.synth = true;
     config.baseDir += '/synth';
     config.clueCount = config.synthClueCount || 9; // hax
     config.REQ_CLUE_COUNT = 2;
@@ -130,6 +135,7 @@ const ALL_TYPES = [ META, SYNTH, HARMONY, FINAL ];
 
 // name: 'm' or 'meta', for example, used by tools/merge.js
 // and frankly should probably only exist in merge.js
+// doesn't work with apples
 //
 function getByBaseDirOption (name) {
     for (const type of ALL_TYPES) { 
@@ -149,6 +155,20 @@ function isValidBaseDirOption (name) {
     } catch (err) {
 	return false;
     }
+}
+
+//
+
+function getShorthand (clueType) {
+    const dir = clueType.baseDir;
+    Expect(dir.charAt(0)).is.equal('p');
+    return `${dir.charAt(0)}${clueType.sentence}${clueType.synth ? 's' : ''}`;
+}
+
+//
+
+function getDirectory (clueType) {
+    return `${DATA_DIR}${clueType.baseDir}`;
 }
 
 //
@@ -178,6 +198,8 @@ module.exports = {
     cloneAsSynth,
     getByBaseDirOption,
     getByOptions,
+    getDirectory,
+    getShorthand,
     isValidBaseDirOption,
     Options
 

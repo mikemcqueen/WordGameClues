@@ -117,28 +117,50 @@ function diff (listA, listB) {
 
 //
 
-function dumpList (list, options) {
+async function dumpList (list, options) {
+    Expect(options.fd).is.a.Number(); // for now. no other use case yet.
+    const dest = options.fd || ''; 
     for (const [index, sourceElem] of list.entries()) {
-	if (index > 0) console.log();
-	if (options.json) {
+	if (index > 0) { // empty line between entries
+	    await My.writeln(dest, '').then(result => {
+		if (_.isString(dest)) dest = result;
+	    });
+	}
+	if (options.json) { // JSON format
 	    const prefix = (index === 0) ? '[' : ', ';
 	    const suffix = (index === list.length - 1) ? ']' : '';
-	    console.log(`${prefix}${Stringify(sourceElem)}${suffix}`);
+	    await My.writeln(dest, `${prefix}${Stringify(sourceElem)}${suffix}]`).then(result => {
+		if (_.isString(dest)) dest = result;
+	    });
 	}
-	else {
+	else { // filter format
 	    const source = sourceElem.source || sourceElem;
-	    console.log(source);
+	    await My.writeln(dest, `${source}`).then(result => {
+		if (_.isString(dest)) dest = result;
+	    });
 	    if (!_.isObject(sourceElem)) continue;
 	    for (const urlElem of sourceElem.urls) {
 		const url = urlElem.url || urlElem;
-		console.log(url);
+		await My.writeln(dest, url).then(result => {
+		    if (_.isString(dest)) dest = result;
+		});
 		if (!_.isObject(urlElem)) continue;
 		for (const clue of urlElem.clues) {
-		    console.log(clue);
+		    await My.writeln(dest, clue).then(result => {
+			if (_.isString(dest)) dest = result;
+		    });
 		}
 	    }
 	}
     }
+    /*
+    if (!options.json) { // empty line at end of filter format
+    	await My.writeln(dest, '').then(result => {
+	    if (_.isString(dest)) dest = result;
+	});
+    }
+     */
+    return dest;
 }
 
 //

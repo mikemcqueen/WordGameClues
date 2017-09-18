@@ -48,7 +48,6 @@ function parse (text, options = {}) {
     let sourceElement;
     let prevSourceElement;
     let done = false;
-    Debug(`urlResult: ${urlResult}`);
     while (!done) {
 	prevSourceElement = sourceElement;
 	prevSourceResult = sourceResult;
@@ -81,7 +80,7 @@ function parse (text, options = {}) {
 	while ((urlResult !== null) && (urlResult.index < sourceIndex)) {
 	    const urlLine = urlResult[1];
 	    Debug(`urlLine: ${urlLine}`);
-	    // NOTE: suffix on a uril inside a note is within a separate <div> block
+	    // NOTE: suffix on a url inside a note is within a separate <div> block
 	    //const [_, urlLine] = My.hasCommaSuffix(urlResult[1], RejectSuffix); // ValidSuffixes
 	    let urlElement = options.clues ? { url: urlLine, clues: [] } : urlLine;
 	    urlList.push(urlElement);
@@ -111,12 +110,13 @@ function parse (text, options = {}) {
 			throw new Error(`encountered http where clue was expected, ${clueLine}, count ${count}`);
 		    }
 		    debugMsg = 'ignored';
-		} else if (clueLine[0] === ',') {
+		} else if (clueLine.charAt(0) === ',') {
 		    if (count > 1) {
 			throw new Error(`encountered unexpected comma where clue was expected, ${clueLine}`);
 		    }
 		    urlElement.url += clueLine;
-		} else if (clueLine[0] === '@') {
+		    debugMsg = 'adding reject URL';
+		} else if (clueLine.charAt(0) === '@') {
 		    throw new Error(`encountered unexpected source where clue was expected, ${clueLine}`);
 		} else if (!_.isEmpty(clueLine)) {
 		    clueList.push(clueLine);
@@ -124,7 +124,7 @@ function parse (text, options = {}) {
 		} else {
 		    debugMsg = 'empty';
 		}
-		Debug(`clueLine: ${clueLine || ''} (${debugMsg || ''})`);
+		Debug(`clueLine: ${clueLine || ''} (${debugMsg})`);
 		clueResult = clueExpr.exec(text);
 		count += 1;
 	    }

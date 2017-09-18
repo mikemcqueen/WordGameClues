@@ -49,7 +49,7 @@ async function main () {
     //   if --notebook not specified, get notebook name from filename
     
     if (options.production && !options.default) {
-	const nbName = options.notebook || Note.getNotebookName(Path.basename(filename));
+	const nbName = options.notebook || Note.getWorksheetName(Path.basename(filename));
 	const nb = await Note.getNotebook(nbName, options);
 	if (!nb) {
 	    usage(`Can't find notebook ${nbName}`);

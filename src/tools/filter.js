@@ -121,7 +121,9 @@ function filterSearchResultList (resultList, wordList, filteredUrls, options, fi
     // make any clue words with a space into multiple words.
     let wordCount = _.chain(wordList).map(word => word.split(' ')).flatten().size().value();
     
-    Debug(`fSRL: filteredUrls(${_.size(filteredUrls)})\n${JSON.stringify(filteredUrls)}`);
+    if (filteredUrls) {
+	Debug(`fSRL: filteredUrls(${_.size(filteredUrls)})\n${JSON.stringify(filteredUrls)}`);
+    }
 
     return Promise.map(resultList, result => {
 	//Debug(`result: ${_.entries(result)}`);
@@ -144,7 +146,9 @@ function filterSearchResultList (resultList, wordList, filteredUrls, options, fi
 	}
 	return undefined;
     }).then(() => {
-	Debug(`urlList.size = ${_.size(urlList)}`);
+	if (urlList.length > 0) {
+	    Debug(`urlList.length = ${urlList.length}`);
+	}
 	return {
 	    src:     wordList.toString(),
 	    urlList: urlList,
@@ -157,7 +161,7 @@ function filterSearchResultList (resultList, wordList, filteredUrls, options, fi
 //
 
 function loadFilteredUrls (dir, wordList, options) {
-    Expect(dir).is.a.String('lFU dir');
+    Expect(dir).is.a.String();
     Expect(wordList).is.an.Array();
     Expect(options).is.an.Object();
     let filteredFilename = SearchResult.makeFilteredFilename(wordList);
@@ -168,7 +172,7 @@ function loadFilteredUrls (dir, wordList, options) {
 	    return JSON.parse(content);
 	}).catch(err => {
 	    if (err && err.code !== 'ENOENT') throw err;
-	    Debug(`no filtered urls, ${wordList}, ${err}`);
+	    Debug(`no filtered urls, ${wordList}`);
 	    return undefined;
 	});
 }
@@ -233,7 +237,7 @@ function filterSearchResultDir (dir, fileMatch, options) {
 		return next();
 	    }
 	     */
-  	    loadFilteredUrls(dir, wordList, options)
+  	    loadFilteredUrls(Path.dirname(filepath), wordList, options)
 		.then(filteredUrls => {
 		    return filterSearchResultList(JSON.parse(content), wordList, filteredUrls, options, filepath);
 		}).then(filterResult => {
@@ -274,7 +278,8 @@ function filterPathList (pathList, dir, options) {
 	let filename = Path.basename(path);
 	Debug(`filename: ${filename}`);
 	let wordList = SearchResult.makeWordlist(filename);
-  	return Promise.all([Fs.readFile(path, 'utf8'), loadFilteredUrls(dir, wordList, options)])
+  	return Promise.all([Fs.readFile(path, 'utf8'),
+			    loadFilteredUrls(Path.dirname(path), wordList, options)])
 	    .then(([content, filteredUrls]) => {
 		return filterSearchResultList(JSON.parse(content), wordList, filteredUrls, options, path);
 	    }).then(filterResult => {
@@ -333,14 +338,14 @@ function getPathList (dir, fileMatch, nameMap) {
 	    if (err) reject(err);
 	    let match = new RegExp(fileMatch);
 	    let filtered = _.filter(pathList, path => {
-		let filename = Path.basename(path)
+		let filename = Path.basename(path);
 		let wordList = SearchResult.makeWordlist(filename);
 		// filter out rejected word combos
 		if (ClueManager.isRejectSource(wordList)) return false;
 		if (!_.isUndefined(nameMap) && !isInNameMap(nameMap, wordList)) return false;
 		return match.test(filename);
 	    });
-	    Debug(`pathList(${pathList.length}), filtered(${filtered.length})`);
+	    Debug(`files(${pathList.length}), match(${filtered.length})`);
 	    resolve(filtered);
 	});
     });
@@ -428,7 +433,6 @@ async function main () {
 	}
 	return;
     }
-
     if (!options.dir) {
 	options.dir = '2';
     }

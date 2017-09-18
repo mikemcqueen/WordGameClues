@@ -10,8 +10,8 @@ const _              = require('lodash');
 const Debug          = require('debug')('util');
 const Expect         = require('should/as-function');
 const Fs             = require('fs-extra');
-const Path           = require('path');
 const Git            = require('simple-git');
+const Path           = require('path');
 const PrettyMs       = require('pretty-ms');
 const Retry          = require('retry');
 const Tmp            = require('tmp');
@@ -135,7 +135,7 @@ function gitAdd (filepath) {
     return new Promise((resolve, reject) => {
 	gitRetryAdd(filepath, err =>  {
 	    if (err) {
-		console.log('gitAdd failed');
+		console.error('gitAdd failed');
 		return reject(err);
 	    }
 	    return resolve();
@@ -187,26 +187,26 @@ async function gitRetryCommit (filepath, message, retryCount = DEFAULT_RETRY_COU
     while (true) {
 	let result = await gitCommitOnce(filepath, message)
 		.catch(err => {
-		    console.log(`gitRetryCommit error, (${typeof err}), ${err}`);
 		    if (!isGitLockError(err)) {
+			console.error(`gitRetryCommit error, (${typeof err}), ${err}`);
 			// no retries for unknown errors
 			retryCount = 0;
 		    }
 		    lastError = err;
 		    return false;
 		});
-	console.log(`commitResult: ${result}`);
+	console.log(`${Path.basename(filepath)} commitResult: ${result}`);
 	// success: resolve
 	if (result !== false) return result; // Promise.resolve(result);
 	// failure: retry logic
 	if (retryCount < 1) {
-	    console.log('rejecting');
+	    console.error(`gitRetryCommit failure, ${filepath}`);
 	    return Promise.reject(lastError);
 	}
-	console.log(`retryCount: ${retryCount}`);
-	retryCount -= 1;
 	const delay = between(RETRY_DELAY_LOW, RETRY_DELAY_HIGH);
-	console.log(`Retrying in ${PrettyMs(delay)}`);
+	Debug(`${Path.basename(filepath)} retryCount: ${retryCount}`
+	      `, retrying in ${PrettyMs(delay)}`);
+	retryCount -= 1;
 	await waitFor(delay);
     }
 }
@@ -225,7 +225,7 @@ function gitAddCommit (filepath, message) {
     Expect(filepath).is.a.String();
     Expect(message).is.a.String();
     return gitAdd(filepath)
-	.then(() => gitCommit(filepath, message));
+	.then(_ => gitCommit(filepath, message));
     //	.catch(err => console.log(`gitAddCommit error, ${err}`));// TODO: bad
 }
 
@@ -235,7 +235,7 @@ function gitRemoveCommit (filepath, message) {
     Expect(filepath).is.a.String();
     Expect(message).is.a.String();
     return gitRemove(filepath)
-	.then(() => gitCommit(filepath, message));
+	.then(_ => gitCommit(filepath, message));
     //	.catch(err =>  console.log(`gitRemoveCommit error, ${err}`)); // TODO: bad
 }
 
@@ -264,7 +264,7 @@ function gitRemoveCommitIfExists (filepath, message = 'removing test file') {
 	    // file exists, try to git remove/commit it
 	    console.log(`git-removing ${filepath}`);
 	    return gitRemoveCommit(filepath, message);
-	}).then(() => checkIfFile(filepath))
+	}).then(_ => checkIfFile(filepath))
 	.then(result => {
 	    Expect(result.exists).is.false();
 	    console.log(`git-removed ${filepath}`);
@@ -274,7 +274,7 @@ function gitRemoveCommitIfExists (filepath, message = 'removing test file') {
 	}).catch(err => {
 	    // log real errors, eat all errors  // TODO: bad
 	    if (err) {
-		console.log(`gitRemoveCommitIfExists error, ${err}`);
+		console.error(`gitRemoveCommitIfExists error, ${err}`);
 	    };
 	    //TODO: if (err) Promise.reject(err);
 	    return undefined; 
@@ -322,6 +322,25 @@ function hasCommaSuffix (line, suffix) {
 
 //
 
+async function write (dest, text) {
+    const output = text;
+    if (_.isString(dest)) {
+	return `${dest}${output}`;
+    }
+    if (_.isNumber(dest)) {
+	return Fs.write(dest, output);
+    }
+    throw new Error(`bad dest, ${dest}`);
+}
+
+//
+
+function writeln (dest, text) {
+    return write(dest, `${text}\n`);
+}
+
+//
+
 module.exports = {
     between,
     checkIfFile,
@@ -335,5 +354,7 @@ module.exports = {
     gitRemoveCommitIfExists,
     hasCommaSuffix,
     logStream,
-    waitFor
+    waitFor,
+    write,
+    writeln
 };

@@ -77,7 +77,7 @@ ClueManager.prototype.saveClueList = function (list, count, options = {}) {
 //  validateAll:
 //
 ClueManager.prototype.loadAllClues = function (args) {
-    this.dir = `${DATA_DIR}${args.clues.baseDir}`;
+    this.dir = Clues.getDirectory(args.clues);
     if (args.ignoreErrors) {
 	this.ignoreLoadErrors = true;
     }

@@ -47,7 +47,7 @@ async function main () {
     //   else get notebook name from base filename
     const noteName = options.note || Path.basename(filename);
     if (options.production && !options.default) {
-	const nbName = options.notebook || Note.getNotebookName(noteName);
+	const nbName = options.notebook || Note.getWorksheetName(noteName);
 	const nb = await Note.getNotebook(nbName, options).catch(err => { throw err; });
 	if (!nb) {
 	    usage(`notebook not found, ${nbName}`);

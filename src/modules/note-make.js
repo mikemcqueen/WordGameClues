@@ -9,6 +9,7 @@ const Debug            = require('debug')('note-make');
 const Expect           = require('should/as-function');
 const Fs               = require('fs-extra');
 const He               = require('he');
+const My               = require('util');
 const Readlines        = require('n-readlines');
 
 //
@@ -29,33 +30,20 @@ function url (line) {
 
 //
 
-async function write (dest, text) {
-    const output = `${text}`; // + \n`;
-    if (_.isString(dest)) {
-	return `${dest}${output}`;
-    }
-    if (_.isNumber(dest)) {
-	return Fs.write(dest, output);
-    }
-    throw new Error(`bad dest, ${dest}`);
-}
-
-//
-
 function writeEmptyLine (dest) {
-    return write(dest, Note.EmptyLine);
+    return My.write(dest, Note.EmptyLine);
 }
 
 //
 
 function writeUrl (dest, line) {
-    return write(dest, `${Note.Open}${url(line)}${Note.Close}`);
+    return My.write(dest, `${Note.Open}${url(line)}${Note.Close}`);
 }
 
 //
 
 function writeText (dest, line) {
-    return write(dest, `${Note.Open}${line}${Note.Close}`);
+    return My.write(dest, `${Note.Open}${line}${Note.Close}`);
 }
 
 //
@@ -68,7 +56,7 @@ async function makeFromFile (inputFilename, options = {}) {
     let dest = options.fd || '';
     let readLines = new Readlines(inputFilename);
     if (options.outerDiv) {
-	await write(dest, '<div>').then(result => {
+	await My.write(dest, '<div>').then(result => {
 	    if (_.isString(dest)) dest = result;
 	});
     }
@@ -89,7 +77,7 @@ async function makeFromFile (inputFilename, options = {}) {
 	});
     }
     if (options.outerDiv) {
-	await write(dest, '</div>').then(result => {
+	await My.write(dest, '</div>').then(result => {
 	    if (_.isString(dest)) dest = result;
 	});
     }
@@ -106,7 +94,7 @@ function makeFromFilterList (list, options = {}) {
 
     let result = '';
     if (options.outerDiv) {
-	result = write(result, '<div>');
+	result = My.write(result, '<div>');
     }
     for (const sourceElem of list) {
 	result = writeText(result, sourceElem.source);
