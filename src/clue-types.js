@@ -2,41 +2,35 @@
 // clue-types.js
 //
 
-'use strict';
+//'use strict';
 
 //
 
 const _              = require('lodash');
 
 const Options = [
-    ['p', 'poem=NUM',   'use poem clues, sentence NUM' ],
+    ['p', 'apple=NUM',  'use apple clues, sentence NUM' ],
     ['m', 'meta',       'use metamorphosis clues' ],
     ['y', 'synthesis',  'use synthesis clues' ],
     ['r', 'harmony',    'use harmony clues' ],
     ['f', 'final',      'use final clues' ]
 ];
 
-const POEM = {
+const APPLE = {
     '1' : {
 	sentence:       1,
-	baseDir:        'poem/1',
-	resultDir:      'poem',
 	clueCount:      12,
 	REQ_CLUE_COUNT: 12
     },
 
     '2': {
 	sentence:       2,
-	baseDir:        'poem/2',
-	resultDir:      'poem',
 	clueCount:      9,
 	REQ_CLUE_COUNT: 9
     },
 
     '3': {
 	sentence:       3,
-	baseDir:        'poem/3',
-	resultDir:      'poem',
 	clueCount:      4,
 	synthClueCount: 9,
 	REQ_CLUE_COUNT: 4
@@ -44,16 +38,12 @@ const POEM = {
 
     '5': {
 	sentence:       5,
-	baseDir:        'poem/5',
-	resultDir:      'poem',
 	clueCount:      15,
 	REQ_CLUE_COUNT: 15
     },
 
     '6': {
 	sentence:       6,
-	baseDir:        'poem/6',
-	resultDir:      'poem',
 	clueCount:      8,
 	REQ_CLUE_COUNT: 8
     }
@@ -85,6 +75,25 @@ const FINAL = {
 
 //
 
+function metamorph (src) {
+    const name = arguments.callee.name;
+    if (!src.resultDir) {
+	let dir = '';
+	let index = name.length - 2;
+	let next = 0;
+	while (index >= 0) {
+	    dir += name.charAt(index);
+	    next = next === 0 ? 2 : next === 2 ? 4 : 1; 
+	    index -= next;
+	}
+	src.resultDir = dir;
+	src.baseDir = `${dir}/${src.sentence}`;
+    }
+    return src;
+ }
+
+//
+
 function getByOptions(options) {
     let src;
     if (options.meta) {
@@ -95,10 +104,10 @@ function getByOptions(options) {
 	src = HARMONY;
     } else if (options.final) {
 	src = FINAL;
-    } else if (!_.isUndefined(options.poem)) {
-	src = POEM[options.poem[0]];
-	if (_.isUndefined(src)) throw new Error(`POEM[${options.poem}] not supported`);
-	if (options.poem.slice(1, options.poem.length) === 's') {
+    } else if (!_.isUndefined(options.apple)) {
+	src = metamorph(APPLE[options.apple[0]]);
+	if (_.isUndefined(src)) throw new Error(`APPLE[${options.apple}] not supported`);
+	if (options.apple.slice(1, options.apple.length) === 's') {
 	    src = cloneAsSynth(src);
 	}
     } else {
@@ -135,7 +144,7 @@ function getByBaseDirOption (name) {
 	    
 function isValidBaseDirOption (name) {
     try {
-	getBaseDirOption(name);
+	getByBaseDirOption(name);
 	return true;
     } catch (err) {
 	return false;
@@ -169,20 +178,21 @@ module.exports = {
     cloneAsSynth,
     getByBaseDirOption,
     getByOptions,
-
-  /*
-   isMeta,
-   isSynth,
-   isHarmony,
-   isFinal,
-   */
-
     isValidBaseDirOption,
-    Options,
+    Options
 
-    POEM,
-    META,
-    SYNTH,
-    HARMONY,
-    FINAL
+    /*
+     isMeta,
+     isSynth,
+     isHarmony,
+     isFinal,
+     */
+    
+    /*
+     APPLE,
+     META,
+     SYNTH,
+     HARMONY,
+     FINAL
+     */
 };
