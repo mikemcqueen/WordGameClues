@@ -54,6 +54,9 @@ async function main () {
 	}
 	options.notebookGuid = nb.guid;
     }
+    options.filter_urls = true; // filter reject urls
+//    options.reject_sources = true;
+
     return NoteMerge.mergeFilterFile(filename, noteName, options);
 }
 

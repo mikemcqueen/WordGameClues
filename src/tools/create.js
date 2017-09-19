@@ -69,7 +69,7 @@ async function main () {
 	    // TODO: DEP0013 ??
 	    Expect(content).is.ok();
 	    // TODO: check if note exists!
-	    return Note.create(Path.basename(filename), content.toString(), options);
+	    return Note.create(Path.basename(filename), content.toString());
 	});
 }
 

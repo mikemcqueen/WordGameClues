@@ -9,6 +9,7 @@ const Debug        = require('debug')('filter');
 const Duration     = require('duration');
 const Expect       = require('should/as-function');
 const Fs           = require('fs-extra');
+const Markdown     = require('./markdown');
 const My           = require('./util');
 const Path         = require('path');
 const Readlines    = require('n-readlines');
@@ -54,7 +55,7 @@ function isKnown (line) {
 
 //
 
-function parseFile (filename, options) {
+function parseFile (filename, options = {}) {
     let readLines = new Readlines(filename);
     let line;
     let resultList = [];
@@ -76,6 +77,7 @@ function parseFile (filename, options) {
 	} else {
 	    // clue, known, or maybe
 	    // currently requires URL, but i suppose could eliminate that requirement with some work.
+	    Expect(urlList).is.not.empty();
 	    Expect(clueList).is.an.Array();
 	    clueList.push(line);
 	}
@@ -105,50 +107,63 @@ function diff (listA, listB) {
     Expect(listB).is.an.Array();
     const mapA = makeSourceMap(listA);
     Debug(`mapA: ${Stringify(mapA)}`);
-    let resultList = [];
-    for (const elemB of listB) {
-	if (_.has(mapA, elemB.source)) continue;
-	// FYI: not a copy
-	Debug(`${elemB.source} is not in mapA`);
-	resultList.push(elemB);
-    }
-    return resultList;
+    return listB.filter(elemB => {
+	const inA = _.has(mapA, elemB.source);
+	Debug(`${elemB.source}${inA ? 'is' : 'not'} in mapA`);
+	return !inA;
+    });
+}
+
+// listFiltered has some potential for sanity checking. i could load the _filtered.json
+// file and confirm that all of the remaining urls, per clue source, are not rejected
+
+function filterUrls (listToFilter, listFiltered, options)  {
+    //const map = makeSourceMap(listFiltered);
+    let filterCount = 0;
+    let list = listToFilter.filter(sourceElem => {
+	Expect(sourceElem).is.an.Object(); 
+	//const filteredUrls = map[sourceElem.source].urls;
+	sourceElem.urls = sourceElem.urls.filter(urlElem => {
+	    const reject = (urlElem.suffix === Markdown.Suffix.reject);
+	    if (reject) {
+		Debug(`reject: ${urlElem.url}`);
+		filterCount += 1;
+	    }
+	    return !reject;
+	});
+	// keep any source with a url, or marked as a clue
+	// (or valid suffix, but not reject, eventually)
+	return !_.isEmpty(sourceElem.urls) || (sourceElem.suffix === Markdown.Suffix.clue);
+    });
+    return [list, filterCount];
 }
 
 //
 
 async function dumpList (list, options) {
     Expect(options.fd).is.a.Number(); // for now. no other use case yet.
-    const dest = options.fd || ''; 
+    const dest = options.fd;
     for (const [index, sourceElem] of list.entries()) {
 	if (index > 0) { // empty line between entries
-	    await My.writeln(dest, '').then(result => {
-		if (_.isString(dest)) dest = result;
-	    });
+	    await My.writeln(dest, '');
 	}
 	if (options.json) { // JSON format
 	    const prefix = (index === 0) ? '[' : ', ';
 	    const suffix = (index === list.length - 1) ? ']' : '';
-	    await My.writeln(dest, `${prefix}${Stringify(sourceElem)}${suffix}]`).then(result => {
-		if (_.isString(dest)) dest = result;
-	    });
+	    await My.writeln(dest, `${prefix}${Stringify(sourceElem)}${suffix}]`);
 	}
 	else { // filter format
-	    const source = sourceElem.source || sourceElem;
-	    await My.writeln(dest, `${source}`).then(result => {
-		if (_.isString(dest)) dest = result;
-	    });
+	    let source = sourceElem.source || sourceElem;
+	    if (sourceElem.suffix) source += `,${sourceElem.suffix}`;
+	    await My.writeln(dest, `${source}`);
 	    if (!_.isObject(sourceElem)) continue;
-	    for (const urlElem of sourceElem.urls) {
-		const url = urlElem.url || urlElem;
-		await My.writeln(dest, url).then(result => {
-		    if (_.isString(dest)) dest = result;
-		});
+	    for (const urlElem of sourceElem.urls || []) {
+		let url = urlElem.url || urlElem;
+		if (urlElem.suffix) url += `,${urlElem.suffix}`;
+		await My.writeln(dest, url);
 		if (!_.isObject(urlElem)) continue;
-		for (const clue of urlElem.clues) {
-		    await My.writeln(dest, clue).then(result => {
-			if (_.isString(dest)) dest = result;
-		    });
+		for (const clue of urlElem.clues || []) {
+		    await My.writeln(dest, clue);
 		}
 	    }
 	}
@@ -168,6 +183,7 @@ async function dumpList (list, options) {
 module.exports = {
     diff,
     dumpList,
+    filterUrls,
     isKnown,
     isMaybe,
     isSource,

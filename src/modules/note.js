@@ -23,7 +23,6 @@ function NodeNote (options) {
 	token: options.token,
 	sandbox: options.sandbox
     });
-    
     this.userStore = client.getUserStore();
     this.noteStore = client.getNoteStore();
 }
@@ -141,6 +140,15 @@ async function get (title, options = {}) {
 
 //
 
+function setContentBody (note, body) {
+    Expect(note).is.an.Object();
+    Expect(body).is.a.String();
+    note.content = `<?xml version="1.0" encoding="UTF-8"?>` +
+    `<!DOCTYPE en-note SYSTEM "http://xml.evernote.com/pub/enml2.dtd">` +
+    `<en-note>${body}</en-note>`;
+}
+
+
 async function create (title, body, options = {}) {
     Expect(title).is.a.String();
     Expect(body).is.a.String();
@@ -156,11 +164,7 @@ async function create (title, body, options = {}) {
 	     noteAttributes.sourceURL = sourceURL;
 	     note.attributes = noteAttributes;
 	     */
-	    note.content = '<?xml version="1.0" encoding="UTF-8"?>';
-	    note.content += '<!DOCTYPE en-note SYSTEM "http://xml.evernote.com/pub/enml2.dtd">';
-	    note.content += '<en-note>';
-	    note.content += body;
-	    note.content += '</en-note>';
+	    setContentBody(note, body);
 	    return getNotestore(options.production).createNote(note);
 	}).then(_ => note);
 }
@@ -219,5 +223,6 @@ module.exports = {
     get,
     getNotebook,
     getWorksheetName,
+    setContentBody,
     update
 };

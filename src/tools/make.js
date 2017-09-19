@@ -24,7 +24,8 @@ async function main () {
 	usage();
     }
     Debug(`filename: ${filename}`);
-    NoteMaker.makeFromFile(filename, { fd: process.stdout.fd, outerDiv: true });
+    const body = NoteMaker.makeFromFilterFile(filename, { outerDiv: true });
+    console.log(body);
 }
 
 //

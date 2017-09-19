@@ -25,7 +25,8 @@ then
     grep $name tmp/p3s.c2-6.x2 > tmp/p3s.c2-6.x2.$name
 
     echo 'Filtering...'
-    node filter -p3s tmp/p3s.c2-6.x2.$name > tmp/p3s.c2-6.x2.$name.filtered
+    #TODO: need to pass a flag here saying 'don't filter known urls'
+    node filter -p3s --keep known  tmp/p3s.c2-6.x2.$name > tmp/p3s.c2-6.x2.$name.filtered
 fi
 
 node note-merge tmp/p3s.c2-6.x2.$name.filtered  $production --note $1

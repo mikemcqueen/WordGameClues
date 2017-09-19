@@ -10,11 +10,7 @@ const _                = require('lodash');
 const Debug            = require('debug')('note-parse');
 const Expect           = require('should/as-function');
 const Fs               = require('fs-extra');
-const My               = require('./util');
-
-//
-
-const RejectSuffix =  'x'; // copied from update.js :(
+const Markdown         = require('./markdown');
 
 // all options are boolean
 //   .urls:     parse urls (http:// prefix)
@@ -55,9 +51,11 @@ function parse (text, options = {}) {
 	let sourceIndex;
 	if (sourceResult) {
 	    // result[1] = 1st capture group
-	    const [_, sourceLine] = My.hasCommaSuffix(sourceResult[1], RejectSuffix);
-	    Debug(`sourceLine: ${sourceLine}`);
+	    const match = sourceResult[1];
+	    const [sourceLine, suffix] = Markdown.getSuffix(match);
+	    Debug(`sourceLine: ${sourceLine}, suffix: ${suffix}`);
 	    sourceElement = options.urls ? { source: sourceLine } : sourceLine;
+	    if (options.urls && suffix) sourceElement.suffix = suffix;
 	    resultList.push(sourceElement);
 	    sourceIndex = sourceResult.index;
 	} else {
@@ -112,10 +110,14 @@ function parse (text, options = {}) {
 		    debugMsg = 'ignored';
 		} else if (clueLine.charAt(0) === ',') {
 		    if (count > 1) {
-			throw new Error(`encountered unexpected comma where clue was expected, ${clueLine}`);
+			throw new Error(`encountered unexpected comma where clue was expected: ${clueLine}`);
 		    }
-		    urlElement.url += clueLine;
-		    debugMsg = 'adding reject URL';
+		    let [base, suffix] = Markdown.getSuffix(clueLine);
+		    if (!suffix) {
+			throw new Error(`encountered invalid comma or suffix: ${clueLine}`);
+		    }
+		    urlElement.suffix = suffix;
+		    debugMsg = `adding suffix to URL, ${suffix}`;
 		} else if (clueLine.charAt(0) === '@') {
 		    throw new Error(`encountered unexpected source where clue was expected, ${clueLine}`);
 		} else if (!_.isEmpty(clueLine)) {

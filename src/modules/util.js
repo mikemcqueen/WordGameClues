@@ -302,24 +302,6 @@ function createTmpFile (keep)  {
     });
 }
 
-// process last comma suffix, e.g. ",x"
-
-function hasCommaSuffix (line, suffix) {
-    Expect(line).is.a.String();
-    Expect(suffix).is.a.String();
-
-    let match = false;
-    let index = line.lastIndexOf(',');
-    if (index > -1) {
-	const after = line.slice(index + 1, line.length).trim();
-	match = after === suffix;
-	if (match) {
-	    line = line.slice(0, index);
-	}
-    }
-    return [match, line];
-}
-
 //
 
 async function write (dest, text) {
@@ -352,7 +334,6 @@ module.exports = {
     gitRemove,
     gitRemoveCommit,
     gitRemoveCommitIfExists,
-    hasCommaSuffix,
     logStream,
     waitFor,
     write,

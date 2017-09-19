@@ -15,6 +15,7 @@ const Dir          = require('node-dir');
 const Expect       = require('should/as-function');
 const Filter       = require('./filter');
 const Fs           = require('fs-extra');
+const Markdown     = require('./markdown');
 const My           = require('./util');
 const Path         = require('path');
 const Readlines    = require('n-readlines');
@@ -29,10 +30,6 @@ const Clue =    Symbol('clue');
 const Maybe =   Symbol('maybe');
 const Known =   Symbol('known');
 const Done =    Symbol('done');
-
-const ClueSuffix =    'c';
-const RejectSuffix =  'x';
-const ValidSuffixes = [ ClueSuffix, RejectSuffix ];
 
 // state machine
 const SM = {
@@ -71,7 +68,7 @@ function processSrc (rawLine, args, options) {
     Expect(rawLine).is.a.String();
     Expect(args.dir).is.a.String();
 
-    const [reject, line] = My.hasCommaSuffix(rawLine, RejectSuffix);
+    const [reject, line] = My.hasSuffix(rawLine, Markdown.Suffix.reject);
     Debug(`src: ${line}`);
     let nameList = line.split(',');
     Expect(nameList.length).is.above(1); // at.least(2)
@@ -131,37 +128,16 @@ function processSrc (rawLine, args, options) {
 
 //
 
-function getUrlSuffix (line, options) {
-    let url = line;
-    let suffix;
-
-    let index = line.lastIndexOf(',');
-    if (index > -1) {
-	let maybeSuffix = line.slice(index + 1, line.lenghth).trim();
-	if (maybeSuffix.length === 1) {
-	    url = line.slice(0, index).trim();
-	    suffix = maybeSuffix;
-	    if (options.verbose) {
-		console.log(`suffix: ${suffix}`);
-	    }
-	    Expect(ValidSuffixes.includes(suffix)).is.true();
-	}
-    }
-    return [url, suffix];
-}
-
-//
-
 function processUrl (line, args, options) {
     Expect(line).is.a.String();
     Expect(args.filteredUrls).is.an.Object();
 
-    let [url, suffix] = getUrlSuffix(line, options);
+    let [url, suffix] = Markdown.getSuffix(line);
     args.url = url;
-    if (suffix === ClueSuffix) {
+    if (suffix === Markdown.Suffix.clue) {
 	args.flags.clue = true;
     }
-    else if (suffix === RejectSuffix) {
+    else if (suffix === Markdown.Suffix.reject) {
 	args.flags.reject = true;
     }
     else {
@@ -361,9 +337,10 @@ function skipState (state, result, options) {
 async function updateFromFile(filename, options) {
     Expect(filename).is.a.String();
 
+    // TODO: if (options.loadClues) or if (!ClueManager.isLoaded())
     ClueManager.loadAllClues({ clues: Clues.getByOptions(options) });
 
-    const dir = options.dir || '2';// lil haxy
+    const dir = options.dir || '2'; // lil haxy
     let result = {
 	count : {
 	    knownUrls      : 0,

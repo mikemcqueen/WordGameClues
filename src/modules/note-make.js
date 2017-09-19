@@ -15,9 +15,9 @@ const Readlines        = require('n-readlines');
 //
 
 const Note = {
-    Open:      '<div><span><font style="font-size: 12pt;">',
-    Close:     '</font></span></div>',
-    EmptyLine: '<div><br/></div>'
+    open:      '<div><span><font style="font-size: 12pt;">',
+    close:     '</font></span></div>',
+    emptyLine: '<div><br/></div>'
 };
 
 //
@@ -31,59 +31,49 @@ function url (line) {
 //
 
 function writeEmptyLine (dest) {
-    return My.write(dest, Note.EmptyLine);
+    return dest + Note.emptyLine;
 }
 
 //
 
-function writeUrl (dest, line) {
-    return My.write(dest, `${Note.Open}${url(line)}${Note.Close}`);
+function writeUrl (dest, line, suffix) {
+    const _suffix = suffix ? `,${suffix}` : '';
+    return dest + `${Note.open}${url(line)}${_suffix}${Note.close}`;
 }
 
 //
 
 function writeText (dest, line) {
-    return My.write(dest, `${Note.Open}${line}${Note.Close}`);
+    return dest + `${Note.open}${line}${Note.close}`;
 }
 
-//
+// this function is dumb anyway.  Fitler.parse => list -> makefromFilterList
 
-async function makeFromFile (inputFilename, options = {}) {
-    Expect(inputFilename).is.a.String();
-    Debug(`filename: ${inputFilename}`);
+async function makeFromFilterFile (filename, options = {}) {
+    Expect(filename).is.a.String();
+    Debug(`filename: ${filename}`);
 
-    // write to fd if supplied; else build & return string
-    let dest = options.fd || '';
-    let readLines = new Readlines(inputFilename);
+    let dest = '';
+    let readLines = new Readlines(filename);
     if (options.outerDiv) {
-	await My.write(dest, '<div>').then(result => {
-	    if (_.isString(dest)) dest = result;
-	});
+	dest += '<div>';
     }
     while (true) {
-	let promise;
 	let line = readLines.next();
 	if (line === false) break;
 	line = line.toString();
 	if (_.isEmpty(line)) {
-	    promise = writeEmptyLine(dest);
+	    dest = writeEmptyLine(dest);
 	} else if (_.startsWith(line, 'http')) {
-	    promise = writeUrl(dest, line);
+	    dest = writeUrl(dest, line);
 	} else {
-	    promise = writeText(dest, line);
+	    dest = writeText(dest, line);
 	}
-	await promise.then(result => {
-	    if (_.isString(dest)) dest = result;
-	});
     }
     if (options.outerDiv) {
-	await My.write(dest, '</div>').then(result => {
-	    if (_.isString(dest)) dest = result;
-	});
+	dest = + '</div>';
     }
-    await writeEmptyLine(dest).then(result => {
-	if (_.isString(dest)) dest = result;
-    });
+    dest = writeEmptyLine(dest);
     return dest;
 }
 
@@ -94,20 +84,23 @@ function makeFromFilterList (list, options = {}) {
 
     let result = '';
     if (options.outerDiv) {
-	result = My.write(result, '<div>');
+	result += '<div>';
     }
     for (const sourceElem of list) {
-	result = writeText(result, sourceElem.source);
-	for (const urlElem of sourceElem.urls) {
-	    result = writeUrl(result, urlElem.url);
-	    for (const clue of urlElem.clues) {
+	let source = sourceElem.source || sourceElem;
+	if (sourceElem.suffix) source += `,${sourceElem.suffix}`;
+	result = writeText(result, source, sourceElem.suffix);
+	for (const urlElem of sourceElem.urls || []) {
+	    let url = urlElem.url || urlElem;
+	    result = writeUrl(result, url, urlElem.suffix);
+	    for (const clue of urlElem.clues || []) {
 		result = writeText(result, clue);
 	    }
 	}
 	result = writeEmptyLine(result);
     }
     if (options.outerDiv) {
-	result = write(result, '</div>');
+	result += '</div>';
 	result = writeEmptyLine(result);
     }
     return result;
@@ -116,6 +109,6 @@ function makeFromFilterList (list, options = {}) {
 //
 
 module.exports = {
-    makeFromFile,
+    makeFromFilterFile,
     makeFromFilterList
 }

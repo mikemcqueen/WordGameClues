@@ -1,0 +1,22 @@
+merge needs:
+  --append
+  --filter-reject-urls
+  --filter-reject-sources
+
+those will all be defaults most likely.
+
+may want:
+  --filter urls,sources,all,none [all] default0
+  --no-filter [could be same args as above + restore (restore rejected urls)] 
+    (longer term feature, when the need arises)
+
+
+--
+
+the hasCommaSuffix/RejectSuffix problem, where to put this. filter? update? markdown?<<===
+
+--
+
+merge:
+* filter rejects from noteParse - compare filter reject code, ideally 1 place that accesses _filtered files
+* why am I sorting
