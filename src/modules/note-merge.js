@@ -58,34 +58,36 @@ function mergeFilterFile (filename, noteName, options) {
 
 	    Debug(`diffList(${diffList.length})`);
 	    if (options.verbose) {
-		console.log('diffList:');
-		for (const elem of diffList || []) {
-		    console.log(elem);
-		}
+		console.log(`diffList: ${Stringify(diffList)}`);
+                /*
+                for (const elem of diffList || []) {
+                     console.log(elem);
+                }
+		 */
 	    }
-	    let [filteredList, filtered] = options.filter_urls
+	    let [filteredListFromNote, filtered] = options.filter_urls
 		    ? Filter.filterUrls(listFromNote, listFromFilter, options) : [,0];
 	    Debug(`filtered: ${filtered}`);
-	    
-	    if (!options.filter_urls || !filtered) { 
-		// original note unchanged -- only append if there are diffs
-		if (_.isEmpty(diffList)) {
-		    Debug(`no diffs, no changes - nothing to do`);
-		    return false;
-		}
-		const diffBody = NoteMaker.makeFromFilterList(diffList, options);
-		if (options.verbose) {
-		    console.log(`diffBody:\n${diffBody}`);
-		}
-		Debug(`appending new results to note`);
-		return Note.append(note, diffBody, options);
+	    if (options.filter_urls && filtered) { 
+		// some changes -- concat lists and build new note
+		Debug(`building new note body`);
+		filteredListFromNote.push(...diffList);
+		const noteBody = NoteMaker.makeFromFilterList(filteredListFromNote, { outerDiv: true });
+		Note.setContentBody(note, noteBody);
+		return Note.update(note, options);
 	    }
-	    // some changes -- concat lists and build new note
-	    Debug(`building new note body`);
-	    listFromNote.push(...diffList);
-	    const noteBody = NoteMaker.makeFromFilterList(listFromNote, { outerDiv: true });
-	    Note.setContentBody(note, noteBody);
-	    return Note.update(note, options);
+
+	    // original note unchanged -- only append if there are diffs
+	    if (_.isEmpty(diffList)) {
+		Debug(`no diffs, no changes - nothing to do`);
+		return false;
+	    }
+	    const diffBody = NoteMaker.makeFromFilterList(diffList, options);
+	    if (options.verbose) {
+		console.log(`diffBody:\n${diffBody}`);
+	    }
+	    Debug(`appending new results to note`);
+	    return Note.append(note, diffBody, options);
 	});
 }
 
