@@ -26,7 +26,7 @@ const Update         = require('../modules/update');
 //
 
 
-const Commands = { create, get, parse, update };
+const Commands = { create, get, parse, update, count };
 const Options = Getopt.create(_.concat(Clues.Options, [
     ['', 'create=FILE',   'create note from filter result file'],
     ['', 'get=TITLE',     'get (display) a note'],
@@ -35,6 +35,7 @@ const Options = Getopt.create(_.concat(Clues.Options, [
 //    ['', 'parse-file=FILE','parse note file into filter file format'],
     ['', 'json',          '  output in json (parse, parse-file)'],
     ['', 'production',    'use production note store'],
+    ['', 'quiet',         'less noise'],
     ['', 'title=TITLE',   'specify note title (used with --create, --parse)'],
     ['', 'update[=NOTE]', 'update all results in worksheet, or a specific NOTE if specified'],
     ['v','verbose',       'more noise'],
@@ -61,8 +62,10 @@ function get (options) {
     options.content = true;
     return Note.get(options.get, options)
 	.then(note => {
-	    if (!note) usage(`note not found, ${options.get}`);
-	    console.log(note.content);
+	    if (!options.quiet) {
+		if (!note) usage(`note not found, ${options.get}`);
+		console.log(note.content);
+	    }
 	});
 }
 
@@ -76,7 +79,9 @@ function old_create (options) {
 	    Debug(`body: ${body}`);
 	    Note.create(title, body, options);
 	}).then(note => {
-	    console.log(Stringify(note));
+	    if (!options.quiet) {
+		console.log(Stringify(note));
+	    }
 	});
 }
 
@@ -91,7 +96,9 @@ function create (options) {
     Debug(`body: ${body}`);
     return Note.create(title, body, options)
 	.then(note => {
-	    console.log(Stringify(note));
+	    if (!options.quiet) {
+		console.log(Stringify(note));
+	    }
 	});
 }
 
@@ -163,6 +170,17 @@ async function update (options) {
 	const nbName = Note.getWorksheetName(clueType);
 	console.log(`notebook: ${nbName}`);
     }
+}
+
+//
+
+async function count (options) {
+    Debug('count');
+    return Note.getAndParse(options.count, options)
+	.then(([note, filterList]) => {
+	    const count = Filter.count(filterList);
+	    console.log(`sources: ${count.sources}, urls: ${count.urls}, clues: ${count.clues}`);
+	});
 }
 
 //

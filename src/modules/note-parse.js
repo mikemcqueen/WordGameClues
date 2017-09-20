@@ -30,6 +30,9 @@ const Markdown         = require('./markdown');
 //                                  { url: url2, clues: [clue1, .., clueN] }] } ]
 //
 function parse (text, options = {}) {
+    if (_.isBuffer(text)) text = text.toString();
+    Expect(text).is.a.String();
+    
     const sourceExpr = />(@[^<]+)</g;
     const urlExpr =    />(http[s]?\:[^<]+)</g;
     const clueExpr =   />([^<]+)</g;

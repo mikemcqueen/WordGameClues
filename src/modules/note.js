@@ -164,12 +164,16 @@ async function create (title, body, options = {}) {
 	     noteAttributes.sourceURL = sourceURL;
 	     note.attributes = noteAttributes;
 	     */
-	    setContentBody(note, body);
+	    if (options.content) {
+		note.content = body;
+	    } else {
+		setContentBody(note, body);
+	    }
 	    return getNotestore(options.production).createNote(note);
-	}).then(_ => note);
+	}); // .then(_ => note); // huh?
 }
 
-//
+// file is enml content, passed as 'body' to Note.create
 
 function createFromFile (filename, options = {}) {
     return Fs.readFile(filename)
@@ -216,11 +220,25 @@ function append (note, chunk, options = {}) {
 
 //
 
+function deleteNote (guid, options = {}) {
+    return getNotestore(options.production).deleteNote(guid);
+}
+
+//
+
+function getContent (guid, options = {}) {
+    return getNotestore(options.production).getNoteContent(guid);
+}
+
+//
+
 module.exports = {
     append,
     create,
     createFromFile,
+    deleteNote,
     get,
+    getContent,
     getNotebook,
     getWorksheetName,
     setContentBody,

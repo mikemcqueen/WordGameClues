@@ -39,56 +39,60 @@ function compareSource(a, b) {
 
 //
 
+async function merge(note, listFromNote, listFromFilter, options) {
+    Debug(`title: ${note && note.title}, noteList(${listFromNote && listFromNote.length})` +
+	  `, filterList(${listFromFilter && listFromFilter.length})`);
+    if (options.verbose) {
+	console.log(`listFromNote:\n${Stringify(listFromNote)}`);
+	console.log(`listFromFilter:\n${Stringify(listFromFilter)}`);
+    }
+    const diffList = Filter.diff(listFromNote, listFromFilter);
+    
+    const expectedDiffCount = listFromFilter.length - listFromNote.length;
+    Expect(diffList.length).is.equal(expectedDiffCount);
+    Debug(`note(${listFromNote.length}), filter(${listFromFilter.length})` +
+	  `, diffList(${diffList.length}), diffExpected(${expectedDiffCount})`);
+    
+    Debug(`diffList(${diffList.length})`);
+    if (options.verbose) {
+	console.log(`diffList: ${Stringify(diffList)}`);
+        /*
+         for (const elem of diffList || []) {
+         console.log(elem);
+         }
+	 */
+    }
+    let [filteredListFromNote, filtered] = options.filter_urls
+	    ? Filter.filterUrls(listFromNote, listFromFilter, options) : [,0];
+    Debug(`filtered: ${filtered}`);
+    if (options.filter_urls && filtered) { 
+	// some changes -- concat lists and build new note
+	Debug(`building new note body`);
+	filteredListFromNote.push(...diffList);
+	const noteBody = NoteMaker.makeFromFilterList(filteredListFromNote, { outerDiv: true });
+	Note.setContentBody(note, noteBody);
+	return Note.update(note, options);
+    }
+    
+    // original note unchanged -- only append if there are diffs
+    if (_.isEmpty(diffList)) {
+	Debug(`no diffs, no changes - nothing to do`);
+	return note;
+    }
+    const diffBody = NoteMaker.makeFromFilterList(diffList, options);
+    if (options.verbose) {
+	console.log(`diffBody:\n${diffBody}`);
+    }
+    Debug(`appending new results to note`);
+    return Note.append(note, diffBody, options);
+}
+
+//
+
 function mergeFilterFile (filename, noteName, options) {
     // const [note, listFromNote, listFromFilter] =
     return loadNoteFilterLists(filename, noteName, options)
-	.then(([note, listFromNote, listFromFilter]) => {
-	    Debug(`title: ${note && note.title}, noteList(${listFromNote && listFromNote.length})` +
-		 `, filterList(${listFromFilter && listFromFilter.length})`);
-	    if (options.verbose) {
-		console.log(`listFromNote:\n${Stringify(listFromNote)}`);
-		console.log(`listFromFilter:\n${Stringify(listFromFilter)}`);
-	    }
-	    const diffList = Filter.diff(listFromNote, listFromFilter);
-
-	    const expectedDiffCount = listFromFilter.length - listFromNote.length;
-	    Expect(diffList.length).is.equal(expectedDiffCount);
-	    Debug(`note(${listFromNote.length}), filter(${listFromFilter.length})` +
-		  `, diffList(${diffList.length}), diffExpected(${expectedDiffCount})`);
-
-	    Debug(`diffList(${diffList.length})`);
-	    if (options.verbose) {
-		console.log(`diffList: ${Stringify(diffList)}`);
-                /*
-                for (const elem of diffList || []) {
-                     console.log(elem);
-                }
-		 */
-	    }
-	    let [filteredListFromNote, filtered] = options.filter_urls
-		    ? Filter.filterUrls(listFromNote, listFromFilter, options) : [,0];
-	    Debug(`filtered: ${filtered}`);
-	    if (options.filter_urls && filtered) { 
-		// some changes -- concat lists and build new note
-		Debug(`building new note body`);
-		filteredListFromNote.push(...diffList);
-		const noteBody = NoteMaker.makeFromFilterList(filteredListFromNote, { outerDiv: true });
-		Note.setContentBody(note, noteBody);
-		return Note.update(note, options);
-	    }
-
-	    // original note unchanged -- only append if there are diffs
-	    if (_.isEmpty(diffList)) {
-		Debug(`no diffs, no changes - nothing to do`);
-		return false;
-	    }
-	    const diffBody = NoteMaker.makeFromFilterList(diffList, options);
-	    if (options.verbose) {
-		console.log(`diffBody:\n${diffBody}`);
-	    }
-	    Debug(`appending new results to note`);
-	    return Note.append(note, diffBody, options);
-	});
+	.then(([note, listFromNote, listFromFilter]) => merge(note, listFromNote, listFromFilter, options));
 }
 
 //

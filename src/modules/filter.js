@@ -180,7 +180,28 @@ async function dumpList (list, options) {
 
 //
 
+function count (list) {
+    let sources = 0;
+    let urls = 0;
+    let clues = 0;
+    
+    for (let src of list) {
+	sources += 1;
+	for (let url of src.urls || []) {
+	    urls += 1;
+	    for (let clue of url.clues || []) {
+		clues += 1;
+	    }
+	}
+    }
+    console.log(`sources: ${sources}, urls: ${urls}, clues: ${clues}`);
+    return { sources, urls, clues };
+}
+
+//
+
 module.exports = {
+    count,
     diff,
     dumpList,
     filterUrls,
