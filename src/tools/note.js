@@ -28,6 +28,7 @@ const Update         = require('../modules/update');
 
 const Commands = { create, get, parse, update, count };
 const Options = Getopt.create(_.concat(Clues.Options, [
+    ['', 'count=NAME',    'count sources/clues/urls in a note'],
     ['', 'create=FILE',   'create note from filter result file'],
     ['', 'get=TITLE',     'get (display) a note'],
     ['', 'notebook=NAME', 'specify notebook name'],
@@ -176,7 +177,7 @@ async function update (options) {
 
 async function count (options) {
     Debug('count');
-    return Note.getAndParse(options.count, options)
+    return getAndParse(options.count, options)
 	.then(([note, filterList]) => {
 	    const count = Filter.count(filterList);
 	    console.log(`sources: ${count.sources}, urls: ${count.urls}, clues: ${count.clues}`);

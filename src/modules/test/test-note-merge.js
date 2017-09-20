@@ -17,13 +17,31 @@ const Stringify    = require('stringify-object');
 const Test         = require('./test');
 
 const TestNotebookName = 'test';
+const BaseNoteName = 'test-note-merge';
+const BaseNoteNameMd = 'test-note-merge-markdown';
+
+const BaseCount = {
+    sources: 7,
+    urls: 40,
+    clues: 0
+};
+
+//
+
+function compareCount (actual, expected) {
+    Expect(actual.sources).is.equal(expected.sources);
+    Expect(actual.urls).is.equal(expected.urls);
+    Expect(actual.clues).is.equal(expected.clues);
+}
 
 // TODO: Note.getContent(note)
 
-function mergeTest (baseNoteName, updateNoteFilename, expect, done) {
+function mergeTest (baseNoteName, updateNoteFilename, expectedCount, done) {
     return Note.get(baseNoteName, { content: true, notebook: TestNotebookName })
 	.then(baseNote => {
 	    console.log(`base   notebook guid ${baseNote.notebookGuid}`);
+	    const count = Filter.count(NoteParser.parse(baseNote.content, { urls: true, clues: true }));
+	    compareCount(count, expectedCount.base);
 	    return Note.create(`${baseNoteName}_copy`, baseNote.content.toString(), {
 		content:      true, // i.e. supplied body is actually full content
 		notebookGuid: baseNote.notebookGuid
@@ -44,9 +62,7 @@ function mergeTest (baseNoteName, updateNoteFilename, expect, done) {
 	    return Promise.all([Filter.count(filterList), Note.deleteNote(mergedNote.guid)]);
 	}).then(([count, _]) => {		
 	    console.log('copy deleted');
-	    Expect(count.sources).is.equal(expect.sources);
-	    Expect(count.urls).is.equal(expect.urls);
-	    Expect(count.clues).is.equal(expect.clues);
+	    compareCount(count, expectedCount.merged);
 	    done();
 	}).catch(err => {
 	    console.log('error');
@@ -58,33 +74,50 @@ function mergeTest (baseNoteName, updateNoteFilename, expect, done) {
 //
 
 describe ('note-merge tests', function() {
-    this.timeout(20000);
-    this.slow(4000);
+    this.timeout(5000);
+    this.slow(1500);
 
     ////////////////////////////////////////////////////////////////////////////////
     //
-    // test Result.fileScoreSaveCommit
-    //
-    // TODO: all the removing/adding is unnecessary. just make sure the file is there
-    // in before(), then writeAdd if it isn't
-    //
-    it ('should merge notes', function (done) {
-	const baseNoteName = 'test-note-merge';
-	const baseNoteNameMd = 'test-note-merge-markdown';
+    it ('should merge-append a note', function (done) {
 	//const updateNoteName = 'test-note-merge_update';
 	const updateNoteFilename = Test.file('test-note-merge.update');
 
 	// suboptimal (does note.get twice) but dancing around questionable
 	// logic used in note-merge, namely the paired note/filter file loading
 
-	const expect =  {
+	const base = BaseCount;
+	const merged =  {
 	    sources: 24,
 	    urls:    95,
 	    clues:   0
 	};
 	// before: delete all notes named baseNoteName_copy
 
-	mergeTest(baseNoteName, updateNoteFilename, expect, done);
+	mergeTest(BaseNoteName, updateNoteFilename, { base, merged }, done);
+
+	// after: delete all notes named baseNoteName_copy
+    });
+
+
+    ////////////////////////////////////////////////////////////////////////////////
+    //
+    it ('should merge-body a note', function (done) {
+	//const updateNoteName = 'test-note-merge_update';
+	const updateNoteFilename = Test.file('test-note-merge.update');
+
+	// suboptimal (does note.get twice) but dancing around questionable
+	// logic used in note-merge, namely the paired note/filter file loading
+
+	const base = BaseCount;
+	const merged =  {
+	    sources: 22, // 24, // impelment ,x sources
+	    urls:    88, // 95,
+	    clues:   0
+	};
+	// before: delete all notes named baseNoteName_copy
+
+	mergeTest(BaseNoteNameMd, updateNoteFilename, { base, merged }, done);
 
 	// after: delete all notes named baseNoteName_copy
     });

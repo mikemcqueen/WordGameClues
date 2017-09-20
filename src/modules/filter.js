@@ -194,7 +194,6 @@ function count (list) {
 	    }
 	}
     }
-    console.log(`sources: ${sources}, urls: ${urls}, clues: ${clues}`);
     return { sources, urls, clues };
 }
 
