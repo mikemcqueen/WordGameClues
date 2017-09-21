@@ -22,8 +22,13 @@ const BaseNoteNameMd = 'test-note-merge-markdown';
 
 const BaseCount = {
     sources: 7,
-    urls: 40,
-    clues: 0
+    urls:    40,
+    clues:   0
+};
+const UpdateCount =  {
+    sources: 17,
+    urls:    55,
+    clues:   0
 };
 
 //
@@ -49,8 +54,7 @@ function mergeTest (baseNoteName, updateNoteFilename, expectedCount, done) {
 	}).then(copyBaseNote => {
 	    console.log(`copy   notebook guid ${copyBaseNote.notebookGuid}`);
 	    return NoteMerge.mergeFilterFile(updateNoteFilename, copyBaseNote.title, {
-		notebookGuid: copyBaseNote.notebookGuid,
-		filter_urls:  true // filter reject urls
+		notebookGuid: copyBaseNote.notebookGuid
 	    });
 	}).then(mergedNote => {
 	    console.log(`merged notebook guid ${mergedNote.notebookGuid}`);
@@ -104,15 +108,15 @@ describe ('note-merge tests', function() {
     //
     it ('should merge-body a note', function (done) {
 	//const updateNoteName = 'test-note-merge_update';
-	const updateNoteFilename = Test.file('test-note-merge.update');
+	const updateNoteFilename = Test.file('test-note-merge.md-update');
 
 	// suboptimal (does note.get twice) but dancing around questionable
 	// logic used in note-merge, namely the paired note/filter file loading
 
 	const base = BaseCount;
 	const merged =  {
-	    sources: 22, // 24, // impelment ,x sources
-	    urls:    88, // 95,
+	    sources: 22, // 24 
+	    urls:    84, // 95 - 7 (url,x) - 4 (source,x)
 	    clues:   0
 	};
 	// before: delete all notes named baseNoteName_copy

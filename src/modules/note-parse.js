@@ -97,21 +97,25 @@ function parse (text, options = {}) {
 	    let clueList = [];
 	    // move clueExpr position to prevUrlResult
 	    while ((clueResult !== null) && (clueResult.index < prevUrlResult.index)) {
-		//clueExpr.lastIndex = prevUrlResult.index;
-		//Debug(`advanced clueExpr.lastIndex to ${clueExpr.lastIndex}`);
-		clueResult = clueExpr.exec(text);// for while loop
+		clueResult = clueExpr.exec(text);
 	    }
 	    let count = 0;
 	    while ((clueResult !== null) && (clueResult.index < endClueIndex)) {
 		const clueLine = clueResult[1].trim();
 		let debugMsg;
+		// <a> element inner text (with url) gets picked up by clueExpr regex
 		if (_.startsWith(clueLine, 'http')) {
-		    // ignore if first
+		    // ignore if first, fail if > first
 		    if (count > 0) {
 			throw new Error(`encountered http where clue was expected, ${clueLine}, count ${count}`);
 		    }
 		    debugMsg = 'ignored';
 		} else if (clueLine.charAt(0) === ',') {
+		    // a comma is a valid clue starting character only if it is in fact not a clue,
+		    // but a instead suffix to a url.  which means it must immediately follow a url,
+		    // which was actually ignored as the first "clue", above.
+		    // here (count > 1) allows for the possibility that there is no inner text to the
+		    // <a> element (which would be the url ignored, above).
 		    if (count > 1) {
 			throw new Error(`encountered unexpected comma where clue was expected: ${clueLine}`);
 		    }

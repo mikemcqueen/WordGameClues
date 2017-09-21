@@ -118,6 +118,7 @@ function diff (listA, listB) {
 // file and confirm that all of the remaining urls, per clue source, are not rejected
 
 function filterUrls (listToFilter, listFiltered, options)  {
+    if (options.noFilterUrls) return [listToFilter, 0];
     //const map = makeSourceMap(listFiltered);
     let filterCount = 0;
     let list = listToFilter.filter(sourceElem => {
@@ -136,6 +137,22 @@ function filterUrls (listToFilter, listFiltered, options)  {
 	return !_.isEmpty(sourceElem.urls) || (sourceElem.suffix === Markdown.Suffix.clue);
     });
     return [list, filterCount];
+}
+
+//
+
+function filterSources (listToFilter, options)  {
+    let filterCount = 0;
+    let filteredList = listToFilter.filter(sourceElem => {
+	Expect(sourceElem).is.an.Object(); 
+	const reject = (sourceElem.suffix === Markdown.Suffix.reject);
+	if (reject) {
+	    Debug(`reject source: ${sourceElem.source}`);
+	    filterCount += 1;
+	}
+	return !reject;
+    });
+    return [filteredList, filterCount];
 }
 
 //
@@ -203,6 +220,7 @@ module.exports = {
     count,
     diff,
     dumpList,
+    filterSources,
     filterUrls,
     isKnown,
     isMaybe,

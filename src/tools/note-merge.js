@@ -14,6 +14,8 @@ const Path             = require('path');
  
 const Options     = require('node-getopt')
     .create([
+	['',  'no-filter-urls'],
+	['',  'no-filter-sources'],
 	['',  'note=NAME',       'specify note name'],
 	['',  'notebook=NAME',   'specify notebook name'],
 	['',  'production',      'create note in production'],
@@ -42,6 +44,9 @@ async function main () {
     const filename = opt.argv[0];
     Debug(`filename: ${filename}`);
 
+    if (options['no-filter-urls'])    options.noFilterUrls    = true;
+    if (options['no-filter-sources']) options.noFilterSources = true;
+
     // if production && !default (notebook)
     //   if --notebook specified, use specified notebook name
     //   else get notebook name from base filename
@@ -54,9 +59,6 @@ async function main () {
 	}
 	options.notebookGuid = nb.guid;
     }
-    options.filter_urls = true; // filter reject urls
-//    options.reject_sources = true;
-
     return NoteMerge.mergeFilterFile(filename, noteName, options);
 }
 

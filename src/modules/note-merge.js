@@ -46,14 +46,25 @@ async function merge(note, listFromNote, listFromFilter, options) {
 	console.log(`listFromNote:\n${Stringify(listFromNote)}`);
 	console.log(`listFromFilter:\n${Stringify(listFromFilter)}`);
     }
+    // filter before creating difflist
+    if (!options.noFilterSources) { 
+	let [filteredList, count] = Filter.filterSources(listFromNote, options);
+	Debug(`filtered sources: ${count}`);
+	listFromNote = filteredList;
+    }
+    let [filteredList, filteredUrlCount] = Filter.filterUrls(listFromNote, listFromFilter, options);
+    const filteredSrcCount = listFromNote.length - filteredList.length;
+    if (!options.noFilterUrls) {
+	Debug(`filtered urls: ${filteredUrlCount}, sources: ${filteredSrcCount}`);
+	listFromNote = filteredList;
+    }
+
+    // create diff list
     const diffList = Filter.diff(listFromNote, listFromFilter);
-    
     const expectedDiffCount = listFromFilter.length - listFromNote.length;
-    Expect(diffList.length).is.equal(expectedDiffCount);
     Debug(`note(${listFromNote.length}), filter(${listFromFilter.length})` +
-	  `, diffList(${diffList.length}), diffExpected(${expectedDiffCount})`);
-    
-    Debug(`diffList(${diffList.length})`);
+	  `, actualDiff(${diffList.length}), diffExpected(${expectedDiffCount})`);
+    Expect(diffList.length).is.equal(expectedDiffCount);
     if (options.verbose) {
 	console.log(`diffList: ${Stringify(diffList)}`);
         /*
@@ -62,21 +73,20 @@ async function merge(note, listFromNote, listFromFilter, options) {
          }
 	 */
     }
-    let [filteredListFromNote, filtered] = options.filter_urls
-	    ? Filter.filterUrls(listFromNote, listFromFilter, options) : [,0];
-    Debug(`filtered: ${filtered}`);
-    if (options.filter_urls && filtered) { 
-	// some changes -- concat lists and build new note
-	Debug(`building new note body`);
-	filteredListFromNote.push(...diffList);
-	const noteBody = NoteMaker.makeFromFilterList(filteredListFromNote, { outerDiv: true });
+
+    // if listFromNote was filtered, concat diffList and build note from result
+    if (filteredUrlCount || filteredSrcCount) {
+	Debug(`note changed - building new note body`);
+	listFromNote.push(...diffList);
+	const noteBody = NoteMaker.makeFromFilterList(filteredList, { outerDiv: true });
 	Note.setContentBody(note, noteBody);
 	return Note.update(note, options);
     }
     
     // original note unchanged -- only append if there are diffs
+    Debug(`note unchanged`);
     if (_.isEmpty(diffList)) {
-	Debug(`no diffs, no changes - nothing to do`);
+	Debug(`diffList empty - nothing to do`);
 	return note;
     }
     const diffBody = NoteMaker.makeFromFilterList(diffList, options);

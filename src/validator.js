@@ -21,8 +21,8 @@ const ResultMap     = require('./result-map');
 
 //
 
-//const xp = false;
-const xp = true;
+// TODO: options.xp
+const xp = false;
 
 //
 // constructor
@@ -67,8 +67,8 @@ Validator.prototype.setAllowDupeFlags = function (args) {
 // args:
 //  nameList:       list of clue names, e.g. ['bob','jim']
 //  sum:            # of primary clues represented by names in nameList
-//  max:            max # of sources to combine (either this -or- count must be set)
-//  count:          exact # of sources to combine (either this -or- max must be set)
+//  max:            max # of sources to combine (either max -or- count must be set)
+//  count:          exact # of sources to combine (either count -or- max must be set)
 //  require:        list of required clue counts, e.g. [2, 4]
 //  exclude:        list of excluded clue counts, e.g. [3, 5]
 //  excludeSrcList: list of excluded primary sources
@@ -147,10 +147,10 @@ Validator.prototype.recursiveValidateSources = function(args) {
 	  ` in [${args.clueCountList}]`);
     if (xp) Expect(args.clueNameList.length).is.equal(args.clueCountList.length);
 
-    let ncList = _.isUndefined(args.nameCountList) ? [] : args.nameCountList;
+    let ncList = args.nameCountList || [];
     let nameIndex = 0;
     let clueName = args.clueNameList[nameIndex];
-    let rvsResult;
+    let resultList;
 
     // optimization: could have a map of count:boolean entries here
     // on a per-name basis (new map for each outer loop; once a
@@ -163,7 +163,7 @@ Validator.prototype.recursiveValidateSources = function(args) {
 	    return false; // some.continue
 	}
 	Debug(' found');
-	rvsResult = this.rvsWorker({
+	let rvsResult = this.rvsWorker({
 	    name:           clueName,
 	    count:          count,
 	    nameList:       args.clueNameList,
@@ -175,20 +175,21 @@ Validator.prototype.recursiveValidateSources = function(args) {
 	if (!rvsResult.success) {
 	    return false; // some.continue;
 	}
-	Debug(`--rvsWorker output for: ${clueName}, ncList(${ncList.length}) ${ncList}`);
+	Debug(`  rvsWorker output for: ${clueName}, ncList(${ncList.length}) ${ncList}`);
 	// sanity check
 	if (!args.validateAll && (ncList.length < 2)) {
 	    // TODO: add "allowSingleEntry" ?
 	    // can i check vs. clueNameList.length?
 	    // throw new Error('list should have at least two entries1');
 	}
+	resultList = rvsResult.list;
 	return true; // success: some.exit
     });
     --this.logLevel;
 
     return {
 	success: someResult,
-	list:    (someResult ? rvsResult.list : undefined)
+	list:    someResult ? resultList : undefined
     };
 }
 
@@ -383,7 +384,7 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 	    let anyCandidate = false;
 	    candidateResultList.some(result => {
 		let findResult = this.findDuplicatePrimaryClue({ ncList: result.ncList });
-		if (xp) Expect(findResult.allPrimary).is.true;
+		if (xp) Expect(findResult.allPrimary).is.true();
 		if (!this.evalFindDuplicateResult(findResult, '2nd')) {
 		    return false; // some.continue
 		}
@@ -429,7 +430,7 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
     }
 }
 
-//
+// in a word: unnecessary
 
 Validator.prototype.uniqueResult = function(success, list) {
     return {
@@ -1191,6 +1192,8 @@ Validator.prototype.dumpResult = function(args) {
     });
 }
 
+// TODO: stringify-object here?
+//
 // args:
 //  header:
 //  result:
