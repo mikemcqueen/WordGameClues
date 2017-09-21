@@ -39,6 +39,7 @@ const Options = Getopt.create(_.concat(Clues.Options, [
     ['', 'quiet',         'less noise'],
     ['', 'title=TITLE',   'specify note title (used with --create, --parse)'],
     ['', 'update[=NOTE]', 'update all results in worksheet, or a specific NOTE if specified'],
+    ['', 'save',          '  save cluelist files (used with --update)'],
     ['v','verbose',       'more noise'],
     ['h','help', '']
 ])).bindHelp(

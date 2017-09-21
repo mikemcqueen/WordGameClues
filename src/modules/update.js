@@ -337,7 +337,7 @@ function skipState (state, result, options) {
 async function updateFromFile(filename, options) {
     Expect(filename).is.a.String();
 
-    // TODO: if (options.loadClues) or if (!ClueManager.isLoaded())
+    // TODO: if (!ClueManager.isLoaded())
     ClueManager.loadAllClues({ clues: Clues.getByOptions(options) });
 
     const dir = options.dir || '2'; // lil haxy
