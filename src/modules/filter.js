@@ -66,15 +66,18 @@ function parseFile (filename, options = {}) {
 	if (_.isEmpty(line)) continue;
 	Debug(line);
 	if (isSource(line)) {
+	    Debug(`source: ${line}`);
 	    clueList = undefined;
 	    urlList = [];
 	    const sourceElement = options.urls ? { source: line, urls: urlList } : line;
 	    resultList.push(sourceElement);
 	} else if (isUrl(line)) {
+	    Debug(`url: ${line}`);
 	    clueList = [];
 	    const urlElement = (options.clues) ? { url: line, clues: clueList } : line;
 	    urlList.push(urlElement);
 	} else {
+	    Debug(`clue: ${line}`);
 	    // clue, known, or maybe
 	    // currently requires URL, but i suppose could eliminate that requirement with some work.
 	    Expect(urlList).is.not.empty();

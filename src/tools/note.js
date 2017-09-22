@@ -154,9 +154,10 @@ async function getParseSaveCommit (noteName, options) {
 async function update (options) {
     Debug('update');
     const clueType = Clues.getByOptions(options);
+    const nbName = options.notebook || Note.getWorksheetName(clueType);
+    console.log(`notebook: ${nbName}`);
     if (!_.isEmpty(options.update)) {
 	const noteName = options.update;
-	const nbName = Note.getWorksheetName(clueType);
 	return Note.getNotebook(nbName, options)
 	    .then(nb => {
 		if (nb) {
@@ -169,8 +170,7 @@ async function update (options) {
 		return getParseSaveCommit(noteName, options);
 	    }).then(path => Update.updateFromFile(path, options));
     } else {
-	const nbName = Note.getWorksheetName(clueType);
-	console.log(`notebook: ${nbName}`);
+	// do all?
     }
 }
 
@@ -211,4 +211,5 @@ async function main () {
 
 main().catch(err => {
     console.error(err, err.stack);
+    process.exit(-1);
 });

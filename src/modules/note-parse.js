@@ -30,6 +30,7 @@ const Markdown         = require('./markdown');
 //                                  { url: url2, clues: [clue1, .., clueN] }] } ]
 //
 function parse (text, options = {}) {
+    Debug(`++note-parse.parse()`);
     if (_.isBuffer(text)) text = text.toString();
     Expect(text).is.a.String();
     

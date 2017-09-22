@@ -19,9 +19,14 @@ const Stringify        = require('stringify-object');
 //
 
 function loadNoteFilterLists(filename, noteName, options) {
+    Debug(`++loadNoteFilterLists()`);
     const parseOpt = { urls: true, clues: true };
     return Promise.join(
-	Note.get(noteName, { content: true, notebookGuid: options.notebookGuid }),
+	Note.get(noteName, {
+	    content:      true,
+	    notebookGuid: options.notebookGuid,
+	    production:   options.production
+	}),
 	Filter.parseFile(filename, parseOpt),
 	(note, filterData) => {
 	    return [note, NoteParse.parse(note.content, parseOpt), filterData];
@@ -40,7 +45,7 @@ function compareSource(a, b) {
 //
 
 async function merge(note, listFromNote, listFromFilter, options) {
-    Debug(`title: ${note && note.title}, noteList(${listFromNote && listFromNote.length})` +
+    Debug(`++merge() title: ${note && note.title}, noteList(${listFromNote && listFromNote.length})` +
 	  `, filterList(${listFromFilter && listFromFilter.length})`);
     if (options.verbose) {
 	console.log(`listFromNote:\n${Stringify(listFromNote)}`);
@@ -61,10 +66,10 @@ async function merge(note, listFromNote, listFromFilter, options) {
 
     // create diff list
     const diffList = Filter.diff(listFromNote, listFromFilter);
-    const expectedDiffCount = listFromFilter.length - listFromNote.length;
+    //const expectedDiffCount = listFromFilter.length - listFromNote.length;
     Debug(`note(${listFromNote.length}), filter(${listFromFilter.length})` +
-	  `, actualDiff(${diffList.length}), diffExpected(${expectedDiffCount})`);
-    Expect(diffList.length).is.equal(expectedDiffCount);
+	  `, diff(${diffList.length})`); //diffExpected(${expectedDiffCount})`);
+    //    Expect(diffList.length).is.equal(expectedDiffCount);
     if (options.verbose) {
 	console.log(`diffList: ${Stringify(diffList)}`);
         /*

@@ -68,7 +68,7 @@ function processSrc (rawLine, args, options) {
     Expect(rawLine).is.a.String();
     Expect(args.dir).is.a.String();
 
-    const [reject, line] = My.hasSuffix(rawLine, Markdown.Suffix.reject);
+    const [reject, line] = Markdown.hasSuffix(rawLine, Markdown.Suffix.reject);
     Debug(`src: ${line}`);
     let nameList = line.split(',');
     Expect(nameList.length).is.above(1); // at.least(2)

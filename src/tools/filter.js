@@ -34,7 +34,7 @@ const Options = new Getopt(_.concat(Clues.Options, [
     ['a', 'article',             'filter results based on article word count'],
     ['',  'copy',                'copy to clipboard as RTF'],
     ['d', 'dir=NAME',            'directory name'],
-    // ['k', 'known',               'filter known results'],  // easy!, call ClueManager.filter()
+    ['', 'known-urls',           'filter known URLs'],  // easy!, call ClueManager.filter()
     ['', 'keep', 'keep tmp file'],
     ['m', 'match=EXPR',          'filename match expression' ],
     ['n', 'count',               'show result/url counts only'],
@@ -79,13 +79,23 @@ function getUrlCount (resultList) {
 
 //
 
-function isFilteredUrl (url, filteredUrls) {
-    Expect(url).is.a.String('iFU, url');
-    if (_.isUndefined(filteredUrls)) return false; 
-    Expect(filteredUrls).is.an.Object();
-    let reject = _.isArray(filteredUrls.rejectUrls) && filteredUrls.rejectUrls.includes(url);
-    let known = _.isArray(filteredUrls.knownUrls) && filteredUrls.knownUrls.includes(url);
-    return known || reject;
+function isUrlInList (url, list) {
+    Expect(url).is.a.String();
+    if (_.isUndefined(list)) return false; 
+    Expect(list).is.an.Array();
+    return list.includes(url);
+}
+
+//
+
+function isRejectUrl (url, filteredUrls) {
+    return isUrlInList(url, filteredUrls && filteredUrls.rejectUrls);
+}
+
+//
+
+function isKnownUrl (url, filteredUrls) {
+    return isUrlInList(url, filteredUrls && filteredUrls.knownUrls);
 }
 
 // check for broken results if xfactor option specified
@@ -109,49 +119,47 @@ function isXFactor (result, options) {
     return false;
 }
 
-//
+// filter out rejected urls
 
 function filterSearchResultList (resultList, wordList, filteredUrls, options, filepath) {
     Expect(resultList).is.an.Array();
     Expect(wordList).is.an.Array().and.not.empty();
     Expect(options).is.an.Object();
-    // filteredUrls can be undefined or array
-    let urlList = [];
     let loggedXFactor = false;
     // make any clue words with a space into multiple words.
     let wordCount = _.chain(wordList).map(word => word.split(' ')).flatten().size().value();
     
+    Debug(`++filterResultList for ${wordList}`);
     if (filteredUrls) {
-	Debug(`fSRL: filteredUrls(${_.size(filteredUrls)})\n${JSON.stringify(filteredUrls)}`);
+	Debug(	  `, known(${filteredUrls.knownUrls.length})` +
+		  `, reject(${filteredUrls.rejectUrls.length})`);
     }
-
-    return Promise.map(resultList, result => {
+    if (options.verbose) {
+	Debug(`${JSON.stringify(filteredUrls)}`);
+    }
+    // first filter out all rejected, unscored, known (if applicable), and below-score results
+    return Promise.filter(resultList, result => {
 	//Debug(`result: ${_.entries(result)}`);
 	if (options.xfactor && isXFactor(result, options)) {
 	    if (!loggedXFactor) {
 		console.log(`x: ${filepath}`);
 		loggedXFactor = true;
 	    }
-	    return undefined;
+	    return false;
 	}
-	if (isFilteredUrl(result.url, filteredUrls) || _.isUndefined(result.score)) {
-	    Debug(`filtered or unscored url, ${result.url}`);
-	    return undefined;
+	if (isRejectUrl(result.url, filteredUrls) || _.isUndefined(result.score)) {
+	    Debug(`filtering reject or unscored url, ${result.url}, score ${result.score}`);
+	    return false;
 	}
-	return Score.wordCountFilter(result.score, wordCount, options) ? result : undefined;
-    }).each(filterResult => {
-	if (filterResult) {
-	    Debug(`url: ${filterResult.url}`);
-	    urlList.push(filterResult.url);
+	if (options.filterKnownUrls && isKnownUrl(result.url, filteredUrls)) {
+	    Debug(`filtering known url, ${result.url}`);
+	    return false;
 	}
-	return undefined;
-    }).then(() => {
-	if (urlList.length > 0) {
-	    Debug(`urlList.length = ${urlList.length}`);
-	}
+	return Score.wordCountFilter(result.score, wordCount, options);
+    }).then(resultList => {
 	return {
 	    src:     wordList.toString(),
-	    urlList: urlList,
+	    urlList: resultList.map(result => result.url), // only good results remain; map to urls
 	    known:   ClueManager.getKnownClues(wordList)
 	};
     });
@@ -272,29 +280,30 @@ function filterPathList (pathList, dir, options) {
     Expect(pathList).is.an.Array();
     Expect(options).is.an.Object();
 
-    let filteredList = [];
     let rejectList = [];
+    // map to array of result || undefined
     return Promise.map(pathList, path => {
 	let filename = Path.basename(path);
 	Debug(`filename: ${filename}`);
 	let wordList = SearchResult.makeWordlist(filename);
-  	return Promise.all([Fs.readFile(path, 'utf8'),
+  	return Promise.all([Fs.readFile(path),
 			    loadFilteredUrls(Path.dirname(path), wordList, options)])
 	    .then(([content, filteredUrls]) => {
 		return filterSearchResultList(JSON.parse(content), wordList, filteredUrls, options, path);
 	    }).then(filterResult => {
 		// TODO: this is probably wrong for rejects
-		if (_.isEmpty(filterResult.urlList)) {
+		if (_.isEmpty(filterResult.urlList) && !_.isEmpty(filterResult.known)) {
+		    Debug(`rejecting, ${wordList}, no urls or known clues`); 
 		    rejectList.push(filterResult);
-		} else {
-		    filteredList.push(filterResult);
+		    return undefined;
 		}
-		return undefined;
+		return filterResult;
 	    }).catch(err => {
 		// report & eat all errors
 		console.log(`filterSearchResultFiles, path: ${path}`, err, err.stack);
 	    });
-    }).then(() => {
+    }).then(resultList => resultList.filter(result => !_.isUndefined(result)))
+    .then(filteredList => {
 	return {
 	    filtered: filteredList,
 	    rejects:  rejectList
@@ -356,18 +365,18 @@ function getPathList (dir, fileMatch, nameMap) {
 function writeFilterResults (resultList, stream) {
     Expect(resultList).is.an.Array();
     for (const result of resultList) {
-	if (_.isEmpty(result.urlList)) continue;
 	if (ClueManager.isRejectSource(result.src)) continue;
+	const knownList = ClueManager.getKnownClues(result.src);
+	if (_.isEmpty(knownList) && _.isEmpty(result.urlList)) continue;
 
 	My.logStream(stream, `${Filter.SRC_PREFIX}${result.src}`);
 	for (const url of result.urlList) {
 	    My.logStream(stream, url);
 	}
-	const nameList = ClueManager.getKnownClues(result.src);
-	if (!_.isEmpty(nameList)) {
-	    My.logStream(stream, `\n${Filter.KNOWN_PREFIX}known:`);
-	    for (const name of nameList) {
-		My.logStream(stream, `${Filter.KNOWN_PREFIX}${name}`);
+	if (!_.isEmpty(knownList)) {
+	    My.logStream(stream, '');
+	    for (const name of knownList) {
+		My.logStream(stream, name); // `${Filter.KNOWN_PREFIX}${name}`);
 	    }
 	}
 	My.logStream(stream, '');
@@ -426,15 +435,18 @@ async function main () {
 	const resultList = Filter.parseFile(filename, { urls: true, clues: true });
 	if (_.isEmpty(resultList)) {
 	    console.log('no results');
-	    return;
+	} else {
+	    for (const result of resultList) {
+		console.log(result);
+	    }
 	}
-	for (const result of resultList) {
-	    console.log(result);
-	}
-	return;
+	return undefined;
     }
     if (!options.dir) {
 	options.dir = '2';
+    }
+    if (options['known-urls']) {
+	options.filterKnownUrls = true;
     }
 
     ClueManager.loadAllClues({ clues: Clues.getByOptions(options) });

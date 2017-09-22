@@ -58,6 +58,7 @@ async function main () {
 	    usage(`notebook not found, ${nbName}`);
 	}
 	options.notebookGuid = nb.guid;
+	Debug(`notebookGuid: ${options.notebookGuid}`);
     }
     return NoteMerge.mergeFilterFile(filename, noteName, options);
 }
@@ -65,5 +66,5 @@ async function main () {
 //
 
 main().catch(err => {
-    console.log(err, err.stack);
+    console.error(err, err.stack);
 });
