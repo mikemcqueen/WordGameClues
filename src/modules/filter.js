@@ -17,40 +17,12 @@ const Stringify    = require('stringify-object');
 
 //
 
-const SRC_PREFIX      = '@';
-const MAYBE_PREFIX    = ':';
-const KNOWN_PREFIX    = '#';
-
 const URL_PREFIX      = 'http';
-
-//
-
-function hasPrefix (line, prefix) {
-    return line[0] === prefix;
-}
-
-//
-
-function isSource (line) {
-    return hasPrefix(line, SRC_PREFIX);
-}
 
 //
 
 function isUrl (line) {
     return _.startsWith(line, URL_PREFIX);
-}
-
-//
-
-function isMaybe (line) {
-    return hasPrefix(line, MAYBE_PREFIX);
-}
-
-//
-
-function isKnown (line) {
-    return hasPrefix(line, KNOWN_PREFIX);
 }
 
 //
@@ -65,7 +37,7 @@ function parseFile (filename, options = {}) {
 	line = line.toString().trim();
 	if (_.isEmpty(line)) continue;
 	Debug(line);
-	if (isSource(line)) {
+	if (Markdown.isSource(line)) {
 	    Debug(`source: ${line}`);
 	    clueList = undefined;
 	    urlList = [];
@@ -182,7 +154,9 @@ async function dumpList (list, options) {
 		if (urlElem.suffix) url += `,${urlElem.suffix}`;
 		await My.writeln(dest, url);
 		if (!_.isObject(urlElem)) continue;
-		for (const clue of urlElem.clues || []) {
+		for (const clueElem of urlElem.clues || []) {
+		    let clue = clueElem.clue;
+		    if (clueElem.prefix) clue = `${clueElem.prefix}${clue}`;
 		    await My.writeln(dest, clue);
 		}
 	    }
@@ -219,17 +193,28 @@ function count (list) {
 
 //
 
+function getRemovedClues (list) {
+    let removedClues = [];
+    for (let src of list) {
+	for (let url of src.urls || []) {
+	    for (let clue of url.clues || []) {
+		if (clue.prefix === Markdown.Prefix.remove) {
+		    removedClues.push(clue);
+		}
+	    }
+	}
+    }
+    return removedClues;
+}
+
+//
+
 module.exports = {
     count,
     diff,
     dumpList,
     filterSources,
     filterUrls,
-    isKnown,
-    isMaybe,
-    isSource,
-    parseFile,
-    SRC_PREFIX,
-    MAYBE_PREFIX,
-    KNOWN_PREFIX
+    getRemovedClues,
+    parseFile
 };

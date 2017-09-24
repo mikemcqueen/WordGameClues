@@ -131,18 +131,17 @@ function parse (options) {
 	});
 }
 
-//
+// move to Filter.js
 
-async function getParseSaveCommit (noteName, options) {
-    const [note, resultList] = await getAndParse(noteName, options).catch(err => { throw err; });
-    //Debug(resultList);
+async function saveAddCommit (noteName, filterList, options) {
     const filepath = `${Clues.getDirectory(Clues.getByOptions(options))}/updates/${noteName}`;
     Debug(`saving ${noteName} to: ${filepath}`);
     return Fs.open(filepath, 'w')
 	.then(fd => {
-	    return Filter.dumpList(resultList, { fd });
+	    return Filter.dumpList(filterList, { fd });
 	}).then(fd => Fs.close(fd))
 	.then(_ => {
+	    // TODO MAYBE: options.wait
 	    // no return = no await completion = OK
 	    My.gitAddCommit(filepath, 'parsed live note');
 	    return filepath;
@@ -151,27 +150,55 @@ async function getParseSaveCommit (noteName, options) {
 
 //
 
+function getParseSaveCommit (noteName, options) {
+    return getAndParse(noteName, options)
+	.then(([note, resultList]) => {
+	    return saveAddCommit(noteName, resultList, options);
+	});
+}
+
+//
+
+function updateOneClue (noteName, options) {
+    return getAndParse(noteName, options)
+	.then(([note, resultList]) => {
+	    const removedClues = Filter.getRemovedClues(resultList);
+	    if (!_.isEmpty(removedClues)) {
+		usage(`can't update single note with removed clues, ${removedClues}`);
+	    }
+	    return saveAddCommit(noteName, resultList, options);
+	}).then(path => Update.updateFromFile(path, options));
+}
+
+//
+
+function updateAllClues (options) {
+}
+
+//
+
 async function update (options) {
+    // but i could support multiple: just call updateOneClue in a for() loop
+    // but not exactly that simple due to removed clues
+    if (_.isArray(options.update)) usage('multiple --updates not yet supported');
     Debug('update');
     const clueType = Clues.getByOptions(options);
     const nbName = options.notebook || Note.getWorksheetName(clueType);
-    console.log(`notebook: ${nbName}`);
-    if (!_.isEmpty(options.update)) {
-	const noteName = options.update;
-	return Note.getNotebook(nbName, options)
-	    .then(nb => {
-		if (nb) {
-		    options.notebookGuid = nb.guid;
-		} else {
-		    if (options.production || !options.default) {
-			throw new Error(`notebook not found, ${nbName}`);
-		    }
-		}
-		return getParseSaveCommit(noteName, options);
-	    }).then(path => Update.updateFromFile(path, options));
-    } else {
-	// do all?
-    }
+    return Note.getNotebook(nbName, options)
+	.then(nb => {
+	    if (nb) {
+		options.notebookGuid = nb.guid;
+	    } else if (!options.default) {
+		throw new Error(`notebook not found, ${nbName}`);
+	    }
+	    console.log(`notebook: ${nb.title}, guid: ${nb.guid}`);
+	    if (options.update === true) {
+		// no note name supplied, update all notes
+		return updateAllClues(options);
+	    }
+	    // update supplied note name(s)
+	    return updateOneClue(options.update, options);
+	});
 }
 
 //

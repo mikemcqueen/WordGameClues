@@ -11,6 +11,7 @@ module.exports = exports = new ClueManager();
 const _              = require('lodash');
 const ClueList       = require('./clue-list');
 const Clues          = require('./clue-types');
+const Debug          = require('debug')('clue-manager');
 const Expect         = require('should/as-function');
 const NameCount      = require('./name-count');
 const Path           = require('path');
@@ -95,7 +96,7 @@ ClueManager.prototype.loadAllClues = function (args) {
     }
 
     for (let count = 2; count <= this.maxClues; ++count) {
-	let rejectClueList = null;
+	let rejectClueList;
 	try {
 	    rejectClueList = ClueList.makeFrom({
 		filename : this.getRejectFilename(count)
@@ -181,7 +182,7 @@ ClueManager.prototype.addKnownCompoundClues = function (clueList, clueCount, val
 		    validateAll: validateAll
 		});
 		if (!this.ignoreLoadErrors) {
-		    Expect(vsResult.success).is.true;
+		    Expect(vsResult.success).is.true();
 		}
 		srcMap[srcKey] = [];
 	    }
@@ -221,6 +222,27 @@ ClueManager.prototype.addKnownClue = function (count, name, source, nothrow) {
 //
 //
 
+ClueManager.prototype.removeKnownClue = function (count, name, source, nothrow) {
+    Expect(count).is.a.Number();
+    Expect(name).is.a.String();
+    Expect(source).is.a.String();
+    let clueMap = this.knownClueMapArray[count];
+    if (!_.has(clueMap, name) || !clueMap[name].includes(source)) {
+	// turn off nothrow while testing
+	//if (nothrow) return false;
+	throw new Error(`removeKnownClue, missing clue: ${name}:${source} at count: ${count}`);
+    } else {
+	Debug(`before clueMap[${name}]: len(${clueMap[name].length}), sources:${clueMap[name]}`);
+	Debug(`removing clue: ${name}:${source} from count: ${count}`);
+	_.pull(clueMap[name], source);
+	Debug(`after clueMap[${name}]: len(${clueMap[name].length}), sources: ${clueMap[name]}`);
+    }
+    return true;
+}
+
+//
+//
+
 ClueManager.prototype.saveClues = function (counts) {
     if (_.isNumber(counts)) {
 	counts = [ counts ];
@@ -239,6 +261,24 @@ ClueManager.prototype.addClue = function (count, clue, save = false, nothrow = f
     clue.src = clue.src.split(',').sort().toString();
     if (this.addKnownClue(count, clue.name, clue.src, nothrow)) {
 	this.clueListArray[count].push(clue);
+	if (save) {
+	    this.saveClues(count);
+	}
+	return true;
+    }
+    return false;
+}
+
+//
+//
+
+ClueManager.prototype.removeClue = function (count, clue, save = false, nothrow = false) {
+    // sort src
+    clue.src = clue.src.split(',').sort().toString();
+    if (this.removeKnownClue(count, clue.name, clue.src, nothrow)) {
+	_.remove(this.clueListArray[count], elem => {
+	    return (elem.name === clue.name) &&	(elem.src === clue.src);
+	});
 	if (save) {
 	    this.saveClues(count);
 	}
@@ -606,3 +646,109 @@ ClueManager.prototype.getInversePrimarySources = function (sources) {
     }
     return inverseSources;
 }
+
+//
+
+ClueManager.prototype.addClueForCounts = function (countSet, name, src) {
+    Expect(countSet).is.instanceof(Set);
+    Expect(name).is.a.String();
+    Expect(src).is.a.String();
+    countSet.forEach(count => {
+	if (this.addClue(count, {
+	    name: name,
+	    src:  src
+	}, true, true)) { // save, nothrow
+	    console.log(`${count}: added ${name}`);
+	} else {
+	    console.log(`${count}: ${name} already present`);
+	}
+    });
+}
+
+//
+
+ClueManager.prototype.removeClueForCounts = function (countSet, name, src) {
+    Expect(countSet).is.instanceof(Set);
+    Expect(name).is.a.String();
+    Expect(src).is.a.String();
+    let removed = 0;
+    countSet.forEach(count => {
+	if (this.removeClue(count, {
+	    name: name,
+	    src:  src
+	}, true, true)) { // save, nothrow
+	    console.log(`${count}: removed ${name}`);
+	    removed += 1;
+	} else {
+	    // not sure this should ever happen. removeClue throws atm.
+	    console.log(`${count}: ${name} not present`);
+	}
+    });
+    return removed;
+}
+
+// each count list contains the clueMapArray indexes in which
+// each name appears
+
+ClueManager.prototype.getKnownClueIndexLists = function (nameList) {
+    let countListArray = Array(_.size(nameList)).fill().map(_ => []);
+    //Debug(countListArray);
+    for (let count = 1; count <= this.maxClues; ++count) {
+	const map = this.knownClueMapArray[count];
+	if (!_.isUndefined(map)) {
+	    nameList.forEach((name, index) => {
+		if (_.has(map, name)) {
+		    countListArray[index].push(count);
+		}
+	    });
+	}
+	else {
+	    console.log('missing known cluemap #' + count);
+	}
+    }
+    // verify that all names were found
+    nameList.forEach((name, index) => {
+	Expect(countListArray[index]).is.ok();
+    });
+    return countListArray;
+}
+
+//
+// args:
+//   add=Name
+//   remove=Name
+//   reject
+//   isKnown
+//   isReject
+//
+
+ClueManager.prototype.addRemoveOrReject = function (args, nameList, countSet) {
+    if (args.add) {
+	if (nameList.length === 1) {
+	    console.log('WARNING! ignoring --add due to single source');
+	} else if (args.isReject) {
+	    console.log('WARNING! cannot add known clue: already rejected, ' + nameList);
+	} else {
+	    this.addClueForCounts(countSet, args.add, nameList.toString());
+	}
+    } else if (args.remove) {
+	Debug(`remove ${args.remove}:${nameList} from ${[...countSet.values()]}`);
+	if (nameList.length === 1) {
+	    console.log('WARNING! ignoring --remove due to single source');
+	} else {
+	    this.removeClueForCounts(countSet, args.remove, nameList.toString());
+	}
+    } else if (args.reject) {
+	if (nameList.length === 1) {
+	    console.log('WARNING! ignoring --reject due to single source');
+	} else if (args.isKnown) {
+	    console.log('WARNING! cannot add reject clue: already known, ' + nameList);
+	} else if (this.addReject(nameList.toString(), true)) {
+	    console.log('updated');
+	}
+	else {
+	    console.log('update failed');
+	}
+    }
+}
+

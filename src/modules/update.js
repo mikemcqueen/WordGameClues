@@ -32,6 +32,7 @@ const Known =   Symbol('known');
 const Done =    Symbol('done');
 
 // state machine
+
 const SM = {
     [Start] : { next: [ Src ] },
     [Src]   : { next: [ Url,   Clue,  Maybe, Known/*, Src should test this*/ ], func: processSrc },
@@ -46,9 +47,9 @@ const SM = {
 function getLineState (line) {
     Expect(line.length >= 1).is.true(); // at.least(1)
     let state;
-    if (Filter.isSource(line)) state = Src;
-    if (Filter.isMaybe(line)) state = Maybe;
-    if (Filter.isKnown(line)) state = Known;
+    if (Markdown.hasSourcePrefix(line)) state = Src;
+    if (Markdown.hasMaybePrefix(line)) state = Maybe;
+    if (Markdown.hasKnownPrefix(line)) state = Known;
     // all of the above get first char sliced off
     if (state) {
 	line = line.slice(1);

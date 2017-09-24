@@ -14,7 +14,7 @@ const Markdown         = require('./markdown');
 
 // all options are boolean
 //   .urls:     parse urls (http:// prefix)
-//   .clues:    parse clues (no prefix)
+//   .clues:    parse clues (no prefix, or '-' remove prefix)
 //
 // returns (eventually)
 //   if only one options is supplied, returns a list of that option type
@@ -105,13 +105,13 @@ function parse (text, options = {}) {
 		const clueLine = clueResult[1].trim();
 		let debugMsg;
 		// <a> element inner text (with url) gets picked up by clueExpr regex
-		if (_.startsWith(clueLine, 'http')) {
+		if (_.startsWith(clueLine, 'http')) {// TODO: Filter.isUrl/or My.isUrl/or Markdown.isUrl
 		    // ignore if first, fail if > first
 		    if (count > 0) {
 			throw new Error(`encountered http where clue was expected, ${clueLine}, count ${count}`);
 		    }
 		    debugMsg = 'ignored';
-		} else if (clueLine.charAt(0) === ',') {
+		} else if (clueLine.charAt(0) === ',') { 
 		    // a comma is a valid clue starting character only if it is in fact not a clue,
 		    // but a instead suffix to a url.  which means it must immediately follow a url,
 		    // which was actually ignored as the first "clue", above.
@@ -126,10 +126,15 @@ function parse (text, options = {}) {
 		    }
 		    urlElement.suffix = suffix;
 		    debugMsg = `adding suffix to URL, ${suffix}`;
-		} else if (clueLine.charAt(0) === '@') {
+		} else if (Markdown.hasSourcePrefix(clueLine)) {
 		    throw new Error(`encountered unexpected source where clue was expected, ${clueLine}`);
 		} else if (!_.isEmpty(clueLine)) {
-		    clueList.push(clueLine);
+		    // TODO: 'note', 'need' markdowns
+		    let [line, prefix] = Markdown.getPrefix(clueLine);
+		    if (prefix) {
+			clueLine = line;
+		    }
+		    clueList.push({ clue: clueLine, prefix });
 		    debugMsg = 'added';
 		} else {
 		    debugMsg = 'empty';

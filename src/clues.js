@@ -47,6 +47,7 @@ const Opt = require('node-getopt')
 	['s', 'show-sources=NAME[:COUNT][,v]',       'show primary source combinations for the specified name[:count]' ],
 	['t', 'test=SOURCE[,SOURCE,...]',    'test the specified source list, e.g. blue,fish' ],
 	['',  'add=NAME',                    '  add combination to known list as NAME; use with --test' ],
+	['',  'remove=NAME',                 '  remove combination from known list as NAME; use with --test' ],
 	['',  'reject',                      '  add combination to reject list; use with --test' ],
 	['u', 'use=NAME[:COUNT]+',           'use the specified name[:count](s)' ],
 	['x', 'max=COUNT',                   'specify maximum # of components to combine'],
