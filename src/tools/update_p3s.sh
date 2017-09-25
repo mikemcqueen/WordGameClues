@@ -6,30 +6,36 @@ then
 fi
 echo $1
 
-production=--production
-save=
+#_production=--production
+#_save=--save
+_ct=p3s    #clue type
+
+#make update_p3s.sh read words file.
+#all console.log(err) -> console.error(err)
+#note update -p3s (update all)
+#does merge-note work if note doesn't exist? probably not. should it? easier that way.
+#how about --create flag? otherwise i need note get <note> --quiet to return 0/1 then note create <note>.
 
 #update-1
-node note -p3s --update=$1 $production 
+node note -$_ct --update=$1 $2 $3 $4
 #update-all:
-#node note -p3s --update=$1 --production
+#node note -$_ct --update --production
 
-#for each name in  note (p3s).wordlist
+#for each name in  note (or file ../../data/words/$_ct.txt
 name=sugar
 
 if [ !save ]
 then
     echo 'Generating new clues..'
-    node ../clues -p3s -c2,6 -x2 > tmp/p3s.c2-6.x2
+    node ../clues -$_ct -c2,6 -x2 > tmp/$_ct.c2-6.x2
 
-    grep $name tmp/p3s.c2-6.x2 > tmp/p3s.c2-6.x2.$name
+    grep $name tmp/$_ct.c2-6.x2 > tmp/$_ct.c2-6.x2.$name
 
     echo 'Filtering...'
-    #TODO: need to pass a flag here saying 'don't filter known urls'
-    node filter -p3s --keep known  tmp/p3s.c2-6.x2.$name > tmp/p3s.c2-6.x2.$name.filtered
+    node filter -$_ct   tmp/$_ct.c2-6.x2.$name > tmp/$_ct.c2-6.x2.$name.filtered
 fi
 
-node note-merge tmp/p3s.c2-6.x2.$name.filtered  $production --note $1
+node note-merge tmp/$_ct.c2-6.x2.$name.filtered --note $1 $2 $3 $4
 
 #TODO : (auto remove .filtered, no need for --note)
 #dump errors in a file 2>tmp/p3s.update.errors

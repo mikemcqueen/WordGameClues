@@ -78,7 +78,9 @@ function getSuffix (line) {
     if (index > -1) {
 	suffix = line.slice(index + 1, line.length).trim();
 	if (!isValidSuffix(suffix)) {
-	    Debug(`invalid suffix, ${suffix}`);
+	    if (suffix.length === 1) {
+		Debug(`invalid suffix, ${suffix}`);
+	    }
 	    suffix = undefined;
 	} else {
 	    line = line.slice(0, index);

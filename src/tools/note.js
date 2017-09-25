@@ -11,6 +11,7 @@ const Clues          = require('../clue-types');
 const Debug          = require('debug')('note');
 const Evernote       = require('evernote');
 const EvernoteConfig = require('../../data/evernote-config.json');
+const Expect         = require('should/as-function');
 const Filter         = require('../modules/filter');
 const Fs             = require('fs-extra');
 const Getopt         = require('node-getopt');
@@ -24,7 +25,6 @@ const Stringify      = require('stringify-object');
 const Update         = require('../modules/update');
 
 //
-
 
 const Commands = { create, get, parse, update, count };
 const Options = Getopt.create(_.concat(Clues.Options, [
@@ -48,7 +48,7 @@ const Options = Getopt.create(_.concat(Clues.Options, [
 
 //
 
-const DATA_DIR      =  Path.normalize(`${Path.dirname(module.filename)}/../../data/`);
+const DATA_DIR =  Path.normalize(`${Path.dirname(module.filename)}/../../data/`);
 
 //
 
@@ -65,7 +65,6 @@ function get (options) {
     return Note.get(options.get, options)
 	.then(note => {
 	    if (!options.quiet) {
-		if (!note) usage(`note not found, ${options.get}`);
 		console.log(note.content);
 	    }
 	});
@@ -112,7 +111,7 @@ function getAndParse (noteName, options) {
     options.clues = true;
     options.content = true;
     return Note.get(noteName, options)
-	.then(note => Promise.all([note, NoteParser.parse(note.content, options)]));
+	.then(note => [note, NoteParser.parse(note.content, options)]);
 }
 
 //
@@ -120,7 +119,6 @@ function getAndParse (noteName, options) {
 function parse (options) {
     return getAndParse(options.parse, options)
 	.then(([note, resultList]) => {
-	    if (!note) usage(`note not found, ${options.parse}`);
 	    if (_.isEmpty(resultList)) {
 		return console.log('no results');
 	    } else {
@@ -164,7 +162,8 @@ function updateOneClue (noteName, options) {
 	.then(([note, resultList]) => {
 	    const removedClues = Filter.getRemovedClues(resultList);
 	    if (!_.isEmpty(removedClues)) {
-		usage(`can't update single note with removed clues, ${removedClues}`);
+		usage(`can't update single note with removed clues:` +
+		      ` ${removedClues.map(clueElem => clueElem.clue)}`);
 	    }
 	    return saveAddCommit(noteName, resultList, options);
 	}).then(path => Update.updateFromFile(path, options));
@@ -172,7 +171,58 @@ function updateOneClue (noteName, options) {
 
 //
 
+function getSomeAndParse (options, filterFunc) {
+    Expect(filterFunc).is.a.Function();
+    Debug(`getSomeAndParse`);
+    options.urls = true;
+    options.clues = true;
+    options.content = true;
+    return Note.getSome(options, filterFunc)
+	.then(noteList => {
+	    if (_.isEmpty(noteList)) throw new Error('no notes found');
+	    Debug(`found ${noteList.length} notes`);
+	    // map list of notes to list of { note, filterList }
+	    // use _ prefix because filterFunc may likely have conflicting 'note' param
+	    return noteList.map(note => {
+		return { note, filterList: NoteParser.parse(note.content, options) };
+	    });
+	});
+}
+
+//moveto: Filter
+
+function addRemovedClues (to, from) {
+    for (let source of from.keys()) {
+	Debug(`${source} has ${_.size(from.get(source))} removed clue(s)`);
+	if (!to.has(source)) {
+	    to.set(source, from.get(source));
+	} else {
+	    for (let clueName of from.get(source).values()) {
+		to.get(source).add(clueName);
+	    }
+	}
+    }
+}
+
+//
+
 function updateAllClues (options) {
+    const prefix = Clues.getShorthand(Clues.getByOptions(options));
+    const bignoteSuffix = '.article';
+    return getSomeAndParse(options, note => {
+	return _.startsWith(note.title, prefix) && !_.endsWith(note.title, bignoteSuffix);
+    }).then(resultList => {
+	let allRemovedClues = new Map();
+	resultList.forEach(result => {
+	    console.log(`note: ${result.note.title}`);
+	    const removedClues = Filter.getRemovedClues(result.filterList);
+	    if (!_.isEmpty(removedClues)) {
+		addRemovedClues(allRemovedClues, removedClues);
+		Debug(`found ${_.size(removedClues)} source(s) with removed clues` +
+			    `, total unique: ${_.size(allRemovedClues)}`);
+	    }
+	});
+    });
 }
 
 //
@@ -181,18 +231,16 @@ async function update (options) {
     // but i could support multiple: just call updateOneClue in a for() loop
     // but not exactly that simple due to removed clues
     if (_.isArray(options.update)) usage('multiple --updates not yet supported');
-    Debug('update');
-    const clueType = Clues.getByOptions(options);
-    const nbName = options.notebook || Note.getWorksheetName(clueType);
-    return Note.getNotebook(nbName, options)
+    Debug(`update, ${options.update}`);
+    // TODO: what if noteobok is undefined
+    return Note.getNotebook(options.notebook, options)
 	.then(nb => {
-	    if (nb) {
-		options.notebookGuid = nb.guid;
-	    } else if (!options.default) {
-		throw new Error(`notebook not found, ${nbName}`);
+	    if (!nb && !options.default) {
+		throw new Error(`notebook not found, ${options.notebook}`);
 	    }
 	    console.log(`notebook: ${nb.title}, guid: ${nb.guid}`);
-	    if (options.update === true) {
+	    options.notebookGuid = nb.guid;
+	    if (_.isEmpty(options.update)) {
 		// no note name supplied, update all notes
 		return updateAllClues(options);
 	    }
@@ -205,6 +253,7 @@ async function update (options) {
 
 async function count (options) {
     Debug('count');
+    // options.notebook = options.notebook || Note.getWorksheetName(Clues.getByOptions(options));
     return getAndParse(options.count, options)
 	.then(([note, filterList]) => {
 	    const count = Filter.count(filterList);
@@ -221,6 +270,8 @@ async function main () {
 	usage(`invalid non-option parameter(s) supplied, ${opt.argv}`);
     }
     if (options.production) console.log('---PRODUCTION--');
+
+    options.notebook = options.notebook || Note.getWorksheetName(Clues.getByOptions(options));
 
     let cmd;
     for (const key of _.keys(Commands)) {

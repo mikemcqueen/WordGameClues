@@ -30,7 +30,7 @@ const Markdown         = require('./markdown');
 //                                  { url: url2, clues: [clue1, .., clueN] }] } ]
 //
 function parse (text, options = {}) {
-    Debug(`++note-parse.parse()`);
+    Debug(`++parse()`);
     if (_.isBuffer(text)) text = text.toString();
     Expect(text).is.a.String();
     
@@ -57,7 +57,7 @@ function parse (text, options = {}) {
 	    // result[1] = 1st capture group
 	    const match = sourceResult[1];
 	    const [sourceLine, suffix] = Markdown.getSuffix(match);
-	    Debug(`sourceLine: ${sourceLine}, suffix: ${suffix}`);
+	    Debug(`sourceLine: ${sourceLine} suffix: ${suffix}`);
 	    sourceElement = options.urls ? { source: sourceLine } : sourceLine;
 	    if (options.urls && suffix) sourceElement.suffix = suffix;
 	    resultList.push(sourceElement);
@@ -102,7 +102,7 @@ function parse (text, options = {}) {
 	    }
 	    let count = 0;
 	    while ((clueResult !== null) && (clueResult.index < endClueIndex)) {
-		const clueLine = clueResult[1].trim();
+		let clueLine = clueResult[1].trim();
 		let debugMsg;
 		// <a> element inner text (with url) gets picked up by clueExpr regex
 		if (_.startsWith(clueLine, 'http')) {// TODO: Filter.isUrl/or My.isUrl/or Markdown.isUrl
@@ -132,10 +132,27 @@ function parse (text, options = {}) {
 		    // TODO: 'note', 'need' markdowns
 		    let [line, prefix] = Markdown.getPrefix(clueLine);
 		    if (prefix) {
+			if (prefix === Markdown.Prefix.maybe) {
+			    debugMsg = 'maybe';
+			} else if (prefix === Markdown.Prefix.remove) {
+			    debugMsg = 'remove';
+			}
 			clueLine = line;
+		    } else {
+			debugMsg = 'clue';
 		    }
-		    clueList.push({ clue: clueLine, prefix });
-		    debugMsg = 'added';
+		    let note;
+		    let commaIndex = clueLine.indexOf(',');
+		    if (commaIndex > -1) {
+			// TODO: process note for need
+			note = clueLine.slice(commaIndex + 1, clueLine.length);
+			debugMsg += ' [with note]';
+			clueLine = clueLine.slice(0, commaIndex);
+		    }
+		    let clueElem = { clue: clueLine };
+		    if (prefix) clueElem.prefix = prefix;
+		    if (note) clueElem.note = note;
+		    clueList.push(clueElem);
 		} else {
 		    debugMsg = 'empty';
 		}
@@ -148,6 +165,7 @@ function parse (text, options = {}) {
 	prevSourceElement.urls = urlList;
 	Debug(`found ${urlList.length} urls for ${prevSourceElement.source}`);
     }
+    Debug(`--parse`);
     return resultList;
 }
 

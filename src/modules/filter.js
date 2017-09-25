@@ -25,7 +25,7 @@ function isUrl (line) {
     return _.startsWith(line, URL_PREFIX);
 }
 
-//
+// rename parseFileSync?
 
 function parseFile (filename, options = {}) {
     let readLines = new Readlines(filename);
@@ -194,12 +194,15 @@ function count (list) {
 //
 
 function getRemovedClues (list) {
-    let removedClues = [];
-    for (let src of list) {
-	for (let url of src.urls || []) {
-	    for (let clue of url.clues || []) {
-		if (clue.prefix === Markdown.Prefix.remove) {
-		    removedClues.push(clue);
+    let removedClues = new Map();
+    for (let srcElem of list) {
+	for (let urlElem of srcElem.urls || []) {
+	    for (let clueElem of urlElem.clues || []) {
+		if (clueElem.prefix === Markdown.Prefix.remove) {
+		    if (!_.has(removedClues, srcElem.source)) {
+			removedClues.set(srcElem.source, new Set());
+		    }
+		    removedClues.get(srcElem.source).add(clueElem.clue);
 		}
 	    }
 	}

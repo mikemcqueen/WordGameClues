@@ -14,6 +14,7 @@ const EvernoteConfig   = require('../../data/evernote-config.json');
 const Expect           = require('should/as-function');
 const Fs               = require('fs-extra');
 const Path             = require('path');
+const Promise          = require('bluebird');
 const Stringify        = require('stringify-object');
  
 //
@@ -27,34 +28,35 @@ function NodeNote (options) {
     this.noteStore = client.getNoteStore();
 }
 
-const Production = new NodeNote({ token: EvernoteConfig.production.token, sandbox: false });
-const Sandbox    = new NodeNote({ token: EvernoteConfig.develop.token, sandbox: true });
+const ProductionDev   = new NodeNote({ token: EvernoteConfig.production.developerToken, sandbox: false });
+const ProductionOauth = new NodeNote({ token: EvernoteConfig.production.oauthToken, sandbox: false });
+const SandboxDev      = new NodeNote({ token: EvernoteConfig.sandbox.developerToken, sandbox: true });
+const SandboxOauth    = new NodeNote({ token: EvernoteConfig.sandbox.oauthToken, sandbox: true });
 
 //
 
 function getNotestore (production) {
-    return production ? Production.noteStore : Sandbox.noteStore;
+    return production ? ProductionOauth.noteStore : SandboxOauth.noteStore;
 }
 
 //
 
-function getNotebook (name, options = {}) {
+async function getNotebook (name, options = {}) {
     if (!name) return undefined;
     const noteStore = getNotestore(options.production);
     return noteStore.listNotebooks()
 	.then(nbList => {
-	    let match = false;
 	    for(const nb of nbList) {
+		Debug(`notebook: ${nb.name}`);
+		let match = false;
 		if (options.relaxed) {
 		    match = _.includes(nb.name, name);
 		} else {
 		    match = (nb.name === name);
 		}
 		if (match ) {
-		    Debug(`notebook match: ${nb.name}`);
+		    Debug(`match`);
 		    return nb;
-		} else {
-		    Debug(`not notebook: ${nb.name}`);
 		}
 	    }
 	    Debug(`notebook not found, ${name}`);
@@ -62,7 +64,7 @@ function getNotebook (name, options = {}) {
 	});
 }
 
-//
+// probably belongs in clue-types, or somewhere else
 
 function getWorksheetName (noteNameOrClueType) {
     let noteName = noteNameOrClueType;
@@ -85,57 +87,100 @@ function getWorksheetName (noteNameOrClueType) {
 
 //
 
-async function getNotebookGuidByOptions (options) {
-    if (options.notebookGuid) return options.notebookGuid;
+async function getNotebookByOptions (options) {
+//    if (options.notebookGuid) return options.notebookGuid;
     if (!options.notebook) return undefined;
     return getNotebook(options.notebook, options)
 	.then(nb => {
 	    if (!nb) throw new Error(`no notebook matches: ${options.notebook}`);
-	    return nb.guid;
+	    return nb;
 	});
 }
 
 //
+/* noteSpec:
+ includeContent
+ includeResourcesData
+ includeResourcesRecognition
+ includeResourcesAlternateData
+ includeSharedNotes
+ includeNoteAppDataValues
+ includeResourceAppDataValues
+ includeAccountLimits
+ */
+
+/* metaSpec:
+ includeTitle
+ includeContentLength
+ includeCreated
+ includeUpdated
+ includeDeleted
+ */
 
 async function get (title, options = {}) {
-    let filter = {};
-    // todo: could combine a couple of these awaits into a chain
-
-    filter.notebookGuid = await getNotebookGuidByOptions(options).catch(err => { throw err; });
-    Debug(`notebookGuid: ${filter.notebookGuid}`);
-    /*
-     includeContent
-     includeResourcesData
-     includeResourcesRecognition
-     includeResourcesAlternateData
-     includeSharedNotes
-     includeNoteAppDataValues
-     includeResourceAppDataValues
-     includeAccountLimits
-     */
     const noteStore = getNotestore(options.production);
-
-    let spec = {};
-    if (options.content) {
-	spec.includeContent = true;
-    }
-
-    let metaSpec = {};
-    let result = await noteStore.findNotesMetadata(filter, 0, 250, metaSpec).catch(err => { throw err; });
-    //Debug(Stringify(result));
-    for (const metaNote of result.notes) {
-	Debug(`GUID: ${metaNote.guid}`);
-	let note = await noteStore.getNoteWithResultSpec(metaNote.guid, spec).catch(err => { throw err; });
-	if (!note) continue;
-	// TODO: check for duplicate named notes (option)
-	if (note.title === title) {
-	    Debug(`note match: ${note.title}`);
+    return getNotebookByOptions(options)
+	.then(notebook => {
+	    Debug(`get from notebook: ${notebook.title}, ${notebook.guid}`);
+	    const filter = { notebookGuid: notebook.guid };
+	    const metaSpec = { includeTitle: true };
+	    return noteStore.findNotesMetadata(filter, 0, 250, metaSpec);
+	}).then(findResult => {
+	    for (const metaNote of findResult.notes) {
+		Debug(`note: ${metaNote.title}`);
+		// TODO: check for duplicate named notes (option)
+		if (metaNote.title === title) {
+		    Debug(`match`);
+		    const noteSpec = { includeContent: true };
+		    return noteStore.getNoteWithResultSpec(metaNote.guid, noteSpec);
+		}
+	    }
+	    return undefined;
+	}).then(note => {
+	    if (!note) throw new Error(`note not found, ${title}`);
 	    return note;
-	} else {
-	    Debug(`not note: ${note.title}`);
+	});
+}
+
+//
+// options:
+//   notebookGuid  only filter notes in this notebook
+//   title         notes matching title exactly
+//
+// filterFunc:
+//   DIY filtering on note-by-note basis
+//
+// to return all notes in a notebook, set options.notebookGuid = GUID, filterFunc = undefined
+// or DIY filter them all by providing filterFunc
+//
+function getSome (options, filterFunc = undefined) {
+    const noteStore = getNotestore(options.production);
+    // strange way to do this. might be more than just 1 options that control notebook (like --default)
+    // so, hasNotebookOption(options)
+    const firstPromise = options.notebook ? getNotebookByOptions(options) : Promise.resolve(false);
+    return firstPromise.then(notebook => {
+	let filter = {};
+	if (notebook) {
+	    Debug(`getSome from notebook: ${notebook.name}, ${notebook.guid}`);
+	    filter.notebookGuid = notebook.guid;
 	}
-    }
-    throw new Error(`note not found, ${title}`);
+	// include title
+	const metaSpec = { includeTitle: true };
+	return noteStore.findNotesMetadata(filter, 0, 250, metaSpec);
+    }).then(findResult => findResult.notes.filter(note => {
+	Debug(`note: ${note.title}, guid: ${note.guid}`);
+	// TODO: check for duplicate named notes (option)
+	if (options.title) {
+	    if (options.title !== note.title) return false;
+	    Debug(`title match`);
+	}
+	const keep = !filterFunc || filterFunc(note);
+	Debug(keep ? 'keeping' : 'discarding');
+	return keep;
+    })).then(metaNoteList => Promise.map(metaNoteList, note => {
+	const noteSpec = { includeContent: true };
+	return noteStore.getNoteWithResultSpec(note.guid, noteSpec);
+    }, { concurrency: 1 }));
 }
 
 //
@@ -154,10 +199,10 @@ async function create (title, body, options = {}) {
     Expect(body).is.a.String();
 
     let note = {};
-    return getNotebookGuidByOptions(options)
-	.then(guid => {
+    return getNotebookByOptions(options)
+	.then(notebook => {
 	    note.title = title;
-	    note.notebookGuid = guid;
+	    note.notebookGuid = notebook.guid;
 	    /*
 	     let noteAttributes;
 	     noteAttributes.author = author;
@@ -240,6 +285,7 @@ module.exports = {
     get,
     getContent,
     getNotebook,
+    getSome,
     getWorksheetName,
     setContentBody,
     update
