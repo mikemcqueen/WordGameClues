@@ -5,6 +5,7 @@
 'use strict';
 
 const _            = require('lodash');
+const Clues        = require('../clue-types');
 const Debug        = require('debug')('filter');
 const Duration     = require('duration');
 const Expect       = require('should/as-function');
@@ -130,7 +131,10 @@ function filterSources (listToFilter, options)  {
     return [filteredList, filterCount];
 }
 
-//
+// options:
+//  fd       file descriptor.  required
+//  json     json format, else filter format
+//  removed  if (false) don't save removed clues
 
 async function dumpList (list, options) {
     Expect(options.fd).is.a.Number(); // for now. no other use case yet.
@@ -151,12 +155,17 @@ async function dumpList (list, options) {
 	    if (!_.isObject(sourceElem)) continue;
 	    for (const urlElem of sourceElem.urls || []) {
 		let url = urlElem.url || urlElem;
-		if (urlElem.suffix) url += `,${urlElem.suffix}`;
+		if (urlElem.suffix) url = `${url},${urlElem.suffix}`;
 		await My.writeln(dest, url);
 		if (!_.isObject(urlElem)) continue;
 		for (const clueElem of urlElem.clues || []) {
+		    if (!options.all && (clueElem.prefix === Markdown.Prefix.remove)) {
+			Debug(`excluding removed clue: ${source} | ${clueElem.clue}`);
+			continue;
+		    }
 		    let clue = clueElem.clue;
 		    if (clueElem.prefix) clue = `${clueElem.prefix}${clue}`;
+		    if (clueElem.note)   clue = `${clue},${clueElem.note}`;
 		    await My.writeln(dest, clue);
 		}
 	    }
@@ -193,9 +202,25 @@ function count (list) {
 
 //
 
-function getRemovedClues (list) {
+async function saveAddCommit (noteName, filterList, options) {
+    const filepath = `${Clues.getDirectory(Clues.getByOptions(options))}/updates/${noteName}`;
+    Debug(`saving ${noteName} to: ${filepath}`);
+    return Fs.open(filepath, 'w')
+	.then(fd => {
+	    return dumpList(filterList, { fd });
+	}).then(fd => Fs.close(fd))
+	.then(_ => {
+	    // TODO MAYBE: options.wait
+	    // no return = no await completion = OK
+	    return (options.production) ? My.gitAddCommit(filepath, 'parsed live note') : undefined;
+	}).then(_ => filepath); // return path
+}
+
+//
+
+function getRemovedClues (filterList) {
     let removedClues = new Map();
-    for (let srcElem of list) {
+    for (let srcElem of filterList) {
 	for (let urlElem of srcElem.urls || []) {
 	    for (let clueElem of urlElem.clues || []) {
 		if (clueElem.prefix === Markdown.Prefix.remove) {
@@ -219,5 +244,6 @@ module.exports = {
     filterSources,
     filterUrls,
     getRemovedClues,
-    parseFile
+    parseFile,
+    saveAddCommit
 };

@@ -7,6 +7,7 @@
 //
 
 const _              = require('lodash');
+const ClueManager    = require('../clue-manager');
 const Clues          = require('../clue-types');
 const Debug          = require('debug')('note');
 const Evernote       = require('evernote');
@@ -15,6 +16,7 @@ const Expect         = require('should/as-function');
 const Filter         = require('../modules/filter');
 const Fs             = require('fs-extra');
 const Getopt         = require('node-getopt');
+const Markdown       = require('../modules/markdown');
 const My             = require('../modules/util');
 const Note           = require('../modules/note');
 const NoteMaker      = require('../modules/note-make');
@@ -30,6 +32,7 @@ const Commands = { create, get, parse, update, count };
 const Options = Getopt.create(_.concat(Clues.Options, [
     ['', 'count=NAME',    'count sources/clues/urls in a note'],
     ['', 'create=FILE',   'create note from filter result file'],
+    ['', 'force',         'force execution: update single note with removed clue'],
     ['', 'get=TITLE',     'get (display) a note'],
     ['', 'notebook=NAME', 'specify notebook name'],
     ['', 'parse=TITLE',   'parse note into filter file format'],
@@ -60,7 +63,7 @@ function usage (msg) {
 
 //
 
-function get (options) {
+async function get (options) {
     options.content = true;
     return Note.get(options.get, options)
 	.then(note => {
@@ -88,7 +91,7 @@ function old_create (options) {
 
 //
 
-function create (options) {
+async function create (options) {
     const title = options.title;
     
     const list = Filter.parseFile(options.create, { urls: true, clues: true });
@@ -105,7 +108,7 @@ function create (options) {
 
 //
 
-function getAndParse (noteName, options) {
+async function getAndParse (noteName, options) {
     Debug(`getAndParse ${noteName}`);
     options.urls = true;
     options.clues = true;
@@ -123,26 +126,9 @@ function parse (options) {
 		return console.log('no results');
 	    } else {
 		const fd = process.stdout.fd;
-		return Filter.dumpList(resultList, { fd });
+		return Filter.dumpList(resultList, { fd, all: true });
 		//console.log(`${Stringify(resultList)}`);
 	    }
-	});
-}
-
-// move to Filter.js
-
-async function saveAddCommit (noteName, filterList, options) {
-    const filepath = `${Clues.getDirectory(Clues.getByOptions(options))}/updates/${noteName}`;
-    Debug(`saving ${noteName} to: ${filepath}`);
-    return Fs.open(filepath, 'w')
-	.then(fd => {
-	    return Filter.dumpList(filterList, { fd });
-	}).then(fd => Fs.close(fd))
-	.then(_ => {
-	    // TODO MAYBE: options.wait
-	    // no return = no await completion = OK
-	    My.gitAddCommit(filepath, 'parsed live note');
-	    return filepath;
 	});
 }
 
@@ -151,7 +137,7 @@ async function saveAddCommit (noteName, filterList, options) {
 function getParseSaveCommit (noteName, options) {
     return getAndParse(noteName, options)
 	.then(([note, resultList]) => {
-	    return saveAddCommit(noteName, resultList, options);
+	    return Filter.saveAddCommit(noteName, resultList, options);
 	});
 }
 
@@ -161,17 +147,17 @@ function updateOneClue (noteName, options) {
     return getAndParse(noteName, options)
 	.then(([note, resultList]) => {
 	    const removedClues = Filter.getRemovedClues(resultList);
-	    if (!_.isEmpty(removedClues)) {
+	    if (!_.isEmpty(removedClues) && !options.force) {
 		usage(`can't update single note with removed clues:` +
-		      ` ${removedClues.map(clueElem => clueElem.clue)}`);
+		      ` ${_.keys(removedClues).map(clueElem => clueElem.clue)}`);
 	    }
-	    return saveAddCommit(noteName, resultList, options);
+	    return Filter.saveAddCommit(noteName, resultList, options);
 	}).then(path => Update.updateFromFile(path, options));
 }
 
 //
 
-function getSomeAndParse (options, filterFunc) {
+async function getSomeAndParse (options, filterFunc) {
     Expect(filterFunc).is.a.Function();
     Debug(`getSomeAndParse`);
     options.urls = true;
@@ -189,7 +175,7 @@ function getSomeAndParse (options, filterFunc) {
 	});
 }
 
-//moveto: Filter
+// to, from: are Map() type. must be the builtin class type, not generic objects
 
 function addRemovedClues (to, from) {
     for (let source of from.keys()) {
@@ -206,22 +192,73 @@ function addRemovedClues (to, from) {
 
 //
 
-function updateAllClues (options) {
+function getAllRemovedClues (resultList) {
+    let allRemovedClues = new Map();
+    for (let result of resultList) {
+	console.log(`note: ${result.note.title}`);
+	const removedClues = Filter.getRemovedClues(result.filterList);
+	if (!_.isEmpty(removedClues)) {
+	    addRemovedClues(allRemovedClues, removedClues);
+	    Debug(`found ${_.size(removedClues)} source(s) with removed clues` +
+		  `, total unique: ${_.size(allRemovedClues)}`);
+	}
+    }
+    return allRemovedClues;
+}
+
+//
+
+function removeAllClues (removedClues, options = {}) {
+    Debug('removeAllClues');
+    let total = 0;
+    for (let source of removedClues.keys()) {
+	let nameCsv = Markdown.hasSourcePrefix(source)
+		? source.slice(1, source.length) : source;
+	const nameList = nameCsv.split(',').sort();
+	const result = ClueManager.getCountListArrays(nameCsv, { remove: true });
+	if (!result) {
+	    Debug(`no matches for source: ${source}`);
+	    continue;
+	}
+	// for each clue word in set
+	for (let clue of removedClues.get(source).keys()) {
+	    let removed = ClueManager.addRemoveOrReject(
+		{ remove: clue }, nameList, result.addRemoveSet, options);
+	    if (removed > 0) {
+		Debug(`removed ${removed} instance(s) of [${clue}] : ${source}`);
+	    }
+	    total += removed;
+	}
+    }
+    Debug(`total removed: ${total}`);
+    return total;
+}
+
+// return array of save paths
+
+async function saveAddCommitAll (resultList, options) {
+    Expect(resultList).is.an.Array();
+    Expect(options).is.an.Object();
+    return Promise.map(resultList, result => {
+	return Filter.saveAddCommit(result.note.title, result.filterList, options);
+    }, { concurrency: 1 });
+}
+
+//
+
+async function updateAllClues (options) {
     const prefix = Clues.getShorthand(Clues.getByOptions(options));
     const bignoteSuffix = '.article';
     return getSomeAndParse(options, note => {
 	return _.startsWith(note.title, prefix) && !_.endsWith(note.title, bignoteSuffix);
     }).then(resultList => {
-	let allRemovedClues = new Map();
-	resultList.forEach(result => {
-	    console.log(`note: ${result.note.title}`);
-	    const removedClues = Filter.getRemovedClues(result.filterList);
-	    if (!_.isEmpty(removedClues)) {
-		addRemovedClues(allRemovedClues, removedClues);
-		Debug(`found ${_.size(removedClues)} source(s) with removed clues` +
-			    `, total unique: ${_.size(allRemovedClues)}`);
-	    }
-	});
+	let allRemovedClues = getAllRemovedClues(resultList);
+	removeAllClues(allRemovedClues, options);
+	return saveAddCommitAll(resultList, options);
+    }).then(pathList => {
+	// NOTE: updateFromPathList should do something with options.save, don't pass it to
+	// updateFromFile, just call save at the end.
+	return Update.updateFromPathList(pathList, options);
     });
 }
 
@@ -240,6 +277,9 @@ async function update (options) {
 	    }
 	    console.log(`notebook: ${nb.title}, guid: ${nb.guid}`);
 	    options.notebookGuid = nb.guid;
+
+	    ClueManager.loadAllClues({ clues: Clues.getByOptions(options) });
+
 	    if (_.isEmpty(options.update)) {
 		// no note name supplied, update all notes
 		return updateAllClues(options);

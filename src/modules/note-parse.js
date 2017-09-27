@@ -146,7 +146,7 @@ function parse (text, options = {}) {
 		    if (commaIndex > -1) {
 			// TODO: process note for need
 			note = clueLine.slice(commaIndex + 1, clueLine.length);
-			debugMsg += ' [with note]';
+			debugMsg += ' with note';
 			clueLine = clueLine.slice(0, commaIndex);
 		    }
 		    let clueElem = { clue: clueLine };

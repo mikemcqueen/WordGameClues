@@ -204,7 +204,7 @@ async function gitRetryCommit (filepath, message, retryCount = DEFAULT_RETRY_COU
 	    return Promise.reject(lastError);
 	}
 	const delay = between(RETRY_DELAY_LOW, RETRY_DELAY_HIGH);
-	Debug(`${Path.basename(filepath)} retryCount: ${retryCount}`
+	Debug(`${Path.basename(filepath)} retryCount: ${retryCount}` +
 	      `, retrying in ${PrettyMs(delay)}`);
 	retryCount -= 1;
 	await waitFor(delay);

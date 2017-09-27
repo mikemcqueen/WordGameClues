@@ -228,12 +228,11 @@ ClueManager.prototype.removeKnownClue = function (count, name, source, nothrow) 
     Expect(source).is.a.String();
     let clueMap = this.knownClueMapArray[count];
     if (!_.has(clueMap, name) || !clueMap[name].includes(source)) {
-	// turn off nothrow while testing
-	//if (nothrow) return false;
+	if (nothrow) return false;
 	throw new Error(`removeKnownClue, missing clue: ${name}:${source} at count: ${count}`);
     } else {
 	Debug(`before clueMap[${name}]: len(${clueMap[name].length}), sources:${clueMap[name]}`);
-	Debug(`removing clue: ${name}:${source} from count: ${count}`);
+	Debug(`removing clue: [${name}] : ${source} from count: ${count}`);
 	_.pull(clueMap[name], source);
 	Debug(`after clueMap[${name}]: len(${clueMap[name].length}), sources: ${clueMap[name]}`);
     }
@@ -667,23 +666,23 @@ ClueManager.prototype.addClueForCounts = function (countSet, name, src) {
 
 //
 
-ClueManager.prototype.removeClueForCounts = function (countSet, name, src) {
+ClueManager.prototype.removeClueForCounts = function (countSet, name, src, options = {}) {
     Expect(countSet).is.instanceof(Set);
     Expect(name).is.a.String();
     Expect(src).is.a.String();
     let removed = 0;
-    countSet.forEach(count => {
+    for (let count of countSet.keys()) {
 	if (this.removeClue(count, {
 	    name: name,
 	    src:  src
-	}, true, true)) { // save, nothrow
-	    console.log(`${count}: removed ${name}`);
+	}, options.save, options.nothrow)) {
+	    Debug(`removed ${name}:${count}`);
 	    removed += 1;
 	} else {
 	    // not sure this should ever happen. removeClue throws atm.
-	    console.log(`${count}: ${name} not present`);
+	    Debug(`${name}:${count} not present`);
 	}
-    });
+    }
     return removed;
 }
 
@@ -722,7 +721,8 @@ ClueManager.prototype.getKnownClueIndexLists = function (nameList) {
 //   isReject
 //
 
-ClueManager.prototype.addRemoveOrReject = function (args, nameList, countSet) {
+ClueManager.prototype.addRemoveOrReject = function (args, nameList, countSet, options) {
+    let count = 0;
     if (args.add) {
 	if (nameList.length === 1) {
 	    console.log('WARNING! ignoring --add due to single source');
@@ -732,11 +732,12 @@ ClueManager.prototype.addRemoveOrReject = function (args, nameList, countSet) {
 	    this.addClueForCounts(countSet, args.add, nameList.toString());
 	}
     } else if (args.remove) {
-	Debug(`remove ${args.remove}:${nameList} from ${[...countSet.values()]}`);
+	Debug(`remove [${args.remove}] as ${nameList} from ${[...countSet.values()]}`);
 	if (nameList.length === 1) {
 	    console.log('WARNING! ignoring --remove due to single source');
 	} else {
-	    this.removeClueForCounts(countSet, args.remove, nameList.toString());
+	    let removeOptions = { save: options.save, nothrow: true };
+	    count = this.removeClueForCounts(countSet, args.remove, nameList.toString(), removeOptions);
 	}
     } else if (args.reject) {
 	if (nameList.length === 1) {
@@ -750,5 +751,78 @@ ClueManager.prototype.addRemoveOrReject = function (args, nameList, countSet) {
 	    console.log('update failed');
 	}
     }
+    return count;
 }
 
+// Probably not the most unique function name possible.
+
+ClueManager.prototype.getCountListArrays = function (nameCsv, options) {
+    const nameList = nameCsv.split(',').sort();
+    Debug(`getValidCountLists for ${nameList}`);
+
+    /// TODO, check if existing sourcelist (knownSourceMapArray)
+
+    let countListArray = this.getKnownClueIndexLists(nameList);
+    Debug(countListArray);
+    let resultList = Peco.makeNew({
+	listArray: countListArray,
+	max:       this.maxClues
+    }).getCombinations();
+    if (_.isEmpty(resultList)) {
+	Debug('No matches');
+	return null;
+    }
+
+    let addRemoveSet;
+    if (options.add || options.remove) {
+	addRemoveSet = new Set();
+    }
+    let known = [];
+    let rejects = [];
+    let clues = [];
+    let invalid = [];
+
+    for (const clueCountList of resultList) {
+	const sum = clueCountList.reduce((a, b) => a + b);
+	const result = Validator.validateSources({
+	    sum:         sum,
+	    nameList:    nameList,
+	    count:       nameList.length,
+	    validateAll: true
+	});
+	
+	if (!result.success) {
+	    invalid.push(clueCountList);
+	} else if (this.isRejectSource(nameList)) {
+	    rejects.push(clueCountList);
+	} else if (nameList.length === 1) {
+	    let name = nameList[0];
+	    let nameSrcList = this.clueListArray[sum]
+		    .filter(clue => clue.name === name)
+		    .map(clue => clue.src);
+	    if (nameSrcList.length > 0) {
+		//let clueNameList = this.clueListArray[sum].map(clue => clue.name);
+		//if (clueNameList.includes(name)) {
+		//
+		
+		/*
+		 this.clueListArray[sum].forEach(clue => {
+		 if (clue.name === name) {
+		 clueSrcList.push(`"${clue.src}"`);
+		 }
+		 });
+		 */
+		clues.push({ countList: clueCountList, nameList: nameSrcList });
+	    }
+	} else {
+	    let clueList = this.knownSourceMapArray[sum][nameList];
+	    if (clueList) {
+		known.push({ countList: clueCountList, nameList: clueList.map(clue => clue.name) });
+	    }
+	    if (options.add || options.remove) {
+		addRemoveSet.add(sum);
+	    }
+	}
+    }
+    return { known, rejects, invalid, clues, addRemoveSet };
+}

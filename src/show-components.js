@@ -12,6 +12,15 @@ let Peco        = require('./peco');
 let Validator   = require('./validator');
 
 //
+
+function showCountListArray (countListArray, text, hasNameList = false) {
+    for (let elem of countListArray) {
+	const countList = hasNameList ? elem.countList : elem;
+	console.log(`${countList} ${text} ${hasNameList ? elem.nameList : ''}`);
+    }
+}
+
+//
 //
 
 function show (options) {
@@ -21,7 +30,18 @@ function show (options) {
 	Expect(options.add).is.undefined();
     }
 
-    let nameList = options.test.split(',').sort();
+    //
+    // TODO: call ClueManager.getCountLists
+    //
+
+    const nameList = options.test.split(',').sort();
+    const result = ClueManager.getCountListArrays(options.test, options);
+    if (!result) {
+	console.log('No matches');
+	return;
+    }
+
+    /*
     nameList.forEach(name => {
 	console.log('name: ' + name);
     });
@@ -29,8 +49,7 @@ function show (options) {
     /// TODO, check if existing sourcelist (knownSourceMapArray)
 
     let countListArray = ClueManager.getKnownClueIndexLists(nameList);
-    console.log(countListArray);
-
+    Debug(countListArray);
     let resultList = Peco.makeNew({
 	listArray: countListArray,
 	max:       ClueManager.maxClues
@@ -69,14 +88,12 @@ function show (options) {
 		//let clueNameList = ClueManager.clueListArray[sum].map(clue => clue.name);
 		//if (clueNameList.includes(name)) {
 		//
-		
-		/*
-		 ClueManager.clueListArray[sum].forEach(clue => {
-		 if (clue.name === name) {
-		 clueSrcList.push(`"${clue.src}"`);
-		 }
-		 });
-		 */
+                //ClueManager.clueListArray[sum].forEach(clue => {
+                //if (clue.name === name) {
+                //clueSrcList.push(`"${clue.src}"`);
+                //}
+                //});
+
 		msg += ': PRESENT as clue with sources: ' + nameSrcList.join(' - ');
 	    }
 	} else {
@@ -89,19 +106,27 @@ function show (options) {
 		addCountSet.add(sum);
 	    }
 	}
-	console.log(msg);
+        console.log(msg);
     }
+    */
+
+    showCountListArray(result.rejects, 'REJECTED');
+    showCountListArray(result.invalid, 'INVALID');
+    showCountListArray(result.known, 'PRESENT as', true);
+    showCountListArray(result.clues, 'PRESENT as clue with sources:', true);
+
     ClueManager.addRemoveOrReject({
-	add:    options.add,
-	remove: options.remove,
-	reject: options.reject,
-	isKnown,
-	isReject
-    }, nameList, addCountSet);
+	add:      options.add,
+	remove:   options.remove,
+	reject:   options.reject,
+	isKnown:  !_.isEmpty(result.known),
+	isReject: !_.isEmpty(result.reject)
+    }, nameList, result.addRemoveSet);
 }
 
 //
 
 module.exports = {
-    show
+    show,
+    countListArray: showCountListArray
 };

@@ -99,9 +99,7 @@ function processSrc (rawLine, args, options) {
 	content = Fs.readFileSync(path, 'utf8');
     } catch(err) {
 	// file not existing is OK.
-	if (options.verbose) {
-	    console.log('filtered file not found');
-	}
+	// check err.code NOENT
     }
     let flags = {};
     let filteredUrls;
@@ -338,8 +336,10 @@ function skipState (state, result, options) {
 async function updateFromFile(filename, options) {
     Expect(filename).is.a.String();
 
-    // TODO: if (!ClueManager.isLoaded())
-    ClueManager.loadAllClues({ clues: Clues.getByOptions(options) });
+    if (!ClueManager.loaded) {
+	Debug('updateFromFile: calling ClueManager.loadAllClues()');
+	ClueManager.loadAllClues({ clues: Clues.getByOptions(options) });
+    }
 
     const dir = options.dir || '2'; // lil haxy
     let result = {
@@ -411,6 +411,20 @@ async function updateFromFile(filename, options) {
 
 //
 
+async function updateFromPathList(pathList, options) {
+    Expect(pathList).is.an.Array();
+    // NOTE: updateFromPathList should do something with options.save, don't pass it to
+    // updateFromFile, just call save at the end.
+    // return countLists from updateFromFile. oh wait i do that already...~
+    for (let path of pathList) {
+	updateFromFile(path, options);
+    }
+    // 
+}
+
+//
+
 module.exports = {
-    updateFromFile
+    updateFromFile,
+    updateFromPathList
 }
