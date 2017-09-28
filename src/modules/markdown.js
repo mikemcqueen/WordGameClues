@@ -18,7 +18,8 @@ const Prefix = {
     known:  '#',
     remove: '-'
 };
-Prefix.any = _.values(Prefix);
+Prefix.any  = _.values(Prefix);
+Prefix.clue = [Prefix.known, Prefix.remove];
 
 const Suffix =  {
     clue:   'c',
@@ -91,11 +92,12 @@ function getSuffix (line) {
 
 //
 
-function getPrefix (line) {
+function getPrefix (line, allowed = Prefix.any) {
     Expect(line).is.a.String();
+    if (!_.isArray(allowed)) allowed = [allowed];
     let prefix;
     let firstChar = line.charAt(0);
-    if (isValidPrefix(firstChar)) {
+    if (allowed.includes(firstChar)) {
 	prefix = firstChar;
 	line = line.slice(1, line.length);
     }

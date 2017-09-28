@@ -381,8 +381,8 @@ async function updateFromFile(filename, options) {
     result.dir = dir;
     preProcess(Done, result, options);
     if (options.save) {
-	if (!options.production) {
-	    throw new Error('--save only allowed with --production');
+	if (!options.production && !options.force) {
+	    throw new Error('--save only allowed with --production (or --force)');
 	}
 	if (result.count.knownClues > 0) {
 	    // save clues

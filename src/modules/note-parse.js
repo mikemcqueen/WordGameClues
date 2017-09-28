@@ -13,8 +13,8 @@ const Fs               = require('fs-extra');
 const Markdown         = require('./markdown');
 
 // all options are boolean
-//   .urls:     parse urls (http:// prefix)
-//   .clues:    parse clues (no prefix, or '-' remove prefix)
+//   .urls:     parse urls (http(s) prefix)
+//   .clues:    parse clues (removed, maybe)
 //
 // returns (eventually)
 //   if only one options is supplied, returns a list of that option type
@@ -142,6 +142,7 @@ function parse (text, options = {}) {
 			debugMsg = 'clue';
 		    }
 		    let note;
+		    //TODO: Markdown.hasSuffix(line, []) // allow truly any suffix
 		    let commaIndex = clueLine.indexOf(',');
 		    if (commaIndex > -1) {
 			// TODO: process note for need

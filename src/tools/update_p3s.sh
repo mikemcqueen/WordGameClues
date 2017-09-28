@@ -9,6 +9,7 @@ echo $1
 #_production=--production
 #_save=--save
 _ct=p3s    #clue type
+_force=--force
 
 #make update_p3s.sh read words file.
 #all console.log(err) -> console.error(err)
@@ -17,14 +18,14 @@ _ct=p3s    #clue type
 #how about --create flag? otherwise i need note get <note> --quiet to return 0/1 then note create <note>.
 
 #update-1
-node note -$_ct --update=$1 $2 $3 $4
+node note -$_ct --update=$1 $2 $3 $4 $_force --save
 #update-all:
-#node note -$_ct --update --production
+
 
 #for each name in  note (or file ../../data/words/$_ct.txt
 name=sugar
 
-if [ !save ]
+if [ !_save ]
 then
     echo 'Generating new clues..'
     node ../clues -$_ct -c2,6 -x2 > tmp/$_ct.c2-6.x2
@@ -35,7 +36,7 @@ then
     node filter -$_ct   tmp/$_ct.c2-6.x2.$name > tmp/$_ct.c2-6.x2.$name.filtered
 fi
 
-node note-merge tmp/$_ct.c2-6.x2.$name.filtered --note $1 $2 $3 $4
+node note-merge -$_ct tmp/$_ct.c2-6.x2.$name.filtered --note $1 $2 $3 $4
 
 #TODO : (auto remove .filtered, no need for --note)
 #dump errors in a file 2>tmp/p3s.update.errors

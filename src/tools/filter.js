@@ -18,6 +18,7 @@ const Expect       = require('should/as-function');
 const Filter       = require('../modules/filter');
 const Fs           = require('fs-extra');
 const Getopt       = require('node-getopt');
+const Markdown     = require('../modules/markdown');
 const My           = require('../modules/util');
 const Path         = require('path');
 const PrettyMs     = require('pretty-ms');
@@ -160,7 +161,7 @@ function filterSearchResultList (resultList, wordList, filteredUrls, options, fi
 	return {
 	    src:     wordList.toString(),
 	    urlList: resultList.map(result => result.url), // only good results remain; map to urls
-	    known:   ClueManager.getKnownClues(wordList)
+	    known:   ClueManager.getKnownClueNames(wordList)
 	};
     });
     // TODO: .catch()
@@ -366,17 +367,17 @@ function writeFilterResults (resultList, stream) {
     Expect(resultList).is.an.Array();
     for (const result of resultList) {
 	if (ClueManager.isRejectSource(result.src)) continue;
-	const knownList = ClueManager.getKnownClues(result.src);
+	const knownList = ClueManager.getKnownClueNames(result.src);
 	if (_.isEmpty(knownList) && _.isEmpty(result.urlList)) continue;
 
-	My.logStream(stream, `${Filter.SRC_PREFIX}${result.src}`);
+	My.logStream(stream, `${Markdown.Prefix.source}${result.src}`);
 	for (const url of result.urlList) {
 	    My.logStream(stream, url);
 	}
 	if (!_.isEmpty(knownList)) {
 	    My.logStream(stream, '');
 	    for (const name of knownList) {
-		My.logStream(stream, name); // `${Filter.KNOWN_PREFIX}${name}`);
+		My.logStream(stream, name); // `${Markdown.Prefix.known}${name}`);
 	    }
 	}
 	My.logStream(stream, '');

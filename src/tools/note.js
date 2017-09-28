@@ -146,10 +146,15 @@ function getParseSaveCommit (noteName, options) {
 function updateOneClue (noteName, options) {
     return getAndParse(noteName, options)
 	.then(([note, resultList]) => {
-	    const removedClues = Filter.getRemovedClues(resultList);
-	    if (!_.isEmpty(removedClues) && !options.force) {
-		usage(`can't update single note with removed clues:` +
-		      ` ${_.keys(removedClues).map(clueElem => clueElem.clue)}`);
+	    const removedClueMap = Filter.getRemovedClues(resultList);
+	    if (!_.isEmpty(removedClueMap)) {
+		if (!options.force) {
+		    for (const key of removedClueMap.keys()) {
+			console.log(`removed clue: ${key} -> ${Array.from(removedClueMap.get(key).values())}`);
+		    }
+		    usage(`can't update single note with removed clues (${removedClueMap.size})`);
+		}
+		removeAllClues(removedClueMap, options);
 	    }
 	    return Filter.saveAddCommit(noteName, resultList, options);
 	}).then(path => Update.updateFromFile(path, options));

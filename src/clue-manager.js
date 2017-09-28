@@ -550,23 +550,51 @@ ClueManager.prototype.filter = function (srcCsvList, clueCount, map = {}) {
     };
 }
 
+// this actually returns knownClueNames
+// and I don't think it's returning unique values (i.e. there are duplicates);
 //
-//
-
-ClueManager.prototype.getKnownClues = function (wordList) {
-    if (_.isString(wordList)) {
-	wordList = wordList.split(',');
+ClueManager.prototype.old_getKnownClues = function (nameList) {
+    if (_.isString(nameList)) {
+	nameList = nameList.split(',');
     }
-    Expect(wordList).is.an.Array();
-    wordList = wordList.sort().toString();
+    Expect(nameList).is.an.Array();
+    nameList = nameList.sort().toString();
     let resultList = [];
     this.knownSourceMapArray.forEach(srcMap => {
-	if (_.has(srcMap, wordList)) {
-	    // srcMap[wordList] is a clueList
-	    resultList.push(...srcMap[wordList].map(clue => clue.name));
+	if (_.has(srcMap, nameList)) {
+	    // srcMap[nameList] is a clueList
+	    resultList.push(...srcMap[nameList].map(clue => clue.name));
 	}
     });
     return resultList;
+}
+
+//
+
+ClueManager.prototype.getKnownClues = function (nameList) {
+    if (_.isString(nameList)) {
+	nameList = nameList.split(',');
+    }
+    Expect(nameList).is.an.Array();
+    nameList = nameList.sort().toString();
+    let nameClueMap = {};
+    this.knownSourceMapArray.forEach(srcMap => {
+	if (_.has(srcMap, nameList)) {
+	    for (let clue of srcMap[nameList]) {
+		if (!_.has(nameClueMap, clue.name)) {
+		    nameClueMap[clue.name] = [];
+		}
+		nameClueMap[clue.name].push(clue);
+	    }
+	}
+    });
+    return nameClueMap;
+}
+
+//
+
+ClueManager.prototype.getKnownClueNames = function (nameList) {
+    return _.keys(this.getKnownClues(nameList));
 }
 
 //

@@ -17,16 +17,19 @@ const Promise          = require('bluebird');
 const Stringify        = require('stringify-object');
 
 //
+// i question this being a separate file. should probably be in modules/filter
+// although this whole thing deals with filterlists, so maybe filter-list is
+// a new module.
 
-function loadNoteFilterLists(filename, noteName, options) {
+// unnecessesarily convoluted
+
+async function loadNoteFilterLists(filename, noteName, options) {
     Debug(`++loadNoteFilterLists()`);
     const parseOpt = { urls: true, clues: true };
+    const getOpt = _.clone(options);
+    getOpt.content = true;
     return Promise.join(
-	Note.get(noteName, {
-	    content:      true,
-	    notebookGuid: options.notebookGuid,
-	    production:   options.production
-	}),
+	Note.get(noteName, getOpt),
 	Filter.parseFile(filename, parseOpt),
 	(note, filterData) => {
 	    return [note, NoteParse.parse(note.content, parseOpt), filterData];
@@ -51,43 +54,55 @@ async function merge(note, listFromNote, listFromFilter, options) {
 	console.log(`listFromNote:\n${Stringify(listFromNote)}`);
 	console.log(`listFromFilter:\n${Stringify(listFromFilter)}`);
     }
-    // filter before creating difflist
+    
+    // should these be in filterMerge (which calls merge?)
+    // is there ever a merge without a filter?
+    // filter rejects before creating diffList
+    let filteredSrcCount = 0;
     if (!options.noFilterSources) { 
-	let [filteredList, count] = Filter.filterSources(listFromNote, options);
+	let [filteredList, count] = Filter.filterRejectSources(listFromNote, options);
 	Debug(`filtered sources: ${count}`);
+	filteredSrcCount = count;
 	listFromNote = filteredList;
     }
-    let [filteredList, filteredUrlCount] = Filter.filterUrls(listFromNote, listFromFilter, options);
-    const filteredSrcCount = listFromNote.length - filteredList.length;
+    let filteredUrlCount = 0;
     if (!options.noFilterUrls) {
-	Debug(`filtered urls: ${filteredUrlCount}, sources: ${filteredSrcCount}`);
+	let [filteredList, count] = Filter.filterRejectUrls(listFromNote, listFromFilter, options);
+	Debug(`filtered urls: ${count}`);
+	// add however many sources were filtered due to all URLs being removed
+	filteredSrcCount += listFromNote.length - filteredList.length;
+	filteredUrlCount = count;
 	listFromNote = filteredList;
     }
-
     // create diff list
     const diffList = Filter.diff(listFromNote, listFromFilter);
-    //const expectedDiffCount = listFromFilter.length - listFromNote.length;
     Debug(`note(${listFromNote.length}), filter(${listFromFilter.length})` +
-	  `, diff(${diffList.length})`); //diffExpected(${expectedDiffCount})`);
-    //    Expect(diffList.length).is.equal(expectedDiffCount);
+	  `, diff(${diffList.length})`);
     if (options.verbose) {
 	console.log(`diffList: ${Stringify(diffList)}`);
-        /*
-         for (const elem of diffList || []) {
-         console.log(elem);
-         }
-	 */
+    }
+
+    let addedClueCount = Filter.addKnownClues(listFromNote);
+    Filter.addKnownClues(listFromFilter);
+
+    if (options.verbose) {
+	console.log(`filteredUrls(${filteredUrlCount}), filteredSources(${filteredSrcCount})` +
+		    `, addedClues(${addedClueCount})`);
+	Filter.dumpList(listFromNote, { all: true, fd: process.stdout.fd });
     }
 
     // if listFromNote was filtered, concat diffList and build note from result
-    if (filteredUrlCount || filteredSrcCount) {
-	Debug(`note changed - building new note body`);
+    if (filteredUrlCount || filteredSrcCount || addedClueCount) {
+	Debug(`base note changed - building new note body`);
 	listFromNote.push(...diffList);
-	const noteBody = NoteMaker.makeFromFilterList(filteredList, { outerDiv: true });
+	const noteBody = NoteMaker.makeFromFilterList(listFromNote, { outerDiv: true });
 	Note.setContentBody(note, noteBody);
 	return Note.update(note, options);
     }
     
+    // well, actually, at this point it's still possible there are removed clues in
+    // listFromNote. we found them earlier. how do we get them here.
+
     // original note unchanged -- only append if there are diffs
     Debug(`note unchanged`);
     if (_.isEmpty(diffList)) {

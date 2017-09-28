@@ -7,22 +7,26 @@
 //
 
 const _                = require('lodash');
+const ClueManager      = require('../clue-manager');
+const Clues            = require('../clue-types');
 const Debug            = require('debug')('note-merge');
 const Note             = require('../modules/note');
 const NoteMerge        = require('../modules/note-merge');
+const GetOpt           = require('node-getopt');
 const Path             = require('path');
  
-const Options     = require('node-getopt')
-    .create([
-	['',  'no-filter-urls'],
-	['',  'no-filter-sources'],
-	['',  'note=NAME',       'specify note name'],
-	['',  'notebook=NAME',   'specify notebook name'],
-	['',  'production',      'create note in production'],
-	['v', 'verbose',         'more logging']
-    ]).bindHelp(
-	"Usage: node note-merge [options] FILE\n\n[[OPTIONS]]\n"
-    );
+//
+
+const Options = GetOpt.create(_.concat(Clues.Options, [
+    ['',  'no-filter-urls'],
+    ['',  'no-filter-sources'],
+    ['',  'note=NAME',       'specify note name'],
+    ['',  'notebook=NAME',   'specify notebook name'],
+    ['',  'production',      'create note in production'],
+    ['v', 'verbose',         'more logging']
+])).bindHelp(
+    "Usage: node note-merge [options] FILE\n\n[[OPTIONS]]\n"
+);
 
 //
 
@@ -37,12 +41,13 @@ function usage (msg) {
 async function main () {
     const opt = Options.parseSystem();
     const options = opt.options;
-
     if (opt.argv.length !== 1) {
 	usage('exactly one FILE argument required');
     }
     const filename = opt.argv[0];
     Debug(`filename: ${filename}`);
+
+    ClueManager.loadAllClues({ clues: Clues.getByOptions(options) });
 
     if (options['no-filter-urls'])    options.noFilterUrls    = true;
     if (options['no-filter-sources']) options.noFilterSources = true;
@@ -51,7 +56,7 @@ async function main () {
     //   if --notebook specified, use specified notebook name
     //   else get notebook name from base filename
     const noteName = options.note || Path.basename(filename);
-    if (options.production && !options.default) {
+    if (!options.default) {
 	const nbName = options.notebook || Note.getWorksheetName(noteName);
 	const nb = await Note.getNotebook(nbName, options).catch(err => { throw err; });
 	if (!nb) {

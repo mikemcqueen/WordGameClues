@@ -7,6 +7,7 @@
 const _                = require('lodash');
 const Debug            = require('debug')('note-make');
 const Expect           = require('should/as-function');
+const Filter           = require('./filter');
 const Fs               = require('fs-extra');
 const He               = require('he');
 const My               = require('util');
@@ -77,8 +78,12 @@ async function makeFromFilterFile (filename, options = {}) {
     return dest;
 }
 
+// move to Filter? and maybe the writeXXX methods stay here,
+// or in modules/note-markup
 //
-
+// changes to this probably require similar changes to
+// Filter.dumpList()
+//
 function makeFromFilterList (list, options = {}) {
     Expect(list).is.an.Array();
 
@@ -93,8 +98,10 @@ function makeFromFilterList (list, options = {}) {
 	for (const urlElem of sourceElem.urls || []) {
 	    let url = urlElem.url || urlElem;
 	    result = writeUrl(result, url, urlElem.suffix);
-	    for (const clue of urlElem.clues || []) {
-		result = writeText(result, clue);
+	    for (const clueElem of urlElem.clues || []) {
+		const text = Filter.getClueText(clueElem, options);
+		if (!text) continue;
+		result = writeText(result, text);
 	    }
 	}
 	result = writeEmptyLine(result);

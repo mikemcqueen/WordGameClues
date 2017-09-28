@@ -5,6 +5,7 @@
 'use strict';
 
 const _            = require('lodash');
+const ClueManager  = require('../clue-manager');
 const Clues        = require('../clue-types');
 const Debug        = require('debug')('filter');
 const Duration     = require('duration');
@@ -19,6 +20,7 @@ const Stringify    = require('stringify-object');
 //
 
 const URL_PREFIX      = 'http';
+const MORE_CLUES_URL  = 'https://more.clues';
 
 //
 
@@ -38,7 +40,7 @@ function parseFile (filename, options = {}) {
 	line = line.toString().trim();
 	if (_.isEmpty(line)) continue;
 	Debug(line);
-	if (Markdown.isSource(line)) {
+	if (Markdown.hasSourcePrefix(line)) {
 	    Debug(`source: ${line}`);
 	    clueList = undefined;
 	    urlList = [];
@@ -53,7 +55,7 @@ function parseFile (filename, options = {}) {
 	    Debug(`clue: ${line}`);
 	    // clue, known, or maybe
 	    // currently requires URL, but i suppose could eliminate that requirement with some work.
-	    Expect(urlList).is.not.empty();
+	    Expect(urlList).is.an.Array().and.not.empty();
 	    Expect(clueList).is.an.Array();
 	    clueList.push(line);
 	}
@@ -82,18 +84,19 @@ function diff (listA, listB) {
     Expect(listA).is.an.Array();
     Expect(listB).is.an.Array();
     const mapA = makeSourceMap(listA);
-    Debug(`mapA: ${Stringify(mapA)}`);
+    if (0) Debug(`mapA: ${Stringify(mapA)}`);
     return listB.filter(elemB => {
 	const inA = _.has(mapA, elemB.source);
-	Debug(`${elemB.source}${inA ? 'is' : 'not'} in mapA`);
+	Debug(`${elemB.source} ${inA ? 'is' : 'not'} in mapA`);
 	return !inA;
     });
 }
 
+// filter rejects
 // listFiltered has some potential for sanity checking. i could load the _filtered.json
 // file and confirm that all of the remaining urls, per clue source, are not rejected
 
-function filterUrls (listToFilter, listFiltered, options)  {
+function filterRejectUrls (listToFilter, listFiltered, options)  {
     if (options.noFilterUrls) return [listToFilter, 0];
     //const map = makeSourceMap(listFiltered);
     let filterCount = 0;
@@ -115,9 +118,9 @@ function filterUrls (listToFilter, listFiltered, options)  {
     return [list, filterCount];
 }
 
-//
+// 
 
-function filterSources (listToFilter, options)  {
+function filterRejectSources (listToFilter, options)  {
     let filterCount = 0;
     let filteredList = listToFilter.filter(sourceElem => {
 	Expect(sourceElem).is.an.Object(); 
@@ -129,6 +132,19 @@ function filterSources (listToFilter, options)  {
 	return !reject;
     });
     return [filteredList, filterCount];
+}
+
+//
+
+function getClueText (clue, options) {
+    if (!options.all && (clue.prefix === Markdown.Prefix.remove)) {
+	return undefined;
+    }
+    let text = clue.clue;
+    Expect(text).is.ok();
+    if (clue.prefix) text = clue.prefix + text;
+    if (clue.note)   text += `,${clue.note}`;
+    return text;
 }
 
 // options:
@@ -159,14 +175,12 @@ async function dumpList (list, options) {
 		await My.writeln(dest, url);
 		if (!_.isObject(urlElem)) continue;
 		for (const clueElem of urlElem.clues || []) {
-		    if (!options.all && (clueElem.prefix === Markdown.Prefix.remove)) {
+		    const text = getClueText(clueElem, options);
+		    if (!text) {
 			Debug(`excluding removed clue: ${source} | ${clueElem.clue}`);
 			continue;
 		    }
-		    let clue = clueElem.clue;
-		    if (clueElem.prefix) clue = `${clueElem.prefix}${clue}`;
-		    if (clueElem.note)   clue = `${clue},${clueElem.note}`;
-		    await My.writeln(dest, clue);
+		    await My.writeln(dest, text);
 		}
 	    }
 	}
@@ -213,37 +227,119 @@ async function saveAddCommit (noteName, filterList, options) {
 	    // TODO MAYBE: options.wait
 	    // no return = no await completion = OK
 	    return (options.production) ? My.gitAddCommit(filepath, 'parsed live note') : undefined;
-	}).then(_ => filepath); // return path
+	}).then(_ => filepath); // return the path we saved to
 }
 
 //
 
 function getRemovedClues (filterList) {
-    let removedClues = new Map();
+    let removedClueMap = new Map();
     for (let srcElem of filterList) {
 	for (let urlElem of srcElem.urls || []) {
 	    for (let clueElem of urlElem.clues || []) {
 		if (clueElem.prefix === Markdown.Prefix.remove) {
-		    if (!_.has(removedClues, srcElem.source)) {
-			removedClues.set(srcElem.source, new Set());
+		    if (!removedClueMap.has(srcElem.source)) {
+			removedClueMap.set(srcElem.source, new Set());
 		    }
-		    removedClues.get(srcElem.source).add(clueElem.clue);
+		    removedClueMap.get(srcElem.source).add(clueElem.clue);
+		    Debug(`getRemovedClue: ${srcElem.source}` +
+			  `[${removedClueMap.get(srcElem.source).size}] = ${clueElem.clue}`);
 		}
 	    }
 	}
     }
-    return removedClues;
+    return removedClueMap;
+}
+
+// don't pass command line options here. just specific
+// options for this function
+//
+// options
+//  all - include all clues (even removed)
+//
+function getClues (urlList, options = {}) {
+    Expect(urlList).is.an.Array();  // require this
+    let clues = new Set();
+    for (let urlElem of urlList) {
+	for (let clueElem of urlElem.clues) {
+	    Expect(clueElem.clue).is.ok();
+	    if ((clueElem.prefix === Markdown.Prefix.remove) && !options.all) continue;
+	    clues.add(clueElem.clue);
+	}
+    }
+    return clues;
 }
 
 //
 
+function addKnownClues (filterList) {
+    let added = 0;
+    for (let srcElem of filterList) {
+	let allClues = getClues(srcElem.urls);
+	// fancy way of saying slice(1,length);
+	let [source, prefix] = Markdown.getPrefix(srcElem.source, Markdown.Prefix.source);
+	let knownClues = ClueManager.getKnownClueNames(source) // or just KnownClues() eventually
+		.filter(name => !allClues.has(name)) // filter out entries in allClues
+	        // map to 'clueElem' object. kinda dumb. could just use clue object except
+           	// we're expecting "name" to be "clue" here due to poor decision in noteParse.
+		.map(name => { 
+		    return {
+			clue: name
+//			note: clue.note
+		    };
+		});
+	Expect(knownClues).is.ok();
+	if (!_.isEmpty(knownClues)) {
+	    Debug(`${srcElem.source} known: ${knownClues}`); // todo: map:clue->clue.name
+	    const moreCluesUrl = _.find(srcElem.urls, { url: MORE_CLUES_URL });
+	    if (moreCluesUrl) {
+		// add known clues to existing more.clues URL elem
+		moreCluesUrl.clues.push(...knownClues);
+	    } else {
+		// create new more.clues URL elem with known clues
+		srcElem.urls.push({
+		    url:   MORE_CLUES_URL,
+		    clues: knownClues
+		});
+	    }
+	    added += knownClues.length;
+	}
+    }
+   return added;
+}
+
+//
+
+function removeAllClues (filterList, removedClueMap, options = {}) {
+    Debug('removeAllClues');
+    let total = 0;
+    for (const source of removedClueMap.keys()) {
+	const srcElem = _.find(filterList, { source });
+	Expect(srcElem).is.ok(); // would be weird if not
+	// for each clue word in set
+	for (const clue of removedClueMap.get(source).values()) {
+	    // if clue was an object that linked back to it's urlList this would be
+	    // much easier.
+	    Expect(clue.list).is.an.Array().and.not.empty();
+	    _.pullAllBy(clue.list, [{ name: clue.name }], 'name');
+	}
+    }
+}
+
+//
+
+//
+
 module.exports = {
+    addKnownClues,
     count,
     diff,
     dumpList,
-    filterSources,
-    filterUrls,
+    filterRejectSources,
+    filterRejectUrls,
+    getClueText,
     getRemovedClues,
     parseFile,
+    removeAllClues,
     saveAddCommit
 };

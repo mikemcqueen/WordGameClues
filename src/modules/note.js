@@ -85,11 +85,21 @@ function getWorksheetName (noteNameOrClueType) {
     return wsName;
 }
 
+// dumb name. should be getNotebook({ guid }, options);
+
+async function getNotebookByGuid (guid, options = {}) {
+    const noteStore = getNotestore(options.production);
+    return noteStore.getNotebook(guid);
+}
+
 //
 
 async function getNotebookByOptions (options) {
-//    if (options.notebookGuid) return options.notebookGuid;
-    if (!options.notebook) return undefined;
+    if (options.notebookGuid) return getNotebookByGuid(options.notebookGuid, options);
+    if (!options.notebook) {
+	Debug(`NO NOTEBOOK - THROW?`);
+	return undefined;
+    }
     return getNotebook(options.notebook, options)
 	.then(nb => {
 	    if (!nb) throw new Error(`no notebook matches: ${options.notebook}`);
