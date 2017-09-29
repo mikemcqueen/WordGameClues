@@ -76,7 +76,7 @@ function parse (text, options = {}) {
 	    //Debug(`advanced urlExpr.lastIndex to ${urlExpr.lastIndex}`);
 	    urlResult = urlExpr.exec(text); // for while loop
 	}
-	Debug(`urlResult.index = ${urlResult.index}, sourceIndex = ${sourceIndex}`);
+	Debug(`urlResult.index = ${urlResult && urlResult.index}, sourceIndex = ${sourceIndex}`);
 	let urlList = [];
 	// while urlResult is at a position before the current sourceResult
 	while ((urlResult !== null) && (urlResult.index < sourceIndex)) {
