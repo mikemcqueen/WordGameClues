@@ -55,8 +55,9 @@ async function merge(note, listFromNote, listFromFilter, options) {
 	console.log(`listFromFilter:\n${Stringify(listFromFilter)}`);
     }
     
-    // should these be in filterMerge (which calls merge?)
+    // should these be in filterMerge() (which calls filter + merge?)
     // is there ever a merge without a filter?
+
     // filter rejects before creating diffList
     let filteredSrcCount = 0;
     if (!options.noFilterSources) { 
@@ -82,26 +83,33 @@ async function merge(note, listFromNote, listFromFilter, options) {
 	console.log(`diffList: ${Stringify(diffList)}`);
     }
 
-    let addedClueCount = Filter.addKnownClues(listFromNote);
+    const addedClueCount = Filter.addKnownClues(listFromNote);
     Filter.addKnownClues(listFromFilter);
 
+    // at this point it's still possible there are removed clues in listFromNote
+    const removedClueMap = Filter.getRemovedClues(listFromNote);
+    let removedClueCount = 0;
+    if (!_.isEmpty(removedClueMap)) {
+	// remove clues from removedClueMap that are known (i.e. they weren't removed)
+	// why is this in Filter? not sure.
+	Filter.removeKnownClues(removedClueMap, options);
+	// remove clues from noteFromList that are in removedClueMap
+	removedClueCount = Filter.removeRemovedClues(listFromNote, removedClueMap, options);
+    }
     if (options.verbose) {
 	console.log(`filteredUrls(${filteredUrlCount}), filteredSources(${filteredSrcCount})` +
-		    `, addedClues(${addedClueCount})`);
-	Filter.dumpList(listFromNote, { all: true, fd: process.stdout.fd });
+		    `, addedClues(${addedClueCount}), removedClues(${removedClueCount})`);
+	Filter.dumpList(listFromNote, { /*all: true,*/ fd: process.stdout.fd });
     }
 
-    // if listFromNote was filtered, concat diffList and build note from result
-    if (filteredUrlCount || filteredSrcCount || addedClueCount) {
+    // if listFromNote was modified, concat diffList and build note from result
+    if (filteredUrlCount || filteredSrcCount || addedClueCount || removedClueCount) {
 	Debug(`base note changed - building new note body`);
 	listFromNote.push(...diffList);
 	const noteBody = NoteMaker.makeFromFilterList(listFromNote, { outerDiv: true });
 	Note.setContentBody(note, noteBody);
 	return Note.update(note, options);
     }
-    
-    // well, actually, at this point it's still possible there are removed clues in
-    // listFromNote. we found them earlier. how do we get them here.
 
     // original note unchanged -- only append if there are diffs
     Debug(`note unchanged`);

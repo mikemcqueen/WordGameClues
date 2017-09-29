@@ -12,6 +12,7 @@ const Clues       = require('./clue-types');
 const ComboMaker  = require('./combo-maker');
 const ComboSearch = require('./combo-search');
 const Components  = require('./show-components');
+const Debug       = require('debug')('clues');
 const Duration    = require('duration');
 const Expect      = require('should/as-function');
 const NameCount   = require('./name-count');
@@ -120,11 +121,11 @@ function main () {
 
     if (_.includes(options.flags, '1')) {
 	validateAllOnLoad = true;
-	console.log('validateAllOnLoad=true');
+	Debug('validateAllOnLoad=true');
     }
     if (_.includes(options.flags, '2')) {
 	ignoreLoadErrors = true;
-	console.log('ignoreLoadErrors=true');
+	Debug('ignoreLoadErrors=true');
     }
 
     let clueSource = Clues.getByOptions(options);
@@ -227,7 +228,7 @@ function doCombos(args) {
 	sumRange = _.chain(args.sum).split(',').map(_.toNumber).value();
     }
     Expect(sumRange).is.an.Array().with.property('length').below(3); // of.at.most(2);
-    console.log('++combos' +
+    Debug('++combos' +
 		`, sum: ${sumRange}` +
 		`, max: ${args.max}` +
 		`, require: ${args.require}` +
@@ -255,15 +256,15 @@ function doCombos(args) {
     }
     let d = new Duration(beginDate, new Date()).milliseconds;
     _.keys(comboMap).forEach(nameCsv => console.log(nameCsv));
-    console.log(`total: ${total}` +
+    Debug(`total: ${total}` +
 		', filtered: ' + _.size(comboMap) +
 		', known: ' + known +
 		', reject: ' + reject +
 		', duplicate: ' + duplicate);
-    console.log(`--combos: ${PrettyMs(d)}`);
+    Debug(`--combos: ${PrettyMs(d)}`);
 
     if (total !== _.size(comboMap) + known + reject + duplicate) {
-	console.log('WARNING: amounts to not add up!');
+	Debug('WARNING: amounts to not add up!');
     }
 }
 

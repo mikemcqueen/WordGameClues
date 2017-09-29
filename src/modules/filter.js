@@ -134,12 +134,13 @@ function filterRejectSources (listToFilter, options)  {
     return [filteredList, filterCount];
 }
 
-//
+// belongs in modules/clue.js
 
 function getClueText (clue, options) {
-    if (!options.all && (clue.prefix === Markdown.Prefix.remove)) {
-	return undefined;
-    }
+    // used to be options.all, but i think that i was wrong
+    //if (options.remove && (clue.prefix === Markdown.Prefix.remove)) {
+    //return undefined;
+    //}
     let text = clue.clue;
     Expect(text).is.ok();
     if (clue.prefix) text = clue.prefix + text;
@@ -263,7 +264,8 @@ function getClues (urlList, options = {}) {
     for (let urlElem of urlList) {
 	for (let clueElem of urlElem.clues) {
 	    Expect(clueElem.clue).is.ok();
-	    if ((clueElem.prefix === Markdown.Prefix.remove) && !options.all) continue;
+	    // NOTE: test this
+	    //if ((clueElem.prefix === Markdown.Prefix.remove) && !options.all) continue;
 	    clues.add(clueElem.clue);
 	}
     }
@@ -308,25 +310,72 @@ function addKnownClues (filterList) {
    return added;
 }
 
-//
+// remove clues from filterList that are in removedClueMap
+// removedClueMap is a Map<@sourceCsv, Set<clueName>>
 
-function removeAllClues (filterList, removedClueMap, options = {}) {
-    Debug('removeAllClues');
-    let total = 0;
-    for (const source of removedClueMap.keys()) {
-	const srcElem = _.find(filterList, { source });
-	Expect(srcElem).is.ok(); // would be weird if not
-	// for each clue word in set
-	for (const clue of removedClueMap.get(source).values()) {
-	    // if clue was an object that linked back to it's urlList this would be
-	    // much easier.
-	    Expect(clue.list).is.an.Array().and.not.empty();
-	    _.pullAllBy(clue.list, [{ name: clue.name }], 'name');
+function removeRemovedClues (filterList, removedClueMap, options = {}) {
+    Debug('removeRemovedClues');
+    let removed = 0;
+    for (const srcElem of filterList) {
+	if (!removedClueMap.has(srcElem.source)) continue;
+	const removedSet = removedClueMap.get(srcElem.source);
+	// for each urlElem of this source
+	for (const urlElem of srcElem.urls) {
+	    // filter out any removed clues
+	    // lazy Seq here faster? would be neat to test. with Immutable & 1million iters.
+	    urlElem.clues = urlElem.clues.filter(clueElem => {
+		if (removedSet.has(clueElem.clue)) {
+		    Expect(Markdown.Prefix.remove === clueElem.prefix);
+		    removed += 1;
+		    return false;
+		}
+		return true;
+	    });
 	}
     }
+    Debug(`removed: ${removed}`);
+    return removed;
 }
 
-//
+// remove clues from removedClueMap that are known by ClueManager (i.e. they aren't removed)
+// removedClueMap is a Map<@sourceCsv, Set<clueName>>
+// why is this in Filter? it totally doesn't belong here. 
+// clue-manager or clue-utils or removed-clues maybe
+
+function removeKnownClues (removedClueMap, options = {}) {
+    Debug('removeKnownClues');
+    let removed = 0;
+    for (let source of removedClueMap.keys()) {
+	let nameCsv = Markdown.hasSourcePrefix(source)
+		? source.slice(1, source.length) : source;
+	const nameList = nameCsv.split(',').sort();
+	const result = ClueManager.getCountListArrays(nameCsv, { remove: true });
+	if (!result || _.isEmpty(result.known)) {
+	    continue;
+	}
+
+	// copy (potentially) multiple lists of clue names to a set
+	let knownSet = new Set();
+	for (let known of result.known) {
+	    known.nameList.forEach(name => knownSet.add(name));
+	}
+
+	// for each clue word in removed set
+	let removedSet = removedClueMap.get(source);
+	for (let name of removedSet.keys()) {
+	    if (knownSet.has(name)) {
+		removedSet.delete(name); // safe when iterating
+		Debug(`removed ${source} -> ${name}`);
+		removed += 1;
+	    }
+	}
+	if (_.isEmpty(removedSet)) {
+	    removedClueMap.delete(source); // safe when iterating
+	}
+    }
+    Debug(`removed: ${removed}`);
+    return removed;
+}
 
 //
 
@@ -340,6 +389,7 @@ module.exports = {
     getClueText,
     getRemovedClues,
     parseFile,
-    removeAllClues,
+    removeRemovedClues,
+    removeKnownClues,
     saveAddCommit
 };

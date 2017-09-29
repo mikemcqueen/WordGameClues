@@ -126,7 +126,7 @@ function parse (options) {
 		return console.log('no results');
 	    } else {
 		const fd = process.stdout.fd;
-		return Filter.dumpList(resultList, { fd, all: true });
+		return Filter.dumpList(resultList, { /*all: true,*/ fd });
 		//console.log(`${Stringify(resultList)}`);
 	    }
 	});
