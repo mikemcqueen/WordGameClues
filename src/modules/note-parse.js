@@ -8,9 +8,154 @@
 
 const _                = require('lodash');
 const Debug            = require('debug')('note-parse');
+const DomParser        = require('xmldom').DOMParser;
 const Expect           = require('should/as-function');
-const Fs               = require('fs-extra');
+const Filter           = require('./filter'); // shouldn't be necessary
+const Fs               = require('fs-extra'); 
 const Markdown         = require('./markdown');
+
+//
+
+const Tag = {
+    break: 'br',
+    div:   'div',
+    link:  'a',
+    text:  '#text'
+};
+
+//  div: defines a line 
+//   all #text concatenate.
+//   if an outer div has an inner div, outer div cannot have text.
+
+function processDiv (node, div, queue) {
+    if (div) {
+	div.noText = true;
+    }
+    queue.push({});
+}
+
+// #text:
+//  cannot exist outside of a div
+//  fail if div.noText (current div has inner div)
+//  cannot exist in div that contains a break
+//  fail if follows link & not comma prefixed
+//  fail if follows link & link suffix already supplied
+
+function processText (node, div, queue) {
+    Expect(div).is.ok();
+    Expect(div.noText).is.not.true();
+    Expect(div.break).is.not.true();
+    const text = node.textContent;
+    if (div.link) {
+	if (!div.linkText) {
+	    Expect(_.startsWith(text, 'http')).is.true();
+	    div.linkText = true;
+	} else {
+	    Expect(div.linkSuffix).is.not.true();
+	    Expect(text.charAt(0)).is.equal(',');
+	    div.linkSuffix = true;
+	}
+    }
+    return text;
+}
+
+// a: link
+//  must be in div
+//  only one per div
+//  cannot exist in div that contains a break
+//  cannot have preceding text
+//  can have one succeeding text with ',' prefix
+//  next tag must be Tag.text, with http prefix
+
+function processLink (node, div, divQueue) {
+    Expect(div).is.ok();
+    Expect(div.link).is.not.true();
+    Expect(div.break).is.not.true();
+    Expect(div.text).is.not.ok();
+    div.link = true;
+    div.nextTag = Tag.text;
+    //return node.textContent;
+}
+
+// br: break.
+//  cannot exist outside of a div
+//  only one per div?
+//  link not allowed in same div
+//  text not allowed in same div
+
+function processBreak (node, div, divQueue) {
+    Expect(div).is.ok();
+    Expect(div.break).is.not.true();
+    Expect(div.link).is.not.true();
+    Expect(div.text).is.not.ok();
+    div.break = true;
+    return '';
+}
+
+//
+
+function isDiv (node) {
+    return node.nodeName === Tag.div;
+}
+
+// Nodes we care about:
+//  a:     only one per div, cannot have preceding text, can have one succeeding text with ',' prefix
+//  br:    empy line, currenly only allow in div without text
+//  div:   defines a line (all text concatenate. if an outer div has an inner div, outer div cannot have text.
+//  #text: cannot exist outside of a <div>
+//
+
+const tagMap = {
+    [Tag.break]: processBreak,
+    [Tag.div]:   processDiv,
+    [Tag.link]:  processLink,
+    [Tag.text]:  processText
+};
+
+function parseDomLines (lines, node, queue, options) {
+    if (_.has(tagMap, node.nodeName)) {
+	let div = _.last(queue);
+	let expected;
+	if (div && div.nextTag) {
+	    Expect(div.nextTag).is.equal(node.nodeName);
+	    div.nextTag = undefined;
+	}
+	let text = tagMap[node.nodeName](node, div, queue);
+	if (text) {
+	    Expect(div).is.ok();
+	    if (!div.text) div.text = text;
+	    else div.text += text;
+	}
+    }
+    if (node.childNodes) {
+	Array.prototype.forEach.call(node.childNodes, child => {
+	    parseDomLines (lines, child, queue, options);
+	});
+    }
+    if (isDiv(node)) {
+	let div = queue.pop();
+	Expect(div).is.ok();
+	let text = div.text && div.text.trim();
+	if (text && !_.isEmpty(text)) {
+	    Debug(`line: ${text}`);
+	    lines.push(text);
+	} else if (!_.isEmpty(_.last(lines))) {
+	    Debug('empty line');
+	    lines.push('');
+	}
+    }
+}
+
+// 
+    
+function parseDom (xmlText, options = {}) {
+    const doc = new DomParser().parseFromString(xmlText);
+    let node = doc.documentElement;
+    let lines = [];
+    let divQueue = [];
+    parseDomLines(lines, node, divQueue, options);
+    return lines;
+}
 
 // all options are boolean
 //   .urls:     parse urls (http(s) prefix)
@@ -129,30 +274,18 @@ function parse (text, options = {}) {
 		} else if (Markdown.hasSourcePrefix(clueLine)) {
 		    throw new Error(`encountered unexpected source where clue was expected, ${clueLine}`);
 		} else if (!_.isEmpty(clueLine)) {
-		    // TODO: 'note', 'need' markdowns
-		    let [line, prefix] = Markdown.getPrefix(clueLine);
-		    if (prefix) {
-			if (prefix === Markdown.Prefix.maybe) {
+		    // makeClueElem belongs somewhere else, then can remove Fitler dependency
+		    const clueElem = Filter.makeClueElem(clueLine);
+		    if (clueElem.prefix) {
+			if (clueElem.prefix === Markdown.Prefix.maybe) {
 			    debugMsg = 'maybe';
-			} else if (prefix === Markdown.Prefix.remove) {
+			} else if (clueElem.prefix === Markdown.Prefix.remove) {
 			    debugMsg = 'remove';
 			}
-			clueLine = line;
 		    } else {
 			debugMsg = 'clue';
 		    }
-		    let note;
-		    //TODO: Markdown.hasSuffix(line, []) // allow truly any suffix
-		    let commaIndex = clueLine.indexOf(',');
-		    if (commaIndex > -1) {
-			// TODO: process note for need
-			note = clueLine.slice(commaIndex + 1, clueLine.length);
-			debugMsg += ' with note';
-			clueLine = clueLine.slice(0, commaIndex);
-		    }
-		    let clueElem = { clue: clueLine };
-		    if (prefix) clueElem.prefix = prefix;
-		    if (note) clueElem.note = note;
+		    if (clueElem.note) debugMsg += ' with note';
 		    clueList.push(clueElem);
 		} else {
 		    debugMsg = 'empty';
@@ -183,5 +316,6 @@ function parseFile (filename, options) {
 
 module.exports = {
     parse,
+    parseDom,
     parseFile
 };

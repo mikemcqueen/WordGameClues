@@ -57,7 +57,7 @@ function parseFile (filename, options = {}) {
 	    // currently requires URL, but i suppose could eliminate that requirement with some work.
 	    Expect(urlList).is.an.Array().and.not.empty();
 	    Expect(clueList).is.an.Array();
-	    clueList.push(line);
+	    clueList.push(makeClueElem(line));
 	}
     }
     return resultList;
@@ -142,10 +142,30 @@ function getClueText (clue, options) {
     //return undefined;
     //}
     let text = clue.clue;
-    Expect(text).is.ok();
+    if (!text) {
+	console.log(Stringify(clue));
+	Expect(text).is.ok();
+    }
     if (clue.prefix) text = clue.prefix + text;
     if (clue.note)   text += `,${clue.note}`;
     return text;
+}
+
+function makeClueElem (clueLine) {
+    // TODO: 'note', 'need' markdowns
+    let [line, prefix] = Markdown.getPrefix(clueLine);
+    if (prefix) {
+	clueLine = line;
+    }
+    let note;
+    //TODO: Markdown.hasSuffix(line, []) // allow truly any suffix
+    let commaIndex = clueLine.indexOf(',');
+    if (commaIndex > -1) {
+	// TODO: process note for need
+	note = clueLine.slice(commaIndex + 1, clueLine.length);
+	clueLine = clueLine.slice(0, commaIndex);
+    }
+    return { clue: clueLine, prefix, note };
 }
 
 // options:
@@ -215,20 +235,24 @@ function count (list) {
     return { sources, urls, clues };
 }
 
+function save (filterList, path) {
+    return Fs.open(path, 'w')
+	.then(fd => {
+	    return dumpList(filterList, { fd });
+	}).then(fd => Fs.close(fd));
+}
+
 //
 
 async function saveAddCommit (noteName, filterList, options) {
-    const filepath = `${Clues.getDirectory(Clues.getByOptions(options))}/updates/${noteName}`;
-    Debug(`saving ${noteName} to: ${filepath}`);
-    return Fs.open(filepath, 'w')
-	.then(fd => {
-	    return dumpList(filterList, { fd });
-	}).then(fd => Fs.close(fd))
+    const path = `${Clues.getDirectory(Clues.getByOptions(options))}/updates/${noteName}`;
+    Debug(`saving ${noteName} to: ${path}`);
+    return save(filterList, path)
 	.then(_ => {
 	    // TODO MAYBE: options.wait
 	    // no return = no await completion = OK
-	    return (options.production) ? My.gitAddCommit(filepath, 'parsed live note') : undefined;
-	}).then(_ => filepath); // return the path we saved to
+	    return (options.production) ? My.gitAddCommit(path, 'parsed live note') : undefined;
+	}).then(_ => path); // return the path we saved to
 }
 
 //
@@ -388,8 +412,10 @@ module.exports = {
     filterRejectUrls,
     getClueText,
     getRemovedClues,
+    makeClueElem,
     parseFile,
     removeRemovedClues,
     removeKnownClues,
+    save,
     saveAddCommit
 };

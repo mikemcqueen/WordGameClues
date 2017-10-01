@@ -92,6 +92,7 @@ function makeFromFilterList (list, options = {}) {
 	result += '<div>';
     }
     for (const sourceElem of list) {
+	if (options.verbose) Debug(`${sourceElem.source}`);
 	let source = sourceElem.source || sourceElem;
 	if (sourceElem.suffix) source += `,${sourceElem.suffix}`;
 	result = writeText(result, source, sourceElem.suffix);

@@ -36,6 +36,8 @@ const Options = Getopt.create(_.concat(Clues.Options, [
     ['', 'get=TITLE',     'get (display) a note'],
     ['', 'notebook=NAME', 'specify notebook name'],
     ['', 'parse=TITLE',   'parse note into filter file format'],
+    ['', 'compare',       '  parse old + dom  and show differences'],
+    ['', 'dom',           '  parse dom (change this to old: use old parse method)'],
 //    ['', 'parse-file=FILE','parse note file into filter file format'],
     ['', 'json',          '  output in json (parse, parse-file)'],
     ['', 'production',    'use production note store'],
@@ -93,11 +95,11 @@ function old_create (options) {
 
 async function create (options) {
     const title = options.title;
-    
+    if (!title) usage('--title is required');
     const list = Filter.parseFile(options.create, { urls: true, clues: true });
-    Debug(`filterList: ${list}`);
-    const body = NoteMaker.makeFromFilterList(list, { outerDiv: true });
-    Debug(`body: ${body}`);
+    //Debug(`filterList: ${list}`);
+    const body = NoteMaker.makeFromFilterList(list, { outerDiv: true }, options);
+    //Debug(`body: ${body}`);
     return Note.create(title, body, options)
 	.then(note => {
 	    if (!options.quiet) {
@@ -119,17 +121,67 @@ async function getAndParse (noteName, options) {
 
 //
 
-function parse (options) {
-    return getAndParse(options.parse, options)
-	.then(([note, resultList]) => {
-	    if (_.isEmpty(resultList)) {
-		return console.log('no results');
-	    } else {
-		const fd = process.stdout.fd;
-		//console.log(`${Stringify(resultList)}\n------`);
-		return Filter.dumpList(resultList, { json: options.json, /*all: true,*/ fd });
+async function saveLines (lines, path) {
+    return new Promise((resolve, reject) => {
+	// what on earth happens if this fails.
+	const stream = Fs.createWriteStream(path);
+	stream.on('open', _ => {
+	    for (const line of lines) {
+		stream.write(line + '\n');
 	    }
+	    stream.end();
+	}).on('close', _ => {
+	    resolve(path);
+	}).on('error', err => {
+	    reject(err);
 	});
+    });
+}
+
+//
+
+async function saveLinesAndList (filename, lines, filterList) {
+    const path = Path.dirname(module.filename) +`/tmp/${filename}`;
+    return Promise.join(saveLines(lines, path + '-lines'),
+			Filter.save(filterList, path + '-list'),
+			(linePath, listPath) => [linePath, listPath]);
+
+}
+
+//
+
+async function parse (options) {
+    if (options.compare) {
+	return Note.get(options.parse, options)
+	    .then(note => {
+		let lines = NoteParser.parseDom(note.content, options);
+		options.urls = true;
+		options.clues = true;
+		options.content = true;
+		let filterList = NoteParser.parse(note.content, options);
+		return saveLinesAndList(note.title, lines, filterList);
+	    }).then(([linePath, listPath]) => {
+		console.log(`lines: ${linePath}`);
+		console.log(`list:  ${listPath}`);
+	    });
+    } else if (options.dom) {
+	return Note.get(options.parse, options)
+	    .then(note => {
+		let lines = NoteParser.parseDom(note.content, options);
+		lines.forEach(line => console.log(line));
+	    });
+    } else {
+	return getAndParse(options.parse, options)
+	    .then(([note, resultList]) => {
+		if (_.isEmpty(resultList)) {
+		    return console.log('no results');
+		} else {
+		    const fd = process.stdout.fd;
+		    //console.log(`${Stringify(resultList)}\n------`);
+		    return Filter.dumpList(resultList, { json: options.json, /*all: true,*/ fd });
+		}
+	    });
+    }
 }
 
 //
