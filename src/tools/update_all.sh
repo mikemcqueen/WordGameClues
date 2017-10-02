@@ -60,6 +60,11 @@ else
 	    #does merge-note work if note doesn't exist? probably not. should it? easier that way.
 	    #how about --create flag? otherwise i need note get <note> --quiet to return 0/1 then note create <note>.
 	    node note-merge -$_ct tmp/$_note.filtered --note $_note $1 $2
+	    if [ $? -ne 0 ]
+	    then
+		echo "merge failed on $_note.filtered"
+		exit -1
+	    fi
 	fi
     done < "$_input"
     exit -1

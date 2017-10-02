@@ -6,13 +6,12 @@
 
 const _            = require('lodash');
 const Expect       = require('should/as-function');
-const Fs           = require('fs');
+const Fs           = require('fs-extra');
 const Ms           = require('ms');
 const Promise      = require('bluebird');
 const Search       = require('../modules/search');
 
 const CsvParse     = Promise.promisify(require('csv-parse'));
-const FsReadFile   = Promise.promisify(Fs.readFile);
 
 //
 
@@ -67,28 +66,14 @@ async function main() {
 	low:   Ms(`${delayLow}m`),
 	high:  Ms(`${delayHigh}m`)
     };
-    return FsReadFile(filename, 'utf8')
+    return Fs.readFile(filename)
 	.then(csvContent => CsvParse(csvContent, { relax_column_count: true } ))
-    /* testing CsvParse option.relax_column_count
-	.then(wordListArray => {
-	    wordListArray.forEach(wordList => {
-		console.log(wordList.join(','));
-	    });
-	    return Promise.reject();
-	})
-     */
 	.then(wordListArray => Search.getAllResults({
 	    // NOTE: use default dir
 	    wordListArray: wordListArray,
 	    pages:         DEFAULT_PAGE_COUNT,
 	    delay:         delay
 	}, { force: Opt.options.force }));
-        /*
-	.catch(err => {
-	    console.log(`error caught in main, ${err}`);
-	    if (err) console.log(err.stack);
-	});
-	*/
 }
 
 //

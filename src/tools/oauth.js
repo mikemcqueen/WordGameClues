@@ -1,5 +1,5 @@
 //
-// oath.js
+// oauth.js
 //
 // code copied from stackoverflow, or evernote forums
 //

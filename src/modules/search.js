@@ -118,7 +118,7 @@ async function getAllResultsLoop (args, options) {
 	let path = SearchResult.pathFormat({
 	    root: args.root,
 	    dir:  args.dir || _.toString(wordList.length),
-	    base: filename,
+	    base: filename
 	}, options);
 	Debug(path);
 

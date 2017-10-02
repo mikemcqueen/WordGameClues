@@ -8,15 +8,10 @@ const _            = require('lodash');
 const Dir          = require('node-dir');
 const Expect       = require('should/as-function');
 const Fs           = require('fs');
-const Linebyline   = require('linebyline');
 const Path         = require('path');
-const Promise      = require('bluebird');
 const Readlines    = require('n-readlines');
 const Score        = require('../modules/score');
 const SearchResult = require('../modules/search-result');
-
-const FsReadFile   = Promise.promisify(Fs.readFile);
-const FsWriteFile  = Promise.promisify(Fs.writeFile);
 
 const Opt          = require('node-getopt')
       .create([
@@ -66,14 +61,14 @@ function scoreSaveFile (filepath, options) {
     Expect(options).is.an.Object();
 
     // TODO: Path.format()
-    return FsReadFile(filepath, 'utf8')
+    return Fs.readFile(filepath, 'utf8')
 	.then(content => Score.scoreResultList(
 	    SearchResult.makeWordlist(filepath),
 	    JSON.parse(content),
 	    options
 	).then(scoreResult => {
 	    if (_.isEmpty(scoreResult)) return false;
-	    return FsWriteFile(filepath, JSON.stringify(scoreResult));
+	    return Fs.writeFile(filepath, JSON.stringify(scoreResult));
 	}));
 }
 
