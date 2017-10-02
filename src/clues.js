@@ -50,6 +50,7 @@ const Opt = require('node-getopt')
 	['',  'add=NAME',                    '  add combination to known list as NAME; use with --test' ],
 	['',  'remove=NAME',                 '  remove combination from known list as NAME; use with --test' ],
 	['',  'reject',                      '  add combination to reject list; use with --test' ],
+	['',  'validate',                    '  treat SOURCE as filename, validate all source lists in file'],
 	['u', 'use=NAME[:COUNT]+',           'use the specified name[:count](s)' ],
 	['x', 'max=COUNT',                   'specify maximum # of components to combine'],
 	['z', 'flags=OPTION+',               'flags: 1=validateAllOnLoad,2=ignoreLoadErrors' ],
@@ -162,7 +163,11 @@ function main () {
 	});
     }
     else if (options.test) {
-	Components.show(options);
+	if (options.validate) {
+	    Components.validate(options.test, options);
+	} else {
+	    Components.show(options);
+	}
     }
     else if (showSourcesClueName) {
 	showSources(showSourcesClueName);

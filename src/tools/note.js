@@ -37,9 +37,9 @@ const Options = Getopt.create(_.concat(Clues.Options, [
     ['', 'notebook=NAME', 'specify notebook name'],
     ['', 'parse=TITLE',   'parse note into filter file format'],
     ['', 'compare',       '  parse old + dom  and show differences'],
-    ['', 'dom',           '  parse dom (change this to old: use old parse method)'],
+    ['', 'old',           '  use old parse method (use with parse)'],
 //    ['', 'parse-file=FILE','parse note file into filter file format'],
-    ['', 'json',          '  output in json (parse, parse-file)'],
+    ['', 'json',          '  output in json (use with parse, parse-file)'],
     ['', 'production',    'use production note store'],
     ['', 'quiet',         'less noise'],
     ['', 'title=TITLE',   'specify note title (used with --create, --parse)'],
@@ -96,10 +96,9 @@ function old_create (options) {
 async function create (options) {
     const title = options.title;
     if (!title) usage('--title is required');
-    const list = Filter.parseFile(options.create, { urls: true, clues: true });
-    //Debug(`filterList: ${list}`);
-    const body = NoteMaker.makeFromFilterList(list, { outerDiv: true }, options);
-    //Debug(`body: ${body}`);
+    const list = Filter.parseFile(options.create, options);
+    // NOTE: not passing cmd line options here
+    const body = NoteMaker.makeFromFilterList(list, { outerDiv: true });
     return Note.create(title, body, options)
 	.then(note => {
 	    if (!options.quiet) {
@@ -116,14 +115,19 @@ async function getAndParse (noteName, options) {
     options.clues = true;
     options.content = true;
     return Note.get(noteName, options)
-	.then(note => [note, NoteParser.parse(note.content, options)]);
+	.then(note => {
+	    return {
+		note,
+		filterList: Filter.parseLines(NoteParser.parseDom(note.content, options))
+	    };
+	});
 }
 
+/*
 //
 
 async function saveLines (lines, path) {
     return new Promise((resolve, reject) => {
-	// what on earth happens if this fails.
 	const stream = Fs.createWriteStream(path);
 	stream.on('open', _ => {
 	    for (const line of lines) {
@@ -137,12 +141,14 @@ async function saveLines (lines, path) {
 	});
     });
 }
+ */
 
 //
 
 async function saveLinesAndList (filename, lines, filterList) {
     const path = Path.dirname(module.filename) +`/tmp/${filename}`;
-    return Promise.join(saveLines(lines, path + '-lines'),
+    //saveLines(lines, path + '-lines'),
+    return Promise.join(Filter.save(Filter.parseLines(lines), path + '-lines'),
 			Filter.save(filterList, path + '-list'),
 			(linePath, listPath) => [linePath, listPath]);
 
@@ -158,27 +164,38 @@ async function parse (options) {
 		options.urls = true;
 		options.clues = true;
 		options.content = true;
-		let filterList = NoteParser.parse(note.content, options);
+		let filterList = NoteParser.oldParse(note.content, options);
 		return saveLinesAndList(note.title, lines, filterList);
 	    }).then(([linePath, listPath]) => {
 		console.log(`lines: ${linePath}`);
 		console.log(`list:  ${listPath}`);
 	    });
-    } else if (options.dom) {
+    } else if (options.old) {
 	return Note.get(options.parse, options)
 	    .then(note => {
-		let lines = NoteParser.parseDom(note.content, options);
-		lines.forEach(line => console.log(line));
+		options.urls = true;
+		options.clues = true;
+		options.content = true;
+		let filterList = NoteParser.parse(note.content, options);
+		if (_.isEmpty(filterList)) {
+		    return console.log('no results');
+		} else {
+		    return Filter.dumpList(filterList, {
+			json: options.json,
+			fd: process.stdout.fd
+		    });
+		}
 	    });
     } else {
 	return getAndParse(options.parse, options)
-	    .then(([note, resultList]) => {
-		if (_.isEmpty(resultList)) {
+	    .then(result => {
+		if (_.isEmpty(result.filterList)) {
 		    return console.log('no results');
 		} else {
-		    const fd = process.stdout.fd;
-		    //console.log(`${Stringify(resultList)}\n------`);
-		    return Filter.dumpList(resultList, { json: options.json, /*all: true,*/ fd });
+		    return Filter.dumpList(result.filterList, {
+			json: options.json,
+			fd: process.stdout.fd
+		    });
 		}
 	    });
     }
@@ -186,19 +203,21 @@ async function parse (options) {
 
 //
 
+/*
 function getParseSaveCommit (noteName, options) {
     return getAndParse(noteName, options)
-	.then(([note, resultList]) => {
-	    return Filter.saveAddCommit(noteName, resultList, options);
+	.then(result => {
+	    return Filter.saveAddCommit(noteName, result.filterList, options);
 	});
 }
+ */
 
 //
 
 function updateOneClue (noteName, options) {
     return getAndParse(noteName, options)
-	.then(([note, resultList]) => {
-	    const removedClueMap = Filter.getRemovedClues(resultList);
+	.then(result => {
+	    const removedClueMap = Filter.getRemovedClues(result.filterList);
 	    if (!_.isEmpty(removedClueMap)) {
 		if (!options.force) {
 		    for (const key of removedClueMap.keys()) {
@@ -208,7 +227,7 @@ function updateOneClue (noteName, options) {
 		}
 		removeAllClues(removedClueMap, options);
 	    }
-	    return Filter.saveAddCommit(noteName, resultList, options);
+	    return Filter.saveAddCommit(noteName, result.filterList, options);
 	}).then(path => Update.updateFromFile(path, options));
 }
 
@@ -227,7 +246,10 @@ async function getSomeAndParse (options, filterFunc) {
 	    // map list of notes to list of { note, filterList }
 	    // use _ prefix because filterFunc may likely have conflicting 'note' param
 	    return noteList.map(note => {
-		return { note, filterList: NoteParser.parse(note.content, options) };
+		return {
+		    note,
+		    filterList: Filter.parseLines(NoteParser.parseDom(note.content, options), options)
+		};
 	    });
 	});
 }
@@ -282,7 +304,7 @@ function removeAllClues (removedClues, options = {}) {
 	    let removed = ClueManager.addRemoveOrReject(
 		{ remove: clue }, nameList, result.addRemoveSet, options);
 	    if (removed > 0) {
-		Debug(`removed ${removed} instance(s) of [${clue}] : ${source}`);
+		Debug(`removed ${removed} instance(s) of ${source} -> ${clue}`);
 	    }
 	    total += removed;
 	}
@@ -352,8 +374,8 @@ async function count (options) {
     Debug('count');
     // options.notebook = options.notebook || Note.getWorksheetName(Clues.getByOptions(options));
     return getAndParse(options.count, options)
-	.then(([note, filterList]) => {
-	    const count = Filter.count(filterList);
+	.then(result => {
+	    const count = Filter.count(result.filterList);
 	    console.log(`sources: ${count.sources}, urls: ${count.urls}, clues: ${count.clues}`);
 	});
 }

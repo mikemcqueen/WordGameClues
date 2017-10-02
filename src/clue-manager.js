@@ -805,6 +805,7 @@ ClueManager.prototype.getCountListArrays = function (nameCsv, options) {
     if (options.add || options.remove) {
 	addRemoveSet = new Set();
     }
+    let valid = [];
     let known = [];
     let rejects = [];
     let clues = [];
@@ -843,6 +844,7 @@ ClueManager.prototype.getCountListArrays = function (nameCsv, options) {
 		clues.push({ countList: clueCountList, nameList: nameSrcList });
 	    }
 	} else {
+	    valid.push(clueCountList);
 	    let clueList = this.knownSourceMapArray[sum][nameList];
 	    if (clueList) {
 		known.push({ countList: clueCountList, nameList: clueList.map(clue => clue.name) });
@@ -852,5 +854,5 @@ ClueManager.prototype.getCountListArrays = function (nameCsv, options) {
 	    }
 	}
     }
-    return { known, rejects, invalid, clues, addRemoveSet };
+    return { valid, known, rejects, invalid, clues, addRemoveSet };
 }

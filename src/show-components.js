@@ -4,17 +4,19 @@
 
 'use strict';
 
-let _           = require('lodash');
-let ClueManager = require('./clue-manager');
-let Debug       = require('debug')('show-components');
-let Expect      = require('should/as-function');
-let Peco        = require('./peco');
-let Validator   = require('./validator');
+const _           = require('lodash');
+const ClueManager = require('./clue-manager');
+const Debug       = require('debug')('show-components');
+const Expect      = require('should/as-function');
+const Path        = require('path');
+const Peco        = require('./peco');
+const Readlines   = require('n-readlines');
+const Validator   = require('./validator');
 
 //
 
 function showCountListArray (countListArray, text, hasNameList = false) {
-    for (let elem of countListArray) {
+    for (const elem of countListArray) {
 	const countList = hasNameList ? elem.countList : elem;
 	console.log(`${countList} ${text} ${hasNameList ? elem.nameList : ''}`);
     }
@@ -114,6 +116,7 @@ function show (options) {
     showCountListArray(result.invalid, 'INVALID');
     showCountListArray(result.known, 'PRESENT as', true);
     showCountListArray(result.clues, 'PRESENT as clue with sources:', true);
+    showCountListArray(result.valid, 'VALID');
 
     ClueManager.addRemoveOrReject({
 	add:      options.add,
@@ -126,7 +129,23 @@ function show (options) {
 
 //
 
+function validate(filename, options = {}) {
+    const path = Path.normalize(`${Path.dirname(module.filename)}/tools/${filename}`);
+    const readLines = new Readlines(filename);
+    let line;
+    while ((line = readLines.next()) !== false) {
+	line = line.toString().trim();
+	const result = ClueManager.getCountListArrays(line, options);
+	if (!result || !result.valid) {
+	    console.log(`${line} ${!result ? 'doesnt exist??' : result.invalid ? 'invalid' : 'rejected'}`);
+	}
+    }
+}
+
+//
+
 module.exports = {
+//    countListArray: showCountListArray,
     show,
-    countListArray: showCountListArray
+    validate
 };

@@ -14,7 +14,7 @@ const Fs      = require('fs');
 //
 
 function display () {
-    var arr = [];
+    let arr = [];
     
     this.forEach(function(clue) {
 	arr.push(clue.name);
@@ -37,8 +37,8 @@ function persist(filename) {
 //
 
 function toJSON () {
-    var result = '[\n';
-    var first = true;
+    let result = '[\n';
+    let first = true;
 
     this.forEach(clue => {
 	if (!first) {
@@ -96,8 +96,8 @@ function clueToJSON (clue) {
 
 function format2 (text, span)
 {
-    var result = "";
-    for (var len = text.toString().length; len < span; ++len) { result += " "; }
+    let result = "";
+    for (let len = text.toString().length; len < span; ++len) { result += " "; }
     return result;
 }
 

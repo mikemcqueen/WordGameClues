@@ -28,9 +28,53 @@ function isUrl (line) {
     return _.startsWith(line, URL_PREFIX);
 }
 
-// rename parseFileSync?
+//
+
+function parseLines (lines, options = {}) {
+    let filterList = [];
+    let urlList;
+    let clueList;
+    for (let line of lines) {
+	line = line.trim();
+	Debug(line);
+	if (Markdown.hasSourcePrefix(line)) {
+	    clueList = undefined;
+	    urlList = [];
+	    const [source, suffix] = Markdown.getSuffix(line);
+	    Debug(`source: ${source} suffix: ${suffix}`);
+	    filterList.push({ source, suffix,  urls: urlList });
+	} else if (isUrl(line)) {
+	    clueList = [];
+	    const [url, suffix] = Markdown.getSuffix(line);
+	    Debug(`url: ${url} suffix: ${suffix}`);
+	    urlList.push({ url, suffix, clues: clueList });
+	} else if (!_.isEmpty(line)) {
+	    Debug(`clue: ${line}`);
+	    // clue, known, or maybe
+	    // currently requires URL, but i suppose could eliminate that requirement with some work.
+	    Expect(urlList).is.an.Array().and.not.empty();
+	    Expect(clueList).is.an.Array();
+	    clueList.push(makeClueElem(line));
+	}
+    }
+    return filterList;
+}
+
+//
 
 function parseFile (filename, options = {}) {
+    let readLines = new Readlines(filename);
+    let lines = [];
+    let line;
+    while ((line = readLines.next()) !== false) {
+	lines.push(line.toString().trim());
+    }
+    return parseLines(lines, options);
+}
+
+// rename parseFileSync?
+
+function old_parseFile (filename, options = {}) {
     let readLines = new Readlines(filename);
     let line;
     let resultList = [];
@@ -62,6 +106,7 @@ function parseFile (filename, options = {}) {
     }
     return resultList;
 }
+
 
 //
 
@@ -235,11 +280,14 @@ function count (list) {
     return { sources, urls, clues };
 }
 
+//
+
 function save (filterList, path) {
     return Fs.open(path, 'w')
 	.then(fd => {
 	    return dumpList(filterList, { fd });
-	}).then(fd => Fs.close(fd));
+	}).then(fd => Fs.close(fd))
+	.then(_ => path);
 }
 
 //
@@ -414,6 +462,7 @@ module.exports = {
     getRemovedClues,
     makeClueElem,
     parseFile,
+    parseLines,
     removeRemovedClues,
     removeKnownClues,
     save,

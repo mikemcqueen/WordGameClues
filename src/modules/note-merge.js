@@ -11,7 +11,7 @@ const Fs               = require('fs-extra');
 const Filter           = require('./filter');
 const Note             = require('./note');
 const NoteMaker        = require('./note-make');
-const NoteParse        = require('./note-parse');
+const NoteParser       = require('./note-parse');
 const Path             = require('path');
 const Promise          = require('bluebird');
 const Stringify        = require('stringify-object');
@@ -25,14 +25,15 @@ const Stringify        = require('stringify-object');
 
 async function loadNoteFilterLists(filename, noteName, options) {
     Debug(`++loadNoteFilterLists()`);
-    const parseOpt = { urls: true, clues: true };
     const getOpt = _.clone(options);
     getOpt.content = true;
     return Promise.join(
 	Note.get(noteName, getOpt),
-	Filter.parseFile(filename, parseOpt),
-	(note, filterData) => {
-	    return [note, NoteParse.parse(note.content, parseOpt), filterData];
+	Filter.parseFile(filename, options),
+	(note, listFromFile) => {
+	    return [note,
+		    Filter.parseLines(NoteParser.parseDom(note.content, options), options),
+		    listFromFile];
 	});
 }
 

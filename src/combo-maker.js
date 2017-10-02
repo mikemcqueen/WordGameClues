@@ -13,6 +13,7 @@ module.exports = exports = new ComboMaker();
 const _           = require('lodash');
 const ClueManager = require('./clue-manager');
 const ClueList    = require('./clue-list');
+const Debug       = require('debug')('combo-maker');
 const Duration    = require('duration');
 const Expect      = require('should/as-function');
 const Validator   = require('./validator');
@@ -24,16 +25,6 @@ const NameCount   = require('./name-count');
 
 function ComboMaker() {
     this.hash = {};
-
-    this.logging = false;
-}
-
-//
-//
-ComboMaker.prototype.log = function(text) {
-    if (this.logging) {
-	console.log(text);
-    }
 }
 
 //
@@ -72,7 +63,7 @@ ComboMaker.prototype.makeCombos = function(args) {
     }
     let validateAll = false;
     if (args.sources) {
-	console.log('Validating sources: ' + args.sources);
+	Debug('Validating sources: ' + args.sources);
 	validateAll = true;
     }
 
@@ -123,9 +114,7 @@ ComboMaker.prototype.makeCombos = function(args) {
 	    // if useNcList, all nc must exist in current combo's nc list
 	    if (!_.isUndefined(useNcList)) {
 		if (_.intersectionBy(useNcList, result.ncList, _.toString).length !== useNcList.length) {
-		    if (this.logging) {
-			console.log(`skipping: ${result.ncList}`);
-		    }
+		    Debug(`skipping: ${result.ncList}`);
 		    ++skipCount;
 		    continue;
 		}
@@ -152,7 +141,7 @@ ComboMaker.prototype.makeCombos = function(args) {
 		    csvNameList.push(result.nameList.toString());
 		}
 		if ((++totalCount % 10000) === 0) {
-		    console.log(`total(${totalCount}), hash(${_.size(this.hash)}), list(${csvNameList.length})`);
+		    Debug(`total(${totalCount}), hash(${_.size(this.hash)}), list(${csvNameList.length})`);
 		}
 	    }
 	    else {
@@ -161,16 +150,14 @@ ComboMaker.prototype.makeCombos = function(args) {
 	}
     }, this);
 
-    console.log('success: ' + successDuration + 'ms' +
-		', fail: ' + failDuration + 'ms' +
-		', next: ' + nextDuration + 'ms');
-    console.log(`total(${totalCount})` +
-		', dupeClue(' + this.nextDupeClue + ')' +
-		', dupeSrc(' + this.nextDupeSrc + ')' +
-		', dupeCombo(' + this.nextDupeCombo + ')' +
-		`, skip(${skipCount})`);
-
-    if (0) { this.displayCombos(clueListArray); }
+    Debug(`success: ${successDuration}ms` +
+	  `, fail: $(failDuration}ms` +
+	  `, next: ${nextDuration}ms`);
+    Debug(`total(${totalCount})` +
+	  `, dupeClue(${this.nextDupeClue})` +
+	  `, dupeSrc(${this.nextDupeSrc})` +
+	  `, dupeCombo(${this.nextDupeCombo})` +
+	  `, skip(${skipCount})`);
 
     return csvNameList;
 }
@@ -289,18 +276,14 @@ ComboMaker.prototype.next = function(clueSourceList, sourceIndexes) {
 
 	// skip combinations that have duplicate source:count
 	if (_.uniq(srcCountStrList).length !== srcCountStrList.length) {
-	    if (this.logging) {
-		this.log('skipping duplicate clue src: ' + srcCountStrList);
-	    }
+	    Debug('skipping duplicate clue src: ' + srcCountStrList);
 	    ++this.nextDupeSrc;
 	    continue;
 	}
 
 	// skip combinations that have duplicate names
 	if (_.sortedUniq(nameList).length !== nameList.length) {
-	    if (this.logging) {
-		this.log('skipping duplicate clue name: ' + nameList);
-	    }
+	    Debug('skipping duplicate clue name: ' + nameList);
 	    ++this.nextDupeClue; // TODO: DupeName
 	    continue;
 	}
@@ -320,9 +303,7 @@ ComboMaker.prototype.addComboToFoundHash = function(nameListCsv) {
 	this.hash[nameListCsv] = true;
 	return true;
     }
-    if (this.logging) {
-	console.log('skipping duplicate combo: ' + nameListCsv);
-    }
+    Debug('skipping duplicate combo: ' + nameListCsv);
     ++this.nextDupeCombo;
     return false;
 }

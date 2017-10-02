@@ -186,7 +186,7 @@ function addToCompatibleMap(args) {
 function dumpCompatibleClues(args) {
     let sources = '';
     args.nameList.forEach(name => {
-	var nc = NameCount.makeNew(name);
+	let nc = NameCount.makeNew(name);
 	if (sources.length > 0) {
 	    sources += ', ';
 	}
@@ -251,8 +251,8 @@ function format2(text, span) {
     if (text === undefined) {
 	text = 'undefined'
     }
-    var result = '';
-    for (var len = text.toString().length; len < span; ++len) { result += ' '; }
+    let result = '';
+    for (let len = text.toString().length; len < span; ++len) { result += ' '; }
     return result;
 }
 

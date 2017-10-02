@@ -1,3 +1,9 @@
+//
+// oath.js
+//
+// code copied from stackoverflow, or evernote forums
+//
+
 'use strict';
 
 const Evernote = require('evernote');
@@ -5,23 +11,24 @@ const http = require("http");
 const url = require("url");
 const Config = require('../../data/evernote-config.json');
 
+//
 
-
-var global = {};
+let global = {};
 global.oauthToken = '';
 global.oauthSecret = '';
 
+//
 
-function getOauthVerifier(url) {
+function getOauthVerifier (url) {
     let regex = new RegExp("[\\?&]oauth_verifier=([^&]*)");
     let results = regex.exec(url);
     
     return results === null ? "" : decodeURIComponent(results[1].replace(/\+/g, " "));
 }
 
+//
 
-
-let handler = function(request, response) {
+let handler = function (request, response) {
     let params = url.parse(request.url);
     let pathname = params.pathname;
     console.log("Request for " + pathname + " received.");
@@ -31,7 +38,6 @@ let handler = function(request, response) {
         consumerSecret: Config.consumer.secret,
         sandbox:        false
     });
-    
     
     if (pathname == "/"){
         let callbackUrl = 'http://localhost:8888/oauth';
@@ -78,5 +84,7 @@ let handler = function(request, response) {
         response.end();
     }
 };
+
+//
 
 http.createServer(handler).listen(8888);

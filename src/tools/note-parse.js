@@ -8,6 +8,7 @@
 
 const _                = require('lodash');
 const Debug            = require('debug')('test-note-parse');
+const Filter           = require('../modules/filter');
 const NoteParse        = require('../modules/note-parse');
  
 //
@@ -27,15 +28,13 @@ async function main () {
     Debug(`filename: ${filename}`);
     // TODO: streams = better here
     let fd = process.stdout.fd;
-    return NoteParse.parseFile(filename, { urls: true })
-	.then(resultList => {
-	    if (_.isEmpty(resultList)) {
+    return NoteParse.parseFile(filename)
+	.then(filterList => {
+	    if (_.isEmpty(filterList)) {
 		console.log('no results');
 		return;
 	    }
-	    for (const result of resultList) {
-		console.log(result);
-	    }
+	    Filter.dumpList(filterList, { fd: process.stdout.fd });
 	});
 }
 

@@ -157,6 +157,9 @@ function parseDom (xmlText, options = {}) {
     return lines;
 }
 
+// NOTE: this function is old and shouldn't really be used except to compare
+// to the new (parseDom) function
+//
 // all options are boolean
 //   .urls:     parse urls (http(s) prefix)
 //   .clues:    parse clues (removed, maybe)
@@ -174,7 +177,7 @@ function parseDom (xmlText, options = {}) {
 //         { source: value2, urls: [{ url: url1, clues: [clue1, .., clueN] },
 //                                  { url: url2, clues: [clue1, .., clueN] }] } ]
 //
-function parse (text, options = {}) {
+function oldParse (text, options = {}) {
     Debug(`++parse()`);
     if (_.isBuffer(text)) text = text.toString();
     Expect(text).is.a.String();
@@ -203,15 +206,14 @@ function parse (text, options = {}) {
 	    const match = sourceResult[1];
 	    const [sourceLine, suffix] = Markdown.getSuffix(match);
 	    Debug(`sourceLine: ${sourceLine} suffix: ${suffix}`);
-	    sourceElement = options.urls ? { source: sourceLine } : sourceLine;
-	    if (options.urls && suffix) sourceElement.suffix = suffix;
+	    sourceElement = options.noUrls ? sourceLine : { source: sourceLine, suffix };
 	    resultList.push(sourceElement);
 	    sourceIndex = sourceResult.index;
 	} else {
 	    sourceIndex = Number.MAX_SAFE_INTEGER;
 	    done = true;
 	}
-	if (!options.urls || !prevSourceElement) continue;
+	if (options.noUrls || !prevSourceElement) continue;
 	
 	// parse urls for previous source
 
@@ -229,11 +231,11 @@ function parse (text, options = {}) {
 	    Debug(`urlLine: ${urlLine}`);
 	    // NOTE: suffix on a url inside a note is within a separate <div> block
 	    //const [_, urlLine] = My.hasCommaSuffix(urlResult[1], RejectSuffix); // ValidSuffixes
-	    let urlElement = options.clues ? { url: urlLine, clues: [] } : urlLine;
+	    let urlElement = options.noClues ? urlLine : { url: urlLine, clues: [] };
 	    urlList.push(urlElement);
 	    prevUrlResult = urlResult;
 	    urlResult = urlExpr.exec(text);
-	    if (!options.clues) continue;
+	    if (options.noClues) continue;
 
 	    // parse clues for previous url
 
@@ -315,7 +317,7 @@ function parseFile (filename, options) {
 //
 
 module.exports = {
-    parse,
+    oldParse,
     parseDom,
     parseFile
 };
