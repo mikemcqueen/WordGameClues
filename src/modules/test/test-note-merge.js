@@ -5,6 +5,7 @@
 'use strict';
 
 const _            = require('lodash');
+const Debug        = require('debug')('test-note-merge');
 const Expect       = require('should/as-function');
 const Filter       = require('../filter');
 const Fs           = require('fs-extra');
@@ -17,8 +18,8 @@ const Stringify    = require('stringify-object');
 const Test         = require('./test');
 
 const TestNotebookName = 'test';
-const BaseNoteName = 'test-note-merge';
-const BaseNoteNameMd = 'test-note-merge-markdown';
+const BaseNoteName =     'test-note-merge';
+const BaseNoteNameMd =   'test-note-merge-markdown';
 
 const BaseCount = {
     sources: 7,
@@ -34,6 +35,8 @@ const UpdateCount =  {
 //
 
 function compareCount (actual, expected) {
+    Debug(`actual:   ${Stringify(actual)}`);
+    Debug(`expected: ${Stringify(expected)}`);
     Expect(actual.sources).is.equal(expected.sources);
     Expect(actual.urls).is.equal(expected.urls);
     Expect(actual.clues).is.equal(expected.clues);
@@ -45,7 +48,7 @@ function mergeTest (baseNoteName, updateNoteFilename, expectedCount, done) {
     return Note.get(baseNoteName, { content: true, notebook: TestNotebookName })
 	.then(baseNote => {
 	    console.log(`base   notebook guid ${baseNote.notebookGuid}`);
-	    const count = Filter.count(NoteParser.parse(baseNote.content, { urls: true, clues: true }));
+	    const count = Filter.count(Filter.parseLines(NoteParser.parseDom(baseNote.content)));
 	    compareCount(count, expectedCount.base);
 	    return Note.create(`${baseNoteName}_copy`, baseNote.content.toString(), {
 		content:      true, // i.e. supplied body is actually full content
@@ -61,7 +64,7 @@ function mergeTest (baseNoteName, updateNoteFilename, expectedCount, done) {
 	    console.log(`note guid ${mergedNote.guid}`);
 	    return Promise.all([mergedNote, Note.getContent(mergedNote.guid)]);
 	}).then(([mergedNote, content]) => {
-	    const filterList = NoteParser.parse(content, { urls: true, clues: true });
+	    const filterList = Filter.parseLines(NoteParser.parseDom(content));
 	    //TODO: move deleteNote to post test cleanup step
 	    return Promise.all([Filter.count(filterList), Note.deleteNote(mergedNote.guid)]);
 	}).then(([count, _]) => {		
@@ -115,8 +118,8 @@ describe ('note-merge tests', function() {
 
 	const base = BaseCount;
 	const merged =  {
-	    sources: 22, // 24 
-	    urls:    84, // 95 - 7 (url,x) - 4 (source,x)
+	    sources: 22, // 24 - 2 rejected
+	    urls:    84, // 95 - 7 (url,x) - 4 (2 rejected sources)
 	    clues:   0
 	};
 	// before: delete all notes named baseNoteName_copy
