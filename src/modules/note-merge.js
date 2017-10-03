@@ -21,16 +21,33 @@ const Stringify        = require('stringify-object');
 // although this whole thing deals with filterlists, so maybe filter-list is
 // a new module.
 
+// get a note by name. if it doesn't exist, create it. return note with content.
+
+async function getOrCreate (noteName, options) {
+    let created = false;
+    return Note.get(noteName, Object.assign(_.clone(options), { content: true, nothrow: true }))
+	.then(note => {
+	    if (note) return note;
+	    created = true;
+	    return Note.create(noteName, '<div></div>', options);
+	}).then (note => {
+	    if (!note) throw new Error(`error creating note, ${noteName}`);
+	    if (!created) return note;
+	    if (!note.guid) throw new Error(`created note has no guid, ${noteName}`);
+	    return Note.get(null, Object.assign(_.clone(options), { guid: note.guid }));
+	});
+}
+
 // unnecessesarily convoluted
 
 async function loadNoteFilterLists(filename, noteName, options) {
     Debug(`++loadNoteFilterLists()`);
-    const getOpt = _.clone(options);
-    getOpt.content = true;
     return Promise.join(
-	Note.get(noteName, getOpt),
-	Filter.parseFile(filename, options),
+	// TODO: Note.getOrCreate(
+	getOrCreate(noteName, options),
+	Filter.parseFile(filename),
 	(note, listFromFile) => {
+	    console.log(`content: ${note.content}`);
 	    return [note,
 		    Filter.parseLines(NoteParser.parseDom(note.content, options), options),
 		    listFromFile];

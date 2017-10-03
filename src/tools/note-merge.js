@@ -18,6 +18,7 @@ const Path             = require('path');
 //
 
 const Options = GetOpt.create(_.concat(Clues.Options, [
+    ['',  'force-create',    `create note if it doesn't exist`],
     ['',  'no-filter-urls'],
     ['',  'no-filter-sources'],
     ['',  'note=NAME',       'specify note name'],
@@ -51,6 +52,7 @@ async function main () {
 
     if (options['no-filter-urls'])    options.noFilterUrls    = true;
     if (options['no-filter-sources']) options.noFilterSources = true;
+    if (options['force-create'])      options.force_create = true;
 
     // if production && !default (notebook)
     //   if --notebook specified, use specified notebook name

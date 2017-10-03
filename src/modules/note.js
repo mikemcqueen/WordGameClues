@@ -127,8 +127,18 @@ async function getNotebookByOptions (options) {
  includeDeleted
  */
 
+// TODO: remove title as param, go off options purely
+
 async function get (title, options = {}) {
+    const noteSpec = { includeContent: true };
     const noteStore = getNotestore(options.production);
+    if (options.guid) {
+	return noteStore.getNoteWithResultSpec(options.guid, noteSpec)
+	    .then(note => {
+		if (!note && !options.nothrow) throw new Error(`note not found, ${options.guid}`);
+		return note;
+	    });
+    }
     return getNotebookByOptions(options)
 	.then(notebook => {
 	    Debug(`get from notebook: ${notebook.title}, ${notebook.guid}`);
@@ -141,13 +151,12 @@ async function get (title, options = {}) {
 		// TODO: check for duplicate named notes (option)
 		if (metaNote.title === title) {
 		    Debug(`match`);
-		    const noteSpec = { includeContent: true };
 		    return noteStore.getNoteWithResultSpec(metaNote.guid, noteSpec);
 		}
 	    }
 	    return undefined;
 	}).then(note => {
-	    if (!note) throw new Error(`note not found, ${title}`);
+	    if (!note && !options.nothrow) throw new Error(`note not found, ${title}`);
 	    return note;
 	});
 }
@@ -225,7 +234,7 @@ async function create (title, body, options = {}) {
 		setContentBody(note, body);
 	    }
 	    return getNotestore(options.production).createNote(note);
-	}); // .then(_ => note); // huh?
+	}); // .then(_ => note); // return the note.  why not? coz it's not really the note.
 }
 
 // file is enml content, passed as 'body' to Note.create

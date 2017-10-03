@@ -32,7 +32,6 @@ const Commands = { create, get, parse, update, count };
 const Options = Getopt.create(_.concat(Clues.Options, [
     ['', 'count=NAME',    'count sources/clues/urls in a note'],
     ['', 'create=FILE',   'create note from filter result file'],
-    ['', 'force',         'force execution: update single note with removed clue'],
     ['', 'get=TITLE',     'get (display) a note'],
     ['', 'notebook=NAME', 'specify notebook name'],
     ['', 'parse=TITLE',   'parse note into filter file format'],
@@ -44,6 +43,7 @@ const Options = Getopt.create(_.concat(Clues.Options, [
     ['', 'quiet',         'less noise'],
     ['', 'title=TITLE',   'specify note title (used with --create, --parse)'],
     ['', 'update[=NOTE]', 'update all results in worksheet, or a specific NOTE if specified'],
+    ['', 'force-update',  '  update single note with removed clue (used with --update)'],
     ['', 'save',          '  save cluelist files (used with --update)'],
     ['v','verbose',       'more noise'],
     ['h','help', '']
@@ -219,7 +219,7 @@ function updateOneClue (noteName, options) {
 	.then(result => {
 	    const removedClueMap = Filter.getRemovedClues(result.filterList);
 	    if (!_.isEmpty(removedClueMap)) {
-		if (!options.force) {
+		if (!options.force_update) {
 		    for (const key of removedClueMap.keys()) {
 			console.log(`removed clue: ${key} -> ${Array.from(removedClueMap.get(key).values())}`);
 		    }
@@ -388,6 +388,9 @@ async function main () {
     if (opt.argv.length > 0) {
 	usage(`invalid non-option parameter(s) supplied, ${opt.argv}`);
     }
+    if (options['force-update']) options.force_update = true;
+    if (options['force-create']) options.force_create = true;
+
     if (options.production) console.log('---PRODUCTION--');
 
     options.notebook = options.notebook || Note.getWorksheetName(Clues.getByOptions(options));
