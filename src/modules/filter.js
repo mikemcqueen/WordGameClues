@@ -20,7 +20,7 @@ const Stringify    = require('stringify-object');
 //
 
 const URL_PREFIX      = 'http';
-const MORE_CLUES_URL  = 'https://more.clues';
+const KNOWN_CLUES_URL  = 'https://known.clues';
 
 //
 
@@ -365,14 +365,14 @@ function addKnownClues (filterList) {
 	Expect(knownClues).is.ok();
 	if (!_.isEmpty(knownClues)) {
 	    Debug(`${srcElem.source} known: ${knownClues}`); // todo: map:clue->clue.name
-	    const moreCluesUrl = _.find(srcElem.urls, { url: MORE_CLUES_URL });
+	    const moreCluesUrl = _.find(srcElem.urls, { url: KNOWN_CLUES_URL });
 	    if (moreCluesUrl) {
 		// add known clues to existing more.clues URL elem
 		moreCluesUrl.clues.push(...knownClues);
 	    } else {
 		// create new more.clues URL elem with known clues
 		srcElem.urls.push({
-		    url:   MORE_CLUES_URL,
+		    url:   KNOWN_CLUES_URL,
 		    clues: knownClues
 		});
 	    }
@@ -466,5 +466,7 @@ module.exports = {
     removeRemovedClues,
     removeKnownClues,
     save,
-    saveAddCommit
+    saveAddCommit,
+
+    KNOWN_CLUES_URL
 };

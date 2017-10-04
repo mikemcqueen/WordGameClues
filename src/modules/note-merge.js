@@ -47,7 +47,6 @@ async function loadNoteFilterLists(filename, noteName, options) {
 	getOrCreate(noteName, options),
 	Filter.parseFile(filename),
 	(note, listFromFile) => {
-	    console.log(`content: ${note.content}`);
 	    return [note,
 		    Filter.parseLines(NoteParser.parseDom(note.content, options), options),
 		    listFromFile];

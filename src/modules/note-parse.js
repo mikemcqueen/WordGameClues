@@ -13,6 +13,7 @@ const Expect           = require('should/as-function');
 const Filter           = require('./filter'); // shouldn't be necessary
 const Fs               = require('fs-extra'); 
 const Markdown         = require('./markdown');
+const Stringify        = require('stringify-object');
 
 //
 
@@ -37,24 +38,32 @@ function processDiv (node, div, queue) {
 // #text:
 //  cannot exist outside of a div
 //  fail if div.noText (current div has inner div)
-//  cannot exist in div that contains a break
+//  cannot have preceding break
 //  fail if follows link & not comma prefixed
 //  fail if follows link & link suffix already supplied
 
 function processText (node, div, queue) {
-    Expect(div).is.ok();
-    Expect(div.noText).is.not.true();
-    Expect(div.break).is.not.true();
     const text = node.textContent;
-    if (div.link) {
-	if (!div.linkText) {
-	    Expect(_.startsWith(text, 'http')).is.true();
-	    div.linkText = true;
-	} else {
-	    Expect(div.linkSuffix).is.not.true();
-	    Expect(text.charAt(0)).is.equal(',');
-	    div.linkSuffix = true;
+    try {
+	Expect(div).is.ok();
+	Expect(div.noText).is.not.true();
+	Expect(div.break).is.not.true();
+	if (div.link) {
+	    if (!div.linkText) {
+		Expect(_.startsWith(text, 'http')).is.true();
+		div.linkText = true;
+	    } else {
+		Expect(div.linkSuffix).is.not.true();
+		Expect(text.charAt(0)).is.equal(',');
+		div.linkSuffix = true;
+	    }
 	}
+    } catch(e) {
+	console.log(`text: ${text}`);
+	console.log(`node: ${Stringify(div)}`);
+	let prev = queue.pop();
+	console.log(`prevNode: ${prev && Stringify(prev)}`);
+	throw err;
     }
     return text;
 }
@@ -62,7 +71,7 @@ function processText (node, div, queue) {
 // a: link
 //  must be in div
 //  only one per div
-//  cannot exist in div that contains a break
+//  cannot have preceding break
 //  cannot have preceding text
 //  can have one succeeding text with ',' prefix
 //  next tag must be Tag.text, with http prefix
@@ -81,13 +90,14 @@ function processLink (node, div, divQueue) {
 //  cannot exist outside of a div
 //  only one per div?
 //  link not allowed in same div
-//  text not allowed in same div
+//  #text not allowed in same div
+//  previous text allowed, following text not allowed 
 
 function processBreak (node, div, divQueue) {
     Expect(div).is.ok();
     Expect(div.break).is.not.true();
     Expect(div.link).is.not.true();
-    Expect(div.text).is.not.ok();
+//    Expect(div.text).is.not.ok();
     div.break = true;
     return '';
 }

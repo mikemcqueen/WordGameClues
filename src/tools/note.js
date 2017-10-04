@@ -43,6 +43,7 @@ const Options = Getopt.create(_.concat(Clues.Options, [
     ['', 'quiet',         'less noise'],
     ['', 'title=TITLE',   'specify note title (used with --create, --parse)'],
     ['', 'update[=NOTE]', 'update all results in worksheet, or a specific NOTE if specified'],
+    ['', 'match=PREFIX',  '  update notes matching title PREFIX (used with --update)'],
     ['', 'force-update',  '  update single note with removed clue (used with --update)'],
     ['', 'save',          '  save cluelist files (used with --update)'],
     ['v','verbose',       'more noise'],
@@ -326,7 +327,8 @@ async function saveAddCommitAll (resultList, options) {
 //
 
 async function updateAllClues (options) {
-    const prefix = Clues.getShorthand(Clues.getByOptions(options));
+    const prefix = options.match || Clues.getShorthand(Clues.getByOptions(options));
+    Debug(`prefix: ${prefix}`);
     const bignoteSuffix = '.article';
     return getSomeAndParse(options, note => {
 	return _.startsWith(note.title, prefix) && !_.endsWith(note.title, bignoteSuffix);
@@ -389,7 +391,6 @@ async function main () {
 	usage(`invalid non-option parameter(s) supplied, ${opt.argv}`);
     }
     if (options['force-update']) options.force_update = true;
-    if (options['force-create']) options.force_create = true;
 
     if (options.production) console.log('---PRODUCTION--');
 

@@ -32,11 +32,12 @@ const Stringify    = require('stringify-object');
 const csvParse     = Promise.promisify(require('csv-parse'));
 
 const Options = new Getopt(_.concat(Clues.Options, [
+    ['',  'add-known',           'add known clues'],
     ['a', 'article',             'filter results based on article word count'],
     ['',  'copy',                'copy to clipboard as RTF'],
     ['d', 'dir=NAME',            'directory name'],
-    ['', 'known-urls',           'filter known URLs'],  // easy!, call ClueManager.filter()
-    ['', 'keep', 'keep tmp file'],
+    ['',  'known-urls',           'filter known URLs'],
+    ['',  'keep', 'keep tmp file'],
     ['m', 'match=EXPR',          'filename match expression' ],
     ['n', 'count',               'show result/url counts only'],
     ['',  'parse',               'parse a filter output file'],
@@ -152,7 +153,7 @@ function filterSearchResultList (resultList, wordList, filteredUrls, options, fi
 	    Debug(`filtering reject or unscored url, ${result.url}, score ${result.score}`);
 	    return false;
 	}
-	if (options.filterKnownUrls && isKnownUrl(result.url, filteredUrls)) {
+	if (options.filter_known_urls && isKnownUrl(result.url, filteredUrls)) {
 	    Debug(`filtering known url, ${result.url}`);
 	    return false;
 	}
@@ -287,13 +288,13 @@ function filterPathList (pathList, dir, options) {
 	let filename = Path.basename(path);
 	Debug(`filename: ${filename}`);
 	let wordList = SearchResult.makeWordlist(filename);
-  	return Promise.all([Fs.readFile(path),
-			    loadFilteredUrls(Path.dirname(path), wordList, options)])
+  	return Promise.all(
+	    [Fs.readFile(path), loadFilteredUrls(Path.dirname(path), wordList, options)])
 	    .then(([content, filteredUrls]) => {
 		return filterSearchResultList(JSON.parse(content), wordList, filteredUrls, options, path);
 	    }).then(filterResult => {
 		// TODO: this is probably wrong for rejects
-		if (_.isEmpty(filterResult.urlList) && !_.isEmpty(filterResult.known)) {
+		if (_.isEmpty(filterResult.urlList) && _.isEmpty(filterResult.known)) {
 		    Debug(`rejecting, ${wordList}, no urls or known clues`); 
 		    rejectList.push(filterResult);
 		    return undefined;
@@ -363,7 +364,7 @@ function getPathList (dir, fileMatch, nameMap) {
 
 //
 
-function writeFilterResults (resultList, stream) {
+function writeFilterResults (resultList, stream, options) {
     Expect(resultList).is.an.Array();
     for (const result of resultList) {
 	if (ClueManager.isRejectSource(result.src)) continue;
@@ -374,8 +375,8 @@ function writeFilterResults (resultList, stream) {
 	for (const url of result.urlList) {
 	    My.logStream(stream, url);
 	}
-	if (!_.isEmpty(knownList)) {
-	    My.logStream(stream, '');
+	if (options.add_known_clues && !_.isEmpty(knownList)) {
+	    My.logStream(stream, Filter.KNOWN_CLUES_URL);
 	    for (const name of knownList) {
 		My.logStream(stream, name); // `${Markdown.Prefix.known}${name}`);
 	    }
@@ -446,9 +447,8 @@ async function main () {
     if (!options.dir) {
 	options.dir = '2';
     }
-    if (options['known-urls']) {
-	options.filterKnownUrls = true;
-    }
+    if (options['known-urls']) options.filter_known_urls = true;
+    if (options['add-known']) options.add_known_clues = true;
 
     ClueManager.loadAllClues({ clues: Clues.getByOptions(options) });
 
@@ -519,7 +519,7 @@ async function main () {
 	}
 	return [null, process.stdout];
     }).then(([path, stream]) => {
-	writeFilterResults(options.rejects ? result.rejects : result.filtered, stream);
+	writeFilterResults(options.rejects ? result.rejects : result.filtered, stream, options);
 	if (useTmpFile) {
 	    stream && stream.end();
 	    if (options.mail) {
