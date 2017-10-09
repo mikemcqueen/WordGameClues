@@ -23,7 +23,6 @@ const Validator      = require('./validator');
 const DATA_DIR              =  Path.normalize(`${Path.dirname(module.filename)}/../data/`);
 const REJECTS_DIR           = 'rejects';
 
-//
 // constructor
 
 function ClueManager () {
@@ -46,7 +45,6 @@ function ClueManager () {
     this.logLevel = 0;
 }
 
-//
 //
 
 ClueManager.prototype.log = function (text) {
@@ -152,7 +150,6 @@ ClueManager.prototype.getRejectFilename = function (count) {
 }
 
 //
-//
 
 ClueManager.prototype.addKnownCompoundClues = function (clueList, clueCount, validateAll) {
     // so this is currently only callable once per clueCount.
@@ -194,7 +191,6 @@ ClueManager.prototype.addKnownCompoundClues = function (clueList, clueCount, val
 }
 
 //
-//
 
 ClueManager.prototype.addKnownClue = function (count, name, source, nothrow) {
     Expect(count).is.a.Number();
@@ -220,7 +216,6 @@ ClueManager.prototype.addKnownClue = function (count, name, source, nothrow) {
 }
 
 //
-//
 
 ClueManager.prototype.removeKnownClue = function (count, name, source, nothrow) {
     Expect(count).is.a.Number();
@@ -240,19 +235,19 @@ ClueManager.prototype.removeKnownClue = function (count, name, source, nothrow) 
 }
 
 //
-//
 
 ClueManager.prototype.saveClues = function (counts) {
     if (_.isNumber(counts)) {
 	counts = [ counts ];
     }
+    Debug(`saving clueLists ${counts}`);
     Expect(counts).is.an.Array();
     for (const count of counts) {
 	this.saveClueList(this.clueListArray[count], count);
+	Debug(`saved clueList ${count}, length: ${this.clueListArray[count].length}`);
     }
 }
 
-//
 //
 
 ClueManager.prototype.addClue = function (count, clue, save = false, nothrow = false) {
@@ -268,7 +263,6 @@ ClueManager.prototype.addClue = function (count, clue, save = false, nothrow = f
     return false;
 }
 
-//
 //
 
 ClueManager.prototype.removeClue = function (count, clue, save = false, nothrow = false) {
@@ -310,8 +304,6 @@ ClueManager.prototype.addMaybe = function (name, srcNameList, note, save = false
     return true;
 }
 
-
-//
 //
 
 ClueManager.prototype.addRejectCombos = function (clueList, clueCount) {
@@ -326,7 +318,6 @@ ClueManager.prototype.addRejectCombos = function (clueList, clueCount) {
     return this;
 }
 
-//
 //
 
 ClueManager.prototype.saveRejects = function (counts) {
@@ -400,7 +391,7 @@ ClueManager.prototype.isKnownSource = function (source, count = 0) {
 }
 
 // source: csv string or array of strings
-//
+
 ClueManager.prototype.isRejectSource = function (source) {
     if (!_.isString(source) && !_.isArray(source)) {
 	throw new Error('bad source: ' + source);
@@ -408,7 +399,6 @@ ClueManager.prototype.isRejectSource = function (source) {
     return _.has(this.rejectSourceMap, source.toString());
 }
 
-//
 //
 
 ClueManager.prototype.getCountListForName = function (name) {
@@ -422,7 +412,6 @@ ClueManager.prototype.getCountListForName = function (name) {
 }
 
 //
-//
 
 ClueManager.prototype.getSrcListForNc = function (nc) {
     let clueMap = this.knownClueMapArray[nc.count];
@@ -430,7 +419,6 @@ ClueManager.prototype.getSrcListForNc = function (nc) {
     return clueMap[nc.name];
 }
 
-//
 //
 
 ClueManager.prototype.getSrcListMapForName = function (name) {
@@ -445,7 +433,6 @@ ClueManager.prototype.getSrcListMapForName = function (name) {
 }
 
 //
-//
 
 ClueManager.prototype.makeSrcNameListArray = function (nc) {
     let srcNameListArray = [];
@@ -455,7 +442,6 @@ ClueManager.prototype.makeSrcNameListArray = function (nc) {
     return srcNameListArray;
 }
 
-//
 // args:
 //  sum:     args.sum,
 //  max:     args.max,
@@ -506,7 +492,6 @@ ClueManager.prototype.getClueSourceListArray = function (args) {
 }
 
 //
-//
 
 ClueManager.prototype.filterAddends = function (addends, sizes) {
     let filtered = [];
@@ -520,7 +505,6 @@ ClueManager.prototype.filterAddends = function (addends, sizes) {
     return filtered;
 }
 
-//
 //
 
 ClueManager.prototype.filter = function (srcCsvList, clueCount, map = {}) {
@@ -749,7 +733,7 @@ ClueManager.prototype.getKnownClueIndexLists = function (nameList) {
 //   isReject
 //
 
-ClueManager.prototype.addRemoveOrReject = function (args, nameList, countSet, options) {
+ClueManager.prototype.addRemoveOrReject = function (args, nameList, countSet, options = {}) {
     let count = 0;
     if (args.add) {
 	if (nameList.length === 1) {
@@ -844,10 +828,11 @@ ClueManager.prototype.getCountListArrays = function (nameCsv, options) {
 		clues.push({ countList: clueCountList, nameList: nameSrcList });
 	    }
 	} else {
-	    valid.push(clueCountList);
 	    let clueList = this.knownSourceMapArray[sum][nameList];
 	    if (clueList) {
 		known.push({ countList: clueCountList, nameList: clueList.map(clue => clue.name) });
+	    } else {
+		valid.push(clueCountList);
 	    }
 	    if (options.add || options.remove) {
 		addRemoveSet.add(sum);

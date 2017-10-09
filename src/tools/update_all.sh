@@ -54,35 +54,16 @@ else
     echo "Generating new clues.."
     node ../clues -$_ct -c2,$_cc -x2 > tmp/$_ct.c2-$_cc.x2 2>> $_out
 
-    #for each name in  note (or file ../../data/words/$_ct.txt
-    _input="../../data/words/$_ct.txt"
-    echo "update all from $_input"
-    while read -r _name
+    #for each name in  ../../data/words/$_ct.txt
+    _wordsfile="../../data/words/$_ct.txt"
+    echo "update all from $_wordsfile"
+    while read -r _word
     do
-	if [ ! -z $_name ]
+	if [ ! -z $_word ]
 	then
-	    echo "Grepping..."
-	    grep $_name tmp/$_ct.c2-$_cc.x2 > tmp/$_ct.c2-$_cc.x2.$_name
-
-	    echo "Filtering..."
-	    _note=$_ct.c2-$_cc.x2.$_name
-	    node filter -$_ct tmp/$_note > tmp/$_note.filtered 2>> $_out
-	    if [ $? -ne 0 ]
-	    then
-		echo "filter failed on $_note"
-		exit -1
-	    fi
-	    echo "Merging..."
-	    #does merge-note work if note doesn't exist? probably not. should it? easier that way.
-	    #how about --create flag? otherwise i need note get <note> --quiet to return 0/1 then note create <note>.
-	    node note-merge -$_ct tmp/$_note.filtered --note $_note $1 $2 $_production 2>> $_out
-	    if [ $? -ne 0 ]
-	    then
-		echo "merge failed on $_note.filtered"
-		exit -1
-	    fi
+	    ./filtermerge.sh $_ct $_cc $_word $_production 
 	fi
-    done < "$_input"
+    done < "$_wordsfile"
     exit -1
 fi
 

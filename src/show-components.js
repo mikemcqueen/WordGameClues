@@ -118,13 +118,16 @@ function show (options) {
     showCountListArray(result.clues, 'PRESENT as clue with sources:', true);
     showCountListArray(result.valid, 'VALID');
 
-    ClueManager.addRemoveOrReject({
+    const count = ClueManager.addRemoveOrReject({
 	add:      options.add,
 	remove:   options.remove,
 	reject:   options.reject,
 	isKnown:  !_.isEmpty(result.known),
 	isReject: !_.isEmpty(result.reject)
-    }, nameList, result.addRemoveSet);
+    }, nameList, result.addRemoveSet, { save: true });
+    if (options.add || options.remove) {
+	console.log(`${options.add ? "added" : "removed"} ${count} clues`);
+    }
 }
 
 //
