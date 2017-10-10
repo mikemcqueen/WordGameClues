@@ -70,7 +70,8 @@ function processText (node, div, queue) {
 
 // a: link
 //  must be in div
-//  only one per div
+//  only one per div, with exception:
+//    a link with no inner #text may immediately preceed a link with text
 //  cannot have preceding break
 //  cannot have preceding text
 //  can have one succeeding text with ',' prefix
@@ -78,12 +79,19 @@ function processText (node, div, queue) {
 
 function processLink (node, div, divQueue) {
     Expect(div).is.ok();
-    Expect(div.link).is.not.true();
     Expect(div.break).is.not.true();
     Expect(div.text).is.not.ok();
+    
+    if (div.prevTag != Tag.link) {
+	// cannot be a link if previous node was not a link
+	Expect(div.link).is.not.true();
+	// first link in div, next tag can be text or link
+	div.nextTags = [Tag.text, Tag.link];
+    } else {
+	// second tag in div, next tag must be text
+	div.nextTags = Tag.text;
+    }
     div.link = true;
-    div.nextTag = Tag.text;
-    //return node.textContent;
 }
 
 // br: break.
@@ -115,26 +123,33 @@ function isDiv (node) {
 //  #text: cannot exist outside of a <div>
 //
 
-const tagMap = {
+const TagFnMap = {
     [Tag.break]: processBreak,
     [Tag.div]:   processDiv,
     [Tag.link]:  processLink,
     [Tag.text]:  processText
 };
 
+// should use stream here
 function parseDomLines (lines, node, queue, options) {
-    if (_.has(tagMap, node.nodeName)) {
+    if (_.has(TagFnMap, node.nodeName)) {
 	let div = _.last(queue);
 	let expected;
-	if (div && div.nextTag) {
-	    Expect(div.nextTag).is.equal(node.nodeName);
-	    div.nextTag = undefined;
+	if (div && div.nextTags) {
+	    Expect(_.includes(div.nextTags, node.nodeName)).is.true();
+	    div.nextTags = undefined;
 	}
-	let text = tagMap[node.nodeName](node, div, queue);
+	let text = TagFnMap[node.nodeName](node, div, queue);
 	if (text) {
 	    Expect(div).is.ok();
-	    if (!div.text) div.text = text;
-	    else div.text += text;
+	    if (!div.text) {
+		div.text = text;
+	    } else {
+		div.text += text;
+	    }
+	}
+	if (div) {
+	    div.prevTag = node.nodeName;
 	}
     }
     if (node.childNodes) {

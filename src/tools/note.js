@@ -412,5 +412,6 @@ async function main () {
 
 main().catch(err => {
     console.error(err, err.stack);
+    console.log(err);
     process.exit(-1);
 });
