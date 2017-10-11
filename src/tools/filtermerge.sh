@@ -23,6 +23,9 @@ do
       elif [[ $1 == "--generate" ]]
       then
 	   _generate=true
+      elif [[ $1 == "--article" ]]
+      then
+	   _article=$1
       else
 	  echo "unknown option, $1"
 	  exit -1
@@ -41,18 +44,24 @@ then
 fi
 
 _note=$_ct.c2-$_cc.x2.$_name
+_filtered=$_note
+if [[ ! -z $_article ]]
+then
+    _filtered=$_filtered.$_article
+fi
+
 echo "Grepping..."
 grep $_name tmp/$_base > tmp/$_note
 
 echo "Filtering..."
-node filter -$_ct tmp/$_note > tmp/$_note.filtered 2>> $_out
+node filter -$_ct tmp/$_note $_article > tmp/$_filtered.filtered 2>> $_out
 if [ $? -ne 0 ]
 then
     echo "filter failed on $_note"
     exit -1
 fi
 echo "Merging..."
-node note-merge -$_ct tmp/$_note.filtered --note $_note --force-create $1 $2 $_production 2>> $_out
+node note-merge -$_ct tmp/$_filtered.filtered --note $_note --force-create $_production 2>> $_out
 if [ $? -ne 0 ]
 then
     echo "merge failed on $_note.filtered"
