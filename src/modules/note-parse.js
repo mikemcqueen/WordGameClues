@@ -71,7 +71,7 @@ function processText (node, div, queue) {
 // a: link
 //  must be in div
 //  only one per div, with exception:
-//    a link with no inner #text may immediately preceed a link with text
+//    a link with no inner #text may immediately preceed a link with text // found sep 2017
 //  cannot have preceding break
 //  cannot have preceding text
 //  can have one succeeding text with ',' prefix
@@ -97,14 +97,13 @@ function processLink (node, div, divQueue) {
 // br: break.
 //  cannot exist outside of a div
 //  only one per div?
-//  link not allowed in same div
 //  #text not allowed in same div
 //  previous text allowed, following text not allowed 
 
 function processBreak (node, div, divQueue) {
     Expect(div).is.ok();
     Expect(div.break).is.not.true();
-    Expect(div.link).is.not.true();
+//    Expect(div.link).is.not.true();  // one break following link is OK oct 2017
 //    Expect(div.text).is.not.ok();
     div.break = true;
     return '';

@@ -70,9 +70,8 @@ async function get (options) {
     options.content = true;
     return Note.get(options.get, options)
 	.then(note => {
-	    if (!options.quiet) {
-		console.log(note.content);
-	    }
+	    // get ignores --quiet
+	    console.log(note.content);
 	});
 }
 
@@ -392,8 +391,6 @@ async function main () {
     }
     if (options['force-update']) options.force_update = true;
 
-    if (options.production) console.log('---PRODUCTION--');
-
     options.notebook = options.notebook || Note.getWorksheetName(Clues.getByOptions(options));
 
     let cmd;
@@ -405,6 +402,8 @@ async function main () {
 	} else Debug(`not: ${key}`);
     }
     if (!cmd) usage(`missing command`);
+    if (cmd == 'get') options.quiet = true;
+    if (options.production && (!options.quiet || options.verbose)) console.log('---PRODUCTION--');
     return Commands[cmd](options);
 }
 
