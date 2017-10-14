@@ -18,6 +18,7 @@ const Duration    = require('duration');
 const Expect      = require('should/as-function');
 const Validator   = require('./validator');
 const NameCount   = require('./name-count');
+const Stringify   = require('stringify-object');
 //const Peco        = require('./peco'); // use this at some point
 
 //
@@ -39,7 +40,7 @@ function ComboMaker() {
 // object that contains a list (cluelist) and a count, such as
 // [ { list:clues1, count:1 },{ list:clues2, count:2 }].
 //
-ComboMaker.prototype.makeCombos = function(args) {
+ComboMaker.prototype.makeCombos = function(args, options = {}) {
     let successDuration = 0;
     let failDuration = 0;
     let nextDuration = 0;
@@ -77,6 +78,7 @@ ComboMaker.prototype.makeCombos = function(args) {
 	max:     args.max,
 	require: require
     }).forEach(clueSourceList => {
+	Debug(`clueSrcList: ${Stringify(clueSourceList)}`);
 	let sourceIndexes = [];
 
 	let result = this.first(clueSourceList, sourceIndexes);
@@ -89,15 +91,16 @@ ComboMaker.prototype.makeCombos = function(args) {
 	while (!result.done) {
 	    if (!first) {
 		let start = new Date();
-		result = this.next(clueSourceList, sourceIndexes);
+		result = this.next(clueSourceList, sourceIndexes, options);
 		nextDuration += (new Duration(start, new Date())).milliseconds;
 		if (result.done) {
 		    break;
 		}
-	    }
-	    else {
+	    } else {
 		first = false;
 	    }
+
+	    Debug(`result.nameList: ${result.nameList}`);
 
 	    /*
 	    // build list of clue names from list of clue sources and sourceIndex array
@@ -121,13 +124,16 @@ ComboMaker.prototype.makeCombos = function(args) {
 	    }
 
 	    let start = new Date();
-	    let validateResult = Validator.validateSources({
-		sum:         args.sum,
-		nameList:    result.nameList,
-		count:       result.nameList.length,
-		require:     require,
-		validateAll: validateAll
-	    });
+	    let validateResult = { success: true };
+	    if (!options.merge_style) {
+		validateResult = Validator.validateSources({
+		    sum:         args.sum,
+		    nameList:    result.nameList,
+		    count:       result.nameList.length,
+		    require:     require,
+		    validateAll: validateAll
+		});
+	    }
 	    let duration = new Duration(start, new Date());
 
 	    if (validateResult.success) {
@@ -238,19 +244,19 @@ ComboMaker.prototype.displaySourceListArray = function(sourceListArray) {
 
 //
 
-ComboMaker.prototype.first = function(clueSourceList, sourceIndexes) {
+ComboMaker.prototype.first = function(clueSourceList, sourceIndexes, options = {}) {
     for (let index = 0; index < clueSourceList.length; ++index) {
 	sourceIndexes[index] = 0;
     }
     sourceIndexes[sourceIndexes.length - 1] = -1;
-    return this.next(clueSourceList, sourceIndexes);
+    return this.next(clueSourceList, sourceIndexes, options);
 }
 
 //
 
-ComboMaker.prototype.next = function(clueSourceList, sourceIndexes) {
+ComboMaker.prototype.next = function(clueSourceList, sourceIndexes, options = {}) {
     for (;;) {
-	if (!this.nextIndex(clueSourceList, sourceIndexes)) {
+	if (!this.nextIndex(clueSourceList, sourceIndexes, options)) {
 	    return { done: true };
 	}
 	let ncList = [];          // e.g. [ { name: "pollock", count: 2 }, { name: "jackson", count: 4 } ]
@@ -275,10 +281,12 @@ ComboMaker.prototype.next = function(clueSourceList, sourceIndexes) {
 	if (!this.addComboToFoundHash(nameList.toString())) continue; // already checked
 
 	// skip combinations that have duplicate source:count
-	if (_.uniq(srcCountStrList).length !== srcCountStrList.length) {
-	    Debug('skipping duplicate clue src: ' + srcCountStrList);
-	    ++this.nextDupeSrc;
-	    continue;
+	if (!options.allow_dupe_src) {
+	    if (_.uniq(srcCountStrList).length !== srcCountStrList.length) {
+		Debug('skipping duplicate clue src: ' + srcCountStrList);
+		++this.nextDupeSrc;
+		continue;
+	    }
 	}
 
 	// skip combinations that have duplicate names

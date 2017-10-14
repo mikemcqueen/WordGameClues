@@ -38,7 +38,8 @@ const Opt = require('node-getopt')
 	['A', 'all-alt-sources',                     'show alternate sources for all clues'],
 	['o', 'output',                              '  output json -or- clues(huh?)'],
 	['c', 'count=COUNT[LO,COUNTHI]',             '# of primary clues to combine; or range if COUNTHI is specified'],
-	['d', 'allow-dupe-source',                   'allow duplicate source, override default behavior of --meta'],
+	['',  'allow-dupe-source',                   '  allow duplicate sources'],
+	['',  'merge-style',                         '  merge-style, no validation except for immediate sources'],
 	['i', 'primary-sources=SOURCE[,SOURCE,...]', 'limit results to the specified primary source(s)'],
 	['',  'inverse',                             '  or the inverse of those source(s); use with -i'],
 	['k', 'show-known',                          'show compatible known clues; -u <clue> required' ],
@@ -86,7 +87,8 @@ function main () {
     let showSourcesClueName = options['show-sources'];
     let altSourcesArg = options['alt-sources'];
     let allAltSourcesFlag = options['all-alt-sources'];
-    let allowDupeSrcFlag = options['allow-dupe-source'];
+    options.allow_dupe_source = options['allow-dupe-source'] ? true : false;
+    options.merge_style = Boolean(options['merge-style']);
     let showKnownArg = options['show-known'];
 
     if (!maxArg) {
@@ -116,7 +118,7 @@ function main () {
 
     Validator.setAllowDupeFlags({
 	allowDupeNameSrc: false,
-	allowDupeSrc:     (allowDupeSrcFlag ? true : false),
+	allowDupeSrc:     options.allow_dupe_source,
 	allowDupeName:    true
     });
 
@@ -195,7 +197,7 @@ function main () {
 	    require: options['require-counts'],
 	    sources,
 	    use:     useClueList
-	});
+	}, options);
     }
 }
 
@@ -221,7 +223,7 @@ function loadClues (clues, validateAllOnLoad, ignoreLoadErrors) {
 //  use:     useClueList
 //
 
-function doCombos(args) {
+function doCombos(args, options) {
     if (!_.isUndefined(args.sources)) {
 	args.sources = _.chain(args.sources).split(',').map(_.toNumber).value();
     }
@@ -251,7 +253,7 @@ function doCombos(args) {
 	args.sum = sum;
 	let max = args.max;
 	if (args.max > args.sum) args.max = args.sum;
-	const comboList = ComboMaker.makeCombos(args);
+	const comboList = ComboMaker.makeCombos(args, options);
 	args.max = max;
 	total += comboList.length;
 	const filterResult = ClueManager.filter(comboList, args.sum, comboMap);
