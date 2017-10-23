@@ -110,7 +110,7 @@ async function merge(note, listFromNote, listFromFilter, options) {
 	// remove clues from removedClueMap that are known (i.e. they weren't removed)
 	// why is this in Filter? not sure.
 	Filter.removeKnownClues(removedClueMap, options);
-	// remove clues from noteFromList that are in removedClueMap
+	// remove clues from listFromNote that are in removedClueMap
 	removedClueCount = Filter.removeRemovedClues(listFromNote, removedClueMap, options);
     }
     if (options.verbose) {

@@ -47,21 +47,23 @@ _note=$_ct.c2-$_cc.x2.$_name
 _filtered=$_note
 if [[ ! -z $_article ]]
 then
-    _filtered=$_filtered.$_article
+    _filtered=$_filtered.article
 fi
+_filtered=$_filtered.filtered
 
 echo "Grepping..."
 grep $_name tmp/$_base > tmp/$_note
 
 echo "Filtering..."
-node filter -$_ct tmp/$_note $_article > tmp/$_filtered.filtered 2>> $_out
+node filter -$_ct tmp/$_note $_article > tmp/$_filtered 2>> $_out
 if [ $? -ne 0 ]
 then
     echo "filter failed on $_note"
     exit -1
 fi
+
 echo "Merging..."
-node note-merge -$_ct tmp/$_filtered.filtered --note $_note --force-create $_production 2>> $_out
+node note-merge -$_ct tmp/$_filtered --note $_note --force-create $_production 2>> $_out
 if [ $? -ne 0 ]
 then
     echo "merge failed on $_note.filtered"
