@@ -13,7 +13,10 @@ module.exports = exports = new AltSources();
 const _                     = require('lodash');
 const ClueManager           = require('./clue-manager');
 const ComboSearch           = require('./combo-search');
+const Debug                 = require('debug')('alt-sources');
+const Duration              = require('duration');
 const NameCount             = require('./name-count');
+const PrettyMs              = require('pretty-ms');
 const Validator             = require('./validator');
 
 //
@@ -31,7 +34,7 @@ function AltSources() {
 //
 //
 
-AltSources.prototype.log = function(text) {
+AltSources.prototype.log = function (text) {
     if (this.logging) {
 	console.log(text);
     }
@@ -41,7 +44,7 @@ AltSources.prototype.log = function(text) {
 //
 //
 
-AltSources.prototype.show = function(args) {
+AltSources.prototype.show = function (args) {
     if (args.all) {
 	this.showAllAlternates({
 	    count: args.count,
@@ -60,7 +63,7 @@ AltSources.prototype.show = function(args) {
 //
 //
 
-AltSources.prototype.showAllAlternates = function(args) {
+AltSources.prototype.showAllAlternates = function (args) {
     if (args.output && !args.count) {
 	console.log('WARNING: output format ignored, no -c COUNT specified');
     }
@@ -69,13 +72,31 @@ AltSources.prototype.showAllAlternates = function(args) {
     }
     let anyAdded = false;
     let max = ClueManager.maxClues;
+    let startTime = new Date();
+    let options = { output: args.output };
+    let validateDurationMs = 0;
     do {
 	for (let index = 2; index <= max; ++index) {
 	    let map = ClueManager.knownClueMapArray[index];
 	    _.keys(map).forEach(name => {
-		anyAdded = this.showAllAlternatesForNc(
-		    NameCount.makeNew(name, index), args.count, args.output);
+		if (this.showAllAlternatesForNc(
+		    NameCount.makeNew(name, index), args.count, options)) {
+
+		    anyAdded = true;
+		}
+		validateDurationMs += options.validateDurationMs;
 	    });
+	    if (!args.output) {
+		let durationMs = new Duration(startTime, new Date()).milliseconds;
+		console.log(`iter ${index}, duration ${PrettyMs(durationMs)}` +
+			    `, validate ${PrettyMs(validateDurationMs)}`);
+	    }
+	}
+	// of course, args.output is the only way anyAdded gets to be true
+	if (anyAdded && !args.output) {
+	    console.log('//////////////////');
+	    console.log('//    loop      //');
+	    console.log('//////////////////');
 	}
     } while (anyAdded);
     if (args.output && args.count) {
@@ -86,29 +107,23 @@ AltSources.prototype.showAllAlternates = function(args) {
 //
 // 
 
-AltSources.prototype.showAllAlternatesForNc = function(nc, count, output) {
+AltSources.prototype.showAllAlternatesForNc = function (nc, count, options = {}) {
     let ncLstAryAry;
     let clue;
     let added = false;
 
-    if (this.logging) {
-	console.log(name + ':' + index);
-    }
-
-    ncLstAryAry = ComboSearch.findAlternateSourcesForName(_.toString(nc));
-    if (!ncLstAryAry.length) {
+    Debug(`${nc.name}:${nc.count}`);
+    ncLstAryAry = ComboSearch.findAlternateSourcesForNc(nc, options);
+    if (_.isEmpty(ncLstAryAry)) {
 	return;
     }
 
-    if (this.logging) {
-	this.log(nc.name + ' : ' + nc.count + ' : ' + output);
-    }
-
+    // TODO: can I make this parallel with map?
     ncLstAryAry.forEach((ncListArray, index) => {
 	if (ncListArray.length === 0) {
 	    return; // forEach.continue
 	}
-	if (output && count) {
+	if (options.output && count) {
 	    // TODO: comment why we're not checking if (count == index)
 	    //
 	    // display only specific index, in JSON. in this case we just
@@ -121,14 +136,12 @@ AltSources.prototype.showAllAlternatesForNc = function(nc, count, output) {
 	    }
 
 	    added = ClueManager.addClue(index, clue);
-	}
-	else if (count) {
-	    if ((count === index)) {
+	} else if (count) {
+	    if (count === index) {
 		// display only specific index
 		displayAlternate(nc.name, index, ncListArray);
 	    }
-	}
-	else {
+	} else {
 	    // display all
 	    displayAlternate(nc.name, index, ncListArray);
 	}
@@ -139,7 +152,7 @@ AltSources.prototype.showAllAlternatesForNc = function(nc, count, output) {
 //
 //
 
-AltSources.prototype.showAlternates = function(args) {
+AltSources.prototype.showAlternates = function (args) {
     let argList;
     let count;
     let name;
@@ -164,7 +177,8 @@ AltSources.prototype.showAlternates = function(args) {
     if (!args.output) {
 	console.log('showAlternates: ' + nc);
     }
-    ncLstAryAry = ComboSearch.findAlternateSourcesForName(name, count);
+    let options = { count };
+    ncLstAryAry = ComboSearch.findAlternateSourcesForNc(name, options);
     if (!ncLstAryAry.length) {
 	if (!args.output) {
 	    console.log('No alternates found.');
@@ -177,7 +191,7 @@ AltSources.prototype.showAlternates = function(args) {
     }
 
     if (args.output && count) {
-	displayModifiedClueList(count, getAlternateClue(name, ncLstAryAry[count]))
+	displayModifiedClueList(count, getAlternateClue(name, ncLstAryAry[count]));
     }
     else if (count) {
 	ncLstAry = ncLstAryAry[count];
@@ -192,7 +206,7 @@ AltSources.prototype.showAlternates = function(args) {
 
 //
 
-function displayAlternate(name, count, ncListArray) {
+function displayAlternate (name, count, ncListArray) {
     let s;
     let nameList;
     let found = false;
@@ -200,11 +214,8 @@ function displayAlternate(name, count, ncListArray) {
     s = name + '[' + count + '] ';
     s += format2(s, 20) + ' ';
     ncListArray.forEach((ncList, nclaIndex) => {
-	nameList = [];
-	ncList.forEach(nc => {
-	    nameList.push(nc.name);
-	});
-	nameList.sort();
+	nameList = ncList.map(nc => nc.name);
+	nameList.sort(); // really necessary?
 	if (ClueManager.knownSourceMapArray[count][nameList.toString()]) {
 	    //console.log('found: ' + nameList + ' in ' + count);
 	    return; // continue
@@ -228,7 +239,7 @@ function displayAlternate(name, count, ncListArray) {
 
 //
 
-function format2(text, span)
+function format2 (text, span)
 {
     let result = "";
     for (let len = text.toString().length; len < span; ++len) { result += " "; }
@@ -237,7 +248,7 @@ function format2(text, span)
 
 //
 
-function displayModifiedClueList(count, clue) {
+function displayModifiedClueList (count, clue) {
     let clueList = ClueManager.clueListArray[count];
     
     clueList.push(clue);
@@ -247,7 +258,7 @@ function displayModifiedClueList(count, clue) {
 
 //
 
-function getAlternateClue(name,  ncListArray) {
+function getAlternateClue (name,  ncListArray) {
     let srcList;
     srcList = [];
     // no loop here because entries will always have the

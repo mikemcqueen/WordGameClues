@@ -138,8 +138,8 @@ Validator.prototype.validateSources = function(args) {
 
 Validator.prototype.recursiveValidateSources = function(args) {
     if (xp) {
-	Expect(args.clueNameList).is.Array().not.empty;
-	Expect(args.clueCountList).is.Array().not.empty;
+	Expect(args.clueNameList).is.an.Array().and.not.empty();
+	Expect(args.clueCountList).is.an.Array().and.not.empty();
     }
 
     this.logLevel++;
@@ -216,12 +216,12 @@ Validator.prototype.rvsWorker = function(args) {
 	  `${this.indentNewline()}  ncList: ${args.ncList}` +
 	  `, nameList: ${args.nameList}`);
     if (xp) {
-	Expect(args.name).is.String().not.empty;
-	Expect(args.count).is.Number()
+	Expect(args.name).is.a.String().and.not.empty();
+	Expect(args.count).is.aNumber()
 	    .aboveOrEqual(1)
 	    .belowOrEqual(ClueManager.maxClues);
-	Expect(args.ncList).is.Array();
-	Expect(args.nameList).is.Array();
+	Expect(args.ncList).is.an.Array();
+	Expect(args.nameList).is.an.Array();
     }
 	
     let newNameCountList = this.copyAddNcList(args.ncList, args.name, args.count);
@@ -421,9 +421,9 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 	    return this.uniqueResult(anyFlag, resultList); // success , exit function
 	}
 	// sanity check
-	if (xp) Expect(buildResult, 'buildResult').exist;
+	if (xp) Expect(buildResult).is.ok();
 	if (!this.incrementIndexMap(buildResult.indexMap)) {
-	    Debug(`--checkUniqueSources, full validate, ${anyFlag}`);
+	    Debug(`--checkUniqueSources, full validate, success: ${anyFlag}`);
 	    return this.uniqueResult(anyFlag, resultList);
 	}
 	Debug(`++outer looping`);

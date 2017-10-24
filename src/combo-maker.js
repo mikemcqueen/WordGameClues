@@ -157,7 +157,7 @@ ComboMaker.prototype.makeCombos = function(args, options = {}) {
     }, this);
 
     Debug(`success: ${successDuration}ms` +
-	  `, fail: $(failDuration}ms` +
+	  `, fail: ${failDuration}ms` +
 	  `, next: ${nextDuration}ms`);
     Debug(`total(${totalCount})` +
 	  `, dupeClue(${this.nextDupeClue})` +

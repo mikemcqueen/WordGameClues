@@ -11,6 +11,8 @@ module.exports = exports = new ComboSearch();
 
 const _              = require('lodash');
 const ClueManager    = require('./clue-manager');
+const Debug          = require('debug')('combo-maker');
+const Duration       = require('duration');
 const Validator      = require('./validator');
 const ClueList       = require('./clue-list');
 const NameCount      = require('./name-count');
@@ -40,13 +42,13 @@ ComboSearch.prototype.log = function(text) {
 //
 //
 
-ComboSearch.prototype.findAlternateSourcesForName = function(name, count) {
-    let nc;
+ComboSearch.prototype.findAlternateSourcesForNc = function(nc, options = {}) {
     let srcNameListArray;
     let resultNcListArray = [];
     let peco;
 
-    nc = NameCount.makeNew(name);
+    options.validateDurationMs = 0;
+
     srcNameListArray = ClueManager.makeSrcNameListArray(nc);
     srcNameListArray.forEach(srcNameList => {
 	let curCount;
@@ -58,10 +60,7 @@ ComboSearch.prototype.findAlternateSourcesForName = function(name, count) {
 	    this.log('looking for source list ' + srcNameList);
 	}
 
-	countListArray = [];
-	srcNameList.forEach(name => {
-	    countListArray.push(ClueManager.getCountListForName(name));
-	});
+	countListArray = srcNameList.map(name => ClueManager.getCountListForName(name));
 	
 	if (this.logging) {
 	    this.log('count list:');
@@ -70,10 +69,9 @@ ComboSearch.prototype.findAlternateSourcesForName = function(name, count) {
 	    });
 	}
 	    
-	if (count) {
-	    curCount = maxCount = count;
-	}
-	else {
+	if (options.count) {
+	    curCount = maxCount = options.count;
+	} else {
 	    curCount = srcNameList.length;
 	    maxCount = ClueManager.maxClues;
 	}
@@ -97,8 +95,7 @@ ComboSearch.prototype.findAlternateSourcesForName = function(name, count) {
 		if (this.findCountListInCountListArray(countList, countListArray)) {
 		    if (!matchCountListArray[curCount]) {
 			matchCountListArray[curCount] = [ countList ];
-		    }
-		    else {
+		    } else {
 			matchCountListArray[curCount].push(countList);
 		    }
 		    if (this.logging) {
@@ -124,14 +121,16 @@ ComboSearch.prototype.findAlternateSourcesForName = function(name, count) {
 		    sum += count;
 		    ncList.push(NameCount.makeNew(srcNameList[clIndex], count));
 		});
-		if (sum != claaIndex ) {
+		if (sum !== claaIndex ) {
 		    throw new Error('something i dont understand here obviously');
 		}
+		let startTime = new Date();
 		result = Validator.validateSources({
 		    sum:      sum,
 		    nameList: srcNameList,
 		    count:    srcNameList.length
 		});
+		options.validateDurationMs += new Duration(startTime, new Date());
 		if (result.success) {
 		    ncListArray.push(ncList);
 		}
