@@ -59,16 +59,13 @@ ComboSearch.prototype.findAlternateSourcesForNc = function(nc, options = {}) {
 	if (this.logging) {
 	    this.log('looking for source list ' + srcNameList);
 	}
-
 	countListArray = srcNameList.map(name => ClueManager.getCountListForName(name));
-	
 	if (this.logging) {
 	    this.log('count list:');
 	    countListArray.forEach(countList => {
 		this.log(' ' + countList);
 	    });
 	}
-	    
 	if (options.count) {
 	    curCount = maxCount = options.count;
 	} else {
@@ -79,11 +76,9 @@ ComboSearch.prototype.findAlternateSourcesForNc = function(nc, options = {}) {
 	    if (curCount == nc.count) {
 		continue;
 	    }
-
 	    if (this.logging) {
 		this.log('  for count ' + curCount);
 	    }
-
 	    Peco.makeNew({
 		sum:   curCount,
 		count: srcNameList.length
@@ -91,7 +86,6 @@ ComboSearch.prototype.findAlternateSourcesForNc = function(nc, options = {}) {
 		if (this.logging) {
 		    this.log('   in ' + countList);
 		}
-
 		if (this.findCountListInCountListArray(countList, countListArray)) {
 		    if (!matchCountListArray[curCount]) {
 			matchCountListArray[curCount] = [ countList ];

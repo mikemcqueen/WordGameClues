@@ -21,9 +21,8 @@ const DEFAULT_DELAY_HIGH = 12;
 
 //
 
-const Opt          = require('node-getopt')
+const Opt = require('node-getopt')
       .create([
-/*	  ['d', 'dir=NAME',            'directory name'],*/
 	  ['',  'force',               'force search even if results file exists'],
 	  ['h', 'help',                'this screen' ]
       ])

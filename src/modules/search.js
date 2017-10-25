@@ -12,7 +12,11 @@ const Ms           = require('ms');
 const My           = require('./util');
 const Path         = require('path');
 const PrettyMs     = require('pretty-ms');
+const Promise      = require('bluebird');
 const SearchResult = require('./search-result');
+
+const FsOpen = Promise.promisify(Fs.open);
+const FsClose = Promise.promisify(Fs.close);
 
 // make a search term from a list of words and the supplied options
 //
@@ -50,29 +54,24 @@ function getOneResult (wordList, pages, options = {}) {
 
 function checkGetSaveResult(args, options) {
     let nextDelay = 0;
-
-    return My.checkIfFile(args.path)
-	.then(checkResult => {
-	    // skip this file if it already exists, unless force flag set
-	    if (checkResult.exists && !options.force) { 
-		args.count.skip += 1;
-		console.log(`Skip: file exists, ${args.path}`); 
-		return Promise.reject();
-	    }
-
+    let mode = options.force ? 'w' : 'wx';
+    return FsOpen(args.path, mode)
+	.then(fd => {
+	    Expect(fd).is.above(-1);
+	    return FsClose(fd);
+	}).then(_ => {
 	    // we are going to do a search; set delay for next search.
 	    // NOTE: need to set this here, rather than on successful
 	    // search, because we may get robot warning
 	    // TODO: add retry to getOneResult; check for robot result
-	    nextDelay = args.delay; // My.between(args.delay.low, args.delay.high);
-
+	    nextDelay = args.delay;
 	    let oneResultOptions = { reject: options.forceNextError };
 	    options.forceNextError = false;
-	    // file does not already exist; do the search
+	    // file did not exist prior to creation; do the search
 	    return getOneResult(args.wordList, args.pages, oneResultOptions);
 	}).then(oneResult => {
 	    if (_.isEmpty(oneResult)) {
-		// empty search result. lower delay for next search, and
+		// empty search result. 
 		// save an empty result so we don't do this search again
 		args.count.empty += 1;
 		oneResult = [];
@@ -85,10 +84,14 @@ function checkGetSaveResult(args, options) {
 		    return [oneResult, nextDelay];
 		});
 	}).catch(err => {
-	    // log & eat all errors (err might be undefined from Promise.reject())
 	    if (err) {
-		console.log(`checkGetSaveResult error, ${err}`);
-		args.count.error += 1;
+		if (err.code === 'EEXIST') {
+		    args.count.skip += 1;
+		    console.log(`Skip: file exists, ${args.path}`);
+		} else {
+		    console.log(`checkGetSaveResult error, ${err}`);
+		    args.count.error += 1;
+		}
 	    }
 	    return [null, nextDelay];
 	});

@@ -84,7 +84,7 @@ function makeResultDir (args, options) {
 //
 
 function pathFormat (args, options = {}) {
-    Expect(args).is.an.Object()
+    Expect(args).is.an.Object();
     Expect(args.dir).is.a.String();
     let formatArgs = _.clone(args);
     formatArgs.dir = makeResultDir(args, options);
