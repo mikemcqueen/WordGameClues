@@ -9,6 +9,7 @@
 //
 
 const _           = require('lodash');
+const Debug       = require('debug')('peco');
 
 //
 
@@ -27,6 +28,7 @@ function makeNew(args) {
 //
 //  sum       
 //  count     create lists of this length
+//    -or-
 //  max       create lists of max length
 //
 //
@@ -133,22 +135,19 @@ Peco.prototype.getAllAddends = function(combFlag) {
 //
 
 Peco.prototype.getAddendsForCount = function(count, combFlag, pecoList, quiet) {
-    let last = this.sum - (count - 1);
-    
     if (count > this.sum) {
 	throw new Error(`Peco: count(${count}) > sum(${this.sum})`);
     }
-
     if (LOGGING) {
+	const last = this.sum - (count - 1);
 	this.log('Peco: for ' + count + ', last=' + last + 
 		 ', combFlag: ' + combFlag);
     }
-
     return this.buildResult({
-	count:    count,
-	combFlag: combFlag,
-	pecoList: pecoList,
-	quiet:    quiet
+	count,
+	combFlag,
+	pecoList,
+	quiet
     });
 }
 
@@ -207,7 +206,7 @@ Peco.prototype.buildResult = function(args) {
 
 //
 
-Peco.prototype.listFirst = function(listArray, combFlag) {
+Peco.prototype.listFirst = function (listArray, combFlag) {
     let last;
     let start;
     let srcCount;
@@ -249,8 +248,7 @@ Peco.prototype.listFirst = function(listArray, combFlag) {
 //
 //
 
-Peco.prototype.listNext = function(combFlag)
-{
+Peco.prototype.listNext = function (combFlag) {
     let lastIndex = this.indexList.length - 1;
     let index;
     let start;
@@ -293,22 +291,17 @@ Peco.prototype.listNext = function(combFlag)
 }
 
 //
-//
 
-Peco.prototype.first = function(srcCount, combFlag) {
-    let start;
-    let last;
-    let list;
-    let index;
-
+Peco.prototype.first = function (srcCount, combFlag) {
     if ((srcCount < 1) || (srcCount > this.sum)) {
 	throw new Error('invalid srcCount, ' + srcCount);
     }
 
-    last = this.sum - (srcCount - 1);
-    start = 1;
+    // initIndexList;
+    let last = this.sum - (srcCount - 1);
+    let start = 1;
     this.indexList = [];
-    for (index = 1; index <= srcCount; ++index) {
+    for (let index = 1; index <= srcCount; index += 1) {
 	this.indexList.push({
 	    first:  start, 
 	    index:  start,
@@ -323,33 +316,25 @@ Peco.prototype.first = function(srcCount, combFlag) {
 		  ', this.getIndexSum(): ' + this.getIndexSum() +
 		  ', this.sum: ' + this.sum);
     }
-
-    if (this.isValidIndex()) {
-	list = this.getPecoList();
-    } else {
-	list = this.next(combFlag);
+    if (!this.isValidIndex()) {
+	return this.next(combFlag);	
     }
-    return list;
+    return this.getPecoList();
 }
     
 //
-//
 
-Peco.prototype.next = function(combFlag)
-{
+Peco.prototype.next = function (combFlag) {
     let lastIndex = this.indexList.length - 1;
     let index;
-    let start;
-    let sum;
-    let inner;
 
     // if last index is maxed reset to zero, increment next-to-last index, etc.
     do {
 	index = lastIndex;
 	while (++this.indexList[index].index > this.indexList[index].last) {
 	    if (combFlag) { // combinations
-		start = ++this.indexList[index].first;
-		for (inner = index + 1; inner < this.indexList.length; ++inner) {
+		let start = ++this.indexList[index].first;
+		for (let inner = index + 1; inner < this.indexList.length; inner += 1) {
 		    this.indexList[inner].index = this.indexList[inner].first = start;
 		}
 	    }
@@ -359,14 +344,10 @@ Peco.prototype.next = function(combFlag)
 		return null;
 	    }
 	}
-
-	if (LOGGING) {
-	    this.log('-----\nnext: ' + this.indexListToJSON());
-	    this.log (//'srcCount: ' + srcCount + 
-		      'indexList.length: ' + this.indexList.length +
-		      ', this.getIndexSum(): ' + this.getIndexSum() +
-		      ', this.sum: ' + this.sum);
-	}
+	Debug('-----\nnext: ' + this.indexListToJSON());
+	Debug('indexList.length: ' + this.indexList.length +
+	      ', this.getIndexSum(): ' + this.getIndexSum() +
+	      ', this.sum: ' + this.sum);
     } while (!this.isValidIndex());
 
     return this.getPecoList();
@@ -374,7 +355,7 @@ Peco.prototype.next = function(combFlag)
 
 //
 
-Peco.prototype.isValidIndex = function() {
+Peco.prototype.isValidIndex = function () {
     if (this.getIndexSum() != this.sum) {
 	if (LOGGING) {
 	    this.log('Mismatch sums, ' + this.getIndexSum() +

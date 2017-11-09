@@ -363,7 +363,7 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
 		    break; // fail, try other combos
 		}
 		// sanity check
-		if (xp) Expect(vsResult.list).is.not.empty;
+		if (xp) Expect(vsResult.list).is.not.empty();
 		Debug(`from validateSources(${buildResult.count$})`);
 		Debug(`  compoundSrcNameList: ${buildResult.compoundSrcNameList}`);
 		Debug(`  list.size: ${_.size(vsResult.list)}`);
@@ -456,9 +456,9 @@ Validator.prototype.getCompatibleResults = function(args) {
 	  `${this.indentNewline()}  ncList:      ${args.ncList}` +
 	  `${this.indentNewline()}  nameSrcList: ${args.nameSrcList}`);
     if (xp) {
-	Expect(args.origNcList).is.Array().not.empty;
-	Expect(args.ncList).is.Array().not.empty;
-	Expect(args.nameSrcList).is.Array().not.empty;
+	Expect(args.origNcList).is.an.Array().and.not.empty();
+	Expect(args.ncList).is.an.Array().and.not.empty();
+	Expect(args.nameSrcList).is.an.Array().and.not.empty();
     }
 
     let logit = false;
@@ -524,7 +524,7 @@ Validator.prototype.addCompatibleResult = function(resultList, nameSrcList, args
 //  exclueSrcList:
 //
 Validator.prototype.cyclePrimaryClueSources = function(args) {
-    if (xp) Expect(args.ncList).is.Array().not.empty;
+    if (xp) Expect(args.ncList).is.an.Array().and.not.empty();
 
     Debug(`++cyclePrimaryClueSources`);
 
@@ -772,7 +772,7 @@ Validator.prototype.resolvePrimarySourceConflicts = function(args) {
 //  nameMap:
 //
 Validator.prototype.findDuplicatePrimarySource = function(args) {
-    if (xp) Expect(args.ncList).is.Array();
+    if (xp) Expect(args.ncList).is.an.Array();
 
     let duplicateSrcName;
     let duplicateSrc;
@@ -1000,7 +1000,7 @@ Validator.prototype.getSrcListIndex = function(indexMap, nc, srcList) {
 //
 
 Validator.prototype.incrementIndexMap = function(indexMap) {
-    if (xp) Expect(indexMap, 'bad indexMap').is.Object().not.empty;
+    if (xp) Expect(indexMap).is.an.Object().and.not.empty();
     Debug(`++indexMap: ${this.indexMapToJSON(indexMap)}`);
 
     // TODO: this is a bit flaky. assumes the order of keys isn't changing.

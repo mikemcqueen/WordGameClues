@@ -55,7 +55,7 @@ ComboMaker.prototype.makeCombos = function(args, options = {}) {
 
     // TODO USE "validateArgs" 
 
-    let require = _.isUndefined(args.require) ? [] : _.clone(args.require);
+    let require = args.require ? _.clone(args.require) : [];
     let useNcList;
     if (!_.isUndefined(args.use)) {
 	let buildResult = this.buildUseNcList(args.use);
