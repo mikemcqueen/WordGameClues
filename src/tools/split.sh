@@ -8,6 +8,7 @@ fi
 
 _filename=$1  #filename
 shift
+echo "filename: $_filename"
 
 _chunks=3
 if [[ $# -gt 0 ]]
@@ -23,4 +24,4 @@ _lpc=$(($_lines / $_chunks)) # lines per chunk
 
 echo "lines: $_lines, chunks: $_chunks, lpc: $_lpc"
 
-split $filename tmp/$filename.
+split -l $_lpc $_filename $_filename.
