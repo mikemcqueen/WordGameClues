@@ -9,7 +9,6 @@
 const _              = require('lodash');
 const ClueManager    = require('../clue-manager');
 const Clues          = require('../clue-types');
-const Debug          = require('debug')('note');
 const Evernote       = require('evernote');
 const EvernoteConfig = require('../../data/evernote-config.json');
 const Expect         = require('should/as-function');
@@ -17,10 +16,12 @@ const Filter         = require('../modules/filter');
 const Fs             = require('fs-extra');
 const Getopt         = require('node-getopt');
 const Markdown       = require('../modules/markdown');
+const Log            = require('../modules/log')('note');
 const My             = require('../modules/util');
 const Note           = require('../modules/note');
 const NoteMaker      = require('../modules/note-make');
 const NoteParser     = require('../modules/note-parse');
+let   Options        = require('../modules/options');
 const Path           = require('path');
 const Promise        = require('bluebird');
 const Stringify      = require('stringify-object');
@@ -29,7 +30,7 @@ const Update         = require('../modules/update');
 //
 
 const Commands = { create, get, parse, update, count };
-const Options = Getopt.create(_.concat(Clues.Options, [
+const CmdLineOptions = Getopt.create(_.concat(Clues.Options, [
     ['', 'count=NAME',    'count sources/clues/urls in a note'],
     ['', 'create=FILE',   'create note from filter result file'],
     ['', 'get=TITLE',     'get (display) a note'],
@@ -46,6 +47,7 @@ const Options = Getopt.create(_.concat(Clues.Options, [
     ['', 'match=PREFIX',  '  update notes matching title PREFIX (used with --update)'],
     ['', 'force-update',  '  update single note with removed clue (used with --update)'],
     ['', 'save',          '  save cluelist files (used with --update)'],
+    ['', 'dry-run',       '  show what would change without making any changes (used with --update)'],
     ['v','verbose',       'more noise'],
     ['h','help', '']
 ])).bindHelp(
@@ -60,7 +62,7 @@ const DATA_DIR =  Path.normalize(`${Path.dirname(module.filename)}/../../data/`)
 
 function usage (msg) {
     console.log(msg + '\n');
-    Options.showHelp();
+    CmdLineOptions.showHelp();
     process.exit(-1);
 }
 
@@ -82,7 +84,7 @@ function old_create (options) {
     
     return NoteMaker.makeFromFilterFile(options.create, { outerDiv: true })
 	.then(body => {
-	    Debug(`body: ${body}`);
+	    Log.debug(`body: ${body}`);
 	    Note.create(title, body, options);
 	}).then(note => {
 	    if (!options.quiet) {
@@ -109,8 +111,19 @@ async function create (options) {
 
 //
 
+function optLog (options, message) {
+    Expect(options).is.an.Object();
+    if (options.verbose) {
+	console.log(message);
+    } else {
+ 	Log.debug(message);
+    }
+}
+
+//
+
 async function getAndParse (noteName, options) {
-    Debug(`getAndParse ${noteName}`);
+    optLog(options, `getAndParse ${noteName}`);
     options.urls = true;
     options.clues = true;
     options.content = true;
@@ -218,7 +231,9 @@ function updateOneClue (noteName, options) {
     return getAndParse(noteName, options)
 	.then(result => {
 	    const removedClueMap = Filter.getRemovedClues(result.filterList);
-	    if (!_.isEmpty(removedClueMap)) {
+	    if (_.isEmpty(removedClueMap)) {
+		optLog(options, `no removed clues`);
+	    } else {
 		if (!options.force_update) {
 		    for (const key of removedClueMap.keys()) {
 			console.log(`removed clue: ${key} -> ${Array.from(removedClueMap.get(key).values())}`);
@@ -235,30 +250,39 @@ function updateOneClue (noteName, options) {
 
 async function getSomeAndParse (options, filterFunc) {
     Expect(filterFunc).is.a.Function();
-    Debug(`getSomeAndParse`);
+    Log.debug(`getSomeAndParse`);
     options.urls = true;
     options.clues = true;
     options.content = true;
-    return Note.getSome(options, filterFunc)
-	.then(noteList => {
-	    if (_.isEmpty(noteList)) throw new Error('no notes found');
-	    Debug(`found ${noteList.length} notes`);
-	    // map list of notes to list of { note, filterList }
-	    // use _ prefix because filterFunc may likely have conflicting 'note' param
-	    return noteList.map(note => {
-		return {
-		    note,
-		    filterList: Filter.parseLines(NoteParser.parseDom(note.content, options), options)
-		};
-	    });
-	});
+    // NOTE: the problem with this approach is that we load all notes
+    // first, then if one note then craps on parsing, we just wasted
+    // all of that download time/bandwidth. should download & process
+    // each note independently (in parallel?)
+    const result = [];
+    return Note.getSomeMetadata(options, filterFunc)
+	.then(metadataList => {
+	    if (_.isEmpty(metadataList)) throw new Error('no notes found');
+	    Log.info(`found ${metadataList.length} notes`);
+	    return metadataList;
+	}).each(metadata => {
+	    Log.info(`meta note: ${metadata.title}`);
+	    options.guid = metadata.guid;
+	    return Note.get(null, options)
+		.then(note => {
+		    Log.info(`parsing note ${note.title}`);
+		    result.push({
+			note,
+			filterList: Filter.parseLines(NoteParser.parseDom(note.content, options), options)
+		    });
+		});
+	}).then(_ => result);
 }
 
 // to, from: are Map() type. must be the builtin class type, not generic objects
 
 function addRemovedClues (to, from) {
     for (let source of from.keys()) {
-	Debug(`${source} has ${_.size(from.get(source))} removed clue(s)`);
+	Log.debug(`${source} has ${_.size(from.get(source))} removed clue(s)`);
 	if (!to.has(source)) {
 	    to.set(source, from.get(source));
 	} else {
@@ -274,11 +298,11 @@ function addRemovedClues (to, from) {
 function getAllRemovedClues (resultList) {
     let allRemovedClues = new Map();
     for (let result of resultList) {
-	console.log(`note: ${result.note.title}`);
+	Log.info(`removing clues in note: ${result.note.title}`);
 	const removedClues = Filter.getRemovedClues(result.filterList);
 	if (!_.isEmpty(removedClues)) {
 	    addRemovedClues(allRemovedClues, removedClues);
-	    Debug(`found ${_.size(removedClues)} source(s) with removed clues` +
+	    Log.debug(`found ${_.size(removedClues)} source(s) with removed clues` +
 		  `, total unique: ${_.size(allRemovedClues)}`);
 	}
     }
@@ -288,7 +312,7 @@ function getAllRemovedClues (resultList) {
 //
 
 function removeAllClues (removedClues, options = {}) {
-    Debug('removeAllClues');
+    Log.debug('removeAllClues');
     let total = 0;
     for (let source of removedClues.keys()) {
 	let nameCsv = Markdown.hasSourcePrefix(source)
@@ -296,7 +320,7 @@ function removeAllClues (removedClues, options = {}) {
 	const nameList = nameCsv.split(',').sort();
 	const result = ClueManager.getCountListArrays(nameCsv, { remove: true });
 	if (!result) {
-	    Debug(`no matches for source: ${source}`);
+	    Log.debug(`no matches for source: ${source}`);
 	    continue;
 	}
 	// for each clue word in set
@@ -304,12 +328,12 @@ function removeAllClues (removedClues, options = {}) {
 	    let removed = ClueManager.addRemoveOrReject(
 		{ remove: clue }, nameList, result.addRemoveSet, options);
 	    if (removed > 0) {
-		Debug(`removed ${removed} instance(s) of ${source} -> ${clue}`);
+		Log.debug(`removed ${removed} instance(s) of ${source} -> ${clue}`);
 	    }
 	    total += removed;
 	}
     }
-    Debug(`total removed: ${total}`);
+    Log.debug(`total removed: ${total}`);
     return total;
 }
 
@@ -327,7 +351,7 @@ async function saveAddCommitAll (resultList, options) {
 
 async function updateAllClues (options) {
     const prefix = options.match || Clues.getShorthand(Clues.getByOptions(options));
-    Debug(`prefix: ${prefix}`);
+    Log.debug(`prefix: ${prefix}`);
     const bignoteSuffix = '.article';
     return getSomeAndParse(options, note => {
 	return _.startsWith(note.title, prefix) && !_.endsWith(note.title, bignoteSuffix);
@@ -348,14 +372,14 @@ async function update (options) {
     // but i could support multiple: just call updateOneClue in a for() loop
     // but not exactly that simple due to removed clues
     if (_.isArray(options.update)) usage('multiple --updates not yet supported');
-    Debug(`update, ${options.update}`);
+    Log.info(`update, ${options.update || 'all'}`);
     // TODO: what if noteobok is undefined
     return Note.getNotebook(options.notebook, options)
 	.then(nb => {
 	    if (!nb && !options.default) {
 		throw new Error(`notebook not found, ${options.notebook}`);
 	    }
-	    console.log(`notebook: ${nb.title}, guid: ${nb.guid}`);
+	    Log.info(`notebook, title: ${nb.title}, guid: ${nb.guid}`);
 	    options.notebookGuid = nb.guid;
 
 	    ClueManager.loadAllClues({ clues: Clues.getByOptions(options) });
@@ -372,38 +396,55 @@ async function update (options) {
 //
 
 async function count (options) {
-    Debug('count');
-    // options.notebook = options.notebook || Note.getWorksheetName(Clues.getByOptions(options));
+    Log.info('count');
     return getAndParse(options.count, options)
 	.then(result => {
 	    const count = Filter.count(result.filterList);
-	    console.log(`sources: ${count.sources}, urls: ${count.urls}, clues: ${count.clues}`);
+	    Log(`sources: ${count.sources}, urls: ${count.urls}, clues: ${count.clues}`);
 	});
 }
 
 //
 
 async function main () {
-    const opt = Options.parseSystem();
-    const options = opt.options;
+    const opt = CmdLineOptions.parseSystem();
+    const options = opt.options; // = Options.set(opt.options);
+
     if (opt.argv.length > 0) {
 	usage(`invalid non-option parameter(s) supplied, ${opt.argv}`);
     }
-    if (options['force-update']) options.force_update = true;
+    if (options.quiet && options.verbose) {
+	usage('--quiet and --verbose cannot both be specified');
+    }
 
+    if (options['force-update']) options.force_update = true;
+    if (options['dry-run']) {
+	options.dry_run = true;
+	if (!options.quiet) {
+	    options.verbose = true;
+	}
+    }
     options.notebook = options.notebook || Note.getWorksheetName(Clues.getByOptions(options));
 
     let cmd;
     for (const key of _.keys(Commands)) {
 	if (_.has(options, key)) {
 	    cmd = key;
-	    Debug(`command: ${key}`);
+	    Log.debug(`command: ${key}`);
 	    break;
-	} else Debug(`not: ${key}`);
+	} else {
+	    Log.debug(`not: ${key}`);
+	}
     }
     if (!cmd) usage(`missing command`);
     if (cmd == 'get') options.quiet = true;
-    if (options.production && (!options.quiet || options.verbose)) console.log('---PRODUCTION--');
+
+    Options = Options.set(options);
+
+    if (options.production) Log('---PRODUCTION---');
+    if (options.dry_run) Log('---DRY_RUN---');
+    if (options.verbose) Log('---VERBOSE---');
+    
     return Commands[cmd](options);
 }
 

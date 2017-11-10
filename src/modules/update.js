@@ -10,11 +10,11 @@
 const _            = require('lodash');
 const ClueManager  = require('../clue-manager');
 const Clues        = require('../clue-types');
-const Debug        = require('debug')('update');
 const Dir          = require('node-dir');
 const Expect       = require('should/as-function');
 const Filter       = require('./filter');
 const Fs           = require('fs-extra');
+const Log          = require('./log')('update');
 const Markdown     = require('./markdown');
 const My           = require('./util');
 const Path         = require('path');
@@ -70,7 +70,7 @@ function processSrc (rawLine, args, options) {
     Expect(args.dir).is.a.String();
 
     const [reject, line] = Markdown.hasSuffix(rawLine, Markdown.Suffix.reject);
-    Debug(`src: ${line}`);
+    Log.debug(`src: ${line}`);
     let nameList = line.split(',');
     Expect(nameList.length).is.above(1); // at.least(2)
     if (reject) {
@@ -105,7 +105,7 @@ function processSrc (rawLine, args, options) {
     let filteredUrls;
     if (!_.isUndefined(content)) {
 	filteredUrls = JSON.parse(content);
-	Debug(`loaded: ${path}`);
+	Log.debug(`loaded: ${path}`);
 	// maybe were added later, some files don't have it
 	if (!filteredUrls.maybeUrls) filteredUrls.maybeUrls = [];
     }
@@ -187,12 +187,12 @@ function processClue (line, args, options) {
     // we're about to update known clues. double-sanity check.
     Expect(ClueManager.isRejectSource(args.nameList)).is.false();
     let countList = ClueManager.getCountList(args.nameList);
-    Debug(`countList: ${_.isEmpty(countList) ? "empty" : countList}`) ;
+    Log.debug(`countList: ${_.isEmpty(countList) ? "empty" : countList}`) ;
     countList = addClues(countList, name, args.nameList.toString());
     if (!_.isEmpty(countList)) {
 	args.count.knownClues += 1;
 	countList.forEach(count => args.count.knownCountSet.add(count));
-	Debug(`added clue, ${name} : ${args.nameList} - ${note} : [${countList}]`);
+	Log.info(`added clue, ${name} : ${args.nameList} - ${note} : [${countList}]`);
     }
     args.flags.clue = true;
     return args;
@@ -210,7 +210,7 @@ function processMaybe (line, args, options) {
     if (ClueManager.addMaybe(name, args.nameList, note)) {
 	args.count.maybeClues += 1;
 	args.count.maybeCountSet.add(args.nameList.length);
-	Debug(`added maybe clue, ${name} : ${args.nameList} - ${note}`);
+	Log.info(`added maybe clue, ${name} : ${args.nameList} - ${note}`);
     }
     args.flags.maybe = true;
     return args;
@@ -248,7 +248,7 @@ function updateFilteredUrls (args) {
     if (args.flags.clue) {
 	// we added a clue. add url to knownUrls if not already
 	if (addUrl(args.filteredUrls.knownUrls, args.url)) {
-	    Debug(`added clue url, ${args.url}`);
+	    Log.debug(`added clue url, ${args.url}`);
 	    args.count.knownUrls += 1;
 	    args.filteredUrls.anyChange = true;
 	}
@@ -257,14 +257,14 @@ function updateFilteredUrls (args) {
     if (args.flags.maybe) {
 	// we added a maybe clue. add url to maybeUrls if not already
 	if (addUrl(args.filteredUrls.maybeUrls, args.url)) {
-	    Debug(`added maybe url, ${args.url}`);
+	    Log.debug(`added maybe url, ${args.url}`);
 	    args.count.maybeUrls += 1;
 	    args.filteredUrls.anyChange = true;
 	}
     }
     if (args.flags.reject) {
 	if (addUrl(args.filteredUrls.rejectUrls, args.url)) {
-	    Debug(`added reject url, ${args.url}`);
+	    Log.debug(`added reject url, ${args.url}`);
 	    args.count.rejectUrls += 1;
 	    args.filteredUrls.anyChange = true;
 	}
@@ -292,7 +292,7 @@ function preProcess (state, args, options) {
     case Src:
     case Url:
     case Done:
-	if (options.production) {
+	if (options.production && !options.dry_run) {
 	    writeFilteredUrls(updateFilteredUrls(args));
 	}
 	break;
@@ -324,20 +324,17 @@ function preProcess (state, args, options) {
 //
 
 function skipState (state, result, options) {
-    let skip = _.isUndefined(result.nextState) ? false : result.nextState !== state;
-    if (skip && options.verbose) {
-	console.log(`skipping line: ${state.toString()}`);
-    }
-    return skip;
+    return result.nextState ? result.nextState !== state : false;
 }
 
 //
 
 async function updateFromFile(filename, options) {
     Expect(filename).is.a.String();
+    Log.info(`file: ${Path.basename(filename)}`);
 
     if (!ClueManager.loaded) {
-	Debug('updateFromFile: calling ClueManager.loadAllClues()');
+	Log.debug('updateFromFile: calling ClueManager.loadAllClues()');
 	ClueManager.loadAllClues({ clues: Clues.getByOptions(options) });
     }
 
@@ -357,10 +354,10 @@ async function updateFromFile(filename, options) {
     };
     // TODO: result.requiredNextState = Src
 
-    let readLines = new Readlines(filename);
     let state = Start;
     let lineNumber = 0;
     let inputLine;
+    let readLines = new Readlines(filename);
     while ((inputLine = readLines.next()) !== false) {
 	lineNumber += 1;
 	inputLine = inputLine.toString().trim();
@@ -371,7 +368,11 @@ async function updateFromFile(filename, options) {
 			    ` to ${nextState.toString()}, line ${inputLine}`);
 	}
 	state = nextState;
-	if (skipState(state, result, options)) continue;
+	if (skipState(state, result, options)) {
+	    Log.info(`skipping line: ${state.toString()}, ${line}`);
+	    continue;
+	}
+
 	result.dir = dir;
 	const args = preProcess(state, result, options);
 	// TODO: try/catch block
@@ -380,31 +381,50 @@ async function updateFromFile(filename, options) {
     // hacky !? yes
     result.dir = dir;
     preProcess(Done, result, options);
-    if (options.save) {
-	if (!options.production && !options.force) {
+
+    // NOTE: it seems like we could aggregate these known/maybe/reject countlists
+    // and do a single save at the end of the loop
+    if (options.save || options.verbose) {
+	if (options.save && !options.production && !options.force) {
 	    throw new Error('--save only allowed with --production (or --force)');
 	}
+	let totalClueCount = 0;
 	if (result.count.knownClues > 0) {
+	    totalClueCount += result.count.knownClues;
 	    // save clues
 	    let countList = Array.from(result.count.knownCountSet);
 	    Expect(countList).is.not.empty();
-	    Debug(`knownList: ${countList}`);
-	    ClueManager.saveClues(countList);
+	    // TODO: My.optlog(options, msg...)
+	    // some way to teak util.Debug()('name') to current module's debug instance name?
+	    // can i say My=require('util')(Debug) or (MODULE_NAME)
+	    Log.info(`knownList: ${countList}`);
+	    if (options.save) {
+		ClueManager.saveClues(countList);
+	    }
 	}
 	if (result.count.maybeClues > 0) {
+	    totalClueCount += result.count.maybeClues;
 	    // save maybes
 	    let countList = Array.from(result.count.maybeCountSet);
 	    Expect(countList).is.not.empty();
-	    Debug(`maybeList: ${countList}`);
-	    ClueManager.saveMaybes(countList);
+	    Log.info(`maybeList: ${countList}`);
+	    if (options.save) {
+		ClueManager.saveMaybes(countList);
+	    }
 	}	    
 	if (result.count.rejectClues > 0) {
+	    totalClueCount += result.count.rejectClues;
 	    // save rejects
 	    let countList = Array.from(result.count.rejectCountSet);
 	    Expect(countList).is.not.empty();
-	    Debug(`rejectList: ${countList}`);
-	    ClueManager.saveRejects(countList);
+	    Log.info(`rejectList: ${countList}`);
+	    if (options.save) {
+		ClueManager.saveRejects(countList);
+	    }
 	}	    
+	if (!totalClueCount) {
+	    Log.info(`no new known clues, maybes, or rejects`);
+	}
     }
     return result;
 }
@@ -413,13 +433,10 @@ async function updateFromFile(filename, options) {
 
 async function updateFromPathList(pathList, options) {
     Expect(pathList).is.an.Array();
-    // NOTE: updateFromPathList should do something with options.save, don't pass it to
-    // updateFromFile, just call save at the end.
-    // return countLists from updateFromFile. oh wait i do that already...~
+//    if (options.dry_run) return;
     for (let path of pathList) {
-	updateFromFile(path, options);
+	const result = updateFromFile(path, options);
     }
-    // 
 }
 
 //

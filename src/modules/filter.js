@@ -24,6 +24,17 @@ const KNOWN_CLUES_URL  = 'https://known.clues';
 
 //
 
+function optLog (options, message) {
+    Expect(options).is.an.Object();
+    if (options.verbose) {
+	console.log(message);
+    } else {
+ 	Debug(message);
+    }
+}
+
+//
+
 function isUrl (line) {
     return _.startsWith(line, URL_PREFIX);
 }
@@ -294,6 +305,7 @@ function save (filterList, path) {
 
 async function saveAddCommit (noteName, filterList, options) {
     const path = `${Clues.getDirectory(Clues.getByOptions(options))}/updates/${noteName}`;
+    if (options.dry_run) return path;
     Debug(`saving ${noteName} to: ${path}`);
     return save(filterList, path)
 	.then(_ => {

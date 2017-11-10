@@ -58,7 +58,7 @@ function processText (node, div, queue) {
 		div.linkSuffix = true;
 	    }
 	}
-    } catch(e) {
+    } catch(err) {
 	console.log(`text: ${text}`);
 	console.log(`node: ${Stringify(div)}`);
 	let prev = queue.pop();

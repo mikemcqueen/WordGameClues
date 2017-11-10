@@ -44,6 +44,7 @@ async function loadNoteFilterLists(filename, noteName, options) {
     Debug(`++loadNoteFilterLists()`);
     return Promise.join(
 	// TODO: Note.getOrCreate(
+	// TODO: get rid of this. if no note, don't create. wait until Note.append.
 	getOrCreate(noteName, options),
 	Filter.parseFile(filename),
 	(note, listFromFile) => {
@@ -138,6 +139,7 @@ async function merge(note, listFromNote, listFromFilter, options) {
     if (options.verbose) {
 	console.log(`diffBody:\n${diffBody}`);
     }
+    // TODO: options.force_create could be used here.
     Debug(`appending new results to note`);
     return Note.append(note, diffBody, options);
 }

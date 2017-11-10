@@ -8,11 +8,11 @@
 
 const _                = require('lodash');
 const Clues            = require('../clue-types');
-const Debug            = require('debug')('note');
 const Evernote         = require('evernote');
 const EvernoteConfig   = require('../../data/evernote-config.json');
 const Expect           = require('should/as-function');
 const Fs               = require('fs-extra');
+const Log              = require('./log')('note');
 const Path             = require('path');
 const Promise          = require('bluebird');
 const Stringify        = require('stringify-object');
@@ -47,7 +47,7 @@ async function getNotebook (name, options = {}) {
     return noteStore.listNotebooks()
 	.then(nbList => {
 	    for(const nb of nbList) {
-		Debug(`notebook: ${nb.name}`);
+		Log.debug(`notebook: ${nb.name}`);
 		let match = false;
 		if (options.relaxed) {
 		    match = _.includes(nb.name, name);
@@ -55,11 +55,11 @@ async function getNotebook (name, options = {}) {
 		    match = (nb.name === name);
 		}
 		if (match ) {
-		    Debug(`match`);
+		    Log.debug(`match`);
 		    return nb;
 		}
 	    }
-	    Debug(`notebook not found, ${name}`);
+	    Log.debug(`notebook not found, ${name}`);
 	    return undefined;
 	});
 }
@@ -81,7 +81,7 @@ function getWorksheetName (noteNameOrClueType) {
     let count = 2;
     if (noteName.charAt(2) === 's') count += 1;
     const wsName = `Worksheets.${noteName.slice(0, count)}`;
-    Debug(`worksheet name: ${wsName}`);
+    Log.debug(`worksheet name: ${wsName}`);
     return wsName;
 }
 
@@ -97,7 +97,7 @@ async function getNotebookByGuid (guid, options = {}) {
 async function getNotebookByOptions (options) {
     if (options.notebookGuid) return getNotebookByGuid(options.notebookGuid, options);
     if (!options.notebook) {
-	Debug(`NO NOTEBOOK - THROW?`);
+	Log.debug(`NO NOTEBOOK - THROW?`);
 	return undefined;
     }
     return getNotebook(options.notebook, options)
@@ -133,24 +133,27 @@ async function get (title, options = {}) {
     const noteSpec = { includeContent: true };
     const noteStore = getNotestore(options.production);
     if (options.guid) {
+	Log.info(`Note.get: ${options.guid}`);
 	return noteStore.getNoteWithResultSpec(options.guid, noteSpec)
 	    .then(note => {
-		if (!note && !options.nothrow) throw new Error(`note not found, ${options.guid}`);
+		if (!note && !options.nothrow) {
+		    throw new Error(`note not found, ${options.guid}`);
+		}
 		return note;
 	    });
     }
     return getNotebookByOptions(options)
 	.then(notebook => {
-	    Debug(`get from notebook: ${notebook.title}, ${notebook.guid}`);
+	    Log.debug(`get from notebook: ${notebook.title}, ${notebook.guid}`);
 	    const filter = { notebookGuid: notebook.guid };
 	    const metaSpec = { includeTitle: true };
 	    return noteStore.findNotesMetadata(filter, 0, 250, metaSpec);
 	}).then(findResult => {
 	    for (const metaNote of findResult.notes) {
-		Debug(`note: ${metaNote.title}`);
+		Log.debug(`note: ${metaNote.title}`);
 		// TODO: check for duplicate named notes (option)
 		if (metaNote.title === title) {
-		    Debug(`match`);
+		    Log.debug(`match`);
 		    return noteStore.getNoteWithResultSpec(metaNote.guid, noteSpec);
 		}
 	    }
@@ -167,39 +170,77 @@ async function get (title, options = {}) {
 //   title         notes matching title exactly
 //
 // filterFunc:
-//   DIY filtering on note-by-note basis
+//   user-defined metadata filter 
 //
 // to return all notes in a notebook, set options.notebookGuid = GUID, filterFunc = undefined
-// or DIY filter them all by providing filterFunc
+// to return a subset, filter by providing filterFunc
 //
 function getSome (options, filterFunc = undefined) {
     const noteStore = getNotestore(options.production);
     // strange way to do this. might be more than just 1 options that control notebook (like --default)
     // so, hasNotebookOption(options)
-    const firstPromise = options.notebook ? getNotebookByOptions(options) : Promise.resolve(false);
-    return firstPromise.then(notebook => {
-	let filter = {};
-	if (notebook) {
-	    Debug(`getSome from notebook: ${notebook.name}, ${notebook.guid}`);
-	    filter.notebookGuid = notebook.guid;
-	}
-	// include title
-	const metaSpec = { includeTitle: true };
-	return noteStore.findNotesMetadata(filter, 0, 250, metaSpec);
-    }).then(findResult => findResult.notes.filter(note => {
-	Debug(`note: ${note.title}, guid: ${note.guid}`);
-	// TODO: check for duplicate named notes (option)
-	if (options.title) {
-	    if (options.title !== note.title) return false;
-	    Debug(`title match`);
-	}
-	const keep = !filterFunc || filterFunc(note);
-	Debug(keep ? 'keeping' : 'discarding');
-	return keep;
-    })).then(metaNoteList => Promise.map(metaNoteList, note => {
-	const noteSpec = { includeContent: true };
-	return noteStore.getNoteWithResultSpec(note.guid, noteSpec);
-    }, { concurrency: 1 }));
+    return Promise.resolve(options.notebook ? getNotebookByOptions(options) : false)
+	.then(notebook => {
+	    let filter = {};
+	    if (notebook) {
+		Log.debug(`getSome from notebook: ${notebook.name}, ${notebook.guid}`);
+		filter.notebookGuid = notebook.guid;
+	    }
+	    // include title
+	    const metaSpec = { includeTitle: true };
+	    return noteStore.findNotesMetadata(filter, 0, 250, metaSpec);
+	}).then(findResult => findResult.notes.filter(note => {
+	    Log.debug(`note: ${note.title}, guid: ${note.guid}`);
+	    // TODO: check for duplicate named notes (option)
+	    if (options.title) {
+		if (options.title !== note.title) return false;
+		Log.debug(`title match`);
+	    }
+	    const keep = !filterFunc || filterFunc(note);
+	    Log.debug(keep ? 'keeping' : 'discarding');
+	    return keep;
+	})).then(metaNoteList => Promise.map(metaNoteList, note => {
+	    const noteSpec = { includeContent: true };
+	    return noteStore.getNoteWithResultSpec(note.guid, noteSpec);
+	}, { concurrency: 1 }));
+}
+
+//
+// options:
+//   notebookGuid  only filter notes in this notebook
+//   title         notes matching title exactly
+//
+// filterFunc:
+//   user-defined metadata filter 
+//
+// to return all notes in a notebook, set options.notebookGuid = GUID, filterFunc = undefined
+// to return a subset, filter by providing filterFunc
+//
+function getSomeMetadata (options, filterFunc = undefined) {
+    const noteStore = getNotestore(options.production);
+    // strange way to do this. might be more than just 1 options that control notebook (like --default)
+    // so, hasNotebookOption(options)
+    return Promise.resolve(options.notebook ? getNotebookByOptions(options) : false)
+	.then(notebook => {
+	    let filter = {};
+	    if (notebook) {
+		Log.debug(`all notes from notebook: ${notebook.name}, ${notebook.guid}`);
+		filter.notebookGuid = notebook.guid;
+	    }
+	    // include title
+	    const metaSpec = { includeTitle: true };
+	    return noteStore.findNotesMetadata(filter, 0, 250, metaSpec);
+	}).then(findResult => findResult.notes.filter(note => {
+	    Log.debug(`note: ${note.title}, guid: ${note.guid}`);
+	    // TODO: check for duplicate named notes (option)
+	    if (options.title) {
+		if (options.title !== note.title) return false;
+		Log.debug(`title match`);
+	    }
+	    const keep = !filterFunc || filterFunc(note);
+	    Log.debug(keep ? 'keeping' : 'discarding');
+	    return keep;
+	}));
 }
 
 //
@@ -304,7 +345,8 @@ module.exports = {
     get,
     getContent,
     getNotebook,
-    getSome,
+//    getSome,
+    getSomeMetadata,
     getWorksheetName,
     setContentBody,
     update
