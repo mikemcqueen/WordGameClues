@@ -36,7 +36,7 @@ const APPLE = {
     '3': {
 	sentence:       3,
 	clueCount:      4,
-	synthClueCount: 9,
+	synthClueCount: 6,
 	REQ_CLUE_COUNT: 4
     },
 
@@ -108,7 +108,7 @@ function getByOptions (options) {
 	src = HARMONY;
     } else if (options.final) {
 	src = FINAL;
-    } else if (!_.isUndefined(options.apple)) {
+    } else if (options.apple) {
 	src = metamorph(APPLE[options.apple[0]]);
 	if (_.isUndefined(src)) throw new Error(`APPLE[${options.apple}] not supported`);
 	if (options.apple.slice(1, options.apple.length) === 's') {
@@ -196,8 +196,8 @@ function isFinal (name) {
 
 module.exports = {
     cloneAsSynth,
+    getByOptions,  
     getByBaseDirOption,
-    getByOptions,
     getDirectory,
     getShorthand,
     isValidBaseDirOption,

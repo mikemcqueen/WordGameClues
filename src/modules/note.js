@@ -69,7 +69,7 @@ async function getNotebook (name, options = {}) {
 function getWorksheetName (noteNameOrClueType) {
     let noteName = noteNameOrClueType;
     if (_.isObject(noteName)) {
-	noteName = Clues.getShorthand(noteName); // noteName isa clueType
+	noteName = Clues.getShorthand(noteName); // noteName is a clueType object
     } else {
 	const appleExpr = /p[0-9]s?/;
 	const result = appleExpr.exec(noteName);
@@ -237,7 +237,7 @@ function getSomeMetadata (options, filterFunc = undefined) {
 		if (options.title !== note.title) return false;
 		Log.debug(`title match`);
 	    }
-	    const keep = !filterFunc || filterFunc(note);
+	    const keep = !filterFunc || filterFunc(note, options);
 	    Log.debug(keep ? 'keeping' : 'discarding');
 	    return keep;
 	}));

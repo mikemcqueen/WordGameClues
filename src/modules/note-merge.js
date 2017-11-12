@@ -22,7 +22,9 @@ const Stringify        = require('stringify-object');
 // a new module.
 
 // get a note by name. if it doesn't exist, create it. return note with content.
-
+//
+// TODO: get rid of this. if no note, don't create. wait until Note.append.
+//
 async function getOrCreate (noteName, options) {
     let created = false;
     return Note.get(noteName, Object.assign(_.clone(options), { content: true, nothrow: true }))

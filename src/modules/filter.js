@@ -19,7 +19,7 @@ const Stringify    = require('stringify-object');
 
 //
 
-const URL_PREFIX      = 'http';
+const URL_PREFIX       = 'http';
 const KNOWN_CLUES_URL  = 'https://known.clues';
 
 //
@@ -303,8 +303,14 @@ function save (filterList, path) {
 
 //
 
+function getUpdateFilePath(noteName, options) {
+    return `${Clues.getDirectory(Clues.getByOptions(options))}/updates/${noteName}`;
+}
+
+//
+
 async function saveAddCommit (noteName, filterList, options) {
-    const path = `${Clues.getDirectory(Clues.getByOptions(options))}/updates/${noteName}`;
+    const path = getUpdateFilePath(noteName, options);
     if (options.dry_run) return path;
     Debug(`saving ${noteName} to: ${path}`);
     return save(filterList, path)
@@ -472,6 +478,7 @@ module.exports = {
     filterRejectUrls,
     getClueText,
     getRemovedClues,
+    getUpdateFilePath,
     makeClueElem,
     parseFile,
     parseLines,

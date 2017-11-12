@@ -9,6 +9,7 @@
 const _              = require('lodash');
 const ClueManager    = require('../clue-manager');
 const Clues          = require('../clue-types');
+const Duration       = require('duration');
 const Evernote       = require('evernote');
 const EvernoteConfig = require('../../data/evernote-config.json');
 const Expect         = require('should/as-function');
@@ -23,6 +24,7 @@ const NoteMaker      = require('../modules/note-make');
 const NoteParser     = require('../modules/note-parse');
 let   Options        = require('../modules/options');
 const Path           = require('path');
+const PrettyMs       = require('pretty-ms');
 const Promise        = require('bluebird');
 const Stringify      = require('stringify-object');
 const Update         = require('../modules/update');
@@ -45,9 +47,10 @@ const CmdLineOptions = Getopt.create(_.concat(Clues.Options, [
     ['', 'title=TITLE',   'specify note title (used with --create, --parse)'],
     ['', 'update[=NOTE]', 'update all results in worksheet, or a specific NOTE if specified'],
     ['', 'match=PREFIX',  '  update notes matching title PREFIX (used with --update)'],
+    ['', 'from-fs',       '  update from filesystem'],
     ['', 'force-update',  '  update single note with removed clue (used with --update)'],
     ['', 'save',          '  save cluelist files (used with --update)'],
-    ['', 'dry-run',       '  show what would change without making any changes (used with --update)'],
+    ['', 'dry-run',       '  show changes only (used with --update)'],
     ['v','verbose',       'more noise'],
     ['h','help', '']
 ])).bindHelp(
@@ -227,7 +230,7 @@ function getParseSaveCommit (noteName, options) {
 
 //
 
-function updateOneClue (noteName, options) {
+function loadParseSaveOneWorksheet (noteName, options) {
     return getAndParse(noteName, options)
 	.then(result => {
 	    const removedClueMap = Filter.getRemovedClues(result.filterList);
@@ -243,7 +246,7 @@ function updateOneClue (noteName, options) {
 		removeAllClues(removedClueMap, options);
 	    }
 	    return Filter.saveAddCommit(noteName, result.filterList, options);
-	}).then(path => Update.updateFromFile(path, options));
+	});
 }
 
 //
@@ -267,6 +270,8 @@ async function getSomeAndParse (options, filterFunc) {
 	}).each(metadata => {
 	    Log.info(`meta note: ${metadata.title}`);
 	    options.guid = metadata.guid;
+	    // nested chain because .each appears to continue to next
+	    // element upon completion of the first promise (Note.get)
 	    return Note.get(null, options)
 		.then(note => {
 		    Log.info(`parsing note ${note.title}`);
@@ -344,26 +349,42 @@ async function saveAddCommitAll (resultList, options) {
     Expect(options).is.an.Object();
     return Promise.map(resultList, result => {
 	return Filter.saveAddCommit(result.note.title, result.filterList, options);
-    }, { concurrency: 1 });
+    }, { concurrency: 2 });
+}
+
+// params:
+//   note only contains metadata (no content)
+
+function noteChooserFunc (note, options) {
+    const prefix = options.match || Clues.getShorthand(Clues.getByOptions(options));
+    Log.debug(`prefix: ${prefix}`);
+    const bignoteSuffix = '.article';
+    return _.startsWith(note.title, prefix) && !_.endsWith(note.title, bignoteSuffix);
 }
 
 //
 
-async function updateAllClues (options) {
-    const prefix = options.match || Clues.getShorthand(Clues.getByOptions(options));
-    Log.debug(`prefix: ${prefix}`);
-    const bignoteSuffix = '.article';
-    return getSomeAndParse(options, note => {
-	return _.startsWith(note.title, prefix) && !_.endsWith(note.title, bignoteSuffix);
-    }).then(resultList => {
-	let allRemovedClues = getAllRemovedClues(resultList);
-	removeAllClues(allRemovedClues, options);
-	return saveAddCommitAll(resultList, options);
-    }).then(pathList => {
-	// NOTE: updateFromPathList should do something with options.save, don't pass it to
-	// updateFromFile, just call save at the end.
-	return Update.updateFromPathList(pathList, options);
-    });
+async function loadParseSaveAllWorksheets (options) {
+    return getSomeAndParse(options, noteChooserFunc)
+	.then(resultList => {
+	    let allRemovedClues = getAllRemovedClues(resultList);
+	    removeAllClues(allRemovedClues, options);
+	    return saveAddCommitAll(resultList, options);
+	});
+}
+
+//
+
+async function getAllUpdateFilePaths (options) {
+    return Note.getSomeMetadata(options, noteChooserFunc)
+	.then(metadataList => {
+	    if (_.isEmpty(metadataList)) throw new Error('no notes found');
+	    Log.info(`found ${metadataList.length} notes`);
+	    return metadataList;
+	}).map(metadata => {
+	    Log.info(`meta note: ${metadata.title}`);
+	    return Filter.getUpdateFilePath(metadata.title, options);
+	});
 }
 
 //
@@ -386,10 +407,17 @@ async function update (options) {
 
 	    if (_.isEmpty(options.update)) {
 		// no note name supplied, update all notes
-		return updateAllClues(options);
+		return options.from_fs ? getAllUpdateFilePaths(options)
+		    : loadParseSaveAllWorksheets(options);
 	    }
-	    // update supplied note name(s)
-	    return updateOneClue(options.update, options);
+	    // download/save a single note or load single file
+	    return [options.from_fs
+		? Filter.getUpdateFilePath(options.update, options)
+		: loadParseSaveOneWorksheet(options.update, options)];
+	}).then(pathList => {
+	    // NOTE: updateFromPathList should do something with options.save, don't pass it to
+	    // updateFromFile, just call save at the end.
+	    return Update.updateFromPathList(pathList, options);
 	});
 }
 
@@ -417,6 +445,7 @@ async function main () {
 	usage('--quiet and --verbose cannot both be specified');
     }
 
+    if (options['from-fs']) options.from_fs = true;
     if (options['force-update']) options.force_update = true;
     if (options['dry-run']) {
 	options.dry_run = true;
@@ -439,19 +468,28 @@ async function main () {
     if (!cmd) usage(`missing command`);
     if (cmd == 'get') options.quiet = true;
 
+    // Other modules will see snapshot of options taken here.
     Options = Options.set(options);
 
     if (options.production) Log('---PRODUCTION---');
     if (options.dry_run) Log('---DRY_RUN---');
     if (options.verbose) Log('---VERBOSE---');
     
-    return Commands[cmd](options);
+    const start = new Date();
+    const result = await Commands[cmd](options).catch(err => { throw err; });
+    const duration = new Duration(start, new Date()).milliseconds;
+    console.log(`${cmd}: ${PrettyMs(duration)}`);
+
+    // test bat,western - look at the countlists, combinations, make sure there's no duplicates
+
+    return result;
 }
 
 //
 
-main().catch(err => {
-    console.error(err, err.stack);
-    console.log(err);
-    process.exit(-1);
-});
+ main()
+    .then(count => process.exit(count))
+    .catch(err => {
+	console.error(err, err.stack);
+	console.log(err, err.stack);
+    });

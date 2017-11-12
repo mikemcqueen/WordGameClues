@@ -169,9 +169,7 @@ ClueManager.prototype.addKnownCompoundClues = function (clueList, clueCount, val
 	if (clueCount > 1) {
 	    // new sources need to be validated
 	    if (!_.has(srcMap, srcKey)) {
-		if (this.logging) {
-		    this.log('############ validating Known Combo: ' + srcKey);
-		}
+		Debug(`############ validating Known Combo: ${srcKey}:${clueCount}`);
 		let vsResult = Validator.validateSources({
 		    sum:         clueCount,
 		    nameList:    srcNameList,
@@ -369,7 +367,9 @@ ClueManager.prototype.addRejectSource = function (srcNameList) {
     }
     if (this.isRejectSource(srcNameList)) {
 	console.log('WARNING! duplicate reject source, ' + srcNameList);
-	//return false;
+	// i had this return false commented out for some reason,
+	// but it should be here.
+	return false;
     }
     this.rejectSourceMap[srcNameList.toString()] = true;
     return true;
@@ -461,11 +461,15 @@ ClueManager.prototype.getClueSourceListArray = function (args) {
 	this.log(`++clueSrcListArray` +
 		 `, sum: ${args.sum}, max: ${args.max}, require: ${args.require}`);
     }
-    Peco.makeNew({
+    let cclist = Peco.makeNew({
 	sum:     args.sum,
 	max:     args.max,
 	require: args.require
-    }).getCombinations().forEach(clueCountList => {
+    }).getCombinations(); 
+
+    Log.debug(`cclist.length = ${cclist.length}, cclist: ${cclist}`);
+
+    cclist.forEach(clueCountList => {
 	let clueSourceList = [];
 	if (clueCountList.every(count => {
 	    // empty lists not allowed
@@ -587,7 +591,7 @@ ClueManager.prototype.getClueCountListArray = function (nameList) {
     Expect(nameList).is.not.empty();
     // each count list contains the clueMapArray indexes in which
     // each name appears
-    let countListArray = Array(_.size(nameList)).fill().map(() => []);
+    let countListArray = Array(_.size(nameList)).fill().map(_ => []);
     for (let count = 1; count <= this.maxClues; ++count) {
 	let map = this.knownClueMapArray[count];
 	Expect(map).is.ok(); // I know this will fail when I move to synth clues
@@ -612,12 +616,15 @@ ClueManager.prototype.getValidCounts = function (nameList, countListArray) {
 	listArray: countListArray,
 	max:       this.maxClues
     }).getCombinations().forEach(clueCountList => {
+	Debug(`nameList: ${nameList}, clueCountList: ${clueCountList}`);
 	let sum = clueCountList.reduce((a, b) => a + b);
+	// why am I passing validateAll: true here, shouldn't a single
+	// validation suffice?
 	if (Validator.validateSources({
-	    sum:      sum,
-	    nameList: nameList,
-	    count:    nameList.length,
-	    validateAll: true
+	    sum:         sum,
+	    nameList:    nameList,
+	    count:       nameList.length,
+	    validateAll: false
 	}).success) {
 	    addCountSet.add(sum);
 	}
