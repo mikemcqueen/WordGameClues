@@ -467,7 +467,7 @@ ClueManager.prototype.getClueSourceListArray = function (args) {
 	require: args.require
     }).getCombinations(); 
 
-    Log.debug(`cclist.length = ${cclist.length}, cclist: ${cclist}`);
+    Debug(`cclist.length = ${cclist.length}, cclist: ${cclist}`);
 
     cclist.forEach(clueCountList => {
 	let clueSourceList = [];
@@ -618,7 +618,7 @@ ClueManager.prototype.getValidCounts = function (nameList, countListArray) {
     }).getCombinations().forEach(clueCountList => {
 	Debug(`nameList: ${nameList}, clueCountList: ${clueCountList}`);
 	let sum = clueCountList.reduce((a, b) => a + b);
-	// why am I passing validateAll: true here, shouldn't a single
+	// why was I passing validateAll: true here, shouldn't a single
 	// validation suffice?
 	if (Validator.validateSources({
 	    sum:         sum,

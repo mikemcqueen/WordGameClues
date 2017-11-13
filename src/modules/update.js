@@ -500,7 +500,7 @@ async function updateFromPathList(pathList, options) {
 	    }).catch(err => {
 		console.log(`updateFromFile, ${err}`);
 		if (err && err.code !== 'ENOENT') {
-		    console.log(err.stack);
+		    throw err;
 		}
 	    });
     }

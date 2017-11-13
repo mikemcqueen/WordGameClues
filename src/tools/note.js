@@ -406,14 +406,16 @@ async function update (options) {
 	    ClueManager.loadAllClues({ clues: Clues.getByOptions(options) });
 
 	    if (_.isEmpty(options.update)) {
-		// no note name supplied, update all notes
+		// no note name supplied, update all notes; return path list
 		return options.from_fs ? getAllUpdateFilePaths(options)
 		    : loadParseSaveAllWorksheets(options);
 	    }
 	    // download/save a single note or load single file
-	    return [options.from_fs
-		? Filter.getUpdateFilePath(options.update, options)
-		: loadParseSaveOneWorksheet(options.update, options)];
+	    if (options.from_fs) {
+		return [Filter.getUpdateFilePath(options.update, options)];
+	    } 
+	    return loadParseSaveOneWorksheet(options.update, options)
+		.then(path => [path]); // return a "path list" containing one path
 	}).then(pathList => {
 	    // NOTE: updateFromPathList should do something with options.save, don't pass it to
 	    // updateFromFile, just call save at the end.

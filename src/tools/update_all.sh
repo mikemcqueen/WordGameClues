@@ -7,7 +7,7 @@ fi
 
 _ct=$1  #clue type
 shift
-_cc=$1   #clue count
+_cc=$1  #clue count
 shift
 
 _name=""
@@ -18,15 +18,23 @@ do
       then
 	  echo "--PRODUCTION"
 	  _production=$1
-	  _save=--save
+	  _options="$_options --save"
       elif [[ $1 == '--dry-run' ]]
       then
 	  echo "--DRY RUN"
-	  _dryrun=$1
+	  _options="$_options $1"
       elif [[ $1 == '--verbose' ]]
       then
 	  echo "--VERBOSE"
 	  _options="$_options $1"
+      elif [[ $1 == '--from-fs' ]]
+      then
+	  echo "Updating from filesystem..."
+	  _from_fs=true
+      elif [[ $1 == '--from-en' ]]
+      then
+	  echo "Updating from Evernote..."
+	  _from_en=true
       elif [[ $1 == --match* ]]
       then
 	  shift
@@ -41,21 +49,11 @@ do
       then
 	  _name=$1
       else
-	  echo "multiple note names supplied: 1) $_name 2) $1"
+	  echo "multiple note names or unsupported option: 1) $_name 2) $1"
 	  exit -1
       fi
       shift
 done
-
-# add save/dry-run option
-
-if [[ ! -z $_dryrun ]]
-then
-    _options="$_options $_dryrun"
-elif [[ ! -z $_save ]]
-then
-    _options="$_options $_save"
-fi
 
 echo "clues: $_ct, count: $_cc, note: $_note"
 
@@ -66,28 +64,41 @@ echo $(date) >> $_out
 
 #_force=--force
 
-if [[ ! -z $_name ]]
+update () {
+    if [[ ! -z $_name ]]
+    then
+	#
+	#  update one note
+	#
+	_note=$_base.$_name
+	node note -$_ct --update=$_note $1 $2 $_production $_options 2>> $_out
+	if [[ $? -ne 0 ]]
+	then
+	    echo "update failed for $_note"
+	    exit -1
+	fi
+    else
+	#
+	# update all notes
+	#
+	node note -$_ct --match $_ct.c2-$_cc.x2.$_match $1 $2 $_production $_options --update 2>> $_out
+	if [[ $? -ne 0 ]]
+	then
+	    echo "update all failed"
+	    exit -1
+	fi
+    fi
+    return $?
+}
+
+if [[ ! -z $_from_en  ]]
 then
-    #
-    #  update one note
-    #
-    _note=$_base.$_name
-    node note -$_ct --update=$_note $1 $2 $_production $_options 2>> $_out
-    if [[ $? -ne 0 ]]
-    then
-	echo "update failed for $_note"
-	exit -1
-    fi
-else
-    #
-    # update all notes
-    #
-    node note -$_ct --match $_ct.c2-$_cc.x2.$_match $1 $2 $_production $_options --update 2>> $_out
-    if [[ $? -ne 0 ]]
-    then
-	echo "update all failed"
-	exit -1
-    fi
+    update
+fi
+if [[ ! -z $_from_fs  ]]
+then
+    _options="$_options --from-fs"
+    update
 fi
 
 exit 0
