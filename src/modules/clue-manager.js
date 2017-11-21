@@ -9,18 +9,18 @@
 module.exports = exports = new ClueManager();
 
 const _              = require('lodash');
-const ClueList       = require('./clue-list');
+const ClueList       = require('../types/clue-list');
 const Clues          = require('./clue-types');
 const Debug          = require('debug')('clue-manager');
 const Expect         = require('should/as-function');
-const NameCount      = require('./name-count');
+const NameCount      = require('../types/name-count');
 const Path           = require('path');
 const Peco           = require('./peco');
 const Validator      = require('./validator');
 
 //
 
-const DATA_DIR              =  Path.normalize(`${Path.dirname(module.filename)}/../data/`);
+const DATA_DIR              =  Path.normalize(`${Path.dirname(module.filename)}/../../data/`);
 const REJECTS_DIR           = 'rejects';
 
 // constructor
@@ -169,7 +169,7 @@ ClueManager.prototype.addKnownCompoundClues = function (clueList, clueCount, val
 	if (clueCount > 1) {
 	    // new sources need to be validated
 	    if (!_.has(srcMap, srcKey)) {
-		Debug(`############ validating Known Combo: ${srcKey}:${clueCount}`);
+		Debug(`## validating Known Combo: ${srcKey}:${clueCount}`);
 		let vsResult = Validator.validateSources({
 		    sum:         clueCount,
 		    nameList:    srcNameList,
@@ -385,7 +385,6 @@ ClueManager.prototype.isKnownSource = function (source, count = 0) {
     if (count > 0) {
 	return _.has(this.knownSourceMapArray[count], source);
     }
-
     // check for all counts
     return this.knownSourceMapArray.some(srcMap => _.has(srcMap, source));
 }
@@ -450,13 +449,13 @@ ClueManager.prototype.makeSrcNameListArray = function (nc) {
 // A "clueSourceList" is a list (array) where each element is a
 // cluelist, such as [clues1,clues1,clues2].
 //
-// Given a sum, such as 3, retrieve the array of lists of addends
-// that add up to that sum, such as [1,2], and return an array of lists
-// of clueLists of the specified clue counts, such as [clues1,clues2].
+// Given a sum, such as 3, generate an array of lists of addends that
+// that add up to that sum, such as [ [1, 2], [2, 1] ], and return an
+// array of lists of clueLists of the corresponding clue counts, such
+// as [ [clues1, clues2], [clues2, clues1] ].
 //
 ClueManager.prototype.getClueSourceListArray = function (args) {
     let clueSourceListArray = [];
-
     if (this.logging) {
 	this.log(`++clueSrcListArray` +
 		 `, sum: ${args.sum}, max: ${args.max}, require: ${args.require}`);
@@ -568,7 +567,7 @@ ClueManager.prototype.getKnownClues = function (nameList) {
     let nameClueMap = {};
     this.knownSourceMapArray.forEach(srcMap => {
 	if (_.has(srcMap, nameList)) {
-	    for (let clue of srcMap[nameList]) {
+	    for (const clue of srcMap[nameList]) {
 		if (!_.has(nameClueMap, clue.name)) {
 		    nameClueMap[clue.name] = [];
 		}

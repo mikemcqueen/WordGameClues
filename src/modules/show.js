@@ -5,8 +5,8 @@ const ClueManager    = require('./clue-manager');
 const Clues          = require('./clue-types');
 const Debug          = require('debug')('show');
 const Expect         = require('should/as-function');
-const NameCount      = require('./name-count');
-const SearchResult   = require('./modules/search-result');
+const NameCount      = require('../types/name-count');
+const SearchResult   = require('./search-result');
 const Validator      = require('./validator');
 
 //

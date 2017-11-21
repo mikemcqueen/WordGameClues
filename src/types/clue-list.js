@@ -8,7 +8,7 @@
 
 const _       = require('lodash');
 const Expect  = require('should/as-function');
-const Fs      = require('fs');
+const Fs      = require('fs-extra');
 
 //
 //

@@ -5,23 +5,23 @@
 'use strict';
 
 const _           = require('lodash');
-const AltSources  = require('./alt-sources');
-const ClueList    = require('./clue-list');
-const ClueManager = require('./clue-manager');
-const Clues       = require('./clue-types');
-const ComboMaker  = require('./combo-maker');
-const ComboSearch = require('./combo-search');
-const Components  = require('./show-components');
+const AltSources  = require('../modules/alt-sources');
+const ClueList    = require('../types/clue-list');
+const ClueManager = require('../modules/clue-manager');
+const Clues       = require('../modules/clue-types');
+const ComboMaker  = require('../modules/combo-maker');
+const ComboSearch = require('../modules/combo-search');
+const Components  = require('../modules/show-components');
 const Debug       = require('debug')('clues');
 const Duration    = require('duration');
 const Expect      = require('should/as-function');
-const NameCount   = require('./name-count');
-const Peco        = require('./peco');
+const NameCount   = require('../types/name-count');
+const Peco        = require('../modules/peco');
 const PrettyMs    = require('pretty-ms');
-const Show        = require('./show');
-const StringifyObject = require('stringify-object');
-const ResultMap   = require('./result-map');
-const Validator   = require('./validator');
+const Show        = require('../modules/show');
+const Stringify   = require('stringify-object');
+const ResultMap   = require('../types/result-map');
+const Validator   = require('../modules/validator');
 
 // initialize command line options.  do this before logger.
 //
@@ -304,7 +304,7 @@ function showSources(clueName) {
     if (result.success) {
 	result.list.forEach(result => {
 //	    result.resultMap.dump();
-	    console.log(StringifyObject(result.resultMap.map(), { indent: '  ' }));
+	    console.log(Stringify(result.resultMap.map(), { indent: '  ' }));
 	    console.log('nameSrcList: ' + result.nameSrcList);
 	    if (verbose) {
 		console.log('ncList:      ' + result.ncList);

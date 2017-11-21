@@ -18,7 +18,7 @@ const Options = [
     ['f', 'final',      'use final clues' ]
 ];
 
-const DATA_DIR              =  Path.normalize(`${Path.dirname(module.filename)}/../data/`);
+const DATA_DIR              =  Path.normalize(`${Path.dirname(module.filename)}/../../data/`);
 
 const APPLE = {
     '1' : {

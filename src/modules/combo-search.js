@@ -14,8 +14,8 @@ const ClueManager    = require('./clue-manager');
 const Debug          = require('debug')('combo-maker');
 const Duration       = require('duration');
 const Validator      = require('./validator');
-const ClueList       = require('./clue-list');
-const NameCount      = require('./name-count');
+const ClueList       = require('../types/clue-list');
+const NameCount      = require('../types/name-count');
 const Peco           = require('./peco');
 
 //

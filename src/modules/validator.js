@@ -11,13 +11,13 @@ module.exports = new Validator();
 //
 
 const _             = require('lodash');
-const ClueList      = require('./clue-list');
+const ClueList      = require('../types/clue-list');
 const ClueManager   = require('./clue-manager');
 const Debug         = require('debug')('validator');
 const Expect        = require('should/as-function');
-const NameCount     = require('./name-count');
+const NameCount     = require('../types/name-count');
 const Peco          = require('./peco');
-const ResultMap     = require('./result-map');
+const ResultMap     = require('../types/result-map');
 
 //
 

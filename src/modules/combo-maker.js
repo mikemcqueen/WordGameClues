@@ -12,12 +12,12 @@ module.exports = exports = new ComboMaker();
 
 const _           = require('lodash');
 const ClueManager = require('./clue-manager');
-const ClueList    = require('./clue-list');
+const ClueList    = require('../types/clue-list');
 const Debug       = require('debug')('combo-maker');
 const Duration    = require('duration');
 const Expect      = require('should/as-function');
 const Validator   = require('./validator');
-const NameCount   = require('./name-count');
+const NameCount   = require('../types/name-count');
 const Stringify   = require('stringify-object');
 //const Peco        = require('./peco'); // use this at some point
 

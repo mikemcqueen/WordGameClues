@@ -7,6 +7,12 @@
 'use strict';
 
 //
+// TODO:
+// make this a work with hasNext(), next().
+// then make it stream.
+//
+// Use log.debug instead of logging.
+//
 
 const _           = require('lodash');
 const Debug       = require('debug')('peco');

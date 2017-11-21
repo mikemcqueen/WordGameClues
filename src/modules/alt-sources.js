@@ -15,7 +15,7 @@ const ClueManager           = require('./clue-manager');
 const ComboSearch           = require('./combo-search');
 const Debug                 = require('debug')('alt-sources');
 const Duration              = require('duration');
-const NameCount             = require('./name-count');
+const NameCount             = require('../types/name-count');
 const PrettyMs              = require('pretty-ms');
 const Validator             = require('./validator');
 
@@ -23,6 +23,8 @@ const Validator             = require('./validator');
 
 const FIRST_COLUMN_WIDTH    = 15;
 const SECOND_COLUMN_WIDTH   = 25;
+
+// TODO: this doesn't need to have a constructor.  Can be a true module.
 
 // constructor
 // 
