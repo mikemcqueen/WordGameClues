@@ -5,8 +5,8 @@
 'use strict';
 
 const _            = require('lodash');
-const ClueManager  = require('../clue-manager');
-const Clues        = require('../clue-types');
+const ClueManager  = require('./clue-manager');
+const Clues        = require('./clue-types');
 const Debug        = require('debug')('filter');
 const Duration     = require('duration');
 const Expect       = require('should/as-function');

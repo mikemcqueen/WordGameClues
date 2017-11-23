@@ -7,7 +7,7 @@
 //
 
 const _                = require('lodash');
-const Clues            = require('../clue-types');
+const Clues            = require('./clue-types');
 const Evernote         = require('evernote');
 const EvernoteConfig   = require('../../data/evernote-config.json');
 const Expect           = require('should/as-function');

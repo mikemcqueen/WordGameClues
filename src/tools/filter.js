@@ -9,8 +9,8 @@
 
 const _            = require('lodash');
 const ChildProcess = require('child_process');
-const ClueManager  = require('../clue-manager');
-const Clues        = require('../clue-types');
+const ClueManager  = require('../modules/clue-manager');
+const Clues        = require('../modules/clue-types');
 const Debug        = require('debug')('filter');
 const Dir          = require('node-dir');
 const Duration     = require('duration');
@@ -42,6 +42,7 @@ const Options = new Getopt(_.concat(Clues.Options, [
     ['n', 'count',               'show result/url counts only'],
     ['',  'parse',               'parse a filter output file'],
     ['',  'note',                'mail results to evernote'], 
+    //['',  'merge',               ''], 
     // ['r', 'rejects',             'show only results that fail all filters'],
     ['t', 'title',               'filter results based on title word count (default)'],
     ['x', 'xfactor=VALUE',       'show 1) missing URL/title/summary 2) unscored URLs 3) article < summary'], 
@@ -444,9 +445,7 @@ async function main () {
 	}
 	return undefined;
     }
-    if (!options.dir) {
-	options.dir = '2';
-    }
+    options.dir = options.dir || '2';
     if (options['known-urls']) options.filter_known_urls = true;
     if (options['add-known']) options.add_known_clues = true;
 
@@ -461,25 +460,27 @@ async function main () {
 	let wordListArray = await loadCsv(filename);
 	nameMap = buildNameMap(wordListArray);
     }
-    let dir = SearchResult.DIR + options.dir;
-    let filterOptions = {
+    const dir = SearchResult.DIR + options.dir;
+    const filterOptions = {
 	filterArticle: options.article,
 	filterTitle:   options.title,
 	filterRejects: options.rejects,
 	xfactor:       _.toNumber(options.xfactor)
     };
     let start = new Date();
-    let pathList = await getPathList(dir, SearchResult.getFileMatch(options.match), nameMap);
-    let getDuration = new Duration(start, new Date()).milliseconds;
+    const pathList = await getPathList(dir, SearchResult.getFileMatch(options.match), nameMap)
+	      .catch(err => { throw err; });
+    const getDuration = new Duration(start, new Date()).milliseconds;
     start = new Date();
-    let result = await filterPathList(pathList, dir, filterOptions);
-    let d = new Duration(start, new Date()).milliseconds;
+    const result = await filterPathList(pathList, dir, filterOptions)
+	      .catch(err => { throw err; });
+    const filterDuration = new Duration(start, new Date()).milliseconds;
     if (options.count) {
 	console.log(`Results: ${_.size(result.filtered)}` +
 		    `, Urls: ${getUrlCount(result.filtered)}` +
 		    `, Rejects: ${_.size(result.rejects)}` +
 		    `, get(${PrettyMs(getDuration)})` +
-		    `, filter(${PrettyMs(d)})`);
+		    `, filter(${PrettyMs(filterDuration)})`);
 	return undefined;
     }
 
@@ -510,8 +511,8 @@ async function main () {
     //   is there a database that auto-indexes all words in a document?
     //
 
-    let useTmpFile = options.note || options.copy;
-    return Promise.resolve().then(() => {
+    const useTmpFile = options.note || options.copy;
+    return Promise.resolve().then((_ => {
 	if (useTmpFile) {
 	    return My.createTmpFile(Boolean(options.keep)).then(([path, fd]) => {
 		return [path, Fs.createWriteStream(null, { fd })];

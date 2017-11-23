@@ -7,8 +7,8 @@
 //
 
 const _              = require('lodash');
-const ClueManager    = require('../clue-manager');
-const Clues          = require('../clue-types');
+const ClueManager    = require('../modules/clue-manager');
+const Clues          = require('../modules/clue-types');
 const Duration       = require('duration');
 const Evernote       = require('evernote');
 const EvernoteConfig = require('../../data/evernote-config.json');
@@ -22,7 +22,7 @@ const My             = require('../modules/util');
 const Note           = require('../modules/note');
 const NoteMaker      = require('../modules/note-make');
 const NoteParser     = require('../modules/note-parse');
-let   Options        = require('../modules/options');
+const Options        = require('../modules/options');
 const Path           = require('path');
 const PrettyMs       = require('pretty-ms');
 const Promise        = require('bluebird');
@@ -31,26 +31,28 @@ const Update         = require('../modules/update');
 
 //
 
-const Commands = { create, get, parse, update, count };
+const Commands = { count, create, get, parse, update, validate };
 const CmdLineOptions = Getopt.create(_.concat(Clues.Options, [
-    ['', 'count=NAME',    'count sources/clues/urls in a note'],
-    ['', 'create=FILE',   'create note from filter result file'],
-    ['', 'get=TITLE',     'get (display) a note'],
-    ['', 'notebook=NAME', 'specify notebook name'],
-    ['', 'parse=TITLE',   'parse note into filter file format'],
+    ['', 'count=NAME',      'count sources/clues/urls in a note'],
+    ['', 'create=FILE',     'create note from filter result file'],
+    ['', 'get=TITLE',       'get (display) a note'],
+    ['', 'parse=TITLE',     'parse note into filter file format'],
     ['', 'compare',       '  parse old + dom  and show differences'],
     ['', 'old',           '  use old parse method (use with parse)'],
 //    ['', 'parse-file=FILE','parse note file into filter file format'],
     ['', 'json',          '  output in json (use with parse, parse-file)'],
+    ['', 'update[=NOTE]',   'update all results in worksheet, or a specific NOTE if specified'],
+    ['', 'match=PREFIX',    '  update notes matching title PREFIX (used with --update)'],
+    ['', 'from-fs',         '  update from filesystem'],
+    ['', 'force-update',    '  update single note with removed clue (used with --update)'],
+    ['', 'save',            '  save cluelist files (used with --update)'],
+    ['', 'dry-run',         '  show changes only (used with --update)'],
+    ['', 'validate[=NOTE]', 'parse note into filter file format'],
+//    [],
+    ['', 'notebook=NAME', 'specify notebook name'],
     ['', 'production',    'use production note store'],
     ['', 'quiet',         'less noise'],
     ['', 'title=TITLE',   'specify note title (used with --create, --parse)'],
-    ['', 'update[=NOTE]', 'update all results in worksheet, or a specific NOTE if specified'],
-    ['', 'match=PREFIX',  '  update notes matching title PREFIX (used with --update)'],
-    ['', 'from-fs',       '  update from filesystem'],
-    ['', 'force-update',  '  update single note with removed clue (used with --update)'],
-    ['', 'save',          '  save cluelist files (used with --update)'],
-    ['', 'dry-run',       '  show changes only (used with --update)'],
     ['v','verbose',       'more noise'],
     ['h','help', '']
 ])).bindHelp(
@@ -67,6 +69,33 @@ function usage (msg) {
     console.log(msg + '\n');
     CmdLineOptions.showHelp();
     process.exit(-1);
+}
+
+//
+
+async function count (options) {
+    Log.info('count');
+    return getAndParse(options.count, options)
+	.then(result => {
+	    const count = Filter.count(result.filterList);
+	    Log(`sources: ${count.sources}, urls: ${count.urls}, clues: ${count.clues}`);
+	});
+}
+
+//
+
+async function create (options) {
+    const title = options.title;
+    if (!title) usage('--title is required');
+    const list = Filter.parseFile(options.create, options);
+    // NOTE: not passing cmd line options here
+    const body = NoteMaker.makeFromFilterList(list, { outerDiv: true });
+    return Note.create(title, body, options)
+	.then(note => {
+	    if (!options.quiet) {
+		console.log(Stringify(note));
+	    }
+	});
 }
 
 //
@@ -98,35 +127,8 @@ function old_create (options) {
 
 //
 
-async function create (options) {
-    const title = options.title;
-    if (!title) usage('--title is required');
-    const list = Filter.parseFile(options.create, options);
-    // NOTE: not passing cmd line options here
-    const body = NoteMaker.makeFromFilterList(list, { outerDiv: true });
-    return Note.create(title, body, options)
-	.then(note => {
-	    if (!options.quiet) {
-		console.log(Stringify(note));
-	    }
-	});
-}
-
-//
-
-function optLog (options, message) {
-    Expect(options).is.an.Object();
-    if (options.verbose) {
-	console.log(message);
-    } else {
- 	Log.debug(message);
-    }
-}
-
-//
-
 async function getAndParse (noteName, options) {
-    optLog(options, `getAndParse ${noteName}`);
+    Log.info(`getAndParse ${noteName}`);
     options.urls = true;
     options.clues = true;
     options.content = true;
@@ -235,7 +237,7 @@ function loadParseSaveOneWorksheet (noteName, options) {
 	.then(result => {
 	    const removedClueMap = Filter.getRemovedClues(result.filterList);
 	    if (_.isEmpty(removedClueMap)) {
-		optLog(options, `no removed clues`);
+		Log.info(`no removed clues`);
 	    } else {
 		if (!options.force_update) {
 		    for (const key of removedClueMap.keys()) {
@@ -407,7 +409,8 @@ async function update (options) {
 
 	    if (_.isEmpty(options.update)) {
 		// no note name supplied, update all notes; return path list
-		return options.from_fs ? getAllUpdateFilePaths(options)
+		return options.from_fs
+		    ? getAllUpdateFilePaths(options)
 		    : loadParseSaveAllWorksheets(options);
 	    }
 	    // download/save a single note or load single file
@@ -425,13 +428,8 @@ async function update (options) {
 
 //
 
-async function count (options) {
-    Log.info('count');
-    return getAndParse(options.count, options)
-	.then(result => {
-	    const count = Filter.count(result.filterList);
-	    Log(`sources: ${count.sources}, urls: ${count.urls}, clues: ${count.clues}`);
-	});
+async function validate (options) {
+    Log.info(`validate, ${options.validate || 'all'}`);
 }
 
 //
@@ -468,29 +466,30 @@ async function main () {
 	}
     }
     if (!cmd) usage(`missing command`);
-    if (cmd == 'get') options.quiet = true;
+    if (cmd === 'get') options.quiet = true;
 
     // Other modules will see snapshot of options taken here.
-    Options = Options.set(options);
+    Options.set(options);
 
     if (options.production) Log('---PRODUCTION---');
     if (options.dry_run) Log('---DRY_RUN---');
     if (options.verbose) Log('---VERBOSE---');
     
     const start = new Date();
-    const result = await Commands[cmd](options).catch(err => { throw err; });
+    const result = await Commands[cmd](options)
+	      .catch(err => { throw err; });
     const duration = new Duration(start, new Date()).milliseconds;
     console.log(`${cmd}: ${PrettyMs(duration)}`);
-
+    
     // test bat,western - look at the countlists, combinations, make sure there's no duplicates
-
+    
     return result;
 }
-
+    
 //
-
- main()
-    .then(count => process.exit(count))
+    
+main()
+    .then(result => process.exit(result))
     .catch(err => {
 	console.error(err, err.stack);
 	console.log(err, err.stack);

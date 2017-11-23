@@ -5,9 +5,9 @@
 'use strict';
 
 const _ = require('lodash');
-const Options = require('./options').options;
+const Options = require('./options');//.options;
 
-exports = module.exports = createLog;
+module.exports = exports = createLog;
 
 function createLog (namespace) {
     if (!namespace) throw new Error('namespace required for now');

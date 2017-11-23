@@ -6,15 +6,17 @@
 
 const _ = require('lodash');
 
-exports = module.exports = new options(); // return a singleton
+module.exports = exports = new options(); // return a singleton
 
-function options () {
-    const self = this;
-
+function options (a) {
     if (!this.options) {
+	console.log(`options INIT: ${a}`);
 	this.options = {};
+    } else {
+	console.log(`options ${a}`);
     }
 
+    const self = this;
     this.set = function (options = {}) {
 	_.forOwn(options, (value, key) => {
 	    //console.log(`adding option: ${key} : ${value}`);
@@ -23,5 +25,5 @@ function options () {
 	return self.options;
     };
 
-    return self;
+    return this;
 }
