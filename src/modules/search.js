@@ -12,11 +12,7 @@ const Ms           = require('ms');
 const My           = require('./util');
 const Path         = require('path');
 const PrettyMs     = require('pretty-ms');
-const Promise      = require('bluebird');
 const SearchResult = require('./search-result');
-
-const FsOpen = Promise.promisify(Fs.open);
-const FsClose = Promise.promisify(Fs.close);
 
 // make a search term from a list of words and the supplied options
 //
@@ -50,25 +46,49 @@ function getOneResult (wordList, pages, options = {}) {
     });
 }
 
+//
+
+async function retryGetOneResult (wordList, pages, options = {}) {
+    Expect(options).is.an.Object();
+    const retryDelay = options.retryDelay || 5000;
+    while (true) {
+	const result = await getOneResult(wordList, pages, options)
+		  .catch(err => {
+		      if (_.contains(err.message, 'CAPTCHA')) {
+			  console.log('CAPTCHA error');
+		      } else {
+			  console.log(err);
+		      }
+		      return false;
+		  });
+	if (result !== false) return result;
+	console.log(`Retrying in ${PrettyMs(retryDelay)}...`);
+	My.waitFor(retryDelay);
+    }
+}
+
 // check if file exists; if not, get, then save, a search result
 
 function checkGetSaveResult(args, options) {
     let nextDelay = 0;
     let mode = options.force ? 'w' : 'wx';
-    return FsOpen(args.path, mode)
+    return Fs.open(args.path, mode)
 	.then(fd => {
 	    Expect(fd).is.above(-1);
-	    return FsClose(fd);
+	    return Fs.close(fd);
 	}).then(_ => {
 	    // we are going to do a search; set delay for next search.
 	    // NOTE: need to set this here, rather than on successful
 	    // search, because we may get robot warning
 	    // TODO: add retry to getOneResult; check for robot result
 	    nextDelay = args.delay;
-	    let oneResultOptions = { reject: options.forceNextError };
+	    let oneResultOptions = {
+		reject: options.forceNextError,
+		retryDelay:  args.delay * 2
+	    };
 	    options.forceNextError = false;
 	    // file did not exist prior to creation; do the search
-	    return getOneResult(args.wordList, args.pages, oneResultOptions);
+	    return retryGetOneResult(args.wordList, args.pages, oneResultOptions);
 	}).then(oneResult => {
 	    if (_.isEmpty(oneResult)) {
 		// empty search result. 
@@ -79,7 +99,7 @@ function checkGetSaveResult(args, options) {
 		args.count.data += 1;
 	    }
 	    return Fs.writeFile(args.path, JSON.stringify(oneResult))
-		.then(() => {
+		.then(_ => {
 		    console.log(`Saved: ${args.path}`);
 		    return [oneResult, nextDelay];
 		});
