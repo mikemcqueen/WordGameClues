@@ -63,7 +63,7 @@ async function retryGetOneResult (wordList, pages, options = {}) {
 		  });
 	if (result !== false) return result;
 	console.log(`Retrying in ${PrettyMs(retryDelay)}...`);
-	My.waitFor(retryDelay);
+	await My.waitFor(retryDelay);
     }
 }
 
