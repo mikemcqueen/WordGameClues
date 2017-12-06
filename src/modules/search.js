@@ -54,7 +54,7 @@ async function retryGetOneResult (wordList, pages, options = {}) {
     while (true) {
 	const result = await getOneResult(wordList, pages, options)
 		  .catch(err => {
-		      if (_.contains(err.message, 'CAPTCHA')) {
+		      if (_.includes(err.message, 'CAPTCHA')) {
 			  console.log('CAPTCHA error');
 		      } else {
 			  console.log(err);
