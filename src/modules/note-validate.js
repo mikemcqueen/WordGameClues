@@ -24,20 +24,20 @@ const SearchResult = require('./search-result');
 
 function initResult () {
     return {
-	count : {
-	    knownUrls      : 0,
-	    rejectUrls     : 0,
-	    maybeUrls      : 0,
-	    knownClues     : 0,
-	    rejectClues    : 0,
-	    maybeClues     : 0,
-	    knownCountSet  : new Set(),
-	    rejectCountSet : new Set(),
-	    maybeCountSet  : new Set()
-	},
-	timing : {
-	    getCountList : 0
-	}
+        count : {
+            knownUrls      : 0,
+            rejectUrls     : 0,
+            maybeUrls      : 0,
+            knownClues     : 0,
+            rejectClues    : 0,
+            maybeClues     : 0,
+            knownCountSet  : new Set(),
+            rejectCountSet : new Set(),
+            maybeCountSet  : new Set()
+        },
+        timing : {
+            getCountList : 0
+        }
     };
 }
 
@@ -48,8 +48,8 @@ async function _validateFile(filename, options) {
     Log.info(`file: ${Path.basename(filename)}`);
 
     if (!ClueManager.loaded) {
-	Log.info('_validateFile: calling ClueManager.loadAllClues()');
-	ClueManager.loadAllClues({ clues: Clues.getByOptions(options) });
+        Log.info('_validateFile: calling ClueManager.loadAllClues()');
+        ClueManager.loadAllClues({ clues: Clues.getByOptions(options) });
     }
     // get trailing word of filename
     const lastDot = _.lastIndexOf(filename, '.');
@@ -59,20 +59,20 @@ async function _validateFile(filename, options) {
     // for each clue source in file
     const filterList = Filter.parseFile(filename, options);
     for (const clueObj of filterList) {
-	// remove prefix from clueObj.source
-	const [source, prefix]  = Markdown.getPrefix(clueObj.source, Markdown.Prefix.source);
-	Expect(prefix).is.ok();
-	const countListResult = ClueManager.getCountListArrays(source, options);
-	if (!countListResult || !countListResult.valid) {
-	    const message = !countListResult ? 'doesnt exist??' : countListResult.invalid ? 'invalid' : 'rejected';
-	    console.log(`${source} ${message}`);
-	}
-	// Not sure if i should do this, or just a straight grep-style match.
-	const regex = new RegExp(`(^${word}|[ ,]${word})`);
-	const matchResult = source.match(regex);
-	if (!matchResult) {
-	    console.log(`${source}: no sources match ${word}`);
-	}
+        // remove prefix from clueObj.source
+        const [source, prefix]  = Markdown.getPrefix(clueObj.source, Markdown.Prefix.source);
+        Expect(prefix).is.ok();
+        const countListResult = ClueManager.getCountListArrays(source, options);
+        if (!countListResult || !countListResult.valid) {
+            const message = !countListResult ? 'doesnt exist??' : countListResult.invalid ? 'invalid' : 'rejected';
+            console.log(`${source} ${message}`);
+        }
+        // Not sure if i should do this, or just a straight grep-style match.
+        const regex = new RegExp(`(^${word}|[ ,]${word})`);
+        const matchResult = source.match(regex);
+        if (!matchResult) {
+            console.log(`${source}: no sources match ${word}`);
+        }
     }
 }
 
@@ -81,14 +81,13 @@ async function _validateFile(filename, options) {
 async function validateFile(filename, options) {
     const start = new Date();
     return _validateFile(filename, options)
-	.then(result => {
-	    if (options.perf) {
-		const duration = new Duration(start, new Date()).milliseconds;
-		Log.info(`updateFromFile duration(${PrettyMs(duration)})` +
-			 `, getCountList(${PrettyMs(result.timing.getCountList)})`);
-	    }
-	    //return saveClues(result, options);
-	});
+        .then(result => {
+            if (options.perf) {
+                const duration = new Duration(start, new Date()).milliseconds;
+                Log.info(`validateFile duration(${PrettyMs(duration)})` +
+                         `, getCountList(${PrettyMs(result.timing.getCountList)})`);
+            }
+        });
 }
     
 //
@@ -113,21 +112,22 @@ async function validatePathList(pathList, options) {
     let allResults = initResult();
     let start = new Date();
     for (let path of pathList) {
-	let result = await _validateFile(path, options)
-	    .then(result => {
-		//allResults = aggregate(result, allResults);
-		return result;
-	    }).catch(err => {
-		console.log(`validateFile, ${err}`);
-		if (err && err.code !== 'ENOENT') {
-		    throw err;
-		}
-	    });
+        let result = await _validateFile(path, options)
+            .then(result => {
+                //allResults = aggregate(result, allResults);
+                return result;
+            }).catch(err => {
+                if (err.code === 'ENOENT') {
+                    Log.info('file not found');
+                } else {
+                    throw err;
+                }
+            });
     }
     if (options.perf) {
-	let duration = new Duration(start, new Date()).milliseconds;
-	Log.info(`validateFromPathList duration(${PrettyMs(duration)})` +
-		 `, getCountList(${PrettyMs(allResults.timing.getCountList)})`);
+        let duration = new Duration(start, new Date()).milliseconds;
+        Log.info(`validateFromPathList duration(${PrettyMs(duration)})` +
+                 `, getCountList(${PrettyMs(allResults.timing.getCountList)})`);
     }
     const count = allResults.count;
 //    Log.message(`new: known(${count.knownClues}), maybe(${count.maybeClues}), rejects(${count.rejectClues})`);

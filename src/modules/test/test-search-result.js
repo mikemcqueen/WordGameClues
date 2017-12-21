@@ -11,8 +11,8 @@ let wordList = [ 'one', 'two' ];
 let filename = 'one-two.json';
 let args = { dir: null };
 let path = SearchResult.pathFormat({
-//	    root: args.root,
-	    dir:  args.dir || _.toString(wordList.length),
-	    base: filename
-	});
+//          root: args.root,
+            dir:  args.dir || _.toString(wordList.length),
+            base: filename
+        });
 console.log(path);

@@ -57,22 +57,22 @@ async function makeFromFilterFile (filename, options = {}) {
     let dest = '';
     let readLines = new Readlines(filename);
     if (options.outerDiv) {
-	dest += '<div>';
+        dest += '<div>';
     }
     while (true) {
-	let line = readLines.next();
-	if (line === false) break;
-	line = line.toString();
-	if (_.isEmpty(line)) {
-	    dest = writeEmptyLine(dest);
-	} else if (_.startsWith(line, 'http')) {
-	    dest = writeUrl(dest, line);
-	} else {
-	    dest = writeText(dest, line);
-	}
+        let line = readLines.next();
+        if (line === false) break;
+        line = line.toString();
+        if (_.isEmpty(line)) {
+            dest = writeEmptyLine(dest);
+        } else if (_.startsWith(line, 'http')) {
+            dest = writeUrl(dest, line);
+        } else {
+            dest = writeText(dest, line);
+        }
     }
     if (options.outerDiv) {
-	dest = + '</div>';
+        dest = + '</div>';
     }
     dest = writeEmptyLine(dest);
     return dest;
@@ -89,27 +89,27 @@ function makeFromFilterList (list, options = {}) {
 
     let result = '';
     if (options.outerDiv) {
-	result += '<div>';
+        result += '<div>';
     }
     for (const sourceElem of list) {
-	if (options.verbose) Debug(`${sourceElem.source}`);
-	let source = sourceElem.source || sourceElem;
-	if (sourceElem.suffix) source += `,${sourceElem.suffix}`;
-	result = writeText(result, source, sourceElem.suffix);
-	for (const urlElem of sourceElem.urls || []) {
-	    let url = urlElem.url || urlElem;
-	    result = writeUrl(result, url, urlElem.suffix);
-	    for (const clueElem of urlElem.clues || []) {
-		const text = Filter.getClueText(clueElem, options);
-		if (!text) continue;
-		result = writeText(result, text);
-	    }
-	}
-	result = writeEmptyLine(result);
+        if (options.verbose) Debug(`${sourceElem.source}`);
+        let source = sourceElem.source || sourceElem;
+        if (sourceElem.suffix) source += `,${sourceElem.suffix}`;
+        result = writeText(result, source, sourceElem.suffix);
+        for (const urlElem of sourceElem.urls || []) {
+            let url = urlElem.url || urlElem;
+            result = writeUrl(result, url, urlElem.suffix);
+            for (const clueElem of urlElem.clues || []) {
+                const text = Filter.getClueText(clueElem, options);
+                if (!text) continue;
+                result = writeText(result, text);
+            }
+        }
+        result = writeEmptyLine(result);
     }
     if (options.outerDiv) {
-	result += '</div>';
-	result = writeEmptyLine(result);
+        result += '</div>';
+        result = writeEmptyLine(result);
     }
     return result;
 }

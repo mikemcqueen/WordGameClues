@@ -29,30 +29,30 @@ async function main () {
     const opt = Options.parseSystem();
     const options = opt.options;
     if (opt.argv.length !== 1) {
-	console.log('a FILE parameter is required');
-	process.exit(-1);
+        console.log('a FILE parameter is required');
+        process.exit(-1);
     }
     const filename = opt.argv[0];
 
     const wordListArray = await Fs.readFile(filename)
-	      .then(csvContent => CsvParse(csvContent, { relax_column_count: true }))
-	      .then(wordListArray => wordListArray)
-	      .catch(err => { throw err; });
+              .then(csvContent => CsvParse(csvContent, { relax_column_count: true }))
+              .then(wordListArray => wordListArray)
+              .catch(err => { throw err; });
     
     for (const [index, wordList] of wordListArray.entries()) {
-	let filename = SearchResult.makeFilename(wordList);
-	let path = SearchResult.pathFormat({
-	    //root: args.root,
-	    dir:  _.toString(wordList.length),
-	    base: filename
-	}, options);
-	Debug(path);
-	Debug(`list: ${wordList}`);
-	Debug(`file: ${filename}`);
-	let result = await My.checkIfFile(path).catch(err => { throw err; });
-	Debug(`path: ${path}, exists: ${result.exists}`);
-	if (result.exists) continue;
-	console.log(wordList.join(','));
+        let filename = SearchResult.makeFilename(wordList);
+        let path = SearchResult.pathFormat({
+            //root: args.root,
+            dir:  _.toString(wordList.length),
+            base: filename
+        }, options);
+        Debug(path);
+        Debug(`list: ${wordList}`);
+        Debug(`file: ${filename}`);
+        let result = await My.checkIfFile(path).catch(err => { throw err; });
+        Debug(`path: ${path}, exists: ${result.exists}`);
+        if (result.exists) continue;
+        console.log(wordList.join(','));
     }
 }
 

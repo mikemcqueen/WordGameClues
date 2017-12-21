@@ -30,7 +30,7 @@ const Tag = {
 
 function processDiv (node, div, queue) {
     if (div) {
-	div.noText = true;
+        div.noText = true;
     }
     queue.push({});
 }
@@ -45,25 +45,25 @@ function processDiv (node, div, queue) {
 function processText (node, div, queue) {
     const text = node.textContent;
     try {
-	Expect(div).is.ok();
-	Expect(div.noText).is.not.true();
-	Expect(div.break).is.not.true();
-	if (div.link) {
-	    if (!div.linkText) {
-		Expect(_.startsWith(text, 'http')).is.true();
-		div.linkText = true;
-	    } else {
-		Expect(div.linkSuffix).is.not.true();
-		Expect(text.charAt(0)).is.equal(',');
-		div.linkSuffix = true;
-	    }
-	}
+        Expect(div).is.ok();
+        Expect(div.noText).is.not.true();
+        Expect(div.break).is.not.true();
+        if (div.link) {
+            if (!div.linkText) {
+                Expect(_.startsWith(text, 'http')).is.true();
+                div.linkText = true;
+            } else {
+                Expect(div.linkSuffix).is.not.true();
+                Expect(text.charAt(0)).is.equal(',');
+                div.linkSuffix = true;
+            }
+        }
     } catch(err) {
-	console.log(`text: ${text}`);
-	console.log(`node: ${Stringify(div)}`);
-	let prev = queue.pop();
-	console.log(`prevNode: ${prev && Stringify(prev)}`);
-	throw err;
+        console.log(`text: ${text}`);
+        console.log(`node: ${Stringify(div)}`);
+        let prev = queue.pop();
+        console.log(`prevNode: ${prev && Stringify(prev)}`);
+        throw err;
     }
     return text;
 }
@@ -83,13 +83,13 @@ function processLink (node, div, divQueue) {
     Expect(div.text).is.not.ok();
     
     if (div.prevTag != Tag.link) {
-	// cannot be a link if previous node was not a link
-	Expect(div.link).is.not.true();
-	// first link in div, next tag can be text or link
-	div.nextTags = [Tag.text, Tag.link];
+        // cannot be a link if previous node was not a link
+        Expect(div.link).is.not.true();
+        // first link in div, next tag can be text or link
+        div.nextTags = [Tag.text, Tag.link];
     } else {
-	// second tag in div, next tag must be text
-	div.nextTags = Tag.text;
+        // second tag in div, next tag must be text
+        div.nextTags = Tag.text;
     }
     div.link = true;
 }
@@ -132,41 +132,41 @@ const TagFnMap = {
 // should use stream here
 function parseDomLines (lines, node, queue, options) {
     if (_.has(TagFnMap, node.nodeName)) {
-	let div = _.last(queue);
-	let expected;
-	if (div && div.nextTags) {
-	    Expect(_.includes(div.nextTags, node.nodeName)).is.true();
-	    div.nextTags = undefined;
-	}
-	let text = TagFnMap[node.nodeName](node, div, queue);
-	if (text) {
-	    Expect(div).is.ok();
-	    if (!div.text) {
-		div.text = text;
-	    } else {
-		div.text += text;
-	    }
-	}
-	if (div) {
-	    div.prevTag = node.nodeName;
-	}
+        let div = _.last(queue);
+        let expected;
+        if (div && div.nextTags) {
+            Expect(_.includes(div.nextTags, node.nodeName)).is.true();
+            div.nextTags = undefined;
+        }
+        let text = TagFnMap[node.nodeName](node, div, queue);
+        if (text) {
+            Expect(div).is.ok();
+            if (!div.text) {
+                div.text = text;
+            } else {
+                div.text += text;
+            }
+        }
+        if (div) {
+            div.prevTag = node.nodeName;
+        }
     }
     if (node.childNodes) {
-	Array.prototype.forEach.call(node.childNodes, child => {
-	    parseDomLines (lines, child, queue, options);
-	});
+        Array.prototype.forEach.call(node.childNodes, child => {
+            parseDomLines (lines, child, queue, options);
+        });
     }
     if (isDiv(node)) {
-	let div = queue.pop();
-	Expect(div).is.ok();
-	let text = div.text && div.text.trim();
-	if (text && !_.isEmpty(text)) {
-	    Debug(`line: ${text}`);
-	    lines.push(text);
-	} else if (!_.isEmpty(_.last(lines))) {
-	    Debug('empty line');
-	    lines.push('');
-	}
+        let div = queue.pop();
+        Expect(div).is.ok();
+        let text = div.text && div.text.trim();
+        if (text && !_.isEmpty(text)) {
+            Debug(`line: ${text}`);
+            lines.push(text);
+        } else if (!_.isEmpty(_.last(lines))) {
+            Debug('empty line');
+            lines.push('');
+        }
     }
 }
 
@@ -221,109 +221,109 @@ function oldParse (text, options = {}) {
     let prevSourceElement;
     let done = false;
     while (!done) {
-	prevSourceElement = sourceElement;
-	prevSourceResult = sourceResult;
-	sourceResult = sourceExpr.exec(text);
-	let sourceIndex;
-	if (sourceResult) {
-	    // result[1] = 1st capture group
-	    const match = sourceResult[1];
-	    const [sourceLine, suffix] = Markdown.getSuffix(match);
-	    Debug(`sourceLine: ${sourceLine} suffix: ${suffix}`);
-	    sourceElement = options.noUrls ? sourceLine : { source: sourceLine, suffix };
-	    resultList.push(sourceElement);
-	    sourceIndex = sourceResult.index;
-	} else {
-	    sourceIndex = Number.MAX_SAFE_INTEGER;
-	    done = true;
-	}
-	if (options.noUrls || !prevSourceElement) continue;
-	
-	// parse urls for previous source
+        prevSourceElement = sourceElement;
+        prevSourceResult = sourceResult;
+        sourceResult = sourceExpr.exec(text);
+        let sourceIndex;
+        if (sourceResult) {
+            // result[1] = 1st capture group
+            const match = sourceResult[1];
+            const [sourceLine, suffix] = Markdown.getSuffix(match);
+            Debug(`sourceLine: ${sourceLine} suffix: ${suffix}`);
+            sourceElement = options.noUrls ? sourceLine : { source: sourceLine, suffix };
+            resultList.push(sourceElement);
+            sourceIndex = sourceResult.index;
+        } else {
+            sourceIndex = Number.MAX_SAFE_INTEGER;
+            done = true;
+        }
+        if (options.noUrls || !prevSourceElement) continue;
+        
+        // parse urls for previous source
 
-	// move urlExpr position to prevSourceResult
-	while ((urlResult !== null) && (urlResult.index < prevSourceResult.index)) {
-	    //urlExpr.lastIndex = prevSourceResult.index;
-	    //Debug(`advanced urlExpr.lastIndex to ${urlExpr.lastIndex}`);
-	    urlResult = urlExpr.exec(text); // for while loop
-	}
-	Debug(`urlResult.index = ${urlResult && urlResult.index}, sourceIndex = ${sourceIndex}`);
-	let urlList = [];
-	// while urlResult is at a position before the current sourceResult
-	while ((urlResult !== null) && (urlResult.index < sourceIndex)) {
-	    const urlLine = urlResult[1];
-	    Debug(`urlLine: ${urlLine}`);
-	    // NOTE: suffix on a url inside a note is within a separate <div> block
-	    //const [_, urlLine] = My.hasCommaSuffix(urlResult[1], RejectSuffix); // ValidSuffixes
-	    let urlElement = options.noClues ? urlLine : { url: urlLine, clues: [] };
-	    urlList.push(urlElement);
-	    prevUrlResult = urlResult;
-	    urlResult = urlExpr.exec(text);
-	    if (options.noClues) continue;
+        // move urlExpr position to prevSourceResult
+        while ((urlResult !== null) && (urlResult.index < prevSourceResult.index)) {
+            //urlExpr.lastIndex = prevSourceResult.index;
+            //Debug(`advanced urlExpr.lastIndex to ${urlExpr.lastIndex}`);
+            urlResult = urlExpr.exec(text); // for while loop
+        }
+        Debug(`urlResult.index = ${urlResult && urlResult.index}, sourceIndex = ${sourceIndex}`);
+        let urlList = [];
+        // while urlResult is at a position before the current sourceResult
+        while ((urlResult !== null) && (urlResult.index < sourceIndex)) {
+            const urlLine = urlResult[1];
+            Debug(`urlLine: ${urlLine}`);
+            // NOTE: suffix on a url inside a note is within a separate <div> block
+            //const [_, urlLine] = My.hasCommaSuffix(urlResult[1], RejectSuffix); // ValidSuffixes
+            let urlElement = options.noClues ? urlLine : { url: urlLine, clues: [] };
+            urlList.push(urlElement);
+            prevUrlResult = urlResult;
+            urlResult = urlExpr.exec(text);
+            if (options.noClues) continue;
 
-	    // parse clues for previous url
+            // parse clues for previous url
 
-	    // clue parsing ends at next url or next source, whichever is first
-	    let urlIndex = urlResult ? urlResult.index : Number.MAX_SAFE_INTEGER;
-	    let endClueIndex = urlIndex < sourceIndex ? urlIndex : sourceIndex;
-	    let clueList = [];
-	    // move clueExpr position to prevUrlResult
-	    while ((clueResult !== null) && (clueResult.index < prevUrlResult.index)) {
-		clueResult = clueExpr.exec(text);
-	    }
-	    let count = 0;
-	    while ((clueResult !== null) && (clueResult.index < endClueIndex)) {
-		let clueLine = clueResult[1].trim();
-		let debugMsg;
-		// <a> element inner text (with url) gets picked up by clueExpr regex
-		if (_.startsWith(clueLine, 'http')) {// TODO: Filter.isUrl/or My.isUrl/or Markdown.isUrl
-		    // ignore if first, fail if > first
-		    if (count > 0) {
-			throw new Error(`encountered http where clue was expected, ${clueLine}, count ${count}`);
-		    }
-		    debugMsg = 'ignored';
-		} else if (clueLine.charAt(0) === ',') { 
-		    // a comma is a valid clue starting character only if it is in fact not a clue,
-		    // but a instead suffix to a url.  which means it must immediately follow a url,
-		    // which was actually ignored as the first "clue", above.
-		    // here (count > 1) allows for the possibility that there is no inner text to the
-		    // <a> element (which would be the url ignored, above).
-		    if (count > 1) {
-			throw new Error(`encountered unexpected comma where clue was expected: ${clueLine}`);
-		    }
-		    let [base, suffix] = Markdown.getSuffix(clueLine);
-		    if (!suffix) {
-			throw new Error(`encountered invalid comma or suffix: ${clueLine}`);
-		    }
-		    urlElement.suffix = suffix;
-		    debugMsg = `adding suffix to URL, ${suffix}`;
-		} else if (Markdown.hasSourcePrefix(clueLine)) {
-		    throw new Error(`encountered unexpected source where clue was expected, ${clueLine}`);
-		} else if (!_.isEmpty(clueLine)) {
-		    // makeClueElem belongs somewhere else, then can remove Fitler dependency
-		    const clueElem = Filter.makeClueElem(clueLine);
-		    if (clueElem.prefix) {
-			if (clueElem.prefix === Markdown.Prefix.maybe) {
-			    debugMsg = 'maybe';
-			} else if (clueElem.prefix === Markdown.Prefix.remove) {
-			    debugMsg = 'remove';
-			}
-		    } else {
-			debugMsg = 'clue';
-		    }
-		    if (clueElem.note) debugMsg += ' with note';
-		    clueList.push(clueElem);
-		} else {
-		    debugMsg = 'empty';
-		}
-		Debug(`clueLine: ${clueLine || ''} (${debugMsg})`);
-		clueResult = clueExpr.exec(text);
-		count += 1;
-	    }
-	    urlElement.clues = clueList;
-	}
-	prevSourceElement.urls = urlList;
-	Debug(`found ${urlList.length} urls for ${prevSourceElement.source}`);
+            // clue parsing ends at next url or next source, whichever is first
+            let urlIndex = urlResult ? urlResult.index : Number.MAX_SAFE_INTEGER;
+            let endClueIndex = urlIndex < sourceIndex ? urlIndex : sourceIndex;
+            let clueList = [];
+            // move clueExpr position to prevUrlResult
+            while ((clueResult !== null) && (clueResult.index < prevUrlResult.index)) {
+                clueResult = clueExpr.exec(text);
+            }
+            let count = 0;
+            while ((clueResult !== null) && (clueResult.index < endClueIndex)) {
+                let clueLine = clueResult[1].trim();
+                let debugMsg;
+                // <a> element inner text (with url) gets picked up by clueExpr regex
+                if (_.startsWith(clueLine, 'http')) {// TODO: Filter.isUrl/or My.isUrl/or Markdown.isUrl
+                    // ignore if first, fail if > first
+                    if (count > 0) {
+                        throw new Error(`encountered http where clue was expected, ${clueLine}, count ${count}`);
+                    }
+                    debugMsg = 'ignored';
+                } else if (clueLine.charAt(0) === ',') { 
+                    // a comma is a valid clue starting character only if it is in fact not a clue,
+                    // but a instead suffix to a url.  which means it must immediately follow a url,
+                    // which was actually ignored as the first "clue", above.
+                    // here (count > 1) allows for the possibility that there is no inner text to the
+                    // <a> element (which would be the url ignored, above).
+                    if (count > 1) {
+                        throw new Error(`encountered unexpected comma where clue was expected: ${clueLine}`);
+                    }
+                    let [base, suffix] = Markdown.getSuffix(clueLine);
+                    if (!suffix) {
+                        throw new Error(`encountered invalid comma or suffix: ${clueLine}`);
+                    }
+                    urlElement.suffix = suffix;
+                    debugMsg = `adding suffix to URL, ${suffix}`;
+                } else if (Markdown.hasSourcePrefix(clueLine)) {
+                    throw new Error(`encountered unexpected source where clue was expected, ${clueLine}`);
+                } else if (!_.isEmpty(clueLine)) {
+                    // makeClueElem belongs somewhere else, then can remove Fitler dependency
+                    const clueElem = Filter.makeClueElem(clueLine);
+                    if (clueElem.prefix) {
+                        if (clueElem.prefix === Markdown.Prefix.maybe) {
+                            debugMsg = 'maybe';
+                        } else if (clueElem.prefix === Markdown.Prefix.remove) {
+                            debugMsg = 'remove';
+                        }
+                    } else {
+                        debugMsg = 'clue';
+                    }
+                    if (clueElem.note) debugMsg += ' with note';
+                    clueList.push(clueElem);
+                } else {
+                    debugMsg = 'empty';
+                }
+                Debug(`clueLine: ${clueLine || ''} (${debugMsg})`);
+                clueResult = clueExpr.exec(text);
+                count += 1;
+            }
+            urlElement.clues = clueList;
+        }
+        prevSourceElement.urls = urlList;
+        Debug(`found ${urlList.length} urls for ${prevSourceElement.source}`);
     }
     Debug(`--parse`);
     return resultList;
@@ -333,15 +333,15 @@ function oldParse (text, options = {}) {
 
 function parseFile (filename, options) {
     return Fs.readFile(filename)
-	.then(content => {
-	    return parse(content.toString(), options);
-	});
+        .then(content => {
+            return parse(content.toString(), options);
+        });
 }
 
 //
 
 module.exports = {
-    oldParse,
+//    oldParse,
     parseDom,
-    parseFile
+//    parseFile
 };

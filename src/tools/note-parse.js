@@ -23,19 +23,19 @@ function usage () {
 async function main () {
     const filename = process.argv[2];
     if (!filename) {
-	usage();
+        usage();
     }
     Debug(`filename: ${filename}`);
     // TODO: streams = better here
     let fd = process.stdout.fd;
     return NoteParse.parseFile(filename)
-	.then(filterList => {
-	    if (_.isEmpty(filterList)) {
-		console.log('no results');
-		return;
-	    }
-	    Filter.dumpList(filterList, { fd: process.stdout.fd });
-	});
+        .then(filterList => {
+            if (_.isEmpty(filterList)) {
+                console.log('no results');
+                return;
+            }
+            Filter.dumpList(filterList, { fd: process.stdout.fd });
+        });
 }
 
 //

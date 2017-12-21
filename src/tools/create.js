@@ -18,10 +18,10 @@ const Tmp         = require('tmp');
  
 const Options     = require('node-getopt')
     .create([
-	['', 'notebook=NAME',   'specify notebook name'],
-	['', 'production',      'create note in production']
+        ['', 'notebook=NAME',   'specify notebook name'],
+        ['', 'production',      'create note in production']
     ]).bindHelp(
-	"Usage: node create [options] FILE\n\n[[OPTIONS]]\n"
+        "Usage: node create [options] FILE\n\n[[OPTIONS]]\n"
     );
 
 //
@@ -39,7 +39,7 @@ async function main () {
     const options = opt.options;
 
     if (opt.argv.length !== 1) {
-	usage('exactly one FILE argument required');
+        usage('exactly one FILE argument required');
     }
     const filename = opt.argv[0];
     Debug(`filename: ${filename}`);
@@ -49,28 +49,28 @@ async function main () {
     //   if --notebook not specified, get notebook name from filename
     
     if (options.production && !options.default) {
-	const nbName = options.notebook || Note.getWorksheetName(Path.basename(filename));
-	const nb = await Note.getNotebook(nbName, options);
-	if (!nb) {
-	    usage(`Can't find notebook ${nbName}`);
-	}
-	options.notebookGuid = nb.guid;
+        const nbName = options.notebook || Note.getWorksheetName(Path.basename(filename));
+        const nb = await Note.getNotebook(nbName, options);
+        if (!nb) {
+            usage(`Can't find notebook ${nbName}`);
+        }
+        options.notebookGuid = nb.guid;
     }
     const keep = true; // <-- NOTE
     const [path, fd] = await My.createTmpFile(keep).catch(err => { throw err; });
 
     // TODO: streams = better here
     return NoteMake.make(filename, fd)
-	.then(_ => {
-	    // a little weird. fseek(0) then read (then close)?
-	    Fs.closeSync(fd);
-	    return Fs.readFile(path);
-	}).then(content => {
-	    // TODO: DEP0013 ??
-	    Expect(content).is.ok();
-	    // TODO: check if note exists!
-	    return Note.create(Path.basename(filename), content.toString());
-	});
+        .then(_ => {
+            // a little weird. fseek(0) then read (then close)?
+            Fs.closeSync(fd);
+            return Fs.readFile(path);
+        }).then(content => {
+            // TODO: DEP0013 ??
+            Expect(content).is.ok();
+            // TODO: check if note exists!
+            return Note.create(Path.basename(filename), content.toString());
+        });
 }
 
 //

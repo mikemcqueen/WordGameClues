@@ -62,7 +62,7 @@ const XFACTOR_BADSCORE = 3;
 
 function usage (msg) {
     if (msg) {
-	console.log(`\n${msg}\n`);
+        console.log(`\n${msg}\n`);
     }
     Options.showHelp();
     process.exit(-1);
@@ -75,7 +75,7 @@ function getUrlCount (resultList) {
     // TODO _.reduce()
     let urlCount = 0;
     for (const result of resultList) {
-	urlCount += _.size(result.urlList);
+        urlCount += _.size(result.urlList);
     }
     return urlCount;
 }
@@ -107,17 +107,17 @@ function isXFactor (result, options) {
     Expect(result).is.an.Object();
     Expect(options).is.an.Object();
     if (options.xfactor === XFACTOR_MISSING) { 
-	const missing = _.isEmpty(result.url) || _.isEmpty(result.title) || _.isEmpty(result.summary);
-	if (missing) {
-	    console.log(`${JSON.stringify(result)}`);
-	}
-	return missing;
+        const missing = _.isEmpty(result.url) || _.isEmpty(result.title) || _.isEmpty(result.summary);
+        if (missing) {
+            console.log(`${JSON.stringify(result)}`);
+        }
+        return missing;
     }
     if (options.xfactor === XFACTOR_UNSCORED) {
-	return _.isEmpty(result.score);
+        return _.isEmpty(result.score);
     }
     if (options.xfactor === XFACTOR_BADSCORE && _.isObject(result.score)) {
-	return result.score.wordsInArticle < result.score.wordsInSummary;
+        return result.score.wordsInArticle < result.score.wordsInSummary;
     }
     return false;
 }
@@ -134,37 +134,37 @@ function filterSearchResultList (resultList, wordList, filteredUrls, options, fi
     
     Debug(`++filterResultList for ${wordList}`);
     if (filteredUrls) {
-	Debug(	  `, known(${filteredUrls.knownUrls.length})` +
-		  `, reject(${filteredUrls.rejectUrls.length})`);
+        Debug(    `, known(${filteredUrls.knownUrls.length})` +
+                  `, reject(${filteredUrls.rejectUrls.length})`);
     }
     if (options.verbose) {
-	Debug(`${JSON.stringify(filteredUrls)}`);
+        Debug(`${JSON.stringify(filteredUrls)}`);
     }
     // first filter out all rejected, unscored, known (if applicable), and below-score results
     return Promise.filter(resultList, result => {
-	//Debug(`result: ${_.entries(result)}`);
-	if (options.xfactor && isXFactor(result, options)) {
-	    if (!loggedXFactor) {
-		console.log(`x: ${filepath}`);
-		loggedXFactor = true;
-	    }
-	    return false;
-	}
-	if (isRejectUrl(result.url, filteredUrls) || _.isUndefined(result.score)) {
-	    Debug(`filtering reject or unscored url, ${result.url}, score ${result.score}`);
-	    return false;
-	}
-	if (options.filter_known_urls && isKnownUrl(result.url, filteredUrls)) {
-	    Debug(`filtering known url, ${result.url}`);
-	    return false;
-	}
-	return Score.wordCountFilter(result.score, wordCount, options);
+        //Debug(`result: ${_.entries(result)}`);
+        if (options.xfactor && isXFactor(result, options)) {
+            if (!loggedXFactor) {
+                console.log(`x: ${filepath}`);
+                loggedXFactor = true;
+            }
+            return false;
+        }
+        if (isRejectUrl(result.url, filteredUrls) || _.isUndefined(result.score)) {
+            Debug(`filtering reject or unscored url, ${result.url}, score ${result.score}`);
+            return false;
+        }
+        if (options.filter_known_urls && isKnownUrl(result.url, filteredUrls)) {
+            Debug(`filtering known url, ${result.url}`);
+            return false;
+        }
+        return Score.wordCountFilter(result.score, wordCount, options);
     }).then(resultList => {
-	return {
-	    src:     wordList.toString(),
-	    urlList: resultList.map(result => result.url), // only good results remain; map to urls
-	    known:   ClueManager.getKnownClueNames(wordList)
-	};
+        return {
+            src:     wordList.toString(),
+            urlList: resultList.map(result => result.url), // only good results remain; map to urls
+            known:   ClueManager.getKnownClueNames(wordList)
+        };
     });
     // TODO: .catch()
 }
@@ -178,14 +178,14 @@ function loadFilteredUrls (dir, wordList, options) {
     let filteredFilename = SearchResult.makeFilteredFilename(wordList);
     Debug(`filtered filename: ${filteredFilename}`);
     return Fs.readFile(Path.format({ dir, base: filteredFilename }), 'utf8')
-	.then(content => {
-	    Debug(`resolving filtered urls for: ${wordList}`);
-	    return JSON.parse(content);
-	}).catch(err => {
-	    if (err && err.code !== 'ENOENT') throw err;
-	    Debug(`no filtered urls, ${wordList}`);
-	    return undefined;
-	});
+        .then(content => {
+            Debug(`resolving filtered urls for: ${wordList}`);
+            return JSON.parse(content);
+        }).catch(err => {
+            if (err && err.code !== 'ENOENT') throw err;
+            Debug(`no filtered urls, ${wordList}`);
+            return undefined;
+        });
 }
 
 //
@@ -194,10 +194,10 @@ function hasRemaining (wordListArray, remaining) {
     Expect(wordListArray).is.an.Array();
     Expect(remaining).is.an.Array().and.not.empty();
     for (const wordList of wordListArray) {
-	if (wordList.length !== remaining.length) continue;
-	if (remaining.some(word => _.includes(wordList, word))) {
-	    return true;
-	}
+        if (wordList.length !== remaining.length) continue;
+        if (remaining.some(word => _.includes(wordList, word))) {
+            return true;
+        }
     }
     return false;
 }
@@ -227,53 +227,54 @@ function filterSearchResultDir (dir, fileMatch, options) {
     Expect(fileMatch).is.a.String('fSRD filematch');
     Expect(options).is.an.Object();
     return new Promise((resolve, reject) => {
-	let filteredList = [];
-	let rejectList = [];
-	Dir.readFiles(dir , {
-	    match:     new RegExp(fileMatch),
-	    exclude:   /^\./,
-	    recursive: false
-	}, function(err, content, filepath, next) {
-	    if (err) throw err; // TODO: test
-	    Debug(`filename: ${filepath}`);
-	    let wordList = SearchResult.makeWordlist(filepath);
-	    // filter out rejected word combos
-	    if (ClueManager.isRejectSource(wordList)) return next();
-	    if (!_.isUndefined(options.nameMap) && !isInNameMap(options.nameMap, wordList)) return next();
-	    // temp
+        let filteredList = [];
+        let rejectList = [];
+        Dir.readFiles(dir , {
+            match:     new RegExp(fileMatch),
+            exclude:   /^\./,
+            recursive: false
+        }, function(err, content, filepath, next) {
+            if (err) throw err; // TODO: test
+            Debug(`filename: ${filepath}`);
+            let wordList = SearchResult.makeWordlist(filepath);
+            // filter out rejected word combos
+            if (ClueManager.isRejectSource(wordList)) return next();
+            if (!_.isUndefined(options.nameMap) && !isInNameMap(options.nameMap, wordList)) return next();
+            // temp
 
-	    /*
-	    if (!_.isUndefined(options.nameMap)) {
-		console.log(`filename: ${filepath}`);
-		return next();
-	    }
-	     */
-  	    loadFilteredUrls(Path.dirname(filepath), wordList, options)
-		.then(filteredUrls => {
-		    return filterSearchResultList(JSON.parse(content), wordList, filteredUrls, options, filepath);
-		}).then(filterResult => {
-		    // TODO: I question this logic at the moment
-		    if (_.isEmpty(filterResult.urlList)) {
-			rejectList.push(filterResult);
-		    } else {
-			filteredList.push(filterResult);
-		    }
-		    return undefined;
-		}).catch(err => {
-		    // report & eat all errors
-		    console.log(`filterSearchResultDir, path: ${filepath}`, err, err.stack);
-		});//.then(() => next()); // process files synchronously
-	    return next(); // process files asynchronously
-	}, function(err, files) {
+            /*
+            if (!_.isUndefined(options.nameMap)) {
+                console.log(`filename: ${filepath}`);
+                return next();
+            }
+             */
+            loadFilteredUrls(Path.dirname(filepath), wordList, options)
+                .then(filteredUrls => {
+                    return filterSearchResultList(JSON.parse(content), wordList, filteredUrls, options, filepath);
+                }).then(filterResult => {
+                    // TODO: I question this logic at the moment
+                    if (_.isEmpty(filterResult.urlList)) {
+                        rejectList.push(filterResult);
+                    } else {
+                        filteredList.push(filterResult);
+                    }
+                    return undefined;
+                }).catch(err => {
+                    // report & eat all errors
+                    console.log(`filterSearchResultDir, path: ${filepath}`, err, err.stack);
+                });//.then(() => next()); // process files synchronously
+            return next(); // process files asynchronously
+        }, function(err, files) {
             if (err) throw err;  // TODO: test
-	    resolve({
-		filtered: filteredList,
-		rejects:  rejectList
-	    });
-	});
+            resolve({
+                filtered: filteredList,
+                rejects:  rejectList
+            });
+        });
     });
 }
 
+//
 // for each result file path in pathlist
 //   load result file
 //   make word list from filename
@@ -286,31 +287,33 @@ function filterPathList (pathList, dir, options) {
     let rejectList = [];
     // map to array of result || undefined
     return Promise.map(pathList, path => {
-	let filename = Path.basename(path);
-	Debug(`filename: ${filename}`);
-	let wordList = SearchResult.makeWordlist(filename);
-  	return Promise.all(
-	    [Fs.readFile(path), loadFilteredUrls(Path.dirname(path), wordList, options)])
-	    .then(([content, filteredUrls]) => {
-		return filterSearchResultList(JSON.parse(content), wordList, filteredUrls, options, path);
-	    }).then(filterResult => {
-		// TODO: this is probably wrong for rejects
-		if (_.isEmpty(filterResult.urlList) && _.isEmpty(filterResult.known)) {
-		    Debug(`rejecting, ${wordList}, no urls or known clues`); 
-		    rejectList.push(filterResult);
-		    return undefined;
-		}
-		return filterResult;
-	    }).catch(err => {
-		// report & eat all errors
-		console.log(`filterSearchResultFiles, path: ${path}`, err, err.stack);
-	    });
+        let filename = Path.basename(path);
+        Debug(`filename: ${filename}`);
+        let wordList = SearchResult.makeWordlist(filename);
+        return Promise.all(
+            [Fs.readFile(path), loadFilteredUrls(Path.dirname(path), wordList, options)])
+            .then(([content, filteredUrls]) => {
+                return filterSearchResultList(JSON.parse(content), wordList, filteredUrls, options, path);
+            }).then(filterResult => {
+                // TODO: this is probably wrong for rejects
+                if (_.isEmpty(filterResult.urlList) && _.isEmpty(filterResult.known)) {
+                    Debug(`rejecting, ${wordList}, no urls or known clues`); 
+                    rejectList.push(filterResult);
+                    return undefined;
+                }
+                return filterResult;
+            }).catch(err => {
+                // report & eat all errors
+                // THIS IS SO VERY VERY WRONG. SPITTING AN ERROR OUT TO A FILTERED OUTPUT
+                // MAKES NO SENSE IN SOME CASES - SHOULD ABORT
+                console.log(`filterSearchResultFiles, path: ${path}`, err, err.stack);
+            });
     }).then(resultList => resultList.filter(result => !_.isUndefined(result)))
     .then(filteredList => {
-	return {
-	    filtered: filteredList,
-	    rejects:  rejectList
-	};
+        return {
+            filtered: filteredList,
+            rejects:  rejectList
+        };
     });
 }
 
@@ -318,7 +321,7 @@ function filterPathList (pathList, dir, options) {
 
 function loadCsv (filename) {
     return Fs.readFile(filename, 'utf8')
-	.then(csvContent => csvParse(csvContent, { relax_column_count: true }));
+        .then(csvContent => csvParse(csvContent, { relax_column_count: true }));
 }
 
 //
@@ -326,16 +329,16 @@ function loadCsv (filename) {
 function buildNameMap (wordListArray) {
     let map = {};
     for (const wordList of wordListArray) {
-	for (const word of wordList) {
-	    let remaining = _.difference(wordList, [word]);
-	    Expect(remaining.length).is.above(0, `${wordList}, ${word}`); // at.least(1)
-	    if (!_.has(map, word)) {
-		map[word] = [];
-	    }
-	    if (!hasRemaining(map[word], remaining)) {
-		map[word].push(remaining);
-	    }
-	}
+        for (const word of wordList) {
+            let remaining = _.difference(wordList, [word]);
+            Expect(remaining.length).is.above(0, `${wordList}, ${word}`); // at.least(1)
+            if (!_.has(map, word)) {
+                map[word] = [];
+            }
+            if (!hasRemaining(map[word], remaining)) {
+                map[word].push(remaining);
+            }
+        }
     }
     return map;
 }
@@ -346,20 +349,20 @@ function getPathList (dir, fileMatch, nameMap) {
     Expect(dir).is.a.String('gPL dir');
     Expect(fileMatch).is.a.String('gPL filematch');
     return new Promise((resolve, reject) => {
-	Dir.files(dir, (err, pathList) => {
-	    if (err) reject(err);
-	    let match = new RegExp(fileMatch);
-	    let filtered = _.filter(pathList, path => {
-		let filename = Path.basename(path);
-		let wordList = SearchResult.makeWordlist(filename);
-		// filter out rejected word combos
-		if (ClueManager.isRejectSource(wordList)) return false;
-		if (!_.isUndefined(nameMap) && !isInNameMap(nameMap, wordList)) return false;
-		return match.test(filename);
-	    });
-	    Debug(`files(${pathList.length}), match(${filtered.length})`);
-	    resolve(filtered);
-	});
+        Dir.files(dir, (err, pathList) => {
+            if (err) reject(err);
+            let match = new RegExp(fileMatch);
+            let filtered = _.filter(pathList, path => {
+                let filename = Path.basename(path);
+                let wordList = SearchResult.makeWordlist(filename);
+                // filter out rejected word combos
+                if (ClueManager.isRejectSource(wordList)) return false;
+                if (!_.isUndefined(nameMap) && !isInNameMap(nameMap, wordList)) return false;
+                return match.test(filename);
+            });
+            Debug(`files(${pathList.length}), match(${filtered.length})`);
+            resolve(filtered);
+        });
     });
 }
 
@@ -368,21 +371,21 @@ function getPathList (dir, fileMatch, nameMap) {
 function writeFilterResults (resultList, stream, options) {
     Expect(resultList).is.an.Array();
     for (const result of resultList) {
-	if (ClueManager.isRejectSource(result.src)) continue;
-	const knownList = ClueManager.getKnownClueNames(result.src);
-	if (_.isEmpty(knownList) && _.isEmpty(result.urlList)) continue;
+        if (ClueManager.isRejectSource(result.src)) continue;
+        const knownList = ClueManager.getKnownClueNames(result.src);
+        if (_.isEmpty(knownList) && _.isEmpty(result.urlList)) continue;
 
-	My.logStream(stream, `${Markdown.Prefix.source}${result.src}`);
-	for (const url of result.urlList) {
-	    My.logStream(stream, url);
-	}
-	if (options.add_known_clues && !_.isEmpty(knownList)) {
-	    My.logStream(stream, Filter.KNOWN_CLUES_URL);
-	    for (const name of knownList) {
-		My.logStream(stream, name); // `${Markdown.Prefix.known}${name}`);
-	    }
-	}
-	My.logStream(stream, '');
+        My.logStream(stream, `${Markdown.Prefix.source}${result.src}`);
+        for (const url of result.urlList) {
+            My.logStream(stream, url);
+        }
+        if (options.add_known_clues && !_.isEmpty(knownList)) {
+            My.logStream(stream, Filter.KNOWN_CLUES_URL);
+            for (const name of knownList) {
+                My.logStream(stream, name); // `${Markdown.Prefix.known}${name}`);
+            }
+        }
+        My.logStream(stream, '');
     }
 }
 
@@ -392,18 +395,18 @@ function mailTextFile(options) {
     let pipe = false;
     let fd = Fs.openSync(options.path, 'r');
     let child = ChildProcess.spawn('mail', ['-s', `${options.subject}`, `${options.to}`], {
-	stdio: [pipe ? 'pipe' : fd, 1, 2]
+        stdio: [pipe ? 'pipe' : fd, 1, 2]
     });
     if (pipe) {
-	let s = Fs.createReadStream(null, { fd });
-	s.pipe(child.stdin);
-	s.on('data', (data) => {
-	    console.log('s.data');
-	});
-	s.on('end', () => {
-	    console.log('s.end');
-	    child.stdin.end();
-	});
+        let s = Fs.createReadStream(null, { fd });
+        s.pipe(child.stdin);
+        s.on('data', (data) => {
+            console.log('s.data');
+        });
+        s.on('end', () => {
+            console.log('s.end');
+            child.stdin.end();
+        });
     }
 }
 
@@ -412,13 +415,13 @@ function mailTextFile(options) {
 function copyTextFile(path) {
     let fd = Fs.openSync(path, 'r');
     let textutil = ChildProcess.spawn(
-	'textutil', ['-format', 'txt', '-convert', 'rtf', '-stdout', `${path}`],
-	{ stdio: [fd, 'pipe', 2] });	
+        'textutil', ['-format', 'txt', '-convert', 'rtf', '-stdout', `${path}`],
+        { stdio: [fd, 'pipe', 2] });    
     let pbcopy = ChildProcess.spawn('pbcopy', ['-Prefer', 'rtf']);
     textutil.stdout.pipe(pbcopy.stdin);
     textutil.stdout.on('end', () => {
-	Debug('textutil.end');
-	Fs.closeSync(fd);
+        Debug('textutil.end');
+        Fs.closeSync(fd);
     });
 }
 
@@ -430,20 +433,20 @@ async function main () {
     const options = opt.options;
 
     if (opt.argv.length > 1) {
-	usage('only one non-switch FILE argument allowed');
+        usage('only one non-switch FILE argument allowed');
     }
     const filename = opt.argv[0];
 
     if (options.parse) {
-	const resultList = Filter.parseFile(filename, options);
-	if (_.isEmpty(resultList)) {
-	    console.log('no results');
-	} else {
-	    for (const result of resultList) {
-		console.log(result);
-	    }
-	}
-	return undefined;
+        const resultList = Filter.parseFile(filename, options);
+        if (_.isEmpty(resultList)) {
+            console.log('no results');
+        } else {
+            for (const result of resultList) {
+                console.log(result);
+            }
+        }
+        return undefined;
     }
     options.dir = options.dir || '2';
     if (options['known-urls']) options.filter_known_urls = true;
@@ -453,35 +456,35 @@ async function main () {
 
     // default to title filter if no filter specified
     if (!options.article && !options.title) {
-	options.title = true;
+        options.title = true;
     }
     let nameMap;
     if (opt.argv.length > 0) {
-	let wordListArray = await loadCsv(filename);
-	nameMap = buildNameMap(wordListArray);
+        let wordListArray = await loadCsv(filename);
+        nameMap = buildNameMap(wordListArray);
     }
     const dir = SearchResult.DIR + options.dir;
     const filterOptions = {
-	filterArticle: options.article,
-	filterTitle:   options.title,
-	filterRejects: options.rejects,
-	xfactor:       _.toNumber(options.xfactor)
+        filterArticle: options.article,
+        filterTitle:   options.title,
+        filterRejects: options.rejects,
+        xfactor:       _.toNumber(options.xfactor)
     };
     let start = new Date();
     const pathList = await getPathList(dir, SearchResult.getFileMatch(options.match), nameMap)
-	      .catch(err => { throw err; });
+              .catch(err => { throw err; });
     const getDuration = new Duration(start, new Date()).milliseconds;
     start = new Date();
     const result = await filterPathList(pathList, dir, filterOptions)
-	      .catch(err => { throw err; });
+              .catch(err => { throw err; });
     const filterDuration = new Duration(start, new Date()).milliseconds;
     if (options.count) {
-	console.log(`Results: ${_.size(result.filtered)}` +
-		    `, Urls: ${getUrlCount(result.filtered)}` +
-		    `, Rejects: ${_.size(result.rejects)}` +
-		    `, get(${PrettyMs(getDuration)})` +
-		    `, filter(${PrettyMs(filterDuration)})`);
-	return undefined;
+        console.log(`Results: ${_.size(result.filtered)}` +
+                    `, Urls: ${getUrlCount(result.filtered)}` +
+                    `, Rejects: ${_.size(result.rejects)}` +
+                    `, get(${PrettyMs(getDuration)})` +
+                    `, filter(${PrettyMs(filterDuration)})`);
+        return undefined;
     }
 
     if (options.xfactor) return undefined;
@@ -513,27 +516,27 @@ async function main () {
 
     const useTmpFile = options.note || options.copy;
     return Promise.resolve().then((_ => {
-	if (useTmpFile) {
-	    return My.createTmpFile(Boolean(options.keep)).then(([path, fd]) => {
-		return [path, Fs.createWriteStream(null, { fd })];
-	    });
-	}
-	return [null, process.stdout];
-    }).then(([path, stream]) => {
-	writeFilterResults(options.rejects ? result.rejects : result.filtered, stream, options);
-	if (useTmpFile) {
-	    stream && stream.end();
-	    if (options.mail) {
-		mailTextFile({
-		    to:      'zippy@pinhead.com',
-		    subject: `filtered @Worksheets.new`,
-		    path:    path
-		});
-	    } else if (options.copy) {
-		copyTextFile(path);
-	    }
-	}
-	return undefined;
+        if (useTmpFile) {
+            return My.createTmpFile(Boolean(options.keep)).then(([path, fd]) => {
+                return [path, Fs.createWriteStream(null, { fd })];
+            });
+        }
+        return [null, process.stdout];
+    })).then(([path, stream]) => {
+        writeFilterResults(options.rejects ? result.rejects : result.filtered, stream, options);
+        if (useTmpFile) {
+            stream && stream.end();
+            if (options.mail) {
+                mailTextFile({
+                    to:      'zippy@pinhead.com',
+                    subject: `filtered @Worksheets.new`,
+                    path:    path
+                });
+            } else if (options.copy) {
+                copyTextFile(path);
+            }
+        }
+        return undefined;
     });
 }
 
@@ -542,4 +545,5 @@ async function main () {
 main().catch(err => {
     console.log(err, err.stack);
 });
+
 

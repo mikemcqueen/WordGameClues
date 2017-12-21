@@ -9,6 +9,7 @@
 const _              = require('lodash');
 const Expect         = require('should/as-function');
 const Path           = require('path');
+const Stringify      = require('stringify-object');
 
 const Options = [
     ['p', 'apple=NUM',  'use apple clues, sentence NUM' ],
@@ -22,34 +23,39 @@ const DATA_DIR              =  Path.normalize(`${Path.dirname(module.filename)}/
 
 const APPLE = {
     '1' : {
-	sentence:       1,
-	clueCount:      12,
-	REQ_CLUE_COUNT: 12
+        sentence:       1,
+        clueCount:      12,
+        REQ_CLUE_COUNT: 12
     },
 
     '2': {
-	sentence:       2,
-	clueCount:      9,
-	REQ_CLUE_COUNT: 9
+        sentence:       2,
+        clueCount:      9,
+        REQ_CLUE_COUNT: 9
     },
 
     '3': {
-	sentence:       3,
-	clueCount:      4,
-	synthClueCount: 6,
-	REQ_CLUE_COUNT: 4
+        sentence:         3,
+        clueCount:        4,
+        REQ_CLUE_COUNT:   4
     },
 
     '5': {
-	sentence:       5,
-	clueCount:      15,
-	REQ_CLUE_COUNT: 15
+        sentence:       5,
+        clueCount:      15,
+        REQ_CLUE_COUNT: 15
     },
 
     '6': {
-	sentence:       6,
-	clueCount:      8,
-	REQ_CLUE_COUNT: 8
+        sentence:       6,
+        clueCount:      8,
+        REQ_CLUE_COUNT: 8
+    },
+
+    '7': {
+        sentence:       7,
+        clueCount:      7,
+        REQ_CLUE_COUNT: 7
     }
 };
 
@@ -61,8 +67,8 @@ const META = {
 
 const SYNTH = {
     baseDir:        'synth',
-    clueCount: 4,
-    REQ_CLUE_COUNT: 4
+    clueCount: 6,
+    REQ_CLUE_COUNT: 6
 };
 
 const HARMONY = {
@@ -82,16 +88,16 @@ const FINAL = {
 function metamorph (src) {
     const name = arguments.callee.name;
     if (!src.baseDir) {
-	let dir = '';
-	let index = name.length - 2;
-	let next = 0;
-	while (index >= 0) {
-	    dir += name.charAt(index);
-	    next = next === 0 ? 2 : next === 2 ? 4 : 1; 
-	    index -= next;
-	}
-	//src.resultDir = dir;
-	src.baseDir = `${dir}/${src.sentence}`;
+        let dir = '';
+        let index = name.length - 2;
+        let next = 0;
+        while (index >= 0) {
+            dir += name.charAt(index);
+            next = next === 0 ? 2 : next === 2 ? 4 : 1; 
+            index -= next;
+        }
+        //src.resultDir = dir;
+        src.baseDir = `${dir}/${src.sentence}`;
     }
     return src;
 }
@@ -101,33 +107,75 @@ function metamorph (src) {
 function getByOptions (options) {
     let src;
     if (options.meta) {
-	src = META;
+        src = META;
     } else if (options.synthesis) {
-	src = SYNTH;
+        src = SYNTH;
     } else if (options.harmony) {
-	src = HARMONY;
+        src = HARMONY;
     } else if (options.final) {
-	src = FINAL;
+        src = FINAL;
     } else if (options.apple) {
-	src = metamorph(APPLE[options.apple[0]]);
-	if (_.isUndefined(src)) throw new Error(`APPLE[${options.apple}] not supported`);
-	if (options.apple.slice(1, options.apple.length) === 's') {
-	    src = cloneAsSynth(src);
-	}
+        src = metamorph(APPLE[options.apple[0]]);
+        if (_.isUndefined(src)) throw new Error(`APPLE[${options.apple}] not supported`);
+        if (options.apple.length > 1) {
+            src = cloneAsType(src, options.apple.slice(1, options.apple.length));
+        }
     } else {
-	throw new Error('No clue-type option supplied');
+        throw new Error('No clue-type option supplied');
     }
     return src;
 }
 
 //
 
-function cloneAsSynth (config) {
+function getByType (type) {
+    switch (type) {
+    case 's': return SYNTH;
+    case 'h': return HARMONY;
+    case 'f': return FINAL;
+    default:
+        throw new Error(`invalid type, ${type}`);
+    }
+}
+
+//
+
+function getTypeSuffix (config) {
+    const index = _.lastIndexOf(config, '/') + 1;
+    let type;
+    if (index > 0) {
+        const firstLetter = config.baseDir.slice(index, index + 1);
+        const number = _.toNumber(firstLetter);
+        type = number > 0 ? 'p' : firstLetter;
+    }
+    return type;
+}
+
+//
+
+function getNextType (config) {
+    switch (getTypeSuffix(config)) {
+    case 's': return HARMONY;
+    case 'h': return FINAL;
+    default:
+        throw new Error(`not implemented next type for: ${Stringify(config)}`);
+    }
+}
+
+//
+
+function cloneAsNextType (config) {
+    return cloneAsType(config, getNextType(config));
+}
+
+//
+
+function cloneAsType (config, type) {
+    const ct = getByType(type);
     config = _.clone(config);
-    config.synth = true;
-    config.baseDir += '/synth';
-    config.clueCount = config.synthClueCount || 9; // hax
-    config.REQ_CLUE_COUNT = 2;
+    config.baseDir += '/' + ct.baseDir;
+    config.clueCount = ct.clueCount;
+    config.REQ_CLUE_COUNT = ct.REQ_CLUE_COUNT;
     return config;
 }
 
@@ -139,30 +187,39 @@ const ALL_TYPES = [ META, SYNTH, HARMONY, FINAL ];
 //
 function getByBaseDirOption (name) {
     for (const type of ALL_TYPES) { 
-	if (name === type.baseDir || name === type.baseDir.charAt(0)) {
-	    return type;
-	}
+        if (name === type.baseDir || name === type.baseDir.charAt(0)) {
+            return type;
+        }
     }
     throw new Error(`invalid type name, ${name}`);
 }
 
 //
-	    
+            
 function isValidBaseDirOption (name) {
     try {
-	getByBaseDirOption(name);
-	return true;
+        getByBaseDirOption(name);
+        return true;
     } catch (err) {
-	return false;
+        return false;
     }
 }
 
-//
+// e.g. p3s
 
 function getShorthand (clueType) {
     const dir = clueType.baseDir;
     Expect(dir.charAt(0)).is.equal('p');
-    return `${dir.charAt(0)}${clueType.sentence}${clueType.synth ? 's' : ''}`;
+    return `${dir.charAt(0)}${clueType.sentence}${getTypeSuffix(clueType)}`;
+}
+
+// e.g. p3s.c2-6.x2
+
+// TODO: getTypeClueCount: synthcClueCount = getByType(clueType).clueCount;
+// TODO: test
+
+function getLonghand (clueType, max = 2) {
+    return `${getShorthand(clueType)}.c2-${clueType.synthClueCount}.x${max}`;
 }
 
 //
@@ -195,11 +252,12 @@ function isFinal (name) {
 */
 
 module.exports = {
-    cloneAsSynth,
+    cloneAsNextType,
     getByOptions,  
     getByBaseDirOption,
     getDirectory,
     getShorthand,
+    getLonghand,
     isValidBaseDirOption,
     Options
 

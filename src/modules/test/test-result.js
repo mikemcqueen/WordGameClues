@@ -1,5 +1,5 @@
 //
-// TEST-RESULT.JS
+// test-result.js
 //
 
 'use strict';
@@ -34,30 +34,30 @@ describe ('result tests:', function() {
     // in before(), then writeAdd if it isn't
     //
     it ('should remove/commit, then add/commit a file to git', function (done) {
-	let wordList = [ 'betsy', 'ariana' ];
-	let options = { force: true };
-	let srcFilepath = TESTFILES_DIR + 'oneResult.json';
-	let filepath = TESTFILES_DIR + 'oneResult-copy.json';
-	My.gitRemoveCommitIfExists(filepath, `removing ${filepath}`)
-	    .then(() => {
-		console.log(`reading file ${srcFilepath}`);
-		return fsReadFile(srcFilepath, 'utf8');
-	    }).then(data => {
-		console.log(`writing ${filepath}`);
-		return fsWriteFile(filepath, data);
-	    }).then(() => { // TODO: actually only need to Add here, not AddCommit
-		console.log('calling gitAddCommit');
-		return My.gitAddCommit(filepath, 'adding test file');
-	    }).then(() => {
-		console.log('calling fileScoreSaveCommit');
-		return Result.fileScoreSaveCommit(filepath, options, wordList);
-	    }).then(() => { // TODO: removeCommit when we're done?
-		console.log('done');
-		done();
-	    }).catch(err => {
-		console.log(`error, ${err}`);
-		done(err);
-	    });
+        let wordList = [ 'betsy', 'ariana' ];
+        let options = { force: true };
+        let srcFilepath = TESTFILES_DIR + 'oneResult.json';
+        let filepath = TESTFILES_DIR + 'oneResult-copy.json';
+        My.gitRemoveCommitIfExists(filepath, `removing ${filepath}`)
+            .then(() => {
+                console.log(`reading file ${srcFilepath}`);
+                return fsReadFile(srcFilepath, 'utf8');
+            }).then(data => {
+                console.log(`writing ${filepath}`);
+                return fsWriteFile(filepath, data);
+            }).then(() => { // TODO: actually only need to Add here, not AddCommit
+                console.log('calling gitAddCommit');
+                return My.gitAddCommit(filepath, 'adding test file');
+            }).then(() => {
+                console.log('calling fileScoreSaveCommit');
+                return Result.fileScoreSaveCommit(filepath, options, wordList);
+            }).then(() => { // TODO: removeCommit when we're done?
+                console.log('done');
+                done();
+            }).catch(err => {
+                console.log(`error, ${err}`);
+                done(err);
+            });
     });
 });
 
@@ -68,16 +68,16 @@ describe('google one word pair, show result count', function() {
     this.timeout(5000);
 
     it ('should get results for one word pair', function(done) {
-	const wiki = 'site:en.wikipedia.org';
-	Result.get('one two ' + wiki, 1, function(err, result) {
-	    if (err) {
-		console.log(`error, ${err}`);
-		done(err);
-	    } else {
-		console.log(`results (${_.size(result)})`);
-		done();
-	    }
-	});
+        const wiki = 'site:en.wikipedia.org';
+        Result.get('one two ' + wiki, 1, function(err, result) {
+            if (err) {
+                console.log(`error, ${err}`);
+                done(err);
+            } else {
+                console.log(`results (${_.size(result)})`);
+                done();
+            }
+        });
     });
 
 });

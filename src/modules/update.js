@@ -54,12 +54,12 @@ function getLineState (line) {
     if (Markdown.hasKnownPrefix(line)) state = Known;
     // all of the above get first char sliced off
     if (state) {
-	line = line.slice(1);
+        line = line.slice(1);
     } else if (line.startsWith('http')) {
-	state = Url;
+        state = Url;
     } else {
-	// else, probably a clue
-	state = Clue;
+        // else, probably a clue
+        state = Clue;
     }
     return [line, state];
 }
@@ -76,56 +76,56 @@ function processSrc (rawLine, args, options) {
     let nameList = line.split(',');
     Expect(nameList.length).is.above(1); // at.least(2)
     if (reject) {
-	if (ClueManager.addReject(nameList)) {
-	    args.count.rejectClues += 1;
-	    args.count.rejectCountSet.add(nameList.length);
-	}
+        if (ClueManager.addReject(nameList)) {
+            args.count.rejectClues += 1;
+            args.count.rejectCountSet.add(nameList.length);
+        }
     }
     if (reject || ClueManager.isRejectSource(line)) {
-	return {
-	    timing:    args.timing,
-	    count:     args.count,
-	    nextState: Src
-	};
+        return {
+            timing:    args.timing,
+            count:     args.count,
+            nextState: Src
+        };
     }
 
     //let dir = `${SearchResult.DIR}${args.dir}`;
     //let path = `${dir}/${SearchResult.makeFilteredFilename(nameList)}`;
     let path = SearchResult.pathFormat({
-	//root: args.root,
-	dir:  args.dir, // || _.toString(wordList.length),
-	base: SearchResult.makeFilteredFilename(nameList)
+        //root: args.root,
+        dir:  args.dir, // || _.toString(wordList.length),
+        base: SearchResult.makeFilteredFilename(nameList)
     }, options);
 
     let content;
     try {
-	content = Fs.readFileSync(path, 'utf8');
+        content = Fs.readFileSync(path, 'utf8');
     } catch(err) {
-	// file not existing is OK.
-	// check err.code NOENT
+        // file not existing is OK.
+        // check err.code NOENT
     }
     let flags = {};
     let filteredUrls;
     if (content) {
-	filteredUrls = JSON.parse(content);
-	Log.debug(`loaded: ${path}`);
-	// maybe were added later, some files don't have it
-	if (!filteredUrls.maybeUrls) filteredUrls.maybeUrls = [];
+        filteredUrls = JSON.parse(content);
+        Log.debug(`loaded: ${path}`);
+        // maybe were added later, some files don't have it
+        if (!filteredUrls.maybeUrls) filteredUrls.maybeUrls = [];
     }
     else {
-	filteredUrls = {
-	    knownUrls:  [],
-	    rejectUrls: [],
-	    maybeUrls: []
-	};
+        filteredUrls = {
+            knownUrls:  [],
+            rejectUrls: [],
+            maybeUrls: []
+        };
     }
     return { 
-	timing:          args.timing,
-	count:           args.count,
-	nameList:        nameList,
-	filteredUrlPath: path,
-	filteredUrls,
-	flags
+        timing:          args.timing,
+        count:           args.count,
+        nameList:        nameList,
+        filteredUrlPath: path,
+        filteredUrls,
+        flags
     };
 }
 
@@ -138,13 +138,13 @@ function processUrl (line, args, options) {
     let [url, suffix] = Markdown.getSuffix(line);
     args.url = url;
     if (suffix === Markdown.Suffix.clue) {
-	args.flags.clue = true;
+        args.flags.clue = true;
     }
     else if (suffix === Markdown.Suffix.reject) {
-	args.flags.reject = true;
+        args.flags.reject = true;
     }
     else {
-	Expect(suffix).is.undefined();
+        Expect(suffix).is.undefined();
     }
     return args;
 }
@@ -158,9 +158,9 @@ function addClues (countList, name, src) { // , add = ClueManager.addClue) {
 
     let updatedCountList = [];
     countList.forEach(count => {
-	if (ClueManager.addClue(count, { name, src }, false, true)) { // save = false, nothrow = true
-	    updatedCountList.push(count);
-	}
+        if (ClueManager.addClue(count, { name, src }, false, true)) { // save = false, nothrow = true
+            updatedCountList.push(count);
+        }
     });
     return updatedCountList;
 }
@@ -172,12 +172,12 @@ function getNameNote (line) {
     let note;
     let firstComma = line.indexOf(',');
     if (firstComma === -1) {
-	name = line.trim();
+        name = line.trim();
     } else {
-	name = line.slice(0, firstComma);
-	if (line.length > firstComma + 1) {
-	    note = line.slice(firstComma + 1, line.length);
-	}
+        name = line.slice(0, firstComma);
+        if (line.length > firstComma + 1) {
+            note = line.slice(firstComma + 1, line.length);
+        }
     }
     return [name, note];
 }
@@ -193,18 +193,18 @@ function processClue (line, args, options) {
     
     let countList = args.countList;
     if (!countList) {
-	let start = new Date();
-	countList = ClueManager.getCountList(args.nameList);
-	let ms = new Duration(start, new Date()).milliseconds;
-	args.timing.getCountList += ms;
-	args.countList = countList;
+        let start = new Date();
+        countList = ClueManager.getCountList(args.nameList);
+        let ms = new Duration(start, new Date()).milliseconds;
+        args.timing.getCountList += ms;
+        args.countList = countList;
     }
     Log.debug(`countList: ${_.isEmpty(countList) ? "empty" : countList}`) ;
     countList = addClues(countList, name, args.nameList.toString());
     if (!_.isEmpty(countList)) {
-	args.count.knownClues += 1;
-	countList.forEach(count => args.count.knownCountSet.add(count));
-	Log.info(`added clue, ${name} : ${args.nameList} - ${note} : [${countList}]`);
+        args.count.knownClues += 1;
+        countList.forEach(count => args.count.knownCountSet.add(count));
+        Log.info(`added clue, ${name} : ${args.nameList} - ${note} : [${countList}]`);
     }
     args.flags.clue = true;
     return args;
@@ -217,9 +217,9 @@ function processMaybe (line, args, options) {
     Expect(ClueManager.isRejectSource(args.nameList)).is.false();
     let [name, note] = getNameNote(line);
     if (ClueManager.addMaybe(name, args.nameList, note)) {
-	args.count.maybeClues += 1;
-	args.count.maybeCountSet.add(args.nameList.length);
-	Log.info(`added maybe clue, ${name} : ${args.nameList} - ${note}`);
+        args.count.maybeClues += 1;
+        args.count.maybeCountSet.add(args.nameList.length);
+        Log.info(`added maybe clue, ${name} : ${args.nameList} - ${note}`);
     }
     args.flags.maybe = true;
     return args;
@@ -230,7 +230,7 @@ function processMaybe (line, args, options) {
 function processKnown (line, args, options) {
     Expect(line).is.a.String();
     if (options.verbose) {
-	console.log(`skipping known clue, ${line}`);
+        console.log(`skipping known clue, ${line}`);
     }
     // TODO: if note present, and no note in known list, add note
     // do nothing
@@ -244,8 +244,8 @@ function addUrl (urlList, url) {
     Expect(url).is.a.String();
 
     if (!urlList.includes(url)) {
-	urlList.push(url);
-	return true;
+        urlList.push(url);
+        return true;
     }
     return false;
 }
@@ -255,28 +255,28 @@ function addUrl (urlList, url) {
 function updateFilteredUrls (args) {
     if (!args.flags || !args.url) return args;
     if (args.flags.clue) {
-	// we added a clue. add url to knownUrls if not already
-	if (addUrl(args.filteredUrls.knownUrls, args.url)) {
-	    Log.debug(`added clue url, ${args.url}`);
-	    args.count.knownUrls += 1;
-	    args.filteredUrls.anyChange = true;
-	}
+        // we added a clue. add url to knownUrls if not already
+        if (addUrl(args.filteredUrls.knownUrls, args.url)) {
+            Log.debug(`added clue url, ${args.url}`);
+            args.count.knownUrls += 1;
+            args.filteredUrls.anyChange = true;
+        }
     }
     // note that, we add maybe even if already added as known; a bit strange
     if (args.flags.maybe) {
-	// we added a maybe clue. add url to maybeUrls if not already
-	if (addUrl(args.filteredUrls.maybeUrls, args.url)) {
-	    Log.debug(`added maybe url, ${args.url}`);
-	    args.count.maybeUrls += 1;
-	    args.filteredUrls.anyChange = true;
-	}
+        // we added a maybe clue. add url to maybeUrls if not already
+        if (addUrl(args.filteredUrls.maybeUrls, args.url)) {
+            Log.debug(`added maybe url, ${args.url}`);
+            args.count.maybeUrls += 1;
+            args.filteredUrls.anyChange = true;
+        }
     }
     if (args.flags.reject) {
-	if (addUrl(args.filteredUrls.rejectUrls, args.url)) {
-	    Log.debug(`added reject url, ${args.url}`);
-	    args.count.rejectUrls += 1;
-	    args.filteredUrls.anyChange = true;
-	}
+        if (addUrl(args.filteredUrls.rejectUrls, args.url)) {
+            Log.debug(`added reject url, ${args.url}`);
+            args.count.rejectUrls += 1;
+            args.filteredUrls.anyChange = true;
+        }
     }
     return args;
 }
@@ -286,11 +286,11 @@ function updateFilteredUrls (args) {
 function writeFilteredUrls (result) {
     const fu = result.filteredUrls;
     if (fu && fu.anyChange) {
-	fu.knownUrls = _.sortedUniq(fu.knownUrls.sort());
-	fu.maybeUrls = _.sortedUniq(fu.maybeUrls.sort());
-	fu.rejectUrls = _.sortedUniq(fu.rejectUrls.sort());
-	Fs.writeFileSync(result.filteredUrlPath, JSON.stringify(fu));
-	result.filteredUrls.anyChange = false;
+        fu.knownUrls = _.sortedUniq(fu.knownUrls.sort());
+        fu.maybeUrls = _.sortedUniq(fu.maybeUrls.sort());
+        fu.rejectUrls = _.sortedUniq(fu.rejectUrls.sort());
+        Fs.writeFileSync(result.filteredUrlPath, JSON.stringify(fu));
+        result.filteredUrls.anyChange = false;
     }
 }
 
@@ -301,32 +301,32 @@ function preProcess (state, args, options) {
     case Src:
     case Url:
     case Done:
-	if (options.production && !options.dry_run) {
-	    writeFilteredUrls(updateFilteredUrls(args));
-	}
-	break;
+        if (options.production && !options.dry_run) {
+            writeFilteredUrls(updateFilteredUrls(args));
+        }
+        break;
 
     default:
-	break;
+        break;
     }
     switch (state) {
     case Src:
-	// clear everything but timing, counts and dir for each new source
-	args = {
-	    timing: args.timing,
-	    count : args.count,
-	    dir   : args.dir
-	};
-	break;
+        // clear everything but timing, counts and dir for each new source
+        args = {
+            timing: args.timing,
+            count : args.count,
+            dir   : args.dir
+        };
+        break;
 
     case Url:
-	// clear flags for each new URL
-	args.flags = {};
-	break;
+        // clear flags for each new URL
+        args.flags = {};
+        break;
 
     default:
-	// default case, pass through all values
-	break;
+        // default case, pass through all values
+        break;
     }
     return args;
 }
@@ -341,50 +341,50 @@ function skipState (state, result, options) {
 
 function saveClues (result, options) {
     if (options.save && !options.production && !options.force) {
-	throw new Error('--save only allowed with --production (or --force)');
+        throw new Error('--save only allowed with --production (or --force)');
     }
     let totalClueCount = 0;
     if (result.count.knownClues > 0) {
-	totalClueCount += result.count.knownClues;
-	if (options.save || options.verbose) {
-	    // save known clues
-	    let countList = Array.from(result.count.knownCountSet);
-	    Expect(countList).is.not.empty();
-	    // TODO: My.optlog(options, msg...)
-	    // some way to teak util.Debug()('name') to current module's debug instance name?
-	    // can i say My=require('util')(Debug) or (MODULE_NAME)
-	    Log.info(`knownList: ${countList}`);
-	    if (options.save) {
-		ClueManager.saveClues(countList);
-	    }
-	}
+        totalClueCount += result.count.knownClues;
+        if (options.save || options.verbose) {
+            // save known clues
+            let countList = Array.from(result.count.knownCountSet);
+            Expect(countList).is.not.empty();
+            // TODO: My.optlog(options, msg...)
+            // some way to teak util.Debug()('name') to current module's debug instance name?
+            // can i say My=require('util')(Debug) or (MODULE_NAME)
+            Log.info(`knownList: ${countList}`);
+            if (options.save) {
+                ClueManager.saveClues(countList);
+            }
+        }
     }
     if (result.count.maybeClues > 0) {
-	totalClueCount += result.count.maybeClues;
-	if (options.save || options.verbose) {
-	    // save maybes
-	    let countList = Array.from(result.count.maybeCountSet);
-	    Expect(countList).is.not.empty();
-	    Log.info(`maybeList: ${countList}`);
-	    if (options.save) {
-		ClueManager.saveMaybes(countList);
-	    }
-	}
+        totalClueCount += result.count.maybeClues;
+        if (options.save || options.verbose) {
+            // save maybes
+            let countList = Array.from(result.count.maybeCountSet);
+            Expect(countList).is.not.empty();
+            Log.info(`maybeList: ${countList}`);
+            if (options.save) {
+                ClueManager.saveMaybes(countList);
+            }
+        }
     }
     if (result.count.rejectClues > 0) {
-	totalClueCount += result.count.rejectClues;
-	if (options.save || options.verbose) {
-	    // save rejects
-	    let countList = Array.from(result.count.rejectCountSet);
-	    Expect(countList).is.not.empty();
-	    Log.info(`rejectList: ${countList}`);
-	    if (options.save) {
-		ClueManager.saveRejects(countList);
-	    }
-	}
+        totalClueCount += result.count.rejectClues;
+        if (options.save || options.verbose) {
+            // save rejects
+            let countList = Array.from(result.count.rejectCountSet);
+            Expect(countList).is.not.empty();
+            Log.info(`rejectList: ${countList}`);
+            if (options.save) {
+                ClueManager.saveRejects(countList);
+            }
+        }
     }
     if (!totalClueCount) {
-	Log.info(`no new known clues, maybes, or rejects`);
+        Log.info(`no new known clues, maybes, or rejects`);
     }
     return totalClueCount;
 }
@@ -393,20 +393,20 @@ function saveClues (result, options) {
 
 function initResult () {
     return {
-	count : {
-	    knownUrls      : 0,
-	    rejectUrls     : 0,
-	    maybeUrls      : 0,
-	    knownClues     : 0,
-	    rejectClues    : 0,
-	    maybeClues     : 0,
-	    knownCountSet  : new Set(),
-	    rejectCountSet : new Set(),
-	    maybeCountSet  : new Set()
-	},
-	timing : {
-	    getCountList : 0
-	}
+        count : {
+            knownUrls      : 0,
+            rejectUrls     : 0,
+            maybeUrls      : 0,
+            knownClues     : 0,
+            rejectClues    : 0,
+            maybeClues     : 0,
+            knownCountSet  : new Set(),
+            rejectCountSet : new Set(),
+            maybeCountSet  : new Set()
+        },
+        timing : {
+            getCountList : 0
+        }
     };
 }
 
@@ -417,8 +417,8 @@ async function _updateFromFile(filename, options) {
     Log.info(`file: ${Path.basename(filename)}`);
 
     if (!ClueManager.loaded) {
-	Log.debug('updateFromFile: calling ClueManager.loadAllClues()');
-	ClueManager.loadAllClues({ clues: Clues.getByOptions(options) });
+        Log.debug('updateFromFile: calling ClueManager.loadAllClues()');
+        ClueManager.loadAllClues({ clues: Clues.getByOptions(options) });
     }
 
     const dir = options.dir || '2'; // lil haxy
@@ -431,24 +431,24 @@ async function _updateFromFile(filename, options) {
     let readLines = new Readlines(filename);
 
     while ((inputLine = readLines.next()) !== false) {
-	lineNumber += 1;
-	inputLine = inputLine.toString().trim();
-	if (_.isEmpty(inputLine)) continue;
-	let [line, nextState] = getLineState(inputLine);
-	if (!SM[state].next.includes(nextState)) {
-	    throw new Error(`Cannot transition from ${state.toString()}` +
-			    ` to ${nextState.toString()}, line ${inputLine}`);
-	}
-	state = nextState;
-	if (skipState(state, result, options)) {
-	    Log.debug(`skipping line: ${state.toString()}, ${line}`);
-	    continue;
-	}
+        lineNumber += 1;
+        inputLine = inputLine.toString().trim();
+        if (_.isEmpty(inputLine)) continue;
+        let [line, nextState] = getLineState(inputLine);
+        if (!SM[state].next.includes(nextState)) {
+            throw new Error(`Cannot transition from ${state.toString()}` +
+                            ` to ${nextState.toString()}, line ${inputLine}`);
+        }
+        state = nextState;
+        if (skipState(state, result, options)) {
+            Log.debug(`skipping line: ${state.toString()}, ${line}`);
+            continue;
+        }
 
-	result.dir = dir;
-	const args = preProcess(state, result, options);
-	// TODO: try/catch block
-	result = SM[state].func(line, args, options);
+        result.dir = dir;
+        const args = preProcess(state, result, options);
+        // TODO: try/catch block
+        result = SM[state].func(line, args, options);
     }
     // hacky !? yes
     result.dir = dir;
@@ -461,14 +461,14 @@ async function _updateFromFile(filename, options) {
 async function updateFromFile(filename, options) {
     const start = new Date();
     return _updateFromFile(filename, options)
-	.then(result => {
-	    if (options.perf) {
-		const duration = new Duration(start, new Date()).milliseconds;
-		Log.info(`updateFromFile duration(${PrettyMs(duration)})` +
-			 `, getCountList(${PrettyMs(result.timing.getCountList)})`);
-	    }
-	    return saveClues(result, options);
-	});
+        .then(result => {
+            if (options.perf) {
+                const duration = new Duration(start, new Date()).milliseconds;
+                Log.info(`updateFromFile duration(${PrettyMs(duration)})` +
+                         `, getCountList(${PrettyMs(result.timing.getCountList)})`);
+            }
+            return saveClues(result, options);
+        });
 }
     
 //
@@ -493,21 +493,21 @@ async function updateFromPathList(pathList, options) {
     let allResults = initResult();
     let start = new Date();
     for (let path of pathList) {
-	let result = await _updateFromFile(path, options)
-	    .then(result => {
-		allResults = aggregate(result, allResults);
-		return result;
-	    }).catch(err => {
-		console.log(`updateFromFile, ${err}`);
-		if (err && err.code !== 'ENOENT') {
-		    throw err;
-		}
-	    });
+        let result = await _updateFromFile(path, options)
+            .then(result => {
+                allResults = aggregate(result, allResults);
+                return result;
+            }).catch(err => {
+                console.log(`updateFromFile, ${err}`);
+                if (err && err.code !== 'ENOENT') {
+                    throw err;
+                }
+            });
     }
     if (options.perf) {
-	let duration = new Duration(start, new Date()).milliseconds;
-	Log.info(`updateFromPathList duration(${PrettyMs(duration)})` +
-		 `, getCountList(${PrettyMs(allResults.timing.getCountList)})`);
+        let duration = new Duration(start, new Date()).milliseconds;
+        Log.info(`updateFromPathList duration(${PrettyMs(duration)})` +
+                 `, getCountList(${PrettyMs(allResults.timing.getCountList)})`);
     }
     const count = allResults.count;
     Log.message(`new: known(${count.knownClues}), maybe(${count.maybeClues}), rejects(${count.rejectClues})`);

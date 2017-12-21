@@ -43,11 +43,11 @@ function makeNew(args) {
 
 function Peco(args) {
     if (LOGGING) {
-	this.log('Peco: sum: '+ args.sum +','  + typeof args.sum +
-		 ', max: ' + args.max+','+ typeof args.max + 
-		 ', count: ' + args.count +','+ typeof args.count +
-		 ', require: ' + args.require +
-		 ', exclude: ' + args.exclude);
+        this.log('Peco: sum: '+ args.sum +','  + typeof args.sum +
+                 ', max: ' + args.max+','+ typeof args.max + 
+                 ', count: ' + args.count +','+ typeof args.count +
+                 ', require: ' + args.require +
+                 ', exclude: ' + args.exclude);
     }
     
     this.listArray  = args.listArray;
@@ -58,30 +58,30 @@ function Peco(args) {
     this.exclude    = args.exclude; // list of exluded numbers
 
     if (this.listArray) {
-	if (!this.max) {
-	    throw new Error('Peco: must specify max');
-	}
+        if (!this.max) {
+            throw new Error('Peco: must specify max');
+        }
     }
     else {
-	if (!this.sum) {
-	    throw new Error('Peco: must specify sum > 0, ' + args.sum +
-			    ', or addends: ' + args.listArray);
-	}
-	if (!this.count && !this.max) {
-	    throw new Error('Peco: must specify either count -or- max');
-	}
-	if (this.count && this.max) {
-	    throw new Error('Peco: cannot specify both count -and- max');
-	}
-	if (this.count > this.sum) {
-	    throw new Error(`Peco: count(${this.count}) > sum(${this.sum})`);
-	}
-	if (this.require && this.exclude &&
-	    _.intersection(this.require, this.exclude).length > 0)
-	{
-	    throw new Error('Peco: require and exclude contain same number(s), ' +
-			    _.intersection(this.require, this.exclude));
-	}
+        if (!this.sum) {
+            throw new Error('Peco: must specify sum > 0, ' + args.sum +
+                            ', or addends: ' + args.listArray);
+        }
+        if (!this.count && !this.max) {
+            throw new Error('Peco: must specify either count -or- max');
+        }
+        if (this.count && this.max) {
+            throw new Error('Peco: cannot specify both count -and- max');
+        }
+        if (this.count > this.sum) {
+            throw new Error(`Peco: count(${this.count}) > sum(${this.sum})`);
+        }
+        if (this.require && this.exclude &&
+            _.intersection(this.require, this.exclude).length > 0)
+        {
+            throw new Error('Peco: require and exclude contain same number(s), ' +
+                            _.intersection(this.require, this.exclude));
+        }
     }
 }
 
@@ -89,7 +89,7 @@ function Peco(args) {
 
 function setLogging(flag) {
     if (!flag || (flag && !FORCE_QUIET)) {
-	LOGGING = flag;
+        LOGGING = flag;
     }
 }
 
@@ -97,7 +97,7 @@ function setLogging(flag) {
 
 Peco.prototype.log = function(text) {
     if (LOGGING) {
-	console.log(text);
+        console.log(text);
     }
 }
 
@@ -105,10 +105,10 @@ Peco.prototype.log = function(text) {
 
 Peco.prototype.getPermutations = function() {
     if (this.listArray) {
-	throw new Error('permutations on lists not supported');
+        throw new Error('permutations on lists not supported');
     }
     else {
-	return this.getAllAddends(false);
+        return this.getAllAddends(false);
     }
 }
 
@@ -118,9 +118,9 @@ Peco.prototype.getCombinations = function() {
     let count;
     
     if (this.listArray) {
-	return this.getListCombinations(this.listArray);
+        return this.getListCombinations(this.listArray);
     } else {
-	return this.getAllAddends(true);
+        return this.getAllAddends(true);
     }
 }
 
@@ -129,11 +129,11 @@ Peco.prototype.getCombinations = function() {
 Peco.prototype.getAllAddends = function(combFlag) {
     let list;
     if (this.count) {
-	list = this.getAddendsForCount(this.count, combFlag);
+        list = this.getAddendsForCount(this.count, combFlag);
     } else {
-	for (let count = 2; count <= this.max; ++count) {
-	    list = this.getAddendsForCount(count, combFlag, list);
-	}
+        for (let count = 2; count <= this.max; ++count) {
+            list = this.getAddendsForCount(count, combFlag, list);
+        }
     }
     return list;
 }
@@ -142,18 +142,18 @@ Peco.prototype.getAllAddends = function(combFlag) {
 
 Peco.prototype.getAddendsForCount = function(count, combFlag, pecoList, quiet) {
     if (count > this.sum) {
-	throw new Error(`Peco: count(${count}) > sum(${this.sum})`);
+        throw new Error(`Peco: count(${count}) > sum(${this.sum})`);
     }
     if (LOGGING) {
-	const last = this.sum - (count - 1);
-	this.log('Peco: for ' + count + ', last=' + last + 
-		 ', combFlag: ' + combFlag);
+        const last = this.sum - (count - 1);
+        this.log('Peco: for ' + count + ', last=' + last + 
+                 ', combFlag: ' + combFlag);
     }
     return this.buildResult({
-	count,
-	combFlag,
-	pecoList,
-	quiet
+        count,
+        combFlag,
+        pecoList,
+        quiet
     });
 }
 
@@ -161,8 +161,8 @@ Peco.prototype.getAddendsForCount = function(count, combFlag, pecoList, quiet) {
 
 Peco.prototype.getListCombinations = function(listArray) {
     return this.buildResult({
-	listArray: listArray,
-	combFlag:  true
+        listArray: listArray,
+        combFlag:  true
     });
 }
 
@@ -178,33 +178,33 @@ Peco.prototype.buildResult = function(args) {
     let list;
 
     if (!args.pecoList) {
-	args.pecoList = [];
+        args.pecoList = [];
     }
 
     if (args.listArray) {
-	list = this.listFirst(args.listArray, args.combFlag);
+        list = this.listFirst(args.listArray, args.combFlag);
     } else if (args.count) {
-	list = this.first(args.count, args.combFlag);
+        list = this.first(args.count, args.combFlag);
     } else {
-	throw new Error('missing arg, count: ' + args.count +
-			', listArray: ' + args.listArray);
+        throw new Error('missing arg, count: ' + args.count +
+                        ', listArray: ' + args.listArray);
     }
     if (!list) {
-	if (LOGGING) {
-	    this.log('Peco: no ' + args.count + ' in ' +  list);
-	}
-	return [];
+        if (LOGGING) {
+            this.log('Peco: no ' + args.count + ' in ' +  list);
+        }
+        return [];
     }
     do {
-	if (LOGGING) {
-	    this.log('Peco: adding: ' + list);
-	}
-	args.pecoList.push(list);
-	if (args.listArray) {
-	    list = this.listNext(args.listArray, args.combFlag);
-	} else {
-	    list = this.next(args.combFlag);
-	}
+        if (LOGGING) {
+            this.log('Peco: adding: ' + list);
+        }
+        args.pecoList.push(list);
+        if (args.listArray) {
+            list = this.listNext(args.listArray, args.combFlag);
+        } else {
+            list = this.next(args.combFlag);
+        }
     } while (list);
 
     return args.pecoList;
@@ -220,33 +220,33 @@ Peco.prototype.listFirst = function (listArray, combFlag) {
     let list;
     
     if (!listArray) {
-	throw new Error('invalid countListArray, ' + listArray);
+        throw new Error('invalid countListArray, ' + listArray);
     }
     listArray.forEach(list => {
-	if (LOGGING) {
-	    this.log('list: ' + list);
-	}
+        if (LOGGING) {
+            this.log('list: ' + list);
+        }
     });
 
     srcCount = listArray.length;
     start = 0;
     this.indexList = [];
     for (index = 0; index < srcCount; ++index) {
-	this.indexList.push({
-	    first:  start, 
-	    index:  start,
-	    last:   listArray[index].length - 1
-	});
+        this.indexList.push({
+            first:  start, 
+            index:  start,
+            last:   listArray[index].length - 1
+        });
     }
 
     if (LOGGING) {
-	this.log ('srcCount: ' + srcCount + ' indexList.length: ' + this.indexList.length);
+        this.log ('srcCount: ' + srcCount + ' indexList.length: ' + this.indexList.length);
     }
 
     if (this.getIndexSum() <= this.max) {
-	list = this.getPecoList();
+        list = this.getPecoList();
     } else {
-	list = this.next(combFlag);
+        list = this.next(combFlag);
     }
     return list;
 }
@@ -263,35 +263,35 @@ Peco.prototype.listNext = function (combFlag) {
 
     // if last index is maxed reset to zero, increment next-to-last index, etc.
     for (;;) {
-	index = lastIndex;
-	while (++this.indexList[index].index > this.indexList[index].last) {
-	    /*
-	    if (combFlag) { // combinations
-		start = ++this.indexList[index].first;
-		for (inner = index + 1; inner < this.indexList.length; ++inner) {
-		    this.indexList[inner].index = this.indexList[inner].first = start;
-		}
-	    }
-	    */
-	    this.indexList[index].index = this.indexList[index].first;
-	    --index;
-	    if (index < 0) {
-		return null;
-	    }
-	}
-	if (this.getIndexSum() > this.max) {
-	    continue;
-	}
-	/*
-	if (this.require) {
-	    if (!this.require.every(size => {
-		return list.indexOf(Number(size)) > -1;
-	    })) {
-		continue;
-	    }
-	}
-	*/
-	break;
+        index = lastIndex;
+        while (++this.indexList[index].index > this.indexList[index].last) {
+            /*
+            if (combFlag) { // combinations
+                start = ++this.indexList[index].first;
+                for (inner = index + 1; inner < this.indexList.length; ++inner) {
+                    this.indexList[inner].index = this.indexList[inner].first = start;
+                }
+            }
+            */
+            this.indexList[index].index = this.indexList[index].first;
+            --index;
+            if (index < 0) {
+                return null;
+            }
+        }
+        if (this.getIndexSum() > this.max) {
+            continue;
+        }
+        /*
+        if (this.require) {
+            if (!this.require.every(size => {
+                return list.indexOf(Number(size)) > -1;
+            })) {
+                continue;
+            }
+        }
+        */
+        break;
     }
     return this.getPecoList();
 }
@@ -300,7 +300,7 @@ Peco.prototype.listNext = function (combFlag) {
 
 Peco.prototype.first = function (srcCount, combFlag) {
     if ((srcCount < 1) || (srcCount > this.sum)) {
-	throw new Error('invalid srcCount, ' + srcCount);
+        throw new Error('invalid srcCount, ' + srcCount);
     }
 
     // initIndexList;
@@ -308,22 +308,22 @@ Peco.prototype.first = function (srcCount, combFlag) {
     let start = 1;
     this.indexList = [];
     for (let index = 1; index <= srcCount; index += 1) {
-	this.indexList.push({
-	    first:  start, 
-	    index:  start,
-	    last:   last
-	});
+        this.indexList.push({
+            first:  start, 
+            index:  start,
+            last:   last
+        });
     }
   
     if (LOGGING) {
-	this.log('first: ' + this.indexListToJSON());
-	this.log ('srcCount: ' + srcCount + 
-		  ', indexList.length: ' + this.indexList.length +
-		  ', this.getIndexSum(): ' + this.getIndexSum() +
-		  ', this.sum: ' + this.sum);
+        this.log('first: ' + this.indexListToJSON());
+        this.log ('srcCount: ' + srcCount + 
+                  ', indexList.length: ' + this.indexList.length +
+                  ', this.getIndexSum(): ' + this.getIndexSum() +
+                  ', this.sum: ' + this.sum);
     }
     if (!this.isValidIndex()) {
-	return this.next(combFlag);	
+        return this.next(combFlag);     
     }
     return this.getPecoList();
 }
@@ -336,24 +336,24 @@ Peco.prototype.next = function (combFlag) {
 
     // if last index is maxed reset to zero, increment next-to-last index, etc.
     do {
-	index = lastIndex;
-	while (++this.indexList[index].index > this.indexList[index].last) {
-	    if (combFlag) { // combinations
-		let start = ++this.indexList[index].first;
-		for (let inner = index + 1; inner < this.indexList.length; inner += 1) {
-		    this.indexList[inner].index = this.indexList[inner].first = start;
-		}
-	    }
-	    this.indexList[index].index = this.indexList[index].first;
-	    --index;
-	    if (index < 0) {
-		return null;
-	    }
-	}
-	Debug('-----\nnext: ' + this.indexListToJSON());
-	Debug('indexList.length: ' + this.indexList.length +
-	      ', this.getIndexSum(): ' + this.getIndexSum() +
-	      ', this.sum: ' + this.sum);
+        index = lastIndex;
+        while (++this.indexList[index].index > this.indexList[index].last) {
+            if (combFlag) { // combinations
+                let start = ++this.indexList[index].first;
+                for (let inner = index + 1; inner < this.indexList.length; inner += 1) {
+                    this.indexList[inner].index = this.indexList[inner].first = start;
+                }
+            }
+            this.indexList[index].index = this.indexList[index].first;
+            --index;
+            if (index < 0) {
+                return null;
+            }
+        }
+        Debug('-----\nnext: ' + this.indexListToJSON());
+        Debug('indexList.length: ' + this.indexList.length +
+              ', this.getIndexSum(): ' + this.getIndexSum() +
+              ', this.sum: ' + this.sum);
     } while (!this.isValidIndex());
 
     return this.getPecoList();
@@ -363,25 +363,25 @@ Peco.prototype.next = function (combFlag) {
 
 Peco.prototype.isValidIndex = function () {
     if (this.getIndexSum() != this.sum) {
-	if (LOGGING) {
-	    this.log('Mismatch sums, ' + this.getIndexSum() +
-		     ' != ' + this.sum);
-	}
-	return false;
+        if (LOGGING) {
+            this.log('Mismatch sums, ' + this.getIndexSum() +
+                     ' != ' + this.sum);
+        }
+        return false;
     }
     if (this.require &&
-	!this.indexContainsAll(this.require)) {
-	if (LOGGING) {
-	    this.log('Missing required number: ' + this.require);
-	}
-	return false;
+        !this.indexContainsAll(this.require)) {
+        if (LOGGING) {
+            this.log('Missing required number: ' + this.require);
+        }
+        return false;
     }
     if (this.exclude &&
-	this.indexContainsAny(this.exclude)) {
-	if (LOGGING) {
-	    this.log('Contains excluded number: ' + this.exclude);
-	}
-	return false;
+        this.indexContainsAny(this.exclude)) {
+        if (LOGGING) {
+            this.log('Contains excluded number: ' + this.exclude);
+        }
+        return false;
     }
     return true;
 }
@@ -392,11 +392,11 @@ Peco.prototype.getIndexSum = function() {
     let sum;
     sum = 0;
     this.indexList.forEach((indexObj, index) => {
-	if (this.listArray) {
-	    sum += this.listArray[index][indexObj.index];
-	} else {
-	    sum += indexObj.index;
-	}
+        if (this.listArray) {
+            sum += this.listArray[index][indexObj.index];
+        } else {
+            sum += indexObj.index;
+        }
     });
     return sum;
 }
@@ -408,14 +408,14 @@ Peco.prototype.indexListToJSON = function() {
     let s;
     s = '';
     this.indexList.forEach((indexObj, index) => {
-	if (s.length > 0) {
-	    s += ',';
-	}
-	if (this.listArray) {
-	    s += this.listArray[index][indexObj.index];
-	} else {
-	    s += indexObj.index;
-	}
+        if (s.length > 0) {
+            s += ',';
+        }
+        if (this.listArray) {
+            s += this.listArray[index][indexObj.index];
+        } else {
+            s += indexObj.index;
+        }
     });
     return '[' + s + ']';
 }
@@ -438,11 +438,11 @@ Peco.prototype.indexContainsAny = function(list) {
 Peco.prototype.getPecoList = function() {
     let list = [];
     this.indexList.forEach((indexObj, index) => {
-	if (this.listArray) {
-	    list.push(this.listArray[index][indexObj.index]);
-	} else {
-	    list.push(indexObj.index);
-	}
+        if (this.listArray) {
+            list.push(this.listArray[index][indexObj.index]);
+        } else {
+            list.push(indexObj.index);
+        }
     });
     return list;
 }
@@ -452,10 +452,10 @@ Peco.prototype.getPecoList = function() {
 function display(prefix, pecoList) {
     let s = '';
     pecoList.forEach(peco => {
-	if (s.length > 0) {
-	    s += ',';
-	}
-	s += peco.index;
+        if (s.length > 0) {
+            s += ',';
+        }
+        s += peco.index;
     });
     console.log(prefix + s);
 }

@@ -41,40 +41,40 @@ let handler = function (request, response) {
     
     if (pathname == "/"){
         let callbackUrl = 'http://localhost:8888/oauth';
-	
+        
         client.getRequestToken(callbackUrl, function(err, oauthToken, oauthSecret, results){
             if(err) {
-		console.log(err);
+                console.log(err);
             }
             else {
-		global.oauthToken = oauthToken;
-		global.oauthSecret = oauthSecret;
-		console.log("set oauth token and secret");
-		let authorizeUrl = client.getAuthorizeUrl(oauthToken);
-		console.log(`authorizedUrl: ${authorizeUrl}`);
-		response.writeHead(200, {"Content-Type":"text/html"});
-		response.write("Please <a href=\""+authorizeUrl+"\">click here</a> to authorize the application");
-		response.end();
+                global.oauthToken = oauthToken;
+                global.oauthSecret = oauthSecret;
+                console.log("set oauth token and secret");
+                let authorizeUrl = client.getAuthorizeUrl(oauthToken);
+                console.log(`authorizedUrl: ${authorizeUrl}`);
+                response.writeHead(200, {"Content-Type":"text/html"});
+                response.write("Please <a href=\""+authorizeUrl+"\">click here</a> to authorize the application");
+                response.end();
             }
         });
     }
     else if (pathname == "/oauth"){
         let verifier = getOauthVerifier(params.search);
-	console.log(`verifier: ${verifier}`);
+        console.log(`verifier: ${verifier}`);
         client.getAccessToken(
             global.oauthToken, 
             global.oauthSecret, 
-	    verifier,
+            verifier,
             function(error, oauthAccessToken, oauthAccessTokenSecret, results) {
-		if(error) {
-		    console.log("error\n\n\n");
-		    console.log(error);
-		}
-		else {
-		    response.writeHead(200, {"Content-Type":"text/html"});
-		    response.write(oauthAccessToken);
-		    response.end();
-		}   
+                if(error) {
+                    console.log("error\n\n\n");
+                    console.log(error);
+                }
+                else {
+                    response.writeHead(200, {"Content-Type":"text/html"});
+                    response.write(oauthAccessToken);
+                    response.end();
+                }   
             }
         );
     }
