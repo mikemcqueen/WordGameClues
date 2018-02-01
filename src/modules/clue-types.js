@@ -40,6 +40,12 @@ const APPLE = {
         REQ_CLUE_COUNT:   4
     },
 
+    '4': {
+        sentence:         4,
+        clueCount:        13,
+        REQ_CLUE_COUNT:   13
+    },
+
     '5': {
         sentence:       5,
         clueCount:      15,
@@ -57,6 +63,21 @@ const APPLE = {
         clueCount:      7,
         REQ_CLUE_COUNT: 7
     }
+
+    /*
+    '8': {
+        sentence:       8,
+        clueCount:      7,
+        REQ_CLUE_COUNT: 7
+    },
+
+    '9': {
+        sentence:       7,
+        clueCount:      7,
+        REQ_CLUE_COUNT: 7
+    }
+     */
+
 };
 
 const META = {

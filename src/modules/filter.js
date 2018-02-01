@@ -73,7 +73,7 @@ function parseLines (lines, options = {}) {
 
 //
 
-function parseFile (filename, options = {}) {
+function parseFileSync (filename, options = {}) {
     let readLines = new Readlines(filename);
     let lines = [];
     let line;
@@ -82,42 +82,6 @@ function parseFile (filename, options = {}) {
     }
     return parseLines(lines, options);
 }
-
-// rename parseFileSync?
-
-function old_parseFile (filename, options = {}) {
-    let readLines = new Readlines(filename);
-    let line;
-    let resultList = [];
-    let urlList;
-    let clueList;
-    while ((line = readLines.next()) !== false) {
-        line = line.toString().trim();
-        if (_.isEmpty(line)) continue;
-        Debug(line);
-        if (Markdown.hasSourcePrefix(line)) {
-            Debug(`source: ${line}`);
-            clueList = undefined;
-            urlList = [];
-            const sourceElement = options.urls ? { source: line, urls: urlList } : line;
-            resultList.push(sourceElement);
-        } else if (isUrl(line)) {
-            Debug(`url: ${line}`);
-            clueList = [];
-            const urlElement = (options.clues) ? { url: line, clues: clueList } : line;
-            urlList.push(urlElement);
-        } else {
-            Debug(`clue: ${line}`);
-            // clue, known, or maybe
-            // currently requires URL, but i suppose could eliminate that requirement with some work.
-            Expect(urlList).is.an.Array().and.not.empty();
-            Expect(clueList).is.an.Array();
-            clueList.push(makeClueElem(line));
-        }
-    }
-    return resultList;
-}
-
 
 //
 
@@ -480,7 +444,7 @@ module.exports = {
     getRemovedClues,
     getUpdateFilePath,
     makeClueElem,
-    parseFile,
+    parseFileSync,
     parseLines,
     removeRemovedClues,
     removeKnownClues,

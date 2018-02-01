@@ -48,7 +48,7 @@ async function loadNoteFilterLists(filename, noteName, options) {
         // TODO: Note.getOrCreate(
         // TODO: get rid of this. if no note, don't create. wait until Note.append.
         getOrCreate(noteName, options),
-        Filter.parseFile(filename),
+        Filter.parseFileSync(filename),
         (note, listFromFile) => {
             return [note,
                     Filter.parseLines(NoteParser.parseDom(note.content, options), options),
