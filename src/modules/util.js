@@ -1,5 +1,5 @@
 //
-// UTIL.JS
+// util.js
 //
 
 'use strict';
@@ -34,11 +34,11 @@ const RETRY_LINEAR_COUNT       = 10; // 50s
 
 
 const RETRY_TIMEOUTS_LINEAR        = linearTimeouts(RETRY_LINEAR_DELAY_MS,
-						    RETRY_LINEAR_DELAY_MS,
-						    RETRY_LINEAR_COUNT);
+                                                    RETRY_LINEAR_DELAY_MS,
+                                                    RETRY_LINEAR_COUNT);
 const RETRY_TIMEOUTS_RANDOM_LINEAR = linearTimeouts(RETRY_LINEAR_DELAY_LO_MS,
-						    RETRY_LINEAR_DELAY_HI_MS,
-						    RETRY_LINEAR_COUNT);
+                                                    RETRY_LINEAR_DELAY_HI_MS,
+                                                    RETRY_LINEAR_COUNT);
 const RETRY_TIMEOUTS_EXPO          = expoTimeouts(RETRY_EXPO_START_MS, RETRY_EXPO_COUNT);
 
 //
@@ -48,9 +48,9 @@ function linearTimeouts (low, high, count) {
     // gotta bet a lodash function for this, like fillWith()
     let to = between(low, high);
     while (count > 0) {
-	timeouts.push(to);
-	to += between(low, high);
-	count -= 1;
+        timeouts.push(to);
+        to += between(low, high);
+        count -= 1;
     }
     return timeouts;
 };
@@ -62,9 +62,9 @@ function expoTimeouts (first, count) {
     // gotta bet a lodash function for this, like fillWith()
     let to = first;
     while (count > 0) {
-	timeouts.push(to);
-	to *= 2;
-	count -= 1;
+        timeouts.push(to);
+        to *= 2;
+        count -= 1;
     }
     return timeouts;
 };
@@ -73,7 +73,7 @@ function expoTimeouts (first, count) {
 
 function waitFor (delay) {
     return new Promise(resolve => {
-	setTimeout(resolve, delay);
+        setTimeout(resolve, delay);
     });
 }
 
@@ -91,18 +91,18 @@ function between (lo, hi) {
 function checkIfFile (path) {
     Expect(path).is.a.String();
     return new Promise((resolve, reject) => {
-	Fs.stat(path, (err, stats) => {
-	    let exists = false;
-	    if (err) {
-		if (err.code !== 'ENOENT') return reject(err); // some unknown error
-	    } else {
-		exists = true;
-	    }
-	    return resolve ({
-		exists,
-		isFile: exists ? stats.isFile() : false
-	    });
-	});
+        Fs.stat(path, (err, stats) => {
+            let exists = false;
+            if (err) {
+                if (err.code !== 'ENOENT') return reject(err); // some unknown error
+            } else {
+                exists = true;
+            }
+            return resolve ({
+                exists,
+                isFile: exists ? stats.isFile() : false
+            });
+        });
     });
 }
 
@@ -110,21 +110,21 @@ function checkIfFile (path) {
 
 function gitRetryAdd (filepath, callback) {
     let op = Retry.operation(
-	linearTimeouts(RETRY_LINEAR_DELAY_LO_MS,
-		       RETRY_LINEAR_DELAY_HI_MS,
-		       RETRY_LINEAR_COUNT));
+        linearTimeouts(RETRY_LINEAR_DELAY_LO_MS,
+                       RETRY_LINEAR_DELAY_HI_MS,
+                       RETRY_LINEAR_COUNT));
     op.attempt(num => {
-	if (num > 1) {
-	    console.log(`gitRetryAdd #${num} @ ${PrettyMs(Date.now())}`);
-	}
-	Git(Path.dirname(filepath))
-	    .add(Path.basename(filepath), err => {
-		if (op.retry(err)) {
-		    console.log('gitRetryAdd: error, retrying...');
-		    return;
-		}
-		callback(err ? op.mainError() : null);
-	    });
+        if (num > 1) {
+            console.log(`gitRetryAdd #${num} @ ${PrettyMs(Date.now())}`);
+        }
+        Git(Path.dirname(filepath))
+            .add(Path.basename(filepath), err => {
+                if (op.retry(err)) {
+                    console.log('gitRetryAdd: error, retrying...');
+                    return;
+                }
+                callback(err ? op.mainError() : null);
+            });
     });
 }
 
@@ -133,13 +133,13 @@ function gitRetryAdd (filepath, callback) {
 function gitAdd (filepath) {
     Expect(filepath).is.a.String();
     return new Promise((resolve, reject) => {
-	gitRetryAdd(filepath, err =>  {
-	    if (err) {
-		console.error('gitAdd failed');
-		return reject(err);
-	    }
-	    return resolve();
-	});
+        gitRetryAdd(filepath, err =>  {
+            if (err) {
+                console.error('gitAdd failed');
+                return reject(err);
+            }
+            return resolve();
+        });
     });
 }
 
@@ -148,8 +148,8 @@ function gitAdd (filepath) {
 function gitRemove (filepath) {
     Expect(filepath).is.a.String();
     return new Promise((resolve, reject) => {
-	Git(Path.dirname(filepath))
-	    .rm(Path.basename(filepath), err => err ? reject(err) : resolve());
+        Git(Path.dirname(filepath))
+            .rm(Path.basename(filepath), err => err ? reject(err) : resolve());
     });
 }
 
@@ -159,8 +159,8 @@ function gitCommitOnce (filepath, message) {
     Expect(filepath).is.a.String();
     Expect(message).is.a.String();
     return new Promise((resolve, reject) => {
-	Git(Path.dirname(filepath))
-	    .commit(message, Path.basename(filepath), {}, err => err ? reject(err) : resolve(true));
+        Git(Path.dirname(filepath))
+            .commit(message, Path.basename(filepath), {}, err => err ? reject(err) : resolve(true));
     });
 }
 
@@ -185,29 +185,29 @@ async function gitRetryCommit (filepath, message, retryCount = DEFAULT_RETRY_COU
     Expect(retryCount).is.a.Number();
     let lastError;
     while (true) {
-	let result = await gitCommitOnce(filepath, message)
-		.catch(err => {
-		    if (!isGitLockError(err)) {
-			console.error(`gitRetryCommit error, (${typeof err}), ${err}`);
-			// no retries for unknown errors
-			retryCount = 0;
-		    }
-		    lastError = err;
-		    return false;
-		});
-	console.log(`${Path.basename(filepath)} commitResult: ${result}`);
-	// success: resolve
-	if (result !== false) return result; // Promise.resolve(result);
-	// failure: retry logic
-	if (retryCount < 1) {
-	    console.error(`gitRetryCommit failure, ${filepath}`);
-	    return Promise.reject(lastError);
-	}
-	const delay = between(RETRY_DELAY_LOW, RETRY_DELAY_HIGH);
-	Debug(`${Path.basename(filepath)} retryCount: ${retryCount}` +
-	      `, retrying in ${PrettyMs(delay)}`);
-	retryCount -= 1;
-	await waitFor(delay);
+        let result = await gitCommitOnce(filepath, message)
+                .catch(err => {
+                    if (!isGitLockError(err)) {
+                        console.error(`gitRetryCommit error, (${typeof err}), ${err}`);
+                        // no retries for unknown errors
+                        retryCount = 0;
+                    }
+                    lastError = err;
+                    return false;
+                });
+        console.log(`${Path.basename(filepath)} commitResult: ${result}`);
+        // success: resolve
+        if (result !== false) return result; // Promise.resolve(result);
+        // failure: retry logic
+        if (retryCount < 1) {
+            console.error(`gitRetryCommit failure, ${filepath}`);
+            return Promise.reject(lastError);
+        }
+        const delay = between(RETRY_DELAY_LOW, RETRY_DELAY_HIGH);
+        Debug(`${Path.basename(filepath)} retryCount: ${retryCount}` +
+              `, retrying in ${PrettyMs(delay)}`);
+        retryCount -= 1;
+        await waitFor(delay);
     }
 }
 
@@ -225,8 +225,8 @@ function gitAddCommit (filepath, message) {
     Expect(filepath).is.a.String();
     Expect(message).is.a.String();
     return gitAdd(filepath)
-	.then(_ => gitCommit(filepath, message));
-    //	.catch(err => console.log(`gitAddCommit error, ${err}`));// TODO: bad
+        .then(_ => gitCommit(filepath, message));
+    //  .catch(err => console.log(`gitAddCommit error, ${err}`));// TODO: bad
 }
 
 //
@@ -235,8 +235,8 @@ function gitRemoveCommit (filepath, message) {
     Expect(filepath).is.a.String();
     Expect(message).is.a.String();
     return gitRemove(filepath)
-	.then(_ => gitCommit(filepath, message));
-    //	.catch(err =>  console.log(`gitRemoveCommit error, ${err}`)); // TODO: bad
+        .then(_ => gitCommit(filepath, message));
+    //  .catch(err =>  console.log(`gitRemoveCommit error, ${err}`)); // TODO: bad
 }
 
 //
@@ -246,10 +246,10 @@ function gitForceAddCommit (filepath, message) {
     Expect(message).is.a.String();
     let basename = Path.basename(filepath);
     return new Promise((resolve, reject) => {
-	return Git(Path.dirname(filepath))
-	    .raw([ 'add', '-f', basename ], err => {
-		if (err) reject(err);
-	    }).commit(message, basename, {}, err => err ? reject(err) : resolve());
+        return Git(Path.dirname(filepath))
+            .raw([ 'add', '-f', basename ], err => {
+                if (err) reject(err);
+            }).commit(message, basename, {}, err => err ? reject(err) : resolve());
     });
 }
 
@@ -259,26 +259,26 @@ function gitRemoveCommitIfExists (filepath, message = 'removing test file') {
     Expect(filepath).is.a.String();
     Expect(message).is.a.String();
     return checkIfFile(filepath)
-	.then(result => {
-	    if (!result.exists) return Promise.reject();
-	    // file exists, try to git remove/commit it
-	    console.log(`git-removing ${filepath}`);
-	    return gitRemoveCommit(filepath, message);
-	}).then(_ => checkIfFile(filepath))
-	.then(result => {
-	    Expect(result.exists).is.false();
-	    console.log(`git-removed ${filepath}`);
-	    return undefined;
-	    // TODO: add "git reset HEAD -- filename" if we had git remove error or file
-	    // still exists; file may be added but not committed.
-	}).catch(err => {
-	    // log real errors, eat all errors  // TODO: bad
-	    if (err) {
-		console.error(`gitRemoveCommitIfExists error, ${err}`);
-	    };
-	    //TODO: if (err) Promise.reject(err);
-	    return undefined; 
-	});
+        .then(result => {
+            if (!result.exists) return Promise.reject();
+            // file exists, try to git remove/commit it
+            console.log(`git-removing ${filepath}`);
+            return gitRemoveCommit(filepath, message);
+        }).then(_ => checkIfFile(filepath))
+        .then(result => {
+            Expect(result.exists).is.false();
+            console.log(`git-removed ${filepath}`);
+            return undefined;
+            // TODO: add "git reset HEAD -- filename" if we had git remove error or file
+            // still exists; file may be added but not committed.
+        }).catch(err => {
+            // log real errors, eat all errors  // TODO: bad
+            if (err) {
+                console.error(`gitRemoveCommitIfExists error, ${err}`);
+            };
+            //TODO: if (err) Promise.reject(err);
+            return undefined; 
+        });
 }
 
 //
@@ -294,11 +294,11 @@ function logStream (stream, string) {
 
 function createTmpFile (keep)  {
     return new Promise((resolve, reject) => {
-	Tmp.file({ keep }, (err, path, fd) => {
-	    if (err) reject(err);
-	    Debug(`File: ${path}, fd: ${fd}`);
-	    resolve([path, fd]);
-	});
+        Tmp.file({ keep }, (err, path, fd) => {
+            if (err) reject(err);
+            Debug(`File: ${path}, fd: ${fd}`);
+            resolve([path, fd]);
+        });
     });
 }
 
@@ -307,10 +307,10 @@ function createTmpFile (keep)  {
 async function write (dest, text) {
     const output = text;
     if (_.isString(dest)) {
-	return `${dest}${output}`;
+        return `${dest}${output}`;
     }
     if (_.isNumber(dest)) {
-	return Fs.write(dest, output);
+        return Fs.write(dest, output);
     }
     throw new Error(`bad dest, ${dest}`);
 }

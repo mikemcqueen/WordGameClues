@@ -31,11 +31,11 @@ ComboSearch.prototype.log = function(text) {
     let pad;
     let index;
     if (this.logging) {
-	pad = '';
-	for (let index=0; index<this.logLevel; ++index) {
-	    pad += ' ';
-	}
-	console.log(pad + text);
+        pad = '';
+        for (let index=0; index<this.logLevel; ++index) {
+            pad += ' ';
+        }
+        console.log(pad + text);
     }
 }
 
@@ -51,86 +51,86 @@ ComboSearch.prototype.findAlternateSourcesForNc = function(nc, options = {}) {
 
     srcNameListArray = ClueManager.makeSrcNameListArray(nc);
     srcNameListArray.forEach(srcNameList => {
-	let curCount;
-	let maxCount;
-	let countListArray;
-	let matchCountListArray = [];
+        let curCount;
+        let maxCount;
+        let countListArray;
+        let matchCountListArray = [];
 
-	if (this.logging) {
-	    this.log('looking for source list ' + srcNameList);
-	}
-	countListArray = srcNameList.map(name => ClueManager.getCountListForName(name));
-	if (this.logging) {
-	    this.log('count list:');
-	    countListArray.forEach(countList => {
-		this.log(' ' + countList);
-	    });
-	}
-	if (options.count) {
-	    curCount = maxCount = options.count;
-	} else {
-	    curCount = srcNameList.length;
-	    maxCount = ClueManager.maxClues;
-	}
-	for (; curCount <= maxCount; ++curCount) {
-	    if (curCount == nc.count) {
-		continue;
-	    }
-	    if (this.logging) {
-		this.log('  for count ' + curCount);
-	    }
-	    Peco.makeNew({
-		sum:   curCount,
-		count: srcNameList.length
-	    }).getPermutations().forEach(countList => {
-		if (this.logging) {
-		    this.log('   in ' + countList);
-		}
-		if (this.findCountListInCountListArray(countList, countListArray)) {
-		    if (!matchCountListArray[curCount]) {
-			matchCountListArray[curCount] = [ countList ];
-		    } else {
-			matchCountListArray[curCount].push(countList);
-		    }
-		    if (this.logging) {
-			this.log('    found! length=' + countList.length);
-		    }
-		}
-		else {
-		    if (this.logging) {
-			this.log('    failed');
-		    }
-		}
-	    }, this);
-	}
+        if (this.logging) {
+            this.log('looking for source list ' + srcNameList);
+        }
+        countListArray = srcNameList.map(name => ClueManager.getCountListForName(name));
+        if (this.logging) {
+            this.log('count list:');
+            countListArray.forEach(countList => {
+                this.log(' ' + countList);
+            });
+        }
+        if (options.count) {
+            curCount = maxCount = options.count;
+        } else {
+            curCount = srcNameList.length;
+            maxCount = ClueManager.maxClues;
+        }
+        for (; curCount <= maxCount; ++curCount) {
+            if (curCount == nc.count) {
+                continue;
+            }
+            if (this.logging) {
+                this.log('  for count ' + curCount);
+            }
+            Peco.makeNew({
+                sum:   curCount,
+                count: srcNameList.length
+            }).getPermutations().forEach(countList => {
+                if (this.logging) {
+                    this.log('   in ' + countList);
+                }
+                if (this.findCountListInCountListArray(countList, countListArray)) {
+                    if (!matchCountListArray[curCount]) {
+                        matchCountListArray[curCount] = [ countList ];
+                    } else {
+                        matchCountListArray[curCount].push(countList);
+                    }
+                    if (this.logging) {
+                        this.log('    found! length=' + countList.length);
+                    }
+                }
+                else {
+                    if (this.logging) {
+                        this.log('    failed');
+                    }
+                }
+            }, this);
+        }
 
-	// really: countListArrayArray
-	matchCountListArray.forEach((countListArray, claaIndex) => {
-	    let ncListArray = [];
-	    countListArray.forEach((countList, claIndex) => {
-		let ncList = [];
-		let sum = 0;
-		let result;
-		countList.forEach((count, clIndex) => {
-		    sum += count;
-		    ncList.push(NameCount.makeNew(srcNameList[clIndex], count));
-		});
-		if (sum !== claaIndex ) {
-		    throw new Error('something i dont understand here obviously');
-		}
-		let startTime = new Date();
-		result = Validator.validateSources({
-		    sum:      sum,
-		    nameList: srcNameList,
-		    count:    srcNameList.length
-		});
-		options.validateDurationMs += new Duration(startTime, new Date());
-		if (result.success) {
-		    ncListArray.push(ncList);
-		}
-	    });
-	    resultNcListArray[claaIndex] = ncListArray;
-	});
+        // really: countListArrayArray
+        matchCountListArray.forEach((countListArray, claaIndex) => {
+            let ncListArray = [];
+            countListArray.forEach((countList, claIndex) => {
+                let ncList = [];
+                let sum = 0;
+                let result;
+                countList.forEach((count, clIndex) => {
+                    sum += count;
+                    ncList.push(NameCount.makeNew(srcNameList[clIndex], count));
+                });
+                if (sum !== claaIndex ) {
+                    throw new Error('something i dont understand here obviously');
+                }
+                let startTime = new Date();
+                result = Validator.validateSources({
+                    sum:      sum,
+                    nameList: srcNameList,
+                    count:    srcNameList.length
+                });
+                options.validateDurationMs += new Duration(startTime, new Date());
+                if (result.success) {
+                    ncListArray.push(ncList);
+                }
+            });
+            resultNcListArray[claaIndex] = ncListArray;
+        });
     });
     return resultNcListArray;
 }
@@ -146,27 +146,27 @@ ComboSearch.prototype.findCountListInCountListArray =
     let resultCountList;
 
     if (countList.length != countListArray.length) {
-	throw new Error('mismatched lengths');
+        throw new Error('mismatched lengths');
     }
 
     indexLengthList = [];
     countListArray.forEach(cl => {
-	indexLengthList.push({
-	    index:  0,
-	    length: cl.length
-	});
+        indexLengthList.push({
+            index:  0,
+            length: cl.length
+        });
     });
 
     do {
-	resultCountList = [];
-	if (countList.every((count, index) => {
-	    if (count != countListArray[index][indexLengthList[index].index]) {
-		return false;
-	    }
-	    return true; // every.continue
-	})) {
-	    return true; // function.exit
-	}
+        resultCountList = [];
+        if (countList.every((count, index) => {
+            if (count != countListArray[index][indexLengthList[index].index]) {
+                return false;
+            }
+            return true; // every.continue
+        })) {
+            return true; // function.exit
+        }
     } while (this.nextIndexLength(indexLengthList));
 
     return null;
@@ -183,7 +183,7 @@ ComboSearch.prototype.findNameListInCountList =
     let count;
 
     if (nameList.length != countList.length) {
-	throw new Error('mismatched list lengths');
+        throw new Error('mismatched list lengths');
     }
     return ncList;
 }
@@ -198,7 +198,7 @@ ComboSearch.prototype.first =
 
     this.hash = {};
     for (index = 0; index < clueSourceList.length; ++index) {
-	sourceIndexes[index] = 0;
+        sourceIndexes[index] = 0;
     }
     sourceIndexes[sourceIndexes.length - 1] = -1;
 
@@ -218,12 +218,12 @@ ComboSearch.prototype.nextIndexLength =
 
     // if last index is maxed reset to zero, increment next-to-last index, etc.
     while (indexLengthList[index].index >= indexLengthList[index].length) {
-	indexLengthList[index].index = 0;
-	--index;
-	if (index < 0) {
-	    return false;
-	}
-	++indexLengthList[index].index;
+        indexLengthList[index].index = 0;
+        --index;
+        if (index < 0) {
+            return false;
+        }
+        ++indexLengthList[index].index;
     }
     return true;
 }

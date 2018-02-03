@@ -24,14 +24,14 @@ function show (node, indent, suffix) {
     let text = '';
     if (node.nodeName === '#text') text = node.textContent;
     if (node.nodeName === 'a') {
-	text = node.attributes.getNamedItem('href');
+        text = node.attributes.getNamedItem('href');
     }
     console.log(`${spaces(indent)}${node.nodeName} ${text} ${suffix || ''}`);
     
     if (node.childNodes) {
-	Array.prototype.forEach.call(node.childNodes, child => {
-	    show (child, indent + 1);
-	});
+        Array.prototype.forEach.call(node.childNodes, child => {
+            show (child, indent + 1);
+        });
     }
 }
 

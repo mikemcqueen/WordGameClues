@@ -13,22 +13,36 @@ _name=$1  #word
 echo "Name: $_name"
 shift
 
+_base=$_ct.c2-$_cc.x2
+_note=$_ct.c2-$_cc.x2.$_name
+
+if [[ $_name == "remaining" ]]
+then
+    _base=$_base.$_name
+    _remaining="--remaining"
+fi
+
 while [[ $# -gt 0 ]]
 do
       if [[ $1 == "--production" ]]
       then
-	  echo "---PRODUCTION---"
-	  _production=$1
-	  _save=--save
+          echo "---PRODUCTION---"
+          _production=$1
+          _save=--save
       elif [[ $1 == "--generate" ]]
       then
-	   _generate=true
+           _generate=true
       elif [[ $1 == "--article" ]]
       then
-	   _article=$1
+          if [[ ! -z $_remaining ]]
+          then
+              echo "$1 not allowed with $_remaining"
+              exit -1
+          fi
+          _article=$1
       else
-	  echo "unknown option, $1"
-	  exit -1
+          echo "unknown option, $1"
+          exit -1
       fi
       shift
 done
@@ -36,14 +50,18 @@ done
 _out=tmp/filtermerge.err
 echo $(date) >> $_out
 
-_base=$_ct.c2-$_cc.x2
-if [[ $_generate ]]
+if [[ $_generate || ! -z $_remaining ]]
 then
-    echo "Generating new clues.."
-    node ../clues -$_ct -c2,$_cc -x2 > tmp/$_base 2>> $_out
+    echo "Generating word pairs for $_base..."
+    node clues -$_ct -c2,$_cc -x2 $_remaining $_production > tmp/$_base 2>> $_out
 fi
 
-_note=$_ct.c2-$_cc.x2.$_name
+if [[ -z $_remaining ]]
+then
+    echo "Grepping..."
+    grep $_name tmp/$_base > tmp/$_note
+fi
+
 _filtered=$_note
 if [[ ! -z $_article ]]
 then
@@ -51,21 +69,20 @@ then
 fi
 _filtered=$_filtered.filtered
 
-echo "Grepping..."
-grep $_name tmp/$_base > tmp/$_note
-
 echo "Filtering..."
 node filter -$_ct tmp/$_note $_article > tmp/$_filtered 2>> $_out
-if [ $? -ne 0 ]
+_exitcode=$?
+if [ $_exitcode -ne 0 ]
 then
-    echo "filter failed on $_note"
+    echo "filter failed on $_note, $_exitcode"
     exit -1
 fi
 
 echo "Merging..."
 node note-merge -$_ct tmp/$_filtered --note $_note --force-create $_production 2>> $_out
-if [ $? -ne 0 ]
+_exitcode=$?
+if [ $_exitcode -ne 0 ]
 then
-    echo "merge failed on $_note.filtered"
+    echo "merge failed on $_filtered, $_exitcode"
     exit -1
 fi

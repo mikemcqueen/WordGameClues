@@ -77,15 +77,15 @@ function getSuffix (line) {
     let match = false;
     let index = line.lastIndexOf(',');
     if (index > -1) {
-	suffix = line.slice(index + 1, line.length).trim();
-	if (!isValidSuffix(suffix)) {
-	    if (suffix.length === 1) {
-		Debug(`invalid suffix, ${suffix}`);
-	    }
-	    suffix = undefined;
-	} else {
-	    line = line.slice(0, index);
-	}
+        suffix = line.slice(index + 1, line.length).trim();
+        if (!isValidSuffix(suffix)) {
+            if (suffix.length === 1) {
+                Debug(`invalid suffix, ${suffix}`);
+            }
+            suffix = undefined;
+        } else {
+            line = line.slice(0, index);
+        }
     }
     return [line, suffix];
 }
@@ -98,8 +98,8 @@ function getPrefix (line, allowed = Prefix.any) {
     let prefix;
     let firstChar = line.charAt(0);
     if (allowed.includes(firstChar)) {
-	prefix = firstChar;
-	line = line.slice(1, line.length);
+        prefix = firstChar;
+        line = line.slice(1, line.length);
     }
     return [line, prefix];
 }

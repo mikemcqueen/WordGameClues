@@ -28,15 +28,15 @@ function NameCount(name, count, index) {
     this.index = _.toNumber(index);
 
     if (!this.count) {
-	splitList = name.split(':');
-	if (splitList.length > 1) {
-	    this.name = splitList[0];
-	    this.count = _.toNumber(splitList[1]);
-	    splitList = splitList[1].split('.');
-	    if (splitList.length > 1) {
-		this.index = _.toNumber(splitList[1]);
-	    }
-	}
+        splitList = name.split(':');
+        if (splitList.length > 1) {
+            this.name = splitList[0];
+            this.count = _.toNumber(splitList[1]);
+            splitList = splitList[1].split('.');
+            if (splitList.length > 1) {
+                this.index = _.toNumber(splitList[1]);
+            }
+        }
     }
 }
 
@@ -52,7 +52,7 @@ function makeListFromNameList(nameList) {
     let ncList;
     ncList = [];
     nameList.forEach(name => {
-	ncList.push(new NameCount(name));
+        ncList.push(new NameCount(name));
     });
     return ncList;
 }
@@ -80,10 +80,10 @@ function makeNameList(ncList) {
 function makeCanonicalName(name, count, index) {
     let s = name;
     if (count) {
-	s += ':' + count;
-	if (index) {
-	    s += '.' + index;
-	}
+        s += ':' + count;
+        if (index) {
+            s += '.' + index;
+        }
     }
     return s;
 }
@@ -93,12 +93,12 @@ function makeCanonicalName(name, count, index) {
 function makeNameMap(ncList) {
     let nameMap = {};
     ncList.forEach(nc => {
-	if (!nameMap[nc.name]) {
-	    nameMap[nc.name] = [ nc.src ]; 
-	}
-	else {
-	    nameMap[nc.name].push(nc.src);
-	}
+        if (!nameMap[nc.name]) {
+            nameMap[nc.name] = [ nc.src ]; 
+        }
+        else {
+            nameMap[nc.name].push(nc.src);
+        }
     });
     return nameMap;
 }
@@ -108,12 +108,12 @@ function makeNameMap(ncList) {
 function makeCountMap(ncList) {
     let countMap = {};
     ncList.forEach(nc => {
-	if (!countMap[nc.src]) {
-	    countMap[nc.src] = [ nc.name ]; 
-	}
-	else {
-	    countMap[nc.src].push(nc.name);
-	}
+        if (!countMap[nc.src]) {
+            countMap[nc.src] = [ nc.name ]; 
+        }
+        else {
+            countMap[nc.src].push(nc.name);
+        }
     });
 }
 
@@ -126,10 +126,10 @@ function listToJSON(ncList) {
 
     s = '[';
     ncList.forEach((nc, index) => {
-	if (index > 0) {
-	    s += ',\n';
-	}
-	s += nc.toJSON();
+        if (index > 0) {
+            s += ',\n';
+        }
+        s += nc.toJSON();
     });
     s += ']';
     return s;
@@ -145,13 +145,13 @@ function listContains(ncListContains, nc) {
     
 function listContainsAll(ncListContains, ncList) {
     return ncList.every(nc => {
-	return _.find(ncListContains, ['name', nc.name, 'count', nc.count]);
+        return _.find(ncListContains, ['name', nc.name, 'count', nc.count]);
     });
 
     /*
     console.log('listContainsAll, contains: ' + ncListContains + 
-		', list: ' + ncList +
-		', result: ' + ret);
+                ', list: ' + ncList +
+                ', result: ' + ret);
     return ret;
     */
 }
@@ -195,10 +195,10 @@ NameCount.prototype.logList = function(list) {
     let str;
 
     list.forEach(nc => {
-	if (str.length > 0) {
-	    str += ',';
-	}
-	str += nc;
+        if (str.length > 0) {
+            str += ',';
+        }
+        str += nc;
     });
     console.log(str);
 }

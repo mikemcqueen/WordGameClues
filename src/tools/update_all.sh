@@ -1,7 +1,7 @@
 #!/bin/bash
 if [ $# -lt 2  ]
 then
-   echo 'usage: update_all.sh <clue-type> <clue-count>  [note-name] [--dry-run] [--production] [--match chars]'
+   echo 'usage: update_all.sh <clue-type> <clue-count>  [note-name] [--dry-run] [--production] [--match chars] [--from-fs] [--from-en]'
    exit -1
 fi
 
@@ -16,41 +16,41 @@ while [[ $# -gt 0 ]]
 do
       if [[ $1 == '--production' ]]
       then
-	  echo "--PRODUCTION"
-	  _production=$1
-	  _options="$_options --save"
+          echo "--PRODUCTION"
+          _production=$1
+          _options="$_options --save"
       elif [[ $1 == '--dry-run' ]]
       then
-	  echo "--DRY RUN"
-	  _options="$_options $1"
+          echo "--DRY RUN"
+          _options="$_options $1"
       elif [[ $1 == '--verbose' ]]
       then
-	  echo "--VERBOSE"
-	  _options="$_options $1"
+          echo "--VERBOSE"
+          _options="$_options $1"
       elif [[ $1 == '--from-fs' ]]
       then
-	  echo "Updating from filesystem..."
-	  _from_fs=true
+          echo "Updating from filesystem..."
+          _from_fs=true
       elif [[ $1 == '--from-en' ]]
       then
-	  echo "Updating from Evernote..."
-	  _from_en=true
+          echo "Updating from Evernote..."
+          _from_en=true
       elif [[ $1 == --match* ]]
       then
-	  shift
-	  if [[ $# -eq 0 ]]
-	  then
-	      echo "--match requires an argument"
-	      exit -1
-	  fi
-	  echo "--MATCH: $1"
-	  _match=$1
+          shift
+          if [[ $# -eq 0 ]]
+          then
+              echo "--match requires an argument"
+              exit -1
+          fi
+          echo "--MATCH: $1"
+          _match=$1
       elif [[ -z $_name ]]
       then
-	  _name=$1
+          _name=$1
       else
-	  echo "multiple note names or unsupported option: 1) $_name 2) $1"
-	  exit -1
+          echo "multiple note names or unsupported option: 1) $_name 2) $1"
+          exit -1
       fi
       shift
 done
@@ -67,39 +67,37 @@ echo $(date) >> $_out
 update () {
     if [[ ! -z $_name ]]
     then
-	#
-	#  update one note
-	#
-	_note=$_base.$_name
-	node note -$_ct --update=$_note $1 $2 $_production $_options 2>> $_out
-	if [[ $? -ne 0 ]]
-	then
-	    echo "update failed for $_note"
-	    exit -1
-	fi
+        #
+        #  update one note
+        #
+        _note=$_base.$_name
+        node note -$_ct --update=$_note $1 $2 $_production $_options 2>> $_out
+        _exitcode=$?
+        if [[ $_exitcode -ne 0 ]]
+        then
+            echo "$_exitcode updated"
+            #exit -1
+        fi
     else
-	#
-	# update all notes
-	#
-	node note -$_ct --match $_ct.c2-$_cc.x2.$_match $1 $2 $_production $_options --update 2>> $_out
-	if [[ $? -ne 0 ]]
-	then
-	    echo "update all failed"
-	    exit -1
-	fi
+        #
+        # update all notes
+        #
+        node note -$_ct --match $_ct.c2-$_cc.x2.$_match $1 $2 $_production $_options --update 2>> $_out
+        _exitcode=$?
+        if [[ $_exitcode -ne 0 ]]
+        then
+            echo "update all failed, $_exitcode"
+            exit -1
+        fi
     fi
-    return $?
+    return $_exitcode
 }
 
-if [[ ! -z $_from_en  ]]
-then
-    update
-fi
 if [[ ! -z $_from_fs  ]]
 then
     _options="$_options --from-fs"
-    update
 fi
+update
 
 exit 0
 
@@ -115,10 +113,10 @@ else
     echo "update all from $_wordsfile"
     while read -r _word
     do
-	if [ ! -z $_word ]
-	then
-	    ./filtermerge.sh $_ct $_cc $_word $_production 
-	fi
+        if [ ! -z $_word ]
+        then
+            ./filtermerge.sh $_ct $_cc $_word $_production 
+        fi
     done < "$_wordsfile"
 fi
     

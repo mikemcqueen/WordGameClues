@@ -7,8 +7,8 @@
 //
 
 const _                = require('lodash');
-const ClueManager      = require('../clue-manager');
-const Clues            = require('../clue-types');
+const ClueManager      = require('../modules/clue-manager');
+const Clues            = require('../modules/clue-types');
 const Debug            = require('debug')('note-merge');
 const Note             = require('../modules/note');
 const NoteMerge        = require('../modules/note-merge');
@@ -43,7 +43,7 @@ async function main () {
     const opt = Options.parseSystem();
     const options = opt.options;
     if (opt.argv.length !== 1) {
-	usage('exactly one FILE argument required');
+        usage('exactly one FILE argument required');
     }
     const filename = opt.argv[0];
     Debug(`filename: ${filename}`);
@@ -59,13 +59,13 @@ async function main () {
     //   else get notebook name from base filename
     const noteName = options.note || Path.basename(filename);
     if (!options.default) {
-	const nbName = options.notebook || Note.getWorksheetName(noteName);
-	const nb = await Note.getNotebook(nbName, options).catch(err => { throw err; });
-	if (!nb) {
-	    usage(`notebook not found, ${nbName}`);
-	}
-	options.notebookGuid = nb.guid;
-	Debug(`notebookGuid: ${options.notebookGuid}`);
+        const nbName = options.notebook || Note.getWorksheetName(noteName);
+        const nb = await Note.getNotebook(nbName, options).catch(err => { throw err; });
+        if (!nb) {
+            usage(`notebook not found, ${nbName}`);
+        }
+        options.notebookGuid = nb.guid;
+        Debug(`notebookGuid: ${options.notebookGuid}`);
     }
     return NoteMerge.mergeFilterFile(filename, noteName, options);
 }

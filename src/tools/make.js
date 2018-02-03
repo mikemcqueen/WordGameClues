@@ -21,7 +21,7 @@ function usage () {
 async function main () {
     const filename = process.argv[2];
     if (!filename) {
-	usage();
+        usage();
     }
     Debug(`filename: ${filename}`);
     const body = NoteMaker.makeFromFilterFile(filename, { outerDiv: true });

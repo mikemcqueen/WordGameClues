@@ -9,12 +9,12 @@ const Update       = require('../modules/update');
 
 const Options      = require('node-getopt')
     .create(_.concat(Clues.Options, [
-//	['d', 'dir=NAME',            'directory name'],
-	['',  'save',                'save clues'],
-	['v', 'verbose',             'show logging'],
-	['h', 'help',                'this screen']
+//      ['d', 'dir=NAME',            'directory name'],
+        ['',  'save',                'save clues'],
+        ['v', 'verbose',             'show logging'],
+        ['h', 'help',                'this screen']
     ])).bindHelp(
-	"Usage: node update [options] <wordListFile>\n\n[[OPTIONS]]\n"
+        "Usage: node update [options] <wordListFile>\n\n[[OPTIONS]]\n"
     );
 
 //
@@ -32,23 +32,23 @@ async function main() {
     const options = opt.options;
 
     if (opt.argv.length !== 1) {
-	usage('exactly one FILE argument is required');
+        usage('exactly one FILE argument is required');
     }
     let filename = opt.argv[0];
     console.log(`filename: ${filename}`);
     if (options.verbose) {
-	console.log('verbose: true');
+        console.log('verbose: true');
     }
 
     return Update.updateFromFile(filename, options)
-	.then(result => {
-	    console.log(`updated knownClues(${result.count.knownClues})` +
-			`, maybeClues(${result.count.maybeClues})` +
-			`, rejectClues(${result.count.rejectClues})` +
-			`, knownUrls(${result.count.knownUrls})` +
-			`, maybeUrls(${result.count.maybeUrls})` +
-			`, rejectUrls(${result.count.rejectUrls})`);
-	});
+        .then(result => {
+            console.log(`updated knownClues(${result.count.knownClues})` +
+                        `, maybeClues(${result.count.maybeClues})` +
+                        `, rejectClues(${result.count.rejectClues})` +
+                        `, knownUrls(${result.count.knownUrls})` +
+                        `, maybeUrls(${result.count.maybeUrls})` +
+                        `, rejectUrls(${result.count.rejectUrls})`);
+        });
 }
 
 //

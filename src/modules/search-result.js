@@ -42,11 +42,11 @@ function makeFilename (wordList, suffix = undefined) {
     Expect(wordList.length).is.aboveOrEqual(2);
     let filename = wordList.join('-');
     if (suffix) { // necessary?
-	filename += suffix;
+        filename += suffix;
     }
     return Path.format({
-	name: filename,
-	ext:  EXT_JSON
+        name: filename,
+        ext:  EXT_JSON
     });
 }
 
@@ -74,8 +74,8 @@ function makeResultDir (args, options) {
     const root = args.root || RESULT_DIR;
     let resultDir = `${root}${args.dir}`;
     if (!options.flat) {
-	const baseDir = args.base.slice(0, 1);
-	resultDir += `/${baseDir}`;
+        const baseDir = args.base.slice(0, 1);
+        resultDir += `/${baseDir}`;
     }
     Debug(`flat: ${options.flat}, resultDir: ${resultDir}`);
     return resultDir;
@@ -101,26 +101,26 @@ function get (text, pages, cb) {
     let resultList = [];
     let count = 0;
     Google(text, function (err, result) {
-	if (err) return cb(err);
-	resultList.push(...result.links.map(link => {
-	    return {
-		title:   link.title,
-		url:     link.href,
-		summary: link.description
-	    };
-	}));
-	count += 1;
-	// done?
-	if (count === pages || !result.next) {
-	    return cb(null, resultList);
-	}
-	Expect(count).is.below(pages);
-	Expect(result.next).is.ok();
-	let msDelay = My.between(Ms('30s'), Ms('60s'));
-	console.log(`Delaying ${PrettyMs(msDelay)} for next page of results...`);
-	// TODO async function, use await My.delay(msDelay)
-	setTimeout(result.next, msDelay);
-	return undefined;
+        if (err) return cb(err);
+        resultList.push(...result.links.map(link => {
+            return {
+                title:   link.title,
+                url:     link.href,
+                summary: link.description
+            };
+        }));
+        count += 1;
+        // done?
+        if (count === pages || !result.next) {
+            return cb(null, resultList);
+        }
+        Expect(count).is.below(pages);
+        Expect(result.next).is.ok();
+        let msDelay = My.between(Ms('30s'), Ms('60s'));
+        console.log(`Delaying ${PrettyMs(msDelay)} for next page of results...`);
+        // TODO async function, use await My.delay(msDelay)
+        setTimeout(result.next, msDelay);
+        return undefined;
     });
 }
 
@@ -131,24 +131,24 @@ function scoreSaveCommit (resultList, filepath, options = {}, wordList = undefin
     Expect(filepath).is.a.String();
     Expect(options).is.a.Object();
     if (!_.isUndefined(wordList)) {
-	Expect(wordList).is.an.Array().with.property('length').above(1); // at.least(2);
+        Expect(wordList).is.an.Array().with.property('length').above(1); // at.least(2);
     }
     console.log(`scoreSaveCommit, ${filepath} (${_.size(resultList)})`);
     return Score.scoreResultList(
-	_.isUndefined(wordList) ? makeWordlist(filepath) : wordList,
-	resultList,
-	options
+        _.isUndefined(wordList) ? makeWordlist(filepath) : wordList,
+        resultList,
+        options
     ).then(list => {
-	if (_.isEmpty(list)) {
-	    // if list is empty, all the results in this file were already scored
-	    console.log('empty list, already scored?');
-	    return Promise.reject(); // skip save/commit
-	}
-	return Fs.writeFile(filepath, JSON.stringify(list))
-	    .then(() => console.log(' updated'));
+        if (_.isEmpty(list)) {
+            // if list is empty, all the results in this file were already scored
+            console.log('empty list, already scored?');
+            return Promise.reject(); // skip save/commit
+        }
+        return Fs.writeFile(filepath, JSON.stringify(list))
+            .then(() => console.log(' updated'));
     }).then(() => {
-	return My.gitCommit(filepath, 'updated score')
-	    .then(() => console.log(' committed'));
+        return My.gitCommit(filepath, 'updated score')
+            .then(() => console.log(' committed'));
     });
 }
 
@@ -158,10 +158,10 @@ function fileScoreSaveCommit (filepath, options = {}, wordList = undefined) {
     Expect(filepath).is.a.String();
     Expect(options).is.a.Object();
     if (!_.isUndefined(wordList)) {
-	Expect(wordList).is.an.Array().with.property('length').above(1); // at.least(2)
+        Expect(wordList).is.an.Array().with.property('length').above(1); // at.least(2)
     }
     return Fs.readFile(filepath, 'utf8')
-	.then(data => scoreSaveCommit(JSON.parse(data), filepath, options, wordList));
+        .then(data => scoreSaveCommit(JSON.parse(data), filepath, options, wordList));
 }
 
 //

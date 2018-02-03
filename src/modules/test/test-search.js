@@ -1,5 +1,5 @@
 //
-// TEST-SEARCH.JS
+// test-search.js
 //
 
 'use strict';
@@ -27,14 +27,14 @@ function createTmpFileSync (filename) {
     Expect(filename).to.be.a('string');
     console.log(`creating: ${filename}`);
     let args = {
-	root: TEST_ROOT,
-	dir:  TMP_DIRNAME,
-	base: filename
+        root: TEST_ROOT,
+        dir:  TMP_DIRNAME,
+        base: filename
     };
     try {
-	Fs.writeFileSync(SearchResult.pathFormat(args, Flat), '[]');
+        Fs.writeFileSync(SearchResult.pathFormat(args, Flat), '[]');
     } catch(err) {
-	throw err;
+        throw err;
     }
 }
 
@@ -44,17 +44,17 @@ function deleteTmpFileSync (filename) {
     Expect(filename).to.be.a('string');
     console.log(`deleting: ${filename}`);
     let args = {
-	root: TEST_ROOT,
-	dir:  TMP_DIRNAME,
-	base: filename
+        root: TEST_ROOT,
+        dir:  TMP_DIRNAME,
+        base: filename
     };
     try {
-	Fs.unlinkSync(SearchResult.pathFormat(args, Flat));
+        Fs.unlinkSync(SearchResult.pathFormat(args, Flat));
     } catch(err) {
-	if (err.code !== 'ENOENT') {
-	    throw err;
-	}
-	// else eat it
+        if (err.code !== 'ENOENT') {
+            throw err;
+        }
+        // else eat it
     }
 }
 
@@ -78,81 +78,81 @@ describe ('search tests:', function() {
     // build a 2-element array of unique 2-element word lists
     // e.g. [ [ 'one', 'two' ], [ 'three', 'four' ] ]
     function getWordListArray () {
-	function getPair(other = []) {
-	    const pair = [ _.sample(wordList), _.sample(wordList) ];
-	    if (!_.isEqual(pair, other)) return pair;
-	    return getPair(other);
-	}
-	let firstPair = getPair();
-	return [ firstPair, getPair(firstPair) ];
+        function getPair(other = []) {
+            const pair = [ _.sample(wordList), _.sample(wordList) ];
+            if (!_.isEqual(pair, other)) return pair;
+            return getPair(other);
+        }
+        let firstPair = getPair();
+        return [ firstPair, getPair(firstPair) ];
     }
 
     ////////////////////////////////////////////////////////////////////////////////
 
     // test skip-when-file-exists functionality
     it ('should skip [one,two] because file exists, then process [three,four]', function (done) {
-	let wla = getWordListArray();
-	createTmpFileSync(SearchResult.makeFilename(wla[0]));	// create one-two.json
-	deleteTmpFileSync(SearchResult.makeFilename(wla[1]));	// create three-four.json
+        let wla = getWordListArray();
+        createTmpFileSync(SearchResult.makeFilename(wla[0]));   // create one-two.json
+        deleteTmpFileSync(SearchResult.makeFilename(wla[1]));   // create three-four.json
 
-	Search.getAllResults({
-	    wordListArray: wla,
-	    pages:         1,
-	    delay:         delay,
-	    root:          TEST_ROOT,
-	    dir:           TMP_DIRNAME
-	}, Flat).then(result => {
-	    Expect(result.skip, 'skip').to.equal(1);
-	    Expect(result.data, 'data').to.equal(1);
-	    Expect(result.error, 'error').to.equal(0);
-	    done();
-	}).catch(err => done(err));
+        Search.getAllResults({
+            wordListArray: wla,
+            pages:         1,
+            delay:         delay,
+            root:          TEST_ROOT,
+            dir:           TMP_DIRNAME
+        }, Flat).then(result => {
+            Expect(result.skip, 'skip').to.equal(1);
+            Expect(result.data, 'data').to.equal(1);
+            Expect(result.error, 'error').to.equal(0);
+            done();
+        }).catch(err => done(err));
     });
     
     ////////////////////////////////////////////////////////////////////////////////
 
     // test forced rejection in Search.getOneResult
     it ('should skip [one,two] because of forced rejection, then process [three,four]', function (done) {
-	let wla = getWordListArray();
-	let options = {
-	    force:          true,  // search even if file exists
-	    forceNextError: true,  // reject in getOneResult
-	    flat:           true   // flat directory structure
-	};
-	Search.getAllResults({
-	    wordListArray:  wla,
-	    pages:          1,
-	    delay:          delay,
-	    root:           TEST_ROOT,
-	    dir:            TMP_DIRNAME
-	}, options).then(result => {
-	    Expect(result.skip, 'skip').to.equal(0);
-	    Expect(result.data, 'data').to.equal(1);
-	    Expect(result.error, 'error').to.equal(1);
-	    done();
-	}).catch(err => done(err));
+        let wla = getWordListArray();
+        let options = {
+            force:          true,  // search even if file exists
+            forceNextError: true,  // reject in getOneResult
+            flat:           true   // flat directory structure
+        };
+        Search.getAllResults({
+            wordListArray:  wla,
+            pages:          1,
+            delay:          delay,
+            root:           TEST_ROOT,
+            dir:            TMP_DIRNAME
+        }, options).then(result => {
+            Expect(result.skip, 'skip').to.equal(0);
+            Expect(result.data, 'data').to.equal(1);
+            Expect(result.error, 'error').to.equal(1);
+            done();
+        }).catch(err => done(err));
     });
 
     ////////////////////////////////////////////////////////////////////////////////
 
     it ('should process both results successfully', function(done) {
-	let wla = getWordListArray();
-	// for testing wihtout --force, need to delete both files
-	deleteTmpFileSync(SearchResult.makeFilename(wla[0]));	  // delete one-two.json
-	deleteTmpFileSync(SearchResult.makeFilename(wla[1]));	  // delete three-four.json
+        let wla = getWordListArray();
+        // for testing wihtout --force, need to delete both files
+        deleteTmpFileSync(SearchResult.makeFilename(wla[0]));     // delete one-two.json
+        deleteTmpFileSync(SearchResult.makeFilename(wla[1]));     // delete three-four.json
 
-	Search.getAllResults({
-	    wordListArray:  wla,
-	    pages:          1,
-	    delay:          delay,
-	    root:           TEST_ROOT,
-	    dir:            TMP_DIRNAME
-	}, Flat).then(result => {
-	    Expect(result.skip, 'skip').to.equal(0);
-	    Expect(result.data, 'data').to.equal(2);
-	    Expect(result.error, 'error').to.equal(0);
-	    done();
-	}).catch(err => done(err));
+        Search.getAllResults({
+            wordListArray:  wla,
+            pages:          1,
+            delay:          delay,
+            root:           TEST_ROOT,
+            dir:            TMP_DIRNAME
+        }, Flat).then(result => {
+            Expect(result.skip, 'skip').to.equal(0);
+            Expect(result.data, 'data').to.equal(2);
+            Expect(result.error, 'error').to.equal(0);
+            done();
+        }).catch(err => done(err));
     });
 
     ////////////////////////////////////////////////////////////////////////////////
