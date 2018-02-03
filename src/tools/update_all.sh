@@ -93,15 +93,11 @@ update () {
     return $_exitcode
 }
 
-if [[ ! -z $_from_en  ]]
-then
-    update
-fi
 if [[ ! -z $_from_fs  ]]
 then
     _options="$_options --from-fs"
-    update
 fi
+update
 
 exit 0
 

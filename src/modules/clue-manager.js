@@ -17,6 +17,7 @@ const Log            = require('./log')('clue-manager');
 const NameCount      = require('../types/name-count');
 const Path           = require('path');
 const Peco           = require('./peco');
+const Stringify      = require('stringify-object');
 const Validator      = require('./validator');
 
 //
@@ -466,7 +467,7 @@ ClueManager.prototype.getClueSourceListArray = function (args) {
         require: args.require
     }).getCombinations(); 
 
-    Debug(`clueCountListArray(${clueCountListArray.length}): ${clueCountListArray}`);
+    Debug(`clueCountListArray(${clueCountListArray.length}): ${Stringify(clueCountListArray)}`);
 
     let clueSourceListArray = [];
     // TODO: .filter()
@@ -491,7 +492,7 @@ ClueManager.prototype.getClueSourceListArray = function (args) {
         // we require sources 1,2,3, and search for combos with
         // -max 1,2,3 of which both -max 1,2 will hit here because
         // we can't match the 3 required sources
-        console.log('WARNING! getClueSrcListArray empty!');
+        //console.log('WARNING! getClueSrcListArray empty!');
     }
     return clueSourceListArray;
 }

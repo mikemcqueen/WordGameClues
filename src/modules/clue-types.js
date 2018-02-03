@@ -62,21 +62,19 @@ const APPLE = {
         sentence:       7,
         clueCount:      7,
         REQ_CLUE_COUNT: 7
-    }
+    },
 
-    /*
     '8': {
         sentence:       8,
-        clueCount:      7,
-        REQ_CLUE_COUNT: 7
+        clueCount:      8,
+        REQ_CLUE_COUNT: 8
     },
 
     '9': {
-        sentence:       7,
-        clueCount:      7,
-        REQ_CLUE_COUNT: 7
+        sentence:       9,
+        clueCount:      8,
+        REQ_CLUE_COUNT: 8
     }
-     */
 
 };
 
