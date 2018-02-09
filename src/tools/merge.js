@@ -37,7 +37,7 @@ function main () {
     const from = Clues.getByOptions(Opt.options);
     if (!from) throw new Error('oops');
     const to = Clues.cloneAsNextType(from);
-    console.log(`from: ${from}[${from.baseDir}], to: ${to}[${to.baseDir}]`);
+    console.log(`from: [${from.baseDir}], to: [${to.baseDir}]`);
     if (Opt.options.verbose) {
         console.log('verbose: true');
     }

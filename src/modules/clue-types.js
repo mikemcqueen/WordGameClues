@@ -137,7 +137,7 @@ function getByOptions (options) {
         src = metamorph(APPLE[options.apple[0]]);
         if (_.isUndefined(src)) throw new Error(`APPLE[${options.apple}] not supported`);
         if (options.apple.length > 1) {
-            src = cloneAsType(src, options.apple.slice(1, options.apple.length));
+            src = cloneAsType(src, getTypeFromSuffix(options.apple.slice(1, options.apple.length)));
         }
     } else {
         throw new Error('No clue-type option supplied');
@@ -147,20 +147,20 @@ function getByOptions (options) {
 
 //
 
-function getByType (type) {
+function getTypeFromSuffix (type) {
     switch (type) {
     case 's': return SYNTH;
     case 'h': return HARMONY;
     case 'f': return FINAL;
     default:
-        throw new Error(`invalid type, ${type}`);
+        throw new Error(`invalid type suffix, ${type}`);
     }
 }
 
 //
 
 function getTypeSuffix (config) {
-    const index = _.lastIndexOf(config, '/') + 1;
+    const index = _.lastIndexOf(config.baseDir, '/') + 1;
     let type;
     if (index > 0) {
         const firstLetter = config.baseDir.slice(index, index + 1);
@@ -174,10 +174,11 @@ function getTypeSuffix (config) {
 
 function getNextType (config) {
     switch (getTypeSuffix(config)) {
+    case 'p': return SYNTH;
     case 's': return HARMONY;
     case 'h': return FINAL;
     default:
-        throw new Error(`not implemented next type for: ${Stringify(config)}`);
+        throw new Error(`next type not implemented for: ${Stringify(config)}`);
     }
 }
 
@@ -189,12 +190,11 @@ function cloneAsNextType (config) {
 
 //
 
-function cloneAsType (config, type) {
-    const ct = getByType(type);
+function cloneAsType (config, otherType) {
     config = _.clone(config);
-    config.baseDir += '/' + ct.baseDir;
-    config.clueCount = ct.clueCount;
-    config.REQ_CLUE_COUNT = ct.REQ_CLUE_COUNT;
+    config.baseDir += '/' + otherType.baseDir;
+    config.clueCount = otherType.clueCount;
+    config.REQ_CLUE_COUNT = otherType.REQ_CLUE_COUNT;
     return config;
 }
 

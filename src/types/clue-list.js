@@ -7,8 +7,10 @@
 //
 
 const _       = require('lodash');
+const Debug   = require('debug')('clue-list');
 const Expect  = require('should/as-function');
 const Fs      = require('fs-extra');
+const Stringify = require('stringify-object');
 
 //
 //
@@ -217,7 +219,8 @@ function clueMergeFrom (toClue, fromClue, options) {
 //
 
 function sameSrcMergeFrom (fromList, options = {}) {
-    Expect(fromList.length >= this.length).is.true(); // at.least()
+    Debug(`fromList: ${Stringify(fromList)}, to this: ${Stringify(this)}`);
+    Expect(fromList.length).is.aboveOrEqual(this.length);
     let warnings = 0;
     for (let [index, clue] of this.entries()) {
         Expect(clue.name)//, `name mismatch, from ${fromList[index].name} to ${clue.name}`)
