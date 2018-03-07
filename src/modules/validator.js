@@ -639,7 +639,7 @@ Validator.prototype.findPrimarySourceConflicts = function(args) {
 
     Debug(`++findPrimarySourceConflicts, ncList: ${args.ncList}`);
 
-    if (xp) Expect(args.ncList, 'args.ncList').exist;
+    if (xp) Expect(args.ncList, 'args.ncList').is.ok();
 
     let allPrimary = true;
     let nameMap = {};

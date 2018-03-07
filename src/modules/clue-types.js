@@ -2,7 +2,7 @@
 // clue-types.js
 //
 
-//'use strict';
+//'use strict'; // because arguments.callee
 
 //
 
@@ -79,25 +79,25 @@ const APPLE = {
 };
 
 const META = {
-    baseDir:        'meta',
+    baseDir: 'meta',
     clueCount: 9,
     REQ_CLUE_COUNT: 9
 };
 
 const SYNTH = {
-    baseDir:        'synth',
+    baseDir: 'synth',
     clueCount: 6,
     REQ_CLUE_COUNT: 6
 };
 
 const HARMONY = {
-    baseDir:        'harmony',
+    baseDir: 'harmony',
     clueCount: 3,
     REQ_CLUE_COUNT: 3
 };
 
 const FINAL = {
-    baseDir:        'final',
+    baseDir: 'final',
     clueCount: 2,
     REQ_CLUE_COUNT: 2
 };

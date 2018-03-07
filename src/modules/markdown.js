@@ -116,17 +116,6 @@ function hasSuffix (line, suffix) {
 }
 
 // 
-/*
-function hasPrefix (line, suffix) {
-    Expect(line).is.a.String();
-    Expect(suffix).is.a.String().and.not.empty();
-
-    const [base, lineSuffix] = getSuffix(line);
-    const has = (lineSuffix === suffix);
-    return [has, base];
-}
- */
-//
 
 module.exports = {
     getPrefix,

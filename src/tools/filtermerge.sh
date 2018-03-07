@@ -40,6 +40,7 @@ do
               exit -1
           fi
           _article=$1
+	  _note=$_note.article
       else
           echo "unknown option, $1"
           exit -1
@@ -62,12 +63,7 @@ then
     grep $_name tmp/$_base > tmp/$_note
 fi
 
-_filtered=$_note
-if [[ ! -z $_article ]]
-then
-    _filtered=$_filtered.article
-fi
-_filtered=$_filtered.filtered
+_filtered=$_note.filtered
 
 echo "Filtering..."
 node filter -$_ct tmp/$_note $_article > tmp/$_filtered 2>> $_out

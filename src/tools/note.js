@@ -324,8 +324,7 @@ function removeAllClues (removedClues, options = {}) {
     Log.debug('removeAllClues');
     let total = 0;
     for (let source of removedClues.keys()) {
-        let nameCsv = Markdown.hasSourcePrefix(source)
-                ? source.slice(1, source.length) : source;
+        let nameCsv = Markdown.hasSourcePrefix(source) ? source.slice(1, source.length) : source;
         const nameList = nameCsv.split(',').sort();
         const result = ClueManager.getCountListArrays(nameCsv, { remove: true });
         if (!result) {
@@ -351,9 +350,8 @@ function removeAllClues (removedClues, options = {}) {
 async function saveAddCommitAll (resultList, options) {
     Expect(resultList).is.an.Array();
     Expect(options).is.an.Object();
-    return Promise.map(resultList, result => {
-        return Filter.saveAddCommit(result.note.title, result.filterList, options);
-    }, { concurrency: 2 });
+    return Promise.map(resultList, result => Filter.saveAddCommit(result.note.title, result.filterList, options),
+		       { concurrency: 2 });
 }
 
 //
@@ -498,8 +496,7 @@ async function main () {
     if (options.verbose) Log('---VERBOSE---');
     
     const start = new Date();
-    const result = await Commands[cmd](options)
-              .catch(err => { throw err; });
+    const result = await Commands[cmd](options).catch(err => { throw err; });
     const duration = new Duration(start, new Date()).milliseconds;
     console.log(`${cmd}: ${PrettyMs(duration)}`);
     
