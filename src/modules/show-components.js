@@ -18,7 +18,7 @@ const Validator   = require('./validator');
 function showCountListArray (countListArray, text, hasNameList = false) {
     for (const elem of countListArray) {
         const countList = hasNameList ? elem.countList : elem;
-        console.log(`${countList} ${text} ${hasNameList ? elem.nameList : ''}`);
+        console.log(`${countList} ${text} ${hasNameList ? elem.nameList.join(' - ') : ''}`);
     }
 }
 

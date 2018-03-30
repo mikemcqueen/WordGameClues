@@ -45,6 +45,7 @@ const CmdLineOptions = Getopt.create(_.concat(Clues.Options, [
     ['', 'update[=NOTE]',   'update all results in worksheet, or a specific NOTE if specified'],
     ['', 'match=PREFIX',    '  update notes matching title PREFIX (used with --update)'],
     ['', 'force-update',    '  update single note with removed clue (used with --update)'],
+    ['', 'always',          '  update notes that don\'t need updating'],
     ['', 'save',            '  save cluelist files (used with --update)'],
     ['', 'dry-run',         '  show changes only (used with --update)'],
     ['', 'from-fs',         '  update from filesystem (used with --update, --validate)'],
@@ -130,14 +131,14 @@ function old_create (options) {
 
 async function getAndParse (noteName, options) {
     Log.info(`getAndParse ${noteName}`);
-    options.urls = true;
-    options.clues = true;
-    options.content = true;
-    return Note.get(noteName, options)
+    const getOptions = Object.assign(_.clone(options), { content: true });
+    return Note.get(noteName, getOptions)
         .then(note => {
+	    if (!note) return undefined;
+	    const  parseOptions = Object.assign(_.clone(options), { urls: true, clues: true });
             return {
                 note,
-                filterList: Filter.parseLines(NoteParser.parseDom(note.content, options))
+                filterList: Filter.parseLines(NoteParser.parseDom(note.content, parseOptions))
             };
         });
 }
@@ -231,11 +232,25 @@ function getParseSaveCommit (noteName, options) {
 }
  */
 
+// pullOneWorksheet
+
+function getLastUpdateTime (noteName, options) {
+    return My.fstat(Filter.getUpdateFilePath(noteName, options))
+	.then(stats => {
+	    Log.info(`file: stats: ${Stringify(stats)}`);
+	    return stats ? stats.mtimeMs : 0;
+	});
+}
+
 //
 
 function loadParseSaveOneWorksheet (noteName, options) {
-    return getAndParse(noteName, options)
-        .then(result => {
+    return Promise.resolve(options.always ? 0 : getLastUpdateTime(noteName, options))
+	.then(lastUpdateTime => {
+	    const getOptions = Object.assign(_.clone(options), { updated_after: lastUpdateTime });
+	    return getAndParse(noteName, getOptions);
+	}).then(result => {
+	    if (!result) return undefined;
             const removedClueMap = Filter.getRemovedClues(result.filterList);
             if (_.isEmpty(removedClueMap)) {
                 Log.info(`no removed clues`);
@@ -278,6 +293,7 @@ async function getSomeAndParse (options, filterFunc) {
             // element upon completion of the first promise (Note.get)
             return Note.get(null, options)
                 .then(note => {
+		    if (!note) return undefined;
                     Log.info(`parsing note ${note.title}`);
                     result.push({
                         note,
@@ -350,8 +366,7 @@ function removeAllClues (removedClues, options = {}) {
 async function saveAddCommitAll (resultList, options) {
     Expect(resultList).is.an.Array();
     Expect(options).is.an.Object();
-    return Promise.map(resultList, result => Filter.saveAddCommit(result.note.title, result.filterList, options),
-		       { concurrency: 2 });
+    return Promise.map(resultList, result => Filter.saveAddCommit(result.note.title, result.filterList, options), { concurrency: 2 });
 }
 
 //
@@ -359,6 +374,7 @@ async function saveAddCommitAll (resultList, options) {
 async function loadParseSaveAllWorksheets (options) {
     return getSomeAndParse(options, Note.chooser)
         .then(resultList => {
+	    if (_.isEmpty(resultList)) return undefined;
             let allRemovedClues = getAllRemovedClues(resultList);
             removeAllClues(allRemovedClues, options);
             return saveAddCommitAll(resultList, options);
@@ -393,7 +409,7 @@ async function update (options) {
             if (!nb && !options.default) {
                 usage(`notebook not found, ${options.notebook}`);
             }
-            Log.info(`notebook, title: ${nb.title}, guid: ${nb.guid}`);
+	    Log.info(`notebook, name: ${nb.name}, guid: ${nb.guid}`);
             options.notebookGuid = nb.guid;
 
             ClueManager.loadAllClues({ clues: Clues.getByOptions(options) });
@@ -409,10 +425,11 @@ async function update (options) {
                 return [Filter.getUpdateFilePath(options.update, options)];
             } 
             return loadParseSaveOneWorksheet(options.update, options)
-                .then(path => [path]); // return a "path list" containing one path
+                .then(path => path ? [path] : undefined); // return a "path list" containing one path
         }).then(pathList => {
             // NOTE: updateFromPathList should do something with options.save, don't pass it to
             // updateFromFile, just call save at the end.
+	    if (!pathList) return undefined;
             return Update.updateFromPathList(pathList, options);
         });
 }

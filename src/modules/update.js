@@ -351,7 +351,7 @@ function saveClues (result, options) {
             let countList = Array.from(result.count.knownCountSet);
             Expect(countList).is.not.empty();
             // TODO: My.optlog(options, msg...)
-            // some way to teak util.Debug()('name') to current module's debug instance name?
+            // some way to tweak util.Debug()('name') to current module's debug instance name?
             // can i say My=require('util')(Debug) or (MODULE_NAME)
             Log.info(`knownList: ${countList}`);
             if (options.save) {

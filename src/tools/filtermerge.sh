@@ -1,7 +1,7 @@
 #!/bin/bash
 if [ $# -lt 3  ]
 then
-   echo 'usage: filtermerge.sh <clue-type> <clue-count> <word> [--production] [--generate]'
+   echo 'usage: filtermerge.sh <clue-type> <clue-count> <word> [--production] [--generate] [--notebook NAME]'
    exit -1
 fi
 
@@ -40,7 +40,12 @@ do
               exit -1
           fi
           _article=$1
-	  _note=$_note.article
+          _note=$_note.article
+      elif [[ $1 == "--notebook" ]]
+      then
+           shift
+           # check if $# -eq 0 || $1.startsWith('--')
+           _notebook=--notebook=$1
       else
           echo "unknown option, $1"
           exit -1
@@ -75,7 +80,7 @@ then
 fi
 
 echo "Merging..."
-node note-merge -$_ct tmp/$_filtered --note $_note --force-create $_production 2>> $_out
+node note-merge -$_ct tmp/$_filtered --note $_note --force-create $_production $_notebook 2>> $_out
 _exitcode=$?
 if [ $_exitcode -ne 0 ]
 then

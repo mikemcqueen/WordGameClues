@@ -94,11 +94,12 @@ async function getNotebookByGuid (guid, options = {}) {
 
 //
 
-async function getNotebookByOptions (options) {
+async function getNotebookByOptions (options = {}) {
     if (options.notebookGuid) return getNotebookByGuid(options.notebookGuid, options);
     if (!options.notebook) {
-        Log.debug(`NO NOTEBOOK - THROW?`);
-        return undefined;
+	throw new Error('No notebook specified.');
+        //Log.debug(`NO NOTEBOOK - THROW?`);
+	//return undefined;
     }
     return getNotebook(options.notebook, options)
         .then(nb => {
@@ -130,23 +131,37 @@ async function getNotebookByOptions (options) {
 // TODO: remove title as param, go off options purely
 
 async function get (title, options = {}) {
-    const noteSpec = { includeContent: true };
     const noteStore = getNotestore(options.production);
-    if (options.guid) {
-        Log.info(`Note.get: ${options.guid}`);
-        return noteStore.getNoteWithResultSpec(options.guid, noteSpec)
-            .then(note => {
-                if (!note && !options.nothrow) {
-                    throw new Error(`note not found, ${options.guid}`);
-                }
-                return note;
-            });
-    }
+    return getNoteGuid(title, options)
+	.then(guid => {
+            Log.info(`note guid: ${guid}`);
+	    if (!guid) return undefined;
+	    return noteStore.getNoteWithResultSpec(guid, {});
+	}).then(note => {
+	    //Log.info(`note header: ${Stringify(note)}`);
+	    if (options.updated_after) {
+		const updatedTime = new Date(note.updated);
+		const cutoffTime = new Date(options.updated_after);
+		Log.debug(`update < cutoff: ${updatedTime < cutoffTime}`);
+		if (updatedTime < cutoffTime) return false; // false = note exist, but hasn't been updated
+	    }
+	    return noteStore.getNoteWithResultSpec(note.guid, { includeContent: true });
+	}).then(note => {
+            if (_.isUndefined(note) && !options.nothrow) {
+                throw new Error(`note not found, title: ${title}, guid: ${options.guid}`);
+            }
+            return note;
+        });
+}
+
+async function getNoteGuid (title, options = {}) {
+    if (options.guid) return options.guid;
     return getNotebookByOptions(options)
         .then(notebook => {
-            Log.debug(`get from notebook: ${notebook.title}, ${notebook.guid}`);
+            Log.debug(`get from notebook: ${notebook.name}, ${notebook.guid}`);
             const filter = { notebookGuid: notebook.guid };
-            const metaSpec = { includeTitle: true };
+            const metaSpec = { includeTitle: true ,  includeResourcesData: true };
+	    const noteStore = getNotestore(options.production);
             return noteStore.findNotesMetadata(filter, 0, 250, metaSpec);
         }).then(findResult => {
             for (const metaNote of findResult.notes) {
@@ -154,13 +169,11 @@ async function get (title, options = {}) {
                 // TODO: check for duplicate named notes (option)
                 if (metaNote.title === title) {
                     Log.debug(`match`);
-                    return noteStore.getNoteWithResultSpec(metaNote.guid, noteSpec);
+		    Log.debug(`meta: ${Stringify(metaNote)}`);
+		    return metaNote.guid;
                 }
             }
             return undefined;
-        }).then(note => {
-            if (!note && !options.nothrow) throw new Error(`note not found, ${title}`);
-            return note;
         });
 }
 

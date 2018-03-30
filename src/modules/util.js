@@ -86,9 +86,21 @@ function between (lo, hi) {
     return lo + Math.random() * (hi - lo);
 }
 
+function fstat (path) {
+    return new Promise((resolve, reject) => {
+	Expect(path).is.a.String();
+        Fs.stat(path, (err, stats) => {
+            if (err) {
+                if (err.code !== 'ENOENT') return reject(err); // some unknown error
+	    }
+	    return resolve(err ? undefined : stats);
+	});
+    });
+}
+
 // check if path exists, and whether it is a file.
 //
-function checkIfFile (path) {
+async function checkIfFile (path) {
     Expect(path).is.a.String();
     return new Promise((resolve, reject) => {
         Fs.stat(path, (err, stats) => {
@@ -327,6 +339,7 @@ module.exports = {
     between,
     checkIfFile,
     createTmpFile,
+    fstat,
     gitAdd,
     gitAddCommit,
     gitCommit,
