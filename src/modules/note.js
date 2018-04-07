@@ -130,22 +130,23 @@ async function getNotebookByOptions (options = {}) {
 
 // TODO: remove title as param, go off options purely
 
-async function get (title, options = {}) {
-    const noteStore = getNotestore(options.production);
+function get (title, options = {}) {
     return getNoteGuid(title, options)
 	.then(guid => {
             Log.info(`note guid: ${guid}`);
 	    if (!guid) return undefined;
-	    return noteStore.getNoteWithResultSpec(guid, {});
+	    return getNotestore(options.production).getNoteWithResultSpec(guid, {});
 	}).then(note => {
 	    //Log.info(`note header: ${Stringify(note)}`);
 	    if (options.updated_after) {
 		const updatedTime = new Date(note.updated);
 		const cutoffTime = new Date(options.updated_after);
+ 		Log.debug(`updatedTime: ${updatedTime}`);
+ 		Log.debug(`cutoffTime: ${cutoffTime}`);
 		Log.debug(`update < cutoff: ${updatedTime < cutoffTime}`);
 		if (updatedTime < cutoffTime) return false; // false = note exist, but hasn't been updated
 	    }
-	    return noteStore.getNoteWithResultSpec(note.guid, { includeContent: true });
+	    return getNotestore(options.production).getNoteWithResultSpec(note.guid, { includeContent: true });
 	}).then(note => {
             if (_.isUndefined(note) && !options.nothrow) {
                 throw new Error(`note not found, title: ${title}, guid: ${options.guid}`);

@@ -129,13 +129,12 @@ function old_create (options) {
 
 //
 
-async function getAndParse (noteName, options) {
-    Log.info(`getAndParse ${noteName}`);
-    const getOptions = Object.assign(_.clone(options), { content: true });
-    return Note.get(noteName, getOptions)
+async function getAndParse (noteName, options = {}) {
+    Log.info(`getAndParse ${noteName} : ${options.guid}`);
+    return Note.get(noteName, options)
         .then(note => {
-	    if (!note) return undefined;
-	    const  parseOptions = Object.assign(_.clone(options), { urls: true, clues: true });
+            if (!note) return undefined;
+            const parseOptions = Object.assign(_.clone(options), { urls: true, clues: true });
             return {
                 note,
                 filterList: Filter.parseLines(NoteParser.parseDom(note.content, parseOptions))
@@ -236,21 +235,21 @@ function getParseSaveCommit (noteName, options) {
 
 function getLastUpdateTime (noteName, options) {
     return My.fstat(Filter.getUpdateFilePath(noteName, options))
-	.then(stats => {
-	    Log.info(`file: stats: ${Stringify(stats)}`);
-	    return stats ? stats.mtimeMs : 0;
-	});
+        .then(stats => {
+            Log.info(`file: stats: ${Stringify(stats)}`);
+            return stats ? stats.mtimeMs : 0;
+        });
 }
 
 //
 
 function loadParseSaveOneWorksheet (noteName, options) {
     return Promise.resolve(options.always ? 0 : getLastUpdateTime(noteName, options))
-	.then(lastUpdateTime => {
-	    const getOptions = Object.assign(_.clone(options), { updated_after: lastUpdateTime });
-	    return getAndParse(noteName, getOptions);
-	}).then(result => {
-	    if (!result) return undefined;
+        .then(lastUpdateTime => {
+            const getOptions = Object.assign(_.clone(options), { updated_after: lastUpdateTime });
+            return getAndParse(noteName, getOptions);
+        }).then(result => {
+            if (!result) return undefined;
             const removedClueMap = Filter.getRemovedClues(result.filterList);
             if (_.isEmpty(removedClueMap)) {
                 Log.info(`no removed clues`);
@@ -269,6 +268,23 @@ function loadParseSaveOneWorksheet (noteName, options) {
 
 //
 
+async function getSomeFilteredMetadata (options, filterFunc) {
+    Expect(filterFunc).is.a.Function();
+    Log.debug(`getSomeAndParse`);
+    options.urls = true;
+    options.clues = true;
+    options.content = true;
+    return Note.getSomeMetadata(options)
+        .filter(metadata => filterFunc(metadata, options))
+        .then(metadataList => {
+            if (_.isEmpty(metadataList)) usage('no notes found');
+            Log.info(`found ${metadataList.length} notes`);
+            return metadataList;
+        });
+}
+
+//
+
 async function getSomeAndParse (options, filterFunc) {
     Expect(filterFunc).is.a.Function();
     Log.debug(`getSomeAndParse`);
@@ -276,9 +292,9 @@ async function getSomeAndParse (options, filterFunc) {
     options.clues = true;
     options.content = true;
     // NOTE: the problem with this approach is that we load all notes
-    // first, then if one note then craps on parsing, we just wasted
-    // all of that download time/bandwidth. should download & process
-    // each note independently (in parallel?)
+    // first, then if one note craps on parsing, we just wasted all
+    // of that download time/bandwidth. should download, parse and
+    // *process* each note serially (eventually: in parallel)
     const result = [];
     return Note.getSomeMetadata(options)
         .filter(metadata => filterFunc(metadata, options))
@@ -293,12 +309,13 @@ async function getSomeAndParse (options, filterFunc) {
             // element upon completion of the first promise (Note.get)
             return Note.get(null, options)
                 .then(note => {
-		    if (!note) return undefined;
+                    if (!note) return undefined;
                     Log.info(`parsing note ${note.title}`);
                     result.push({
                         note,
                         filterList: Filter.parseLines(NoteParser.parseDom(note.content, options), options)
                     });
+                    return undefined;
                 });
         }).then(_ => result);
 }
@@ -371,13 +388,41 @@ async function saveAddCommitAll (resultList, options) {
 
 //
 
-async function loadParseSaveAllWorksheets (options) {
-    return getSomeAndParse(options, Note.chooser)
-        .then(resultList => {
-	    if (_.isEmpty(resultList)) return undefined;
+function loadParseSaveAllWorksheets (options) {
+    return getSomeFilteredMetadata(options, Note.chooser)
+        .then(metadataList => {
+            if (_.isEmpty(metadataList)) return undefined;
+	    /// this should be a function: parseAndSaveSomeMetadata(metadataList, options)
+            return Promise.mapSeries(metadataList, metadata => { // map from metadata to { parsed result, save path
+                Log.info(`note: ${metadata.title} : ${metadata.guid}`);
+                return Promise.join(metadata.guid, options.always ? 0 : getLastUpdateTime(metadata.title, options),
+		    (guid, lastUpdatedTime) => {
+			const getOptions = Object.assign(_.clone(options), {
+			    guid: metadata.guid,
+			    updated_after: lastUpdatedTime
+			});
+			// get, parse, then save. return path
+			return getAndParse(null, getOptions)
+			    .then(result => {
+				if (!result) return {};
+				return {
+				    result,
+				    path: Filter.saveAddCommit(result.note.title, result.filterList, options)
+				};
+			    });
+		    });
+	    });
+        }).then(resultPathList => {
+	    const resultList = resultPathList
+		  .filter(resultPath =>  resultPath.result)
+		  .map(resultPath => resultPath.result);
+	    Log.debug(`resultList: ${_.size(resultList)}`);
             let allRemovedClues = getAllRemovedClues(resultList);
             removeAllClues(allRemovedClues, options);
-            return saveAddCommitAll(resultList, options);
+            // return path list
+            return resultPathList
+		.filter(resultPath =>  resultPath.path)
+		.map(resultPath => resultPath.path);
         });
 }
 
@@ -409,7 +454,7 @@ async function update (options) {
             if (!nb && !options.default) {
                 usage(`notebook not found, ${options.notebook}`);
             }
-	    Log.info(`notebook, name: ${nb.name}, guid: ${nb.guid}`);
+            Log.info(`notebook, name: ${nb.name}, guid: ${nb.guid}`);
             options.notebookGuid = nb.guid;
 
             ClueManager.loadAllClues({ clues: Clues.getByOptions(options) });
@@ -429,7 +474,7 @@ async function update (options) {
         }).then(pathList => {
             // NOTE: updateFromPathList should do something with options.save, don't pass it to
             // updateFromFile, just call save at the end.
-	    if (!pathList) return undefined;
+            if (!pathList) return undefined;
             return Update.updateFromPathList(pathList, options);
         });
 }
