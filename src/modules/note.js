@@ -206,17 +206,24 @@ function getSomeMetadata (options) {
 
 function chooser (note, options) {
     Log.debug(`chooser, note: ${note.title}, guid: ${note.guid}`);
+    if (options.all) return true;
+
     // TODO: check for duplicate named notes (option)
     if (options.title) {
         if (options.title !== note.title) return false;
         Log.debug(`title match`);
         return true;
     }
+    
     const prefix = options.match || Clues.getLonghand(Clues.getByOptions(options)) + '.';
     Log.debug(`prefix: ${prefix}`);
-    return _.startsWith(note.title, prefix)
-        && !_.endsWith(note.title, 'article')
-        && (!options.remaining || !_.endsWith(note.title, 'remaining'));
+    // if --match is specified, choose all notes that match
+    // otherwise, don't choose 'article' suffixed notes (TODO: unless --article is specified)
+    // and don't choose 'remaining' suffixed notes (unless --remaining is specified)
+
+    return _.startsWith(note.title, prefix) && (options.match ||
+        (!_.endsWith(note.title, 'article') &&
+        (!options.remaining || !_.endsWith(note.title, 'remaining'))));
 }
 
 //

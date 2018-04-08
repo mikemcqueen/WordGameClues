@@ -43,6 +43,7 @@ const CmdLineOptions = Getopt.create(_.concat(Clues.Options, [
     ['', 'old',             '  use old parse method (use with parse)'],
     ['', 'json',            '  output in json (use with parse, parse-file)'],
     ['', 'update[=NOTE]',   'update all results in worksheet, or a specific NOTE if specified'],
+// TOOD: change PREFIX to REGEX
     ['', 'match=PREFIX',    '  update notes matching title PREFIX (used with --update)'],
     ['', 'force-update',    '  update single note with removed clue (used with --update)'],
     ['', 'always',          '  update notes that don\'t need updating'],
@@ -401,14 +402,14 @@ function loadParseSaveAllWorksheets (options) {
 			    guid: metadata.guid,
 			    updated_after: lastUpdatedTime
 			});
-			// get, parse, then save. return path
+			// get, parse, then save. return {result, path }
 			return getAndParse(null, getOptions)
 			    .then(result => {
 				if (!result) return {};
-				return {
-				    result,
-				    path: Filter.saveAddCommit(result.note.title, result.filterList, options)
-				};
+				const path = Filter.saveAddCommit(result.note.title, result.filterList, options);
+				return Promise.join(result, path, (result, path) => {
+				    return { result, path };
+				});
 			    });
 		    });
 	    });
