@@ -58,6 +58,8 @@ function getLineState (line) {
     } else if (line.startsWith('http')) {
         state = Url;
     } else {
+	// TODO: enforce alpha-numeric 1st char
+
         // else, probably a clue
         state = Clue;
     }
@@ -203,6 +205,7 @@ function processClue (line, args, options) {
     countList = addClues(countList, name, args.nameList.toString());
     if (!_.isEmpty(countList)) {
         args.count.knownClues += 1;
+	// TODO: can I knownCountSet.addAll(...countList) ?
         countList.forEach(count => args.count.knownCountSet.add(count));
         Log.info(`added clue, ${name} : ${args.nameList} - ${note} : [${countList}]`);
     }
@@ -435,6 +438,7 @@ async function _updateFromFile(filename, options) {
         inputLine = inputLine.toString().trim();
         if (_.isEmpty(inputLine)) continue;
         let [line, nextState] = getLineState(inputLine);
+	Log.debug(`nextState: ${nextState.toString()}, line: ${line}`);
         if (!SM[state].next.includes(nextState)) {
             throw new Error(`Cannot transition from ${state.toString()}` +
                             ` to ${nextState.toString()}, line ${inputLine}`);

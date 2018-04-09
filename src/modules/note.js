@@ -137,14 +137,14 @@ function get (title, options = {}) {
 	    if (!guid) return undefined;
 	    return getNotestore(options.production).getNoteWithResultSpec(guid, {});
 	}).then(note => {
-	    //Log.info(`note header: ${Stringify(note)}`);
+	    Log.debug(`note header: ${Stringify(note)}`);
 	    if (options.updated_after) {
-		const updatedTime = new Date(note.updated);
-		const cutoffTime = new Date(options.updated_after);
- 		Log.debug(`updatedTime: ${updatedTime}`);
- 		Log.debug(`cutoffTime: ${cutoffTime}`);
-		Log.debug(`update < cutoff: ${updatedTime < cutoffTime}`);
-		if (updatedTime < cutoffTime) return false; // false = note exist, but hasn't been updated
+		const noteLastUpdated = new Date(note.updated);
+		const updatedAfter = new Date(options.updated_after);
+ 		Log.debug(`noteLastUpdated: ${noteLastUpdated}`);
+ 		Log.debug(`updatedAfter: ${updatedAfter}`);
+		Log.debug(`note ${noteLastUpdated < updatedAfter ? "is current" : "needs updating"}`);
+		if (noteLastUpdated < updatedAfter) return false; // skip: note is current
 	    }
 	    return getNotestore(options.production).getNoteWithResultSpec(note.guid, { includeContent: true });
 	}).then(note => {
