@@ -28,6 +28,12 @@ const APPLE = {
         REQ_CLUE_COUNT: 12
     },
 
+    '1.1' : {
+        sentence:       1,
+        clueCount:      12,
+        REQ_CLUE_COUNT: 12
+    },
+
     '2': {
         sentence:       2,
         clueCount:      9,
@@ -70,6 +76,18 @@ const APPLE = {
         REQ_CLUE_COUNT: 8
     },
 
+    '8.1': {
+        sentence:       8,
+        clueCount:      9,
+        REQ_CLUE_COUNT: 8
+    },
+
+    '8.2': {
+        sentence:       8,
+        clueCount:      9,
+        REQ_CLUE_COUNT: 8
+    },
+
     '9': {
         sentence:       9,
         clueCount:      8,
@@ -104,8 +122,9 @@ const FINAL = {
 
 //
 
-function metamorph (src) {
+function metamorph (variety) {
     const name = arguments.callee.name;
+    const src = APPLE[variety];
     if (!src.baseDir) {
         let dir = '';
         let index = name.length - 2;
@@ -116,7 +135,8 @@ function metamorph (src) {
             index -= next;
         }
         //src.resultDir = dir;
-        src.baseDir = `${dir}/${src.sentence}`;
+        src.baseDir = `${dir}/${variety}`;
+        src.variety = variety;
     }
     return src;
 }
@@ -134,10 +154,14 @@ function getByOptions (options) {
     } else if (options.final) {
         src = FINAL;
     } else if (options.apple) {
-        src = metamorph(APPLE[options.apple[0]]);
+        let variety = options.apple[0]; // M
+        if (options.apple[1] === '.') variety += options.apple[1]; // M.
+        if (_.toNumber(options.apple[2]) > 0) variety += options.apple[2]; // M.X
+        if (_.toNumber(options.apple[3]) > 0) variety += options.apple[3]; // M.XY
+        src = metamorph(variety);
         if (_.isUndefined(src)) throw new Error(`APPLE[${options.apple}] not supported`);
-        if (options.apple.length > 1) {
-            src = cloneAsType(src, getTypeFromSuffix(options.apple.slice(1, options.apple.length)));
+        if (_.size(options.apple) > _.size(variety)) {
+            src = cloneAsType(src, getTypeFromSuffix(options.apple.slice(_.size(variety), _.size(options.apple))));
         }
     } else {
         throw new Error('No clue-type option supplied');
@@ -161,13 +185,10 @@ function getTypeFromSuffix (type) {
 
 function getTypeSuffix (config) {
     const index = _.lastIndexOf(config.baseDir, '/') + 1;
-    let type;
-    if (index > 0) {
-        const firstLetter = config.baseDir.slice(index, index + 1);
-        const number = _.toNumber(firstLetter);
-        type = number > 0 ? 'p' : firstLetter;
-    }
-    return type;
+    if (index === 0) return undefined;
+    const firstLetter = config.baseDir.slice(index, index + 1);
+    const number = _.toNumber(firstLetter);
+    return number > 0 ? 'p' : firstLetter;
 }
 
 //
@@ -195,6 +216,7 @@ function cloneAsType (config, otherType) {
     config.baseDir += '/' + otherType.baseDir;
     config.clueCount = otherType.clueCount;
     config.REQ_CLUE_COUNT = otherType.REQ_CLUE_COUNT;
+    config.clone = true;
     return config;
 }
 
@@ -224,12 +246,12 @@ function isValidBaseDirOption (name) {
     }
 }
 
-// e.g. p3s
+// e.g. p3s, p8.1
 
 function getShorthand (clueType) {
     const dir = clueType.baseDir;
     Expect(dir.charAt(0)).is.equal('p');
-    return `${dir.charAt(0)}${clueType.sentence}${getTypeSuffix(clueType)}`;
+    return `${dir.charAt(0)}${clueType.variety}${getTypeSuffix(clueType)}`;
 }
 
 // e.g. p3s.c2-6.x2
