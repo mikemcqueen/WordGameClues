@@ -69,9 +69,9 @@ async function getNotebook (name, options = {}) {
 function getWorksheetName (noteNameOrClueType) {
     let noteName = noteNameOrClueType;
     if (_.isObject(noteName)) {
-        noteName = Clues.getShorthand(noteName); // noteName is a clueType object
+        noteName = Clues.getShorthand(noteName); // convert clueType to, e.g, 'p8s'
     } else {
-        const appleExpr = /p[0-9]s?/;
+        const appleExpr = /p[0-9](?:\.[0-9])?s?/;
         const result = appleExpr.exec(noteName);
         if (!result || (result.index !== 0)) return undefined;
     }
