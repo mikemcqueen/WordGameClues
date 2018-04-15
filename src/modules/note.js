@@ -70,6 +70,7 @@ function getWorksheetName (noteNameOrClueType) {
     let noteName = noteNameOrClueType;
     if (_.isObject(noteName)) {
         noteName = Clues.getShorthand(noteName); // convert clueType to, e.g, 'p8s'
+	Log.info(`noteName: ${noteName}`);
     } else {
         const appleExpr = /p[0-9](?:\.[0-9])?s?/;
         const result = appleExpr.exec(noteName);
@@ -79,7 +80,13 @@ function getWorksheetName (noteNameOrClueType) {
     Expect(noteName.charAt(0)).is.equal('p');
     Expect(_.toNumber(noteName.charAt(1))).is.above(0);
     let count = 2;
-    if (noteName.charAt(2) === 's') count += 1;
+    if (noteName.charAt(count) === '.') {
+	count += 1;
+	if (_.toNumber(noteName.charAt(count) > 0)) count += 1;
+	if (_.toNumber(noteName.charAt(count) > 0)) count += 1;
+	Expect(count > 3).is.true();
+    }
+    if (noteName.charAt(count) === 's') count += 1;
     const wsName = `Worksheets.${noteName.slice(0, count)}`;
     Log.debug(`worksheet name: ${wsName}`);
     return wsName;

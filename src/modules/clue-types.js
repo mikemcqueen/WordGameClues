@@ -7,6 +7,7 @@
 //
 
 const _              = require('lodash');
+const Debug          = require('debug')('clue-types');
 const Expect         = require('should/as-function');
 const Path           = require('path');
 const Stringify      = require('stringify-object');
@@ -79,13 +80,13 @@ const APPLE = {
     '8.1': {
         sentence:       8,
         clueCount:      9,
-        REQ_CLUE_COUNT: 8
+        REQ_CLUE_COUNT: 9
     },
 
     '8.2': {
         sentence:       8,
         clueCount:      9,
-        REQ_CLUE_COUNT: 8
+        REQ_CLUE_COUNT: 9
     },
 
     '9': {
@@ -154,17 +155,28 @@ function getByOptions (options) {
     } else if (options.final) {
         src = FINAL;
     } else if (options.apple) {
-        let variety = options.apple[0]; // M
-        if (options.apple[1] === '.') variety += options.apple[1]; // M.
-        if (_.toNumber(options.apple[2]) > 0) variety += options.apple[2]; // M.X
-        if (_.toNumber(options.apple[3]) > 0) variety += options.apple[3]; // M.XY
-        src = metamorph(variety);
-        if (_.isUndefined(src)) throw new Error(`APPLE[${options.apple}] not supported`);
-        if (_.size(options.apple) > _.size(variety)) {
-            src = cloneAsType(src, getTypeFromSuffix(options.apple.slice(_.size(variety), _.size(options.apple))));
-        }
+	src = getByVariety(options.apple);
     } else {
         throw new Error('No clue-type option supplied');
+    }
+    return src;
+}
+
+function getByVariety (apple) {
+    let variety = _.clone(apple);
+    Debug(`Apple: ${apple} Variety: ${variety}`);
+    Expect(_.toNumber(variety.charAt(0))).is.above(0); // M
+    let count = 1;
+    if (variety.charAt(count) === '.') {
+	count += 1;
+	if (_.toNumber(variety.charAt(count)) > 0) count += 1; // M.X
+	if (_.toNumber(variety.charAt(count)) > 0) count += 1; // M.XY
+    }
+    variety = variety.slice(0, count);
+    let src = metamorph(variety);
+    if (_.isUndefined(src)) throw new Error(`APPLE[${variety}] not supported`);
+    if (_.size(apple) > _.size(variety) + 1) {
+        src = cloneAsType(src, getTypeFromSuffix(apple.slice(_.size(variety), _.size(apple))));
     }
     return src;
 }
@@ -256,7 +268,7 @@ function getShorthand (clueType) {
 
 // e.g. p3s.c2-6.x2
 
-// TODO: getTypeClueCount: synthcClueCount = getByType(clueType).clueCount;
+// TODO: getTypeClueCount: synthClueCount = getByType(clueType).clueCount;
 // TODO: test
 
 function getLonghand (clueType, max = 2) {
@@ -269,51 +281,15 @@ function getDirectory (clueType) {
     return `${DATA_DIR}${clueType.baseDir}`;
 }
 
-//
-/*
-function isClueType (name, type) {
-    return getFullName(name) === type.name;
-}
-
-function isMeta (name) {
-    return isClueType(name, META);
-}
-
-function isSynth (name) {
-    return isClueType(name, SYNTH);
-}
-
-function isHarmony (name) {
-    return isClueType(name, HARMONY);
-}
-
-function isFinal (name) {
-    return isClueType(name, FINAL);
-}
-*/
 
 module.exports = {
     cloneAsNextType,
-    getByOptions,  
     getByBaseDirOption,
+    getByOptions,  
+    getByVariety,
     getDirectory,
     getShorthand,
     getLonghand,
     isValidBaseDirOption,
     Options
-
-    /*
-     isMeta,
-     isSynth,
-     isHarmony,
-     isFinal,
-     */
-    
-    /*
-     APPLE,
-     META,
-     SYNTH,
-     HARMONY,
-     FINAL
-     */
 };

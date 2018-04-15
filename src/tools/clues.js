@@ -36,32 +36,33 @@ const Validator   = require('../modules/validator');
 // 
 
 const CmdLineOptions = Opt.create(_.concat(Clues.Options, [
-        ['a', 'alt-sources=NAME',                  'show alternate sources for the specified clue NAME'],
-        ['A', 'all-alt-sources',                   'show alternate sources for all clues'],
-        ['o', 'output',                            '  output json -or- clues(huh?)'],
-        ['c', 'count=COUNT[LO,COUNTHI]',           'specify a COUNT; if COUNTHI, treat as range'],
-        ['x', 'max=COUNT',                         '  maximum # of sources to combine'],
-        ['',  'allow-dupe-source',                 '  allow duplicate sources'],
-        ['',  'merge-style',                       '  merge-style, no validation except for immediate sources'],
-        ['',  'remaining',                         '  only word combos not present in any named note'],
-        ['q', 'require-counts=COUNT+',             '  require clue(s) of specified COUNT(s)' ],
-        ['i', 'primary-sources=SOURCE[,SOURCE,...]', 'limit results to the specified primary SOURCE(s)'],
-        ['',  'inverse',                           '    or the inverse of those source(s); use with -i'],
-        ['k', 'show-known',                        'show compatible known clues; -u <clue> required' ],
-        ['',  'csv',                               '  output in search-term csv format' ],
-        ['',  'files',                             '  output in result file full-path format' ],
-        ['s', 'show-sources=NAME[:COUNT][,v]',     'show primary source combos for the specified NAME[:COUNT]' ],
-        ['t', 'test=SOURCE[,SOURCE,...]',          'test the specified source list, e.g. blue,fish' ],
-        ['',  'add=NAME',                          '  add combination to known list as NAME; use with --test' ],
-        ['',  'remove=NAME',                       '  remove combination from known list as NAME; use with --test' ],
-        ['',  'reject',                            '  add combination to reject list; use with --test' ],
-        ['',  'validate',                          '  treat SOURCE as filename, validate all source lists in file'],
-        ['u', 'use=NAME[:COUNT]+',                 'use the specified NAME[:COUNT](s)' ],
-        ['',  'production',                        'use production note store'],
-        ['z', 'flags=OPTION+',                     'flags: 1=validateAllOnLoad,2=ignoreLoadErrors' ],
-        ['v', 'verbose',                           'more output'],
-        ['h', 'help',                              'this screen']
-    ])).bindHelp();
+    ['a', 'alt-sources=NAME',                  'show alternate sources for the specified clue NAME'],
+    ['A', 'all-alt-sources',                   'show alternate sources for all clues'],
+    ['o', 'output',                            '  output json -or- clues(huh?)'],
+    ['c', 'count=COUNT[LO,COUNTHI]',           '  use the specified COUNT; if COUNTHI, treat as range'],
+    ['x', 'max=COUNT',                         '  maximum # of sources to combine'],
+    ['',  'copy-from=SOURCE',                  'copy clues from source cluetype; e.g. p1.1'],
+    ['',  'allow-dupe-source',                 '  allow duplicate sources'],
+    ['',  'merge-style',                       '  merge-style, no validation except for immediate sources'],
+    ['',  'remaining',                         '  only word combos not present in any named note'],
+    ['q', 'require-counts=COUNT+',             '  require clue(s) of specified COUNT(s)' ],
+    ['i', 'primary-sources=SOURCE[,SOURCE,...]', 'limit results to the specified primary SOURCE(s)'],
+    ['',  'inverse',                           '    or the inverse of those source(s); use with -i'],
+    ['k', 'show-known',                        'show compatible known clues; -u <clue> required' ],
+    ['',  'csv',                               '  output in search-term csv format' ],
+    ['',  'files',                             '  output in result file full-path format' ],
+    ['s', 'show-sources=NAME[:COUNT][,v]',     'show primary source combos for the specified NAME[:COUNT]' ],
+    ['t', 'test=SOURCE[,SOURCE,...]',          'test the specified source list, e.g. blue,fish' ],
+    ['',  'add=NAME',                          '  add combination to known list as NAME; use with --test' ],
+    ['',  'remove=NAME',                       '  remove combination from known list as NAME; use with --test' ],
+    ['',  'reject',                            '  add combination to reject list; use with --test' ],
+    ['',  'validate',                          '  treat SOURCE as filename, validate all source lists in file'],
+    ['u', 'use=NAME[:COUNT]+',                 'use the specified NAME[:COUNT](s)' ],
+    ['',  'production',                        'use production note store'],
+    ['z', 'flags=OPTION+',                     'flags: 1=validateAllOnLoad,2=ignoreLoadErrors' ],
+    ['v', 'verbose',                           'more output'],
+    ['h', 'help',                              'this screen']
+])).bindHelp();
 
 //
 
@@ -233,7 +234,40 @@ function showSources(clueName) {
 
 //
 
-function setLogging(flag) {
+function copyClues (fromType, options = {}) {
+    const dir = fromType.baseDir;
+    let total = 0;
+    let copied = 0;
+    for (let count = 2; count < 20; ++count) {
+	let list;
+	try {
+	    list = ClueManager.loadClueList(count, { dir });
+	} catch (err) {
+	    if (!_.includes(err.message, 'ENOENT')) throw err;
+	    continue;
+	}
+	total += _.size(list);
+	for (let clue of list) {
+	    const nameList = clue.src.split(',').sort();
+	    const result = ClueManager.getCountListArrays(clue.src, { add: true });
+	    if (!result) {
+		Debug(`No matches for: ${clue.src}`);
+		continue;
+	    }
+	    Debug(`Adding ${clue.name}:${clue.src}, set: ${Stringify(result.addRemoveSet)}`);
+	    const count = ClueManager.addRemoveOrReject({
+		add: clue.name,
+		isReject: !_.isEmpty(result.reject)
+	    }, nameList, result.addRemoveSet, { save: options.save });
+	    copied += count;
+	}
+    }
+    Log.info(`total: ${total}, copied: ${copied}`);
+}
+
+//
+
+function setLogging (flag) {
     ClueManager.logging = flag;
     ComboMaker.logging  = flag;
     AltSources.logging  = flag;
@@ -245,7 +279,7 @@ function setLogging(flag) {
 
 //
 
-function log(text) {
+function log (text) {
     if (LOGGING) {
         console.log(text);
     }
@@ -271,6 +305,7 @@ async function main () {
     options.allow_dupe_source = options['allow-dupe-source'] ? true : false;
     options.merge_style = Boolean(options['merge-style']);
     let showKnownArg = options['show-known'];
+    options.copy_from = options['copy-from'];
 
     if (!maxArg) {
         maxArg = 2; // TODO: default values in opt
@@ -282,9 +317,10 @@ async function main () {
             altSourcesArg ||
             allAltSourcesFlag ||
             showKnownArg ||
+            useClueList ||
             options.test ||
-            useClueList
-           ) {
+	    options.copy_from
+	   ) {
             needCount = false;
         }
         if (needCount) {
@@ -367,7 +403,11 @@ async function main () {
             output : options.output
         });
     }
-    else {
+    else if (options.copy_from) {
+	const from = Clues.getByVariety(options.copy_from);
+	Debug(`from: ${from.baseDir}`);
+	copyClues(from, options);
+    } else {
         let sources = options['primary-sources'];
         if (options.inverse) {
             sources = ClueManager.getInversePrimarySources(sources.split(',')).join(',');

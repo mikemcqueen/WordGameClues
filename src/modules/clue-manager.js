@@ -6,7 +6,7 @@
 
 // export a singleton
 
-module.exports = exports = new ClueManager();
+module.exports = new ClueManager();
 
 const _              = require('lodash');
 const ClueList       = require('../types/clue-list');
@@ -60,13 +60,6 @@ ClueManager.prototype.log = function (text) {
 
 //
 
-ClueManager.prototype.loadClueList = function (count, options = {}) {
-    return ClueList.makeFrom({
-        filename : this.getKnownFilename(count, options.dir)
-    });
-}
-
-//
 
 ClueManager.prototype.saveClueList = function (list, count, options = {}) {
     list.save(this.getKnownFilename(count, options.dir));
@@ -115,6 +108,14 @@ ClueManager.prototype.loadAllClues = function (args) {
     this.loaded = true;
 
     return this;
+}
+
+//
+
+ClueManager.prototype.loadClueList = function (count, options = {}) {
+    return ClueList.makeFrom({
+        filename : this.getKnownFilename(count, options.dir)
+    });
 }
 
 //
@@ -673,16 +674,18 @@ ClueManager.prototype.addClueForCounts = function (countSet, name, src) {
     Expect(countSet).is.instanceof(Set);
     Expect(name).is.a.String();
     Expect(src).is.a.String();
-    countSet.forEach(count => {
+    return Array.from(countSet).reduce((added, count) => {
         if (this.addClue(count, {
             name: name,
             src:  src
         }, true, true)) { // save, nothrow
             console.log(`${count}: added ${name}`);
+	    added += 1;
         } else {
             console.log(`${count}: ${name} already present`);
-        }
-    });
+	}
+	return added;
+    }, 0);
 }
 
 //
@@ -750,7 +753,7 @@ ClueManager.prototype.addRemoveOrReject = function (args, nameList, countSet, op
         } else if (args.isReject) {
             console.log('WARNING! cannot add known clue: already rejected, ' + nameList);
         } else {
-            this.addClueForCounts(countSet, args.add, nameList.toString());
+            count = this.addClueForCounts(countSet, args.add, nameList.toString());
         }
     } else if (args.remove) {
         Debug(`remove [${args.remove}] as ${nameList} from ${[...countSet.values()]}`);

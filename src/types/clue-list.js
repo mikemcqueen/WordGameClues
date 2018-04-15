@@ -303,7 +303,7 @@ function objectFrom (args) {
             clueList = JSON.parse(Fs.readFileSync(args.filename, 'utf8'));
         }
         catch(e) {
-            throw new Error(`${args.filename}, ${e}`);
+	    throw new Error(`${args.filename}, ${e}`);
         }
     }
     else if (args.array) {
