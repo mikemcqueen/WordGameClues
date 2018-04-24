@@ -74,4 +74,5 @@ async function main () {
 
 main().catch(err => {
     console.error(err, err.stack);
+    console.log(err, err.stack);
 });

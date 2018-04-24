@@ -47,10 +47,23 @@ const APPLE = {
         REQ_CLUE_COUNT: 14
     },
 
+    '2.2': {
+        sentence:       2,
+        clueCount:      14,
+        REQ_CLUE_COUNT: 14
+    },
+
+    '2.9': {
+        comment:        'all clues from 2.0 with broken down compound words',
+        sentence:       2,
+        clueCount:      14,
+        REQ_CLUE_COUNT: 14
+    },
+
     '2.99': {
         sentence:       2,
-        clueCount:      9,
-        REQ_CLUE_COUNT: 9
+        clueCount:      14,
+        REQ_CLUE_COUNT: 14
     },
 
     '3': {

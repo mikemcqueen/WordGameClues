@@ -144,6 +144,7 @@ function get (title, options = {}) {
 	    if (!guid) return undefined;
 	    return getNotestore(options.production).getNoteWithResultSpec(guid, {});
 	}).then(note => {
+            if (!note) return undefined;
 	    Log.debug(`note header: ${Stringify(note)}`);
 	    if (options.updated_after) {
 		const noteLastUpdated = new Date(note.updated);
