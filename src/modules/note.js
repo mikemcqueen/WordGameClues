@@ -82,8 +82,8 @@ function getWorksheetName (noteNameOrClueType) {
     let count = 2;
     if (noteName.charAt(count) === '.') {
 	count += 1;
-	if (_.toNumber(noteName.charAt(count) > 0)) count += 1;
-	if (_.toNumber(noteName.charAt(count) > 0)) count += 1;
+	if (Clues.isVarietyDigit(noteName.charAt(count))) count += 1;
+	if (Clues.isVarietyDigit(noteName.charAt(count))) count += 1;
 	Expect(count > 3).is.true();
     }
     if (noteName.charAt(count) === 's') count += 1;

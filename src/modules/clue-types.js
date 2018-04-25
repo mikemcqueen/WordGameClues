@@ -41,6 +41,13 @@ const APPLE = {
         REQ_CLUE_COUNT: 9
     },
 
+    '2.0': {
+        comment:        'all clues from 2with broken down compound words',
+        sentence:       2,
+        clueCount:      15,
+        REQ_CLUE_COUNT: 15
+    },
+
     '2.1': {
         sentence:       2,
         clueCount:      14,
@@ -48,13 +55,6 @@ const APPLE = {
     },
 
     '2.2': {
-        sentence:       2,
-        clueCount:      14,
-        REQ_CLUE_COUNT: 14
-    },
-
-    '2.9': {
-        comment:        'all clues from 2.0 with broken down compound words',
         sentence:       2,
         clueCount:      14,
         REQ_CLUE_COUNT: 14
@@ -150,6 +150,7 @@ const FINAL = {
 
 function metamorph (variety) {
     const name = arguments.callee.name;
+    if (!APPLE[variety]) throw Error(`Bad apple variety: ${variety}`);
     const src = APPLE[variety];
     if (!src.baseDir) {
         let dir = '';
@@ -188,14 +189,16 @@ function getByOptions (options) {
 }
 
 function getByVariety (apple) {
+    // TODO: same code in note.js, refactor it out to getVariety()
     let variety = _.clone(apple);
     Debug(`Apple: ${apple} Variety: ${variety}`);
     Expect(_.toNumber(variety.charAt(0))).is.above(0); // M
     let count = 1;
     if (variety.charAt(count) === '.') {
 	count += 1;
-	if (_.toNumber(variety.charAt(count)) > 0) count += 1; // M.X
-	if (_.toNumber(variety.charAt(count)) > 0) count += 1; // M.XY
+	if (isVarietyDigit(variety.charAt(count))) count += 1; // M.X
+	if (isVarietyDigit(variety.charAt(count))) count += 1; // M.XY
+	Expect(count > 3).is.true();
     }
     variety = variety.slice(0, count);
     let src = metamorph(variety);
@@ -204,6 +207,10 @@ function getByVariety (apple) {
         src = cloneAsType(src, getTypeFromSuffix(apple.slice(_.size(variety), _.size(apple))));
     }
     return src;
+}
+
+function isVarietyDigit (n) {
+    return "0123456789".includes(n);
 }
 
 //
@@ -316,5 +323,6 @@ module.exports = {
     getShorthand,
     getLonghand,
     isValidBaseDirOption,
+    isVarietyDigit,
     Options
 };
