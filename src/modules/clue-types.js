@@ -44,8 +44,8 @@ const APPLE = {
     '2.0': {
         comment:        'all clues from 2with broken down compound words',
         sentence:       2,
-        clueCount:      15,
-        REQ_CLUE_COUNT: 15
+        clueCount:      17,
+        REQ_CLUE_COUNT: 17
     },
 
     '2.1': {
@@ -58,6 +58,12 @@ const APPLE = {
         sentence:       2,
         clueCount:      14,
         REQ_CLUE_COUNT: 14
+    },
+
+    '2.98': {
+        sentence:       2,
+        clueCount:      15,
+        REQ_CLUE_COUNT: 15
     },
 
     '2.99': {
