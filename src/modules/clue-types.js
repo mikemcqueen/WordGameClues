@@ -124,6 +124,24 @@ const APPLE = {
         sentence:       9,
         clueCount:      8,
         REQ_CLUE_COUNT: 8
+    },
+
+    '9.0': {
+        sentence:       9,
+        clueCount:      10,
+        REQ_CLUE_COUNT: 10
+    },
+
+    '9.1': {
+        sentence:       9,
+        clueCount:      10,
+        REQ_CLUE_COUNT: 10
+    },
+
+    '9.98': {
+        sentence:       9,
+        clueCount:      15,
+        REQ_CLUE_COUNT: 15
     }
 
 };
