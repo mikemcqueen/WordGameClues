@@ -366,6 +366,7 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
                 if (xp) Expect(vsResult.list).is.not.empty();
                 Debug(`from validateSources(${buildResult.count$})`);
                 Debug(`  compoundSrcNameList: ${buildResult.compoundSrcNameList}`);
+                Debug(`  compoundNcList: ${buildResult.compoundNcList}`);
                 Debug(`  list.size: ${_.size(vsResult.list)}`);
                 vsResult.list.forEach(result => {
                     Debug(`   ncList:      ${result.ncList}`);
@@ -881,7 +882,7 @@ Validator.prototype.buildSrcNameList = function(args) {
         } else {
             slIndex = 0;
         }
-        Debug(`build: index: {$ncIndex}, source: ${srcList[slIndex]}`);
+        Debug(`build: index: ${ncIndex}, source: ${srcList[slIndex]}`);
 
         let srcNameList = srcList[slIndex].split(',');      // e.g. [ 'src1', 'src2', 'src3' ]
         if (nc.count === 1) {
@@ -892,7 +893,7 @@ Validator.prototype.buildSrcNameList = function(args) {
                 return; // forEach.next
             }
         }
-        if (xp) Expect(resultMap.map()[nc]).is.undefined;
+        if (xp) Expect(resultMap.map()[nc]).is.undefined();
 
         // if nc is a primary clue
         if (nc.count == 1) {
@@ -942,13 +943,11 @@ Validator.prototype.buildSrcNameList = function(args) {
     Debug(`__primaryNcList: ${primaryNcList}`);
     // this.indentNewline() + '  compoundNcNameListPairs: ' + compoundNcNameListPairs +
 
-    if (this.logResults) {
-        if (!_.isEmpty(resultMap.map())) {
-            Debug(`resultMap:`);
-            resultMap.dump();
-        } else {
-            Debug(`resultMap: empty`);
-        }
+    if (!_.isEmpty(resultMap.map())) {
+        Debug(`resultMap:`);
+        resultMap.dump();
+    } else {
+        Debug(`resultMap: empty`);
     }
     return {
         compoundNcNameListPairs,
