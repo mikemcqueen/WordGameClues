@@ -20,6 +20,12 @@ if [[ $_name == "remaining" ]]
 then
     _base=$_base.$_name
     _remaining="--remaining"
+elif [[ $_name == "all" ]]
+then
+    _base=$_base.$_name
+    _all=$_name
+else
+    _grep=$_name
 fi
 
 while [[ $# -gt 0 ]]
@@ -40,7 +46,6 @@ do
               exit -1
           fi
           _article=$1
-          _note=$_note.article
       elif [[ $1 == "--notebook" ]]
       then
            shift
@@ -53,6 +58,16 @@ do
       shift
 done
 
+if [[ ! -z $_article ]]
+then
+    _note=$_note.article
+    _base=$_base.article
+elif [[ ! -z $_all ]]
+then
+    _note=$_note.title
+    _base=$_base.title
+fi    
+
 _out=tmp/filtermerge.err
 echo $(date) >> $_out
 
@@ -62,7 +77,7 @@ then
     node clues -$_ct -c2,$_cc -x2 $_remaining $_production > tmp/$_base 2>> $_out
 fi
 
-if [[ -z $_remaining ]]
+if [[ ! -z $_grep ]]
 then
     echo "Grepping..."
     grep $_name tmp/$_base > tmp/$_note
