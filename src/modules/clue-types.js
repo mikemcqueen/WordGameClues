@@ -31,8 +31,14 @@ const APPLE = {
 
     '1.1' : {
         sentence:       1,
-        clueCount:      12,
-        REQ_CLUE_COUNT: 12
+        clueCount:      16,
+        REQ_CLUE_COUNT: 16
+    },
+
+    '1.2' : {
+        sentence:       1,
+        clueCount:      17,
+        REQ_CLUE_COUNT: 17
     },
 
     '1.98': {
