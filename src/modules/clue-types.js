@@ -116,8 +116,8 @@ const APPLE = {
 
     '7.1': {
         sentence:       7,
-        clueCount:      9,
-        REQ_CLUE_COUNT: 9
+        clueCount:      10,
+        REQ_CLUE_COUNT: 10
     },
 
     '8': {
