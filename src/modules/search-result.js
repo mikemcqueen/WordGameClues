@@ -39,6 +39,7 @@ function getFileMatch (match = undefined) {
 // ([ 'word', 'list' ], '_suffix' ) => 'word-list_suffix.json'
 //
 function makeFilename (wordList, suffix = undefined) {
+    Debug(wordList);
     Expect(wordList.length).is.aboveOrEqual(2);
     let filename = wordList.join('-');
     if (suffix) { // necessary?
