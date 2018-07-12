@@ -1,7 +1,7 @@
 #!/bin/bash
 if [ $# -lt 2  ]
 then
-   echo 'usage: update_all.sh <clue-type> <clue-count>  [note-name] [--dry-run] [--production] [--match chars] [--from-fs] [--from-en]'
+   echo 'usage: update_all.sh <clue-type> <clue-count>  [note-name] [--dry-run] [--production] [--match CHARS] [--from-fs] [--from-en]'
    exit -1
 fi
 

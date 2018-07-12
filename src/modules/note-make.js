@@ -45,7 +45,7 @@ function writeUrl (dest, line, suffix) {
 //
 
 function writeText (dest, line) {
-    return dest + `${Note.open}${line}${Note.close}`;
+    return `${dest}${Note.open}${line}${Note.close}`;
 }
 
 // this function is dumb anyway.  Fitler.parse => list -> makefromFilterList
@@ -71,10 +71,10 @@ async function makeFromFilterFile (filename, options = {}) {
             dest = writeText(dest, line);
         }
     }
-    if (options.outerDiv) {
-        dest = + '</div>';
-    }
     dest = writeEmptyLine(dest);
+    if (options.outerDiv) {
+        dest += '</div>';
+    }
     return dest;
 }
 

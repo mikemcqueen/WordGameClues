@@ -9,6 +9,7 @@
 const _              = require('lodash');
 const ClueManager    = require('../modules/clue-manager');
 const Clues          = require('../modules/clue-types');
+const Debug          = require('debug')('note');
 const Duration       = require('duration');
 const Evernote       = require('evernote');
 const EvernoteConfig = require('../../data/evernote-config.json');
@@ -35,7 +36,8 @@ const NoteValidator  = require('../modules/note-validate');
 const Commands = { count, create, get, parse, update, validate };
 const CmdLineOptions = Getopt.create(_.concat(Clues.Options, [
     ['', 'count=NAME',      'count sources/clues/urls in a note'],
-    ['', 'create=FILE',     'create note from filter result file'],
+    ['', 'create=FILE',     'create note from file (default: filter result file)'],
+    ['', 'text',            '  create note from any text file'],
     ['', 'get=TITLE',       'get (display) a note'],
     ['', 'parse=TITLE',     'parse note into filter file format'],
 //    ['', 'parse-file=FILE','parse note file into filter file format'],
@@ -87,7 +89,24 @@ async function count (options) {
 
 //
 
+function createFromTextFile (options) {
+    const title = options.title || options.create;
+    return NoteMaker.makeFromFilterFile(options.create, { outerDiv: true })
+        .then(body => {
+            Debug(`body: ${body}`);
+            return Note.create(title, body, options);
+        }).then(note => {
+            if (!options.quiet) {
+                console.log(Stringify(note));
+            }
+        });
+}
+
+//
+
 async function create (options) {
+    if (options.text) return createFromTextFile(options);
+
     const title = options.title;
     if (!title) usage('--title is required');
     const list = Filter.parseFile(options.create, options);
@@ -109,22 +128,6 @@ async function get (options) {
         .then(note => {
             // get ignores --quiet
             console.log(note.content);
-        });
-}
-
-//
-
-function old_create (options) {
-    const title = options.title;
-    
-    return NoteMaker.makeFromFilterFile(options.create, { outerDiv: true })
-        .then(body => {
-            Log.debug(`body: ${body}`);
-            Note.create(title, body, options);
-        }).then(note => {
-            if (!options.quiet) {
-                console.log(Stringify(note));
-            }
         });
 }
 
