@@ -38,6 +38,7 @@ const CmdLineOptions = Getopt.create(_.concat(Clues.Options, [
     ['', 'count=NAME',      'count sources/clues/urls in a note'],
     ['', 'create=FILE',     'create note from file (default: filter result file)'],
     ['', 'text',            '  create note from any text file'],
+    ['', 'point-size=SIZE', '  font point size'],
     ['', 'get=TITLE',       'get (display) a note'],
     ['', 'parse=TITLE',     'parse note into filter file format'],
 //    ['', 'parse-file=FILE','parse note file into filter file format'],
@@ -53,12 +54,11 @@ const CmdLineOptions = Getopt.create(_.concat(Clues.Options, [
     ['', 'dry-run',         '  show changes only (used with --update)'],
     ['', 'from-fs',         '  update from filesystem (used with --update, --validate)'],
     ['', 'validate[=NOTE]', 'validate sources in note file (requires --from-fs).'],
-//    [],
-    ['', 'notebook=NAME', 'specify notebook name'],
-    ['', 'production',    'use production note store'],
-    ['', 'quiet',         'less noise'],
-    ['', 'title=TITLE',   'specify note title (used with --create, --parse)'],
-    ['v','verbose',       'more noise'],
+    ['', 'notebook=NAME',   'specify notebook name'],
+    ['', 'production',      'use production note store'],
+    ['', 'quiet',           'less noise'],
+    ['', 'title=TITLE',     'specify note title (used with --create, --parse)'],
+    ['v','verbose',         'more noise'],
     ['h','help', '']
 ])).bindHelp(
     `usage: node note --${_.keys(Commands)} [options]\n[[OPTIONS]]\n`
@@ -90,7 +90,7 @@ async function count (options) {
 //
 
 function createFromTextFile (options) {
-    const title = options.title || options.create;
+    const title = options.title || Path.basename(options.create);
     return NoteMaker.makeFromFilterFile(options.create, { outerDiv: true })
         .then(body => {
             Debug(`body: ${body}`);
@@ -533,6 +533,7 @@ async function main () {
 
     if (options['from-fs']) options.from_fs = true;
     if (options['force-update']) options.force_update = true;
+    if (options['point-size']) options.point_size = options['point-size'];
     if (options['dry-run']) {
         options.dry_run = true;
         if (!options.quiet) {

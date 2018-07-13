@@ -11,14 +11,16 @@ const Filter           = require('./filter');
 const Fs               = require('fs-extra');
 const He               = require('he');
 const My               = require('util');
+const Options          = require('./options').options;
 const Readlines        = require('n-readlines');
 
 //
 
 const Note = {
-    open:      '<div><span><font style="font-size: 12pt;">',
-    close:     '</font></span></div>',
-    emptyLine: '<div><br/></div>'
+    point_size: function () { return Options.point_size || 12; },
+    open:       function () { return `<div><span><font style="font-size: ${Note.point_size()}pt;">`; },
+    close:      '</font></span></div>',
+    emptyLine:  '<div><br/></div>'
 };
 
 //
@@ -39,18 +41,20 @@ function writeEmptyLine (dest) {
 
 function writeUrl (dest, line, suffix) {
     const _suffix = suffix ? `,${suffix}` : '';
-    return dest + `${Note.open}${url(line)}${_suffix}${Note.close}`;
+    return dest + `${Note.open()}${url(line)}${_suffix}${Note.close}`;
 }
 
 //
 
 function writeText (dest, line) {
-    return `${dest}${Note.open}${line}${Note.close}`;
+    return `${dest}${Note.open()}${line}${Note.close}`;
 }
 
 // this function is dumb anyway.  Fitler.parse => list -> makefromFilterList
 
 async function makeFromFilterFile (filename, options = {}) {
+    console.log(`options.point_size: ${Options.point_size}`);
+
     Expect(filename).is.a.String();
     Debug(`filename: ${filename}`);
 
