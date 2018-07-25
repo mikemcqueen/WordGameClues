@@ -23,6 +23,8 @@ do
     if [ ! -z $_word ]
     then
         echo $_word
-        ./ancc --two -m $_mwl --dict sentence/$_cn/reduced "`cat $_lettersfile`" -u "$_word $@" | grep -E "[^ ']{$_rwl}" > $_cn/pairs.$_word.$_mwl.$_rwl
+        ./ancc --two -m $_mwl --dict sentence/$_cn/reduced "`cat $_lettersfile`" -u "$_word $@" | grep -E "[^ ']{$_rwl}" | sort > $_cn/pairs.$_word.$_mwl.$_rwl
     fi
 done < "$_wordsfile"
+
+#todo: makenote.sh if ! node note --exists=$_notename $_notebook=Worksheets.$ct.$cc.done
