@@ -10,7 +10,7 @@
     "debug": "^2.6.8",
     "duration": "^0.2.0",
     "event-stream": "^3.3.4",
-    "evernote": "^2.0.1-beta",
+    "evernote": "^2.0.5",
     "fs-extra": "^4.0.2",
     "google": "^2.1.0",
     "he": "^1.1.1",
@@ -31,7 +31,7 @@
     "xmldom": "^0.1.27"
   },
   "devDependencies": {
-    "mocha": "^3.5.2"
+    "mocha": "^5.2.0"
   },
   "scripts": {
     "test": "make test"

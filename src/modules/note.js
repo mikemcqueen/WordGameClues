@@ -44,6 +44,7 @@ function getNotestore (production) {
 async function getNotebook (name, options = {}) {
     if (!name) return undefined;
     const noteStore = getNotestore(options.production);
+    Log.debug('listing');
     return noteStore.listNotebooks()
         .then(nbList => {
             for(const nb of nbList) {
@@ -102,15 +103,18 @@ async function getNotebookByGuid (guid, options = {}) {
 //
 
 async function getNotebookByOptions (options = {}) {
+    Log.debug(`++getNotebookByOptions, guid:${options.notebookGuid}`);
     if (options.notebookGuid) return getNotebookByGuid(options.notebookGuid, options);
     if (!options.notebook) {
 	throw new Error('No notebook specified.');
         //Log.debug(`NO NOTEBOOK - THROW?`);
 	//return undefined;
     }
+    Log.debug(`options : ${Stringify(options)}`);
     return getNotebook(options.notebook, options)
         .then(nb => {
             if (!nb) throw new Error(`no notebook matches: ${options.notebook}`);
+            Log.debug(`--getNotebookByOptions, guid:${nb.guid}`);
             return nb;
         });
 }
@@ -290,9 +294,11 @@ async function create (title, body, options = {}) {
     Expect(title).is.a.String();
     Expect(body).is.a.String();
 
+    Log.debug(`note.create`);
     let note = {};
     return getNotebookByOptions(options)
         .then(notebook => {
+            Log.debug(`nb guid: ${notebook.guid}`);
             note.title = title;
             note.notebookGuid = notebook.guid;
             /*
