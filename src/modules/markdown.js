@@ -23,7 +23,7 @@ Prefix.clue = [Prefix.known, Prefix.remove];
 
 const Suffix =  {
     clue:   'c',
-    reject: 'x'
+    reject: 'x',
 };
 Suffix.any = _.values(Suffix);
 

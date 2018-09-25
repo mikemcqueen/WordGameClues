@@ -73,6 +73,7 @@ function processSrc (rawLine, args, options) {
     Expect(rawLine).is.a.String();
     Expect(args.dir).is.a.String();
 
+    let done = false;
     const [reject, line] = Markdown.hasSuffix(rawLine, Markdown.Suffix.reject);
     Log.debug(`src: ${line}`);
     let nameList = line.split(',');
@@ -82,8 +83,17 @@ function processSrc (rawLine, args, options) {
             args.count.rejectClues += 1;
             args.count.rejectCountSet.add(nameList.length);
         }
+        done = true;
+    } else if (ClueManager.isRejectSource(line)) {
+        done = true;
+    } else {
+        const [clue, unused] = Markdown.hasSuffix(rawLine, Markdown.Suffix.clue);
+        if (clue && options.yes_mode) {
+            console.log(line);
+            done = true;
+        }
     }
-    if (reject || ClueManager.isRejectSource(line)) {
+    if (done) {
         return {
             timing:    args.timing,
             count:     args.count,
@@ -141,6 +151,14 @@ function processUrl (line, args, options) {
     args.url = url;
     if (suffix === Markdown.Suffix.clue) {
         args.flags.clue = true;
+        if (options.yes_mode) {
+            console.log(args.nameList.join(','));
+            return {
+                timing:    args.timing,
+                count:     args.count,
+                nextState: Src
+            };
+        }
     }
     else if (suffix === Markdown.Suffix.reject) {
         args.flags.reject = true;

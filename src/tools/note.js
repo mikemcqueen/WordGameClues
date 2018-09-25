@@ -53,6 +53,8 @@ const CmdLineOptions = Getopt.create(_.concat(Clues.Options, [
     ['', 'save',            '  save cluelist files (used with --update)'],
     ['', 'dry-run',         '  show changes only (used with --update)'],
     ['', 'from-fs',         '  update from filesystem (used with --update, --validate)'],
+    ['d','download-only',   '  download only (used with --update)'],
+    ['y','yes-mode',        '  yes mode (used with update)'],
     ['', 'validate[=NOTE]', 'validate sources in note file (requires --from-fs).'],
     ['', 'notebook=NAME',   'specify notebook name'],
     ['', 'production',      'use production note store'],
@@ -478,7 +480,7 @@ async function update (options) {
         }).then(pathList => {
             // NOTE: updateFromPathList should do something with options.save, don't pass it to
             // updateFromFile, just call save at the end.
-            if (!pathList) return undefined;
+            if (!pathList || options.download_only) return undefined;
             return Update.updateFromPathList(pathList, options);
         });
 }
@@ -534,6 +536,8 @@ async function main () {
     if (options['from-fs']) options.from_fs = true;
     if (options['force-update']) options.force_update = true;
     if (options['point-size']) options.point_size = options['point-size'];
+    if (options['yes-mode']) options.yes_mode = true;
+    if (options['download-only']) options.download_only = true;
     if (options['dry-run']) {
         options.dry_run = true;
         if (!options.quiet) {
