@@ -111,7 +111,7 @@ async function create (options) {
 
     const title = options.title;
     if (!title) usage('--title is required');
-    const list = Filter.parseFile(options.create, options);
+    const list = Filter.parseFileSync(options.create, options);
     // NOTE: not passing cmd line options here
     const body = NoteMaker.makeFromFilterList(list, { outerDiv: true });
     return Note.create(title, body, options)

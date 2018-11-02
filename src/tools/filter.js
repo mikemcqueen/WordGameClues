@@ -438,7 +438,7 @@ async function main () {
     const filename = opt.argv[0];
 
     if (options.parse) {
-        const resultList = Filter.parseFile(filename, options);
+        const resultList = Filter.parseFileSync(filename, options);
         if (_.isEmpty(resultList)) {
             console.log('no results');
         } else {
