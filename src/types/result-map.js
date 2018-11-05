@@ -428,21 +428,22 @@ function addAllPrimary (origNcList, mutatingPrimaryNcList, mutatingNameSrcList) 
 //
 
 function addPrimary (ncPrimaryStr, nameSrcStr) {
-    let list;
+    Debug(`addPrimary, nc: ${ncPrimaryStr}, nameSrc: ${nameSrcStr}`);
 
-    if (!this.map()[ncPrimaryStr]) {
-        if (!this.resolvePrimary(ncPrimaryStr)) {
-            throw new Error('failure to resolve pending primary, ' + ncPrimaryStr +
-                            ', for: ' + nameSrcStr);
-        }
+    let required = false;
+    // change this logic to remove __primary block when duplicate primary NCs
+    if (!_.has(this.map(), ncPrimaryStr)) {
+        this.map()[ncPrimaryStr] = [];
+        required = true;
     }
-    list = this.map()[ncPrimaryStr] = [];
+    if (!this.resolvePrimary(ncPrimaryStr, required)) {
+        throw new Error(`failure to resolve pending primary, ${ncPrimaryStr} for ${nameSrcStr}`);
+    }
+    let list = this.map()[ncPrimaryStr];
     if (!_.isArray(list)) {
-        throw new Error('pending primary list, ' + list +
-                        ' is not an array, type: ' + (typeof list));
+        throw new Error(`pending primary list, ${list} is not an array, type: ${typeof(list)}`);
     }
-    Debug('addPrimary: adding ' + nameSrcStr +
-          ' to ' + ncPrimaryStr);
+    Debug(`addPrimary: adding ${nameSrcStr} to ${ncPrimaryStr}`);
     list.push(nameSrcStr);
     return this;
 }
@@ -450,29 +451,32 @@ function addPrimary (ncPrimaryStr, nameSrcStr) {
 //
 //
 
-function resolvePrimary (ncPrimaryStr) {
+function resolvePrimary (ncPrimaryStr, required = false) {
     let primaryNcStrList;
     let index;
 
     primaryNcStrList = this.map()[PRIMARY_KEY];
     if (!primaryNcStrList || _.isEmpty(primaryNcStrList)) {
-        Debug('missing or empty unresolved primary list, ' + primaryNcStrList +
-                 ', for nc: ' + ncPrimaryStr);
-        Debug('keys: ' + _.keys(this.map()));
-        return false;
+        if (required) {
+            Debug('missing or empty unresolved primary list, ' + primaryNcStrList +
+                  ', for nc: ' + ncPrimaryStr);
+            Debug('keys: ' + _.keys(this.map()));
+        }
+        return !required;
     }
 
     index = _.indexOf(primaryNcStrList, ncPrimaryStr);
     if (index === -1) {
-        Debug('nc not in unresolved list, ' + ncPrimaryStr +
-                 ', list: ' + primaryNcStrList);
-        return false;
+        if (required) {
+            Debug('nc not in unresolved list, ' + ncPrimaryStr + ', list: ' + primaryNcStrList);
+        }
+        return !required;
     }
 
     Debug('found unresolved pending primary nc: ' + ncPrimaryStr +
              ', at index: ' + index);
 
-    _.pullAt(primaryNcStrList, [ index ]);
+    _.pullAt(primaryNcStrList, [index]);
     if (_.isEmpty(primaryNcStrList)) {
         delete this.map()[PRIMARY_KEY];
     }
@@ -519,34 +523,46 @@ function mergeNcList (fromMap, ncList) {
              ', ncList: ' + ncList);
 
     ncList.forEach(nc => {
-        let map;
-        let srcNameList;
-        let keys;
-
-        map = this.map()[nc];
+        const map = this.map()[nc];
         if (!map) {
             throw new Error('resultMap missing nc, ' + nc);
         }
-        srcNameList = map[SOURCES_KEY];
+        const srcNameList = map[SOURCES_KEY];
         if (!srcNameList || _.isEmpty(srcNameList)) {
             throw new Error('missing or empty srcNameList, ' + srcNameList);
         }
-        keys = _.keys(fromMap.map());
-        if (_.isEmpty(keys)) {
-            throw new Error('empty keys');
+        const fromKeys = _.keys(fromMap.map());
+        if (_.isEmpty(fromKeys)) {
+            throw new Error('fromMap empty');
         }
-        keys.forEach(ncStr => {
-            let keyNc = NameCount.makeNew(ncStr);
+        fromKeys.forEach(fromKey => {
+            let keyNc = NameCount.makeNew(fromKey);
             let index;
             index = _.indexOf(srcNameList, keyNc.name);
-            if (index > -1) {
-                // copy sub-map from fromMap to resultMap
-                map[ncStr] = fromMap.map()[ncStr];
+            if (index === -1) return; // forEach.next
+
+            let fromObj = fromMap.map()[fromKey];
+            let deleteKey = true;
+            // if this is actually an array (of primary clues), do some magic
+            if (_.isArray(fromObj)) {
+                Expect(fromObj).is.not.empty();
+                let newObj = {};
+                newObj[fromKey] = [fromObj[0]];
+                fromObj.shift(0);
+                if (!_.isEmpty(fromObj)) {
+                    deleteKey = false;
+                }
+                fromObj = newObj;
+            }                
+            if (deleteKey) {
                 // delete sub-map in fromMap;
-                delete fromMap.map()[ncStr];
-                // delete key from srcNameList
-                _.pullAt(srcNameList, [index]);
+                delete fromMap.map()[fromKey];
             }
+
+            // copy sub-map from fromMap to resultMap
+            map[fromKey] = fromObj;
+            // delete key from srcNameList
+            _.pullAt(srcNameList, [index]);
         });
 
         if (!_.isEmpty(srcNameList)) {
