@@ -13,8 +13,8 @@ _name=$1  #word
 echo "Name: $_name"
 shift
 
-_base=$_ct.c2-$_cc.x2
-_note=$_ct.c2-$_cc.x2.$_name
+_base=$_ct # .c2-$_cc.x2
+_note=$_ct.$_name # .c2-$_cc.x2.$_name
 
 if [[ $_name == "remaining" ]]
 then
@@ -24,6 +24,7 @@ elif [[ $_name == "all" ]]
 then
     _base=$_base.$_name
     _all=$_name
+    _generate=true
 else
     _grep=$_name
 fi
