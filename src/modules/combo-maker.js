@@ -160,10 +160,9 @@ ComboMaker.prototype.makeCombos = function(args, options = {}) {
             if (validateResult.success) {
                 successDuration += duration.milliseconds;
 
-                if (validateAll &&
-                    !this.checkPrimarySources(validateResult.list, args.sources)) {
+                if (validateAll && !this.checkPrimarySources(validateResult.list, args.sources)) {
                     continue;
-                }                       
+                }
                 if (csvNameList.length < args.maxResults) {
                     csvNameList.push(result.nameList.toString());
                 }

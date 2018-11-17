@@ -128,6 +128,12 @@ const APPLE = {
 
     '4.5': {
         sentence:         4,
+        clueCount:        21,
+        REQ_CLUE_COUNT:   17
+    },
+
+    '4.6': {
+        sentence:         4,
         clueCount:        20,
         REQ_CLUE_COUNT:   17
     },

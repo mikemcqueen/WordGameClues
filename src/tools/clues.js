@@ -94,6 +94,48 @@ function loadClues (clues, validateAllOnLoad, ignoreLoadErrors) {
     return true;
 }
 
+function convertUseToPrimarySources (args) {
+    // build ncList of supplied name:counts
+    const ncList = args.use.map(ncStr => NameCount.makeNew(ncStr));
+    for (const nc of ncList) {
+        if (!nc.count) {
+            console.log('All -u names require a count (for now)');
+            return [false, null];
+        }
+    }
+
+    // TODO: some more clear way to extract just ".count"s into an array, then reduce them
+    const sum = ncList.reduce((a, b) => Object({ count: (a.count + b.count) })).count;
+    const remain = ClueManager.maxClues - sum;
+    if (remain < 1) {
+        console.log(`The sum of the specified clue counts (${sum})` +
+                    ` equals or exceeds the maximum clue count (${ClueManager.maxClues})`);
+        return [false, null];
+    }
+    
+    Debug('convertNcStrToPrimarySources ' + args.use + 
+                ', sum: ' + sum + ', remain: ' + remain);
+
+    // first, make sure the supplied nameList:sum by itself is a valid clue
+    // combination, and find out how many primary-clue variations there
+    // are in which the clue names in args.nameList exist.
+    let vsResult = Validator.validateSources({
+        sum:         sum,
+        nameList:    ncList.map(nc => nc.name),
+        count:       args.use.length,
+        validateAll: true
+    });
+    if (!vsResult.success) {
+        console.log(`The ncStr [${args.use}] is not a valid clue combination`);
+        return [false, null];
+    }
+
+    console.log(`results: ${vsResult.list.length}`);
+
+    // TODO: for each primary-clue variation from validateResults
+    return [true, vsResult.list[0].nameSrcList.map(nc => _.toString(nc.count))];
+}
+
 //
 // args:
 //  sum:     countArg,
@@ -107,7 +149,19 @@ function doCombos(args, options) {
     if (!_.isUndefined(args.sources)) {
         args.sources = _.chain(args.sources).split(',').map(_.toNumber).value();
     }
+    if (args.use) {
+        const [success, sources] = convertUseToPrimarySources(args);
+        if (!success) {
+            console.log('success: false');
+            return false;
+        }
+        console.log(`${args.use} - ${sources}`);
+        args.sources = ClueManager.getInversePrimarySources(sources).map(_.toNumber);
+        console.log(`inverse: ${args.sources}`);
+        args.use = undefined;
+    }
     if (!_.isUndefined(args.require)) {
+        console.log(`require: ${args.require}`);
         args.require = _.chain(args.require).split(',').map(_.toNumber).value();
     }
     let sumRange;
@@ -179,7 +233,7 @@ async function getNamedNoteNames(options) {
 
 //
 
-async function combo_maker(args, options) {
+function combo_maker(args, options) {
     return Promise.resolve(options.remaining ? getNamedNoteNames(options) : false)
         .then(noteNames => {
             if (noteNames) {
