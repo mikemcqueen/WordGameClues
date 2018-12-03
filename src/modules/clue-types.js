@@ -143,8 +143,28 @@ const APPLE = {
         clueCount:        20,
         REQ_CLUE_COUNT:   17
     },
-
     '4.61': {
+        sentence:         4,
+        clueCount:        20,
+        REQ_CLUE_COUNT:   17
+    },
+    '4.62': {
+        sentence:         4,
+        clueCount:        20,
+        REQ_CLUE_COUNT:   17
+    },
+
+    '4.7': {
+        sentence:         4,
+        clueCount:        20,
+        REQ_CLUE_COUNT:   17
+    },
+    '4.71': {
+        sentence:         4,
+        clueCount:        20,
+        REQ_CLUE_COUNT:   17
+    },
+    '4.72': {
         sentence:         4,
         clueCount:        20,
         REQ_CLUE_COUNT:   17
