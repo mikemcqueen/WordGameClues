@@ -153,7 +153,7 @@ function parseDomLines (lines, node, queue, options) {
     }
     if (node.childNodes) {
         Array.prototype.forEach.call(node.childNodes, child => {
-            parseDomLines (lines, child, queue, options);
+            parseDomLines(lines, child, queue, options);
         });
     }
     if (isDiv(node)) {

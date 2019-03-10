@@ -37,14 +37,15 @@ const Commands = { count, create, get, parse, update, validate };
 const CmdLineOptions = Getopt.create(_.concat(Clues.Options, [
     ['', 'count=NAME',      'count sources/clues/urls in a note'],
     ['', 'create=FILE',     'create note from file (default: filter result file)'],
-    ['', 'text',            '  create note from any text file'],
+    ['', 'text',            '  create from text file'],
     ['', 'point-size=SIZE', '  font point size'],
     ['', 'get=TITLE',       'get (display) a note'],
-    ['', 'parse=TITLE',     'parse note into filter file format'],
+    ['', 'parse=TITLE',     'parse note, by default into filter file format'],
 //    ['', 'parse-file=FILE','parse note file into filter file format'],
     ['', 'compare',         '  parse old + dom  and show differences'],
     ['', 'old',             '  use old parse method (use with parse)'],
     ['', 'json',            '  output in json (use with parse, parse-file)'],
+    ['', 'lines',           '  output raw lines of text'],
     ['', 'update[=NOTE]',   'update all results in worksheet, or a specific NOTE if specified'],
 // TOOD: change PREFIX to REGEX
     ['', 'match=PREFIX',    '  update notes matching title PREFIX (used with --update)'],
@@ -135,17 +136,27 @@ async function get (options) {
 
 //
 
-async function getAndParse (noteName, options = {}) {
+async function getAndParseDom (noteName, options = {}) {
     Log.info(`getAndParse ${noteName} : ${options.guid}`);
     return Note.get(noteName, options)
         .then(note => {
             if (!note) return undefined;
-            const parseOptions = Object.assign(_.clone(options), { urls: true, clues: true });
             return {
                 note,
-                filterList: Filter.parseLines(NoteParser.parseDom(note.content, parseOptions))
+                lines: NoteParser.parseDom(note.content)
             };
         });
+}
+
+//
+
+async function getAndParse (noteName, options = {}) {
+    return getAndParse(noteName.options, (note, lines) => {
+        return {
+            note,
+            filterList: Filter.parseLines(lines)
+        };
+    });
 }
 
 /*
@@ -212,17 +223,29 @@ async function parse (options) {
                 }
             });
     } else {
-        return getAndParse(options.parse, options)
-            .then(result => {
-                if (_.isEmpty(result.filterList)) {
-                    return console.log('no results');
-                } else {
-                    return Filter.dumpList(result.filterList, {
-                        json: options.json,
-                        fd: process.stdout.fd
-                    });
-                }
-            });
+        if (options.lines) {
+            return getAndParseDom(options.parse, options)
+                .then(result => {
+                    if (_.isEmpty(result.lines)) {
+                        return console.log('empty note');
+                    }                    
+                    Log.debug(`lines: ${_.size(result.lines)}`);
+                    result.lines.forEach(line => console.log(line));
+                    return undefined;
+                });
+        } else {
+            return getAndParse(options.parse, options)
+                .then(result => {
+                    if (_.isEmpty(result.filterList)) {
+                        return console.log('no results');
+                    } else {
+                        return Filter.dumpList(result.filterList, {
+                            json: options.json,
+                            fd: process.stdout.fd
+                        });
+                    }
+                });
+        }
     }
 }
 
@@ -557,7 +580,7 @@ async function main () {
         }
     }
     if (!cmd) usage(`missing command`);
-    if (cmd === 'get') options.quiet = true;
+    if (_.includes(['get', 'parse'], cmd)) options.quiet = true;
 
     // Other modules will see snapshot of options taken here.
     Options.set(options);
@@ -569,7 +592,9 @@ async function main () {
     const start = new Date();
     const result = await Commands[cmd](options).catch(err => { throw err; });
     const duration = new Duration(start, new Date()).milliseconds;
-    console.log(`${cmd}: ${PrettyMs(duration)}`);
+    if (!options.quiet) {
+        console.log(`${cmd}: ${PrettyMs(duration)}`);
+    }
     
     // test bat,western - look at the countlists, combinations, make sure there's no duplicates
     

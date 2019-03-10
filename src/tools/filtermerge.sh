@@ -14,19 +14,19 @@ echo "Name: $_name"
 shift
 
 _base=$_ct # .c2-$_cc.x2
-_note=$_ct.$_name # .c2-$_cc.x2.$_name
+_note=$_ct."$_name" # .c2-$_cc.x2.$_name
 
 if [[ $_name == "remaining" ]]
 then
-    _base=$_base.$_name
+    _base=$_base."$_name"
     _remaining="--remaining"
 elif [[ $_name == "all" ]]
 then
-    _base=$_base.$_name
-    _all=$_name
+    _base=$_base."$_name"
+    _all="$_name"
     _generate=true
 else
-    _grep=$_name
+    _grep="$_name"
 fi
 
 while [[ $# -gt 0 ]]
@@ -75,19 +75,19 @@ echo $(date) >> $_out
 if [[ $_generate || ! -z $_remaining ]]
 then
     echo "Generating word pairs for $_base..."
-    node clues -$_ct -c2,$_cc -x2 $_remaining $_production > tmp/$_base 2>> $_out
+    node clues -$_ct -c2,$_cc -x2 $_remaining $_production > tmp/"$_base" 2>> $_out
 fi
 
 if [[ ! -z $_grep ]]
 then
     echo "Grepping..."
-    grep $_name tmp/$_base > tmp/$_note
+    grep "$_name" tmp/"$_base" > tmp/"$_note"
 fi
 
 _filtered=$_note.filtered
 
 echo "Filtering..."
-node filter -$_ct tmp/$_note $_article > tmp/$_filtered 2>> $_out
+node filter -$_ct tmp/"$_note" $_article > tmp/"$_filtered" 2>> $_out
 _exitcode=$?
 if [ $_exitcode -ne 0 ]
 then
@@ -96,7 +96,7 @@ then
 fi
 
 echo "Merging..."
-node note-merge -$_ct tmp/$_filtered --note $_note --force-create $_production $_notebook 2>> $_out
+node note-merge -$_ct tmp/"$_filtered" --note "$_note" --force-create $_production $_notebook 2>> $_out
 _exitcode=$?
 if [ $_exitcode -ne 0 ]
 then
