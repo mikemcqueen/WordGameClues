@@ -188,6 +188,18 @@ const APPLE = {
         REQ_CLUE_COUNT: 15
     },
 
+    '5.1': {
+        sentence:       5,
+        clueCount:      20,
+        REQ_CLUE_COUNT: 20
+    },
+
+    '5.2': {
+        sentence:       5,
+        clueCount:      21,
+        REQ_CLUE_COUNT: 21
+    },
+
     '6': {
         sentence:       6,
         clueCount:      8,
