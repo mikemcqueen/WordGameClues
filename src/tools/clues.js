@@ -29,8 +29,6 @@ const Validator   = require('../modules/validator');
 // initialize command line options.  do this before logger.
 //
 
-// metamorphois -> synthesis -> harmonize -> finalize
-
 // TODO:
 // solve the -p/-y problem: standardize how to set/initialize state based on target clues
 // 
@@ -41,6 +39,7 @@ const CmdLineOptions = Opt.create(_.concat(Clues.Options, [
     ['o', 'output',                            '  output json -or- clues(huh?)'],
     ['c', 'count=COUNT[LO,COUNTHI]',           '  use the specified COUNT; if COUNTHI, treat as range'],
     ['x', 'max=COUNT',                         '  maximum # of sources to combine'],
+    ['',  'primary',                           '  show combos as primary source clues' ],
     ['',  'copy-from=SOURCE',                  'copy clues from source cluetype; e.g. p1.1'],
     ['',  'allow-dupe-source',                 '  allow duplicate sources'],
     ['',  'merge-style',                       '  merge-style, no validation except for immediate sources'],
@@ -198,6 +197,8 @@ function doCombos(args, options) {
     }
     let d = new Duration(beginDate, new Date()).milliseconds;
     _.keys(comboMap).forEach(nameCsv => console.log(nameCsv));
+//    console.log(`${Stringify(comboMap)}`);
+    
     Debug(`total: ${total}` +
                 ', filtered: ' + _.size(comboMap) +
                 ', known: ' + known +
@@ -435,18 +436,15 @@ async function main () {
                 files: options.files
             }
         });
-    }
-    else if (options.test) {
+    } else if (options.test) {
         if (options.validate) {
             Components.validate(options.test, options);
         } else {
             Components.show(options);
         }
-    }
-    else if (showSourcesClueName) {
+    } else if (showSourcesClueName) {
         showSources(showSourcesClueName);
-    }
-    else if (altSourcesArg || allAltSourcesFlag) {
+    } else if (altSourcesArg || allAltSourcesFlag) {
         AltSources.show(allAltSourcesFlag ? {
             all    : true,
             output : options.output,
@@ -456,12 +454,11 @@ async function main () {
             name   : altSourcesArg,
             output : options.output
         });
-    }
-    else if (options.copy_from) {
+    } else if (options.copy_from) {
 	const from = Clues.getByVariety(options.copy_from);
 	Debug(`from: ${from.baseDir}`);
 	copyClues(from, options);
-    } else {
+    } else if (options.count) {
         let sources = options['primary-sources'];
         if (options.inverse) {
             sources = ClueManager.getInversePrimarySources(sources.split(',')).join(',');
@@ -472,7 +469,8 @@ async function main () {
             max:     maxArg,
             require: options['require-counts'],
             sources,
-            use:     useClueList
+            use:     useClueList,
+            primary: options.primary
         }, options);
     }
 }

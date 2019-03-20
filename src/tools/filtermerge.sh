@@ -75,7 +75,7 @@ echo $(date) >> $_out
 if [[ $_generate || ! -z $_remaining ]]
 then
     echo "Generating word pairs for $_base..."
-    node clues -$_ct -c2,$_cc -x2 $_remaining $_production > tmp/"$_base" 2>> $_out
+    node clues -$_ct -c2,$_cc -x2 $_remaining $_production |sort > tmp/"$_base" 2>> $_out
 fi
 
 if [[ ! -z $_grep ]]

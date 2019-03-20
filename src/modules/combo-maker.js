@@ -163,7 +163,16 @@ ComboMaker.prototype.makeCombos = function(args, options = {}) {
                 if (validateAll && !this.checkPrimarySources(validateResult.list, args.sources)) {
                     continue;
                 }
-                if (csvNameList.length < args.maxResults) {
+
+                if (options.primary) {
+                    validateResult.list.forEach(vr => {
+                        Debug(`${vr.ncList}`);
+                        if (csvNameList.length < args.maxResults) {
+                            const nameList = NameCount.makeNameList(vr.ncList).sort();
+                            csvNameList.push(nameList.toString());
+                        }
+                    });
+                } else if (csvNameList.length < args.maxResults) {
                     csvNameList.push(result.nameList.toString());
                 }
                 if ((++totalCount % 10000) === 0) {
