@@ -73,6 +73,7 @@ ComboMaker.prototype.makeCombos = function(args, options = {}) {
     if (!_.isUndefined(args.use)) {
         let buildResult = this.buildUseNcList(args.use);
         useNcList = buildResult.ncList;
+        Log.info(`useNcList: ${useNcList}`);
         require.push(...buildResult.countList);
     }
     let validateAll = false;
@@ -116,6 +117,7 @@ ComboMaker.prototype.makeCombos = function(args, options = {}) {
             }
 
             Log.info(`result.nameList: ${result.nameList}`);
+            Log.info(`result.ncList: ${result.ncList}`);
 
             /*
             // build list of clue names from list of clue sources and sourceIndex array
@@ -160,8 +162,11 @@ ComboMaker.prototype.makeCombos = function(args, options = {}) {
             if (validateResult.success) {
                 successDuration += duration.milliseconds;
 
-                if (validateAll && !this.checkPrimarySources(validateResult.list, args.sources)) {
-                    continue;
+                if (validateAll) {
+                     if (!this.checkPrimarySources(validateResult.list, args.sources, args.use)) {
+                        Log.debug(`checkPrimarySources.fail`);
+                        continue;
+                    }
                 }
 
                 if (options.primary) {
@@ -180,6 +185,7 @@ ComboMaker.prototype.makeCombos = function(args, options = {}) {
                 }
             }
             else {
+                Log.info("validateResult.fail");
                 failDuration += duration.milliseconds;
             }
         }
@@ -200,7 +206,7 @@ ComboMaker.prototype.makeCombos = function(args, options = {}) {
 // As long as one final result has only primary sources from 'sources'
 // array, we're good.
 
-ComboMaker.prototype.checkPrimarySources = function(resultList, sources) {
+ComboMaker.prototype.checkPrimarySources = function(resultList, sources, use) {
     return resultList.some(result => {
         return NameCount.makeCountList(result.nameSrcList)
             .every(source => {

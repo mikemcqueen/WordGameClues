@@ -200,6 +200,30 @@ const APPLE = {
         REQ_CLUE_COUNT: 22
     },
 
+    '5.3': {
+        sentence:       5,
+        clueCount:      17,
+        REQ_CLUE_COUNT: 17
+    },
+
+    '5.4': {
+        sentence:       5,
+        clueCount:      18,
+        REQ_CLUE_COUNT: 18
+    },
+
+    '5.41': {
+        sentence:       5,
+        clueCount:      14,
+        REQ_CLUE_COUNT: 14
+    },
+
+    '5.42': {
+        sentence:       5,
+        clueCount:      14,
+        REQ_CLUE_COUNT: 14
+    },
+
     '6': {
         sentence:       6,
         clueCount:      8,
@@ -294,6 +318,30 @@ const APPLE = {
         sentence:       9,
         clueCount:      15,
         REQ_CLUE_COUNT: 15
+    },
+
+    'f': {
+        sentence:       10,
+        clueCount:      9,
+        REQ_CLUE_COUNT: 9
+    },
+
+    'f.1': {
+        sentence:       10,
+        clueCount:      9,
+        REQ_CLUE_COUNT: 9
+    },
+
+    'f.2': {
+        sentence:       10,
+        clueCount:      9,
+        REQ_CLUE_COUNT: 9
+    },
+
+    'f.3': {
+        sentence:       10,
+        clueCount:      9,
+        REQ_CLUE_COUNT: 9
     }
 
 };
@@ -368,7 +416,7 @@ function getByVariety (apple) {
     // TODO: same code in note.js, refactor it out to getVariety()
     let variety = _.clone(apple);
     Debug(`Apple: ${apple} Variety: ${variety}`);
-    Expect(_.toNumber(variety.charAt(0))).is.above(0); // M
+//    Expect(_.toNumber(variety.charAt(0))).is.above(0); // M
     let count = 1;
     if (variety.charAt(count) === '.') {
 	count += 1;
@@ -470,7 +518,7 @@ function isValidBaseDirOption (name) {
 
 function getShorthand (clueType) {
     const dir = clueType.baseDir;
-    Expect(dir.charAt(0)).is.equal('p');
+//    Expect(dir.charAt(0)).is.equal('p');
     return `${dir.charAt(0)}${clueType.variety}${getTypeSuffix(clueType)}`;
 }
 

@@ -26,6 +26,7 @@ then
     _all="$_name"
     _generate=true
 else
+    _base=$_base."$_name"
     _grep="$_name"
 fi
 

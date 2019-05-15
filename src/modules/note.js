@@ -79,7 +79,7 @@ function getWorksheetName (noteNameOrClueType) {
     }
     Expect(noteName).is.a.String();
     Expect(noteName.charAt(0)).is.equal('p');
-    Expect(_.toNumber(noteName.charAt(1))).is.above(0);
+//    Expect(_.toNumber(noteName.charAt(1))).is.above(0);
     let count = 2;
     if (noteName.charAt(count) === '.') {
 	count += 1;
@@ -299,6 +299,7 @@ async function create (title, body, options = {}) {
     return getNotebookByOptions(options)
         .then(notebook => {
             Log.debug(`nb guid: ${notebook.guid}`);
+            Log.debug(`body: ${body}`);
             note.title = title;
             note.notebookGuid = notebook.guid;
             /*

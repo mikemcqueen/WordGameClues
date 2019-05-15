@@ -99,7 +99,7 @@ function convertUseToPrimarySources (args) {
     for (const nc of ncList) {
         if (!nc.count) {
             console.log('All -u names require a count (for now)');
-            return [false, null];
+            return { success: false };
         }
     }
 
@@ -109,7 +109,7 @@ function convertUseToPrimarySources (args) {
     if (remain < 1) {
         console.log(`The sum of the specified clue counts (${sum})` +
                     ` equals or exceeds the maximum clue count (${ClueManager.maxClues})`);
-        return [false, null];
+        return { success: false };
     }
     
     Debug('convertNcStrToPrimarySources ' + args.use + 
@@ -126,13 +126,18 @@ function convertUseToPrimarySources (args) {
     });
     if (!vsResult.success) {
         console.log(`The ncStr [${args.use}] is not a valid clue combination`);
-        return [false, null];
+        return { success: false };
     }
 
     console.log(`results: ${vsResult.list.length}`);
 
     // TODO: for each primary-clue variation from validateResults
-    return [true, vsResult.list[0].nameSrcList.map(nc => _.toString(nc.count))];
+    const nameSrcList = vsResult.list[0].nameSrcList;
+    return {
+        success: true,
+        sources: nameSrcList.map(nc => _.toString(nc.count)),
+        clues:   nameSrcList.map(nc => _.toString(nc.name))
+    };
 }
 
 //
@@ -149,13 +154,15 @@ function doCombos(args, options) {
         args.sources = _.chain(args.sources).split(',').map(_.toNumber).value();
     }
     if (args.use) {
-        const [success, sources] = convertUseToPrimarySources(args);
-        if (!success) {
+        const result = convertUseToPrimarySources(args);
+        if (!result.success) {
             console.log('success: false');
             return false;
         }
-        console.log(`${args.use} - ${sources}`);
-        args.sources = ClueManager.getInversePrimarySources(sources).map(_.toNumber);
+        args.clues = args.use.map(nameSrc => NameCount.makeNew(nameSrc).name);
+        console.log(`clues: ${args.clues}`);
+        console.log(`${args.use} - ${result.sources}`);
+        args.sources = ClueManager.getInversePrimarySources(result.sources).map(_.toNumber);
         console.log(`inverse: ${args.sources}`);
         args.use = undefined;
     }

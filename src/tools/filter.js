@@ -83,6 +83,7 @@ function getUrlCount (resultList) {
 //
 
 function isUrlInList (url, list) {
+    if (url === null) return false;
     Expect(url).is.a.String();
     if (_.isUndefined(list)) return false; 
     Expect(list).is.an.Array();

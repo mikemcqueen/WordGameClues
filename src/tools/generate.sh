@@ -14,4 +14,4 @@ shift
 _base=$_ct.c2-$_cc.x2
 
 echo "Generating word pairs.."
-node clues -$_ct -c2,$_cc -x2 $1 $2 $3 $4 $5 $6 > tmp/$_base 
+node clues -$_ct -c2,$_cc -x2 $1 $2 $3 $4 $5 $6 | sort > tmp/$_base 
