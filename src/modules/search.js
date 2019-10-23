@@ -29,21 +29,9 @@ function makeSearchTerm (wordList, options = {}) {
 //
 function getOneResult (wordList, pages, options = {}) {
     Expect(options).is.an.Object();
-    return new Promise((resolve, reject) => {
-        let term = makeSearchTerm(wordList, { wikipedia: true });
-        console.log(`term: ${term}, pages: ${pages}`);
-        SearchResult.get(term, pages, (err, data) => {
-            if (!err && options.reject) {
-                err = new Error('getOneResult: forced rejection');
-            }
-            if (err) {
-                console.log('getOneResult: rejecting');
-                reject(err);
-            } else {
-                resolve(data);
-            }
-        });
-    });
+    let term = makeSearchTerm(wordList, { wikipedia: true });
+    console.log(`term: ${term}, pages: ${pages}`);
+    return SearchResult.get_it(term);
 }
 
 //

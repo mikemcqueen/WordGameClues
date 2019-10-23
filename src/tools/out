@@ -1,0 +1,277 @@
+results: 1
+clues: buffalo,doll
+buffalo:6,doll:2 - 5,12,16,17,18,19,21,22
+inverse: 1,2,3,4,6,7,8,9,10,11,13,14,15,20
+base,south
+base,pawn
+base,ninety
+base,seventh
+base,century
+base,queen
+base,huge
+base,jockey
+base,coffee
+base,duck
+base,weed
+base,star
+ball,south
+ball,pawn
+ball,ninety
+ball,seventh
+ball,century
+ball,queen
+ball,huge
+ball,jockey
+ball,coffee
+ball,duck
+ball,weed
+ball,star
+pawn,south
+ninety,south
+seventh,south
+century,south
+queen,south
+huge,south
+jockey,south
+coffee,south
+duck,south
+south,weed
+ninety,pawn
+pawn,seventh
+century,pawn
+pawn,queen
+huge,pawn
+jockey,pawn
+coffee,pawn
+duck,pawn
+pawn,weed
+century,ninety
+ninety,queen
+huge,ninety
+jockey,ninety
+coffee,ninety
+duck,ninety
+ninety,weed
+ninety,star
+queen,seventh
+huge,seventh
+jockey,seventh
+coffee,seventh
+duck,seventh
+seventh,weed
+seventh,star
+century,queen
+century,huge
+century,jockey
+century,coffee
+century,duck
+century,weed
+century,star
+huge,queen
+jockey,queen
+coffee,queen
+duck,queen
+queen,weed
+queen,star
+huge,jockey
+coffee,huge
+duck,huge
+huge,weed
+huge,star
+coffee,jockey
+duck,jockey
+jockey,weed
+jockey,star
+coffee,duck
+coffee,weed
+coffee,star
+duck,star
+star,weed
+base,wolf
+base,seventh century
+base,ninety seventh
+base,pawn star
+base,sirius
+base,seer
+base,sir
+base,old man
+ball,wolf
+ball,seventh century
+ball,ninety seventh
+ball,pawn star
+ball,sirius
+ball,seer
+ball,sir
+ball,old man
+baseball,south
+south,wolf
+seventh century,south
+ninety seventh,south
+pawn star,south
+old man,south
+baseball,pawn
+pawn,wolf
+pawn,seventh century
+ninety seventh,pawn
+pawn,sirius
+pawn,seer
+pawn,sir
+baseball,ninety
+ninety,wolf
+ninety,seventh century
+ninety,pawn star
+ninety,sirius
+ninety,seer
+ninety,sir
+ninety,old man
+baseball,seventh
+seventh,wolf
+pawn star,seventh
+seventh,sirius
+seer,seventh
+seventh,sir
+old man,seventh
+baseball,century
+century,wolf
+century,ninety seventh
+century,pawn star
+century,sirius
+century,seer
+century,sir
+century,old man
+baseball,queen
+queen,wolf
+queen,seventh century
+ninety seventh,queen
+pawn star,queen
+queen,sirius
+queen,seer
+queen,sir
+old man,queen
+baseball,huge
+huge,wolf
+huge,seventh century
+huge,ninety seventh
+huge,pawn star
+huge,sirius
+huge,seer
+huge,sir
+huge,old man
+baseball,jockey
+jockey,wolf
+jockey,seventh century
+jockey,ninety seventh
+jockey,pawn star
+jockey,sirius
+jockey,seer
+jockey,sir
+jockey,old man
+baseball,coffee
+coffee,wolf
+coffee,seventh century
+coffee,ninety seventh
+coffee,pawn star
+coffee,sirius
+coffee,seer
+coffee,sir
+coffee,old man
+baseball,duck
+duck,seventh century
+duck,ninety seventh
+duck,pawn star
+duck,sirius
+duck,seer
+duck,sir
+duck,old man
+baseball,weed
+seventh century,weed
+ninety seventh,weed
+pawn star,weed
+sirius,weed
+seer,weed
+sir,weed
+old man,weed
+star,wolf
+seventh century,star
+ninety seventh,star
+baseball star,south
+babe ruth,south
+babe,south
+ruth,south
+baseball star,pawn
+babe ruth,pawn
+babe,pawn
+pawn,ruth
+baseball star,ninety
+babe ruth,ninety
+babe,ninety
+ninety,ruth
+baseball star,seventh
+babe ruth,seventh
+babe,seventh
+ruth,seventh
+baseball star,century
+babe ruth,century
+babe,century
+century,ruth
+baseball star,queen
+babe ruth,queen
+babe,queen
+queen,ruth
+baseball star,huge
+babe ruth,huge
+babe,huge
+huge,ruth
+baseball star,jockey
+babe ruth,jockey
+babe,jockey
+jockey,ruth
+baseball star,coffee
+babe ruth,coffee
+babe,coffee
+coffee,ruth
+baseball star,duck
+babe ruth,duck
+babe,duck
+duck,ruth
+baseball star,weed
+babe ruth,weed
+babe,weed
+ruth,weed
+baseball,wolf
+baseball,seventh century
+baseball,ninety seventh
+baseball,pawn star
+baseball,sirius
+baseball,seer
+baseball,sir
+baseball,old man
+seventh century,wolf
+ninety seventh,wolf
+pawn star,wolf
+sirius,wolf
+seer,wolf
+sir,wolf
+old man,wolf
+pawn star,seventh century
+seventh century,sirius
+seer,seventh century
+seventh century,sir
+old man,seventh century
+ninety seventh,pawn star
+ninety seventh,sirius
+ninety seventh,seer
+ninety seventh,sir
+ninety seventh,old man
+baseball star,wolf
+babe ruth,wolf
+babe,wolf
+ruth,wolf
+baseball star,seventh century
+babe ruth,seventh century
+babe,seventh century
+ruth,seventh century
+baseball star,ninety seventh
+babe ruth,ninety seventh
+babe,ninety seventh
+ninety seventh,ruth

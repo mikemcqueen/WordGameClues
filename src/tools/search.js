@@ -21,7 +21,7 @@ const DEFAULT_DELAY_HIGH = 12;
 
 //
 
-const Opt = require('node-getopt')
+const CmdLineOptions = require('node-getopt')
       .create([
           ['',  'force',               'force search even if results file exists'],
           ['h', 'help',                'this screen' ]
@@ -31,15 +31,16 @@ const Opt = require('node-getopt')
               ' ex: node search file 4    ; delay 4 minutes between searches' +
               ' ex: node search file 4 5  ; delay 4 to 5 minutes between searches' +
           ` defaults, low: ${DEFAULT_DELAY_LOW}, high: ${DEFAULT_DELAY_HIGH}`
-      ).parseSystem();
+      );
 
 //
 //
 //
 
 async function main() {
+    let Opt = CmdLineOptions.parseSystem();
     if (Opt.argv.length < 1) {
-        Opt.showHelp();
+        CmdLineOptions.showHelp();
         return 1;
     }
 

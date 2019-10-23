@@ -13,20 +13,17 @@ _name=$1  #word
 echo "Name: $_name"
 shift
 
-_base=$_ct # .c2-$_cc.x2
-_note=$_ct."$_name" # .c2-$_cc.x2.$_name
+_base=$_ct."$_name" 
+_note=$_ct."$_name"
 
 if [[ $_name == "remaining" ]]
 then
-    _base=$_base."$_name"
     _remaining="--remaining"
 elif [[ $_name == "all" ]]
 then
-    _base=$_base."$_name"
     _all="$_name"
     _generate=true
 else
-    _base=$_base."$_name"
     _grep="$_name"
 fi
 
@@ -63,12 +60,16 @@ done
 if [[ ! -z $_article ]]
 then
     _note=$_note.article
-    _base=$_base.article
-elif [[ ! -z $_all ]]
-then
+#    _base=$_base
+else #if [[ ! -z $_all ]]
+#then
     _note=$_note.title
-    _base=$_base.title
+#    _base=$_base
 fi    
+
+echo "Note: $_note"
+echo "Base: $_base"
+
 
 _out=tmp/filtermerge.err
 echo $(date) >> $_out

@@ -7,6 +7,7 @@ const Debug        = require('debug')('search-result');
 const Expect       = require('should/as-function');
 const Fs           = require('fs-extra');
 const Google       = require('google');
+const GoogleIt     = require('google-it');
 const Ms           = require('ms');
 const My           = require('./util');
 const Path         = require('path');
@@ -103,6 +104,7 @@ function get (text, pages, cb) {
     let count = 0;
     Google(text, function (err, result) {
         if (err) return cb(err);
+        Debug(`result count: ${_.size(result.links)}`);
         resultList.push(...result.links.map(link => {
             return {
                 title:   link.title,
@@ -123,6 +125,30 @@ function get (text, pages, cb) {
         setTimeout(result.next, msDelay);
         return undefined;
     });
+}
+
+function get_it (text, limit = 20) {
+    Expect(text).is.a.String();
+    Expect(limit).is.a.Number().above(0);
+    let resultList = [];
+
+    let options = {}; // 'limit': limit };
+
+    return GoogleIt({'query': text, 'limit': limit})
+        .then(results => {
+            Debug(`result count: ${_.size(results)}`);
+            Debug(`results: ${results}`);
+            resultList.push(...results.map(entry => {
+                return {
+                    title:   entry.title,
+                    url:     entry.link
+                    //summary: link.description
+                };
+            }));
+            return resultList;
+        }).catch(err => {
+            console.log('get-it ' + err);
+        });
 }
 
 //
@@ -170,6 +196,7 @@ function fileScoreSaveCommit (filepath, options = {}, wordList = undefined) {
 module.exports = {
     fileScoreSaveCommit,
     get,
+    get_it,
     getFileMatch,
     makeFilename,
     makeFilteredFilename,
