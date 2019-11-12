@@ -181,7 +181,10 @@ ClueManager.prototype.addKnownCompoundClues = function (clueList, clueCount, val
                     validateAll: validateAll
                 });
                 if (!this.ignoreLoadErrors) {
-                    Expect(vsResult.success).is.true();
+		    if (!vsResult.success) {
+			Debug(`srcNameList: ${srcNameList}`);
+		    }
+                    Expect(vsResult.success);
                 }
                 srcMap[srcKey] = [];
             }

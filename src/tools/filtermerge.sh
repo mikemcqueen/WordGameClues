@@ -82,13 +82,15 @@ fi
 
 if [[ ! -z $_grep ]]
 then
-    echo "Grepping..."
+    echo "Grepping to tmp/$_note..."
     grep "$_name" tmp/"$_base" > tmp/"$_note"
+else
+    cp tmp/"$_base" tmp/"$_note"
 fi
 
 _filtered=$_note.filtered
 
-echo "Filtering..."
+echo "Filtering tmp/$_note to tmp/$_filtered..."
 node filter -$_ct tmp/"$_note" $_article > tmp/"$_filtered" 2>> $_out
 _exitcode=$?
 if [ $_exitcode -ne 0 ]
@@ -97,7 +99,7 @@ then
     exit -1
 fi
 
-echo "Merging..."
+echo "Merging tmp/$_filtered to $_note..."
 node note-merge -$_ct tmp/"$_filtered" --note "$_note" --force-create $_production $_notebook 2>> $_out
 _exitcode=$?
 if [ $_exitcode -ne 0 ]

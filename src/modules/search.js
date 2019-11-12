@@ -31,7 +31,7 @@ function getOneResult (wordList, pages, options = {}) {
     Expect(options).is.an.Object();
     let term = makeSearchTerm(wordList, { wikipedia: true });
     console.log(`term: ${term}, pages: ${pages}`);
-    return SearchResult.get_it(term);
+    return SearchResult.get_it(term, pages * 10);
 }
 
 //

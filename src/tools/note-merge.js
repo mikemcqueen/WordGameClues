@@ -62,7 +62,7 @@ async function main () {
         const nbName = options.notebook || Note.getWorksheetName(noteName);
         const nb = await Note.getNotebook(nbName, options).catch(err => { throw err; });
         if (!nb) {
-            usage(`notebook not found, ${nbName}`);
+            usage(`notebook not found: ${nbName}`);
         }
         options.notebookGuid = nb.guid;
         Debug(`notebookGuid: ${options.notebookGuid}`);

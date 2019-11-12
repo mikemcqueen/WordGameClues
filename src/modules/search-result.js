@@ -132,17 +132,16 @@ function get_it (text, limit = 20) {
     Expect(limit).is.a.Number().above(0);
     let resultList = [];
 
-    let options = {}; // 'limit': limit };
+    let options = {};
 
     return GoogleIt({'query': text, 'limit': limit})
         .then(results => {
             Debug(`result count: ${_.size(results)}`);
-            Debug(`results: ${results}`);
+            Debug(`results: ${results}, results[0].keys: ${_.keys(results[0])}`);
             resultList.push(...results.map(entry => {
                 return {
                     title:   entry.title,
                     url:     entry.link
-                    //summary: link.description
                 };
             }));
             return resultList;

@@ -8,6 +8,7 @@
 
 const _                = require('lodash');
 const Clues            = require('./clue-types');
+const Debug            = require('debug')('note');
 const Evernote         = require('evernote');
 const EvernoteConfig   = require('../../data/evernote-config.json');
 const Expect           = require('should/as-function');
@@ -44,11 +45,11 @@ function getNotestore (production) {
 async function getNotebook (name, options = {}) {
     if (!name) return undefined;
     const noteStore = getNotestore(options.production);
-    Log.debug('listing');
+    Debug('listing');
     return noteStore.listNotebooks()
         .then(nbList => {
             for(const nb of nbList) {
-                Log.debug(`notebook: ${nb.name}`);
+                Debug(`notebook: ${nb.name}`);
                 let match = false;
                 if (options.relaxed) {
                     match = _.includes(nb.name, name);
@@ -56,11 +57,11 @@ async function getNotebook (name, options = {}) {
                     match = (nb.name === name);
                 }
                 if (match ) {
-                    Log.debug(`match`);
+                    Debug(`match`);
                     return nb;
                 }
             }
-            Log.debug(`notebook not found, ${name}`);
+            Debug(`notebook not found, ${name}`);
             return undefined;
         });
 }
@@ -73,7 +74,7 @@ function getWorksheetName (noteNameOrClueType) {
         noteName = Clues.getShorthand(noteName); // convert clueType to, e.g, 'p8s'
 	Log.info(`noteName: ${noteName}`);
     } else {
-        const appleExpr = /p[0-9](?:\.[0-9])?s?/;
+        const appleExpr = /p[f1-9](?:\.[0-9])?s?/;
         const result = appleExpr.exec(noteName);
         if (!result || (result.index !== 0)) return undefined;
     }
@@ -89,7 +90,7 @@ function getWorksheetName (noteNameOrClueType) {
     }
     if (noteName.charAt(count) === 's') count += 1;
     const wsName = `Worksheets.${noteName.slice(0, count)}`;
-    Log.debug(`worksheet name: ${wsName}`);
+    Debug(`worksheet name: ${wsName}`);
     return wsName;
 }
 
@@ -103,18 +104,18 @@ async function getNotebookByGuid (guid, options = {}) {
 //
 
 async function getNotebookByOptions (options = {}) {
-    Log.debug(`++getNotebookByOptions, guid:${options.notebookGuid}`);
+    Debug(`++getNotebookByOptions, guid:${options.notebookGuid}`);
     if (options.notebookGuid) return getNotebookByGuid(options.notebookGuid, options);
     if (!options.notebook) {
 	throw new Error('No notebook specified.');
-        //Log.debug(`NO NOTEBOOK - THROW?`);
+        //Debug(`NO NOTEBOOK - THROW?`);
 	//return undefined;
     }
-    Log.debug(`options : ${Stringify(options)}`);
+    Debug(`options : ${Stringify(options)}`);
     return getNotebook(options.notebook, options)
         .then(nb => {
             if (!nb) throw new Error(`no notebook matches: ${options.notebook}`);
-            Log.debug(`--getNotebookByOptions, guid:${nb.guid}`);
+            Debug(`--getNotebookByOptions, guid:${nb.guid}`);
             return nb;
         });
 }
@@ -149,13 +150,13 @@ function get (title, options = {}) {
 	    return getNotestore(options.production).getNoteWithResultSpec(guid, {});
 	}).then(note => {
             if (!note) return undefined;
-	    Log.debug(`note header: ${Stringify(note)}`);
+	    Debug(`note header: ${Stringify(note)}`);
 	    if (options.updated_after) {
 		const noteLastUpdated = new Date(note.updated);
 		const updatedAfter = new Date(options.updated_after);
- 		Log.debug(`noteLastUpdated: ${noteLastUpdated}`);
- 		Log.debug(`updatedAfter: ${updatedAfter}`);
-		Log.debug(`note ${noteLastUpdated < updatedAfter ? "is current" : "needs updating"}`);
+ 		Debug(`noteLastUpdated: ${noteLastUpdated}`);
+ 		Debug(`updatedAfter: ${updatedAfter}`);
+		Debug(`note ${noteLastUpdated < updatedAfter ? "is current" : "needs updating"}`);
 		if (noteLastUpdated < updatedAfter) return false; // skip: note is current
 	    }
 	    return getNotestore(options.production).getNoteWithResultSpec(note.guid, { includeContent: true });
@@ -171,18 +172,18 @@ async function getNoteGuid (title, options = {}) {
     if (options.guid) return options.guid;
     return getNotebookByOptions(options)
         .then(notebook => {
-            Log.debug(`get from notebook: ${notebook.name}, ${notebook.guid}`);
+            Debug(`get from notebook: ${notebook.name}, ${notebook.guid}`);
             const filter = { notebookGuid: notebook.guid };
             const metaSpec = { includeTitle: true ,  includeResourcesData: true };
 	    const noteStore = getNotestore(options.production);
             return noteStore.findNotesMetadata(filter, 0, 250, metaSpec);
         }).then(findResult => {
             for (const metaNote of findResult.notes) {
-                Log.debug(`note: ${metaNote.title}`);
+                Debug(`note: ${metaNote.title}`);
                 // TODO: check for duplicate named notes (option)
                 if (metaNote.title === title) {
-                    Log.debug(`match`);
-		    Log.debug(`meta: ${Stringify(metaNote)}`);
+                    Debug(`match`);
+		    Debug(`meta: ${Stringify(metaNote)}`);
 		    return metaNote.guid;
                 }
             }
@@ -217,18 +218,18 @@ function getSomeMetadata (options) {
 //   note only contains metadata (no content)
 
 function chooser (note, options) {
-    Log.debug(`chooser, note: ${note.title}, guid: ${note.guid}`);
+    Debug(`chooser, note: ${note.title}, guid: ${note.guid}`);
     if (options.all) return true;
 
     // TODO: check for duplicate named notes (option)
     if (options.title) {
         if (options.title !== note.title) return false;
-        Log.debug(`title match`);
+        Debug(`title match`);
         return true;
     }
     
     const prefix = options.match || Clues.getLonghand(Clues.getByOptions(options)) + '.';
-    Log.debug(`prefix: ${prefix}`);
+    Debug(`prefix: ${prefix}`);
     // if --match is specified, choose all notes that match
     // otherwise, don't choose 'article' suffixed notes (TODO: unless --article is specified)
     // and don't choose 'remaining' suffixed notes (unless --remaining is specified)
@@ -257,21 +258,21 @@ function getSome (options, filterFunc = undefined) {
         .then(notebook => {
             let filter = {};
             if (notebook) {
-                Log.debug(`getSome from notebook: ${notebook.name}, ${notebook.guid}`);
+                Debug(`getSome from notebook: ${notebook.name}, ${notebook.guid}`);
                 filter.notebookGuid = notebook.guid;
             }
             // include title
             const metaSpec = { includeTitle: true };
             return noteStore.findNotesMetadata(filter, 0, 250, metaSpec);
         }).then(findResult => findResult.notes.filter(note => {
-            Log.debug(`note: ${note.title}, guid: ${note.guid}`);
+            Debug(`note: ${note.title}, guid: ${note.guid}`);
             // TODO: check for duplicate named notes (option)
             if (options.title) {
                 if (options.title !== note.title) return false;
-                Log.debug(`title match`);
+                Debug(`title match`);
             }
             const keep = !filterFunc || filterFunc(note);
-            Log.debug(keep ? 'keeping' : 'discarding');
+            Debug(keep ? 'keeping' : 'discarding');
             return keep;
         })).then(metaNoteList => Promise.map(metaNoteList, note => {
             const noteSpec = { includeContent: true };
@@ -294,12 +295,12 @@ async function create (title, body, options = {}) {
     Expect(title).is.a.String();
     Expect(body).is.a.String();
 
-    Log.debug(`note.create`);
+    Debug(`note.create`);
     let note = {};
     return getNotebookByOptions(options)
         .then(notebook => {
-            Log.debug(`nb guid: ${notebook.guid}`);
-            Log.debug(`body: ${body}`);
+            Debug(`nb guid: ${notebook.guid}`);
+            Debug(`body: ${body}`);
             note.title = title;
             note.notebookGuid = notebook.guid;
             /*
