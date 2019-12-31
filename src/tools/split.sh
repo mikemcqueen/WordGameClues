@@ -17,6 +17,13 @@ then
    shift
 fi
 
+_prefix=$filename
+if [[ $# -gt 0 ]]
+then
+   _prefix=$1
+   shift
+fi
+
 _wcl=$(wc -l $_filename) # line count as ugly string
 _lines=$(echo $_wcl | sed -E 's/^[^[[:digit:]]*([[:digit:]]+).*$/\1/') # line count
 
@@ -24,4 +31,4 @@ _lpc=$(($_lines / $_chunks)) # lines per chunk
 
 echo "lines: $_lines, chunks: $_chunks, lpc: $_lpc"
 
-split -l $_lpc $_filename $_filename.
+split -l $_lpc $_filename $_prefix.

@@ -49,8 +49,7 @@ function makeListFromCsv(csv) {
 //
 
 function makeListFromNameList(nameList) {
-    let ncList;
-    ncList = [];
+    let ncList = [];
     nameList.forEach(name => {
         ncList.push(new NameCount(name));
     });
@@ -60,8 +59,7 @@ function makeListFromNameList(nameList) {
 //
 
 function makeCountList(ncList) {
-    let countList;
-    countList = [];
+    let countList = [];
     ncList.forEach(nc => countList.push(_.toNumber(nc.count)));
     return countList;
 }
@@ -69,8 +67,7 @@ function makeCountList(ncList) {
 //
 
 function makeNameList(ncList) {
-    let nameList;
-    nameList = [];
+    let nameList = [];
     ncList.forEach(nc => nameList.push(nc.name));
     return nameList;
 }

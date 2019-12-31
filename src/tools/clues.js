@@ -57,6 +57,7 @@ const CmdLineOptions = Opt.create(_.concat(Clues.Options, [
     ['',  'reject',                            '  add combination to reject list; use with --test' ],
     ['',  'validate',                          '  treat SOURCE as filename, validate all source lists in file'],
     ['u', 'use=NAME[:COUNT]+',                 'use the specified NAME[:COUNT](s)' ],
+    ['',  'allow-used',                        '  allow used clues in clue combo generation' ],
     ['',  'production',                        'use production note store'],
     ['z', 'flags=OPTION+',                     'flags: 1=validateAllOnLoad,2=ignoreLoadErrors' ],
     ['v', 'verbose',                           'more output'],
@@ -97,13 +98,13 @@ function convertUseToPrimarySources (args) {
     // build ncList of supplied name:counts
     const ncList = args.use.map(ncStr => NameCount.makeNew(ncStr));
     for (const nc of ncList) {
-        if (!nc.count) {
+        if (!nc.count || _.isNaN(nc.coutn)) {
             console.log('All -u names require a count (for now)');
             return { success: false };
         }
     }
 
-    // TODO: some more clear way to extract just ".count"s into an array, then reduce them
+    // TODO: some more clear way to extract just ".count"s into an array, then sum them
     const sum = ncList.reduce((a, b) => Object({ count: (a.count + b.count) })).count;
     const remain = ClueManager.maxClues - sum;
     if (remain < 1) {
@@ -161,10 +162,11 @@ function doCombos(args, options) {
         }
         args.clues = args.use.map(nameSrc => NameCount.makeNew(nameSrc).name);
         console.log(`clues: ${args.clues}`);
-        console.log(`${args.use} - ${result.sources}`);
-        args.sources = ClueManager.getInversePrimarySources(result.sources).map(_.toNumber);
-        console.log(`inverse: ${args.sources}`);
-        args.use = undefined;
+        console.log(`used: ${args.use}, sources: ${result.sources}`);
+	// NEW WAY - don't invert. include all sources (is null valid? probably not)
+        //args.sources = ClueManager.getInversePrimarySources(result.sources).map(_.toNumber);
+        //console.log(`inverse: ${args.sources}`);
+        //args.use = undefined;
     }
     if (!_.isUndefined(args.require)) {
         console.log(`require: ${args.require}`);
@@ -365,6 +367,7 @@ async function main () {
     let altSourcesArg = options['alt-sources'];
     let allAltSourcesFlag = options['all-alt-sources'];
     options.allow_dupe_source = options['allow-dupe-source'] ? true : false;
+    options.allow_used = options['allow-used'] ? true : false;
     options.merge_style = Boolean(options['merge-style']);
     let showKnownArg = options['show-known'];
     options.copy_from = options['copy-from'];

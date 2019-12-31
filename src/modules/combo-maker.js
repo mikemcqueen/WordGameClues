@@ -18,6 +18,7 @@ const Duration    = require('duration');
 const Expect      = require('should/as-function');
 const Log         = require('./log')('combo-maker');
 const NameCount   = require('../types/name-count');
+const PrettyMs    = require('pretty-ms');
 const Stringify   = require('stringify-object');
 const Validator   = require('./validator');
 //const Peco        = require('./peco'); // use this at some point
@@ -70,17 +71,21 @@ ComboMaker.prototype.makeCombos = function(args, options = {}) {
 
     let require = args.require ? _.clone(args.require) : [];
     let useNcList;
-    if (!_.isUndefined(args.use)) {
+    let useNameList;
+    let useSum = 0;
+    if (args.use) {
         let buildResult = this.buildUseNcList(args.use);
         useNcList = buildResult.ncList;
-        Log.info(`useNcList: ${useNcList}`);
-        require.push(...buildResult.countList);
+	useNameList = NameCount.makeNameList(useNcList);
+	useSum = NameCount.makeCountList(useNcList).reduce((a, b) => (a + b));
+        Log.info(`useNcList: ${useNcList}, sum: ${useSum}`);
     }
     let validateAll = false;
     if (args.sources) {
         Debug('Validating sources: ' + args.sources);
         validateAll = true;
     }
+    Debug(`require: ${require}`);
 
     this.hash = {};
     let csvNameList = [];
@@ -132,12 +137,32 @@ ComboMaker.prototype.makeCombos = function(args, options = {}) {
             */
 
             // if useNcList, all nc must exist in current combo's nc list
-            if (!_.isUndefined(useNcList)) {
-                if (_.intersectionBy(useNcList, result.ncList, _.toString).length !== useNcList.length) {
-                    Debug(`skipping: ${result.ncList}`);
-                    ++skipCount;
-                    continue;
-                }
+	    // NEW WAY - is this true? no
+	    let useCountList = [];
+	    if (useNcList) {
+		if (options.allow_used) {
+		    // TODO: filter NCs out of useNcList that are in result.ncList
+		    const useNcDiff = _.differenceBy(useNcList, result.ncList, _.toString);
+		    useNameList = NameCount.makeNameList(useNcDiff);
+		    useCountList = NameCount.makeCountList(useNcDiff);
+		    useSum = useCountList.reduce((a, b) => (a + b), 0);
+		} else {
+		    const numUsed = _.intersectionBy(useNcList, result.ncList, _.toString).length;
+		    // it is entirely possible to have a combo that doesn't
+		    // have any values from useNcList, it only has to be
+		    // *compatible* with useNcList.
+		    /*
+                      if (numUsed !== useNcList.length) {
+                      Debug(`skip1: ${result.ncList}`);
+                      ++skipCount;
+                      continue;
+                      }
+		    */
+		    if (numUsed > 0) {
+			Debug(`skip used (${numUsed}): ${result.ncList}`);
+			continue;
+		    }
+		}
             }
 
             // if --remaining was specified, filter out all source lists
@@ -146,20 +171,36 @@ ComboMaker.prototype.makeCombos = function(args, options = {}) {
                 continue;
             }
 
+	    // NEW WAY - add all used clues to nameList that are not already in it,
+	    //           and increase sum accordingly
+	    let nameList = result.nameList;
+	    let sum = args.sum;
+	    if (useNameList) {
+		nameList = _.concat(nameList, useNameList);
+		sum += useSum;
+	    }
+
+	    // NEW WAY - add all used clue counts to 'require', might speed it up a bit
+	    let requiredAndUsedCounts = _.concat(require, useCountList);
+
             let start = new Date();
             let validateResult = { success: true };
             if (!options.merge_style) {
+//		console.log(`validating: ${nameList}, sum ${sum}, useNameList ${useNameList}`);
                 validateResult = Validator.validateSources({
-                    sum:         args.sum,
-                    nameList:    result.nameList,
-                    count:       result.nameList.length,
-                    require:     require,
+                    sum/*:         args.sum*/,
+                    nameList/*:    result.nameList*/,
+                    count:       /*result.*/nameList.length,
+                    require:     requiredAndUsedCounts,
                     validateAll: validateAll
                 });
             }
             let duration = new Duration(start, new Date());
 
+//	    console.log(`valid: ${validateResult.success}, duration: ${PrettyMs(duration.milliseconds)}`);
+
             if (validateResult.success) {
+
                 successDuration += duration.milliseconds;
 
                 if (validateAll) {
@@ -222,14 +263,13 @@ ComboMaker.prototype.buildUseNcList = function(nameList) {
     let countList = [];
     nameList.forEach(name =>  {
         let nc = NameCount.makeNew(name);
-        if (nc.count > 0) {
-            if (!_.has(ClueManager.knownClueMapArray[nc.count], nc.name)) {
-                throw new Error('specified clue does not exist, ' + nc);
-            }
-            //if (!_.includes(countList, nc.count)) {
-            countList.push(nc.count);
-            //}
+        if (nc.count <= 0) {
+            throw new Error(`name: ${name} requires a :COUNT`);
+	}
+        if (!_.has(ClueManager.knownClueMapArray[nc.count], nc.name)) {
+            throw new Error('specified clue does not exist, ' + nc);
         }
+        countList.push(nc.count);
         ncList.push(nc);
     });
     return {
