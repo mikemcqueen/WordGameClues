@@ -236,6 +236,21 @@ async function dumpList (list, options) {
     return dest;
 }
 
+// options:
+//  fd       file descriptor.  required
+//  json     json format, else filter format
+//  removed  if (false) don't save removed clues
+
+async function dumpLines (list, options) {
+    Expect(options.fd).is.a.Number(); // for now. no other use case yet.
+    const dest = options.fd;
+    for (const line of list) {
+        await My.writeln(dest, line);
+    }
+    return dest;
+}
+
+
 //
 
 function count (list) {
@@ -257,10 +272,10 @@ function count (list) {
 
 //
 
-function save (filterList, path) {
+function save (filterList, path, options) {
     return Fs.open(path, 'w')
         .then(fd => {
-            return dumpList(filterList, { fd });
+	    return options.lines ? dumpLines(filterList, { fd }) : dumpList(filterList, { fd });
         }).then(fd => Fs.close(fd))
         .then(_ => path);
 }
@@ -277,7 +292,7 @@ async function saveAddCommit (noteName, filterList, options) {
     const path = getUpdateFilePath(noteName, options);
     if (options.dry_run) return path;
     Debug(`saving ${noteName} to: ${path}`);
-    return save(filterList, path)
+    return save(filterList, path, options)
         .then(_ => {
             // TODO MAYBE: options.wait
             // no return = no await completion = OK

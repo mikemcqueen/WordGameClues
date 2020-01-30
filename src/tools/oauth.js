@@ -12,6 +12,7 @@ const url = require("url");
 const Config = require('../../data/evernote-config.json');
 
 //
+const port = 8888;
 
 let global = {};
 global.oauthToken = '';
@@ -87,4 +88,5 @@ let handler = function (request, response) {
 
 //
 
+console.log(`Starting server on port ${port}`);
 http.createServer(handler).listen(8888);

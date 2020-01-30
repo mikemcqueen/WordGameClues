@@ -151,8 +151,12 @@ async function getAndParseDom (noteName, options = {}) {
 //
 
 async function getAndParse (noteName, options = {}) {
-    return getAndParse(noteName.options, (note, lines) => {
-        return {
+    console.log(`getandparse ${noteName}`);
+    return getAndParseDom(noteName, options, (note, lines) => {
+        return options.lines ? {
+	    note,
+	    lines
+	} : {
             note,
             filterList: Filter.parseLines(lines)
         };
@@ -223,6 +227,7 @@ async function parse (options) {
                 }
             });
     } else {
+	Log.debug(`options.lines: ${options.lines}`);
         if (options.lines) {
             return getAndParseDom(options.parse, options)
                 .then(result => {
@@ -279,6 +284,7 @@ function loadParseSaveOneWorksheet (noteName, options) {
             return getAndParse(noteName, getOptions);
         }).then(result => {
             if (!result) return undefined;
+	    console.log(`got results`);
             const removedClueMap = Filter.getRemovedClues(result.filterList);
             if (_.isEmpty(removedClueMap)) {
                 Log.info(`no removed clues`);
@@ -430,18 +436,22 @@ function loadParseSaveAllWorksheets (options) {
 			    guid: metadata.guid,
 			    updated_after: lastUpdatedTime
 			});
-			// get, parse, then save. return {result, path }
+			// get, parse, then save. return { result, path }
 			return getAndParse(null, getOptions)
 			    .then(result => {
 				if (!result) return {};
-				const path = Filter.saveAddCommit(result.note.title, result.filterList, options);
+				console.log(`saveAddCommit, result.filterList=${result.filterList}, result.lines=${result.lines}`);
+				const content = options.lines ? result.lines : result.filterList;
+				const path = Filter.saveAddCommit(result.note.title, content, options);
 				return Promise.join(result, path, (result, path) => {
+				    console.log(`join complete`);
 				    return { result, path };
 				});
 			    });
 		    });
 	    });
         }).then(resultPathList => {
+	    console.log(`resultPathList`);
 	    const resultList = resultPathList
 		  .filter(resultPath =>  resultPath.result)
 		  .map(resultPath => resultPath.result);
@@ -501,6 +511,7 @@ async function update (options) {
             return loadParseSaveOneWorksheet(options.update, options)
                 .then(path => path ? [path] : undefined); // return a "path list" containing one path
         }).then(pathList => {
+	    console.log(`upate: pathlist`);
             // NOTE: updateFromPathList should do something with options.save, don't pass it to
             // updateFromFile, just call save at the end.
             if (!pathList || options.download_only) return undefined;
