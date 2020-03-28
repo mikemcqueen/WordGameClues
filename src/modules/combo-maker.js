@@ -78,7 +78,7 @@ ComboMaker.prototype.makeCombos = function(args, options = {}) {
         useNcList = buildResult.ncList;
 	useNameList = NameCount.makeNameList(useNcList);
 	useSum = NameCount.makeCountList(useNcList).reduce((a, b) => (a + b));
-        Log.info(`useNcList: ${useNcList}, sum: ${useSum}`);
+        console.log(`useNcList: ${useNcList}, useNameList: ${useNameList}, sum: ${useSum}`);
     }
     let validateAll = false;
     if (args.sources) {
@@ -111,9 +111,9 @@ ComboMaker.prototype.makeCombos = function(args, options = {}) {
         let first = true;
         while (!result.done) {
             if (!first) {
-                let start = new Date();
+                //let start = new Date();
                 result = this.next(clueSourceList, sourceIndexes, options);
-                nextDuration += (new Duration(start, new Date())).milliseconds;
+                //nextDuration += (new Duration(start, new Date())).milliseconds;
                 if (result.done) {
                     break;
                 }
@@ -137,7 +137,8 @@ ComboMaker.prototype.makeCombos = function(args, options = {}) {
             */
 
             // if useNcList, all nc must exist in current combo's nc list
-	    // NEW WAY - is this true? no
+	    // NEW WAY - is this true? no. not every combo must contain a used NC,
+	    // combo's must only be compatible with all used NC.s
 	    let useCountList = [];
 	    if (useNcList) {
 		if (options.allow_used) {
@@ -158,10 +159,12 @@ ComboMaker.prototype.makeCombos = function(args, options = {}) {
                       continue;
                       }
 		    */
+		    /* I don't want to skip used.  --option maybe.
 		    if (numUsed > 0) {
 			Debug(`skip used (${numUsed}): ${result.ncList}`);
 			continue;
 		    }
+		    */
 		}
             }
 
@@ -183,7 +186,7 @@ ComboMaker.prototype.makeCombos = function(args, options = {}) {
 	    // NEW WAY - add all used clue counts to 'require', might speed it up a bit
 	    let requiredAndUsedCounts = _.concat(require, useCountList);
 
-            let start = new Date();
+//            let start = new Date();
             let validateResult = { success: true };
             if (!options.merge_style) {
 //		console.log(`validating: ${nameList}, sum ${sum}, useNameList ${useNameList}`);
@@ -195,21 +198,21 @@ ComboMaker.prototype.makeCombos = function(args, options = {}) {
                     validateAll: validateAll
                 });
             }
-            let duration = new Duration(start, new Date());
+//            let duration = new Duration(start, new Date());
 
 //	    console.log(`valid: ${validateResult.success}, duration: ${PrettyMs(duration.milliseconds)}`);
 
             if (validateResult.success) {
 
-                successDuration += duration.milliseconds;
+//                successDuration += duration.milliseconds;
 
                 if (validateAll) {
-                     if (!this.checkPrimarySources(validateResult.list, args.sources, args.use)) {
+                    if (!this.checkPrimarySources(validateResult.list, args.sources)) {
                         Log.debug(`checkPrimarySources.fail`);
                         continue;
                     }
                 }
-
+		// if output as primary clues
                 if (options.primary) {
                     validateResult.list.forEach(vr => {
                         Debug(`${vr.ncList}`);
@@ -227,7 +230,7 @@ ComboMaker.prototype.makeCombos = function(args, options = {}) {
             }
             else {
                 Log.info("validateResult.fail");
-                failDuration += duration.milliseconds;
+//                failDuration += duration.milliseconds;
             }
         }
     }, this);
@@ -247,7 +250,7 @@ ComboMaker.prototype.makeCombos = function(args, options = {}) {
 // As long as one final result has only primary sources from 'sources'
 // array, we're good.
 
-ComboMaker.prototype.checkPrimarySources = function(resultList, sources, use) {
+ComboMaker.prototype.checkPrimarySources = function(resultList, sources) {
     return resultList.some(result => {
         return NameCount.makeCountList(result.nameSrcList)
             .every(source => {

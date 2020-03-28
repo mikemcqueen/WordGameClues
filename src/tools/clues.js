@@ -45,8 +45,8 @@ const CmdLineOptions = Opt.create(_.concat(Clues.Options, [
     ['',  'merge-style',                       '  merge-style, no validation except for immediate sources'],
     ['',  'remaining',                         '  only word combos not present in any named note'],
     ['q', 'require-counts=COUNT+',             '  require clue(s) of specified COUNT(s)' ],
-    ['i', 'primary-sources=SOURCE[,SOURCE,...]', 'limit results to the specified primary SOURCE(s)'],
-    ['',  'inverse',                           '    or the inverse of those source(s); use with -i'],
+    ['i', 'primary-sources=SOURCE[,SOURCE,...]','limit results to the specified primary SOURCE(s)'],
+    ['',  'inverse',                           '  or the inverse of those source(s); use with -i'],
     ['k', 'show-known',                        'show compatible known clues; -u <clue> required' ],
     ['',  'csv',                               '  output in search-term csv format' ],
     ['',  'files',                             '  output in result file full-path format' ],
@@ -56,6 +56,7 @@ const CmdLineOptions = Opt.create(_.concat(Clues.Options, [
     ['',  'remove=NAME',                       '  remove combination from known list as NAME; use with --test' ],
     ['',  'reject',                            '  add combination to reject list; use with --test' ],
     ['',  'validate',                          '  treat SOURCE as filename, validate all source lists in file'],
+    ['',  'combos',                            '    validate all combos of sources/source lists in file'],
     ['u', 'use=NAME[:COUNT]+',                 'use the specified NAME[:COUNT](s)' ],
     ['',  'allow-used',                        '  allow used clues in clue combo generation' ],
     ['',  'production',                        'use production note store'],
@@ -98,7 +99,7 @@ function convertUseToPrimarySources (args) {
     // build ncList of supplied name:counts
     const ncList = args.use.map(ncStr => NameCount.makeNew(ncStr));
     for (const nc of ncList) {
-        if (!nc.count || _.isNaN(nc.coutn)) {
+        if (!nc.count || _.isNaN(nc.count)) {
             console.log('All -u names require a count (for now)');
             return { success: false };
         }
@@ -160,9 +161,10 @@ function doCombos(args, options) {
             console.log('success: false');
             return false;
         }
-        args.clues = args.use.map(nameSrc => NameCount.makeNew(nameSrc).name);
-        console.log(`clues: ${args.clues}`);
-        console.log(`used: ${args.use}, sources: ${result.sources}`);
+        //args.clues = args.use.map(nameSrc => NameCount.makeNew(nameSrc).name);
+        //console.log(`clues: ${args.clues}`);
+        //console.log(`used: ${args.use}, sources: ${result.sources}`);
+
 	// NEW WAY - don't invert. include all sources (is null valid? probably not)
         //args.sources = ClueManager.getInversePrimarySources(result.sources).map(_.toNumber);
         //console.log(`inverse: ${args.sources}`);
@@ -170,10 +172,12 @@ function doCombos(args, options) {
     }
     if (!_.isUndefined(args.require)) {
         console.log(`require: ${args.require}`);
+	// is _chain even necessary here?
         args.require = _.chain(args.require).split(',').map(_.toNumber).value();
     }
     let sumRange;
     if (!_.isUndefined(args.sum)) {
+	// is _chain even necessary here?
         sumRange = _.chain(args.sum).split(',').map(_.toNumber).value();
     }
     Expect(sumRange).is.an.Array().with.property('length').below(3); // of.at.most(2);

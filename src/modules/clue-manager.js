@@ -784,6 +784,7 @@ ClueManager.prototype.addRemoveOrReject = function (args, nameList, countSet, op
 // Probably not the most unique function name possible.
 
 ClueManager.prototype.getCountListArrays = function (nameCsv, options) {
+    const validateAll = options.any ? false : true;
     const nameList = nameCsv.split(',').sort();
     Debug(`getValidCountLists for ${nameList}`);
 
@@ -816,7 +817,7 @@ ClueManager.prototype.getCountListArrays = function (nameCsv, options) {
             sum:         sum,
             nameList:    nameList,
             count:       nameList.length,
-            validateAll: true
+            validateAll
         });
         
         if (!result.success) {

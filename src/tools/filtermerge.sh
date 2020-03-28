@@ -13,8 +13,8 @@ _name=$1  #word
 echo "Name: $_name"
 shift
 
-_base=$_ct."$_name" 
-_note=$_ct."$_name"
+_base=$_ct.c2-"$_cc".x2
+_note=$_ct."$_name" 
 
 if [[ $_name == "remaining" ]]
 then
@@ -59,12 +59,9 @@ done
 
 if [[ ! -z $_article ]]
 then
-    _note=$_note.article
-#    _base=$_base
-else #if [[ ! -z $_all ]]
-#then
-    _note=$_note.title
-#    _base=$_base
+    _note="$_note".article
+else
+    _note="$_note".title
 fi    
 
 echo "Note: $_note"
@@ -88,7 +85,7 @@ else
     cp tmp/"$_base" tmp/"$_note"
 fi
 
-_filtered=$_note.filtered
+_filtered="$_note".filtered
 
 echo "Filtering tmp/$_note to tmp/$_filtered..."
 node filter -$_ct tmp/"$_note" $_article > tmp/"$_filtered" 2>> $_out

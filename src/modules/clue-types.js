@@ -352,8 +352,38 @@ const APPLE = {
 
     'f.22': {
         sentence:       10,
+        clueCount:      13,
+        REQ_CLUE_COUNT: 13
+    },
+
+    'f.23': {
+        sentence:       10,
+        clueCount:      14,
+        REQ_CLUE_COUNT: 14
+    },
+
+    'f.24': {
+        sentence:       10,
+        clueCount:      8,
+        REQ_CLUE_COUNT: 8
+    },
+
+    'f.25': {
+        sentence:       10,
         clueCount:      12,
         REQ_CLUE_COUNT: 12
+    },
+
+    'f.26': {
+        sentence:       10,
+        clueCount:      14,
+        REQ_CLUE_COUNT: 14
+    },
+
+    'f.27': {
+        sentence:       10,
+        clueCount:      14,
+        REQ_CLUE_COUNT: 14
     },
 
     'f.3': {
@@ -445,9 +475,11 @@ function getByVariety (apple) {
     variety = variety.slice(0, count);
     let src = metamorph(variety);
     if (_.isUndefined(src)) throw new Error(`APPLE[${variety}] not supported`);
+/* REMOVED 3/7/2020 no longer suppor this shit
     if (_.size(apple) > _.size(variety) + 1) {
         src = cloneAsType(src, getTypeFromSuffix(apple.slice(_.size(variety), _.size(apple))));
     }
+*/
     return src;
 }
 

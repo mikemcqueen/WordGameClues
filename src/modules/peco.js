@@ -47,7 +47,8 @@ function Peco(args) {
                  ', max: ' + args.max+','+ typeof args.max + 
                  ', count: ' + args.count +','+ typeof args.count +
                  ', require: ' + args.require +
-                 ', exclude: ' + args.exclude);
+                 ', exclude: ' + args.exclude +
+		 `, listArray: ${args.listArray ? args.listArray.length : args.listArray}`);
     }
     
     this.listArray  = args.listArray;
@@ -59,7 +60,7 @@ function Peco(args) {
 
     if (this.listArray) {
         if (!this.max) {
-            throw new Error('Peco: must specify max');
+            throw new Error('Peco: must specify max with listArray');
         }
     }
     else {
@@ -115,8 +116,6 @@ Peco.prototype.getPermutations = function() {
 //
 
 Peco.prototype.getCombinations = function() {
-    let count;
-    
     if (this.listArray) {
         return this.getListCombinations(this.listArray);
     } else {
@@ -161,7 +160,7 @@ Peco.prototype.getAddendsForCount = function(count, combFlag, pecoList, quiet) {
 
 Peco.prototype.getListCombinations = function(listArray) {
     return this.buildResult({
-        listArray: listArray,
+        listArray,
         combFlag:  true
     });
 }
@@ -244,8 +243,10 @@ Peco.prototype.listFirst = function (listArray, combFlag) {
     }
 
     if (this.getIndexSum() <= this.max) {
+	this.log(`pecoList, getIndexSum = ${this.getIndexSum()}`);
         list = this.getPecoList();
     } else {
+	this.log(`next, getIndexSum = ${this.getIndexSum()}`);
         list = this.next(combFlag);
     }
     return list;
