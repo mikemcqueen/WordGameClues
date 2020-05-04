@@ -24,6 +24,7 @@ const PrettyMs    = require('pretty-ms');
 const Show        = require('../modules/show');
 const Stringify   = require('stringify-object');
 const ResultMap   = require('../types/result-map');
+const Timing      = require('debug')('timing');
 const Validator   = require('../modules/validator');
 
 // initialize command line options.  do this before logger.
@@ -37,10 +38,11 @@ const CmdLineOptions = Opt.create(_.concat(Clues.Options, [
     ['a', 'alt-sources=NAME',                  'show alternate sources for the specified clue NAME'],
     ['A', 'all-alt-sources',                   'show alternate sources for all clues'],
     ['o', 'output',                            '  output json -or- clues(huh?)'],
-    ['c', 'count=COUNT[LO,COUNTHI]',           '  use the specified COUNT; if COUNTHI, treat as range'],
+    ['c', 'count=COUNT[LO,COUNTHI]',           'show combos of the specified COUNT; if COUNTHI, treat as range'],
     ['x', 'max=COUNT',                         '  maximum # of sources to combine'],
     ['',  'primary',                           '  show combos as primary source clues' ],
     ['',  'copy-from=SOURCE',                  'copy clues from source cluetype; e.g. p1.1'],
+    ['',  'save',                              '  save clue files'],
     ['',  'allow-dupe-source',                 '  allow duplicate sources'],
     ['',  'merge-style',                       '  merge-style, no validation except for immediate sources'],
     ['',  'remaining',                         '  only word combos not present in any named note'],
@@ -55,6 +57,7 @@ const CmdLineOptions = Opt.create(_.concat(Clues.Options, [
     ['',  'add=NAME',                          '  add combination to known list as NAME; use with --test' ],
     ['',  'remove=NAME',                       '  remove combination from known list as NAME; use with --test' ],
     ['',  'reject',                            '  add combination to reject list; use with --test' ],
+    ['',  'fast',                              '  use fast method' ],
     ['',  'validate',                          '  treat SOURCE as filename, validate all source lists in file'],
     ['',  'combos',                            '    validate all combos of sources/source lists in file'],
     ['u', 'use=NAME[:COUNT]+',                 'use the specified NAME[:COUNT](s)' ],
@@ -451,11 +454,16 @@ async function main () {
             }
         });
     } else if (options.test) {
+	let start = new Date();
         if (options.validate) {
             Components.validate(options.test, options);
         } else {
             Components.show(options);
         }
+	Timing(`count: ${Validator.count}, dupe: ${Validator.dupe}`);
+	const d = new Duration(start, new Date()).milliseconds;
+	Timing(`${PrettyMs(d)}`);
+
     } else if (showSourcesClueName) {
         showSources(showSourcesClueName);
     } else if (altSourcesArg || allAltSourcesFlag) {

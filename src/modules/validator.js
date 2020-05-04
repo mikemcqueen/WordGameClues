@@ -18,6 +18,8 @@ const Expect        = require('should/as-function');
 const NameCount     = require('../types/name-count');
 const Peco          = require('./peco');
 const ResultMap     = require('../types/result-map');
+const Stringify     = require('stringify-object');
+const Timing         = require('debug')('timing');
 
 //
 
@@ -36,6 +38,9 @@ function Validator() {
     this.allowDupeName    = true;
 
     this.logLevel         = 0;
+
+    this.count = 0;
+    this.dupe = 0;
 
     // TODO: these are duplicated in ResultMap
     this.PRIMARY_KEY      = '__primary';
@@ -75,10 +80,13 @@ Validator.prototype.setAllowDupeFlags = function (args) {
 //  validateAll:    flag; check all combinations
 //  quiet:          flag; quiet Peco
 //
-// All the primary clues which make up the clues in clueNameList should
-// be unique and their total count should add up to clueCount. Verify
+// All the primary clues which make up the clues in /nameList/ should
+// be unique and their total count should add up to /count/. Verify
 // that some combination of the cluelists of all possible addends of
-// clueCount makes this true.
+// /count/ makes this true.
+
+let hash = {};
+let hash_size = 0;
 
 Validator.prototype.validateSources = function(args) {
     Debug('++validateSources' +
@@ -90,6 +98,20 @@ Validator.prototype.validateSources = function(args) {
           `, exclude: ${args.exclude}` +
           `, validateAll: ${args.validateAll}`);
 
+    ++this.count;
+    let is_dupe = false;
+    let key = `${args.namelist}:${args.sum}:${args.count}`;
+    if (key in hash) {
+	this.dupe += 1;
+	is_dupe = true;
+	const result = hash[key];
+	//if (!result.success) return result;
+    } else {
+	hash_size += 1;
+    }
+    if (!(this.count % 10000)) {
+	Timing(`++validateSources (${++this.count}): ${args.nameList}, hash(${hash_size}) ${is_dupe ? '(dupe)' : ''}`);
+    }
     let found = false;
     let resultList = [];
     Peco.makeNew({
@@ -121,10 +143,13 @@ Validator.prototype.validateSources = function(args) {
     }, this);
     Debug('--validateSources');
 
-    return {
+    const result = {
         success:     found,
         list:        found ? resultList : undefined
     };
+
+    //hash[key] = result;
+    return result;
 }
 
 // args:

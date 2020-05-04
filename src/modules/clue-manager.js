@@ -182,7 +182,7 @@ ClueManager.prototype.addKnownCompoundClues = function (clueList, clueCount, val
                 });
                 if (!this.ignoreLoadErrors) {
 		    if (!vsResult.success) {
-			Debug(`srcNameList: ${srcNameList}`);
+			console.log(`failed srcNameList: ${srcNameList}`);
 		    }
                     Expect(vsResult.success);
                 }
@@ -522,13 +522,14 @@ ClueManager.prototype.filter = function (srcCsvList, clueCount, map = {}) {
     let reject = 0;
     let duplicate = 0;
     srcCsvList.forEach(srcCsv => {
-        if (this.isKnownSource(srcCsv, clueCount)) {
-            if (this.logging) this.log(`isKnownSource(${clueCount}) ${srcCsv}`);
-            ++known;
-        } else if (this.isRejectSource(srcCsv)) {
+        if (this.isRejectSource(srcCsv)) {
             if (this.logging) this.log(`isRejectSource(${clueCount}) ${srcCsv}`);
             ++reject;
         } else {
+            if (this.isKnownSource(srcCsv, clueCount)) {
+		if (this.logging) this.log(`isKnownSource(${clueCount}) ${srcCsv}`);
+		++known;
+	    }
             if (_.has(map, srcCsv)) {
                 if (this.logging) this.log(`duplicate: ${srcCsv}`);
                 ++duplicate;
@@ -673,7 +674,7 @@ ClueManager.prototype.getInversePrimarySources = function (sources) {
 
 //
 
-ClueManager.prototype.addClueForCounts = function (countSet, name, src) {
+ClueManager.prototype.addClueForCounts = function (countSet, name, src, options) {
     Expect(countSet).is.instanceof(Set);
     Expect(name).is.a.String();
     Expect(src).is.a.String();
@@ -681,7 +682,7 @@ ClueManager.prototype.addClueForCounts = function (countSet, name, src) {
         if (this.addClue(count, {
             name: name,
             src:  src
-        }, true, true)) { // save, nothrow
+        }, options.save, true)) { // save, nothrow
             console.log(`${count}: added ${name}`);
 	    added += 1;
         } else {
@@ -756,7 +757,7 @@ ClueManager.prototype.addRemoveOrReject = function (args, nameList, countSet, op
         } else if (args.isReject) {
             console.log('WARNING! cannot add known clue: already rejected, ' + nameList);
         } else {
-            count = this.addClueForCounts(countSet, args.add, nameList.toString());
+            count = this.addClueForCounts(countSet, args.add, nameList.toString(), options);
         }
     } else if (args.remove) {
         Debug(`remove [${args.remove}] as ${nameList} from ${[...countSet.values()]}`);
