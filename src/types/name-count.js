@@ -59,17 +59,13 @@ function makeListFromNameList(nameList) {
 //
 
 function makeCountList(ncList) {
-    let countList = [];
-    ncList.forEach(nc => countList.push(_.toNumber(nc.count)));
-    return countList;
+    return ncList.map(nc => _.toNumber(nc.count));
 }
 
 //
 
 function makeNameList(ncList) {
-    let nameList = [];
-    ncList.forEach(nc => nameList.push(nc.name));
-    return nameList;
+    return ncList.map(nc => nc.name);
 }
 
 //

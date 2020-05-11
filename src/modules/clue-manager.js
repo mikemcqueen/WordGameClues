@@ -186,9 +186,12 @@ ClueManager.prototype.addKnownCompoundClues = function (clueList, clueCount, val
 		    }
                     Expect(vsResult.success);
                 }
-                srcMap[srcKey] = [];
+                srcMap[srcKey] = { clues: [] };
+		if (validateAll) {
+		    srcMap[srcKey].results = vsResult.list;
+		}
             }
-            srcMap[srcKey].push(clue);
+            srcMap[srcKey].clues.push(clue);
         }
         this.addKnownClue(clueCount, clue.name, srcKey);
     }, this);
@@ -440,6 +443,13 @@ ClueManager.prototype.getSrcListMapForName = function (name) {
 
 //
 
+ClueManager.prototype.primaryNcToNameSrc = function (nc) {
+    if (nc.count !== 1) throw new Error(`nc.count must be 1 (${nc})`);
+    return NameCount.makeNew(nc.name, this.knownClueMapArray[1][nc.name]);
+}
+
+//
+
 ClueManager.prototype.makeSrcNameListArray = function (nc) {
     let srcNameListArray = [];
     this.getSrcListForNc(nc).forEach(src => {
@@ -545,9 +555,9 @@ ClueManager.prototype.filter = function (srcCsvList, clueCount, map = {}) {
     };
 }
 
+/*
 // this actually returns knownClueNames
 // and I don't think it's returning unique values (i.e. there are duplicates);
-
 ClueManager.prototype.old_getKnownClues = function (nameList) {
     if (_.isString(nameList)) {
         nameList = nameList.split(',');
@@ -563,6 +573,28 @@ ClueManager.prototype.old_getKnownClues = function (nameList) {
     });
     return resultList;
 }
+*/
+
+function singleEntry (nc) {
+    return {
+	results: [
+	    {
+		ncList: [ nc ]
+	    }
+	]
+    };
+}
+
+ClueManager.prototype.getKnownSourceMapEntries = function (nc) {
+    const clueMap = this.knownClueMapArray[nc.count];
+    if (!clueMap) throw new Error(`No clueMap at ${nc.count}`);
+    const sourcesList = clueMap[nc.name];
+    if (!sourcesList) throw new Error(`No sourcesList at ${nc}`);
+//    Debug(`nc: ${nc}`);
+    if (nc.count === 1) return [ singleEntry(nc) ];
+    return sourcesList.map(sources => sources.split(',').sort().toString()) // sort sources
+	.map(sources => this.knownSourceMapArray[nc.count][sources]);       // map sources to known source map entry
+}
 
 //
 
@@ -571,11 +603,11 @@ ClueManager.prototype.getKnownClues = function (nameList) {
         nameList = nameList.split(',');
     }
     Expect(nameList).is.an.Array();
-    nameList = nameList.sort().toString();
+    const sourceCsv = nameList.sort().toString();
     let nameClueMap = {};
     this.knownSourceMapArray.forEach(srcMap => {
-        if (_.has(srcMap, nameList)) {
-            for (const clue of srcMap[nameList]) {
+        if (_.has(srcMap, sourceCsv)) {
+            for (const clue of srcMap[sourceCsv].clues) {
                 if (!_.has(nameClueMap, clue.name)) {
                     nameClueMap[clue.name] = [];
                 }
@@ -845,9 +877,9 @@ ClueManager.prototype.getCountListArrays = function (nameCsv, options) {
                 clues.push({ countList: clueCountList, nameList: nameSrcList });
             }
         } else {
-            let clueList = this.knownSourceMapArray[sum][nameList];
-            if (clueList) {
-                known.push({ countList: clueCountList, nameList: clueList.map(clue => clue.name) });
+            let any = this.knownSourceMapArray[sum][nameList];
+            if (any) {
+                known.push({ countList: clueCountList, nameList: any.clues.map(clue => clue.name) });
             } else {
                 valid.push(clueCountList);
             }

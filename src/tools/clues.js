@@ -158,23 +158,7 @@ function doCombos(args, options) {
     if (!_.isUndefined(args.sources)) {
         args.sources = _.chain(args.sources).split(',').map(_.toNumber).value();
     }
-    if (args.use) {
-        const result = convertUseToPrimarySources(args);
-        if (!result.success) {
-            console.log('success: false');
-            return false;
-        }
-        //args.clues = args.use.map(nameSrc => NameCount.makeNew(nameSrc).name);
-        //console.log(`clues: ${args.clues}`);
-        //console.log(`used: ${args.use}, sources: ${result.sources}`);
-
-	// NEW WAY - don't invert. include all sources (is null valid? probably not)
-        //args.sources = ClueManager.getInversePrimarySources(result.sources).map(_.toNumber);
-        //console.log(`inverse: ${args.sources}`);
-        //args.use = undefined;
-    }
     if (!_.isUndefined(args.require)) {
-        console.log(`require: ${args.require}`);
 	// is _chain even necessary here?
         args.require = _.chain(args.require).split(',').map(_.toNumber).value();
     }
@@ -203,7 +187,8 @@ function doCombos(args, options) {
         let max = args.max;
         if (args.max > args.sum) args.max = args.sum;
         // TODO: return # of combos filtered due to note name match
-        const comboList = ComboMaker.makeCombos(args, options);
+        const comboList = args.all_validated ? ComboMaker.makeCombos(args, options)
+	                                     : ComboMaker.old_makeCombos(args, options);
         args.max = max;
         total += comboList.length;
         const filterResult = ClueManager.filter(comboList, args.sum, comboMap);
@@ -213,7 +198,7 @@ function doCombos(args, options) {
     }
     let d = new Duration(beginDate, new Date()).milliseconds;
     _.keys(comboMap).forEach(nameCsv => console.log(nameCsv));
-//    console.log(`${Stringify(comboMap)}`);
+    //console.log(`${Stringify(comboMap)}`);
     
     Debug(`total: ${total}` +
                 ', filtered: ' + _.size(comboMap) +
@@ -264,7 +249,7 @@ function combo_maker(args, options) {
 //
 //
 
-function showSources(clueName) {
+function old_showSources(clueName) {
     let result;
     let nc;
     let verbose;
@@ -301,6 +286,39 @@ function showSources(clueName) {
     else {
         console.log('validate failed.');
     }
+}
+
+//
+
+function showSources(clueName) {
+    let result;
+    let nc;
+    let verbose;
+    let clueSplitList = clueName.split(',');
+
+    clueName = clueSplitList[0];
+    nc = NameCount.makeNew(clueName);
+    if (_.size(clueSplitList) > 1) {
+        verbose = clueSplitList[1] === 'v';
+    }
+    if (!nc.count) {
+        throw new Error('Need to supply a count as name:count (for now)');
+    }
+
+    const entries = ClueManager.getKnownSourceMapEntries(nc);
+    if (!entries) {
+        usage('explosion');
+    }
+    entries.forEach(entry => {
+        entry.results.forEach(result => {
+            console.log(Stringify(result.resultMap.map(), { indent: '  ' }));
+            console.log('nameSrcList: ' + result.nameSrcList);
+            if (verbose) {
+                console.log('ncList:      ' + result.ncList);
+                result.resultMap.dump();
+            }
+        });
+    });
 }
 
 //
@@ -465,7 +483,11 @@ async function main () {
 	Timing(`${PrettyMs(d)}`);
 
     } else if (showSourcesClueName) {
-        showSources(showSourcesClueName);
+	if (validateAllOnLoad) {
+            showSources(showSourcesClueName);
+	} else {
+	    old_showSources(showSourcesClueName);
+	}
     } else if (altSourcesArg || allAltSourcesFlag) {
         AltSources.show(allAltSourcesFlag ? {
             all    : true,
@@ -492,7 +514,8 @@ async function main () {
             require: options['require-counts'],
             sources,
             use:     useClueList,
-            primary: options.primary
+            primary: options.primary,
+	    all_validated: validateAllOnLoad
         }, options);
     }
 }
