@@ -71,7 +71,6 @@ function getCompatiblePrimaryNameSrcLists (nameSrcLists1, nameSrcLists2) {
     return nameSrcLists;
 }
 
-
 function getSourcesList (entries) {
     const sources = [];
     entries.forEach(entry => {
@@ -106,24 +105,74 @@ function mergeCompatibleSourcesLists (sources1, sources2) { // TODO sourcesList1
     return mergedSources;
 }
 
-function fn (obj, key) {
-    if (_.has(obj, key)) // or just (key in obj)
-        return [obj];
-    // elegant:
-    return _.flatten(_.map(obj, function(v) {
-        return (_.isObject(v) && !_.isArray(v)) ? fn(v, key) : [];
-    }), true);
+function mergeAllCompatibleSources (ncList) {
+    Expect(ncList.length).is.above(0);
+    let sources = getSourcesList(ClueManager.getKnownSourceMapEntries(ncList[0]));
+    for (let ncIndex = 1; ncIndex < ncList.length; ncIndex += 1) {
+	const nextSources = getSourcesList(ClueManager.getKnownSourceMapEntries(ncList[ncIndex]));
+	sources = mergeCompatibleSourcesLists(sources, nextSources);
+	if (_.isEmpty(sources)) break;
+    }
+    return sources;
 }
 
+//{
+//  'jack:3': {
+//    'card:2': {
+//      'bird:1,red:1': [   // multiple primary sources with array value type, split them
+//        'bird:2,red:8'
+//      ]
+//    },
+//    'face:1': {
+//      'face:1': [         // single primary source with array value type, ignore
+//        'face:10'
+//      ]
+//    }
+//  }
+//}
 
-function isNcInAnyResultMap (nc, ncList) {
-    for (let ncIter of ncList) {
-	const entries = ClueManager.getKnownSourceMapEntries(ncIter);
+function recursiveAddSrcNcLists (list, obj) {
+    let keys = _.keys(obj).flatMap(key => {
+	let val = obj[key];
+	if (_.isObject(val)) {
+	    if (!_.isArray(val)) return key;
+	    // split multiple primary sources into separate keys
+	    let multiplePrimarySourceKeys = key.split(',');
+	    if (multiplePrimarySourceKeys.length > 1) return multiplePrimarySourceKeys;
+	    // else ignore a single primary source key with array value type
+	}
+	return [];
+    });
+    if (!_.isEmpty(keys)) {
+	list.push(keys);
+	keys.forEach(key => {
+	    if (obj[key]) recursiveAddSrcNcLists(list, obj[key]);
+	});
+    }
+    return list;
+}
+
+function buildSrcNcLists (obj) {
+    return recursiveAddSrcNcLists([], obj);
+}
+
+function isUseNcListInAnyResultMap (useNcList, sourceNcList) {
+    for (let sourceNc of sourceNcList) {
+	const entries = ClueManager.getKnownSourceMapEntries(sourceNc);
 	for (let entry of entries) {
             for (let result of entry.results) {
 		if (result.resultMap) {
-		    if (fn(result.resultMap.map(), nc)) return true;
-		    console.log(`${nc} is not in:\n${Stringify(result.resultMap.map())}`);
+		    if (!result.srcNcLists) {
+			result.srcNcLists = buildSrcNcLists(result.resultMap.map());
+			if (_.isEmpty(result.srcNcLists)) throw new Error(`empty srcNcLists for {Stringify(result.resultMap.map())}`);
+		    }
+		    for (let ncList of result.srcNcLists) {
+			if (_.intersectionBy(ncList, useNcList, _.toString).length === useNcList.length) {
+			    // any match is success
+			    return true;
+			}
+		    }
+		    Debug(`${useNcList} is not in:\n${Stringify(result.resultMap.map())}`);
 		}
 	    }
 	}
@@ -131,16 +180,20 @@ function isNcInAnyResultMap (nc, ncList) {
     return false;
 }
 
-function mergeAllUsedSources (sourcesList, useNcList) {
-    for (let useNc of useNcList) {
+function mergeAllUsedSources (sourcesList, useNcLists) {
+    for (let useNcList of useNcLists) {
 	let mergedSourcesList = [];
-	let useSourcesList = getSourcesList(ClueManager.getKnownSourceMapEntries(useNc));
+	let useSourcesList = mergeAllCompatibleSources(useNcList);
+	if (_.isEmpty(useSourcesList)) throw new Error(`sources not compatible: ${useNcList}`);
 	for (let useSources of useSourcesList) {
 	    for (let sources of sourcesList) {
 		const numCommonPrimarySources = _.intersectionBy(sources.primarySrcList, useSources.primarySrcList, _.toNumber).length;
 		let valid = numCommonPrimarySources === 0;
 		if (numCommonPrimarySources === useSources.primarySrcList.length) {
-		    if (useNc.count === 1 || _.includes(sources.ncList, useNc) || isNcInAnyResultMap(useNc, sources.ncList)) {
+		    if ((useNcList.length === 1 && useNcList[0].count === 1) ||
+			(_.intersectionBy(sources.ncList, useNcList, _.toString).length === useNcList.length) ||
+			isUseNcListInAnyResultMap(useNcList, sources.ncList)) {
+
 			valid = true;
 		    }
 		}
@@ -184,25 +237,15 @@ ComboMaker.prototype.makeCombos = function(args, options = {}) {
     // TODO USE "validateArgs" 
 
     let require = args.require ? _.clone(args.require) : [];
-    let useNcList;
-    let useNameList;
-    let useSum = 0;
-    if (args.use) {
-        let buildResult = this.buildUseNcList(args.use);
-        useNcList = buildResult.ncList;
-	useNameList = NameCount.makeNameList(useNcList);
-	useSum = NameCount.makeCountList(useNcList).reduce((a, b) => (a + b));
-        Debug(`useNcList: ${useNcList}, useNameList: ${useNameList}, sum: ${useSum}`);
-    }
-    let validateAll = false;
-    if (args.sources) {
-	throw new Error('sources not yet supported');
-        Debug('Validating sources: ' + args.sources);
-        validateAll = true;
-    }
     if (!_.isEmpty(args.require)) throw new Error('require not yet supported');
-    Debug(`require: ${require}`);
+    if (args.sources) throw new Error('sources not yet supported');
     if (options.remaining) throw new Error('remaining not yet supported');
+
+    let useNcLists;
+    if (args.use) {
+        useNcLists = this.buildUseNcLists(args.use);
+        Debug(`useNcLists: ${useNcLists}`);
+    }
 
     this.hash = {};
     let csvNameList = [];
@@ -218,11 +261,7 @@ ComboMaker.prototype.makeCombos = function(args, options = {}) {
         let sourceIndexes = [];
 
         let result = this.first(clueSourceList, sourceIndexes);
-        if (result.done) {
-            // this shouldn't normally fire, but has happened with
-            // 3,3 (count:6) when only 1 unique source in clues3.json
-            throw new Error(`no valid combos sources`);
-        }
+        if (result.done) throw new Error(`no valid combos sources`);
 
         // this is effectively Peco.getCombinations().forEach()
         let first = true;
@@ -241,14 +280,7 @@ ComboMaker.prototype.makeCombos = function(args, options = {}) {
 	    //logging = (result.nameList.toString() === 'eagle,hill');
 	    /////////////////////////	    
 
-	    // BEGIN mergeAllCompatibleSources(result.ncList)
-	    let sources = getSourcesList(ClueManager.getKnownSourceMapEntries(result.ncList[0]));
-	    for (let ncIndex = 1; ncIndex < result.ncList.length; ncIndex += 1) {
-		const nextSources = getSourcesList(ClueManager.getKnownSourceMapEntries(result.ncList[ncIndex]));
-		sources = mergeCompatibleSourcesLists(sources, nextSources);
-		if (_.isEmpty(sources)) break;
-	    }
-	    // END 
+	    let sources = mergeAllCompatibleSources(result.ncList);
 	    
 	    /////////////////////////	    
 	    if (logging) console.log(`   empty1: ${_.isEmpty(sources)}`);
@@ -259,8 +291,8 @@ ComboMaker.prototype.makeCombos = function(args, options = {}) {
 
 	    // TODO maybe: save each sources.origNcList here
 
-	    if (useNcList) {
-		sources = mergeAllUsedSources(sources, useNcList);
+	    if (useNcLists) {
+		sources = mergeAllUsedSources(sources, useNcLists);
 	    }
 	    
 	    /////////////////////////	    
@@ -269,66 +301,6 @@ ComboMaker.prototype.makeCombos = function(args, options = {}) {
 
 	    if (_.isEmpty(sources)) continue;
 
-	    // not every combo must contain a used NC; combo's must only be compatible
-	    // with all used NCs.
-	    let useCountList = [];
-	    if (0) { // (useNcList) {
-		if (options.allow_used) {
-		    // TODO: filter NCs out of useNcList that are in result.ncList
-		    const useNcDiff = _.differenceBy(useNcList, result.ncList, _.toString);
-		    useNameList = NameCount.makeNameList(useNcDiff);
-		    useCountList = NameCount.makeCountList(useNcDiff);
-		    useSum = useCountList.reduce((a, b) => (a + b), 0);
-		} else {
-		    const numUsed = _.intersectionBy(useNcList, result.ncList, _.toString).length;
-		    /* I don't want to skip used.  --option maybe.
-		    if (numUsed > 0) {
-			Debug(`skip used (${numUsed}): ${result.ncList}`);
-			continue;
-		    }
-		    */
-		}
-            }
-
-            // if --remaining was specified, filter out all source lists
-            // where any source matches a named note 'name' suffix
-            if (options.remaining && this.matchAny(result.nameList, options.note_names)) {
-                continue;
-            }
-
-	    let sum = args.sum;
-	    let nameList = result.nameList;
-	    /***
-	    // add all used clues to nameList that are not already in it,
-	    // and increase sum accordingly
-	    if (useNameList) {
-		nameList = _.concat(nameList, useNameList);
-		sum += useSum;
-	    }
-	    // add all used clue counts to 'require', might speed it up a bit
-	    let requiredAndUsedCounts = _.concat(require, useCountList);
-	    ***/
-	    
-	    /****
-            if (validateAll) {
-                if (!this.checkPrimarySources(validateResult.list, args.sources)) {
-                    Log.debug(`checkPrimarySources.fail`);
-                     continue;
-                }
-            }
-	    *****/
-	    /****
-		// if output as primary clues
-                if (options.primary) {
-                    validateResult.list.forEach(vr => {
-                        Debug(`${vr.ncList}`);
-                        if (csvNameList.length < args.maxResults) {
-                            const nameList = NameCount.makeNameList(vr.ncList).sort();
-                            csvNameList.push(nameList.toString());
-                        }
-                    });
-                } else
-	    ***/
 	    if (csvNameList.length < args.maxResults) {
                 csvNameList.push(result.nameList.toString());
             }
@@ -382,7 +354,7 @@ ComboMaker.prototype.old_makeCombos = function(args, options = {}) {
     let useNameList;
     let useSum = 0;
     if (args.use) {
-        let buildResult = this.buildUseNcList(args.use);
+        let buildResult = this.old_buildUseNcList(args.use);
         useNcList = buildResult.ncList;
 	useNameList = NameCount.makeNameList(useNcList);
 	useSum = NameCount.makeCountList(useNcList).reduce((a, b) => (a + b));
@@ -564,24 +536,32 @@ ComboMaker.prototype.checkPrimarySources = function(resultList, sources) {
 
 //
 
-ComboMaker.prototype.buildUseNcList = function(nameList) {
+ComboMaker.prototype.buildUseNcLists = function(useArgsList) {
+    let useNcLists = [];
+    useArgsList.forEach(useArg =>  {
+	let args = useArg.split(',');
+	let ncList = args.map(arg => {
+            let nc = NameCount.makeNew(arg);
+            if (!nc.count) throw new Error(`arg: ${arg} requires a :COUNT`);
+            if (!_.has(ClueManager.knownClueMapArray[nc.count], nc.name)) throw new Error(`arg: ${nc} does not exist`);
+	    return nc;
+	});
+        useNcLists.push(ncList);
+    });
+    return useNcLists;
+}
+
+ComboMaker.prototype.old_buildUseNcList = function(args) {
     let ncList = [];
     let countList = [];
-    nameList.forEach(name =>  {
-        let nc = NameCount.makeNew(name);
-        if (nc.count <= 0) {
-            throw new Error(`name: ${name} requires a :COUNT`);
-	}
-        if (!_.has(ClueManager.knownClueMapArray[nc.count], nc.name)) {
-            throw new Error('specified clue does not exist, ' + nc);
-        }
+    args.forEach(arg =>  {
+        let nc = NameCount.makeNew(arg);
+        if (!nc.count) throw new Error(`arg: ${arg} requires a :COUNT`);
+        if (!_.has(ClueManager.knownClueMapArray[nc.count], nc.name)) throw new Error(`arg: ${nc} does not exist`);
         countList.push(nc.count);
         ncList.push(nc);
     });
-    return {
-        ncList:    ncList,
-        countList: countList
-    };
+    return { ncList, countList };
 }
 
 //
