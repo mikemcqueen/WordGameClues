@@ -387,7 +387,7 @@ ClueManager.prototype.addRejectSource = function (srcNameList) {
 };
 
 // source is string containing sorted, comma-separated clues
-//
+
 ClueManager.prototype.isKnownSource = function (source, count = 0) {
     Expect(source).is.a.String();
     Expect(count).is.a.Number();
@@ -556,26 +556,6 @@ ClueManager.prototype.filter = function (srcCsvList, clueCount, map = {}) {
     };
 };
 
-/*
-// this actually returns knownClueNames
-// and I don't think it's returning unique values (i.e. there are duplicates);
-ClueManager.prototype.old_getKnownClues = function (nameList) {
-    if (_.isString(nameList)) {
-        nameList = nameList.split(',');
-    }
-    Expect(nameList).is.an.Array();
-    nameList = nameList.sort().toString();
-    let resultList = [];
-    this.knownSourceMapArray.forEach(srcMap => {
-        if (_.has(srcMap, nameList)) {
-            // srcMap[nameList] is a clueList
-            resultList.push(...srcMap[nameList].map(clue => clue.name));
-        }
-    });
-    return resultList;
-}
-*/
-
 function singleEntry (nc) {
     return {
 	results: [
@@ -591,14 +571,9 @@ ClueManager.prototype.getKnownSourceMapEntries = function (nc) {
     if (!clueMap) throw new Error(`No clueMap at ${nc.count}`);
     const sourcesList = clueMap[nc.name];
     if (!sourcesList) throw new Error(`No sourcesList at ${nc}`);
-//    Debug(`nc: ${nc}`);
     if (nc.count === 1) return [ singleEntry(nc) ];
-    let entries = sourcesList.map(sources => sources.split(',').sort().toString()) // sort sources
+    return sourcesList.map(sources => sources.split(',').sort().toString()) // sort sources
 	.map(sources => this.knownSourceMapArray[nc.count][sources]);       // map sources to known source map entry
-    
-    //console.log(`NOT SINGLE: ${nc}, ncList: ${entries[0].results[0].ncList}, keys: ${[..._.keys(entries[0].results[0].resultMap.map())]}`);
-    //${_.keys(entries[0].results[0])}`);
-    return entries;
 };
 
 //
@@ -621,13 +596,13 @@ ClueManager.prototype.getKnownClues = function (nameList) {
         }
     });
     return nameClueMap;
-}
+};
 
 //
 
 ClueManager.prototype.getKnownClueNames = function (nameList) {
     return _.keys(this.getKnownClues(nameList));
-}
+};
 
 //
 
@@ -646,7 +621,7 @@ ClueManager.prototype.getClueCountListArray = function (nameList) {
         });
     }
     return countListArray;
-}
+};
 
 //
 
@@ -674,7 +649,7 @@ ClueManager.prototype.getValidCounts = function (nameList, countListArray) {
         }
     });
     return Array.from(addCountSet);
-}
+};
 
 //
 
@@ -682,7 +657,7 @@ ClueManager.prototype.getCountList = function (nameOrList) {
     return _.isString(nameOrList)
         ? this.getCountListForName(nameOrList)
         : this.getValidCounts(nameOrList, this.getClueCountListArray(nameOrList));
-}
+};
 
 //
 
@@ -695,7 +670,7 @@ ClueManager.prototype.getPrimarySources = function () {
         hash[clue.src] = true;
     }
     return primarySources;
-}
+};
 
 //
 
@@ -707,7 +682,7 @@ ClueManager.prototype.getInversePrimarySources = function (sources) {
         inverseSources.push(src);
     }
     return inverseSources;
-}
+};
 
 //
 
@@ -727,7 +702,7 @@ ClueManager.prototype.addClueForCounts = function (countSet, name, src, options)
 	}
 	return added;
     }, 0);
-}
+};
 
 //
 
@@ -749,7 +724,7 @@ ClueManager.prototype.removeClueForCounts = function (countSet, name, src, optio
         }
     }
     return removed;
-}
+};
 
 // each count list contains the clueMapArray indexes in which
 // each name appears
@@ -775,7 +750,7 @@ ClueManager.prototype.getKnownClueIndexLists = function (nameList) {
         Expect(countListArray[index]).is.ok();
     });
     return countListArray;
-}
+};
 
 //
 // args:
@@ -817,7 +792,7 @@ ClueManager.prototype.addRemoveOrReject = function (args, nameList, countSet, op
         }
     }
     return count;
-}
+};
 
 // Probably not the most unique function name possible.
 
@@ -894,4 +869,4 @@ ClueManager.prototype.getCountListArrays = function (nameCsv, options) {
         }
     }
     return { valid, known, rejects, invalid, clues, addRemoveSet };
-}
+};

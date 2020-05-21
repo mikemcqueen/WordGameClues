@@ -63,7 +63,7 @@ const CmdLineOptions = Opt.create(_.concat(Clues.Options, [
     ['u', 'use=NAME[:COUNT]+',                 'use the specified NAME[:COUNT](s)' ],
     ['',  'allow-used',                        '  allow used clues in clue combo generation' ],
     ['',  'production',                        'use production note store'],
-    ['z', 'flags=OPTION+',                     'flags: 1=validateAllOnLoad,2=ignoreLoadErrors' ],
+    ['z', 'flags=OPTION+',                     'flags: 2=ignoreLoadErrors' ],
     ['v', 'verbose',                           'more output'],
     ['h', 'help',                              'this screen']
 ])).bindHelp();
@@ -87,11 +87,11 @@ function usage (msg) {
 
 //
 
-function loadClues (clues, validateAllOnLoad, ignoreLoadErrors) {
+function loadClues (clues, ignoreLoadErrors) {
     log('loading all clues...');
     ClueManager.loadAllClues({
         clues,
-        validateAll:  validateAllOnLoad,
+        validateAll:  true,
         ignoreErrors: ignoreLoadErrors
     });
     log('done.');
@@ -187,8 +187,7 @@ function doCombos(args, options) {
         let max = args.max;
         if (args.max > args.sum) args.max = args.sum;
         // TODO: return # of combos filtered due to note name match
-        const comboList = args.all_validated ? ComboMaker.makeCombos(args, options)
-	                                     : ComboMaker.old_makeCombos(args, options);
+        const comboList = ComboMaker.makeCombos(args, options);
         args.max = max;
         total += comboList.length;
         const filterResult = ClueManager.filter(comboList, args.sum, comboMap);
@@ -244,48 +243,6 @@ function combo_maker(args, options) {
             }
             return doCombos(args, options);
         });
-}
-
-//
-//
-
-function old_showSources(clueName) {
-    let result;
-    let nc;
-    let verbose;
-    let clueSplitList = clueName.split(',');
-
-    clueName = clueSplitList[0];
-    nc = NameCount.makeNew(clueName);
-    if (_.size(clueSplitList) > 1) {
-        verbose = clueSplitList[1] === 'v';
-    }
-    if (!nc.count) {
-        throw new Error('Need to supply a count as name:count (for now)');
-    }
-
-    log('++sources');
-
-    result = Validator.validateSources({
-        sum:          nc.count,
-        nameList:     [ nc.name ],
-        count:        1,
-        validateAll:  true
-    });
-    if (result.success) {
-        result.list.forEach(result => {
-//          result.resultMap.dump();
-            console.log(Stringify(result.resultMap.map(), { indent: '  ' }));
-            console.log('nameSrcList: ' + result.nameSrcList);
-            if (verbose) {
-                console.log('ncList:      ' + result.ncList);
-                result.resultMap.dump();
-            }
-        });
-    }
-    else {
-        console.log('validate failed.');
-    }
 }
 
 //
@@ -379,7 +336,6 @@ function log (text) {
 
 async function main () {
     let needCount;
-    let validateAllOnLoad;
     let ignoreLoadErrors;
 
     const opt = CmdLineOptions.parseSystem();
@@ -428,10 +384,6 @@ async function main () {
         allowDupeName:    true
     });
 
-    if (_.includes(options.flags, '1')) {
-        validateAllOnLoad = true;
-        Debug('validateAllOnLoad=true');
-    }
     if (_.includes(options.flags, '2')) {
         ignoreLoadErrors = true;
         Debug('ignoreLoadErrors=true');
@@ -440,7 +392,7 @@ async function main () {
     let clueSource = Clues.getByOptions(options);
 
     setLogging(_.includes(options.verbose, VERBOSE_FLAG_LOAD));
-    if (!loadClues(clueSource, validateAllOnLoad, ignoreLoadErrors)) {
+    if (!loadClues(clueSource, ignoreLoadErrors)) {
         return 1;
     }
     setLogging(options.verbose);
@@ -483,11 +435,7 @@ async function main () {
 	Timing(`${PrettyMs(d)}`);
 
     } else if (showSourcesClueName) {
-	if (validateAllOnLoad) {
-            showSources(showSourcesClueName);
-	} else {
-	    old_showSources(showSourcesClueName);
-	}
+        showSources(showSourcesClueName);
     } else if (altSourcesArg || allAltSourcesFlag) {
         AltSources.show(allAltSourcesFlag ? {
             all    : true,
@@ -514,8 +462,7 @@ async function main () {
             require: options['require-counts'],
             sources,
             use:     useClueList,
-            primary: options.primary,
-	    all_validated: validateAllOnLoad
+            primary: options.primary
         }, options);
     }
 }

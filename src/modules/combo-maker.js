@@ -18,11 +18,11 @@ const Duration    = require('duration');
 const Expect      = require('should/as-function');
 const Log         = require('./log')('combo-maker');
 const NameCount   = require('../types/name-count');
+const Peco        = require('./peco');
 const PrettyMs    = require('pretty-ms');
 const ResultMap   = require('../types/result-map');
 const Stringify   = require('stringify-object');
 const Validator   = require('./validator');
-//const Peco        = require('./peco'); // use this at some point
 
 let logging = false;
 
@@ -240,19 +240,15 @@ function mergeAllUsedSources (sourcesList, useNcLists) {
 // args:
 //  count:   # of primary clues to combine
 //  max:     max # of sources to use
-//  require: required clue counts, e.g. [3,5,8]
-//  sources: limit to these primary sources, e.g. [1,9,14]
-//  use:     list of clue name-counts, e.g. ['john:1','bob:5']
+//  use:     list of clue names and name:counts, also allowing pairs, e.g. ['john:1','bob','red,bird']
+//  // not supported: require: required clue counts, e.g. [3,5,8]
+//  // not supported: limit to these primary sources, e.g. [1,9,14]
 //
 // A "clueSourceList" is a list (array) where each element is a
 // object that contains a list (cluelist) and a count, such as
 // [ { list:clues1, count:1 },{ list:clues2, count:2 }].
 //
 ComboMaker.prototype.makeCombos = function(args, options = {}) {
-    let successDuration = 0;
-    let failDuration = 0;
-    let nextDuration = 0;
-
     this.nextDupeClue = 0;
     this.nextDupeSrc = 0;
     this.nextDupeCombo = 0;
@@ -268,27 +264,44 @@ ComboMaker.prototype.makeCombos = function(args, options = {}) {
     if (args.sources) throw new Error('sources not yet supported');
     if (options.remaining) throw new Error('remaining not yet supported');
 
-    let useNcLists;
-    if (args.use) {
-        useNcLists = this.buildUseNcLists(args.use);
-        Debug(`useNcLists: ${useNcLists}`);
+    this.hash = {};
+    let allCombos = [];
+
+    let allUseNcLists = args.use ? buildAllUseNcLists(args.use) : [ [] ];
+    for (let useNcLists of allUseNcLists) {
+//	console.log(`useNcLists: ${useNcLists}`);
+
+	let comboArgs = {
+            sum: args.sum,
+            max: args.max,
+	    useNcLists
+	};
+	let combos = this.getCombosForUseNcLists(comboArgs, options);
+//	console.log(`total(${combos.length})`);
+	allCombos.push(...combos);
     }
 
-    this.hash = {};
-    let csvNameList = [];
-    let totalCount = 0;
-    let skipCount = 0;
+    Debug(`dupeClue(${this.nextDupeClue})` +
+          `, dupeSrc(${this.nextDupeSrc})` +
+          `, dupeCombo(${this.nextDupeCombo})`);
+
+    return allCombos;
+};
+
+
+ComboMaker.prototype.getCombosForUseNcLists = function(args, options = {}) {
+    let combos = [];
+
     // for each sourceList in sourceListArray
     ClueManager.getClueSourceListArray({
-        sum:     args.sum,
-        max:     args.max
-        //,require: require
+        sum: args.sum,
+        max: args.max
     }).forEach(clueSourceList => {
-        Debug(`clueSourceList: ${Stringify(clueSourceList)}`);
+        //Debug(`clueSourceList: ${Stringify(clueSourceList)}`);
         let sourceIndexes = [];
 
         let result = this.first(clueSourceList, sourceIndexes);
-        if (result.done) throw new Error(`no valid combos sources`);
+        if (result.done) return; // continue; 
 
         // this is effectively Peco.getCombinations().forEach()
         let first = true;
@@ -315,233 +328,16 @@ ComboMaker.prototype.makeCombos = function(args, options = {}) {
 
             // TODO maybe: save each sources.origNcList here
 
-            if (useNcLists) {
-                sources = mergeAllUsedSources(sources, useNcLists);
+            if (!_.isEmpty(args.useNcLists)) {
+                sources = mergeAllUsedSources(sources, args.useNcLists);
+		if (logging) console.log(`  compatible with used clues: ${!_.isEmpty(sources)}`);
+		if (_.isEmpty(sources)) continue;
             }
-            
-            if (logging) console.log(`  compatible with used clues: ${!_.isEmpty(sources)}`);
-
-            if (_.isEmpty(sources)) continue;
-
-            if (csvNameList.length < args.maxResults) {
-                csvNameList.push(result.nameList.toString());
-            }
-            if ((++totalCount % 10000) === 0) {
-                Debug(`total(${totalCount}), hash(${_.size(this.hash)}), list(${csvNameList.length})`);
-            }
+            combos.push(result.nameList.toString());
         }
     }, this);
 
-    Debug(`success: ${successDuration}ms` +
-          `, fail: ${failDuration}ms` +
-          `, next: ${nextDuration}ms`);
-    Debug(`total(${totalCount})` +
-          `, dupeClue(${this.nextDupeClue})` +
-          `, dupeSrc(${this.nextDupeSrc})` +
-          `, dupeCombo(${this.nextDupeCombo})` +
-          `, skip(${skipCount})`);
-
-    return csvNameList;
-};
-
-//
-// args:
-//  count:   # of primary clues to combine
-//  max:     max # of sources to use
-//  require: required clue counts, e.g. [3,5,8]
-//  sources: limit to these primary sources, e.g. [1,9,14]
-//  use:     list of clue name-counts, e.g. ['john:1','bob:5']
-//
-// A "clueSourceList" is a list (array) where each element is a
-// object that contains a list (cluelist) and a count, such as
-// [ { list:clues1, count:1 },{ list:clues2, count:2 }].
-//
-ComboMaker.prototype.old_makeCombos = function(args, options = {}) {
-    let successDuration = 0;
-    let failDuration = 0;
-    let nextDuration = 0;
-
-    this.nextDupeClue = 0;
-    this.nextDupeSrc = 0;
-    this.nextDupeCombo = 0;
-
-    if (_.isUndefined(args.maxResults)) {
-        args.maxResults = 50000;
-    }
-
-    // TODO USE "validateArgs" 
-
-    let require = args.require ? _.clone(args.require) : [];
-    let useNcList;
-    let useNameList;
-    let useSum = 0;
-    if (args.use) {
-        let buildResult = this.old_buildUseNcList(args.use);
-        useNcList = buildResult.ncList;
-        useNameList = NameCount.makeNameList(useNcList);
-        useSum = NameCount.makeCountList(useNcList).reduce((a, b) => (a + b));
-        Debug(`useNcList: ${useNcList}, useNameList: ${useNameList}, sum: ${useSum}`);
-    }
-    let validateAll = false;
-    if (args.sources) {
-        Debug('Validating sources: ' + args.sources);
-        validateAll = true;
-    }
-    //Debug(`require: ${require}`);
-
-    this.hash = {};
-    let csvNameList = [];
-    let totalCount = 0;
-    let skipCount = 0;
-    // for each sourceList in sourceListArray
-    ClueManager.getClueSourceListArray({
-        sum:     args.sum,
-        max:     args.max,
-        require: require
-    }).forEach(clueSourceList => {
-        //Debug(`clueSourceList: ${Stringify(clueSourceList)}`);
-        let sourceIndexes = [];
-
-        let result = this.first(clueSourceList, sourceIndexes);
-        if (result.done) {
-            // this shouldn't normally fire, but has happened with
-            // 3,3 (count:6) when only 1 unique source in clues3.json
-            throw new Error(`no valid combos sources`);
-        }
-
-        // this is effectively Peco.getCombinations().forEach()
-        let first = true;
-        while (!result.done) {
-            if (!first) {
-                result = this.next(clueSourceList, sourceIndexes, options);
-                if (result.done) break;
-            } else {
-                first = false;
-            }
-
-            //Log.info(`result.nameList: ${result.nameList}`);
-            //Log.info(`result.ncList: ${result.ncList}`);
-
-            /*
-            // build list of clue names from list of clue sources and sourceIndex array
-            let clueNameList = clueSourceList.map(
-                (clueSource, index) => clueSource.list[sourceIndexes[index]].name);
-
-            // DUBIOUS! filter out clue lists with duplicate clue names.
-            if (_.uniq(clueNameList).length !== clueNameList.length) {
-                Expect(true).is.false(); // because we filter these out in next()
-                continue;
-            }
-            */
-
-            // if useNcList, all nc must exist in current combo's nc list
-            // NEW WAY - is this true? no. not every combo must contain a used NC,
-            // combo's must only be compatible with all used NC.s
-            let useCountList = [];
-            if (useNcList) {
-                if (options.allow_used) {
-                    // TODO: filter NCs out of useNcList that are in result.ncList
-                    const useNcDiff = _.differenceBy(useNcList, result.ncList, _.toString);
-                    useNameList = NameCount.makeNameList(useNcDiff);
-                    useCountList = NameCount.makeCountList(useNcDiff);
-                    useSum = useCountList.reduce((a, b) => (a + b), 0);
-                } else {
-                    const numUsed = _.intersectionBy(useNcList, result.ncList, _.toString).length;
-                    // it is entirely possible to have a combo that doesn't
-                    // have any values from useNcList, it only has to be
-                    // *compatible* with useNcList.
-                    /*
-                      if (numUsed !== useNcList.length) {
-                      Debug(`skip1: ${result.ncList}`);
-                      ++skipCount;
-                      continue;
-                      }
-                    */
-                    /* I don't want to skip used.  --option maybe.
-                    if (numUsed > 0) {
-                        Debug(`skip used (${numUsed}): ${result.ncList}`);
-                        continue;
-                    }
-                    */
-                }
-            }
-
-            // if --remaining was specified, filter out all source lists
-            // where any source matches a named note 'name' suffix
-            if (options.remaining && this.matchAny(result.nameList, options.note_names)) {
-                continue;
-            }
-
-            // NEW WAY - add all used clues to nameList that are not already in it,
-            //           and increase sum accordingly
-            let nameList = result.nameList;
-            let sum = args.sum;
-            if (useNameList) {
-                nameList = _.concat(nameList, useNameList);
-                sum += useSum;
-            }
-
-            // NEW WAY - add all used clue counts to 'require', might speed it up a bit
-            let requiredAndUsedCounts = _.concat(require, useCountList);
-
-//            let start = new Date();
-            let validateResult = { success: true };
-            if (!options.merge_style) {
-//              console.log(`validating: ${nameList}, sum ${sum}, useNameList ${useNameList}`);
-                validateResult = Validator.validateSources({
-                    sum/*:         args.sum*/,
-                    nameList/*:    result.nameList*/,
-                    count:       /*result.*/nameList.length,
-                    require:     requiredAndUsedCounts,
-                    validateAll: validateAll
-                });
-            }
-//            let duration = new Duration(start, new Date());
-
-//          console.log(`valid: ${validateResult.success}, duration: ${PrettyMs(duration.milliseconds)}`);
-
-            if (validateResult.success) {
-
-//                successDuration += duration.milliseconds;
-
-                if (validateAll) {
-                    if (!this.checkPrimarySources(validateResult.list, args.sources)) {
-                        Log.debug(`checkPrimarySources.fail`);
-                        continue;
-                    }
-                }
-                // if output as primary clues
-                if (options.primary) {
-                    validateResult.list.forEach(vr => {
-                        Debug(`${vr.ncList}`);
-                        if (csvNameList.length < args.maxResults) {
-                            const nameList = NameCount.makeNameList(vr.ncList).sort();
-                            csvNameList.push(nameList.toString());
-                        }
-                    });
-                } else if (csvNameList.length < args.maxResults) {
-                    csvNameList.push(result.nameList.toString());
-                }
-                if ((++totalCount % 10000) === 0) {
-                    Debug(`total(${totalCount}), hash(${_.size(this.hash)}), list(${csvNameList.length})`);
-                }
-            }
-            else {
-                //Log.info("validateResult.fail");
-            }
-        }
-    }, this);
-
-    Debug(`success: ${successDuration}ms` +
-          `, fail: ${failDuration}ms` +
-          `, next: ${nextDuration}ms`);
-    Debug(`total(${totalCount})` +
-          `, dupeClue(${this.nextDupeClue})` +
-          `, dupeSrc(${this.nextDupeSrc})` +
-          `, dupeCombo(${this.nextDupeCombo})` +
-          `, skip(${skipCount})`);
-
-    return csvNameList;
+    return combos;
 };
 
 // As long as one final result has only primary sources from 'sources'
@@ -556,9 +352,71 @@ ComboMaker.prototype.checkPrimarySources = function(resultList, sources) {
     });
 };
 
+function getKnownNcListForName (name) {
+    const countList = ClueManager.getCountListForName(name);
+    if (_.isEmpty(countList)) throw new Error(`not a valid clue name: '${name}'`);
+    return countList.map(count => NameCount.makeNew(name, count));
+}
+
+//
+// Given a list of names or NcStrs, convert NcStrs to an array of (1) nc
+// and convert names to an array of all known NCs for that name.
+// Return a list of lists.
+//
+// ex:
+//  convert: [ 'billy', 'bob:1' ]
+//  to: [ [ billy:1, billy:2 ], [ bob:1 ] ]
 //
 
-ComboMaker.prototype.buildUseNcLists = function(useArgsList) {
+function nameOrNcStrListToKnownNcList (nameOrNcStrList) {
+    return nameOrNcStrList.map(nameOrNcStr => NameCount.makeNew(nameOrNcStr))
+	.map(nc => nc.count ? [ nc ] : getKnownNcListForName(nc.name));
+}
+
+function combinationNcList (combo, ncLists) {
+    return combo.map((ncIndex, listIndex) => ncLists[listIndex][ncIndex]);
+}
+
+
+function ncListsToCombinations (ncLists) {
+    return Peco.makeNew({
+	listArray: ncLists.map(ncList => [...Array(ncList.length).keys()]),
+	max: ncLists.reduce((sum, ncList) => sum + ncList.length, 0)        // sum of lengths of nclists
+    })	.getCombinations()
+	.map(combo => combinationNcList(combo, ncLists));
+}
+
+function combinationsToNcLists (combinationNcLists) {
+//    console.log(`nclists: ${Stringify(combinationNcLists)}`);
+
+    let listArray  = combinationNcLists.map(ncList => [...Array(ncList.length).keys()]);
+    let max = combinationNcLists.reduce((sum, ncList) => sum + ncList.length, 0);        // sum of lengths of nclists
+
+//    console.log(`${Stringify(listArray)}, max ${max}`);
+
+    let result = Peco.makeNew({ listArray, max })
+	.getCombinations()
+//	.forEach(combo => { console.log(`${combo}`); });
+	.map(combo => combinationNcList(combo, combinationNcLists));
+
+//    console.log();
+    return result;
+}
+
+function getCombinationNcLists (useArgsList) {
+    return useArgsList.map(useArg => useArg.split(','))
+	.map(nameOrNcStrList => nameOrNcStrListToKnownNcList(nameOrNcStrList))
+	.map(knownNcLists => ncListsToCombinations(knownNcLists));
+}
+
+
+function buildAllUseNcLists (useArgsList) {
+    return combinationsToNcLists(getCombinationNcLists(useArgsList));
+}
+
+//
+
+function buildUseNcLists (useArgsList) {
     let useNcLists = [];
     useArgsList.forEach(useArg =>  {
         let args = useArg.split(',');
@@ -571,20 +429,7 @@ ComboMaker.prototype.buildUseNcLists = function(useArgsList) {
         useNcLists.push(ncList);
     });
     return useNcLists;
-};
-
-ComboMaker.prototype.old_buildUseNcList = function(args) {
-    let ncList = [];
-    let countList = [];
-    args.forEach(arg =>  {
-        let nc = NameCount.makeNew(arg);
-        if (!nc.count) throw new Error(`arg: ${arg} requires a :COUNT`);
-        if (!_.has(ClueManager.knownClueMapArray[nc.count], nc.name)) throw new Error(`arg: ${nc} does not exist`);
-        countList.push(nc.count);
-        ncList.push(nc);
-    });
-    return { ncList, countList };
-};
+}
 
 //
 //
@@ -661,11 +506,13 @@ ComboMaker.prototype.next = function(clueSourceList, sourceIndexes, options = {}
 
         nameList.sort();
         // skip combinations we've already checked
-        if (!this.addComboToFoundHash(nameList.toString())) continue; // already checked
+	let skip = false;
+
+        if (skip && !this.addComboToFoundHash(nameList.toString())) continue; // already checked
 
         // skip combinations that have duplicate source:count
         if (!options.allow_dupe_src) {
-            if (_.uniq(srcCountStrList).length !== srcCountStrList.length) {
+            if (skip && _.uniq(srcCountStrList).length !== srcCountStrList.length) {
                 //Debug('skipping duplicate clue src: ' + srcCountStrList);
                 ++this.nextDupeSrc;
                 continue;
@@ -673,7 +520,7 @@ ComboMaker.prototype.next = function(clueSourceList, sourceIndexes, options = {}
         }
 
         // skip combinations that have duplicate names
-        if (_.sortedUniq(nameList).length !== nameList.length) {
+        if (skip && _.sortedUniq(nameList).length !== nameList.length) {
             //Debug('skipping duplicate clue name: ' + nameList);
             ++this.nextDupeClue; // TODO: DupeName
             continue;
@@ -695,7 +542,7 @@ ComboMaker.prototype.addComboToFoundHash = function(nameListCsv) {
         return true;
     }
     //Debug('skipping duplicate combo: ' + nameListCsv);
-    ++this.nextDupeCombo;
+    this.nextDupeCombo += 1;
     return false;
 };
 
@@ -710,11 +557,11 @@ ComboMaker.prototype.nextIndex = function(clueSourceList, sourceIndexes) {
     // if last index is maxed reset to zero, increment next-to-last index, etc.
     while (sourceIndexes[index] === clueSourceList[index].list.length) {
         sourceIndexes[index] = 0;
-        --index;
+        index -= 1;
         if (index < 0) {
             return false;
         }
-        ++sourceIndexes[index];
+        sourceIndexes[index] += 1;
     }
     return true;
 };
