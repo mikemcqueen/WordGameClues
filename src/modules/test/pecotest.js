@@ -2,20 +2,20 @@
 
 const _           = require('lodash');
 const Duration    = require('duration');
-const Peco        = require('./peco');
+const Peco        = require('../peco');
+const Stringify   = require('stringify-object');
 
 
-const Opt = require('node-getopt')
+const GetOpt = require('node-getopt')
     .create([
         ['c' , 'count=ARG'            , 'primary clue count'],
         ['e' , 'exclude=ARG+'         , 'exclude #s'],
-        ['l',  'list=ARG+',             'test listArray, must specify at least tw' ],
+        ['l',  'list=ARG+',             'test listArray, must specify at least two' ],
         ['r' , 'require=ARG+'         , 'require #s'],
         ['v' , 'verbose'              , 'turn on peco logging'],
         ['x' , 'max=ARG'              , 'specify maximum # of components to combine'],
         ['p' , 'permutations'         , 'permutations flag' ],
-    ])
-    .bindHelp().parseSystem();
+    ]).bindHelp();
 
 
 function main() {
@@ -29,9 +29,10 @@ function main() {
     let listArray;
     let verbose;
 
+
+    let Opt = GetOpt.parseSystem();
     if (Opt.argv.length < 1) {
-        console.log('Usage: node add.js SUM');
-        console.log('');
+	GetOpt.showHelp();
         console.log(Opt);
         return 1;
     }
@@ -80,9 +81,8 @@ function main() {
     }
     
     if (list) {
-        console.log('list: ' + list);
+        console.log(`list: ${Stringify(list)}`);
         listArray = makeListArray(list);
-//      listArray = list;
         console.log('listArray: ' + listArray);
     }
     showAddends(listArray, sum, count, max, permFlag, require, exclude);
@@ -91,10 +91,9 @@ function main() {
 //
 
 function makeListArray(list) {
-    let listArray;
-    listArray = [];
-    list.forEach(str => {
-        console.log('list: ' + str);
+    let listArray = [];
+    list.forEach((str, index) => {
+        console.log(`list${index}: ${str}`);
         let countList = str.split(',');
         countList.forEach((count,index) => {
             countList[index] = Number(count);
@@ -122,7 +121,7 @@ function showAddends(listArray, sum, count, max, permFlag, require, exclude) {
     });
 
     if (permFlag) {
-        resultt = peco.getPermutations();
+        result = peco.getPermutations();
     }
     else {
         result = peco.getCombinations();

@@ -77,11 +77,11 @@ function getSourcesList (srcMapEntries) {
         entry.results.forEach(result => {
             result.primaryNameSrcList = result.ncList.map(nc => ClueManager.primaryNcToNameSrc(nc));
             result.primarySrcList = NameCount.makeCountList(result.primaryNameSrcList);
-	    result.srcNcLists = result.resultMap ? buildSrcNcLists(result.resultMap.map()) : [ result.ncList ];
-	    if (logging) {
-		console.log(`result ncList ${result.ncList}, srcNcLists ${showNcLists(result.srcNcLists)}`);
-		if (_.isEmpty(result.srcNcLists)) console.log(`empty srcNcList: ${Stringify(result.resultMap.map())}`);
-	    }
+            result.srcNcLists = result.resultMap ? buildSrcNcLists(result.resultMap.map()) : [ result.ncList ];
+            if (logging) {
+                console.log(`result ncList ${result.ncList}, srcNcLists ${showNcLists(result.srcNcLists)}`);
+                if (_.isEmpty(result.srcNcLists)) console.log(`empty srcNcList: ${Stringify(result.resultMap.map())}`);
+            }
             sources.push(result);
         });
     });
@@ -92,9 +92,9 @@ function showNcLists (ncLists) {
     let str = "";
     let first = true;
     for (let ncList of ncLists) {
-	if (!first) str += ' - ';
-	str += ncList;
-	first = false;
+        if (!first) str += ' - ';
+        str += ncList;
+        first = false;
     }
     return _.isEmpty(str) ? "[]" : str;
 }
@@ -172,8 +172,8 @@ function recursiveAddSrcNcLists (list, obj, top) {
             // split multiple primary sources into separate keys
             let multiplePrimarySourceKeys = key.split(',');
             if (multiplePrimarySourceKeys.length > 1) return multiplePrimarySourceKeys;
-	    // allow top level single primary source key with array value type
-	    if (top) return key;
+            // allow top level single primary source key with array value type
+            if (top) return key;
             // ignore nested single primary source key with array value type
         }
         return [];
@@ -193,9 +193,9 @@ function buildSrcNcLists (obj) {
 
 function partialMatchAnyNcList (ncList, matchNcLists) {
     for (let matchNcList of matchNcLists) {
-	let match = _.intersectionBy(ncList, matchNcList, _.toString).length == ncList.length;
-	// log nclist, matchlist, match
-	if (match) return true;
+        let match = _.intersectionBy(ncList, matchNcList, _.toString).length == ncList.length;
+        // log nclist, matchlist, match
+        if (match) return true;
     }
     return false;
 }
@@ -220,15 +220,15 @@ function mergeAllUsedSources (sourcesList, useNcLists) {
                     }
                 }
                 if (valid) {
-		    // TODO: i get the feeling that is merging ncList is not working here, doubling up ncList when merging face,card
+                    // TODO: i get the feeling that is merging ncList is not working here, doubling up ncList when merging face,card
                     mergedSourcesList.push(mergeSources(sources, useSources));
                 }
                 if (logging) {
-		    console.log(`  valid: ${valid}, useNcList: ${useNcList}`);
-		    console.log(`    sources:   ${showNcLists(sources.srcNcLists)}, primary: ${sources.primaryNameSrcList}`);
-		    console.log(`    useNcList: ${useNcList}, primary: ${useSources.primaryNameSrcList}`);
-		    console.log(`    allCommon: ${allCommonPrimarySources}, singlePrimaryNc: ${singlePrimaryNc}`);
-		}
+                    console.log(`  valid: ${valid}, useNcList: ${useNcList}`);
+                    console.log(`    sources:   ${showNcLists(sources.srcNcLists)}, primary: ${sources.primaryNameSrcList}`);
+                    console.log(`    useNcList: ${useNcList}, primary: ${useSources.primaryNameSrcList}`);
+                    console.log(`    allCommon: ${allCommonPrimarySources}, singlePrimaryNc: ${singlePrimaryNc}`);
+                }
             }
         }
         sourcesList = mergedSourcesList;
@@ -269,16 +269,13 @@ ComboMaker.prototype.makeCombos = function(args, options = {}) {
 
     let allUseNcLists = args.use ? buildAllUseNcLists(args.use) : [ [] ];
     for (let useNcLists of allUseNcLists) {
-//	console.log(`useNcLists: ${useNcLists}`);
-
-	let comboArgs = {
+        let comboArgs = {
             sum: args.sum,
             max: args.max,
-	    useNcLists
-	};
-	let combos = this.getCombosForUseNcLists(comboArgs, options);
-//	console.log(`total(${combos.length})`);
-	allCombos.push(...combos);
+            useNcLists
+        };
+        let combos = this.getCombosForUseNcLists(comboArgs, options);
+        allCombos.push(...combos);
     }
 
     Debug(`dupeClue(${this.nextDupeClue})` +
@@ -317,7 +314,7 @@ ComboMaker.prototype.getCombosForUseNcLists = function(args, options = {}) {
             Log.info(`result.ncList: ${result.ncList}`);
 
             //logging = result.nameList.toString() === 'king,pitcher' ;
-	    //		|| result.nameList.toString() === 'cardinal,smith';
+            //          || result.nameList.toString() === 'cardinal,smith';
 
             let sources = mergeAllCompatibleSources(result.ncList);
             
@@ -330,8 +327,8 @@ ComboMaker.prototype.getCombosForUseNcLists = function(args, options = {}) {
 
             if (!_.isEmpty(args.useNcLists)) {
                 sources = mergeAllUsedSources(sources, args.useNcLists);
-		if (logging) console.log(`  compatible with used clues: ${!_.isEmpty(sources)}`);
-		if (_.isEmpty(sources)) continue;
+                if (logging) console.log(`  compatible with used clues: ${!_.isEmpty(sources)}`);
+                if (_.isEmpty(sources)) continue;
             }
             combos.push(result.nameList.toString());
         }
@@ -370,7 +367,7 @@ function getKnownNcListForName (name) {
 
 function nameOrNcStrListToKnownNcList (nameOrNcStrList) {
     return nameOrNcStrList.map(nameOrNcStr => NameCount.makeNew(nameOrNcStr))
-	.map(nc => nc.count ? [ nc ] : getKnownNcListForName(nc.name));
+        .map(nc => nc.count ? [ nc ] : getKnownNcListForName(nc.name));
 }
 
 function combinationNcList (combo, ncLists) {
@@ -380,35 +377,25 @@ function combinationNcList (combo, ncLists) {
 
 function ncListsToCombinations (ncLists) {
     return Peco.makeNew({
-	listArray: ncLists.map(ncList => [...Array(ncList.length).keys()]),
-	max: ncLists.reduce((sum, ncList) => sum + ncList.length, 0)        // sum of lengths of nclists
-    })	.getCombinations()
-	.map(combo => combinationNcList(combo, ncLists));
+        listArray: ncLists.map(ncList => [...Array(ncList.length).keys()]),
+        max: ncLists.reduce((sum, ncList) => sum + ncList.length, 0)        // sum of lengths of nclists
+    })  .getCombinations()
+        .map(combo => combinationNcList(combo, ncLists));
 }
 
 function combinationsToNcLists (combinationNcLists) {
-//    console.log(`nclists: ${Stringify(combinationNcLists)}`);
-
-    let listArray  = combinationNcLists.map(ncList => [...Array(ncList.length).keys()]);
-    let max = combinationNcLists.reduce((sum, ncList) => sum + ncList.length, 0);        // sum of lengths of nclists
-
-//    console.log(`${Stringify(listArray)}, max ${max}`);
-
-    let result = Peco.makeNew({ listArray, max })
-	.getCombinations()
-//	.forEach(combo => { console.log(`${combo}`); });
-	.map(combo => combinationNcList(combo, combinationNcLists));
-
-//    console.log();
-    return result;
+    return Peco.makeNew({
+        listArray: combinationNcLists.map(ncList => [...Array(ncList.length).keys()]),
+        max: combinationNcLists.reduce((sum, ncList) => sum + ncList.length, 0)        // sum of lengths of nclists
+    }).getCombinations()
+      .map(combo => combinationNcList(combo, combinationNcLists));
 }
 
 function getCombinationNcLists (useArgsList) {
     return useArgsList.map(useArg => useArg.split(','))
-	.map(nameOrNcStrList => nameOrNcStrListToKnownNcList(nameOrNcStrList))
-	.map(knownNcLists => ncListsToCombinations(knownNcLists));
+        .map(nameOrNcStrList => nameOrNcStrListToKnownNcList(nameOrNcStrList))
+        .map(knownNcLists => ncListsToCombinations(knownNcLists));
 }
-
 
 function buildAllUseNcLists (useArgsList) {
     return combinationsToNcLists(getCombinationNcLists(useArgsList));
@@ -506,7 +493,7 @@ ComboMaker.prototype.next = function(clueSourceList, sourceIndexes, options = {}
 
         nameList.sort();
         // skip combinations we've already checked
-	let skip = false;
+        let skip = false;
 
         if (skip && !this.addComboToFoundHash(nameList.toString())) continue; // already checked
 
