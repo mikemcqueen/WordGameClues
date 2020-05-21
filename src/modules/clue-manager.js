@@ -63,7 +63,7 @@ ClueManager.prototype.log = function (text) {
 
 ClueManager.prototype.saveClueList = function (list, count, options = {}) {
     list.save(this.getKnownFilename(count, options.dir));
-}
+};
 
 // args:
 //  baseDir:  base directory (meta, synth)
@@ -108,7 +108,7 @@ ClueManager.prototype.loadAllClues = function (args) {
     this.loaded = true;
 
     return this;
-}
+};
 
 //
 
@@ -116,7 +116,7 @@ ClueManager.prototype.loadClueList = function (count, options = {}) {
     return ClueList.makeFrom({
         filename : this.getKnownFilename(count, options.dir)
     });
-}
+};
 
 //
 
@@ -133,7 +133,7 @@ ClueManager.prototype.addKnownPrimaryClues = function (clueList) {
         clueMap[clue.name].push(clue.src);
     });
     return this;
-}
+};
 
 //
 
@@ -142,7 +142,7 @@ ClueManager.prototype.getKnownFilename = function (count, dir = undefined) {
         dir:  _.isUndefined(dir) ? this.dir : `${DATA_DIR}${dir}`,
         base: `clues${count}.json`
     });
-}
+};
 
 //
 
@@ -151,7 +151,7 @@ ClueManager.prototype.getRejectFilename = function (count) {
         dir:  `${DATA_DIR}${REJECTS_DIR}`,
         base: `rejects${count}.json`
     });
-}
+};
 
 //
 
@@ -188,6 +188,7 @@ ClueManager.prototype.addKnownCompoundClues = function (clueList, clueCount, val
                 }
                 srcMap[srcKey] = { clues: [] };
 		if (validateAll) {
+		    // this is where the magic happens
 		    srcMap[srcKey].results = vsResult.list;
 		}
             }
@@ -196,7 +197,7 @@ ClueManager.prototype.addKnownCompoundClues = function (clueList, clueCount, val
         this.addKnownClue(clueCount, clue.name, srcKey);
     }, this);
     return this;
-}
+};
 
 //
 
@@ -221,7 +222,7 @@ ClueManager.prototype.addKnownClue = function (count, name, source, nothrow) {
                         name + ' : ' + source);
     }
     return true;
-}
+};
 
 //
 
@@ -240,7 +241,7 @@ ClueManager.prototype.removeKnownClue = function (count, name, source, nothrow) 
         Debug(`after clueMap[${name}]: len(${clueMap[name].length}), sources: ${clueMap[name]}`);
     }
     return true;
-}
+};
 
 //
 
@@ -254,7 +255,7 @@ ClueManager.prototype.saveClues = function (counts) {
         this.saveClueList(this.clueListArray[count], count);
         Debug(`saved clueList ${count}, length: ${this.clueListArray[count].length}`);
     }
-}
+};
 
 //
 
@@ -269,7 +270,7 @@ ClueManager.prototype.addClue = function (count, clue, save = false, nothrow = f
         return true;
     }
     return false;
-}
+};
 
 //
 
@@ -286,7 +287,7 @@ ClueManager.prototype.removeClue = function (count, clue, save = false, nothrow 
         return true;
     }
     return false;
-}
+};
 
 //
 
@@ -310,7 +311,7 @@ ClueManager.prototype.addMaybe = function (name, srcNameList, note, save = false
         this.maybeListArray[count].save(this.getMaybeFilename(count));
     }
     return true;
-}
+};
 
 //
 
@@ -324,7 +325,7 @@ ClueManager.prototype.addRejectCombos = function (clueList, clueCount) {
         this.addRejectSource(srcNameList);
     });
     return this;
-}
+};
 
 //
 
@@ -336,7 +337,7 @@ ClueManager.prototype.saveRejects = function (counts) {
     counts.forEach(count => {
         this.rejectListArray[count].save(this.getRejectFilename(count));
     });
-}
+};
 
 //
 
@@ -357,7 +358,7 @@ ClueManager.prototype.addReject = function (srcNameList, save = false) {
         return true;
     }
     return false;
-}
+};
 
 //
 
@@ -383,7 +384,7 @@ ClueManager.prototype.addRejectSource = function (srcNameList) {
     }
     this.rejectSourceMap[srcNameList.toString()] = true;
     return true;
-}
+};
 
 // source is string containing sorted, comma-separated clues
 //
@@ -397,7 +398,7 @@ ClueManager.prototype.isKnownSource = function (source, count = 0) {
     }
     // check for all counts
     return this.knownSourceMapArray.some(srcMap => _.has(srcMap, source));
-}
+};
 
 // source: csv string or array of strings
 
@@ -406,7 +407,7 @@ ClueManager.prototype.isRejectSource = function (source) {
         throw new Error('bad source: ' + source);
     }
     return _.has(this.rejectSourceMap, source.toString());
-}
+};
 
 //
 
@@ -418,7 +419,7 @@ ClueManager.prototype.getCountListForName = function (name) {
         }
     };
     return countList;
-}
+};
 
 //
 
@@ -426,7 +427,7 @@ ClueManager.prototype.getSrcListForNc = function (nc) {
     let clueMap = this.knownClueMapArray[nc.count];
     Expect(_.has(clueMap, nc.name)).is.true();
     return clueMap[nc.name];
-}
+};
 
 //
 
@@ -439,14 +440,14 @@ ClueManager.prototype.getSrcListMapForName = function (name) {
         }
     }
     return srcListMap;
-}
+};
 
 //
 
 ClueManager.prototype.primaryNcToNameSrc = function (nc) {
     if (nc.count !== 1) throw new Error(`nc.count must be 1 (${nc})`);
     return NameCount.makeNew(nc.name, this.knownClueMapArray[1][nc.name]);
-}
+};
 
 //
 
@@ -456,7 +457,7 @@ ClueManager.prototype.makeSrcNameListArray = function (nc) {
         srcNameListArray.push(src.split(','));
     });
     return srcNameListArray;
-}
+};
 
 // args:
 //  sum:     args.sum,
@@ -509,7 +510,7 @@ ClueManager.prototype.getClueSourceListArray = function (args) {
         //console.log('WARNING! getClueSrcListArray empty!');
     }
     return clueSourceListArray;
-}
+};
 
 //
 
@@ -523,7 +524,7 @@ ClueManager.prototype.filterAddends = function (addends, sizes) {
         }
     });
     return filtered;
-}
+};
 
 //
 
@@ -553,7 +554,7 @@ ClueManager.prototype.filter = function (srcCsvList, clueCount, map = {}) {
         reject:    reject,
         duplicate: duplicate
     };
-}
+};
 
 /*
 // this actually returns knownClueNames
@@ -583,7 +584,7 @@ function singleEntry (nc) {
 	    }
 	]
     };
-}
+};
 
 ClueManager.prototype.getKnownSourceMapEntries = function (nc) {
     const clueMap = this.knownClueMapArray[nc.count];
@@ -592,9 +593,13 @@ ClueManager.prototype.getKnownSourceMapEntries = function (nc) {
     if (!sourcesList) throw new Error(`No sourcesList at ${nc}`);
 //    Debug(`nc: ${nc}`);
     if (nc.count === 1) return [ singleEntry(nc) ];
-    return sourcesList.map(sources => sources.split(',').sort().toString()) // sort sources
+    let entries = sourcesList.map(sources => sources.split(',').sort().toString()) // sort sources
 	.map(sources => this.knownSourceMapArray[nc.count][sources]);       // map sources to known source map entry
-}
+    
+    //console.log(`NOT SINGLE: ${nc}, ncList: ${entries[0].results[0].ncList}, keys: ${[..._.keys(entries[0].results[0].resultMap.map())]}`);
+    //${_.keys(entries[0].results[0])}`);
+    return entries;
+};
 
 //
 

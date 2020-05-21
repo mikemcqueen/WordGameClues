@@ -67,7 +67,7 @@ Validator.prototype.setAllowDupeFlags = function (args) {
     if (!_.isUndefined(args.allowDupeSrc)) {
         this.allowDupeSrc = args.allowDupeSrc;
     }
-}
+};
 
 // args:
 //  nameList:       list of clue names, e.g. ['bob','jim']
@@ -150,7 +150,7 @@ Validator.prototype.validateSources = function(args) {
 
     //hash[key] = result;
     return result;
-}
+};
 
 // args:
 //  clueNameList:
@@ -216,7 +216,7 @@ Validator.prototype.recursiveValidateSources = function(args) {
         success: someResult,
         list:    someResult ? resultList : undefined
     };
-}
+};
 
 // args:
 //   name     : clueName,
@@ -301,7 +301,7 @@ Validator.prototype.rvsWorker = function(args) {
         success: true,
         list:    rvsResult.list
     };
-}
+};
 
 // args:
 //   name:           clueName,
@@ -454,7 +454,7 @@ Validator.prototype.checkUniqueSources = function(nameCountList, args) {
         }
         Debug(`++outer looping`);
     }
-}
+};
 
 // in a word: unnecessary
 
@@ -463,7 +463,7 @@ Validator.prototype.uniqueResult = function(success, list) {
         success: success,
         list:    list // _.uniqBy(resultList, () => {})
     };
-}
+};
 
 //
 //
@@ -519,7 +519,7 @@ Validator.prototype.getCompatibleResults = function(args) {
         });
     }
     return resultList;
-}
+};
 
 //
 Validator.prototype.addCompatibleResult = function(resultList, nameSrcList, args) {
@@ -539,7 +539,7 @@ Validator.prototype.addCompatibleResult = function(resultList, nameSrcList, args
             ncNameListPairs: args.ncNameListPairs
         }).ensureUniquePrimaryLists()
     });
-}
+};
 
 
 // Simplified version of checkUniqueSources, for all-primary clues.
@@ -602,7 +602,7 @@ Validator.prototype.cyclePrimaryClueSources = function(args) {
     });
 
     return resultList;
-}
+};
 
 // ncList:              nameCountList
 //
@@ -651,7 +651,7 @@ Validator.prototype.findDuplicatePrimaryClue = function(args) {
         allPrimary:       findResult.allPrimary,
         srcMap:           findResult.srcMap
     };
-}
+};
 
 
 // args:
@@ -715,7 +715,7 @@ Validator.prototype.findPrimarySourceConflicts = function(args) {
         srcMap:         srcMap,
         conflictSrcMap: conflictSrcMap
     };
-}
+};
 
 // args:
 //  srcMap:
@@ -790,7 +790,7 @@ Validator.prototype.resolvePrimarySourceConflicts = function(args) {
         duplicateSrcName: duplicateSrcName,
         duplicateSrc:     duplicateSrc
     };
-}
+};
 
 // args:
 //  ncList:      // ALL PRIMARY clues in name:source format (not name:count)
@@ -854,7 +854,7 @@ Validator.prototype.evalFindDuplicateResult = function(result, logPrefix) {
         return false;
     }
     return true;
-}
+};
 
 // args:
 //  ncList
@@ -983,9 +983,9 @@ Validator.prototype.buildSrcNameList = function(args) {
         resultMap,
         allPrimary,
         indexMap,
-        count: clueCount,
+        count: clueCount
     };
-}
+};
 
 //
 //
@@ -997,7 +997,7 @@ Validator.prototype.getIndexMap = function(indexMap) {
     }
     Debug(`new index map`);
     return {};
-}
+};
 
 //
 //
@@ -1018,7 +1018,7 @@ Validator.prototype.getSrcListIndex = function(indexMap, nc, srcList) {
               `, actual length(${srcList.length})`);
     }
     return slIndex;
-}
+};
 
 //
 //
@@ -1053,7 +1053,7 @@ Validator.prototype.incrementIndexMap = function(indexMap) {
     }
     Debug(`--indexMap: ${this.indexMapToJSON(indexMap)}`);
     return true;
-}
+};
 
 //
 //
@@ -1067,7 +1067,7 @@ Validator.prototype.indexMapToJSON = function(map) {
         s += map[key].index;
     });
     return '[' + s + ']';
-}
+};
 
 //
 //
@@ -1108,14 +1108,14 @@ Validator.prototype.getDiffNcList = function(origNcList, nameCountList) {
         ncList.push(nameCountList[index]);
     }
     return ncList;
-}
+};
 
 //
 //
 
 Validator.prototype.getNameSrcList = function(srcMap) {
     return _.keys(srcMap).map(key => NameCount.makeNew(srcMap[key], key));
-}
+};
 
 //
 //
@@ -1130,7 +1130,7 @@ Validator.prototype.chop = function(list, removeValue) {
         }
     });
     return copy;
-}
+};
 
 //
 
@@ -1141,7 +1141,7 @@ Validator.prototype.hasNameSrcList = function(resultList, nameSrcList) {
         });
     });
     
-}
+};
 
 // args:
 //  nameSrcList:
@@ -1152,7 +1152,7 @@ Validator.prototype.hasNameSrcList = function(resultList, nameSrcList) {
 Validator.prototype.hasExcludedSource = function(nameSrcList, excludeSrcList) {
     return _.isUndefined(excludeSrcList) ? false :
         !_.isEmpty(_.intersection(excludeSrcList, nameSrcList.map(nc => nc.count)));
-}
+};
 
 //
 //
@@ -1167,7 +1167,7 @@ Validator.prototype.dumpIndexMap = function(indexMap) {
         s += 'index ' + entry.index + ', length ' + entry.length;
     });
     Debug(s);
-}
+};
 
 // args:
 //  header:
@@ -1214,7 +1214,7 @@ Validator.prototype.dumpResult = function(args) {
             });
         });
     });
-}
+};
 
 // TODO: stringify-object here?
 //
@@ -1252,16 +1252,16 @@ Validator.prototype.dumpResultMap = function(seq, level) {
         --level;
         console.log(this.indent() + spaces(2 * level) + (_.isArray(seq) ? ']' : '}'));
     }
-}
+};
 
 function spaces(length) {
     return ' '.repeat(length);
-}
+};
 
 Validator.prototype.indent = function() {
     return spaces(this.logLevel);
-}
+};
 
 Validator.prototype.indentNewline = function() {
     return '\n' + this.indent();
-}
+};

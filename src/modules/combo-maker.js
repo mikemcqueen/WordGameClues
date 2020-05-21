@@ -44,14 +44,14 @@ ComboMaker.prototype.matchAny = function (srcList, nameList) {
         }
     }
     return false;
-}
+};
 
 function getPrimaryNameSrcLists (entries) {
     const nameSrcLists = [];
     entries.forEach(entry => {
         entry.results.forEach(result => {
             nameSrcLists.push(result.ncList.map(nc => ClueManager.primaryNcToNameSrc(nc)));
-	});
+        });
     });
     return nameSrcLists;
 }
@@ -59,48 +59,72 @@ function getPrimaryNameSrcLists (entries) {
 function getCompatiblePrimaryNameSrcLists (nameSrcLists1, nameSrcLists2) {
     let nameSrcLists = [];
     for (const nameSrcList1 of nameSrcLists1) {
-	for (const nameSrcList2 of nameSrcLists2) {
-	    Debug(`nameSrcList1: ${nameSrcList1}, nameSrcList2: ${nameSrcList2}`);
-	    let countList1 = NameCount.makeCountList(nameSrcList1);
-	    let countList2 = NameCount.makeCountList(nameSrcList2);
-	    if (_.isEmpty(_.intersectionBy(countList1, countList2, _.toNumber))) {
-		nameSrcLists.push(_.concat(nameSrcList1, nameSrcList2));
-	    }
-	}
+        for (const nameSrcList2 of nameSrcLists2) {
+            Debug(`nameSrcList1: ${nameSrcList1}, nameSrcList2: ${nameSrcList2}`);
+            let countList1 = NameCount.makeCountList(nameSrcList1);
+            let countList2 = NameCount.makeCountList(nameSrcList2);
+            if (_.isEmpty(_.intersectionBy(countList1, countList2, _.toNumber))) {
+                nameSrcLists.push(_.concat(nameSrcList1, nameSrcList2));
+            }
+        }
     }
     return nameSrcLists;
 }
 
-function getSourcesList (entries) {
+function getSourcesList (srcMapEntries) {
     const sources = [];
-    entries.forEach(entry => {
+    srcMapEntries.forEach(entry => {
         entry.results.forEach(result => {
             result.primaryNameSrcList = result.ncList.map(nc => ClueManager.primaryNcToNameSrc(nc));
-	    result.primarySrcList = NameCount.makeCountList(result.primaryNameSrcList);
+            result.primarySrcList = NameCount.makeCountList(result.primaryNameSrcList);
+	    result.srcNcLists = result.resultMap ? buildSrcNcLists(result.resultMap.map()) : [ result.ncList ];
+	    if (logging) {
+		console.log(`result ncList ${result.ncList}, srcNcLists ${showNcLists(result.srcNcLists)}`);
+		if (_.isEmpty(result.srcNcLists)) console.log(`empty srcNcList: ${Stringify(result.resultMap.map())}`);
+	    }
             sources.push(result);
-	});
+        });
     });
     return sources;
 }
 
+function showNcLists (ncLists) {
+    let str = "";
+    let first = true;
+    for (let ncList of ncLists) {
+	if (!first) str += ' - ';
+	str += ncList;
+	first = false;
+    }
+    return _.isEmpty(str) ? "[]" : str;
+}
+
 function mergeSources (sources1, sources2) {
-    let mergeSources = {};
-    mergeSources.ncList = _.concat(sources1.ncList, sources2.ncList);
-    mergeSources.primaryNameSrcList = _.concat(sources1.primaryNameSrcList, sources2.primaryNameSrcList);
-    mergeSources.primarySrcList = NameCount.makeCountList(mergeSources.primaryNameSrcList);
-    return mergeSources;
+    let mergedSources = {};
+    mergedSources.ncList = _.concat(sources1.ncList, sources2.ncList);
+    mergedSources.primaryNameSrcList = _.concat(sources1.primaryNameSrcList, sources2.primaryNameSrcList);
+    mergedSources.primarySrcList = NameCount.makeCountList(mergedSources.primaryNameSrcList);
+    // move to getSourcesLists
+    let srcNcLists1 = sources1.srcNcLists;
+    let srcNcLists2 = sources2.srcNcLists;
+    if (logging) console.log(`srcNcLists1: ${showNcLists(srcNcLists1)}`);
+    if (logging) console.log(`srcNcLists2: ${showNcLists(srcNcLists2)}`);
+    mergedSources.srcNcLists = _.concat(srcNcLists1, srcNcLists2);
+    if (logging) console.log(`  merged: ${showNcLists(mergedSources.srcNcLists)}`);
+
+    return mergedSources;
 }
 
 function mergeCompatibleSourcesLists (sources1, sources2) { // TODO sourcesList1, sourcesList2
-    let mergedSources = [];
+    let mergedSources = []; // TODO mergedSourcesList
     for (const entry1 of sources1) { // TODO sources1 of sourcesList1
-	for (const entry2 of sources2) { // TODO sources2 of sourcesList2
-	    Debug(`nameSrcList1: ${entry1.primaryNameSrcList}, nameSrcList2: ${entry2.primaryNameSrcList}`);
-	    if (logging) console.log(`merge1: nameSrcList1: ${entry1.primaryNameSrcList}, nameSrcList2: ${entry2.primaryNameSrcList}`);
-	    if (_.isEmpty(_.intersectionBy(entry1.primarySrcList, entry2.primarySrcList, _.toNumber))) {
-		mergedSources.push(mergeSources(entry1, entry2));
-	    }
-	}
+        for (const entry2 of sources2) { // TODO sources2 of sourcesList2
+            Debug(`nameSrcList1: ${entry1.primaryNameSrcList}, nameSrcList2: ${entry2.primaryNameSrcList}`);
+            if (logging) console.log(`mergeCompat: nameSrcList1: ${entry1.primaryNameSrcList}, nameSrcList2: ${entry2.primaryNameSrcList}`);
+            if (_.isEmpty(_.intersectionBy(entry1.primarySrcList, entry2.primarySrcList, _.toNumber))) {
+                mergedSources.push(mergeSources(entry1, entry2));
+            }
+        }
     }
     return mergedSources;
 }
@@ -109,9 +133,9 @@ function mergeAllCompatibleSources (ncList) {
     Expect(ncList.length).is.above(0);
     let sources = getSourcesList(ClueManager.getKnownSourceMapEntries(ncList[0]));
     for (let ncIndex = 1; ncIndex < ncList.length; ncIndex += 1) {
-	const nextSources = getSourcesList(ClueManager.getKnownSourceMapEntries(ncList[ncIndex]));
-	sources = mergeCompatibleSourcesLists(sources, nextSources);
-	if (_.isEmpty(sources)) break;
+        const nextSources = getSourcesList(ClueManager.getKnownSourceMapEntries(ncList[ncIndex]));
+        sources = mergeCompatibleSourcesLists(sources, nextSources);
+        if (_.isEmpty(sources)) break;
     }
     return sources;
 }
@@ -130,81 +154,84 @@ function mergeAllCompatibleSources (ncList) {
 //    }
 //  }
 //}
+//
+//{
+//  'face:1': [              // single top-level primary source with array value type, allow
+//    'face:10'
+//  ]
+//}
 
-function recursiveAddSrcNcLists (list, obj) {
-    let keys = _.keys(obj).flatMap(key => {
-	let val = obj[key];
-	if (_.isObject(val)) {
-	    if (!_.isArray(val)) return key;
-	    // split multiple primary sources into separate keys
-	    let multiplePrimarySourceKeys = key.split(',');
-	    if (multiplePrimarySourceKeys.length > 1) return multiplePrimarySourceKeys;
-	    // else ignore a single primary source key with array value type
-	}
-	return [];
+
+function recursiveAddSrcNcLists (list, obj, top) {
+    // TODO This is broken for top-level primary sources as above
+
+    let keys = _.flatMap(_.keys(obj), key => {
+        let val = obj[key];
+        if (_.isObject(val)) {
+            if (!_.isArray(val)) return key;
+            // split multiple primary sources into separate keys
+            let multiplePrimarySourceKeys = key.split(',');
+            if (multiplePrimarySourceKeys.length > 1) return multiplePrimarySourceKeys;
+	    // allow top level single primary source key with array value type
+	    if (top) return key;
+            // ignore nested single primary source key with array value type
+        }
+        return [];
     });
     if (!_.isEmpty(keys)) {
-	list.push(keys);
-	keys.forEach(key => {
-	    if (obj[key]) recursiveAddSrcNcLists(list, obj[key]);
-	});
+        list.push(keys);
+        keys.forEach(key => {
+            if (obj[key]) recursiveAddSrcNcLists(list, obj[key], false);
+        });
     }
     return list;
 }
 
 function buildSrcNcLists (obj) {
-    return recursiveAddSrcNcLists([], obj);
+    return recursiveAddSrcNcLists([], obj, true);
 }
 
-function isUseNcListInAnyResultMap (useNcList, sourceNcList) {
-    for (let sourceNc of sourceNcList) {
-	const entries = ClueManager.getKnownSourceMapEntries(sourceNc);
-	for (let entry of entries) {
-            for (let result of entry.results) {
-		if (result.resultMap) {
-		    if (!result.srcNcLists) {
-			result.srcNcLists = buildSrcNcLists(result.resultMap.map());
-			if (_.isEmpty(result.srcNcLists)) throw new Error(`empty srcNcLists for {Stringify(result.resultMap.map())}`);
-		    }
-		    for (let ncList of result.srcNcLists) {
-			if (_.intersectionBy(ncList, useNcList, _.toString).length === useNcList.length) {
-			    // any match is success
-			    return true;
-			}
-		    }
-		    Debug(`${useNcList} is not in:\n${Stringify(result.resultMap.map())}`);
-		}
-	    }
-	}
+function partialMatchAnyNcList (ncList, matchNcLists) {
+    for (let matchNcList of matchNcLists) {
+	let match = _.intersectionBy(ncList, matchNcList, _.toString).length == ncList.length;
+	// log nclist, matchlist, match
+	if (match) return true;
     }
     return false;
 }
 
+
 function mergeAllUsedSources (sourcesList, useNcLists) {
     for (let useNcList of useNcLists) {
-	let mergedSourcesList = [];
-	let useSourcesList = mergeAllCompatibleSources(useNcList);
-	if (_.isEmpty(useSourcesList)) throw new Error(`sources not compatible: ${useNcList}`);
-	for (let useSources of useSourcesList) {
-	    for (let sources of sourcesList) {
-		const numCommonPrimarySources = _.intersectionBy(sources.primarySrcList, useSources.primarySrcList, _.toNumber).length;
-		let valid = numCommonPrimarySources === 0;
-		if (numCommonPrimarySources === useSources.primarySrcList.length) {
-		    if ((useNcList.length === 1 && useNcList[0].count === 1) ||
-			(_.intersectionBy(sources.ncList, useNcList, _.toString).length === useNcList.length) ||
-			isUseNcListInAnyResultMap(useNcList, sources.ncList)) {
+        let mergedSourcesList = [];
+        let useSourcesList = mergeAllCompatibleSources(useNcList);
+        if (_.isEmpty(useSourcesList)) throw new Error(`sources not compatible: ${useNcList}`);
+        for (let useSources of useSourcesList) {
+            for (let sources of sourcesList) {
+                const numCommonPrimarySources = _.intersectionBy(sources.primarySrcList, useSources.primarySrcList, _.toNumber).length;
+                let valid = numCommonPrimarySources === 0;
 
-			valid = true;
-		    }
+                const allCommonPrimarySources = numCommonPrimarySources === useSources.primarySrcList.length;
+                const singlePrimaryNc = useNcList.length === 1 && useNcList[0].count === 1;
+
+                if (allCommonPrimarySources) {
+                    if (singlePrimaryNc || partialMatchAnyNcList(useNcList, sources.srcNcLists)) {
+                        valid = true;
+                    }
+                }
+                if (valid) {
+		    // TODO: i get the feeling that is merging ncList is not working here, doubling up ncList when merging face,card
+                    mergedSourcesList.push(mergeSources(sources, useSources));
+                }
+                if (logging) {
+		    console.log(`  valid: ${valid}, useNcList: ${useNcList}`);
+		    console.log(`    sources:   ${showNcLists(sources.srcNcLists)}, primary: ${sources.primaryNameSrcList}`);
+		    console.log(`    useNcList: ${useNcList}, primary: ${useSources.primaryNameSrcList}`);
+		    console.log(`    allCommon: ${allCommonPrimarySources}, singlePrimaryNc: ${singlePrimaryNc}`);
 		}
-		if (valid) {
-		    mergedSourcesList.push(mergeSources(sources, useSources));
-		} else {
-		    if (logging) console.log(`merge2: nameSrcList1: ${sources.primaryNameSrcList}, nameSrcList2: ${useSources.primaryNameSrcList}`);
-		}
-	    }
-	}
-	sourcesList = mergedSourcesList;
+            }
+        }
+        sourcesList = mergedSourcesList;
     }
     return sourcesList;
 }
@@ -276,32 +303,27 @@ ComboMaker.prototype.makeCombos = function(args, options = {}) {
             Log.info(`result.nameList: ${result.nameList}`);
             Log.info(`result.ncList: ${result.ncList}`);
 
-	    /////////////////////////	    
-	    //logging = (result.nameList.toString() === 'eagle,hill');
-	    /////////////////////////	    
+            //logging = result.nameList.toString() === 'king,pitcher' ;
+	    //		|| result.nameList.toString() === 'cardinal,smith';
 
-	    let sources = mergeAllCompatibleSources(result.ncList);
-	    
-	    /////////////////////////	    
-	    if (logging) console.log(`   empty1: ${_.isEmpty(sources)}`);
-	    /////////////////////////	    
+            let sources = mergeAllCompatibleSources(result.ncList);
+            
+            if (logging) console.log(`  found compatible sources: ${!_.isEmpty(sources)}`);
 
-	    // failed to find any compatible combos
-	    if (_.isEmpty(sources)) continue;
+            // failed to find any compatible combos
+            if (_.isEmpty(sources)) continue;
 
-	    // TODO maybe: save each sources.origNcList here
+            // TODO maybe: save each sources.origNcList here
 
-	    if (useNcLists) {
-		sources = mergeAllUsedSources(sources, useNcLists);
-	    }
-	    
-	    /////////////////////////	    
-	    if (logging) console.log(`   empty2: ${_.isEmpty(sources)}`);
-	    /////////////////////////	    
+            if (useNcLists) {
+                sources = mergeAllUsedSources(sources, useNcLists);
+            }
+            
+            if (logging) console.log(`  compatible with used clues: ${!_.isEmpty(sources)}`);
 
-	    if (_.isEmpty(sources)) continue;
+            if (_.isEmpty(sources)) continue;
 
-	    if (csvNameList.length < args.maxResults) {
+            if (csvNameList.length < args.maxResults) {
                 csvNameList.push(result.nameList.toString());
             }
             if ((++totalCount % 10000) === 0) {
@@ -320,7 +342,7 @@ ComboMaker.prototype.makeCombos = function(args, options = {}) {
           `, skip(${skipCount})`);
 
     return csvNameList;
-}
+};
 
 //
 // args:
@@ -356,8 +378,8 @@ ComboMaker.prototype.old_makeCombos = function(args, options = {}) {
     if (args.use) {
         let buildResult = this.old_buildUseNcList(args.use);
         useNcList = buildResult.ncList;
-	useNameList = NameCount.makeNameList(useNcList);
-	useSum = NameCount.makeCountList(useNcList).reduce((a, b) => (a + b));
+        useNameList = NameCount.makeNameList(useNcList);
+        useSum = NameCount.makeCountList(useNcList).reduce((a, b) => (a + b));
         Debug(`useNcList: ${useNcList}, useNameList: ${useNameList}, sum: ${useSum}`);
     }
     let validateAll = false;
@@ -413,35 +435,35 @@ ComboMaker.prototype.old_makeCombos = function(args, options = {}) {
             */
 
             // if useNcList, all nc must exist in current combo's nc list
-	    // NEW WAY - is this true? no. not every combo must contain a used NC,
-	    // combo's must only be compatible with all used NC.s
-	    let useCountList = [];
-	    if (useNcList) {
-		if (options.allow_used) {
-		    // TODO: filter NCs out of useNcList that are in result.ncList
-		    const useNcDiff = _.differenceBy(useNcList, result.ncList, _.toString);
-		    useNameList = NameCount.makeNameList(useNcDiff);
-		    useCountList = NameCount.makeCountList(useNcDiff);
-		    useSum = useCountList.reduce((a, b) => (a + b), 0);
-		} else {
-		    const numUsed = _.intersectionBy(useNcList, result.ncList, _.toString).length;
-		    // it is entirely possible to have a combo that doesn't
-		    // have any values from useNcList, it only has to be
-		    // *compatible* with useNcList.
-		    /*
+            // NEW WAY - is this true? no. not every combo must contain a used NC,
+            // combo's must only be compatible with all used NC.s
+            let useCountList = [];
+            if (useNcList) {
+                if (options.allow_used) {
+                    // TODO: filter NCs out of useNcList that are in result.ncList
+                    const useNcDiff = _.differenceBy(useNcList, result.ncList, _.toString);
+                    useNameList = NameCount.makeNameList(useNcDiff);
+                    useCountList = NameCount.makeCountList(useNcDiff);
+                    useSum = useCountList.reduce((a, b) => (a + b), 0);
+                } else {
+                    const numUsed = _.intersectionBy(useNcList, result.ncList, _.toString).length;
+                    // it is entirely possible to have a combo that doesn't
+                    // have any values from useNcList, it only has to be
+                    // *compatible* with useNcList.
+                    /*
                       if (numUsed !== useNcList.length) {
                       Debug(`skip1: ${result.ncList}`);
                       ++skipCount;
                       continue;
                       }
-		    */
-		    /* I don't want to skip used.  --option maybe.
-		    if (numUsed > 0) {
-			Debug(`skip used (${numUsed}): ${result.ncList}`);
-			continue;
-		    }
-		    */
-		}
+                    */
+                    /* I don't want to skip used.  --option maybe.
+                    if (numUsed > 0) {
+                        Debug(`skip used (${numUsed}): ${result.ncList}`);
+                        continue;
+                    }
+                    */
+                }
             }
 
             // if --remaining was specified, filter out all source lists
@@ -450,22 +472,22 @@ ComboMaker.prototype.old_makeCombos = function(args, options = {}) {
                 continue;
             }
 
-	    // NEW WAY - add all used clues to nameList that are not already in it,
-	    //           and increase sum accordingly
-	    let nameList = result.nameList;
-	    let sum = args.sum;
-	    if (useNameList) {
-		nameList = _.concat(nameList, useNameList);
-		sum += useSum;
-	    }
+            // NEW WAY - add all used clues to nameList that are not already in it,
+            //           and increase sum accordingly
+            let nameList = result.nameList;
+            let sum = args.sum;
+            if (useNameList) {
+                nameList = _.concat(nameList, useNameList);
+                sum += useSum;
+            }
 
-	    // NEW WAY - add all used clue counts to 'require', might speed it up a bit
-	    let requiredAndUsedCounts = _.concat(require, useCountList);
+            // NEW WAY - add all used clue counts to 'require', might speed it up a bit
+            let requiredAndUsedCounts = _.concat(require, useCountList);
 
 //            let start = new Date();
             let validateResult = { success: true };
             if (!options.merge_style) {
-//		console.log(`validating: ${nameList}, sum ${sum}, useNameList ${useNameList}`);
+//              console.log(`validating: ${nameList}, sum ${sum}, useNameList ${useNameList}`);
                 validateResult = Validator.validateSources({
                     sum/*:         args.sum*/,
                     nameList/*:    result.nameList*/,
@@ -476,7 +498,7 @@ ComboMaker.prototype.old_makeCombos = function(args, options = {}) {
             }
 //            let duration = new Duration(start, new Date());
 
-//	    console.log(`valid: ${validateResult.success}, duration: ${PrettyMs(duration.milliseconds)}`);
+//          console.log(`valid: ${validateResult.success}, duration: ${PrettyMs(duration.milliseconds)}`);
 
             if (validateResult.success) {
 
@@ -488,7 +510,7 @@ ComboMaker.prototype.old_makeCombos = function(args, options = {}) {
                         continue;
                     }
                 }
-		// if output as primary clues
+                // if output as primary clues
                 if (options.primary) {
                     validateResult.list.forEach(vr => {
                         Debug(`${vr.ncList}`);
@@ -520,7 +542,7 @@ ComboMaker.prototype.old_makeCombos = function(args, options = {}) {
           `, skip(${skipCount})`);
 
     return csvNameList;
-}
+};
 
 // As long as one final result has only primary sources from 'sources'
 // array, we're good.
@@ -532,24 +554,24 @@ ComboMaker.prototype.checkPrimarySources = function(resultList, sources) {
                 return _.includes(sources, source);
             });
     });
-}
+};
 
 //
 
 ComboMaker.prototype.buildUseNcLists = function(useArgsList) {
     let useNcLists = [];
     useArgsList.forEach(useArg =>  {
-	let args = useArg.split(',');
-	let ncList = args.map(arg => {
+        let args = useArg.split(',');
+        let ncList = args.map(arg => {
             let nc = NameCount.makeNew(arg);
             if (!nc.count) throw new Error(`arg: ${arg} requires a :COUNT`);
             if (!_.has(ClueManager.knownClueMapArray[nc.count], nc.name)) throw new Error(`arg: ${nc} does not exist`);
-	    return nc;
-	});
+            return nc;
+        });
         useNcLists.push(ncList);
     });
     return useNcLists;
-}
+};
 
 ComboMaker.prototype.old_buildUseNcList = function(args) {
     let ncList = [];
@@ -562,7 +584,7 @@ ComboMaker.prototype.old_buildUseNcList = function(args) {
         ncList.push(nc);
     });
     return { ncList, countList };
-}
+};
 
 //
 //
@@ -580,7 +602,7 @@ ComboMaker.prototype.hasUniqueClues = function(clueList) {
         }
     }
     return true;
-}
+};
 
 //
 
@@ -588,7 +610,7 @@ ComboMaker.prototype.testSetKey = function(map, key, value = true) {
     if (_.has(map, key)) return false;
     map[key] = value;
     return true;
-}
+};
 
 //
 
@@ -601,7 +623,7 @@ ComboMaker.prototype.displaySourceListArray = function(sourceListArray) {
         });
         console.log('-----\n');
     });
-}
+};
 
 //
 
@@ -611,7 +633,7 @@ ComboMaker.prototype.first = function(clueSourceList, sourceIndexes, options = {
     }
     sourceIndexes[sourceIndexes.length - 1] = -1;
     return this.next(clueSourceList, sourceIndexes, options);
-}
+};
 
 //
 
@@ -663,7 +685,7 @@ ComboMaker.prototype.next = function(clueSourceList, sourceIndexes, options = {}
             nameList: nameList
         };
     }
-}
+};
 
 //
 //
@@ -675,7 +697,7 @@ ComboMaker.prototype.addComboToFoundHash = function(nameListCsv) {
     //Debug('skipping duplicate combo: ' + nameListCsv);
     ++this.nextDupeCombo;
     return false;
-}
+};
 
 //
 //
@@ -695,7 +717,7 @@ ComboMaker.prototype.nextIndex = function(clueSourceList, sourceIndexes) {
         ++sourceIndexes[index];
     }
     return true;
-}
+};
 
 //
 //
@@ -707,7 +729,7 @@ ComboMaker.prototype.displayCombos = function(clueListArray) {
         ++count;
     });
     console.log('total = ' + count);
-}
+};
 
 //
 //
@@ -723,5 +745,5 @@ ComboMaker.prototype.clueListToString = function(clueList) {
         }
     });
     return str;
-}
+};
 
