@@ -87,7 +87,7 @@ function compatibleKnownClues(args) {
                             nameCount:      nc,
                             resultList:     resultList,
                             excludeSrcList: primarySrcList,
-                            nameMapArray:   matchNameMapArray,
+                            nameMapArray:   matchNameMapArray
                         });
                     }
                     else {
@@ -178,6 +178,18 @@ function addToCompatibleMap(args) {
     });
 }
 
+function primarySourceListSortFunc (a, b) {
+//    return a.primarySrcList.toString().localeCompare(b.primarySrcList.toString());
+    if (a.length != b.length) return a.length - b.length;
+    if (a.length === 1) return _.toNumber(a[0]) - _.toNumber(b[0]);
+    for (let index = 0; index < a.length; index += 1) {
+	if (_.toNumber(a[index]) !== _.toNumber(b[index])) {
+	    return _.toNumber(a[index]) - _.toNumber(b[index]);
+	}
+    }
+    return 0;
+}
+
 // args:
 //  nameList:    
 //  srcList:     
@@ -212,9 +224,10 @@ function dumpCompatibleClues(args) {
         }).flatten().value();                           // to array of elements
 
         if (!_.isEmpty(dumpList)) {
-            dumpList.sort((a, b) => {
-                return a.primarySrcList.toString().localeCompare(b.primarySrcList.toString());
-            });
+	    dumpList.forEach(entry => {
+		entry.primarySrcList.sort((a,b) => _.toNumber(a) - _.toNumber(b));
+	    });
+            dumpList.sort((a, b) => primarySourceListSortFunc(a.primarySrcList, b.primarySrcList));
             dumpCompatibleClueList(dumpList, args, rawNameList);
         }
     }

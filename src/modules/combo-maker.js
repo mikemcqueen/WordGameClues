@@ -27,6 +27,10 @@ const Validator   = require('./validator');
 let logging = false;
 
 
+const Op = { 'and':1, 'or':2, 'xor':3 };
+Object.freeze(Op);
+
+
 //
 //
 
@@ -201,21 +205,30 @@ function partialMatchAnyNcList (ncList, matchNcLists) {
 }
 
 
-function mergeAllUsedSources (sourcesList, useNcLists) {
+function mergeAllUsedSources (sourcesList, useNcLists, op) {
     for (let useNcList of useNcLists) {
         let mergedSourcesList = [];
         let useSourcesList = mergeAllCompatibleSources(useNcList);
-        if (_.isEmpty(useSourcesList)) throw new Error(`sources not compatible: ${useNcList}`);
+	// we can ignore this error because some useSources entries may be invalid, particularly if the sources
+	// were provided without a [:COUNT] were mapped to all possible counts.
+        //if (_.isEmpty(useSourcesList)) throw new Error(`sources not compatible: ${useNcList}`);
         for (let useSources of useSourcesList) {
             for (let sources of sourcesList) {
                 const numCommonPrimarySources = _.intersectionBy(sources.primarySrcList, useSources.primarySrcList, _.toNumber).length;
-                let valid = numCommonPrimarySources === 0;
-
                 const allCommonPrimarySources = numCommonPrimarySources === useSources.primarySrcList.length;
                 const singlePrimaryNc = useNcList.length === 1 && useNcList[0].count === 1;
 
-                if (allCommonPrimarySources) {
-                    if (singlePrimaryNc || partialMatchAnyNcList(useNcList, sources.srcNcLists)) {
+		// the problem here is that i'm not ANDing or XORing with only the original clue combos, but
+		// with the accumulation of previously merged used clues
+
+                let valid = false;
+		if (op !== Op.and) { // or, xor
+		    if (numCommonPrimarySources === 0) {
+			valid = true;
+		    }
+		}
+                if (!valid && (op !== Op.xor)) { // or, and
+		    if (allCommonPrimarySources && (singlePrimaryNc || partialMatchAnyNcList(useNcList, sources.srcNcLists))) {
                         valid = true;
                     }
                 }
@@ -224,7 +237,7 @@ function mergeAllUsedSources (sourcesList, useNcLists) {
                     mergedSourcesList.push(mergeSources(sources, useSources));
                 }
                 if (logging) {
-                    console.log(`  valid: ${valid}, useNcList: ${useNcList}`);
+                    console.log(`  valid: ${valid}, useNcList: ${useNcList}, op: ${op}`);
                     console.log(`    sources:   ${showNcLists(sources.srcNcLists)}, primary: ${sources.primaryNameSrcList}`);
                     console.log(`    useNcList: ${useNcList}, primary: ${useSources.primaryNameSrcList}`);
                     console.log(`    allCommon: ${allCommonPrimarySources}, singlePrimaryNc: ${singlePrimaryNc}`);
@@ -233,6 +246,7 @@ function mergeAllUsedSources (sourcesList, useNcLists) {
         }
         sourcesList = mergedSourcesList;
     }
+    if (logging) console.log(`  mergeUsed, op: ${op}, count: ${sourcesList.length}`);
     return sourcesList;
 }
 
@@ -262,11 +276,11 @@ ComboMaker.prototype.makeCombos = function(args, options = {}) {
     let require = args.require ? _.clone(args.require) : [];
     if (!_.isEmpty(args.require)) throw new Error('require not yet supported');
     if (args.sources) throw new Error('sources not yet supported');
-    if (options.remaining) throw new Error('remaining not yet supported');
 
     this.hash = {};
     let allCombos = [];
 
+    /*
     let allUseNcLists = args.use ? buildAllUseNcLists(args.use) : [ [] ];
     for (let useNcLists of allUseNcLists) {
         let comboArgs = {
@@ -277,6 +291,50 @@ ComboMaker.prototype.makeCombos = function(args, options = {}) {
         let combos = this.getCombosForUseNcLists(comboArgs, options);
         allCombos.push(...combos);
     }
+    */
+
+    // XOR first
+    let allXorNcLists = args.xor ? buildAllUseNcLists(args.xor) : [ [] ];
+    for (let xorNcLists of allXorNcLists) {
+        let comboArgs = {
+            sum: args.sum,
+            max: args.max,
+            useNcLists: xorNcLists,
+	    op: Op.xor
+        };
+        let combos = this.getCombosForUseNcLists(comboArgs, options);
+        allCombos.push(...combos);
+    }
+
+    /*
+    // AND second
+    let allAndNcLists = args.and ? buildAllUseNcLists(args.and) : [ [] ];
+    for (let andNcLists of allAndNcLists) {
+        let comboArgs = {
+            sum: args.sum,
+            max: args.max,
+            useNcLists: andNcLists,
+	    op: Op.and
+        };
+        let combos = this.getCombosForUseNcLists(comboArgs, options);
+        allCombos.push(...combos);
+    }
+    */
+
+    /*
+    let allOrNcLists = args.or ? buildAllUseNcLists(args.or) : [ [] ];
+    for (let orNcLists of allOrNcLists) {
+        let comboArgs = {
+            sum: args.sum,
+            max: args.max,
+            orNcLists,
+	    op: Op.or
+        };
+        let combos = this.getCombosForUseNcLists(comboArgs, options);
+        allCombos.push(...combos);
+    }
+    */
+
 
     Debug(`dupeClue(${this.nextDupeClue})` +
           `, dupeSrc(${this.nextDupeSrc})` +
@@ -313,7 +371,7 @@ ComboMaker.prototype.getCombosForUseNcLists = function(args, options = {}) {
             Log.info(`result.nameList: ${result.nameList}`);
             Log.info(`result.ncList: ${result.ncList}`);
 
-            //logging = result.nameList.toString() === 'king,pitcher' ;
+            //logging = result.nameList.toString() === 'braves,prince';
             //          || result.nameList.toString() === 'cardinal,smith';
 
             let sources = mergeAllCompatibleSources(result.ncList);
@@ -326,7 +384,7 @@ ComboMaker.prototype.getCombosForUseNcLists = function(args, options = {}) {
             // TODO maybe: save each sources.origNcList here
 
             if (!_.isEmpty(args.useNcLists)) {
-                sources = mergeAllUsedSources(sources, args.useNcLists);
+                sources = mergeAllUsedSources(sources, args.useNcLists, args.op);
                 if (logging) console.log(`  compatible with used clues: ${!_.isEmpty(sources)}`);
                 if (_.isEmpty(sources)) continue;
             }
@@ -378,15 +436,15 @@ function combinationNcList (combo, ncLists) {
 function ncListsToCombinations (ncLists) {
     return Peco.makeNew({
         listArray: ncLists.map(ncList => [...Array(ncList.length).keys()]),
-        max: ncLists.reduce((sum, ncList) => sum + ncList.length, 0)        // sum of lengths of nclists
-    })  .getCombinations()
-        .map(combo => combinationNcList(combo, ncLists));
+        max: ncLists.reduce((sum, ncList) => sum + ncList.length, 0)                  // sum of lengths of nclists
+    }).getCombinations()
+      .map(combo => combinationNcList(combo, ncLists));
 }
 
 function combinationsToNcLists (combinationNcLists) {
     return Peco.makeNew({
         listArray: combinationNcLists.map(ncList => [...Array(ncList.length).keys()]),
-        max: combinationNcLists.reduce((sum, ncList) => sum + ncList.length, 0)        // sum of lengths of nclists
+        max: combinationNcLists.reduce((sum, ncList) => sum + ncList.length, 0)       // sum of lengths of nclists
     }).getCombinations()
       .map(combo => combinationNcList(combo, combinationNcLists));
 }

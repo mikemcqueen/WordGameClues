@@ -40,6 +40,9 @@ const CmdLineOptions = Opt.create(_.concat(Clues.Options, [
     ['o', 'output',                            '  output json -or- clues(huh?)'],
     ['c', 'count=COUNT[LO,COUNTHI]',           'show combos of the specified COUNT; if COUNTHI, treat as range'],
     ['x', 'max=COUNT',                         '  maximum # of sources to combine'],
+    ['',  'and=NAME[:COUNT][,NAME[:COUNT]]+',  '  combos must have source NAME[:COUNT]'],
+    ['',  'xor=NAME[:COUNT][,NAME[:COUNT]]+',  '  combos must not have, and must be compatible with, source NAME[:COUNT]'],
+    ['',  'or=NAME[:COUNT][,NAME[:COUNT]]+',   '  combos may either have, or be compatible with, source NAME[:COUNT]'],
     ['',  'primary',                           '  show combos as primary source clues' ],
     ['',  'copy-from=SOURCE',                  'copy clues from source cluetype; e.g. p1.1'],
     ['',  'save',                              '  save clue files'],
@@ -98,6 +101,7 @@ function loadClues (clues, ignoreLoadErrors) {
     return true;
 }
 
+// unused
 function convertUseToPrimarySources (args) {
     // build ncList of supplied name:counts
     const ncList = args.use.map(ncStr => NameCount.makeNew(ncStr));
@@ -171,8 +175,8 @@ function doCombos(args, options) {
     Debug('++combos' +
           `, sum: ${sumRange}` +
           `, max: ${args.max}` +
-          `, require: ${args.require}` +
-          `, sources: ${args.sources}` +
+//          `, require: ${args.require}` +
+//          `, sources: ${args.sources}` +
           `, use: ${args.use}`);
     
     let total = 0;
@@ -456,14 +460,18 @@ async function main () {
             sources = ClueManager.getInversePrimarySources(sources.split(',')).join(',');
             console.log(`inverse sources: ${sources}`);
         }
+	let combo_options = {};
         return combo_maker({
             sum:     options.count,
             max:     maxArg,
             require: options['require-counts'],
             sources,
             use:     useClueList,
-            primary: options.primary
-        }, options);
+            primary: options.primary,
+	    and:     options.and,
+	    or:      options.or,
+	    xor:     options.xor
+        }, combo_options);
     }
 }
 
