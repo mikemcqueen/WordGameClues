@@ -30,6 +30,9 @@ let logging = false;
 const Op = { 'and':1, 'or':2, 'xor':3 };
 Object.freeze(Op);
 
+function OpName (opValue) {
+    return _.findKey(Op, (v) => opValue === v);
+}
 
 //
 //
@@ -105,15 +108,15 @@ function showNcLists (ncLists) {
 
 function mergeSources (sources1, sources2) {
     let mergedSources = {};
-    mergedSources.ncList = _.concat(sources1.ncList, sources2.ncList);
-    mergedSources.primaryNameSrcList = _.concat(sources1.primaryNameSrcList, sources2.primaryNameSrcList);
-    mergedSources.primarySrcList = NameCount.makeCountList(mergedSources.primaryNameSrcList);
+    mergedSources.ncList = _.concat(sources1.ncList, sources2.ncList); // TODO: _uniqBy(, _.toString)
+    mergedSources.primaryNameSrcList = _.concat(sources1.primaryNameSrcList, sources2.primaryNameSrcList);// TODO: _uniqBy(, _.toString)
+    mergedSources.primarySrcList = NameCount.makeCountList(mergedSources.primaryNameSrcList);// TODO: _uniqBy(, _.toString)
     // move to getSourcesLists
     let srcNcLists1 = sources1.srcNcLists;
     let srcNcLists2 = sources2.srcNcLists;
     if (logging) console.log(`srcNcLists1: ${showNcLists(srcNcLists1)}`);
     if (logging) console.log(`srcNcLists2: ${showNcLists(srcNcLists2)}`);
-    mergedSources.srcNcLists = _.concat(srcNcLists1, srcNcLists2);
+    mergedSources.srcNcLists = _.concat(srcNcLists1, srcNcLists2);// TODO: _uniqBy(, _.toString)? maybe not necessary here
     if (logging) console.log(`  merged: ${showNcLists(mergedSources.srcNcLists)}`);
 
     return mergedSources;
@@ -204,6 +207,29 @@ function partialMatchAnyNcList (ncList, matchNcLists) {
     return false;
 }
 
+//
+// useNcLists:
+//
+//
+// useNcList:
+//
+//
+// sourcesList, list of:
+//   ncList
+//   resultMap
+//   primaryNameSrcList = result.ncList.map(nc => ClueManager.primaryNcToNameSrc(nc));
+//   primarySrcList = NameCount.makeCountList(result.primaryNameSrcList);
+//   srcNcLists = result.resultMap ? buildSrcNcLists(result.resultMap.map()) : [ result.ncList ];
+//
+// sources:
+//   one entry from sources liste
+//
+// useSourcesList:
+//
+//
+// useSources:
+//
+//
 
 function mergeAllUsedSources (sourcesList, useNcLists, op) {
     for (let useNcList of useNcLists) {
@@ -223,9 +249,7 @@ function mergeAllUsedSources (sourcesList, useNcLists, op) {
 
                 let valid = false;
 		if (op !== Op.and) { // or, xor
-		    if (numCommonPrimarySources === 0) {
-			valid = true;
-		    }
+		    valid = numCommonPrimarySources === 0;
 		}
                 if (!valid && (op !== Op.xor)) { // or, and
 		    if (allCommonPrimarySources && (singlePrimaryNc || partialMatchAnyNcList(useNcList, sources.srcNcLists))) {
@@ -237,7 +261,7 @@ function mergeAllUsedSources (sourcesList, useNcLists, op) {
                     mergedSourcesList.push(mergeSources(sources, useSources));
                 }
                 if (logging) {
-                    console.log(`  valid: ${valid}, useNcList: ${useNcList}, op: ${op}`);
+                    console.log(`  valid: ${valid}, useNcList: ${useNcList}, op: ${OpName(op)}`);
                     console.log(`    sources:   ${showNcLists(sources.srcNcLists)}, primary: ${sources.primaryNameSrcList}`);
                     console.log(`    useNcList: ${useNcList}, primary: ${useSources.primaryNameSrcList}`);
                     console.log(`    allCommon: ${allCommonPrimarySources}, singlePrimaryNc: ${singlePrimaryNc}`);
@@ -246,9 +270,87 @@ function mergeAllUsedSources (sourcesList, useNcLists, op) {
         }
         sourcesList = mergedSourcesList;
     }
-    if (logging) console.log(`  mergeUsed, op: ${op}, count: ${sourcesList.length}`);
+    if (logging) console.log(`  mergeUsed, op: ${OpName(op)}, count: ${sourcesList.length}`);
     return sourcesList;
 }
+
+function applyUseNcListOperators (sourcesList, args) {
+    // XOR first
+    for (let xorNcLists of args.allXorNcLists) {
+	let xorSources = sourcesList;
+	if (!_.isEmpty(xorNcLists)) {
+            xorSources = mergeAllUsedSources(xorSources, xorNcLists, Op.xor);
+            if (logging) console.log(`  compatible with XOR: ${!_.isEmpty(xorSources)}`);
+	    if (_.isEmpty(xorSources)) continue;
+	}
+	// AND next
+	for (let andNcLists of args.allAndNcLists) {
+	    let andSources = xorSources;
+	    if (!_.isEmpty(andNcLists)) {
+		andSources = mergeAllUsedSources(andSources, andNcLists, Op.and);
+		if (logging) console.log(`  compatible with AND: ${!_.isEmpty(andSources)}`);
+		if (_.isEmpty(andSources)) continue;
+	    }
+	    // OR last
+	    for (let orNcLists of args.allOrNcLists) {
+		let orSources = andSources;
+		if (!_.isEmpty(orNcLists)) {
+		    orSources = mergeAllUsedSources(orSources, orNcLists, Op.or);
+		    if (logging) console.log(`  compatible with OR: ${!_.isEmpty(orSources)}`);
+		    if (_.isEmpty(orSources)) continue;
+		}
+		return true;
+	    }
+	}
+    }
+    return false;
+}
+
+ComboMaker.prototype.getCombosForUseNcLists = function(args, options = {}) {
+    let combos = [];
+
+    // for each sourceList in sourceListArray
+    ClueManager.getClueSourceListArray({
+        sum: args.sum,
+        max: args.max
+    }).forEach(clueSourceList => {
+        //Debug(`clueSourceList: ${Stringify(clueSourceList)}`);
+        let sourceIndexes = [];
+
+        let result = this.first(clueSourceList, sourceIndexes);
+        if (result.done) return; // continue; 
+
+        // this is effectively Peco.getCombinations().forEach()
+        let first = true;
+        while (!result.done) {
+            if (!first) {
+                result = this.next(clueSourceList, sourceIndexes, options);
+                if (result.done) break;
+            } else {
+                first = false;
+            }
+
+            Log.info(`result.nameList: ${result.nameList}`);
+            Log.info(`result.ncList: ${result.ncList}`);
+
+            //logging = result.nameList.toString() === 'dark,wood';
+            //          || result.nameList.toString() === 'cardinal,smith';
+
+            let sources = mergeAllCompatibleSources(result.ncList);
+            
+            if (logging) console.log(`  found compatible sources: ${!_.isEmpty(sources)}`);
+
+            // failed to find any compatible combos
+            if (_.isEmpty(sources)) continue;
+
+	    if (applyUseNcListOperators(sources, args)) {
+		combos.push(result.nameList.toString());
+	    }
+        }
+    }, this);
+
+    return combos;
+};
 
 //
 // args:
@@ -293,8 +395,22 @@ ComboMaker.prototype.makeCombos = function(args, options = {}) {
     }
     */
 
-    // XOR first
+    let comboArgs = {
+        sum: args.sum,
+        max: args.max,
+        allXorNcLists: args.xor ? buildAllUseNcLists(args.xor) : [ [] ],
+        allAndNcLists: args.and ? buildAllUseNcLists(args.and) : [ [] ],
+        allOrNcLists: args.or ? buildAllUseNcLists(args.or) : [ [] ]
+    };
+    let combos = this.getCombosForUseNcLists(comboArgs, options);
+    allCombos.push(...combos);
+
+    /*
     let allXorNcLists = args.xor ? buildAllUseNcLists(args.xor) : [ [] ];
+    let allAndNcLists = args.and ? buildAllUseNcLists(args.and) : [ [] ];
+    let allOrNcLists = args.or ? buildAllUseNcLists(args.or) : [ [] ];
+
+    // XOR first
     for (let xorNcLists of allXorNcLists) {
         let comboArgs = {
             sum: args.sum,
@@ -306,9 +422,7 @@ ComboMaker.prototype.makeCombos = function(args, options = {}) {
         allCombos.push(...combos);
     }
 
-    /*
     // AND second
-    let allAndNcLists = args.and ? buildAllUseNcLists(args.and) : [ [] ];
     for (let andNcLists of allAndNcLists) {
         let comboArgs = {
             sum: args.sum,
@@ -322,7 +436,6 @@ ComboMaker.prototype.makeCombos = function(args, options = {}) {
     */
 
     /*
-    let allOrNcLists = args.or ? buildAllUseNcLists(args.or) : [ [] ];
     for (let orNcLists of allOrNcLists) {
         let comboArgs = {
             sum: args.sum,
@@ -341,58 +454,6 @@ ComboMaker.prototype.makeCombos = function(args, options = {}) {
           `, dupeCombo(${this.nextDupeCombo})`);
 
     return allCombos;
-};
-
-
-ComboMaker.prototype.getCombosForUseNcLists = function(args, options = {}) {
-    let combos = [];
-
-    // for each sourceList in sourceListArray
-    ClueManager.getClueSourceListArray({
-        sum: args.sum,
-        max: args.max
-    }).forEach(clueSourceList => {
-        //Debug(`clueSourceList: ${Stringify(clueSourceList)}`);
-        let sourceIndexes = [];
-
-        let result = this.first(clueSourceList, sourceIndexes);
-        if (result.done) return; // continue; 
-
-        // this is effectively Peco.getCombinations().forEach()
-        let first = true;
-        while (!result.done) {
-            if (!first) {
-                result = this.next(clueSourceList, sourceIndexes, options);
-                if (result.done) break;
-            } else {
-                first = false;
-            }
-
-            Log.info(`result.nameList: ${result.nameList}`);
-            Log.info(`result.ncList: ${result.ncList}`);
-
-            //logging = result.nameList.toString() === 'braves,prince';
-            //          || result.nameList.toString() === 'cardinal,smith';
-
-            let sources = mergeAllCompatibleSources(result.ncList);
-            
-            if (logging) console.log(`  found compatible sources: ${!_.isEmpty(sources)}`);
-
-            // failed to find any compatible combos
-            if (_.isEmpty(sources)) continue;
-
-            // TODO maybe: save each sources.origNcList here
-
-            if (!_.isEmpty(args.useNcLists)) {
-                sources = mergeAllUsedSources(sources, args.useNcLists, args.op);
-                if (logging) console.log(`  compatible with used clues: ${!_.isEmpty(sources)}`);
-                if (_.isEmpty(sources)) continue;
-            }
-            combos.push(result.nameList.toString());
-        }
-    }, this);
-
-    return combos;
 };
 
 // As long as one final result has only primary sources from 'sources'
