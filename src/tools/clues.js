@@ -312,7 +312,7 @@ function copyClues (fromType, options = {}) {
 	    copied += count;
 	}
     }
-    Log.info(`total: ${total}, copied: ${copied}`);
+    console.log(`total: ${total}, copied: ${copied}`);
 }
 
 //

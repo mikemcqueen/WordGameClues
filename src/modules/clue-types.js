@@ -407,6 +407,12 @@ const APPLE = {
         sentence:       10,
         clueCount:      21,
         REQ_CLUE_COUNT: 21
+    },
+
+    'f.5': {
+        sentence:       10,
+        clueCount:      42,
+        REQ_CLUE_COUNT: 42
     }
 
 };

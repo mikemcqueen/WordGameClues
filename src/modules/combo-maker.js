@@ -382,19 +382,6 @@ ComboMaker.prototype.makeCombos = function(args, options = {}) {
     this.hash = {};
     let allCombos = [];
 
-    /*
-    let allUseNcLists = args.use ? buildAllUseNcLists(args.use) : [ [] ];
-    for (let useNcLists of allUseNcLists) {
-        let comboArgs = {
-            sum: args.sum,
-            max: args.max,
-            useNcLists
-        };
-        let combos = this.getCombosForUseNcLists(comboArgs, options);
-        allCombos.push(...combos);
-    }
-    */
-
     let comboArgs = {
         sum: args.sum,
         max: args.max,
@@ -404,50 +391,6 @@ ComboMaker.prototype.makeCombos = function(args, options = {}) {
     };
     let combos = this.getCombosForUseNcLists(comboArgs, options);
     allCombos.push(...combos);
-
-    /*
-    let allXorNcLists = args.xor ? buildAllUseNcLists(args.xor) : [ [] ];
-    let allAndNcLists = args.and ? buildAllUseNcLists(args.and) : [ [] ];
-    let allOrNcLists = args.or ? buildAllUseNcLists(args.or) : [ [] ];
-
-    // XOR first
-    for (let xorNcLists of allXorNcLists) {
-        let comboArgs = {
-            sum: args.sum,
-            max: args.max,
-            useNcLists: xorNcLists,
-	    op: Op.xor
-        };
-        let combos = this.getCombosForUseNcLists(comboArgs, options);
-        allCombos.push(...combos);
-    }
-
-    // AND second
-    for (let andNcLists of allAndNcLists) {
-        let comboArgs = {
-            sum: args.sum,
-            max: args.max,
-            useNcLists: andNcLists,
-	    op: Op.and
-        };
-        let combos = this.getCombosForUseNcLists(comboArgs, options);
-        allCombos.push(...combos);
-    }
-    */
-
-    /*
-    for (let orNcLists of allOrNcLists) {
-        let comboArgs = {
-            sum: args.sum,
-            max: args.max,
-            orNcLists,
-	    op: Op.or
-        };
-        let combos = this.getCombosForUseNcLists(comboArgs, options);
-        allCombos.push(...combos);
-    }
-    */
-
 
     Debug(`dupeClue(${this.nextDupeClue})` +
           `, dupeSrc(${this.nextDupeSrc})` +
@@ -475,9 +418,9 @@ function getKnownNcListForName (name) {
 }
 
 //
-// Given a list of names or NcStrs, convert NcStrs to an array of (1) nc
+// Given a list of names and/or ncStrs, convert ncStrs to an array of (1) NC
 // and convert names to an array of all known NCs for that name.
-// Return a list of lists.
+// Return a list of list of NCs.
 //
 // ex:
 //  convert: [ 'billy', 'bob:1' ]
@@ -493,13 +436,18 @@ function combinationNcList (combo, ncLists) {
     return combo.map((ncIndex, listIndex) => ncLists[listIndex][ncIndex]);
 }
 
-
 function ncListsToCombinations (ncLists) {
     return Peco.makeNew({
-        listArray: ncLists.map(ncList => [...Array(ncList.length).keys()]),
-        max: ncLists.reduce((sum, ncList) => sum + ncList.length, 0)                  // sum of lengths of nclists
+        listArray: ncLists.map(ncList => [...Array(ncList.length).keys()]),       // keys of array are 0..ncList.length
+        max: ncLists.reduce((sum, ncList) => sum + ncList.length, 0)              // sum of lengths of nclists
     }).getCombinations()
       .map(combo => combinationNcList(combo, ncLists));
+}
+
+function getCombinationNcLists (useArgsList) {
+    return useArgsList.map(useArg => useArg.split(','))
+        .map(nameOrNcStrList => nameOrNcStrListToKnownNcList(nameOrNcStrList))
+        .map(knownNcLists => ncListsToCombinations(knownNcLists));
 }
 
 function combinationsToNcLists (combinationNcLists) {
@@ -508,12 +456,6 @@ function combinationsToNcLists (combinationNcLists) {
         max: combinationNcLists.reduce((sum, ncList) => sum + ncList.length, 0)       // sum of lengths of nclists
     }).getCombinations()
       .map(combo => combinationNcList(combo, combinationNcLists));
-}
-
-function getCombinationNcLists (useArgsList) {
-    return useArgsList.map(useArg => useArg.split(','))
-        .map(nameOrNcStrList => nameOrNcStrListToKnownNcList(nameOrNcStrList))
-        .map(knownNcLists => ncListsToCombinations(knownNcLists));
 }
 
 function buildAllUseNcLists (useArgsList) {
