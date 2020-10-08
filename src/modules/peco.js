@@ -65,8 +65,8 @@ function Peco(args) {
     }
     else {
         if (!this.sum) {
-            throw new Error('Peco: must specify sum > 0, ' + args.sum +
-                            ', or addends: ' + args.listArray);
+            throw new Error('Peco: must specify sum > 0 (' + args.sum +
+                            '), or addends: ' + args.listArray);
         }
         if (!this.count && !this.max) {
             throw new Error('Peco: must specify either count -or- max');

@@ -8,6 +8,7 @@
 
 module.exports = new ClueManager();
 
+//                     require('array-peek');
 const _              = require('lodash');
 const ClueList       = require('../types/clue-list');
 const Clues          = require('./clue-types');
@@ -59,7 +60,6 @@ ClueManager.prototype.log = function (text) {
 }
 
 //
-
 
 ClueManager.prototype.saveClueList = function (list, count, options = {}) {
     list.save(this.getKnownFilename(count, options.dir));
@@ -442,13 +442,52 @@ ClueManager.prototype.getSrcListMapForName = function (name) {
     return srcListMap;
 };
 
+// TODO this is failing with ncList.length > 1
+
+ClueManager.prototype.primaryNcListToNameSrcLists = function (ncList) {
+    let log = 0 && (ncList.length > 1); // nameSrcLists.length > 1) {
+    let srcLists = ncList.map(nc => this.primaryNcToSrcList(nc));
+    let indexLists = srcLists.map(srcList => [...Array(srcList.length).keys()]);  // e.g. [ [ 0 ], [ 0, 1 ], [ 0 ], [ 0 ] ]
+    let nameSrcLists = Peco.makeNew({
+        listArray: indexLists,
+        max:        999 // technically, clue-types[variety].max_clues
+    })  .getCombinations()
+	//.peek(indexList => {  if (log) console.log(`    indexList: ${indexList}`); })
+	.map(indexList => indexList.map((value, index) => NameCount.makeNew(ncList[index].name, srcLists[index][value])));
+	//.peek(nameSrcList => { if (log) console.log(`    original nameSrcList: ${nameSrcList}`); })
+
+    nameSrcLists = nameSrcLists.filter(nameSrcList => _.uniqBy(nameSrcList, NameCount.count).length === nameSrcList.length)
+	//.peek(nameSrcList => { if (log) console.log(`    uniq count nameSrcList: ${nameSrcList}`); })
+	.map(nameSrcList => _.sortBy(nameSrcList, NameCount.count));
+
+    if (log) {
+	console.log(`    ncList: ${ncList}`);
+	console.log(`    nameSrcLists: ${nameSrcLists}`);
+	console.log(`    uniq: ${_.uniqBy(nameSrcLists, _.toString)}`);
+    }
+    return _.uniqBy(nameSrcLists, _.toString);
+}
+
 //
 
+ClueManager.prototype.primaryNcToSrcList = function (nc) {
+    if (nc.count !== 1) throw new Error(`nc.count must be 1 (${nc})`);
+    const source = this.knownClueMapArray[1][nc.name];
+    /* result: array of strings
+    if (_.isNaN(_.toNumber(source))) {
+	console.log(`${source}: ${typeof source}, array? ${_.isArray(source)} elem0: ${_.isArray(source) ? typeof source[0] : ''}`);
+    }
+    */
+    return _.isArray(source) ? source : [ source ];
+}
+
+//
+/*
 ClueManager.prototype.primaryNcToNameSrc = function (nc) {
     if (nc.count !== 1) throw new Error(`nc.count must be 1 (${nc})`);
     return NameCount.makeNew(nc.name, this.knownClueMapArray[1][nc.name]);
 };
-
+*/
 //
 
 ClueManager.prototype.makeSrcNameListArray = function (nc) {

@@ -27,6 +27,12 @@ function NameCount(name, count, index) {
     this.count = _.toNumber(count);
     this.index = _.toNumber(index);
 
+/*
+    if (_.isNaN(this.count)) {
+	console.log(`BAD name:${name} count:${count}`);
+    }
+*/
+    
     if (!this.count) {
         splitList = name.split(':');
         if (splitList.length > 1) {
@@ -38,6 +44,12 @@ function NameCount(name, count, index) {
             }
         }
     }
+}
+
+//
+
+function count(nc) {
+    return _.toNumber(nc.count);
 }
 
 //
@@ -59,7 +71,7 @@ function makeListFromNameList(nameList) {
 //
 
 function makeCountList(ncList) {
-    return ncList.map(nc => _.toNumber(nc.count));
+    return ncList.map(nc => count(nc));
 }
 
 //
@@ -199,6 +211,7 @@ NameCount.prototype.logList = function(list) {
 //
 
 module.exports = {
+    count                : count,
     makeNew              : makeNew,
     makeCopy             : makeCopy,
     makeNameList         : makeNameList,

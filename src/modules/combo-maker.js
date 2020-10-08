@@ -24,7 +24,7 @@ const ResultMap   = require('../types/result-map');
 const Stringify   = require('stringify-object');
 const Validator   = require('./validator');
 
-let logging = false;
+let logging = 0;
 
 
 const Op = { 'and':1, 'or':2, 'xor':3 };
@@ -43,6 +43,7 @@ function ComboMaker() {
 
 //
 
+/** not used
 ComboMaker.prototype.matchAny = function (srcList, nameList) {
     for (const source of srcList) {
         for (const name of nameList) {
@@ -52,7 +53,9 @@ ComboMaker.prototype.matchAny = function (srcList, nameList) {
     }
     return false;
 };
+*/
 
+/** not used 
 function getPrimaryNameSrcLists (entries) {
     const nameSrcLists = [];
     entries.forEach(entry => {
@@ -62,7 +65,9 @@ function getPrimaryNameSrcLists (entries) {
     });
     return nameSrcLists;
 }
+*/
 
+/** not used
 function getCompatiblePrimaryNameSrcLists (nameSrcLists1, nameSrcLists2) {
     let nameSrcLists = [];
     for (const nameSrcList1 of nameSrcLists1) {
@@ -77,19 +82,25 @@ function getCompatiblePrimaryNameSrcLists (nameSrcLists1, nameSrcLists2) {
     }
     return nameSrcLists;
 }
+*/
 
 function getSourcesList (srcMapEntries) {
     const sources = [];
     srcMapEntries.forEach(entry => {
         entry.results.forEach(result => {
-            result.primaryNameSrcList = result.ncList.map(nc => ClueManager.primaryNcToNameSrc(nc));
-            result.primarySrcList = NameCount.makeCountList(result.primaryNameSrcList);
-            result.srcNcLists = result.resultMap ? buildSrcNcLists(result.resultMap.map()) : [ result.ncList ];
-            if (logging) {
-                console.log(`result ncList ${result.ncList}, srcNcLists ${showNcLists(result.srcNcLists)}`);
-                if (_.isEmpty(result.srcNcLists)) console.log(`empty srcNcList: ${Stringify(result.resultMap.map())}`);
-            }
-            sources.push(result);
+	    //console.log(`  result.ncList ${result.ncList}`);
+            ClueManager.primaryNcListToNameSrcLists(result.ncList).forEach(primaryNameSrcList => {
+		//console.log(`  nameSrcList: ${primaryNameSrcList}`);
+		let source = { primaryNameSrcList };
+		source.ncList = result.ncList;
+		source.primarySrcList = NameCount.makeCountList(source.primaryNameSrcList);
+		source.srcNcLists = result.resultMap ? buildSrcNcLists(result.resultMap.map()) : [ result.ncList ];
+		if (logging > 3) {
+                    console.log(`result ncList ${source.ncList}, srcNcLists ${showNcLists(source.srcNcLists)}`);
+                    if (_.isEmpty(source.srcNcLists)) console.log(`empty srcNcList: ${Stringify(result.resultMap.map())}`);
+		}
+		sources.push(source);
+	    });
         });
     });
     return sources;
@@ -106,18 +117,21 @@ function showNcLists (ncLists) {
     return _.isEmpty(str) ? "[]" : str;
 }
 
+// TODO : anywhere i see primaryNameSrcList I need to change it to primarySrcLists
+
+
 function mergeSources (sources1, sources2) {
     let mergedSources = {};
     mergedSources.ncList = _.concat(sources1.ncList, sources2.ncList); // TODO: _uniqBy(, _.toString)
     mergedSources.primaryNameSrcList = _.concat(sources1.primaryNameSrcList, sources2.primaryNameSrcList);// TODO: _uniqBy(, _.toString)
-    mergedSources.primarySrcList = NameCount.makeCountList(mergedSources.primaryNameSrcList);// TODO: _uniqBy(, _.toString)
+    mergedSources.primarySrcList = NameCount.makeCountList(mergedSources.primaryNameSrcList);// TODO: _uniqBy(, ['count'])
     // move to getSourcesLists
     let srcNcLists1 = sources1.srcNcLists;
     let srcNcLists2 = sources2.srcNcLists;
-    if (logging) console.log(`srcNcLists1: ${showNcLists(srcNcLists1)}`);
-    if (logging) console.log(`srcNcLists2: ${showNcLists(srcNcLists2)}`);
+    if (logging>3) console.log(`srcNcLists1: ${showNcLists(srcNcLists1)}`);
+    if (logging>3) console.log(`srcNcLists2: ${showNcLists(srcNcLists2)}`);
     mergedSources.srcNcLists = _.concat(srcNcLists1, srcNcLists2);// TODO: _uniqBy(, _.toString)? maybe not necessary here
-    if (logging) console.log(`  merged: ${showNcLists(mergedSources.srcNcLists)}`);
+    if (logging>2) console.log(`  merged: ${showNcLists(mergedSources.srcNcLists)}`);
 
     return mergedSources;
 }
@@ -126,10 +140,12 @@ function mergeCompatibleSourcesLists (sources1, sources2) { // TODO sourcesList1
     let mergedSources = []; // TODO mergedSourcesList
     for (const entry1 of sources1) { // TODO sources1 of sourcesList1
         for (const entry2 of sources2) { // TODO sources2 of sourcesList2
-            Debug(`nameSrcList1: ${entry1.primaryNameSrcList}, nameSrcList2: ${entry2.primaryNameSrcList}`);
-            if (logging) console.log(`mergeCompat: nameSrcList1: ${entry1.primaryNameSrcList}, nameSrcList2: ${entry2.primaryNameSrcList}`);
+            //Debug(`merging nameSrcList1: ${entry1.primaryNameSrcList}, nameSrcList2: ${entry2.primaryNameSrcList}`);
+            if (logging>2) console.log(`mergeCompat: nameSrcList1: ${entry1.primaryNameSrcList}, nameSrcList2: ${entry2.primaryNameSrcList}`);
             if (_.isEmpty(_.intersectionBy(entry1.primarySrcList, entry2.primarySrcList, _.toNumber))) {
-                mergedSources.push(mergeSources(entry1, entry2));
+		let merged = mergeSources(entry1, entry2);
+		//console.log(`  merged nameSrcList: ${merged.primaryNameSrcList}`);
+		mergedSources.push(merged);
             }
         }
     }
@@ -141,20 +157,29 @@ function mergeAllCompatibleSources (ncList) {
     let sources = getSourcesList(ClueManager.getKnownSourceMapEntries(ncList[0]));
     for (let ncIndex = 1; ncIndex < ncList.length; ncIndex += 1) {
         const nextSources = getSourcesList(ClueManager.getKnownSourceMapEntries(ncList[ncIndex]));
+	//console.log(`${ncIndex}: merging ${sources[0] ? sources[0].ncList : 'nothing?'} with ${ncList[ncIndex]}`);
         sources = mergeCompatibleSourcesLists(sources, nextSources);
-        if (_.isEmpty(sources)) break;
+        if (_.isEmpty(sources)) {
+	    //console.log('  merge failed');
+	    break;	    
+	}
+	//console.log(`  merge success`);
     }
+    //console.log(`  empty before: ${_.isEmpty(sources)}`);
     return sources;
 }
 
 //{
+// A:
 //  'jack:3': {
 //    'card:2': {
+// B:
 //      'bird:1,red:1': [   // multiple primary sources with array value type, split them
 //        'bird:2,red:8'
 //      ]
 //    },
 //    'face:1': {
+// C:
 //      'face:1': [         // single primary source with array value type, ignore
 //        'face:10'
 //      ]
@@ -162,11 +187,12 @@ function mergeAllCompatibleSources (ncList) {
 //  }
 //}
 //
-//{
-//  'face:1': [              // single top-level primary source with array value type, allow
-//    'face:10'
-//  ]
-//}
+// {
+// D:
+//   'face:1': [              // single top-level primary source with array value type, allow
+//     'face:10'
+//   ]
+// }
 
 
 function recursiveAddSrcNcLists (list, obj, top) {
@@ -175,13 +201,15 @@ function recursiveAddSrcNcLists (list, obj, top) {
     let keys = _.flatMap(_.keys(obj), key => {
         let val = obj[key];
         if (_.isObject(val)) {
+	    // A: non-array object value type
             if (!_.isArray(val)) return key;
             // split multiple primary sources into separate keys
             let multiplePrimarySourceKeys = key.split(',');
+	    // B: comma separated key with array value type: split; TODO assert primary?
             if (multiplePrimarySourceKeys.length > 1) return multiplePrimarySourceKeys;
-            // allow top level single primary source key with array value type
+            // D: single top-level key with array value type: allow; TODO assert primary?
             if (top) return key;
-            // ignore nested single primary source key with array value type
+            // C: single nested key with array value type: ignore; TODO assert primary?
         }
         return [];
     });
@@ -199,10 +227,11 @@ function buildSrcNcLists (obj) {
 }
 
 function partialMatchAnyNcList (ncList, matchNcLists) {
-    for (let matchNcList of matchNcLists) {
-        let match = _.intersectionBy(ncList, matchNcList, _.toString).length == ncList.length;
-        // log nclist, matchlist, match
-        if (match) return true;
+    if (logging > 3) console.log(`  ncList: ${ncList}`);
+    for (const matchNcList of matchNcLists) {
+        const matchLength = _.intersectionBy(ncList, matchNcList, _.toString).length;
+        if (logging>3) console.log(`    matchNcList: ${matchNcList} len: ${matchLength}`);
+	if (matchLength === ncList.length) return true;
     }
     return false;
 }
@@ -215,14 +244,14 @@ function partialMatchAnyNcList (ncList, matchNcLists) {
 //
 //
 // sourcesList, list of:
-//   ncList
+//   ncList    (primary NC list)
 //   resultMap
-//   primaryNameSrcList = result.ncList.map(nc => ClueManager.primaryNcToNameSrc(nc));
-//   primarySrcList = NameCount.makeCountList(result.primaryNameSrcList);
+//   primaryNameSrcLists = list of all possible primary NameSrcLists which ncList resolves to
+//   primarySrcLists = list of all SrcLists derived from NameSrcLists
 //   srcNcLists = result.resultMap ? buildSrcNcLists(result.resultMap.map()) : [ result.ncList ];
 //
 // sources:
-//   one entry from sources liste
+//   one entry from sources list
 //
 // useSourcesList:
 //
@@ -234,7 +263,19 @@ function partialMatchAnyNcList (ncList, matchNcLists) {
 function mergeAllUsedSources (sourcesList, useNcLists, op) {
     for (let useNcList of useNcLists) {
         let mergedSourcesList = [];
+	//console.log(`  mergeCompat: ${useNcList}`);
         let useSourcesList = mergeAllCompatibleSources(useNcList);
+	//console.log(`  empty after: ${_.isEmpty(useSourcesList)}`);
+	// define problem, start with explaining possible solution
+	// --or, --and V:N where N>1, we aren't actually checking V:N itself for match,
+	// we're only checking the that the sources of V:N match.
+	// we could add V:N to useSourcesList
+	//
+	// in order to match --or V:N and --and V:N, where N>1, we must:
+	//  1. match one of V's direct source NcLists with one of the supplied prospective source NcLists.
+	//       e.g.: --or robin; we must find red:1,bird:1 in the sourcesList.
+	//  2. match V:N itself
+	//useSourcesList = _.uniq(useSourcesList.push(...useNcList));
 	// we can ignore this error because some useSources entries may be invalid, particularly if the sources
 	// were provided without a [:COUNT] were mapped to all possible counts.
         //if (_.isEmpty(useSourcesList)) throw new Error(`sources not compatible: ${useNcList}`);
@@ -243,10 +284,10 @@ function mergeAllUsedSources (sourcesList, useNcLists, op) {
                 const numCommonPrimarySources = _.intersectionBy(sources.primarySrcList, useSources.primarySrcList, _.toNumber).length;
                 const allCommonPrimarySources = numCommonPrimarySources === useSources.primarySrcList.length;
                 const singlePrimaryNc = useNcList.length === 1 && useNcList[0].count === 1;
-
+		
 		// the problem here is that i'm not ANDing or XORing with only the original clue combos, but
 		// with the accumulation of previously merged used clues
-
+		
                 let valid = false;
 		if (op !== Op.and) { // or, xor
 		    valid = numCommonPrimarySources === 0;
@@ -254,33 +295,38 @@ function mergeAllUsedSources (sourcesList, useNcLists, op) {
                 if (!valid && (op !== Op.xor)) { // or, and
 		    if (allCommonPrimarySources && (singlePrimaryNc || partialMatchAnyNcList(useNcList, sources.srcNcLists))) {
                         valid = true;
-                    }
+		    }
                 }
                 if (valid) {
-                    // TODO: i get the feeling that is merging ncList is not working here, doubling up ncList when merging face,card
-                    mergedSourcesList.push(mergeSources(sources, useSources));
+		    // TODO: i get the feeling that is merging ncList is not working here, doubling up ncList when merging face,card
+		    // need to think deeply here
+		    if (1 || op === Op.xor) {
+			mergedSourcesList.push(mergeSources(sources, useSources));
+		    } else {
+			mergedSourcesList.push(sources);
+		    }
                 }
-                if (logging) {
-                    console.log(`  valid: ${valid}, useNcList: ${useNcList}, op: ${OpName(op)}`);
-                    console.log(`    sources:   ${showNcLists(sources.srcNcLists)}, primary: ${sources.primaryNameSrcList}`);
-                    console.log(`    useNcList: ${useNcList}, primary: ${useSources.primaryNameSrcList}`);
-                    console.log(`    allCommon: ${allCommonPrimarySources}, singlePrimaryNc: ${singlePrimaryNc}`);
-                }
+                if (logging>3 || (valid && logging>2)) {
+		    console.log(`  valid: ${valid}, useNcList: ${useNcList}, op: ${OpName(op)}`);
+		    //### console.log(`    sources:   ${showNcLists(sources.srcNcLists)}, primary: ${sources.primaryNameSrcList}`);
+		    //### console.log(`    useNcList: ${useNcList}, primary: ${useSources.primaryNameSrcList}`);
+		    console.log(`    allCommon: ${allCommonPrimarySources}, singlePrimaryNc: ${singlePrimaryNc}`);
+		}
             }
         }
         sourcesList = mergedSourcesList;
     }
-    if (logging) console.log(`  mergeUsed, op: ${OpName(op)}, count: ${sourcesList.length}`);
+    if (logging>3) console.log(`  mergeUsed, op: ${OpName(op)}, count: ${sourcesList.length}`);
     return sourcesList;
 }
 
-function applyUseNcListOperators (sourcesList, args) {
+function applyUseNcListOperators (sourcesList, args, nameList) {
     // XOR first
     for (let xorNcLists of args.allXorNcLists) {
 	let xorSources = sourcesList;
 	if (!_.isEmpty(xorNcLists)) {
             xorSources = mergeAllUsedSources(xorSources, xorNcLists, Op.xor);
-            if (logging) console.log(`  compatible with XOR: ${!_.isEmpty(xorSources)}`);
+            if (logging) console.log(`  compatible with XOR: ${!_.isEmpty(xorSources)}, ${nameList}`);
 	    if (_.isEmpty(xorSources)) continue;
 	}
 	// AND next
@@ -288,16 +334,21 @@ function applyUseNcListOperators (sourcesList, args) {
 	    let andSources = xorSources;
 	    if (!_.isEmpty(andNcLists)) {
 		andSources = mergeAllUsedSources(andSources, andNcLists, Op.and);
-		if (logging) console.log(`  compatible with AND: ${!_.isEmpty(andSources)}`);
+		if (logging) console.log(`  compatible with AND: ${!_.isEmpty(andSources)}, ${nameList}`);
 		if (_.isEmpty(andSources)) continue;
 	    }
 	    // OR last
 	    for (let orNcLists of args.allOrNcLists) {
 		let orSources = andSources;
 		if (!_.isEmpty(orNcLists)) {
-		    orSources = mergeAllUsedSources(orSources, orNcLists, Op.or);
-		    if (logging) console.log(`  compatible with OR: ${!_.isEmpty(orSources)}`);
-		    if (_.isEmpty(orSources)) continue;
+		    let loggy = 0||logging ; //  && !_.isUndefined(_.find(orNcLists.ncList, (o) =>  o.name === 'eye'));
+		    let mergedOrSources = mergeAllUsedSources(orSources, orNcLists, Op.or);
+		    if (!_.isEmpty(mergedOrSources)) {
+			if (loggy) console.log(`  before OR sources: ${Stringify(orSources)}`);
+			if (loggy) console.log(`  after OR sources: ${Stringify(mergedOrSources)}`);
+			if (loggy) console.log(`  compatible with OR: ${!_.isEmpty(mergedOrSources)}, ${nameList}`);
+		    }
+		    if (_.isEmpty(mergedOrSources)) continue;
 		}
 		return true;
 	    }
@@ -343,7 +394,7 @@ ComboMaker.prototype.getCombosForUseNcLists = function(args, options = {}) {
             // failed to find any compatible combos
             if (_.isEmpty(sources)) continue;
 
-	    if (applyUseNcListOperators(sources, args)) {
+	    if (applyUseNcListOperators(sources, args, result.nameList)) {
 		combos.push(result.nameList.toString());
 	    }
         }
@@ -389,6 +440,8 @@ ComboMaker.prototype.makeCombos = function(args, options = {}) {
         allAndNcLists: args.and ? buildAllUseNcLists(args.and) : [ [] ],
         allOrNcLists: args.or ? buildAllUseNcLists(args.or) : [ [] ]
     };
+    
+
     let combos = this.getCombosForUseNcLists(comboArgs, options);
     allCombos.push(...combos);
 
@@ -420,12 +473,14 @@ function getKnownNcListForName (name) {
 //
 // Given a list of names and/or ncStrs, convert ncStrs to an array of (1) NC
 // and convert names to an array of all known NCs for that name.
-// Return a list of list of NCs.
+// Return a list of ncLists.
 //
 // ex:
 //  convert: [ 'billy', 'bob:1' ]
 //  to: [ [ billy:1, billy:2 ], [ bob:1 ] ]
 //
+
+// ..ToListOfKnownNcLists
 
 function nameOrNcStrListToKnownNcList (nameOrNcStrList) {
     return nameOrNcStrList.map(nameOrNcStr => NameCount.makeNew(nameOrNcStr))
@@ -439,9 +494,9 @@ function combinationNcList (combo, ncLists) {
 function ncListsToCombinations (ncLists) {
     return Peco.makeNew({
         listArray: ncLists.map(ncList => [...Array(ncList.length).keys()]),       // keys of array are 0..ncList.length
-        max: ncLists.reduce((sum, ncList) => sum + ncList.length, 0)              // sum of lengths of nclists
+        max: ncLists.reduce((sum, ncList) => sum + ncList.length, 0)
     }).getCombinations()
-      .map(combo => combinationNcList(combo, ncLists));
+	.map(combo => combinationNcList(combo, ncLists));
 }
 
 function getCombinationNcLists (useArgsList) {
@@ -450,12 +505,13 @@ function getCombinationNcLists (useArgsList) {
         .map(knownNcLists => ncListsToCombinations(knownNcLists));
 }
 
+// This is the exact same method as ncListsToCombinations?
 function combinationsToNcLists (combinationNcLists) {
     return Peco.makeNew({
         listArray: combinationNcLists.map(ncList => [...Array(ncList.length).keys()]),
         max: combinationNcLists.reduce((sum, ncList) => sum + ncList.length, 0)       // sum of lengths of nclists
     }).getCombinations()
-      .map(combo => combinationNcList(combo, combinationNcLists));
+	.map(combo => combinationNcList(combo, combinationNcLists));
 }
 
 function buildAllUseNcLists (useArgsList) {
