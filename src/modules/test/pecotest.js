@@ -34,6 +34,7 @@ function main() {
     if (Opt.argv.length < 1) {
 	GetOpt.showHelp();
         console.log(Opt);
+	console.log(`argv.length < 1 (${Opt.argv.length})`);
         return 1;
     }
 
@@ -53,11 +54,11 @@ function main() {
     }
 
     if (!list && !count && !max) {
-        console.log('need count or max');
+        console.log('need count or max if no list');
         return 1;
     }
     if (list && !count) {
-        console.log('need count');
+        console.log('need count with list');
         return 1;
     }
 

@@ -8,7 +8,6 @@
 
 module.exports = new ClueManager();
 
-//                     require('array-peek');
 const _              = require('lodash');
 const ClueList       = require('../types/clue-list');
 const Clues          = require('./clue-types');
@@ -452,12 +451,9 @@ ClueManager.prototype.primaryNcListToNameSrcLists = function (ncList) {
         listArray: indexLists,
         max:        999 // technically, clue-types[variety].max_clues
     })  .getCombinations()
-	//.peek(indexList => {  if (log) console.log(`    indexList: ${indexList}`); })
 	.map(indexList => indexList.map((value, index) => NameCount.makeNew(ncList[index].name, srcLists[index][value])));
-	//.peek(nameSrcList => { if (log) console.log(`    original nameSrcList: ${nameSrcList}`); })
 
     nameSrcLists = nameSrcLists.filter(nameSrcList => _.uniqBy(nameSrcList, NameCount.count).length === nameSrcList.length)
-	//.peek(nameSrcList => { if (log) console.log(`    uniq count nameSrcList: ${nameSrcList}`); })
 	.map(nameSrcList => _.sortBy(nameSrcList, NameCount.count));
 
     if (log) {
@@ -473,11 +469,6 @@ ClueManager.prototype.primaryNcListToNameSrcLists = function (ncList) {
 ClueManager.prototype.primaryNcToSrcList = function (nc) {
     if (nc.count !== 1) throw new Error(`nc.count must be 1 (${nc})`);
     const source = this.knownClueMapArray[1][nc.name];
-    /* result: array of strings
-    if (_.isNaN(_.toNumber(source))) {
-	console.log(`${source}: ${typeof source}, array? ${_.isArray(source)} elem0: ${_.isArray(source) ? typeof source[0] : ''}`);
-    }
-    */
     return _.isArray(source) ? source : [ source ];
 }
 

@@ -84,91 +84,6 @@ function getCompatiblePrimaryNameSrcLists (nameSrcLists1, nameSrcLists2) {
 }
 */
 
-function getSourcesList (srcMapEntries) {
-    const sources = [];
-    srcMapEntries.forEach(entry => {
-        entry.results.forEach(result => {
-	    //console.log(`  result.ncList ${result.ncList}`);
-            ClueManager.primaryNcListToNameSrcLists(result.ncList).forEach(primaryNameSrcList => {
-		//console.log(`  nameSrcList: ${primaryNameSrcList}`);
-		let source = { primaryNameSrcList };
-		source.ncList = result.ncList;
-		source.primarySrcList = NameCount.makeCountList(source.primaryNameSrcList);
-		source.srcNcLists = result.resultMap ? buildSrcNcLists(result.resultMap.map()) : [ result.ncList ];
-		if (logging > 3) {
-                    console.log(`result ncList ${source.ncList}, srcNcLists ${showNcLists(source.srcNcLists)}`);
-                    if (_.isEmpty(source.srcNcLists)) console.log(`empty srcNcList: ${Stringify(result.resultMap.map())}`);
-		}
-		sources.push(source);
-	    });
-        });
-    });
-    return sources;
-}
-
-function showNcLists (ncLists) {
-    let str = "";
-    let first = true;
-    for (let ncList of ncLists) {
-        if (!first) str += ' - ';
-        str += ncList;
-        first = false;
-    }
-    return _.isEmpty(str) ? "[]" : str;
-}
-
-// TODO : anywhere i see primaryNameSrcList I need to change it to primarySrcLists
-
-
-function mergeSources (sources1, sources2) {
-    let mergedSources = {};
-    mergedSources.ncList = _.concat(sources1.ncList, sources2.ncList); // TODO: _uniqBy(, _.toString)
-    mergedSources.primaryNameSrcList = _.concat(sources1.primaryNameSrcList, sources2.primaryNameSrcList);// TODO: _uniqBy(, _.toString)
-    mergedSources.primarySrcList = NameCount.makeCountList(mergedSources.primaryNameSrcList);// TODO: _uniqBy(, ['count'])
-    // move to getSourcesLists
-    let srcNcLists1 = sources1.srcNcLists;
-    let srcNcLists2 = sources2.srcNcLists;
-    if (logging>3) console.log(`srcNcLists1: ${showNcLists(srcNcLists1)}`);
-    if (logging>3) console.log(`srcNcLists2: ${showNcLists(srcNcLists2)}`);
-    mergedSources.srcNcLists = _.concat(srcNcLists1, srcNcLists2);// TODO: _uniqBy(, _.toString)? maybe not necessary here
-    if (logging>2) console.log(`  merged: ${showNcLists(mergedSources.srcNcLists)}`);
-
-    return mergedSources;
-}
-
-function mergeCompatibleSourcesLists (sources1, sources2) { // TODO sourcesList1, sourcesList2
-    let mergedSources = []; // TODO mergedSourcesList
-    for (const entry1 of sources1) { // TODO sources1 of sourcesList1
-        for (const entry2 of sources2) { // TODO sources2 of sourcesList2
-            //Debug(`merging nameSrcList1: ${entry1.primaryNameSrcList}, nameSrcList2: ${entry2.primaryNameSrcList}`);
-            if (logging>2) console.log(`mergeCompat: nameSrcList1: ${entry1.primaryNameSrcList}, nameSrcList2: ${entry2.primaryNameSrcList}`);
-            if (_.isEmpty(_.intersectionBy(entry1.primarySrcList, entry2.primarySrcList, _.toNumber))) {
-		let merged = mergeSources(entry1, entry2);
-		//console.log(`  merged nameSrcList: ${merged.primaryNameSrcList}`);
-		mergedSources.push(merged);
-            }
-        }
-    }
-    return mergedSources;
-}
-
-function mergeAllCompatibleSources (ncList) {
-    Expect(ncList.length).is.above(0);
-    let sources = getSourcesList(ClueManager.getKnownSourceMapEntries(ncList[0]));
-    for (let ncIndex = 1; ncIndex < ncList.length; ncIndex += 1) {
-        const nextSources = getSourcesList(ClueManager.getKnownSourceMapEntries(ncList[ncIndex]));
-	//console.log(`${ncIndex}: merging ${sources[0] ? sources[0].ncList : 'nothing?'} with ${ncList[ncIndex]}`);
-        sources = mergeCompatibleSourcesLists(sources, nextSources);
-        if (_.isEmpty(sources)) {
-	    //console.log('  merge failed');
-	    break;	    
-	}
-	//console.log(`  merge success`);
-    }
-    //console.log(`  empty before: ${_.isEmpty(sources)}`);
-    return sources;
-}
-
 //{
 // A:
 //  'jack:3': {
@@ -194,18 +109,15 @@ function mergeAllCompatibleSources (ncList) {
 //   ]
 // }
 
-
 function recursiveAddSrcNcLists (list, obj, top) {
-    // TODO This is broken for top-level primary sources as above
-
     let keys = _.flatMap(_.keys(obj), key => {
         let val = obj[key];
         if (_.isObject(val)) {
-	    // A: non-array object value type
+            // A: non-array object value type
             if (!_.isArray(val)) return key;
             // split multiple primary sources into separate keys
             let multiplePrimarySourceKeys = key.split(',');
-	    // B: comma separated key with array value type: split; TODO assert primary?
+            // B: comma separated key with array value type: split; TODO assert primary?
             if (multiplePrimarySourceKeys.length > 1) return multiplePrimarySourceKeys;
             // D: single top-level key with array value type: allow; TODO assert primary?
             if (top) return key;
@@ -226,12 +138,83 @@ function buildSrcNcLists (obj) {
     return recursiveAddSrcNcLists([], obj, true);
 }
 
-function partialMatchAnyNcList (ncList, matchNcLists) {
-    if (logging > 3) console.log(`  ncList: ${ncList}`);
+function getSourcesList (nc) {
+    const sources = [];
+    ClueManager.getKnownSourceMapEntries(nc).forEach(entry => {
+        entry.results.forEach(result => {
+            ClueManager.primaryNcListToNameSrcLists(result.ncList).forEach(primaryNameSrcList => {
+                let source = { primaryNameSrcList };
+                source.ncList = result.ncList;
+		// should be albe to eliminate this 
+                source.primarySrcList = NameCount.makeCountList(source.primaryNameSrcList);
+                source.srcNcLists = result.resultMap ? buildSrcNcLists(result.resultMap.map()) : [ result.ncList ];
+		source.srcNcLists.push([ nc ]); // TODO will this break anything, ? (any other use of mergeSources/checkCompatibleSources)
+                if (logging > 3) {
+                    console.log(`result ncList ${source.ncList}, srcNcLists ${showNcLists(source.srcNcLists)}`);
+                    if (_.isEmpty(source.srcNcLists)) console.log(`empty srcNcList: ${Stringify(result.resultMap.map())}`);
+                }
+                sources.push(source);
+            });
+        });
+    });
+    return sources;
+}
+
+function showNcLists (ncLists) {
+    let str = "";
+    let first = true;
+    for (let ncList of ncLists) {
+        if (!first) str += ' - ';
+        str += ncList;
+        first = false;
+    }
+    return _.isEmpty(str) ? "[]" : str;
+}
+
+function mergeSources (sources1, sources2) {
+    let mergedSources = {};
+    mergedSources.ncList = _.concat(sources1.ncList, sources2.ncList); // TODO: _uniqBy(, _.toString)
+    mergedSources.primaryNameSrcList = _.concat(sources1.primaryNameSrcList, sources2.primaryNameSrcList);// TODO: _uniqBy(, _.toString)
+    mergedSources.primarySrcList = NameCount.makeCountList(mergedSources.primaryNameSrcList);// TODO: _uniqBy(, ['count'])
+    // move to getSourcesLists
+    let srcNcLists1 = sources1.srcNcLists;
+    let srcNcLists2 = sources2.srcNcLists;
+    if (logging>3) console.log(`srcNcLists1: ${showNcLists(srcNcLists1)}`);
+    if (logging>3) console.log(`srcNcLists2: ${showNcLists(srcNcLists2)}`);
+    mergedSources.srcNcLists = _.concat(srcNcLists1, srcNcLists2);// TODO: _uniqBy(, _.toString)? maybe not necessary here
+    if (logging>2) console.log(`  merged: ${showNcLists(mergedSources.srcNcLists)}`);
+
+    return mergedSources;
+}
+
+function mergeCompatibleSourcesLists (sources1, sources2) { // TODO sourcesList1, sourcesList2
+    let mergedSources = []; // TODO mergedSourcesList
+    for (const entry1 of sources1) { // TODO sources1 of sourcesList1
+        for (const entry2 of sources2) { // TODO sources2 of sourcesList2
+            if (logging>2) console.log(`mergeCompat: nameSrcList1: ${entry1.primaryNameSrcList}, nameSrcList2: ${entry2.primaryNameSrcList}`);
+            if (_.isEmpty(_.intersectionBy(entry1.primarySrcList, entry2.primarySrcList, _.toNumber))) {
+                mergedSources.push(mergeSources(entry1, entry2));
+            }
+        }
+    }
+    return mergedSources;
+}
+
+function mergeAllCompatibleSources (ncList) {
+    Expect(ncList.length).is.above(0);
+    let sources = getSourcesList(ncList[0]);
+    for (let ncIndex = 1; ncIndex < ncList.length; ncIndex += 1) {
+        const nextSources = getSourcesList(ncList[ncIndex]);
+        sources = mergeCompatibleSourcesLists(sources, nextSources);
+        if (_.isEmpty(sources)) break;
+    }
+    return sources;
+}
+
+function matchAny (ncList, matchNcLists) {
     for (const matchNcList of matchNcLists) {
         const matchLength = _.intersectionBy(ncList, matchNcList, _.toString).length;
-        if (logging>3) console.log(`    matchNcList: ${matchNcList} len: ${matchLength}`);
-	if (matchLength === ncList.length) return true;
+        if (matchLength === ncList.length) return true;
     }
     return false;
 }
@@ -263,55 +246,45 @@ function partialMatchAnyNcList (ncList, matchNcLists) {
 function mergeAllUsedSources (sourcesList, useNcLists, op) {
     for (let useNcList of useNcLists) {
         let mergedSourcesList = [];
-	//console.log(`  mergeCompat: ${useNcList}`);
         let useSourcesList = mergeAllCompatibleSources(useNcList);
-	//console.log(`  empty after: ${_.isEmpty(useSourcesList)}`);
-	// define problem, start with explaining possible solution
-	// --or, --and V:N where N>1, we aren't actually checking V:N itself for match,
-	// we're only checking the that the sources of V:N match.
-	// we could add V:N to useSourcesList
-	//
-	// in order to match --or V:N and --and V:N, where N>1, we must:
-	//  1. match one of V's direct source NcLists with one of the supplied prospective source NcLists.
-	//       e.g.: --or robin; we must find red:1,bird:1 in the sourcesList.
-	//  2. match V:N itself
-	//useSourcesList = _.uniq(useSourcesList.push(...useNcList));
-	// we can ignore this error because some useSources entries may be invalid, particularly if the sources
-	// were provided without a [:COUNT] were mapped to all possible counts.
+        // we can ignore this error because some useSources entries may be invalid, particularly if the sources
+        // were provided without a [:COUNT] were mapped to all possible counts.
         //if (_.isEmpty(useSourcesList)) throw new Error(`sources not compatible: ${useNcList}`);
         for (let useSources of useSourcesList) {
             for (let sources of sourcesList) {
                 const numCommonPrimarySources = _.intersectionBy(sources.primarySrcList, useSources.primarySrcList, _.toNumber).length;
                 const allCommonPrimarySources = numCommonPrimarySources === useSources.primarySrcList.length;
                 const singlePrimaryNc = useNcList.length === 1 && useNcList[0].count === 1;
-		
-		// the problem here is that i'm not ANDing or XORing with only the original clue combos, but
-		// with the accumulation of previously merged used clues
-		
+                
+                // the problem here is that i'm not ANDing or XORing with only the original clue combos, but
+                // with the accumulation of previously merged used clues
+                
                 let valid = false;
-		if (op !== Op.and) { // or, xor
-		    valid = numCommonPrimarySources === 0;
-		}
-                if (!valid && (op !== Op.xor)) { // or, and
-		    if (allCommonPrimarySources && (singlePrimaryNc || partialMatchAnyNcList(useNcList, sources.srcNcLists))) {
+                if ((op !== Op.and) && (numCommonPrimarySources === 0)) { // or, xor
+                    valid = true;
+                }
+                if (!valid && (op !== Op.xor) && allCommonPrimarySources) { // or, and
+                    if (singlePrimaryNc || matchAny(useNcList, sources.srcNcLists)) {
                         valid = true;
-		    }
+                    }
                 }
                 if (valid) {
-		    // TODO: i get the feeling that is merging ncList is not working here, doubling up ncList when merging face,card
-		    // need to think deeply here
-		    if (1 || op === Op.xor) {
-			mergedSourcesList.push(mergeSources(sources, useSources));
-		    } else {
-			mergedSourcesList.push(sources);
-		    }
+                    // TODO: i get the feeling that is merging ncList is not working here, doubling up ncList when merging face,card
+                    //
+                    // need to think deeply here
+                    //
+                    if (1 || op === Op.xor || ((op === Op.or) && !allCommonPrimarySources)) {
+                        mergedSourcesList.push(mergeSources(sources, useSources));
+                    } else {
+                        mergedSourcesList.push(sources);
+                    }
                 }
                 if (logging>3 || (valid && logging>2)) {
-		    console.log(`  valid: ${valid}, useNcList: ${useNcList}, op: ${OpName(op)}`);
-		    //### console.log(`    sources:   ${showNcLists(sources.srcNcLists)}, primary: ${sources.primaryNameSrcList}`);
-		    //### console.log(`    useNcList: ${useNcList}, primary: ${useSources.primaryNameSrcList}`);
-		    console.log(`    allCommon: ${allCommonPrimarySources}, singlePrimaryNc: ${singlePrimaryNc}`);
-		}
+                    console.log(`  valid: ${valid}, useNcList: ${useNcList}, op: ${OpName(op)}`);
+                    //### console.log(`    sources:   ${showNcLists(sources.srcNcLists)}, primary: ${sources.primaryNameSrcList}`);
+                    //### console.log(`    useNcList: ${useNcList}, primary: ${useSources.primaryNameSrcList}`);
+                    console.log(`    allCommon: ${allCommonPrimarySources}, singlePrimaryNc: ${singlePrimaryNc}`);
+                }
             }
         }
         sourcesList = mergedSourcesList;
@@ -323,36 +296,35 @@ function mergeAllUsedSources (sourcesList, useNcLists, op) {
 function applyUseNcListOperators (sourcesList, args, nameList) {
     // XOR first
     for (let xorNcLists of args.allXorNcLists) {
-	let xorSources = sourcesList;
-	if (!_.isEmpty(xorNcLists)) {
+        let xorSources = sourcesList;
+        if (!_.isEmpty(xorNcLists)) {
             xorSources = mergeAllUsedSources(xorSources, xorNcLists, Op.xor);
             if (logging) console.log(`  compatible with XOR: ${!_.isEmpty(xorSources)}, ${nameList}`);
-	    if (_.isEmpty(xorSources)) continue;
-	}
-	// AND next
-	for (let andNcLists of args.allAndNcLists) {
-	    let andSources = xorSources;
-	    if (!_.isEmpty(andNcLists)) {
-		andSources = mergeAllUsedSources(andSources, andNcLists, Op.and);
-		if (logging) console.log(`  compatible with AND: ${!_.isEmpty(andSources)}, ${nameList}`);
-		if (_.isEmpty(andSources)) continue;
-	    }
-	    // OR last
-	    for (let orNcLists of args.allOrNcLists) {
-		let orSources = andSources;
-		if (!_.isEmpty(orNcLists)) {
-		    let loggy = 0||logging ; //  && !_.isUndefined(_.find(orNcLists.ncList, (o) =>  o.name === 'eye'));
-		    let mergedOrSources = mergeAllUsedSources(orSources, orNcLists, Op.or);
-		    if (!_.isEmpty(mergedOrSources)) {
-			if (loggy) console.log(`  before OR sources: ${Stringify(orSources)}`);
-			if (loggy) console.log(`  after OR sources: ${Stringify(mergedOrSources)}`);
-			if (loggy) console.log(`  compatible with OR: ${!_.isEmpty(mergedOrSources)}, ${nameList}`);
-		    }
-		    if (_.isEmpty(mergedOrSources)) continue;
-		}
-		return true;
-	    }
-	}
+            if (_.isEmpty(xorSources)) continue;
+        }
+        // AND next
+        for (let andNcLists of args.allAndNcLists) {
+            let andSources = xorSources;
+            if (!_.isEmpty(andNcLists)) {
+                andSources = mergeAllUsedSources(andSources, andNcLists, Op.and);
+                if (logging) console.log(`  compatible with AND: ${!_.isEmpty(andSources)}, ${nameList}`);
+                if (_.isEmpty(andSources)) continue;
+            }
+            // OR last
+            for (let orNcLists of args.allOrNcLists) {
+                let orSources = andSources;
+                if (!_.isEmpty(orNcLists)) {
+                    let mergedOrSources = mergeAllUsedSources(orSources, orNcLists, Op.or);
+                    if (!_.isEmpty(mergedOrSources)) {
+                        if (logging>2) console.log(`  before OR sources: ${Stringify(orSources)}`);
+                        if (logging>2) console.log(`  after OR sources: ${Stringify(mergedOrSources)}`);
+                        if (logging>2) console.log(`  compatible with OR: ${!_.isEmpty(mergedOrSources)}, ${nameList}`);
+                    }
+                    if (_.isEmpty(mergedOrSources)) continue;
+                }
+                return true;
+            }
+        }
     }
     return false;
 }
@@ -394,9 +366,9 @@ ComboMaker.prototype.getCombosForUseNcLists = function(args, options = {}) {
             // failed to find any compatible combos
             if (_.isEmpty(sources)) continue;
 
-	    if (applyUseNcListOperators(sources, args, result.nameList)) {
-		combos.push(result.nameList.toString());
-	    }
+            if (applyUseNcListOperators(sources, args, result.nameList)) {
+                combos.push(result.nameList.toString());
+            }
         }
     }, this);
 
@@ -496,7 +468,7 @@ function ncListsToCombinations (ncLists) {
         listArray: ncLists.map(ncList => [...Array(ncList.length).keys()]),       // keys of array are 0..ncList.length
         max: ncLists.reduce((sum, ncList) => sum + ncList.length, 0)
     }).getCombinations()
-	.map(combo => combinationNcList(combo, ncLists));
+        .map(combo => combinationNcList(combo, ncLists));
 }
 
 function getCombinationNcLists (useArgsList) {
@@ -511,7 +483,7 @@ function combinationsToNcLists (combinationNcLists) {
         listArray: combinationNcLists.map(ncList => [...Array(ncList.length).keys()]),
         max: combinationNcLists.reduce((sum, ncList) => sum + ncList.length, 0)       // sum of lengths of nclists
     }).getCombinations()
-	.map(combo => combinationNcList(combo, combinationNcLists));
+        .map(combo => combinationNcList(combo, combinationNcLists));
 }
 
 function buildAllUseNcLists (useArgsList) {
