@@ -271,20 +271,28 @@ function matchAnyNcList (ncList, matchNcLists) {
 //
 //
 
-function mergeAllUsedSources (sourcesList, useNcLists, op) {
-    for (let useNcList of useNcLists) {
+let timing = 0;
+
+function mergeAllUsedSources (sourcesList, useNcDataList, op) {
+    for (let useNcData of useNcDataList) {
         let mergedSourcesList = [];
-        let useSourcesList = mergeAllCompatibleSources(useNcList, 'mAUS');
+
+	if (!useNcData.sourcesList) {
+	    let start = new Date();
+            useNcData.sourcesList = mergeAllCompatibleSources(useNcData.ncList, 'mAUS');
+	    timing += new Duration(start, new Date()).milliseconds;
+	}
+
         // we can ignore this error because some useSources entries may be invalid, in particular if the sources
         // that were provided without a [:COUNT] were mapped to all possible counts.
         //if (_.isEmpty(useSourcesList)) throw new Error(`sources not compatible: ${useNcList}`);
-        for (let useSources of useSourcesList) {
+        for (let useSources of useNcData.sourcesList) {
             for (let sources of sourcesList) {
                 const numCommonPrimarySources = _.intersectionBy(sources.primaryNameSrcList, useSources.primaryNameSrcList, NameCount.count).length;
                 const allCommonPrimarySources = numCommonPrimarySources === useSources.primaryNameSrcList.length;
 		// todo: /* subset, equal, distinct */
 		//const { equal, distinct } = setsEqualOrDistinct(useSources.primaryNameSrcSet, sources.primaryNameSrcSet,  'mAUS');
-                const singlePrimaryNc = useNcList.length === 1 && useNcList[0].count === 1;
+                const singlePrimaryNc = useNcData.ncList.length === 1 && useNcData.ncList[0].count === 1;
                 
                 // the problem here is that i'm not ANDing or XORing with only the original clue combos, but
                 // with the accumulation of previously merged used clues
@@ -322,10 +330,10 @@ function mergeAllUsedSources (sourcesList, useNcLists, op) {
                 }
                 */
                 if (logging>3 || (valid && logging>2)) {
-                    console.log(`  valid: ${valid}, useNcList: ${useNcList}, op: ${OpName(op)}`);
+                    console.log(`  valid: ${valid}, useNcList: ${useNcData.ncList}, op: ${OpName(op)}`);
                     console.log(`    sources:   ${showNcLists(sources.srcNcLists)}, primary: ${sources.primaryNameSrcList}`);
-                    console.log(`    useNcList: ${useNcList}, primary: ${useSources.primaryNameSrcList}`);
-                    console.log(`    distinct: ${distinct}, singlePrimaryNc: ${singlePrimaryNc}`);
+                    console.log(`    useNcList: ${useNcData.ncList}, primary: ${useSources.primaryNameSrcList}`);
+                    //console.log(`    distinct: ${distinct}, singlePrimaryNc: ${singlePrimaryNc}`);
                 }
             }
         }
@@ -337,26 +345,26 @@ function mergeAllUsedSources (sourcesList, useNcLists, op) {
 
 function isCompatibleWithUseNcLists (sourcesList, args, nameList) {
     // XOR first
-    for (let xorNcLists of args.allXorNcLists) {
+    for (let xorNcDataList of args.allXorNcDataLists) {
         let xorSources = sourcesList;
-        if (!_.isEmpty(xorNcLists)) {
-            xorSources = mergeAllUsedSources(xorSources, xorNcLists, Op.xor);
+        if (!_.isEmpty(xorNcDataList)) {
+            xorSources = mergeAllUsedSources(xorSources, xorNcDataList, Op.xor);
             if (logging) console.log(`  compatible with XOR: ${!_.isEmpty(xorSources)}, ${nameList}`);
             if (_.isEmpty(xorSources)) continue;
         }
         // AND next
-        for (let andNcLists of args.allAndNcLists) {
+        for (let andNcData of args.allAndNcDataLists) {
             let andSources = xorSources;
-            if (!_.isEmpty(andNcLists)) {
-                andSources = mergeAllUsedSources(andSources, andNcLists, Op.and);
+            if (!_.isEmpty(andNcData)) {
+                andSources = mergeAllUsedSources(andSources, andNcData, Op.and);
                 if (logging) console.log(`  compatible with AND: ${!_.isEmpty(andSources)}, ${nameList}`);
                 if (_.isEmpty(andSources)) continue;
             }
             // OR last
-            for (let orNcLists of args.allOrNcLists) {
+            for (let orNcData of args.allOrNcDataLists) {
                 let orSources = andSources;
-                if (!_.isEmpty(orNcLists)) {
-                    let mergedOrSources = mergeAllUsedSources(orSources, orNcLists, Op.or);
+                if (!_.isEmpty(orNcData)) {
+                    let mergedOrSources = mergeAllUsedSources(orSources, orNcData, Op.or);
                     if (!_.isEmpty(mergedOrSources)) {
                         if (logging>2) console.log(`  before OR sources: ${Stringify(orSources)}`);
                         if (logging>2) console.log(`  after OR sources: ${Stringify(mergedOrSources)}`);
@@ -459,12 +467,20 @@ ComboMaker.prototype.makeCombos = function(args, options = {}) {
     this.hash = {};
     let allCombos = [];
 
+    let allXorNcDataLists = args.xor ? buildAllUseNcDataLists(args.xor) : [ [] ];
+    let allAndNcDataLists = args.and ? buildAllUseNcDataLists(args.and) : [ [] ];
+    let allOrNcDataLists = args.or ? buildAllUseNcDataLists(args.or) : [ [] ];
+
+    //let allXorNcLists = args.xor ? buildAllUseNcLists(args.xor) : [ [] ];
+    //console.log(`allXorNcLists: ${Stringify(allXorNcLists[0])}`);
+    //console.log(`allXorNcDataLists[0]: ${Stringify(allXorNcDataLists[0])}`);
+
     let comboArgs = {
         sum: args.sum,
         max: args.max,
-        allXorNcLists: args.xor ? buildAllUseNcLists(args.xor) : [ [] ],
-        allAndNcLists: args.and ? buildAllUseNcLists(args.and) : [ [] ],
-        allOrNcLists: args.or ? buildAllUseNcLists(args.or) : [ [] ]
+	allXorNcDataLists,
+	allAndNcDataLists,
+	allOrNcDataLists
     };
     
     let combos = this.getCombosForUseNcLists(comboArgs, options);
@@ -473,6 +489,8 @@ ComboMaker.prototype.makeCombos = function(args, options = {}) {
     Debug(`dupeClue(${this.nextDupeClue})` +
           `, dupeSrc(${this.nextDupeSrc})` +
           `, dupeCombo(${this.nextDupeCombo})`);
+
+    //console.log(`timing: ${PrettyMs(timing)}`);
 
     return allCombos;
 };
@@ -516,6 +534,10 @@ function combinationNcList (combo, ncLists) {
     return combo.map((ncIndex, listIndex) => ncLists[listIndex][ncIndex]);
 }
 
+function combinationNcDataList (combo, ncLists) {
+    return combo.map((ncIndex, listIndex) => Object({ ncList: ncLists[listIndex][ncIndex]}));
+}
+
 function ncListsToCombinations (ncLists) {
     return Peco.makeNew({
         listArray: ncLists.map(ncList => [...Array(ncList.length).keys()]),       // keys of array are 0..ncList.length
@@ -539,8 +561,22 @@ function combinationsToNcLists (combinationNcLists) {
         .map(combo => combinationNcList(combo, combinationNcLists));
 }
 
+// todo; get rid fo this, and combinationsToNCLists, and add extra m ap step in buildAllUseNCData
+function combinationsToNcDataLists (combinationNcLists) {
+    return Peco.makeNew({
+        listArray: combinationNcLists.map(ncList => [...Array(ncList.length).keys()]),
+        max: combinationNcLists.reduce((sum, ncList) => sum + ncList.length, 0)       // sum of lengths of nclists
+    }).getCombinations()
+        .map(combo => combinationNcDataList(combo, combinationNcLists));
+}
+
 function buildAllUseNcLists (useArgsList) {
+    //return combinationsToNcLists(getCombinationNcLists(useArgsList));
     return combinationsToNcLists(getCombinationNcLists(useArgsList));
+}
+
+function buildAllUseNcDataLists (useArgsList) {
+    return combinationsToNcDataLists(getCombinationNcLists(useArgsList));
 }
 
 //

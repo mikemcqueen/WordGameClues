@@ -164,8 +164,9 @@ function listContainsAll(ncListContains, ncList) {
 //////////////////////////////////////////////////////////////////////////////
 
 NameCount.prototype.toString = function() {
-    this.cachedCanonicalName = this.cashedCanonicalName || makeCanonicalName(this.name, this.count, this.index);
-    return this.cachedCanonicalName;
+    return makeCanonicalName(this.name, this.count, this.index);
+//    this.cachedCanonicalName = this.cashedCanonicalName || 
+//    return this.cachedCanonicalName;
 }
 
 //
