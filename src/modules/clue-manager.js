@@ -466,6 +466,37 @@ ClueManager.prototype.primaryNcListToNameSrcLists = function (ncList) {
 
 //
 
+ClueManager.prototype.primaryNcListToNameSrcSets = function (ncList) {
+    let log = 0 && (ncList.length > 1); // nameSrcLists.length > 1) {
+    let srcLists = ncList.map(nc => this.primaryNcToSrcList(nc));
+    let indexLists = srcLists.map(srcList => [...Array(srcList.length).keys()]);  // e.g. [ [ 0 ], [ 0, 1 ], [ 0 ], [ 0 ] ]
+    let nameSrcSets = Peco.makeNew({
+        listArray: indexLists,
+        max:       2 // 999 // technically, clue-types[variety].max_clues
+    })  .getCombinations()
+	.reduce((result, indexList) => {
+	    let set = new Set();
+	    //indexList.forEach((value, index) => set.add(NameCount.makeNew(ncList[index].name, srcLists[index][value])));
+	    indexList.forEach((value, index) => set.add(NameCount.makeCanonicalName(ncList[index].name, srcLists[index][value])));
+	    if (set.size === indexList.length) {
+		result.push(set); // no duplicates
+	    }
+	    return result;
+	}, []);
+
+    if (log) {
+	//console.log(`    ncList: ${ncList}`);
+	//console.log(`    nameSrcLists: ${nameSrcLists}`);
+	//console.log(`    uniq: ${_.uniqBy(nameSrcLists, _.toString)}`);
+    }
+    // TODO: put in some code to check for dupes, to see if we're actually seeing dupes. might slow down a little.
+    
+    //return _.uniqBy(nameSrcLists, _.toString);
+    return nameSrcSets;
+}
+
+//
+
 ClueManager.prototype.primaryNcToSrcList = function (nc) {
     if (nc.count !== 1) throw new Error(`nc.count must be 1 (${nc})`);
     const source = this.knownClueMapArray[1][nc.name];

@@ -25,7 +25,7 @@ function NameCount(name, count, index) {
 
     this.name  = name;
     this.count = _.toNumber(count);
-    this.index = _.toNumber(index);
+    this.index = index ? _.toNumber(index) : undefined;
 
 /*
     if (_.isNaN(this.count)) {
@@ -49,7 +49,7 @@ function NameCount(name, count, index) {
 //
 
 function count(nc) {
-    return _.toNumber(nc.count);
+    return nc.count;
 }
 
 //
@@ -164,7 +164,8 @@ function listContainsAll(ncListContains, ncList) {
 //////////////////////////////////////////////////////////////////////////////
 
 NameCount.prototype.toString = function() {
-    return makeCanonicalName(this.name, this.count, this.index);
+    this.cachedCanonicalName = this.cashedCanonicalName || makeCanonicalName(this.name, this.count, this.index);
+    return this.cachedCanonicalName;
 }
 
 //
