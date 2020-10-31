@@ -65,6 +65,7 @@ const CmdLineOptions = Opt.create(_.concat(Clues.Options, [
     ['',  'combos',                            '    validate all combos of sources/source lists in file'],
     ['u', 'use=NAME[:COUNT]+',                 'use the specified NAME[:COUNT](s)' ],
     ['',  'allow-used',                        '  allow used clues in clue combo generation' ],
+    ['',  'any',                               '  any match (uh, probably should not use this)'],
     ['',  'production',                        'use production note store'],
     ['z', 'flags=OPTION+',                     'flags: 2=ignoreLoadErrors' ],
     ['v', 'verbose',                           'more output'],

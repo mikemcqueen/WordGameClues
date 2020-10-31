@@ -8,6 +8,7 @@ const _           = require('lodash');
 const ClueManager = require('./clue-manager');
 const Debug       = require('debug')('show-components');
 const Expect      = require('should/as-function');
+const NameCount   = require('../types/name-count');
 const Path        = require('path');
 const Peco        = require('./peco');
 const Readlines   = require('n-readlines');
@@ -39,7 +40,7 @@ function show (options) {
     //
     console.log(`test: ${options.test}`);
     const nameList = options.test.split(',').sort();
-    if (nameList.length > 2 && options.fast) {
+    if (nameList.length > 1 && options.fast) {
 	return fast_combos(nameList, options);
     }
     const result = ClueManager.getCountListArrays(options.test, options);
@@ -139,8 +140,85 @@ function show (options) {
 
 //
 
-function fast_combos (name_list, options) {
+function buildNcListsFromNameListAndCountLists (nameList, countLists) {
+    let ncLists = [];
+    for (const countList of countLists) {
+	ncLists.push(countList.map((count, index) => NameCount.makeNew(nameList[index], count)));
+    }
+    return ncLists;
+}
+
+function buildNcListsFromNameList (nameList) {
+    const countLists = ClueManager.getAllCountListCombosForNameList(nameList);
+    if (_.isEmpty(countLists)) {
+        return countLists;
+    }
+    return buildNcListsFromNameListAndCountLists(nameList, countLists);
+}
+
+function buildListsOfPrimaryNameSrcLists (ncLists) {
+    return ncLists.map(ncList => {
+	let listOfPrimaryNameSrcLists = [];
+	//console.log(`ncList: ${ncList}`);
+	for (const nc of ncList) {
+	    //console.log(`  nc: ${nc}`);
+	    const entries = ClueManager.getKnownSourceMapEntries(nc);
+	    if (!entries) {
+		console.log(`    explosion`);
+		process.exit(-1);
+	    }
+	    const primaryNameSrcLists = _.flatten(entries.map(entry => entry.results.map(result => result.nameSrcList)));
+	    //primaryNameSrcLists.forEach(nameSrcList => console.log(`    nameSrcList: ${nameSrcList}`));
+	    listOfPrimaryNameSrcLists.push(primaryNameSrcLists);
+	}
+	return listOfPrimaryNameSrcLists;
+    });
+}
+
+function getCompatiblePrimaryNameSrcList (listOfListOfPrimaryNameSrcLists) {
+    //console.log(`${Stringify(listOfListOfPrimaryNameSrcLists)}`);
+    const listArray = listOfListOfPrimaryNameSrcLists.map(listOfNameSrcLists => [...Array(listOfNameSrcLists.length).keys()]); // 0..nameSrcList.length
+    let comboLists = Peco.makeNew({
+        listArray,
+        max: listOfListOfPrimaryNameSrcLists.reduce((sum, listOfNameSrcLists) => sum + listOfNameSrcLists.length, 0)
+    }).getCombinations();
+
+    return comboLists.some(comboList => {
+	const nameSrcList = comboList.reduce((nameSrcList, comboListValue, comboListIndex) => {
+	    let nsList = listOfListOfPrimaryNameSrcLists[comboListIndex][comboListValue];
+	    //console.log(`nameSrcList: ${nameSrcList}, clValue ${comboListValue}, clIndex ${comboListIndex}, nsList: ${nsList}`);
+	    nameSrcList.push(...nsList);
+	    return nameSrcList;
+	}, []);
+	const uniqLen = _.uniqBy(nameSrcList, NameCount.count).length;
+	return (uniqLen === nameSrcList.length) ? nameSrcList : undefined;
+    });
+}
+
+function fast_combos (nameList, options) {
     console.log('fast_combos');
+    const ncLists = buildNcListsFromNameList(nameList);
+    if (_.isEmpty(ncLists)) {
+	console.log(`No ncLists for ${nameList}`);
+	return;
+    }
+    const listOfListOfListOfPrimaryNameSrcLists = buildListsOfPrimaryNameSrcLists(ncLists);
+    //console.log(`ncList: ${ncLists[0]}\nlistsOfnameSrcLists: ${Stringify(listOfListOfListOfPrimaryNameSrcLists[0])}`);
+    listOfListOfListOfPrimaryNameSrcLists.forEach ((listOfListOfPrimaryNameSrcLists, index) => {
+	//console.log(`ncList: ${ncLists[index]}\nlistOfListOfNameSrcLists: ${Stringify(listOfListOfPrimaryNameSrcLists)}`);
+	let compatibleNameSrcList = getCompatiblePrimaryNameSrcList(listOfListOfPrimaryNameSrcLists);
+	console.log(`${ncLists[index]}  ${compatibleNameSrcList ? 'VALID' : 'invalid'}`);
+    });
+}
+
+function showNcLists (ncLists) {
+    for (let ncList of ncLists) {
+	console.log(`${ncList}`);
+    }
+}
+
+function old_fast_combos (name_list, options) {
+    console.log('old_fast_combos');
 /*
     let list_array = [];
     const one_max = name_list.length - 1; // not perfect, only works for combos of 2

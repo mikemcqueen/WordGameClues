@@ -1,4 +1,4 @@
-//
+///
 // combo-maker.js
 //
 
@@ -597,7 +597,7 @@ function ncListsToCombinations (ncLists) {
 
 function getCombinationNcLists (useArgsList) {
     return useArgsList.map(useArg => useArg.split(','))
-        .map(nameOrNcStrList => nameOrNcStrListToKnownNcList(nameOrNcStrList))
+//        .map(nameOrNcStrList => nameOrNcStrListToKnownNcList(nameOrNcStrList))
         .map(knownNcLists => ncListsToCombinations(knownNcLists));
 }
 

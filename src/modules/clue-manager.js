@@ -1,6 +1,6 @@
 //
-// clue-manager.js
 //
+// clue-manager.js//
 
 'use strict';
 
@@ -12,11 +12,13 @@ const _              = require('lodash');
 const ClueList       = require('../types/clue-list');
 const Clues          = require('./clue-types');
 const Debug          = require('debug')('clue-manager');
+const Duration       = require('duration');
 const Expect         = require('should/as-function');
 const Log            = require('./log')('clue-manager');
 const NameCount      = require('../types/name-count');
 const Path           = require('path');
 const Peco           = require('./peco');
+const PrettyMs       = require('pretty-ms');
 const Stringify      = require('stringify-object');
 const Validator      = require('./validator');
 
@@ -855,6 +857,15 @@ ClueManager.prototype.addRemoveOrReject = function (args, nameList, countSet, op
     return count;
 };
 
+ClueManager.prototype.getAllCountListCombosForNameList = function (nameList, max = this.maxClues) {
+    const countListArray = this.getKnownClueIndexLists(nameList);
+    Debug(countListArray);
+    return Peco.makeNew({
+        listArray: countListArray,
+	max
+    }).getCombinations();
+}
+
 // Probably not the most unique function name possible.
 
 ClueManager.prototype.getCountListArrays = function (nameCsv, options) {
@@ -864,12 +875,7 @@ ClueManager.prototype.getCountListArrays = function (nameCsv, options) {
 
     /// TODO, check if existing sourcelist (knownSourceMapArray)
 
-    let countListArray = this.getKnownClueIndexLists(nameList);
-    Debug(countListArray);
-    let resultList = Peco.makeNew({
-        listArray: countListArray,
-        max:       this.maxClues
-    }).getCombinations();
+    const resultList = this.getAllCountListCombosForNameList(nameList);
     if (_.isEmpty(resultList)) {
         Debug('No matches');
         return null;
@@ -885,14 +891,24 @@ ClueManager.prototype.getCountListArrays = function (nameCsv, options) {
     let clues = [];
     let invalid = [];
 
+    console.log(`size ${resultList.length}`);
+    let totalElapsed = 0;
+
     for (const clueCountList of resultList) {
         const sum = clueCountList.reduce((a, b) => a + b);
+	console.log(`sum: ${sum}, list: ${clueCountList}`);
+	const start = new Date();
+	console.log(`${nameList}`);
         const result = Validator.validateSources({
             sum:         sum,
             nameList:    nameList,
             count:       nameList.length,
+	    require:     clueCountList,
             validateAll
         });
+	const elapsed = new Duration(start, new Date()).milliseconds;
+	totalElapsed += elapsed;
+	console.log(`validate: ${PrettyMs(elapsed)}, total: ${PrettyMs(totalElapsed)}`);
         
         if (!result.success) {
             invalid.push(clueCountList);
