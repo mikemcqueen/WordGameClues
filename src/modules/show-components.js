@@ -202,11 +202,8 @@ function fast_combos (nameList, options) {
 	console.log(`No ncLists for ${nameList}`);
 	return;
     }
-    const listOfListOfListOfPrimaryNameSrcLists = buildListsOfPrimaryNameSrcLists(ncLists);
-    //console.log(`ncList: ${ncLists[0]}\nlistsOfnameSrcLists: ${Stringify(listOfListOfListOfPrimaryNameSrcLists[0])}`);
-    listOfListOfListOfPrimaryNameSrcLists.forEach ((listOfListOfPrimaryNameSrcLists, index) => {
-	//console.log(`ncList: ${ncLists[index]}\nlistOfListOfNameSrcLists: ${Stringify(listOfListOfPrimaryNameSrcLists)}`);
-	let compatibleNameSrcList = getCompatiblePrimaryNameSrcList(listOfListOfPrimaryNameSrcLists);
+    buildListsOfPrimaryNameSrcLists(ncLists).forEach ((listOfListOfPrimaryNameSrcLists, index) => {
+	const compatibleNameSrcList = getCompatiblePrimaryNameSrcList(listOfListOfPrimaryNameSrcLists);
 	console.log(`${ncLists[index]}  ${compatibleNameSrcList ? 'VALID' : 'invalid'}`);
     });
 }
