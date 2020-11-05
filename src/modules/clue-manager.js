@@ -868,6 +868,8 @@ ClueManager.prototype.getAllCountListCombosForNameList = function (nameList, max
 
 // Probably not the most unique function name possible.
 
+let invalidHash = {};
+
 ClueManager.prototype.getCountListArrays = function (nameCsv, options) {
     const validateAll = options.any ? false : true;
     const nameList = nameCsv.split(',').sort();
@@ -877,7 +879,7 @@ ClueManager.prototype.getCountListArrays = function (nameCsv, options) {
 
     const resultList = this.getAllCountListCombosForNameList(nameList);
     if (_.isEmpty(resultList)) {
-        Debug('No matches');
+        console.log(`No matches for ${nameList}`);
         return null;
     }
 
@@ -891,30 +893,41 @@ ClueManager.prototype.getCountListArrays = function (nameCsv, options) {
     let clues = [];
     let invalid = [];
 
-    console.log(`size ${resultList.length}`);
+    //console.log(`size ${resultList.length}`);
     let totalElapsed = 0;
 
     for (const clueCountList of resultList) {
         const sum = clueCountList.reduce((a, b) => a + b);
-	console.log(`sum: ${sum}, list: ${clueCountList}`);
+	//console.log(`sum: ${sum}, list: ${clueCountList}`);
 	const start = new Date();
-	console.log(`${nameList}`);
-        const result = Validator.validateSources({
-            sum:         sum,
-            nameList:    nameList,
-            count:       nameList.length,
-	    require:     clueCountList,
-            validateAll
-        });
+	//console.log(`${nameList}`);
+
+	let x =_.uniqBy(clueCountList, _.toNumber);
+	let ncListStr = clueCountList.map((count, index) => NameCount.makeNew(nameList[index], count)).toString();
+	let result;
+	result = invalidHash[ncListStr];
+	if (!result) {
+            result = Validator.validateSources({
+		sum:         sum,
+		nameList:    nameList,
+		count:       nameList.length,
+		require:     x, //clueCountList
+		validateAll
+            });
+	}
 	const elapsed = new Duration(start, new Date()).milliseconds;
 	totalElapsed += elapsed;
-	console.log(`validate: ${PrettyMs(elapsed)}, total: ${PrettyMs(totalElapsed)}`);
+	invalidHash[ncListStr] = result;
+
+	//console.log(`validate: ${PrettyMs(elapsed)}, total: ${PrettyMs(totalElapsed)}`);
         
         if (!result.success) {
+	    //console.log(`invalid: ${nameList}  CL ${clueCountList}  x ${x} sum ${sum}  validateAll=${validateAll}`);
             invalid.push(clueCountList);
         } else if (this.isRejectSource(nameList)) {
             rejects.push(clueCountList);
         } else if (nameList.length === 1) {
+	    //console.log('hereLen1');
             let name = nameList[0];
             let nameSrcList = this.clueListArray[sum]
                     .filter(clue => clue.name === name)
@@ -940,10 +953,13 @@ ClueManager.prototype.getCountListArrays = function (nameCsv, options) {
             } else {
                 valid.push(clueCountList);
             }
+	    //console.log('hereValid1');
             if (options.add || options.remove) {
+		//console.log('hereAdd1');
                 addRemoveSet.add(sum);
             }
         }
     }
+    //console.log('--getCountList');
     return { valid, known, rejects, invalid, clues, addRemoveSet };
 };
