@@ -866,6 +866,85 @@ ClueManager.prototype.getAllCountListCombosForNameList = function (nameList, max
     }).getCombinations();
 }
 
+ClueManager.prototype.buildNcListFromNameListAndCountList = function (nameList, countList) {
+    return countList.map((count, index) => NameCount.makeNew(nameList[index], count));
+}
+
+ClueManager.prototype.buildNcListsFromNameListAndCountLists = function (nameList, countLists) {
+    let ncLists = [];
+    for (const countList of countLists) {
+	ncLists.push(this.buildNcListFromnameListAndCountList(nameList, countList));
+    }
+    return ncLists;
+}
+
+ClueManager.prototype.buildNcListsFromNameList = function (nameList) {
+    const countLists = this.getAllCountListCombosForNameList(nameList);
+    if (_.isEmpty(countLists)) {
+        return countLists;
+    }
+    return this.buildNcListsFromNameListAndCountLists(nameList, countLists);
+}
+
+ClueManager.prototype.getListOfPrimaryNameSrcLists = function (ncList) {
+    // TODO: can use reduce() here too 
+    let listOfPrimaryNameSrcLists = [];
+    //console.log(`ncList: ${ncList}`);
+    for (const nc of ncList) {
+	//console.log(`  nc: ${nc}`);
+	const entries = ClueManager.getKnownSourceMapEntries(nc);
+	if (!entries) {
+	    console.log(`    explosion`);
+	    process.exit(-1);
+	}
+	const primaryNameSrcLists = _.flatten(entries.map(entry => entry.results.map(result => result.nameSrcList)));
+	//primaryNameSrcLists.forEach(nameSrcList => console.log(`    nameSrcList: ${nameSrcList}`));
+	listOfPrimaryNameSrcLists.push(primaryNameSrcLists);
+    }
+    return listOfPrimaryNameSrcLists;
+}
+
+ClueManager.prototype.buildListsOfPrimaryNameSrcLists = function (ncLists) {
+    return ncLists.map(ncList => this.getListOfPrimaryNameSrcLists(ncList));
+}
+
+function getCompatiblePrimaryNameSrcList (listOfListOfPrimaryNameSrcLists) {
+    //console.log(`${Stringify(listOfListOfPrimaryNameSrcLists)}`);
+    const listArray = listOfListOfPrimaryNameSrcLists.map(listOfNameSrcLists => [...Array(listOfNameSrcLists.length).keys()]); // 0..nameSrcList.length
+    let comboLists = Peco.makeNew({
+        listArray,
+        max: listOfListOfPrimaryNameSrcLists.reduce((sum, listOfNameSrcLists) => sum + listOfNameSrcLists.length, 0)
+    }).getCombinations();
+
+    return comboLists.some(comboList => {
+	const nameSrcList = comboList.reduce((nameSrcList, comboListValue, comboListIndex) => {
+	    let nsList = listOfListOfPrimaryNameSrcLists[comboListIndex][comboListValue];
+	    //console.log(`nameSrcList: ${nameSrcList}, clValue ${comboListValue}, clIndex ${comboListIndex}, nsList: ${nsList}`);
+	    nameSrcList.push(...nsList);
+	    return nameSrcList;
+	}, []);
+	const uniqLen = _.uniqBy(nameSrcList, NameCount.count).length;
+	return (uniqLen === nameSrcList.length) ? nameSrcList : undefined;
+    });
+}
+
+ClueManager.prototype.fast_getCountListArrays = function (nameCsv, options) {
+    const nameList = nameCsv.split(',').sort();
+    Debug(`getValidCountLists for ${nameList}`);
+
+    /// TODO, check if existing sourcelist (knownSourceMapArray)
+
+    const ncLists = ClueManager.buildNcListsFromNameList(nameList);
+    if (_.isEmpty(ncLists)) {
+	console.log(`No ncLists for ${nameList}`);
+	return;
+    }
+    ClueManager.buildListsOfPrimaryNameSrcLists(ncLists).forEach ((listOfListOfPrimaryNameSrcLists, index) => {
+	const compatibleNameSrcList = getCompatiblePrimaryNameSrcList(listOfListOfPrimaryNameSrcLists);
+	console.log(`${ncLists[index]}  ${compatibleNameSrcList ? 'VALID' : 'invalid'}`);
+    });
+};
+
 // Probably not the most unique function name possible.
 
 let invalidHash = {};
@@ -963,3 +1042,4 @@ ClueManager.prototype.getCountListArrays = function (nameCsv, options) {
     //console.log('--getCountList');
     return { valid, known, rejects, invalid, clues, addRemoveSet };
 };
+

@@ -300,7 +300,7 @@ function copyClues (fromType, options = {}) {
 	total += _.size(list);
 	for (let clue of list) {
 	    const nameList = clue.src.split(',').sort();
-	    const result = ClueManager.getCountListArrays(clue.src, { add: true });
+	    const result = ClueManager.fast_getCountListArrays(clue.src, { add: true });
 	    if (!result) {
 		Debug(`No matches for: ${clue.src}`);
 		continue;

@@ -140,41 +140,6 @@ function show (options) {
 
 //
 
-function buildNcListsFromNameListAndCountLists (nameList, countLists) {
-    let ncLists = [];
-    for (const countList of countLists) {
-	ncLists.push(countList.map((count, index) => NameCount.makeNew(nameList[index], count)));
-    }
-    return ncLists;
-}
-
-function buildNcListsFromNameList (nameList) {
-    const countLists = ClueManager.getAllCountListCombosForNameList(nameList);
-    if (_.isEmpty(countLists)) {
-        return countLists;
-    }
-    return buildNcListsFromNameListAndCountLists(nameList, countLists);
-}
-
-function buildListsOfPrimaryNameSrcLists (ncLists) {
-    return ncLists.map(ncList => {
-	let listOfPrimaryNameSrcLists = [];
-	//console.log(`ncList: ${ncList}`);
-	for (const nc of ncList) {
-	    //console.log(`  nc: ${nc}`);
-	    const entries = ClueManager.getKnownSourceMapEntries(nc);
-	    if (!entries) {
-		console.log(`    explosion`);
-		process.exit(-1);
-	    }
-	    const primaryNameSrcLists = _.flatten(entries.map(entry => entry.results.map(result => result.nameSrcList)));
-	    //primaryNameSrcLists.forEach(nameSrcList => console.log(`    nameSrcList: ${nameSrcList}`));
-	    listOfPrimaryNameSrcLists.push(primaryNameSrcLists);
-	}
-	return listOfPrimaryNameSrcLists;
-    });
-}
-
 function getCompatiblePrimaryNameSrcList (listOfListOfPrimaryNameSrcLists) {
     //console.log(`${Stringify(listOfListOfPrimaryNameSrcLists)}`);
     const listArray = listOfListOfPrimaryNameSrcLists.map(listOfNameSrcLists => [...Array(listOfNameSrcLists.length).keys()]); // 0..nameSrcList.length
@@ -197,12 +162,12 @@ function getCompatiblePrimaryNameSrcList (listOfListOfPrimaryNameSrcLists) {
 
 function fast_combos (nameList, options) {
     console.log('fast_combos');
-    const ncLists = buildNcListsFromNameList(nameList);
+    const ncLists = ClueManager.buildNcListsFromNameList(nameList);
     if (_.isEmpty(ncLists)) {
 	console.log(`No ncLists for ${nameList}`);
 	return;
     }
-    buildListsOfPrimaryNameSrcLists(ncLists).forEach ((listOfListOfPrimaryNameSrcLists, index) => {
+    ClueManager.buildListsOfPrimaryNameSrcLists(ncLists).forEach ((listOfListOfPrimaryNameSrcLists, index) => {
 	const compatibleNameSrcList = getCompatiblePrimaryNameSrcList(listOfListOfPrimaryNameSrcLists);
 	console.log(`${ncLists[index]}  ${compatibleNameSrcList ? 'VALID' : 'invalid'}`);
     });
