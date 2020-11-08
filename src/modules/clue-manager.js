@@ -1,6 +1,7 @@
 //
 //
-// clue-manager.js//
+// clue-manager.js
+//
 
 'use strict';
 
@@ -47,6 +48,19 @@ function ClueManager () {
 //    this.logging = true;
 
     this.logLevel = 0;
+}
+
+//
+
+function showStrList (strList) {
+    let result = "";
+    let first = true;
+    for (let str of strList) {
+        if (!first) str += ' - ';
+	result += str;
+        first = false;
+    }
+    return _.isEmpty(result) ? "[]" : result;
 }
 
 //
@@ -121,6 +135,17 @@ ClueManager.prototype.loadClueList = function (count, options = {}) {
 
 //
 
+ClueManager.prototype.addPrimaryClueToMap = function (clue) {
+    const count = 1;
+    const clueMap = this.knownClueMapArray[count];
+    if (!_.has(clueMap, clue.name)) {
+        clueMap[clue.name] = [];
+    }
+    clueMap[clue.name].push(clue.src);
+}
+
+//
+
 ClueManager.prototype.addKnownPrimaryClues = function (clueList) {
     const count = 1;
     let clueMap = this.knownClueMapArray[count] = {};
@@ -128,10 +153,7 @@ ClueManager.prototype.addKnownPrimaryClues = function (clueList) {
         if (clue.ignore) {
             return; // continue
         }
-        if (!_.has(clueMap, clue.name)) {
-            clueMap[clue.name] = [];
-        }
-        clueMap[clue.name].push(clue.src);
+	this.addPrimaryClueToMap(clue);
     });
     return this;
 };
@@ -154,48 +176,65 @@ ClueManager.prototype.getRejectFilename = function (count) {
     });
 };
 
+
+function validateAndSaveResults (dst, args) {
+    let vsResult = Validator.validateSources(args);
+    if (args.validateAll) {
+        // this is where the magic happens
+        dst.results = vsResult.list;
+    }
+    return vsResult;
+}
+
+ClueManager.prototype.addCompoundClue = function (clue, count, validateAll = true) {
+    Expect(clue).is.an.Object();
+    Expect(count).is.a.Number();
+    let nameList = clue.src.split(',').sort();
+    let srcMap = this.knownSourceMapArray[count];
+    let srcKey = nameList.toString();
+    // new sources need to be validated
+    let vsResult = { success: true };
+    if (!_.has(srcMap, srcKey)) {
+        srcMap[srcKey] = { clues: [] };
+        Debug(`## validating Known compound clue: ${srcKey}:${count}`);
+	vsResult = validateAndSaveResults(srcMap[srcKey], {
+	    sum: count,
+	    nameList,
+	    count: nameList.length,
+	    validateAll
+	});
+    }
+    srcMap[srcKey].clues.push(clue);
+    return vsResult;
+}
+
 //
 
 ClueManager.prototype.addKnownCompoundClues = function (clueList, clueCount, validateAll) {
     // so this is currently only callable once per clueCount.
     Expect(this.knownClueMapArray[clueCount]).is.undefined();
+    Expect(clueCount > 1);
     this.knownClueMapArray[clueCount] = {};
-    if (clueCount > 1) {
+    //if (clueCount > 1) {
         Expect(this.knownSourceMapArray[clueCount]).is.undefined();
         this.knownSourceMapArray[clueCount] = {};
-    }
-    let srcMap = this.knownSourceMapArray[clueCount];
+    //}
     clueList.forEach(clue => {
         if (clue.ignore) {
             return; // continue
         }
-        let srcNameList = clue.src.split(',').sort();
-        let srcKey = srcNameList.toString();
-        if (clueCount > 1) {
-            // new sources need to be validated
-            if (!_.has(srcMap, srcKey)) {
-                Debug(`## validating Known Combo: ${srcKey}:${clueCount}`);
-                let vsResult = Validator.validateSources({
-                    sum:         clueCount,
-                    nameList:    srcNameList,
-                    count:       srcNameList.length,
-                    validateAll: validateAll
-                });
-                if (!this.ignoreLoadErrors) {
-		    if (!vsResult.success) {
-			console.log(`failed srcNameList: ${srcNameList}`);
-		    }
-                    Expect(vsResult.success);
-                }
-                srcMap[srcKey] = { clues: [] };
-		if (validateAll) {
-		    // this is where the magic happens
-		    srcMap[srcKey].results = vsResult.list;
-		}
-            }
-            srcMap[srcKey].clues.push(clue);
+	let nameList = clue.src.split(',').sort();
+	clue.src = nameList.toString();
+	//if (clueCount > 1) {
+	let result = this.addCompoundClue(clue, clueCount, validateAll);
+        if (!this.ignoreLoadErrors) {
+	    if (!result.success) {
+		console.log(`VALIDATE FAILED KNOWN COMPOUND CLUE: '${clue.src}':${clueCount}`);
+	    }
+            Expect(result.success);
         }
-        this.addKnownClue(clueCount, clue.name, srcKey);
+	//}
+        this.addKnownClue(clueCount, clue.name, clue.src);
     }, this);
     return this;
 };
@@ -619,24 +658,38 @@ ClueManager.prototype.filter = function (srcCsvList, clueCount, map = {}) {
     };
 };
 
-function singleEntry (nc) {
+function singleEntry (nc, sources) {
+    //console.log(`  singleEntry ${nc} sources: ${Stringify(sources)}`);
     return {
 	results: [
 	    {
-		ncList: [ nc ]
+		ncList: [ nc ],
+		nameSrcList: [ NameCount.makeNew(nc.name, sources[0]) ]
 	    }
 	]
     };
 };
 
-ClueManager.prototype.getKnownSourceMapEntries = function (nc) {
+//
+
+ClueManager.prototype.getKnownSourceMapEntries = function (nc, andSources = false) {
     const clueMap = this.knownClueMapArray[nc.count];
     if (!clueMap) throw new Error(`No clueMap at ${nc.count}`);
     const sourcesList = clueMap[nc.name];
-    if (!sourcesList) throw new Error(`No sourcesList at ${nc}`);
-    if (nc.count === 1) return [ singleEntry(nc) ];
+    if (!sourcesList) throw new Error(`No sourcesList at ${nc.name}`);
+    // TODO: single entry, really? what if same primary clue name is used twice?
+    if (nc.count === 1)  {
+	return andSources ? [ { entry: singleEntry(nc, sourcesList) } ] : [ singleEntry(nc, sourcesList) ];
+    }
+    if (nc.toString() == 'red dawn:5') {
+	console.log(`sourcesList: ${showStrList(sourcesList)}`);
+    }
     return sourcesList.map(sources => sources.split(',').sort().toString()) // sort sources
-	.map(sources => this.knownSourceMapArray[nc.count][sources]);       // map sources to known source map entry
+	.map(sources => {
+	    let entry = this.knownSourceMapArray[nc.count][sources];
+	    //console.log(`sources: ${sources}, entry: ${Stringify(entry)}, entry2: ${Stringify(entry2)}`);
+	    return andSources ? { entry, sources } : entry;
+	}); 
 };
 
 //
@@ -873,7 +926,7 @@ ClueManager.prototype.buildNcListFromNameListAndCountList = function (nameList, 
 ClueManager.prototype.buildNcListsFromNameListAndCountLists = function (nameList, countLists) {
     let ncLists = [];
     for (const countList of countLists) {
-	ncLists.push(this.buildNcListFromnameListAndCountList(nameList, countList));
+	ncLists.push(this.buildNcListFromNameListAndCountList(nameList, countList));
     }
     return ncLists;
 }
@@ -891,21 +944,65 @@ ClueManager.prototype.getListOfPrimaryNameSrcLists = function (ncList) {
     let listOfPrimaryNameSrcLists = [];
     //console.log(`ncList: ${ncList}`);
     for (const nc of ncList) {
-	//console.log(`  nc: ${nc}`);
-	const entries = ClueManager.getKnownSourceMapEntries(nc);
-	if (!entries) {
-	    console.log(`    explosion`);
-	    process.exit(-1);
+	console.log(`  nc: ${nc}`);
+	let added = false;
+	let entries;
+	for (;;) {
+	    entries = this.getKnownSourceMapEntries(nc, true);
+	    if (!_.isArray(entries) || _.isEmpty(entries)) {
+		console.log(`    explosion, nc: ${nc}, entries: ${Stringify(entries)}`);
+		process.exit(-1);
+	    }
+	    if (added || entries[0].entry || nc.count === 1) break;
+	    const sources = entries[0].sources;
+	    
+	    console.log(`adding nc: ${nc}, sources ${sources}, entries: ${Stringify(entries)}`);
+
+	    const clue = { name: nc.name, src: sources };
+	    if (nc.count > 1) {
+		this.addCompoundClue(clue, nc.count, true);
+	    } else {
+		this.addPrimaryClueToMap(clue);
+	    }
+	    //
+	    // TODO
+	    //
+	    // call addClue here too
+	    //this.addClue(clue, nc.count)
+	    added = true;
 	}
-	const primaryNameSrcLists = _.flatten(entries.map(entry => entry.results.map(result => result.nameSrcList)));
-	//primaryNameSrcLists.forEach(nameSrcList => console.log(`    nameSrcList: ${nameSrcList}`));
+
+	// verify that no other entries are undefined
+
+	const primaryNameSrcLists = _.flatten(entries.map((item, index) => {
+	    const entry = item.entry;
+	    if (!entry || !entry.results || !_.isArray(entry.results) || _.isEmpty(entry.results)) {
+		 // || _.isEmpty(item.sources)) {
+
+		console.log(`    explosion2, nc: ${nc}, sources: ${item.sources}, ` +
+			    `entries: ${Stringify(entries)}, entry: ${Stringify(entry)}`);
+		process.exit(-1);
+	    }
+	    return entry.results.map(result => result.nameSrcList);
+	}));
+	primaryNameSrcLists.forEach(nameSrcList => console.log(`    nameSrcList: ${nameSrcList}`));
 	listOfPrimaryNameSrcLists.push(primaryNameSrcLists);
     }
     return listOfPrimaryNameSrcLists;
 }
 
-ClueManager.prototype.buildListsOfPrimaryNameSrcLists = function (ncLists) {
+ClueManager.prototype.origbuildListsOfPrimaryNameSrcLists = function (ncLists) {
     return ncLists.map(ncList => this.getListOfPrimaryNameSrcLists(ncList));
+}
+
+ClueManager.prototype.buildListsOfPrimaryNameSrcLists = function (ncLists) {
+    return ncLists.map(ncList => {
+	let result = this.getListOfPrimaryNameSrcLists(ncList);
+	if (!result[0][0]) {
+	    console.log(`ncList ${ncList}`);
+	}
+	return result;
+    });
 }
 
 function getCompatiblePrimaryNameSrcList (listOfListOfPrimaryNameSrcLists) {
@@ -920,7 +1017,11 @@ function getCompatiblePrimaryNameSrcList (listOfListOfPrimaryNameSrcLists) {
 	const nameSrcList = comboList.reduce((nameSrcList, comboListValue, comboListIndex) => {
 	    let nsList = listOfListOfPrimaryNameSrcLists[comboListIndex][comboListValue];
 	    //console.log(`nameSrcList: ${nameSrcList}, clValue ${comboListValue}, clIndex ${comboListIndex}, nsList: ${nsList}`);
-	    nameSrcList.push(...nsList);
+	    if (nsList) {
+		nameSrcList.push(...nsList);
+	    } else {
+		console.log(`no nsList for index: ${comboListIndex}, value: ${comboListValue}`);
+	    }
 	    return nameSrcList;
 	}, []);
 	const uniqLen = _.uniqBy(nameSrcList, NameCount.count).length;
@@ -928,21 +1029,27 @@ function getCompatiblePrimaryNameSrcList (listOfListOfPrimaryNameSrcLists) {
     });
 }
 
+//
+
 ClueManager.prototype.fast_getCountListArrays = function (nameCsv, options) {
     const nameList = nameCsv.split(',').sort();
-    Debug(`getValidCountLists for ${nameList}`);
+    Debug(`fast_getCountListArrays for ${nameList}`);
 
     /// TODO, check if existing sourcelist (knownSourceMapArray)
 
-    const ncLists = ClueManager.buildNcListsFromNameList(nameList);
+    const ncLists = this.buildNcListsFromNameList(nameList);
     if (_.isEmpty(ncLists)) {
 	console.log(`No ncLists for ${nameList}`);
-	return;
+	return [];
     }
-    ClueManager.buildListsOfPrimaryNameSrcLists(ncLists).forEach ((listOfListOfPrimaryNameSrcLists, index) => {
+    return this.buildListsOfPrimaryNameSrcLists(ncLists).reduce((compatibleNcLists, listOfListOfPrimaryNameSrcLists, index) => {
 	const compatibleNameSrcList = getCompatiblePrimaryNameSrcList(listOfListOfPrimaryNameSrcLists);
 	console.log(`${ncLists[index]}  ${compatibleNameSrcList ? 'VALID' : 'invalid'}`);
-    });
+	if (compatibleNameSrcList) {
+	    compatibleNcLists.push(ncLists[index]);
+	}
+	return compatibleNcLists;
+    }, []);
 };
 
 // Probably not the most unique function name possible.

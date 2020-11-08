@@ -152,11 +152,16 @@ function getCompatiblePrimaryNameSrcList (listOfListOfPrimaryNameSrcLists) {
 	const nameSrcList = comboList.reduce((nameSrcList, comboListValue, comboListIndex) => {
 	    let nsList = listOfListOfPrimaryNameSrcLists[comboListIndex][comboListValue];
 	    //console.log(`nameSrcList: ${nameSrcList}, clValue ${comboListValue}, clIndex ${comboListIndex}, nsList: ${nsList}`);
+	    if (!nsList || !_.isArray(nsList)) {
+		console.log(`nsList: ${nsList}, value ${comboListValue} index ${comboListIndex} lolPnsl(${comboListIndex}): ${Stringify(listOfListOfPrimaryNameSrcLists[comboListIndex])} nameSrcList ${Stringify(nameSrcList)}`);
+		console.log(`lolopnsl: ${Stringify(listOfListOfPrimaryNameSrcLists)}`);
+	    }
 	    nameSrcList.push(...nsList);
 	    return nameSrcList;
 	}, []);
 	const uniqLen = _.uniqBy(nameSrcList, NameCount.count).length;
-	return (uniqLen === nameSrcList.length) ? nameSrcList : undefined;
+	//console.log(`nameSrcList ${Stringify(nameSrcList)} len ${nameSrcList.length} uniqLen ${uniqLen}`);
+	return (uniqLen === nameSrcList.length);
     });
 }
 
@@ -167,7 +172,9 @@ function fast_combos (nameList, options) {
 	console.log(`No ncLists for ${nameList}`);
 	return;
     }
-    ClueManager.buildListsOfPrimaryNameSrcLists(ncLists).forEach ((listOfListOfPrimaryNameSrcLists, index) => {
+    const lists = ClueManager.buildListsOfPrimaryNameSrcLists(ncLists);
+    console.log(`len: ${lists.length}`);
+    lists.forEach ((listOfListOfPrimaryNameSrcLists, index) => {
 	const compatibleNameSrcList = getCompatiblePrimaryNameSrcList(listOfListOfPrimaryNameSrcLists);
 	console.log(`${ncLists[index]}  ${compatibleNameSrcList ? 'VALID' : 'invalid'}`);
     });

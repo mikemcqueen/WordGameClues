@@ -300,16 +300,22 @@ function copyClues (fromType, options = {}) {
 	total += _.size(list);
 	for (let clue of list) {
 	    const nameList = clue.src.split(',').sort();
-	    const result = ClueManager.fast_getCountListArrays(clue.src, { add: true });
-	    if (!result) {
+	    const ncLists = ClueManager.fast_getCountListArrays(clue.src, { add: true });
+	    if (_.isEmpty(ncLists)) {
 		Debug(`No matches for: ${clue.src}`);
 		continue;
 	    }
-	    Debug(`Adding ${clue.name}:${clue.src}, set: ${Stringify(result.addRemoveSet)}`);
+	    let countSet = ncLists.reduce((countSet, ncList) => {
+		let sum = ncList.reduce((sum, nc) => { return sum + nc.count; }, 0);
+		countSet.add(sum);
+		return countSet;
+	    }, new Set());
+
+	    Debug(`Adding ${clue.name}:${clue.src}, counts: ${Array.from(countSet)}`);
 	    const count = ClueManager.addRemoveOrReject({
 		add: clue.name,
-		isReject: !_.isEmpty(result.reject)
-	    }, nameList, result.addRemoveSet, { save: options.save });
+		isReject: false,
+	    }, nameList, countSet, { save: options.save });
 	    copied += count;
 	}
     }

@@ -48,19 +48,19 @@ function NameCount(name, count, index) {
 
 //
 
-function count(nc) {
-    return nc.count;
+function count (nc) {
+    return _.toNumber(nc.count);
 }
 
 //
 
-function makeListFromCsv(csv) {
+function makeListFromCsv (csv) {
     return makeListFromNameList(csv.split(','));
 }
 
 //
 
-function makeListFromNameList(nameList) {
+function makeListFromNameList (nameList) {
     let ncList = [];
     nameList.forEach(name => {
         ncList.push(new NameCount(name));

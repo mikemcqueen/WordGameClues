@@ -6,7 +6,6 @@ const _            = require('lodash');
 const Debug        = require('debug')('search-result');
 const Expect       = require('should/as-function');
 const Fs           = require('fs-extra');
-const Google       = require('google');
 const GoogleIt     = require('google-it');
 const Ms           = require('ms');
 const My           = require('./util');
