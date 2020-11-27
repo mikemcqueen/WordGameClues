@@ -710,7 +710,7 @@ ClueManager.prototype.getKnownSourceMapEntries = function (nc, andSources = fals
     return sourcesList.map(sources => sources.split(',').sort().toString()) // sort sources
 	.map(sources => {
 	    let entry = this.knownSourceMapArray[nc.count][sources];
-	    console.log(` sources: ${sources}, entry: ${Stringify(entry)}`);//, entry2: ${Stringify(entry2)}`);
+	    console.log(` sources: ${sources}`); // entry: ${Stringify(entry)}, entry2: ${Stringify(entry2)}`);
 	    return andSources ? { entry, sources } : entry;
 	}); 
 };
@@ -968,31 +968,40 @@ ClueManager.prototype.getListOfPrimaryNameSrcLists = function (ncList) {
     //console.log(`ncList: ${ncList}`);
     for (const nc of ncList) {
 	console.log(`  nc: ${nc}`);
-	let added = false;
+	let lastIndex = -1;
 	let entries;
 	for (;;) {
 	    entries = this.getKnownSourceMapEntries(nc, true);
 	    if (!_.isArray(entries) || _.isEmpty(entries)) {
-		console.log(`  explosion, nc: ${nc}, entries: ${Stringify(entries)}`);
+		console.log(`  explosion, nc: ${nc}, `); //entries: ${Stringify(entries)}`);
 		process.exit(-1);
 	    }
-	    if (added || entries[0].entry || nc.count === 1) break;
-	    const sources = entries[0].sources;
+	    if (nc.count === 1) break;
+
+	    let currIndex = -1;
+	    entries.every((item, index) => {
+		if (item.entry) return true;
+		currIndex = index;
+		return false;
+	    });
+	    if (currIndex === -1) break;
+	    if (currIndex === lastIndex) {
+		console.log(`currIndex == lastIndex (${currIndex})`);
+		process.exit(-1);
+	    }
 	    
-	    console.log(`adding nc: ${nc}, sources ${sources}, entries: ${Stringify(entries)}`);
+	    const sources = entries[currIndex].sources;
+	    
+	    console.log(`adding nc: ${nc}, sources ${sources}`); // entries: ${Stringify(entries)}`);
 
 	    const clue = { name: nc.name, src: sources };
-	    if (nc.count > 1) {
-		this.addCompoundClue(clue, nc.count, true);
-	    } else {
-		this.addPrimaryClueToMap(clue);
-	    }
+	    this.addCompoundClue(clue, nc.count, true);
 	    //
 	    // TODO
 	    //
 	    // call addClue here too
 	    //this.addClue(clue, nc.count)
-	    added = true;
+	    lastIndex = currIndex;
 	}
 
 	// verify that no other entries are undefined
@@ -1002,8 +1011,8 @@ ClueManager.prototype.getListOfPrimaryNameSrcLists = function (ncList) {
 	    if (!entry || !entry.results || !_.isArray(entry.results) || _.isEmpty(entry.results)) {
 		 // || _.isEmpty(item.sources)) {
 
-		console.log(`  explosion2, nc: ${nc}, sources: ${item.sources}, ` +
-			    `entries: ${Stringify(entries)}, entry: ${Stringify(entry)}`);
+		console.log(`  explosion2, nc: ${nc}, sources: ${item.sources}`); //, entry: ${Stringify(entry)}, entries: ${Stringify(entries)}`);
+
 		if (!entry) console.log('entry null');
 		else if (!entry.results) console.log('entry.results null');
 		else if (!_.isArray(entry.results)) console.log('entry.results not array');
