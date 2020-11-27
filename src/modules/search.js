@@ -41,14 +41,14 @@ async function retryGetOneResult (wordList, pages, options = {}) {
     const retryDelay = options.retryDelay || 5000;
     while (true) {
         const result = await getOneResult(wordList, pages, options)
-                  .catch(err => {
-                      if (_.includes(err.message, 'CAPTCHA')) {
-                          console.log('CAPTCHA error');
-                      } else {
-                          console.log(err);
-                      }
-                      return false;
-                  });
+            .catch(err => {
+                if (_.includes(err.message, 'CAPTCHA')) {
+                    console.log('CAPTCHA error');
+                } else {
+                    console.log(err);
+                }
+                return false;
+            });
         if (result !== false) return result;
         console.log(`Retrying in ${PrettyMs(retryDelay)}...`);
         await My.waitFor(retryDelay);

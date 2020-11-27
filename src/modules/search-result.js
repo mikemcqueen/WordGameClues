@@ -136,7 +136,10 @@ function get_it (text, limit = 20) {
     return GoogleIt({'query': text, 'limit': limit})
         .then(results => {
             Debug(`result count: ${_.size(results)}`);
-            Debug(`results: ${results}, results[0].keys: ${_.keys(results[0])}`);
+
+
+
+	    Debug(`results: ${results}, results[0].keys: ${_.keys(results[0])}`);
             resultList.push(...results.map(entry => {
                 return {
                     title:   entry.title,
