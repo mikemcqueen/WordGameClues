@@ -7,7 +7,7 @@
 const _       = require('lodash');
 const Expect  = require('should/as-function');
 const Promise = require('bluebird');
-//const Wiki    = require('wikijs').default;
+const Wiki    = require('wikijs').default;
 
 //
 
