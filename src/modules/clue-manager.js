@@ -20,7 +20,6 @@ const NameCount      = require('../types/name-count');
 const Path           = require('path');
 const Peco           = require('./peco');
 const PrettyMs       = require('pretty-ms');
-//const Stringify      = require('javascript-stringify');
 const Validator      = require('./validator');
 
 const stringify = require('javascript-stringify').stringify;
@@ -114,8 +113,7 @@ ClueManager.prototype.loadAllClues = function (args) {
     if (args.ignoreErrors) {
         this.ignoreLoadErrors = true;
     }
-    this.maxClues = args.clues.clueCount;
-
+    this.maxClues = args.max; // args.clues.clueCount;
     for (let count = 1; count <= this.maxClues; ++count) {
         let knownClueList = this.loadClueList(count);
         this.clueListArray[count] = knownClueList;
@@ -710,7 +708,7 @@ ClueManager.prototype.getKnownSourceMapEntries = function (nc, andSources = fals
     return sourcesList.map(sources => sources.split(',').sort().toString()) // sort sources
 	.map(sources => {
 	    let entry = this.knownSourceMapArray[nc.count][sources];
-	    console.log(` sources: ${sources}`); // entry: ${Stringify(entry)}, entry2: ${Stringify(entry2)}`);
+	    //console.log(` sources: ${sources}`); // entry: ${Stringify(entry)}, entry2: ${Stringify(entry2)}`);
 	    return andSources ? { entry, sources } : entry;
 	}); 
 };

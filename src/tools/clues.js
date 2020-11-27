@@ -91,12 +91,13 @@ function usage (msg) {
 
 //
 
-function loadClues (clues, ignoreLoadErrors) {
+function loadClues (clues, ignoreErrors, max) {
     log('loading all clues...');
     ClueManager.loadAllClues({
         clues,
+        ignoreErrors,
+	max,
         validateAll:  true,
-        ignoreErrors: ignoreLoadErrors
     });
     log('done.');
     return true;
@@ -402,8 +403,14 @@ async function main () {
 
     let clueSource = Clues.getByOptions(options);
 
+    let max = 100;
+    if (!showKnownArg && !altSourcesArg || !allAltSourcesFlag) {
+        let countRange = options.count.split(',').map(_.toNumber);
+	max = countRange.length > 1 ? countRange[1] : countRange[0];
+    }
+
     setLogging(_.includes(options.verbose, VERBOSE_FLAG_LOAD));
-    if (!loadClues(clueSource, ignoreLoadErrors)) {
+    if (!loadClues(clueSource, ignoreLoadErrors, max)) {
         return 1;
     }
     setLogging(options.verbose);
