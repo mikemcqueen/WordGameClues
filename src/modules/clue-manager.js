@@ -96,8 +96,7 @@ const autoSource = (clueList) => {
 	if (clue.src != 'same') source += 1;
 	clue.src = `${source}`;
     }
-    console.log(`autoSource: ${source} primary clues`);
-    //console.log(Stringify(clueList));
+    Debug(`autoSource: ${source} primary clues`);
 };
 
 
