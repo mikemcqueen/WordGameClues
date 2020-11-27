@@ -20,8 +20,18 @@ const NameCount      = require('../types/name-count');
 const Path           = require('path');
 const Peco           = require('./peco');
 const PrettyMs       = require('pretty-ms');
-const Stringify      = require('stringify-object');
+//const Stringify      = require('javascript-stringify');
 const Validator      = require('./validator');
+
+const stringify = require('javascript-stringify').stringify;
+//let Stringify = stringify;
+
+function Stringify(val) {
+    return stringify(val, (value, indent, stringify) => {
+	if (typeof value == 'function') return "function";
+	return stringify(value);
+    }, " ");
+}
 
 //
 
@@ -44,8 +54,8 @@ function ClueManager () {
     this.loaded = false;
     this.maxClues = 0;
 
-    this.logging = false;
-//    this.logging = true;
+//    this.logging = false;
+    this.logging = true;
 
     this.logLevel = 0;
 }
@@ -56,7 +66,7 @@ function showStrList (strList) {
     let result = "";
     let first = true;
     for (let str of strList) {
-        if (!first) str += ' - ';
+        if (!first) result += ' - ';
 	result += str;
         first = false;
     }
@@ -72,13 +82,26 @@ ClueManager.prototype.log = function (text) {
         for (let index = 0; index < this.logLevel; index += 1) { pad += ' '; }
         console.log(pad + text);
     }
-}
+};
 
 //
 
 ClueManager.prototype.saveClueList = function (list, count, options = {}) {
     list.save(this.getKnownFilename(count, options.dir));
 };
+
+
+const autoSource = (clueList) => {
+    let source = 0;
+    for (let clue of clueList) {
+	if (clue.src != 'same') source += 1;
+	clue.src = `${source}`;
+    }
+    console.log(`autoSource: ${source} primary clues`);
+    //console.log(Stringify(clueList));
+};
+
+
 
 // args:
 //  baseDir:  base directory (meta, synth)
@@ -97,6 +120,9 @@ ClueManager.prototype.loadAllClues = function (args) {
         let knownClueList = this.loadClueList(count);
         this.clueListArray[count] = knownClueList;
         if (count === 1) {
+	    if (knownClueList[0].src == 'auto') {
+		autoSource(knownClueList);
+	    }
             this.addKnownPrimaryClues(knownClueList);
         }
         else {
@@ -247,13 +273,10 @@ ClueManager.prototype.addKnownClue = function (count, name, source, nothrow) {
     Expect(source).is.a.String();
     let clueMap = this.knownClueMapArray[count];
     if (!_.has(clueMap, name)) {
+        this.log(`clueMap[${name}] = [ ${source} ]`);
         clueMap[name] = [ source ];
     } else if (!clueMap[name].includes(source)) {
-        if (this.logging) {
-            this.log(`clueMap[${name}] = ${clueMap[name]}`);
-            this.log('addKnownClue(' + count + ') ' +
-                     name + ' : ' + source);
-        }
+        this.log(`clueMap[${name}] += ${source} (${count})`);
         clueMap[name].push(source);
     } else {
         if (nothrow) return false;
@@ -408,9 +431,7 @@ ClueManager.prototype.addRejectSource = function (srcNameList) {
     }
     Expect(srcNameList).is.an.Array().and.not.empty();
     srcNameList.sort();
-    if (this.logging) {
-        this.log('addRejectSource: ' + srcNameList);
-    }
+    this.log('addRejectSource: ' + srcNameList);
 
     if (this.isKnownSource(srcNameList.toString())) {
         console.log('WARNING! not rejecting known source, ' + srcNameList);
@@ -636,15 +657,15 @@ ClueManager.prototype.filter = function (srcCsvList, clueCount, map = {}) {
     let duplicate = 0;
     srcCsvList.forEach(srcCsv => {
         if (this.isRejectSource(srcCsv)) {
-            if (this.logging) this.log(`isRejectSource(${clueCount}) ${srcCsv}`);
+            this.log(`isRejectSource(${clueCount}) ${srcCsv}`);
             ++reject;
         } else {
             if (this.isKnownSource(srcCsv, clueCount)) {
-		if (this.logging) this.log(`isKnownSource(${clueCount}) ${srcCsv}`);
+		this.log(`isKnownSource(${clueCount}) ${srcCsv}`);
 		++known;
 	    }
             if (_.has(map, srcCsv)) {
-                if (this.logging) this.log(`duplicate: ${srcCsv}`);
+                this.log(`duplicate: ${srcCsv}`);
                 ++duplicate;
             }
             map[srcCsv] = true;
@@ -681,13 +702,15 @@ ClueManager.prototype.getKnownSourceMapEntries = function (nc, andSources = fals
     if (nc.count === 1)  {
 	return andSources ? [ { entry: singleEntry(nc, sourcesList) } ] : [ singleEntry(nc, sourcesList) ];
     }
-    if (nc.toString() == 'red dawn:5') {
+
+    if (nc.toString() == 'washington:5') {
 	console.log(`sourcesList: ${showStrList(sourcesList)}`);
     }
+
     return sourcesList.map(sources => sources.split(',').sort().toString()) // sort sources
 	.map(sources => {
 	    let entry = this.knownSourceMapArray[nc.count][sources];
-	    //console.log(`sources: ${sources}, entry: ${Stringify(entry)}, entry2: ${Stringify(entry2)}`);
+	    console.log(` sources: ${sources}, entry: ${Stringify(entry)}`);//, entry2: ${Stringify(entry2)}`);
 	    return andSources ? { entry, sources } : entry;
 	}); 
 };
@@ -950,7 +973,7 @@ ClueManager.prototype.getListOfPrimaryNameSrcLists = function (ncList) {
 	for (;;) {
 	    entries = this.getKnownSourceMapEntries(nc, true);
 	    if (!_.isArray(entries) || _.isEmpty(entries)) {
-		console.log(`    explosion, nc: ${nc}, entries: ${Stringify(entries)}`);
+		console.log(`  explosion, nc: ${nc}, entries: ${Stringify(entries)}`);
 		process.exit(-1);
 	    }
 	    if (added || entries[0].entry || nc.count === 1) break;
@@ -979,8 +1002,12 @@ ClueManager.prototype.getListOfPrimaryNameSrcLists = function (ncList) {
 	    if (!entry || !entry.results || !_.isArray(entry.results) || _.isEmpty(entry.results)) {
 		 // || _.isEmpty(item.sources)) {
 
-		console.log(`    explosion2, nc: ${nc}, sources: ${item.sources}, ` +
+		console.log(`  explosion2, nc: ${nc}, sources: ${item.sources}, ` +
 			    `entries: ${Stringify(entries)}, entry: ${Stringify(entry)}`);
+		if (!entry) console.log('entry null');
+		else if (!entry.results) console.log('entry.results null');
+		else if (!_.isArray(entry.results)) console.log('entry.results not array');
+		else if (_.isEmpty(entry.results)) console.log('entry.results empty');
 		process.exit(-1);
 	    }
 	    return entry.results.map(result => result.nameSrcList);
