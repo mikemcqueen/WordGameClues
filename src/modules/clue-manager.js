@@ -701,7 +701,7 @@ ClueManager.prototype.getKnownSourceMapEntries = function (nc, andSources = fals
     }
 
     if (nc.toString() == 'washington:5') {
-	console.log(`sourcesList: ${showStrList(sourcesList)}`);
+	//console.log(`sourcesList: ${showStrList(sourcesList)}`);
     }
 
     return sourcesList.map(sources => sources.split(',').sort().toString()) // sort sources

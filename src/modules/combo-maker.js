@@ -21,8 +21,18 @@ const NameCount   = require('../types/name-count');
 const Peco        = require('./peco');
 const PrettyMs    = require('pretty-ms');
 const ResultMap   = require('../types/result-map');
-const Stringify   = require('stringify-object');
+//const Stringify   = require('stringify-object');
 const Validator   = require('./validator');
+const stringify = require('javascript-stringify').stringify;
+//let Stringify = stringify;
+
+function Stringify(val) {
+    return stringify(val, (value, indent, stringify) => {
+	if (typeof value == 'function') return "function";
+	return stringify(value);
+    }, " ");
+}
+
 
 let logging = 0;
 
@@ -153,6 +163,7 @@ let two = 0;
 let three =  0;
 let four =  0;
 
+// this is the innermost function of some nasty complexity nested loops.
 function mergeSources (sources1, sources2, mergedPrimaryNameSrcList, prefix = '') {
     let mergedSources = {};
     // timed, 133ms in 2
@@ -188,7 +199,7 @@ function setsEqualOrDistinct(set1, set2, prefix = '') {
     // console.log(`arr2: ${arr2}`);
     //
     let it = 'red:1';
-    let hasit1 = set1.has(it); //_.includes(arr1, it);
+    let hasit1 = set1.has(it); // _.includes(arr1, it);
     let hasit2 = set2.has(it); // _.includes(arr2, it);
     
     if ((hasit1 || hasit2) && logging) {
@@ -241,6 +252,7 @@ function mergeCompatibleSourcesLists (sources1, sources2, prefix = '') { // TODO
 
 function mergeAllCompatibleSources (ncList, prefix = "") {
     Expect(ncList.length).is.above(0);
+    //console.log(Stringify(ncList));
     let sources = getSourcesList(ncList[0]);
     for (let ncIndex = 1; ncIndex < ncList.length; ncIndex += 1) {
         const nextSources = getSourcesList(ncList[ncIndex]);
@@ -342,7 +354,7 @@ function mergeAllUsedSources (sourcesList, useNcDataList, op) {
                 if (valid) {
                     // TODO: i get the feeling that is merging ncList is not working here, doubling up ncList when merging face,card
                     //
-                    // need to think deeply here. the correct logic is an optimation
+                    // need to think deeply here. the correct logic is an optimization
                     //
                     if (op === Op.xor || ((op === Op.or) && !allCommonPrimarySources)) {
                         mergedSourcesList.push(mergeSources(sources, useSources));
@@ -521,7 +533,7 @@ ComboMaker.prototype.makeCombos = function(args, options = {}) {
     let allOrNcDataLists = args.or ? buildAllUseNcDataLists(args.or) : [ [] ];
 
     //let allXorNcLists = args.xor ? buildAllUseNcLists(args.xor) : [ [] ];
-    //console.log(`allXorNcLists: ${Stringify(allXorNcLists[0])}`);
+    //console.log(`allXorNcDataLists: ${Stringify(allXorNcDataLists)}`);
     //console.log(`allXorNcDataLists[0]: ${Stringify(allXorNcDataLists[0])}`);
 
     let comboArgs = {
@@ -596,8 +608,9 @@ function ncListsToCombinations (ncLists) {
 }
 
 function getCombinationNcLists (useArgsList) {
+    Debug(`useArgsList: ${Stringify(useArgsList)}`);
     return useArgsList.map(useArg => useArg.split(','))
-//        .map(nameOrNcStrList => nameOrNcStrListToKnownNcList(nameOrNcStrList))
+        .map(nameOrNcStrList => nameOrNcStrListToKnownNcList(nameOrNcStrList))
         .map(knownNcLists => ncListsToCombinations(knownNcLists));
 }
 
@@ -607,20 +620,20 @@ function combinationsToNcLists (combinationNcLists) {
         listArray: combinationNcLists.map(ncList => [...Array(ncList.length).keys()]),
         max: combinationNcLists.reduce((sum, ncList) => sum + ncList.length, 0)       // sum of lengths of nclists
     }).getCombinations()
-        .map(combo => combinationNcList(combo, combinationNcLists));
+      .map(combo => combinationNcList(combo, combinationNcLists));
 }
 
-// todo; get rid fo this, and combinationsToNCLists, and add extra m ap step in buildAllUseNCData
+// TODO: get rid of this and combinationsToNCLists, and add extra map step in buildAllUseNCData
 function combinationsToNcDataLists (combinationNcLists) {
+    Debug(`combToNcDataLists() combinationNcLists: ${Stringify(combinationNcLists)}`);
     return Peco.makeNew({
         listArray: combinationNcLists.map(ncList => [...Array(ncList.length).keys()]),
         max: combinationNcLists.reduce((sum, ncList) => sum + ncList.length, 0)       // sum of lengths of nclists
     }).getCombinations()
-        .map(combo => combinationNcDataList(combo, combinationNcLists));
+      .map(combo => combinationNcDataList(combo, combinationNcLists));
 }
 
 function buildAllUseNcLists (useArgsList) {
-    //return combinationsToNcLists(getCombinationNcLists(useArgsList));
     return combinationsToNcLists(getCombinationNcLists(useArgsList));
 }
 

@@ -403,8 +403,8 @@ async function main () {
 
     let clueSource = Clues.getByOptions(options);
 
-    let max = 100;
-    if (!showKnownArg && !altSourcesArg || !allAltSourcesFlag) {
+    let max = clueSource.clueCount;
+    if (options.count && !showKnownArg && !altSourcesArg && !allAltSourcesFlag) {
         let countRange = options.count.split(',').map(_.toNumber);
 	max = countRange.length > 1 ? countRange[1] : countRange[0];
     }
