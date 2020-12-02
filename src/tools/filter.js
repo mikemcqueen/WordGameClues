@@ -8,7 +8,7 @@
 'use strict';
 
 const _            = require('lodash');
-//const ChildProcess = require('child_process');
+const ChildProcess = require('child_process');
 const ClueManager  = require('../modules/clue-manager');
 const Clues        = require('../modules/clue-types');
 const Debug        = require('debug')('filter');
@@ -23,7 +23,7 @@ const My           = require('../modules/util');
 const Path         = require('path');
 const PrettyMs     = require('pretty-ms');
 const Promise      = require('bluebird');
-//const Score        = require('../modules/score');
+const Score        = require('../modules/score');
 const SearchResult = require('../modules/search-result');
 const Stringify    = require('stringify-object');
 
