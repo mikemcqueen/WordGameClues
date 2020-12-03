@@ -23,7 +23,10 @@ const DEFAULT_DELAY_HIGH = 12;
 
 const CmdLineOptions = require('node-getopt')
       .create([
-          ['',  'force',               'force search even if results file exists'],
+          ['f', 'force',               'force search even if results file exists'],
+	  ['n', 'nowiki',              'don\'t restrict to en.wikipedia.org'],
+	  ['p', 'pages=COUNT',         'retrieve COUNT pages of result'],
+	  ['q', 'quoted',              'search using quoted words'],
           ['h', 'help',                'this screen' ]
       ])
       .bindHelp(
@@ -66,14 +69,14 @@ async function main() {
         low:   Ms(`${delayLow}m`),
         high:  Ms(`${delayHigh}m`)
     };
+    let pages = Opt.options.pages ? _.toNumber(Opt.options.pages) : DEFAULT_PAGE_COUNT;
+    console.log(`pages: ${pages}`);
     return Fs.readFile(filename)
         .then(csvContent => CsvParse(csvContent, { relax_column_count: true } ))
         .then(wordListArray => Search.getAllResults({
-            // NOTE: use default dir
-            wordListArray: wordListArray,
-            pages:         DEFAULT_PAGE_COUNT,
-            delay:         delay
-        }, { force: Opt.options.force }));
+	    // NOTE: use default dir
+            wordListArray, pages, delay,
+        }, Opt.options));
 }
 
 //

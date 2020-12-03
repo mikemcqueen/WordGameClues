@@ -13,13 +13,14 @@ const My           = require('./util');
 const Path         = require('path');
 const PrettyMs     = require('pretty-ms');
 const SearchResult = require('./search-result');
+const Stringify    = require('stringify-object');
 
 // make a search term from a list of words and the supplied options
 //
-function makeSearchTerm (wordList, options = {}) {
+function makeSearchTerm (wordList, options) {
     Expect(options).is.an.Object();
-    let term = wordList.join(' ');
-    if (options.wikipedia) {
+    let term = wordList.map(word => options.quoted ? `"${word}"` : word).join(' ');
+    if (!options.nowiki) {
         term += ' site:en.wikipedia.org';
     }
     return term;
@@ -27,16 +28,16 @@ function makeSearchTerm (wordList, options = {}) {
 
 // 
 //
-function getOneResult (wordList, pages, options = {}) {
+function getOneResult (wordList, pages, options) {
     Expect(options).is.an.Object();
-    let term = makeSearchTerm(wordList, { wikipedia: true });
+    let term = makeSearchTerm(wordList, options);
     console.log(`term: ${term}, pages: ${pages}`);
     return SearchResult.get_it(term, pages * 10);
 }
 
 //
 
-async function retryGetOneResult (wordList, pages, options = {}) {
+async function retryGetOneResult (wordList, pages, options) {
     Expect(options).is.an.Object();
     const retryDelay = options.retryDelay || 5000;
     while (true) {
@@ -58,6 +59,9 @@ async function retryGetOneResult (wordList, pages, options = {}) {
 // check if file exists; if not, get, then save, a search result
 
 function checkGetSaveResult(args, options) {
+    Expect(args).is.an.Object();
+    Expect(options).is.an.Object();
+
     let nextDelay = 0;
     let mode = options.force ? 'w' : 'wx';
     return Fs.open(args.path, mode)
@@ -70,10 +74,9 @@ function checkGetSaveResult(args, options) {
             // search, because we may get robot warning
             // TODO: add retry to getOneResult; check for robot result
             nextDelay = args.delay;
-            let oneResultOptions = {
-                reject: options.forceNextError,
-                retryDelay:  args.delay * 2
-            };
+            let oneResultOptions = Object.assign({}, options); // _.clone(options);
+            oneResultOptions.reject = options.forceNextError;
+            oneResultOptions.retryDelay =  args.delay * 2;
             options.forceNextError = false;
             // file did not exist prior to creation; do the search
             return retryGetOneResult(args.wordList, args.pages, oneResultOptions);
@@ -119,7 +122,6 @@ function checkGetSaveResult(args, options) {
 async function getAllResultsLoop (args, options) {
     Expect(args).is.an.Object();
     Expect(args.wordListArray).is.an.Array().and.not.empty();
-    Expect(options).is.an.Object();
     let count = { skip: 0, empty: 0, data: 0, error: 0 }; // test support
     for (const [index, wordList] of args.wordListArray.entries()) {
         let filename = SearchResult.makeFilename(wordList);
@@ -148,7 +150,7 @@ async function getAllResultsLoop (args, options) {
             My.gitAddCommit(path, 'new result')
                 .then(() => {
                     console.log(`Committed: ${path}`);
-                    return !_.isEmpty(result) && SearchResult.fileScoreSaveCommit(path);
+                    return !_.isEmpty(result) && SearchResult.fileScoreSaveCommit(path, options);
                 }).catch(err => {
                     // log & eat all errors
                     console.log(`getAllResultsLoop commit error`, err, err.stack);

@@ -8,6 +8,8 @@ const _       = require('lodash');
 const Expect  = require('should/as-function');
 const Promise = require('bluebird');
 //const Wiki    = require('wikijs').default;
+const Stringify = require('stringify-object');
+
 
 //
 
@@ -152,17 +154,24 @@ function getScore (wordList, result, options = {}) {
     };
     Expect(score.wordsInTitle).is.a.Number();
 
-    return getWikiContent(result.title)
-        .then(content => {
-            score.wordsInArticle = getWordCount(
-                wordList, `${content.text} ${_.values(content.info).join(' ')}`, options);
-        }).
-        catch(err => {
-            // eat error
-            console.log(`getScore error, ${err}`);
-        }).then(() => score);
+    //console.log(Stringify(options));
+    return new Promise((resolve, reject) => {
+	if (options.nowiki) {
+	    score.wordsInArticle = wordList.length;
+	    resolve(score);
+	} else {
+	    resolve(getWikiContent(result.title)
+                .then(content => {
+		    score.wordsInArticle = getWordCount(
+			wordList, `${content.text} ${_.values(content.info).join(' ')}`, options);
+		}).catch(err => {
+		    // eat error
+		    console.log(`getScore error, ${err}`);
+		}).then(() => score));
+	}
+    });
 }
-
+    
 // remove empty URLs
 
 function filterBadResults (resultList) {

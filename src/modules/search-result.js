@@ -154,10 +154,10 @@ function get_it (text, limit = 20) {
 
 //
 
-function scoreSaveCommit (resultList, filepath, options = {}, wordList = undefined) {
+function scoreSaveCommit (resultList, filepath, options, wordList = undefined) {
     Expect(resultList).is.an.Array().and.not.empty();
     Expect(filepath).is.a.String();
-    Expect(options).is.a.Object();
+    Expect(options).is.an.Object();
     if (!_.isUndefined(wordList)) {
         Expect(wordList).is.an.Array().with.property('length').above(1); // at.least(2);
     }
@@ -182,7 +182,7 @@ function scoreSaveCommit (resultList, filepath, options = {}, wordList = undefin
 
 //
 
-function fileScoreSaveCommit (filepath, options = {}, wordList = undefined) {
+function fileScoreSaveCommit (filepath, options, wordList = undefined) {
     Expect(filepath).is.a.String();
     Expect(options).is.a.Object();
     if (!_.isUndefined(wordList)) {
