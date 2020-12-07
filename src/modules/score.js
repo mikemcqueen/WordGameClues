@@ -7,7 +7,7 @@
 const _       = require('lodash');
 const Expect  = require('should/as-function');
 const Promise = require('bluebird');
-//const Wiki    = require('wikijs').default;
+const Wiki    = require('wikijs').default;
 const Stringify = require('stringify-object');
 
 
@@ -114,8 +114,7 @@ function removeWikipediaSuffix (title) {
 //
 
 function getWikiContent (title) {
-    throw new Error("not implemented");
-    /*
+    //throw new Error("not implemented");
     Expect(title).is.a.String();
     return Wiki().page(removeWikipediaSuffix(title)).then(page => {
         return Promise.all([
@@ -133,7 +132,6 @@ function getWikiContent (title) {
         console.log(`getWikiContent Wiki.page, title: ${title}, error: ${err}`);
         if (err) throw err;
     });
-*/
 }
 
 //
