@@ -148,7 +148,7 @@ function getCompatiblePrimaryNameSrcList (listOfListOfPrimaryNameSrcLists) {
         max: listOfListOfPrimaryNameSrcLists.reduce((sum, listOfNameSrcLists) => sum + listOfNameSrcLists.length, 0)
     }).getCombinations();
 
-    return comboLists.some(comboList => {
+    for (const comboList of comboLists) {
 	const nameSrcList = comboList.reduce((nameSrcList, comboListValue, comboListIndex) => {
 	    let nsList = listOfListOfPrimaryNameSrcLists[comboListIndex][comboListValue];
 	    //console.log(`nameSrcList: ${nameSrcList}, clValue ${comboListValue}, clIndex ${comboListIndex}, nsList: ${nsList}`);
@@ -159,10 +159,11 @@ function getCompatiblePrimaryNameSrcList (listOfListOfPrimaryNameSrcLists) {
 	    nameSrcList.push(...nsList);
 	    return nameSrcList;
 	}, []);
-	const uniqLen = _.uniqBy(nameSrcList, NameCount.count).length;
-	//console.log(`nameSrcList ${Stringify(nameSrcList)} len ${nameSrcList.length} uniqLen ${uniqLen}`);
-	return (uniqLen === nameSrcList.length);
-    });
+	const uniqNameSrcList = _.uniqBy(nameSrcList, NameCount.count);
+	//console.log(`nameSrcList ${Stringify(nameSrcList)} len ${nameSrcList.length} uniqLen ${uniqNameSrcList.length}`);
+	if (uniqNameSrcList.length === nameSrcList.length) return uniqNameSrcList;
+    }
+    return null;
 }
 
 function fast_combos (nameList, options) {
@@ -176,7 +177,13 @@ function fast_combos (nameList, options) {
     console.log(`len: ${lists.length}`);
     lists.forEach ((listOfListOfPrimaryNameSrcLists, index) => {
 	const compatibleNameSrcList = getCompatiblePrimaryNameSrcList(listOfListOfPrimaryNameSrcLists);
-	console.log(`${ncLists[index]}  ${compatibleNameSrcList ? 'VALID' : 'invalid'}`);
+	let sum = 0;
+	let inversePrimarySources;
+	if (compatibleNameSrcList) {
+	    sum = ncLists[index].reduce((sum, nc) => sum + nc.count, 0);
+	    inversePrimarySources = ClueManager.getInversePrimarySources(compatibleNameSrcList.map(ns => `${ns.count}`));
+	}
+	console.log(`${ncLists[index]} ${compatibleNameSrcList ? 'VALID (' + sum + ') : ' + compatibleNameSrcList  + ' remain: ' + inversePrimarySources : 'invalid'}`);
     });
 }
 

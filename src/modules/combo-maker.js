@@ -335,22 +335,26 @@ function mergeAllUsedSources (sourcesList, useNcDataList, op) {
                     valid = true;
                 }
 
-                /* don't remove
-                if (!valid && (op !== Op.xor) && subset) { // or, and
-
-                    // technically, there is a possibility here that that --or sources
-                    // could split across matching/not matching primary sources, in the
-                    // case where there is a duplicate entry for a particular source
-                    // component's COUNT value.
-                    // Example: --or card = red:1,bird:1, matching sources red:1,anotherword:1 
-                    // Because red:1 is a partial match, I believe we'd fail to merge
-                    // the remaining source (anotherword:1).
-		    // I think we fall into the same trap in mergeCompatibleSourcesLists.
-
-                    if (singlePrimaryNc || matchAnyNcList(useNcList, sources.srcNcLists)) {
-                        valid = true;
-                    }
+                if (!valid && (op === Op.or)) { // or, (and if:  op !== Op.xor)
+		    const numCommonPrimaryCount = _.intersectionBy(sources.primaryNameSrcList, useSources.primaryNameSrcList, NameCount.count).length;
+		    if (numCommonPrimaryCount === useSources.primaryNameSrcList.length) {
+			// technically, there is a possibility here that that --or sources
+			// could split across matching/not matching primary sources, in the
+			// case where there is a duplicate entry for a particular source
+			// component's COUNT value.
+			// Example: --or card = red:1,bird:1, matching sources red:1,anotherword:1 
+			// Because red:1 is a partial match, I believe we'd fail to merge
+			// the remaining source (anotherword:1).
+			// I think we fall into the same trap in mergeCompatibleSourcesLists.
+			
+			if (singlePrimaryNc || matchAnyNcList(useNcData.ncList, sources.srcNcLists)) {
+			    Debug(`--or match: ${useNcData.ncList} with something`);
+			    mergedSourcesList.push(sources);
+                            valid = true;
+			}
+		    }
                 }
+                /* don't remove
                 if (valid) {
                     // TODO: i get the feeling that is merging ncList is not working here, doubling up ncList when merging face,card
                     //

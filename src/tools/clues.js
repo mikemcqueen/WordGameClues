@@ -290,7 +290,8 @@ function copyClues (fromType, options = {}) {
     const dir = fromType.baseDir;
     let total = 0;
     let copied = 0;
-    for (let count = 2; count < 20; ++count) {
+    let max = options.max ? options.max : 20;
+    for (let count = 2; count < max; ++count) {
 	let list;
 	try {
 	    list = ClueManager.loadClueList(count, { dir });
