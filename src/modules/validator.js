@@ -705,9 +705,10 @@ Validator.prototype.findPrimarySourceConflicts = function(args) {
         }
     }, this);
 
-    Debug(`--findPrimarySourceConflicts: ` +
-          (duplicateName ? duplicateName : 'none') +
-          `, allPrimary: ${allPrimary}`);
+    Debug(`--findPrimarySourceConflicts: dupeName: `
+          + (duplicateName ? duplicateName : 'none')
+          + `, allPrimary: ${allPrimary}`
+	  + `, conflicts: ${_.size(conflictSrcMap)}`);
 
     return {
         duplicateName:  duplicateName,
