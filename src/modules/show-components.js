@@ -183,7 +183,8 @@ function fast_combos (nameList, options) {
 	    sum = ncLists[index].reduce((sum, nc) => sum + nc.count, 0);
 	    inversePrimarySources = ClueManager.getInversePrimarySources(compatibleNameSrcList.map(ns => `${ns.count}`));
 	}
-	console.log(`${ncLists[index]} ${compatibleNameSrcList ? 'VALID (' + sum + ') : ' + compatibleNameSrcList  + ' remain: ' + inversePrimarySources : 'invalid'}`);
+	console.log(`${ncLists[index]} ` + compatibleNameSrcList ? `VALID (${sum}): ${compatibleNameSrcList} `
+		    + `REMAIN(${inversePrimarySources.length}): ${inversePrimarySources}` : 'invalid');
     });
 }
 
