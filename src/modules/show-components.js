@@ -141,17 +141,19 @@ function show (options) {
 //
 
 function getCompatiblePrimaryNameSrcList (listOfListOfPrimaryNameSrcLists) {
-    //console.log(`${Stringify(listOfListOfPrimaryNameSrcLists)}`);
+    console.log(`${Stringify(listOfListOfPrimaryNameSrcLists)}`);
     const listArray = listOfListOfPrimaryNameSrcLists.map(listOfNameSrcLists => [...Array(listOfNameSrcLists.length).keys()]); // 0..nameSrcList.length
     let comboLists = Peco.makeNew({
         listArray,
         max: listOfListOfPrimaryNameSrcLists.reduce((sum, listOfNameSrcLists) => sum + listOfNameSrcLists.length, 0)
     }).getCombinations();
 
+    console.log(`${Stringify(comboLists)}`);
+
     for (const comboList of comboLists) {
 	const nameSrcList = comboList.reduce((nameSrcList, comboListValue, comboListIndex) => {
 	    let nsList = listOfListOfPrimaryNameSrcLists[comboListIndex][comboListValue];
-	    //console.log(`nameSrcList: ${nameSrcList}, clValue ${comboListValue}, clIndex ${comboListIndex}, nsList: ${nsList}`);
+	    console.log(`nameSrcList: ${nameSrcList}, clValue ${comboListValue}, clIndex ${comboListIndex}, nsList: ${nsList}`);
 	    if (!nsList || !_.isArray(nsList)) {
 		console.log(`nsList: ${nsList}, value ${comboListValue} index ${comboListIndex} lolPnsl(${comboListIndex}): ${Stringify(listOfListOfPrimaryNameSrcLists[comboListIndex])} nameSrcList ${Stringify(nameSrcList)}`);
 		console.log(`lolopnsl: ${Stringify(listOfListOfPrimaryNameSrcLists)}`);
@@ -160,7 +162,7 @@ function getCompatiblePrimaryNameSrcList (listOfListOfPrimaryNameSrcLists) {
 	    return nameSrcList;
 	}, []);
 	const uniqNameSrcList = _.uniqBy(nameSrcList, NameCount.count);
-	//console.log(`nameSrcList ${Stringify(nameSrcList)} len ${nameSrcList.length} uniqLen ${uniqNameSrcList.length}`);
+	console.log(`nameSrcList ${Stringify(nameSrcList)} len ${nameSrcList.length} uniqLen ${uniqNameSrcList.length}`);
 	if (uniqNameSrcList.length === nameSrcList.length) return uniqNameSrcList;
     }
     return null;
@@ -183,8 +185,8 @@ function fast_combos (nameList, options) {
 	    sum = ncLists[index].reduce((sum, nc) => sum + nc.count, 0);
 	    inversePrimarySources = ClueManager.getInversePrimarySources(compatibleNameSrcList.map(ns => `${ns.count}`));
 	}
-	console.log(`${ncLists[index]} ` + compatibleNameSrcList ? `VALID (${sum}): ${compatibleNameSrcList} `
-		    + `REMAIN(${inversePrimarySources.length}): ${inversePrimarySources}` : 'invalid');
+	console.log(`${ncLists[index]} ` + (compatibleNameSrcList ? `VALID (${sum}): ${compatibleNameSrcList} `
+            + `REMAIN(${inversePrimarySources.length}): ${inversePrimarySources}` : 'invalid'));
     });
 }
 

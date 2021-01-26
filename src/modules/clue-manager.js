@@ -676,13 +676,24 @@ ClueManager.prototype.filter = function (srcCsvList, clueCount, map = {}) {
     };
 };
 
-function singleEntry (nc, sources) {
+function old_singleEntry (nc, sources) {
     //console.log(`  singleEntry ${nc} sources: ${Stringify(sources)}`);
     return {
 	results: [
 	    {
 		ncList: [ nc ],
 		nameSrcList: [ NameCount.makeNew(nc.name, sources[0]) ]
+	    }
+	]
+    };
+};
+
+function singleEntry (nc, source) {
+    return {
+	results: [
+	    {
+		ncList: [ nc ],
+		nameSrcList: [ NameCount.makeNew(nc.name, source) ]
 	    }
 	]
     };
@@ -696,17 +707,23 @@ ClueManager.prototype.getKnownSourceMapEntries = function (nc, andSources = fals
     const sourcesList = clueMap[nc.name];
     if (!sourcesList) throw new Error(`No sourcesList at ${nc.name}`);
     // TODO: single entry, really? what if same primary clue name is used twice?
-    if (nc.count === 1)  {
-	return andSources ? [ { entry: singleEntry(nc, sourcesList) } ] : [ singleEntry(nc, sourcesList) ];
+    // TODO. BUGG.
+    /*
+    if (nc.count === 1) {
+	const entry = singleEntry(nc, sourcesList);
+	return andSources ? [ { entry } ] : [ entry ];
     }
+    */
 
-    if (nc.toString() == 'washington:5') {
-	//console.log(`sourcesList: ${showStrList(sourcesList)}`);
-    }
+    /*
+      if (nc.toString() == 'washington:5') {
+        console.log(`sourcesList: ${showStrList(sourcesList)}`);
+      }
+    */
 
     return sourcesList.map(sources => sources.split(',').sort().toString()) // sort sources
-	.map(sources => {
-	    let entry = this.knownSourceMapArray[nc.count][sources];
+	.map((sources, index) => {
+	    const entry = (nc.count === 1) ? singleEntry(nc, sourcesList[index]) : this.knownSourceMapArray[nc.count][sources];
 	    //console.log(` sources: ${sources}`); // entry: ${Stringify(entry)}, entry2: ${Stringify(entry2)}`);
 	    return andSources ? { entry, sources } : entry;
 	}); 
@@ -973,7 +990,10 @@ ClueManager.prototype.getListOfPrimaryNameSrcLists = function (ncList) {
 		console.log(`  explosion, nc: ${nc}, `); //entries: ${Stringify(entries)}`);
 		process.exit(-1);
 	    }
-	    if (nc.count === 1) break;
+	    console.log(`  entries: ${Stringify(entries)}`);
+	    if (nc.count === 1) {
+		break; // TODO BUGG this might be wrong for multiple equivalent primary sources
+	    }
 
 	    let currIndex = -1;
 	    entries.every((item, index) => {
@@ -987,6 +1007,7 @@ ClueManager.prototype.getListOfPrimaryNameSrcLists = function (ncList) {
 		process.exit(-1);
 	    }
 	    
+	    // TODO BUGG skip this part for primary clues?
 	    const sources = entries[currIndex].sources;
 	    
 	    console.log(`adding nc: ${nc}, sources ${sources}`); // entries: ${Stringify(entries)}`);
