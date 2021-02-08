@@ -38,10 +38,18 @@ function show (options) {
     //
     // TODO: call ClueManager.getCountLists
     //
+
+    // TODO: move buildAllUseNcDataLists to clue-manager?  currently in combo-maker
+
+//    let allOrNcDataLists = options.or ? buildAllUseNcDataLists(args.or) : [];
+    if (!_.isEmpty(options.or)) {
+	options.fast = true; // force fast
+    }
+
     console.log(`test: ${options.test}`);
     const nameList = options.test.split(',').sort();
     if (nameList.length > 1 && options.fast) {
-	return fast_combos(nameList, options);
+	return fast_combo_wrapper(nameList, /*allOrNcDataLists,*/ options);
     }
     const result = ClueManager.getCountListArrays(options.test, options);
     if (!result) {
@@ -143,6 +151,7 @@ function show (options) {
 function getCompatiblePrimaryNameSrcList (listOfListOfPrimaryNameSrcLists) {
     //console.log(`${Stringify(listOfListOfPrimaryNameSrcLists)}`);
     const listArray = listOfListOfPrimaryNameSrcLists.map(listOfNameSrcLists => [...Array(listOfNameSrcLists.length).keys()]); // 0..nameSrcList.length
+    //console.log(`++++ ListArray\n${Stringify(listArray)}\n---- ListArray`);
     let comboLists = Peco.makeNew({
         listArray,
         max: listOfListOfPrimaryNameSrcLists.reduce((sum, listOfNameSrcLists) => sum + listOfNameSrcLists.length, 0)
@@ -168,11 +177,54 @@ function getCompatiblePrimaryNameSrcList (listOfListOfPrimaryNameSrcLists) {
     return null;
 }
 
+function buildSubListFromIndexList (nameList, indexList) {
+    const subList = [];
+    indexList.forEach(index => subList.push(nameList[index]));
+    return subList;
+}
+
+function fast_combo_wrapper (nameList, /*allOrNcDataList,*/ options) {
+    console.log('fast_combo_wrapper');
+    console.log(`--or: ${Stringify(options.or)}`);
+    if (options.or) {
+	const max_results = 10;
+	const min = 2;
+	const max = options.or.length;
+	console.log(`min(${min}) max(${max}) results(${max_results})`);
+
+	const indexList = [...Array(options.or.length).keys()]; // 0..max
+	for (let count = max; count >= min; count -= 1) {
+	    const listArray = [...Array(count).keys()].map(_ => indexList);
+	    console.log(`count(${count}):\n${Stringify(listArray)}`);
+	    Peco.makeNew({
+		listArray,
+		max: count * max
+	    }).getCombinations()
+		.filter(indexList => _.uniq(indexList).length === indexList.length)
+		.forEach(indexList => {
+		    let orNameList = buildSubListFromIndexList(options.or, indexList);
+		    orNameList = _.concat(nameList, orNameList);
+		    //console.log(`orNameLists: ${orNameList}`);
+		    
+		    // TODO: here, i probably just want to build an array of results data
+		    // that i can sort (by total clue count, for example)
+		    // and filter (by valid/invalid)
+		    // and display, independently of the loggin in fast_combos.
+		    return fast_combos(orNameList, Object.assign(_.clone(options), { quiet: true }));
+		});
+	}
+    } else {
+	// TODO: will need to add a display call here as well
+	return fast_combos(nameList, options);
+    }
+}
+
 function fast_combos (nameList, options) {
-    console.log('fast_combos');
     const ncLists = ClueManager.buildNcListsFromNameList(nameList);
     if (_.isEmpty(ncLists)) {
-	console.log(`No ncLists for ${nameList}`);
+	if (!options.quiet) {
+	    console.log(`No ncLists for ${nameList}`);
+	}
 	return;
     }
     const lists = ClueManager.buildListsOfPrimaryNameSrcLists(ncLists);
@@ -280,7 +332,7 @@ function valid_combos(combo_list, options = {}) {
 	if (!result || !(result.known.length + result.valid.length)) {
             return;
 	}
-	  //showCountListArray(result.invalid, 'INVALID');
+	//showCountListArray(result.invalid, 'INVALID');
 	//showCountListArray(result.known, 'PRESENT as', true);
 	  //showCountListArray(result.clues, 'PRESENT as clue with sources:', true);
 	//showCountListArray(result.valid, 'VALID');

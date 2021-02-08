@@ -981,7 +981,7 @@ ClueManager.prototype.getListOfPrimaryNameSrcLists = function (ncList) {
     let listOfPrimaryNameSrcLists = [];
     //console.log(`ncList: ${ncList}`);
     for (const nc of ncList) {
-	console.log(`  nc: ${nc}`);
+	//console.log(`  nc: ${nc}`);
 	let lastIndex = -1;
 	let entries;
 	for (;;) {
@@ -990,7 +990,7 @@ ClueManager.prototype.getListOfPrimaryNameSrcLists = function (ncList) {
 		console.log(`  explosion, nc: ${nc}, `); //entries: ${Stringify(entries)}`);
 		process.exit(-1);
 	    }
-	    console.log(`  entries: ${Stringify(entries)}`);
+	    //console.log(`  entries: ${Stringify(entries)}`);
 	    if (nc.count === 1) {
 		break; // TODO BUGG this might be wrong for multiple equivalent primary sources
 	    }
@@ -1039,7 +1039,7 @@ ClueManager.prototype.getListOfPrimaryNameSrcLists = function (ncList) {
 	    }
 	    return entry.results.map(result => result.nameSrcList);
 	}));
-	primaryNameSrcLists.forEach(nameSrcList => console.log(`    nameSrcList: ${nameSrcList}`));
+	//primaryNameSrcLists.forEach(nameSrcList => console.log(`    nameSrcList: ${nameSrcList}`));
 	listOfPrimaryNameSrcLists.push(primaryNameSrcLists);
     }
     return listOfPrimaryNameSrcLists;
