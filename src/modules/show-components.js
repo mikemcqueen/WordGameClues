@@ -192,16 +192,17 @@ function fast_combo_wrapper (nameList, /*allOrNcDataList,*/ options) {
 	const max = options.or.length;
 	console.log(`min(${min}) max(${max}) results(${max_results})`);
 
+	const validResults = {};
 	const indexList = [...Array(options.or.length).keys()]; // 0..max
 	for (let count = max; count >= min; count -= 1) {
 	    const listArray = [...Array(count).keys()].map(_ => indexList);
-	    console.log(`count(${count}):\n${Stringify(listArray)}`);
+	    //console.log(`count(${count}):\n${Stringify(listArray)}`);
 	    Peco.makeNew({
 		listArray,
 		max: count * max
 	    }).getCombinations()
 		.filter(indexList => _.uniq(indexList).length === indexList.length)
-		.forEach(indexList => {
+		.map(indexList => {
 		    let orNameList = buildSubListFromIndexList(options.or, indexList);
 		    orNameList = _.concat(nameList, orNameList);
 		    //console.log(`orNameLists: ${orNameList}`);
@@ -210,36 +211,70 @@ function fast_combo_wrapper (nameList, /*allOrNcDataList,*/ options) {
 		    // that i can sort (by total clue count, for example)
 		    // and filter (by valid/invalid)
 		    // and display, independently of the loggin in fast_combos.
-		    return fast_combos(orNameList, Object.assign(_.clone(options), { quiet: true }));
-		});
+		    return fast_combos_list(orNameList, Object.assign(_.clone(options), { quiet: true, skip_invalid: true }));
+		}).forEach(validResultList => addValidResults(validResults, validResultList, { slice_index: nameList.length }));
+
+	    // TODO: implement addValidResults, sort better, don't display -t'd clues
+
+	    // Bigger idea: optional arg(s) to -t[COUNTLO[,COUNTHI]]
+	    // build list of input clues from all clues of those counts
 	}
+	display_valid_results(validResults);
     } else {
-	// TODO: will need to add a display call here as well
 	return fast_combos(nameList, options);
     }
 }
 
 function fast_combos (nameList, options) {
+    fast_combos_list(nameList, options)
+	.forEach(result => {
+	    console.log(`${result.ncList} ` + (result.valid ? `VALID (${result.sum}): ${result.compatibleNameSrcList} `
+                 + `REMAIN(${result.inversePrimarySources.length}): ${result.inversePrimarySources}` : 'invalid'));
+	});
+}
+
+function fast_combos_list (nameList, options) {
     const ncLists = ClueManager.buildNcListsFromNameList(nameList);
     if (_.isEmpty(ncLists)) {
 	if (!options.quiet) {
 	    console.log(`No ncLists for ${nameList}`);
 	}
-	return;
+	return [];
     }
     const lists = ClueManager.buildListsOfPrimaryNameSrcLists(ncLists);
-    console.log(`len: ${lists.length}`);
-    lists.forEach ((listOfListOfPrimaryNameSrcLists, index) => {
-	const compatibleNameSrcList = getCompatiblePrimaryNameSrcList(listOfListOfPrimaryNameSrcLists);
-	let sum = 0;
-	let inversePrimarySources;
-	if (compatibleNameSrcList) {
-	    sum = ncLists[index].reduce((sum, nc) => sum + nc.count, 0);
-	    inversePrimarySources = ClueManager.getInversePrimarySources(compatibleNameSrcList.map(ns => `${ns.count}`));
+    //console.log(`len: ${lists.length}`);
+    return lists.reduce((resultList, listOfListOfPrimaryNameSrcLists, index) => {
+	let add = false;
+	let result = {};
+	result.compatibleNameSrcList = getCompatiblePrimaryNameSrcList(listOfListOfPrimaryNameSrcLists);
+	result.valid = Boolean(result.compatibleNameSrcList);
+	result.ncList = ncLists[index];
+	if (result.valid) {
+	    result.sum = ncLists[index].reduce((sum, nc) => sum + nc.count, 0);
+	    result.inversePrimarySources = ClueManager.getInversePrimarySources(result.compatibleNameSrcList.map(ns => `${ns.count}`));
+	    add = true;
+	} else if (!options.skip_invalid) {
+	    add = true;
 	}
-	console.log(`${ncLists[index]} ` + (compatibleNameSrcList ? `VALID (${sum}): ${compatibleNameSrcList} `
-            + `REMAIN(${inversePrimarySources.length}): ${inversePrimarySources}` : 'invalid'));
+	if (add ) resultList.push(result);
+	return resultList;
+    }, []);
+}
+
+function addValidResults (validResults, validResultList, options) {
+    validResultList.forEach(result => {
+	Expect(result.valid).is.ok();
+	let names = result.ncList.slice(options.slice_index).map(nc => nc.name).sort().toString();
+	if (!_.has(validResults, names)) {
+	    validResults[names] = [];
+	}
+	validResults[names].push(result);
+	//console.log(`${result.ncList} : VALID (${result.sum}): ${result.compatibleNameSrcList} `);
     });
+}
+
+function display_valid_results (validResults) {
+    Object.keys(validResults).forEach(key => console.log(key));
 }
 
 function showNcLists (ncLists) {
