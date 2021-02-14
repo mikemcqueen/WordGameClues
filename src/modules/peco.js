@@ -100,7 +100,7 @@ Peco.prototype.log = function(text) {
     if (LOGGING) {
         console.log(text);
     }
-}
+};
 
 //
 
@@ -111,7 +111,7 @@ Peco.prototype.getPermutations = function() {
     else {
         return this.getAllAddends(false);
     }
-}
+};
 
 //
 
@@ -121,7 +121,7 @@ Peco.prototype.getCombinations = function() {
     } else {
         return this.getAllAddends(true);
     }
-}
+};
 
 //
 
@@ -135,7 +135,7 @@ Peco.prototype.getAllAddends = function(combFlag) {
         }
     }
     return list;
-}
+};
 
 //
 
@@ -154,16 +154,23 @@ Peco.prototype.getAddendsForCount = function(count, combFlag, pecoList, quiet) {
         pecoList,
         quiet
     });
-}
+};
 
 //
 
-Peco.prototype.getListCombinations = function(listArray) {
-    return this.buildResult({
-        listArray,
-        combFlag:  true
+Peco.prototype.firstCombination = function () {
+    this.first = true;
+    return this.nextCombination();
+};
+
+//
+
+Peco.prototype.nextCombination = function () {
+    return this.buildNextResult({
+        listArray: this.listArray,
+        combFlag: true
     });
-}
+};
 
 //
 // args:
@@ -173,7 +180,43 @@ Peco.prototype.getListCombinations = function(listArray) {
 //  pecoList (internal)
 //
 
-Peco.prototype.buildResult = function(args) {
+Peco.prototype.buildNextResult = function (args) {
+    if (this.first) {
+	if (args.listArray) {
+	    this.first = false;
+            return this.listFirst(args.listArray, args.combFlag);
+	} else if (args.count) {
+	    this.first = false;
+            return this.first(args.count, args.combFlag);
+	}
+        throw new Error('missing arg, count: ' + args.count +
+                        ', listArray: ' + args.listArray);
+    }
+    if (args.listArray) {
+        return this.listNext(args.listArray, args.combFlag);
+    } else {
+        return this.next(args.combFlag);
+    }
+};
+
+//
+
+Peco.prototype.getListCombinations = function (listArray) {
+    return this.buildResult({
+        listArray,
+        combFlag:  true
+    });
+};
+
+//
+// args:
+//  count
+//  listArray
+//  combFlag
+//  pecoList (internal)
+//
+
+Peco.prototype.buildResult = function (args) {
     let list;
 
     if (!args.pecoList) {
@@ -207,7 +250,7 @@ Peco.prototype.buildResult = function(args) {
     } while (list);
 
     return args.pecoList;
-}
+};
 
 //
 
@@ -250,7 +293,7 @@ Peco.prototype.listFirst = function (listArray, combFlag) {
         list = this.next(combFlag);
     }
     return list;
-}
+};
 
 //
 //
@@ -295,7 +338,7 @@ Peco.prototype.listNext = function (combFlag) {
         break;
     }
     return this.getPecoList();
-}
+};
 
 //
 
@@ -327,7 +370,7 @@ Peco.prototype.first = function (srcCount, combFlag) {
         return this.next(combFlag);     
     }
     return this.getPecoList();
-}
+};
     
 //
 
@@ -358,7 +401,7 @@ Peco.prototype.next = function (combFlag) {
     } while (!this.isValidIndex());
 
     return this.getPecoList();
-}
+};
 
 //
 
@@ -385,7 +428,7 @@ Peco.prototype.isValidIndex = function () {
         return false;
     }
     return true;
-}
+};
 
 // NOTE: this is basically getPecoList().getSum()
 
@@ -400,7 +443,7 @@ Peco.prototype.getIndexSum = function() {
         }
     });
     return sum;
-}
+};
 
 //
 //
@@ -419,20 +462,20 @@ Peco.prototype.indexListToJSON = function() {
         }
     });
     return '[' + s + ']';
-}
+};
 
 //
 
 Peco.prototype.indexContainsAll = function(list) {
     // NOTE: requires list to have unique numbers
     return _.size(_.intersection(this.getPecoList(), list)) === _.size(list);
-}
+};
 
 //
 
 Peco.prototype.indexContainsAny = function(list) {
     return _.size(_.intersection(this.getPecoList(), list)) > 0;
-}
+};
 
 //
 
@@ -446,7 +489,7 @@ Peco.prototype.getPecoList = function() {
         }
     });
     return list;
-}
+};
 
 //
 
@@ -459,7 +502,7 @@ function display(prefix, pecoList) {
         s += peco.index;
     });
     console.log(prefix + s);
-}
+};
 
 
 module.exports = {

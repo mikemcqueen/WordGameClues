@@ -404,14 +404,16 @@ async function main () {
 
     let clueSource = Clues.getByOptions(options);
 
-    let max = clueSource.clueCount;
+    let load_max = clueSource.clueCount;
     if (options.count && !showKnownArg && !altSourcesArg && !allAltSourcesFlag) {
         let countRange = options.count.split(',').map(_.toNumber);
-	max = countRange.length > 1 ? countRange[1] : countRange[0];
+	options.count_lo = countRange[0];
+	options.count_hi = countRange.length > 1 ? countRange[1] : countRange[0];
+	load_max = options.count_hi;
     }
 
     setLogging(_.includes(options.verbose, VERBOSE_FLAG_LOAD));
-    if (!loadClues(clueSource, ignoreLoadErrors, max)) {
+    if (!loadClues(clueSource, ignoreLoadErrors, load_max)) {
         return 1;
     }
     setLogging(options.verbose);

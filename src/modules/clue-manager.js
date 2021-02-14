@@ -1204,3 +1204,6 @@ ClueManager.prototype.getCountListArrays = function (nameCsv, options) {
     return { valid, known, rejects, invalid, clues, addRemoveSet };
 };
 
+ClueManager.prototype.getClueList = function (count) {
+    return this.clueListArray[count];
+};

@@ -41,7 +41,6 @@ function show (options) {
 
     // TODO: move buildAllUseNcDataLists to clue-manager?  currently in combo-maker
 
-//    let allOrNcDataLists = options.or ? buildAllUseNcDataLists(args.or) : [];
     if (!_.isEmpty(options.or)) {
 	options.fast = true; // force fast
     }
@@ -49,7 +48,7 @@ function show (options) {
     console.log(`test: ${options.test}`);
     const nameList = options.test.split(',').sort();
     if (nameList.length > 1 && options.fast) {
-	return fast_combo_wrapper(nameList, /*allOrNcDataLists,*/ options);
+	return fast_combo_wrapper(nameList, options);
     }
     const result = ClueManager.getCountListArrays(options.test, options);
     if (!result) {
@@ -187,34 +186,33 @@ function fast_combo_wrapper (nameList, /*allOrNcDataList,*/ options) {
     console.log('fast_combo_wrapper');
     console.log(`--or: ${Stringify(options.or)}`);
     if (options.or) {
-	const max_results = 10;
-	const min = 2;
-	const max = options.or.length;
-	console.log(`min(${min}) max(${max}) results(${max_results})`);
-
 	const validResults = {};
-	const indexList = [...Array(options.or.length).keys()]; // 0..max
+	let clueNameList = [...get_clue_names(options), ...options.or];
+	const min = 2;
+	let max = clueNameList.length;
+	const indexList = [...Array(max).keys()]; // 0..max
+	if (max > 10) max = 8;
 	for (let count = max; count >= min; count -= 1) {
+	    Timing(`wrapper count(${count})`);//\n${Stringify(listArray)}`);
 	    const listArray = [...Array(count).keys()].map(_ => indexList);
-	    //console.log(`count(${count}):\n${Stringify(listArray)}`);
-	    Peco.makeNew({
+	    let peco = Peco.makeNew({
 		listArray,
 		max: count * max
-	    }).getCombinations()
-		.filter(indexList => _.uniq(indexList).length === indexList.length)
-		.map(indexList => {
-		    let orNameList = buildSubListFromIndexList(options.or, indexList);
-		    orNameList = _.concat(nameList, orNameList);
-		    //console.log(`orNameLists: ${orNameList}`);
-		    
-		    // TODO: here, i probably just want to build an array of results data
-		    // that i can sort (by total clue count, for example)
-		    // and filter (by valid/invalid)
-		    // and display, independently of the loggin in fast_combos.
-		    return fast_combos_list(orNameList, Object.assign(_.clone(options), { quiet: true, skip_invalid: true }));
-		}).forEach(validResultList => addValidResults(validResults, validResultList, { slice_index: nameList.length }));
-
-	    // TODO: implement addValidResults, sort better, don't display -t'd clues
+	    });
+	    let comboCount = 0;
+	    for (let comboList = peco.firstCombination(); !_.isEmpty(comboList); comboList = peco.nextCombination()) {
+		//console.log(comboList);
+		comboCount++;
+		if (1) continue;
+		if (_.uniq(comboList).length !== comboList.length) continue;
+		console.log(comboList);
+		let subList = buildSubListFromIndexList(clueNameList, comboList);
+		let comboNameList = [...nameList, ...subList];
+		console.log(`comboNameList: ${comboNameList}`);
+		let validResultList = fast_combos_list(comboNameList, Object.assign(_.clone(options), { quiet: true, skip_invalid: true }));
+		addValidResults(validResults, validResultList, { slice_index: nameList.length });
+	    }
+	    Timing(`comboCount: ${comboCount}`);
 
 	    // Bigger idea: optional arg(s) to -t[COUNTLO[,COUNTHI]]
 	    // build list of input clues from all clues of those counts
@@ -223,6 +221,18 @@ function fast_combo_wrapper (nameList, /*allOrNcDataList,*/ options) {
     } else {
 	return fast_combos(nameList, options);
     }
+}
+
+function get_clue_names (options) {
+    let result = [];
+    if (options.count_lo) {
+	//console.log(`get_clue_names: lo(${options.count_lo}) hi(${options.count_hi})`);
+	for (let count = options.count_lo; count <= options.count_hi; count += 1) {
+	    result.push(...ClueManager.getClueList(count).map(clue => clue.name));
+	}
+	result = _.uniq(result);
+    }
+    return result;
 }
 
 function fast_combos (nameList, options) {
@@ -257,6 +267,7 @@ function fast_combos_list (nameList, options) {
 	    add = true;
 	}
 	if (add ) resultList.push(result);
+	console.log(`${result.ncList} : ${result.valid ? 'VALID' : 'invalid'}`);
 	return resultList;
     }, []);
 }
