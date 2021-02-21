@@ -191,24 +191,26 @@ function fast_combo_wrapper (nameList, /*allOrNcDataList,*/ options) {
 	const min = 2;
 	let max = clueNameList.length;
 	const indexList = [...Array(max).keys()]; // 0..max
-	if (max > 10) max = 8;
-	for (let count = max; count >= min; count -= 1) {
-	    Timing(`wrapper count(${count})`);//\n${Stringify(listArray)}`);
+	console.log(`maxArg: ${options.maxArg}`);
+	let maxIter = options.maxArg ? options.maxArg : max;
+	for (let count = maxIter; count >= min; --count) {
+	    Timing(`wrapper count(${count})`);
 	    const listArray = [...Array(count).keys()].map(_ => indexList);
 	    let peco = Peco.makeNew({
 		listArray,
 		max: count * max
 	    });
 	    let comboCount = 0;
-	    for (let comboList = peco.firstCombination(); !_.isEmpty(comboList); comboList = peco.nextCombination()) {
-		//console.log(comboList);
+	    let comboList;
+	    for (/*let */comboList = peco.firstCombination(); !_.isNull(comboList); comboList = peco.nextCombination()) {
 		comboCount++;
-		if (1) continue;
-		if (_.uniq(comboList).length !== comboList.length) continue;
-		console.log(comboList);
+		//console.log(`comboList: ${comboList}`); //***logging
+		//if (1) continue;
+		//if (_.uniq(comboList).length !== comboList.length) continue;
+		//console.log(comboList);
 		let subList = buildSubListFromIndexList(clueNameList, comboList);
 		let comboNameList = [...nameList, ...subList];
-		console.log(`comboNameList: ${comboNameList}`);
+		//console.log(`comboNameList: ${comboNameList}`);
 		let validResultList = fast_combos_list(comboNameList, Object.assign(_.clone(options), { quiet: true, skip_invalid: true }));
 		addValidResults(validResults, validResultList, { slice_index: nameList.length });
 	    }
@@ -249,9 +251,16 @@ function fast_combos_list (nameList, options) {
 	if (!options.quiet) {
 	    console.log(`No ncLists for ${nameList}`);
 	}
+	//console.log(`nameList: ${nameList} - EMPTY`);
 	return [];
     }
+    //console.log(`nameList: ${nameList}`);
+
+    //ncLists.forEach(ncList => console.log(`  ncList: ${ncList}`));
+
+    //console.log(`1`);
     const lists = ClueManager.buildListsOfPrimaryNameSrcLists(ncLists);
+    //console.log(`2`);
     //console.log(`len: ${lists.length}`);
     return lists.reduce((resultList, listOfListOfPrimaryNameSrcLists, index) => {
 	let add = false;
@@ -267,7 +276,7 @@ function fast_combos_list (nameList, options) {
 	    add = true;
 	}
 	if (add ) resultList.push(result);
-	console.log(`${result.ncList} : ${result.valid ? 'VALID' : 'invalid'}`);
+	//console.log(`${result.ncList} : ${result.valid ? 'VALID' : 'invalid'}`);
 	return resultList;
     }, []);
 }
@@ -285,7 +294,9 @@ function addValidResults (validResults, validResultList, options) {
 }
 
 function display_valid_results (validResults) {
+    console.log('++display');
     Object.keys(validResults).forEach(key => console.log(key));
+    console.log('--display');
 }
 
 function showNcLists (ncLists) {

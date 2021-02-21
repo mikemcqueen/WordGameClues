@@ -366,9 +366,8 @@ async function main () {
     let showKnownArg = options['show-known'];
     options.copy_from = options['copy-from'];
 
-    if (!maxArg) {
-        maxArg = 2; // TODO: default values in opt
-    }
+    options.maxArg = maxArg;
+    if (!maxArg) maxArg = 2; // TODO: default values in opt
     if (!options.count) {
         needCount = true;
 

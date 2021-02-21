@@ -165,7 +165,7 @@ ClueManager.prototype.addPrimaryClueToMap = function (clue) {
         clueMap[clue.name] = [];
     }
     clueMap[clue.name].push(clue.src);
-}
+};
 
 //
 
@@ -229,7 +229,7 @@ ClueManager.prototype.addCompoundClue = function (clue, count, validateAll = tru
     }
     srcMap[srcKey].clues.push(clue);
     return vsResult;
-}
+};
 
 //
 
@@ -508,7 +508,7 @@ ClueManager.prototype.primaryNcListToNameSrcLists = function (ncList) {
     let indexLists = srcLists.map(srcList => [...Array(srcList.length).keys()]);  // e.g. [ [ 0 ], [ 0, 1 ], [ 0 ], [ 0 ] ]
     let nameSrcLists = Peco.makeNew({
         listArray: indexLists,
-        max:        999 // technically, clue-types[variety].max_clues
+        max:        999 // TODO technically, clue-types[variety].max_clues
     })  .getCombinations()
 	.map(indexList => indexList.map((value, index) => NameCount.makeNew(ncList[index].name, srcLists[index][value])));
 
@@ -521,7 +521,7 @@ ClueManager.prototype.primaryNcListToNameSrcLists = function (ncList) {
 	console.log(`    uniq: ${_.uniqBy(nameSrcLists, _.toString)}`);
     }
     return _.uniqBy(nameSrcLists, _.toString);
-}
+};
 
 //
 
@@ -531,7 +531,7 @@ ClueManager.prototype.primaryNcListToNameSrcSets = function (ncList) {
     let indexLists = srcLists.map(srcList => [...Array(srcList.length).keys()]);  // e.g. [ [ 0 ], [ 0, 1 ], [ 0 ], [ 0 ] ]
     let nameSrcSets = Peco.makeNew({
         listArray: indexLists,
-        max:       2 // 999 // technically, clue-types[variety].max_clues
+        max:       2 // 999 // TODO? technically, clue-types[variety].max_clues
     })  .getCombinations()
 	.reduce((result, indexList) => {
 	    let set = new Set();
@@ -552,7 +552,7 @@ ClueManager.prototype.primaryNcListToNameSrcSets = function (ncList) {
     
     //return _.uniqBy(nameSrcLists, _.toString);
     return nameSrcSets;
-}
+};
 
 //
 
@@ -560,7 +560,7 @@ ClueManager.prototype.primaryNcToSrcList = function (nc) {
     if (nc.count !== 1) throw new Error(`nc.count must be 1 (${nc})`);
     const source = this.knownClueMapArray[1][nc.name];
     return _.isArray(source) ? source : [ source ];
-}
+};
 
 //
 /*
@@ -947,18 +947,18 @@ ClueManager.prototype.addRemoveOrReject = function (args, nameList, countSet, op
     return count;
 };
 
-ClueManager.prototype.getAllCountListCombosForNameList = function (nameList, max = this.maxClues) {
+ClueManager.prototype.getAllCountListCombosForNameList = function (nameList, max = 999) { // TODO technically, clue-types[variety].max_clues
     const countListArray = this.getKnownClueIndexLists(nameList);
     Debug(countListArray);
     return Peco.makeNew({
         listArray: countListArray,
 	max
     }).getCombinations();
-}
+};
 
 ClueManager.prototype.buildNcListFromNameListAndCountList = function (nameList, countList) {
     return countList.map((count, index) => NameCount.makeNew(nameList[index], count));
-}
+};
 
 ClueManager.prototype.buildNcListsFromNameListAndCountLists = function (nameList, countLists) {
     let ncLists = [];
@@ -966,15 +966,16 @@ ClueManager.prototype.buildNcListsFromNameListAndCountLists = function (nameList
 	ncLists.push(this.buildNcListFromNameListAndCountList(nameList, countList));
     }
     return ncLists;
-}
+};
 
 ClueManager.prototype.buildNcListsFromNameList = function (nameList) {
     const countLists = this.getAllCountListCombosForNameList(nameList);
     if (_.isEmpty(countLists)) {
+	console.log('empty countLists');
         return countLists;
     }
     return this.buildNcListsFromNameListAndCountLists(nameList, countLists);
-}
+};
 
 ClueManager.prototype.getListOfPrimaryNameSrcLists = function (ncList) {
     // TODO: can use reduce() here too 
@@ -1043,11 +1044,11 @@ ClueManager.prototype.getListOfPrimaryNameSrcLists = function (ncList) {
 	listOfPrimaryNameSrcLists.push(primaryNameSrcLists);
     }
     return listOfPrimaryNameSrcLists;
-}
+};
 
 ClueManager.prototype.origbuildListsOfPrimaryNameSrcLists = function (ncLists) {
     return ncLists.map(ncList => this.getListOfPrimaryNameSrcLists(ncList));
-}
+};
 
 ClueManager.prototype.buildListsOfPrimaryNameSrcLists = function (ncLists) {
     return ncLists.map(ncList => {
@@ -1057,7 +1058,7 @@ ClueManager.prototype.buildListsOfPrimaryNameSrcLists = function (ncLists) {
 	}
 	return result;
     });
-}
+};
 
 function getCompatiblePrimaryNameSrcList (listOfListOfPrimaryNameSrcLists) {
     //console.log(`${Stringify(listOfListOfPrimaryNameSrcLists)}`);
@@ -1081,7 +1082,7 @@ function getCompatiblePrimaryNameSrcList (listOfListOfPrimaryNameSrcLists) {
 	const uniqLen = _.uniqBy(nameSrcList, NameCount.count).length;
 	return (uniqLen === nameSrcList.length) ? nameSrcList : undefined;
     });
-}
+};
 
 //
 
@@ -1142,7 +1143,7 @@ ClueManager.prototype.getCountListArrays = function (nameCsv, options) {
 	const start = new Date();
 	//console.log(`${nameList}`);
 
-	let x =_.uniqBy(clueCountList, _.toNumber);
+	let x = _.uniqBy(clueCountList, _.toNumber);
 	let ncListStr = clueCountList.map((count, index) => NameCount.makeNew(nameList[index], count)).toString();
 	let result;
 	result = invalidHash[ncListStr];

@@ -22,6 +22,12 @@ const Debug       = require('debug')('peco');
 const FORCE_QUIET = false;
 const LOGGING = false;
 
+const Flag = {
+    Combinations: 1,
+    NoDuplicates: 2
+};
+
+
 function makeNew(args) {
     return new Peco(args);
 }
@@ -150,7 +156,7 @@ Peco.prototype.getAddendsForCount = function(count, combFlag, pecoList, quiet) {
     }
     return this.buildResult({
         count,
-        combFlag,
+	flags: combFlag ? Flag.Combinations : 0,
         pecoList,
         quiet
     });
@@ -168,34 +174,32 @@ Peco.prototype.firstCombination = function () {
 Peco.prototype.nextCombination = function () {
     return this.buildNextResult({
         listArray: this.listArray,
-        combFlag: true
+        flags: Flag.Combinations | Flag.NoDuplicates
     });
 };
 
 //
 // args:
-//  count
 //  listArray
-//  combFlag
-//  pecoList (internal)
+//  flags
 //
 
 Peco.prototype.buildNextResult = function (args) {
     if (this.first) {
 	if (args.listArray) {
 	    this.first = false;
-            return this.listFirst(args.listArray, args.combFlag);
+            return this.listFirst(args.listArray, args.flags);
 	} else if (args.count) {
 	    this.first = false;
-            return this.first(args.count, args.combFlag);
+            return this.first(args.count, args.flags); // TODO flags
 	}
         throw new Error('missing arg, count: ' + args.count +
                         ', listArray: ' + args.listArray);
     }
     if (args.listArray) {
-        return this.listNext(args.listArray, args.combFlag);
+        return this.listNext(args.flags);
     } else {
-        return this.next(args.combFlag);
+        return this.next(args.flags); // TODO flags
     }
 };
 
@@ -204,7 +208,7 @@ Peco.prototype.buildNextResult = function (args) {
 Peco.prototype.getListCombinations = function (listArray) {
     return this.buildResult({
         listArray,
-        combFlag:  true
+	flags: Flag.Combinations
     });
 };
 
@@ -217,24 +221,24 @@ Peco.prototype.getListCombinations = function (listArray) {
 //
 
 Peco.prototype.buildResult = function (args) {
-    let list;
-
     if (!args.pecoList) {
         args.pecoList = [];
     }
 
+    let list;
     if (args.listArray) {
-        list = this.listFirst(args.listArray, args.combFlag);
+        list = this.listFirst(args.listArray, args.flags);
     } else if (args.count) {
-        list = this.first(args.count, args.combFlag);
+        list = this.first(args.count, args.flags);
     } else {
         throw new Error('missing arg, count: ' + args.count +
                         ', listArray: ' + args.listArray);
     }
     if (!list) {
+	console.log(`no list`);
         if (LOGGING) {
             this.log('Peco: no ' + args.count + ' in ' +  list);
-        }
+	}
         return [];
     }
     do {
@@ -243,9 +247,9 @@ Peco.prototype.buildResult = function (args) {
         }
         args.pecoList.push(list);
         if (args.listArray) {
-            list = this.listNext(args.listArray, args.combFlag);
+            list = this.listNext(args.flags);
         } else {
-            list = this.next(args.combFlag);
+            list = this.next(args.flags);
         }
     } while (list);
 
@@ -254,43 +258,40 @@ Peco.prototype.buildResult = function (args) {
 
 //
 
-Peco.prototype.listFirst = function (listArray, combFlag) {
+Peco.prototype.listFirst = function (listArray, flags) {
     let last;
-    let start;
-    let srcCount;
-    let index;
     let list;
     
     if (!listArray) {
         throw new Error('invalid countListArray, ' + listArray);
     }
-    listArray.forEach(list => {
-        if (LOGGING) {
-            this.log('list: ' + list);
-        }
-    });
 
-    srcCount = listArray.length;
-    start = 0;
+    let srcCount = listArray.length;
+    let start = 0;
     this.indexList = [];
-    for (index = 0; index < srcCount; ++index) {
+    this.hash = new Set();
+    for (let index = 0; index < srcCount; ++index) {
         this.indexList.push({
-            first:  start, 
+            first:  start,
             index:  start,
-            last:   listArray[index].length - 1
+            last:   (flags & Flag.NoDuplicates) ? listArray[index].length - (srcCount - index) : listArray[index].length - 1
         });
+	this.hash.add(start);
+	if (flags & Flag.NoDuplicates) ++start;
     }
+    //console.log(`lastList: ${this.indexList.map(entry => entry.last)}`);
 
     if (LOGGING) {
         this.log ('srcCount: ' + srcCount + ' indexList.length: ' + this.indexList.length);
     }
 
-    if (this.getIndexSum() <= this.max) {
-	this.log(`pecoList, getIndexSum = ${this.getIndexSum()}`);
+    const sum = this.getIndexSum();
+    if (sum <= this.max) {
+	this.log(`pecoList, getIndexSum ${sum}`);
         list = this.getPecoList();
     } else {
-	this.log(`next, getIndexSum = ${this.getIndexSum()}`);
-        list = this.next(combFlag);
+	this.log(`next, getIndexSum ${sum}, max ${this.max}`);
+        list = this.listNext(flags);
     }
     return list;
 };
@@ -298,31 +299,43 @@ Peco.prototype.listFirst = function (listArray, combFlag) {
 //
 //
 
-Peco.prototype.listNext = function (combFlag) {
-    let lastIndex = this.indexList.length - 1;
-    let index;
-    let start;
-    let sum;
-    let inner;
+Peco.prototype.listNext = function (flags) {
+    const lastIndex = this.indexList.length - 1;
+    //console.log(`lastIndex ${lastIndex}`);
 
     // if last index is maxed reset to zero, increment next-to-last index, etc.
     for (;;) {
-        index = lastIndex;
-        while (++this.indexList[index].index > this.indexList[index].last) {
-            /*
-            if (combFlag) { // combinations
-                start = ++this.indexList[index].first;
-                for (inner = index + 1; inner < this.indexList.length; ++inner) {
-                    this.indexList[inner].index = this.indexList[inner].first = start;
+        let index = lastIndex;
+        while ((++this.indexList[index].index) > this.indexList[index].last) {
+	    /*
+            if (flags & Flag.Combinations) { // combinations
+	    //} else {
+		    let start = ++this.indexList[index].first;
+                    for (let inner = index + 1; inner <= lastIndex; ++inner) {
+			this.indexList[inner].index = this.indexList[inner].first = start;
+		    }
                 }
             }
-            */
+	    */
             this.indexList[index].index = this.indexList[index].first;
             --index;
             if (index < 0) {
                 return null;
             }
         }
+	if ((flags & Flag.Combinations) && (flags & Flag.NoDuplicates)) {
+            for (let inner = index + 1; inner <= lastIndex; ++inner) {
+		//if (this.indexList[inner].first < previousFirst) throw new Error (`inner ${inner} < prevFirsT ${previousFirst}`);
+		let newFirst = this.indexList[inner - 1].index + 1;
+		if (newFirst > this.indexList[inner].last) {
+		    throw new Error (`newFirst ${newFirst} > last ${this.indexList[inner].last}`);
+		}
+		this.indexList[inner].first = newFirst;
+		//console.log(`index[${inner}].first = ${newFirst}`);
+		this.indexList[inner].index = this.indexList[inner].first;
+	    }
+	}
+
         if (this.getIndexSum() > this.max) {
             continue;
         }
@@ -342,7 +355,7 @@ Peco.prototype.listNext = function (combFlag) {
 
 //
 
-Peco.prototype.first = function (srcCount, combFlag) {
+Peco.prototype.first = function (srcCount, flags) {
     if ((srcCount < 1) || (srcCount > this.sum)) {
         throw new Error('invalid srcCount, ' + srcCount);
     }
@@ -367,14 +380,14 @@ Peco.prototype.first = function (srcCount, combFlag) {
                   ', this.sum: ' + this.sum);
     }
     if (!this.isValidIndex()) {
-        return this.next(combFlag);     
+        return this.next(flags);     
     }
     return this.getPecoList();
 };
     
 //
 
-Peco.prototype.next = function (combFlag) {
+Peco.prototype.next = function (flags) {
     let lastIndex = this.indexList.length - 1;
     let index;
 
@@ -382,9 +395,9 @@ Peco.prototype.next = function (combFlag) {
     do {
         index = lastIndex;
         while (++this.indexList[index].index > this.indexList[index].last) {
-            if (combFlag) { // combinations
+            if (flags & Flag.Combinations) { // combinations
                 let start = ++this.indexList[index].first;
-                for (let inner = index + 1; inner < this.indexList.length; inner += 1) {
+                for (let inner = index + 1; inner < this.indexList.length; ++inner) {
                     this.indexList[inner].index = this.indexList[inner].first = start;
                 }
             }
