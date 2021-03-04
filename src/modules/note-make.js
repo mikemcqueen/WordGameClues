@@ -7,6 +7,7 @@
 const _                = require('lodash');
 const Debug            = require('debug')('note-make');
 const Expect           = require('should/as-function');
+const EncodeURL        = require('encodeurl');
 const Filter           = require('./filter');
 const Fs               = require('fs-extra');
 const He               = require('he');
@@ -17,7 +18,7 @@ const Readlines        = require('n-readlines');
 //
 
 const Note = {
-    point_size: function () { return Options.point_size || 12; },
+    point_size: function () { return Options.point_size || 14; },
     open:       function () { return `<div><span><font style="font-size: ${Note.point_size()}pt;">`; },
     close:      '</font></span></div>',
     emptyLine:  '<div><br/></div>'
@@ -27,8 +28,13 @@ const Note = {
 
 function url (line) {
     const useNamedReferences = true;
-    line = He.encode(line, { useNamedReferences });
-    return `<a href="${line}">${line}</a>`;
+    //let decoded = decodeURI(line);
+    let decoded = line.replace('%3A', ':').replace('%2F', '/');
+    decoded = decoded.replace('&', '&amp;'); //.replace('?redirect=no', ''); // parens
+    let encoded = He.encode(line, { useNamedReferences });
+    encoded = encoded.replace('(', '%28').replace(')', '%29'); // parens
+    //console.log(`url: ${decoded}\n  encoded: ${encoded}`);
+    return `<a href="${encoded}">${decoded}</a>`;
 }
 
 //

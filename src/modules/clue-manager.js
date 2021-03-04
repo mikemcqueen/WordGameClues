@@ -93,6 +93,7 @@ ClueManager.prototype.saveClueList = function (list, count, options = {}) {
 const autoSource = (clueList) => {
     let source = 0;
     for (let clue of clueList) {
+	if (clue.ignore) continue;
 	if (clue.src != 'same') source += 1;
 	clue.src = `${source}`;
     }
@@ -947,9 +948,21 @@ ClueManager.prototype.addRemoveOrReject = function (args, nameList, countSet, op
     return count;
 };
 
+let isAnySubListEmpty = (listOfLists) => {
+    console.log('listOfLists:');
+    console.log(listOfLists);
+    for (const list of listOfLists) {
+	console.log('  list:');
+	console.log(list);
+	if (_.isEmpty(list)) return true;
+    }
+    return false;
+};
+
 ClueManager.prototype.getAllCountListCombosForNameList = function (nameList, max = 999) { // TODO technically, clue-types[variety].max_clues
     const countListArray = this.getKnownClueIndexLists(nameList);
     Debug(countListArray);
+    if (isAnySubListEmpty(countListArray)) return [];
     return Peco.makeNew({
         listArray: countListArray,
 	max
@@ -971,9 +984,10 @@ ClueManager.prototype.buildNcListsFromNameListAndCountLists = function (nameList
 ClueManager.prototype.buildNcListsFromNameList = function (nameList) {
     const countLists = this.getAllCountListCombosForNameList(nameList);
     if (_.isEmpty(countLists)) {
-	console.log('empty countLists');
-        return countLists;
+	Debug('empty countLists or sublist');
+        return [];
     }
+    Debug(countLists);
     return this.buildNcListsFromNameListAndCountLists(nameList, countLists);
 };
 
@@ -982,6 +996,7 @@ ClueManager.prototype.getListOfPrimaryNameSrcLists = function (ncList) {
     let listOfPrimaryNameSrcLists = [];
     //console.log(`ncList: ${ncList}`);
     for (const nc of ncList) {
+	if (!_.isNumber(nc.count) || _.isNaN(nc.count)) throw new Error(`Not a valid nc: ${nc}`);
 	//console.log(`  nc: ${nc}`);
 	let lastIndex = -1;
 	let entries;
@@ -1093,6 +1108,7 @@ ClueManager.prototype.fast_getCountListArrays = function (nameCsv, options) {
     /// TODO, check if existing sourcelist (knownSourceMapArray)
 
     const ncLists = this.buildNcListsFromNameList(nameList);
+    console.log(`ncLists: ${ncLists}`);
     if (_.isEmpty(ncLists)) {
 	console.log(`No ncLists for ${nameList}`);
 	return [];

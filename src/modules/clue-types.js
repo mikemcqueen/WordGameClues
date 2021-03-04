@@ -477,13 +477,13 @@ const APPLE = {
 
     'f.63': {
         sentence:       10,
-        clueCount:      28,
+        clueCount:      35,
         REQ_CLUE_COUNT: 32
     },
 
     'f.64': {
         sentence:       10,
-        clueCount:      28,
+        clueCount:      35,
         REQ_CLUE_COUNT: 32
     },
 
