@@ -240,8 +240,12 @@ function get_clue_names (options) {
 function fast_combos (nameList, options) {
     fast_combos_list(nameList, options)
 	.forEach(result => {
-	    console.log(`${result.ncList} ` + (result.valid ? `VALID (${result.sum}): ${result.compatibleNameSrcList} `
-                 + `REMAIN(${result.inversePrimarySources.length}): ${result.inversePrimarySources}` : 'invalid'));
+	    let message = 'invalid';
+	    if (result.valid) {
+		message = `VALID (${result.sum}) ${result.compatibleNameSrcList} `
+                    + `REMAIN(${result.inversePrimarySources.length}): ${result.inversePrimarySources}`;
+	    }
+	    console.log(`${result.ncList} ${message}`);
 	});
 }
 
@@ -275,7 +279,7 @@ function fast_combos_list (nameList, options) {
 	} else if (!options.skip_invalid) {
 	    add = true;
 	}
-	if (add ) resultList.push(result);
+	if (add) resultList.push(result);
 	//console.log(`${result.ncList} : ${result.valid ? 'VALID' : 'invalid'}`);
 	return resultList;
     }, []);

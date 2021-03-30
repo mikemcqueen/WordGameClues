@@ -91,13 +91,16 @@ ClueManager.prototype.saveClueList = function (list, count, options = {}) {
 
 
 const autoSource = (clueList) => {
+    let result = [];
     let source = 0;
     for (let clue of clueList) {
 	if (clue.ignore) continue;
 	if (clue.src != 'same') source += 1;
 	clue.src = `${source}`;
+	result.push(clue);
     }
-    Debug(`autoSource: ${source} primary clues`);
+    Debug(`autoSource: ${source} primary clues, ${result.reduce((resultList, clue) => { resultList.push(clue.src); return resultList; }, [])}`);
+    return result;
 };
 
 
@@ -116,11 +119,11 @@ ClueManager.prototype.loadAllClues = function (args) {
     this.maxClues = args.max; // args.clues.clueCount;
     for (let count = 1; count <= this.maxClues; ++count) {
         let knownClueList = this.loadClueList(count);
-        this.clueListArray[count] = knownClueList;
+        if ((count === 1) && (knownClueList[0].src == 'auto')) {
+	    knownClueList = autoSource(knownClueList);
+	}
+	this.clueListArray[count] = knownClueList;
         if (count === 1) {
-	    if (knownClueList[0].src == 'auto') {
-		autoSource(knownClueList);
-	    }
             this.addKnownPrimaryClues(knownClueList);
         }
         else {
@@ -823,6 +826,7 @@ ClueManager.prototype.getPrimarySources = function () {
         primarySources.push(clue.src);
         hash[clue.src] = true;
     }
+    //console.log(`primarysources: ${primarySources}`);
     return primarySources;
 };
 
