@@ -15,9 +15,9 @@ const ClueManager           = require('./clue-manager');
 const ComboSearch           = require('./combo-search');
 const Debug                 = require('debug')('alt-sources');
 const Duration              = require('duration');
+const Expect         = require('should/as-function');
 const NameCount             = require('../types/name-count');
 const PrettyMs              = require('pretty-ms');
-const Validator             = require('./validator');
 
 //
 
@@ -63,6 +63,20 @@ AltSources.prototype.show = function (args) {
 }
 
 //
+
+const showMissingValues = function (srcMap) {
+    _.keys(srcMap).forEach(key => {
+	const srcListStrSet = srcMap[key];
+	if (srcListStrSet.size !== 1) {
+	    console.log(`${key} ## source lists (${srcListStrSet.size})`);
+	    for (const srcListStr of srcListStrSet.values()) {
+		console.log(srcListStr);
+	    }
+	}
+    });
+};
+
+//
 //
 
 AltSources.prototype.showAllAlternates = function (args) {
@@ -75,15 +89,14 @@ AltSources.prototype.showAllAlternates = function (args) {
     let anyAdded = false;
     let max = ClueManager.maxClues;
     let startTime = new Date();
-    let options = { output: args.output };
+    let options = { output: args.output, srcMap : {} };
     let validateDurationMs = 0;
     do {
         for (let index = 2; index <= max; ++index) {
             let map = ClueManager.knownClueMapArray[index];
             _.keys(map).forEach(name => {
-                if (this.showAllAlternatesForNc(
-                    NameCount.makeNew(name, index), args.count, options)) {
-
+                if (this.showAllAlternatesForNc(NameCount.makeNew(name, index),
+                        args.count, options)) {
                     anyAdded = true;
                 }
                 validateDurationMs += options.validateDurationMs;
@@ -104,20 +117,23 @@ AltSources.prototype.showAllAlternates = function (args) {
     if (args.output && args.count) {
         console.log(ClueManager.clueListArray[args.count].toJSON());
     }
-}
+    showMissingValues(options.srcMap);
+};
 
 //
 // 
 
-AltSources.prototype.showAllAlternatesForNc = function (nc, count, options = {}) {
+AltSources.prototype.showAllAlternatesForNc = function (nc, count, options) {
+    Expect(options).is.an.Object();
+
     let ncLstAryAry;
     let clue;
     let added = false;
 
-    Debug(`${nc.name}:${nc.count}`);
+    Debug(`${nc}`);
     ncLstAryAry = ComboSearch.findAlternateSourcesForNc(nc, options);
     if (_.isEmpty(ncLstAryAry)) {
-        return;
+        return undefined;
     }
 
     // TODO: can I make this parallel with map?
@@ -141,15 +157,15 @@ AltSources.prototype.showAllAlternatesForNc = function (nc, count, options = {})
         } else if (count) {
             if (count === index) {
                 // display only specific index
-                displayAlternate(nc.name, index, ncListArray);
+                displayAlternate(nc.name, index, ncListArray, options.srcMap);
             }
         } else {
             // display all
-            displayAlternate(nc.name, index, ncListArray);
+            displayAlternate(nc.name, index, ncListArray, options.srcMap);
         }
     });
     return added;
-}
+};
 
 //
 //
@@ -170,7 +186,7 @@ AltSources.prototype.showAlternates = function (args) {
         console.log('WARNING: output format ignored, no ",count" specified');
     }
 
-    name = argList[0]; // 'name:N'
+    name = argList[0]; // 'name:N' (ncStr)
     nc = NameCount.makeNew(name);
 
     if (!nc.count) {
@@ -187,56 +203,51 @@ AltSources.prototype.showAlternates = function (args) {
         }
         return;
     }
-
     if (this.logging) {
-        this.log(name + ' : ' + count + ' : ' + args.output);
+        this.log(`${name}:${count} : ${args.output}`);
     }
-
     if (args.output && count) {
         displayModifiedClueList(count, getAlternateClue(name, ncLstAryAry[count]));
-    }
-    else if (count) {
-        ncLstAry = ncLstAryAry[count];
-        displayAlternate(name, count, ncLstAry);
-    }
-    else {
-        ncLstAryAry.forEach((ncLstAry, index) => {
-            displayAlternate(name, index, ncLstAry);
+    } else if (count) {
+        displayAlternate(name, count, ncLstAryAry[count]);
+    } else {
+        ncLstAryAry.forEach((ncLstArray, index) => {
+            displayAlternate(name, index, ncLstArray);
         });
     }
-}
+};
 
 //
 
-function displayAlternate (name, count, ncListArray) {
+function displayAlternate (name, count, ncListArray, srcMap) {
     let s;
     let nameList;
     let found = false;
 
     s = name + '[' + count + '] ';
     s += format2(s, 20) + ' ';
-    ncListArray.forEach((ncList, nclaIndex) => {
-        nameList = ncList.map(nc => nc.name);
-        nameList.sort(); // really necessary?
-        if (ClueManager.knownSourceMapArray[count][nameList.toString()]) {
-            //console.log('found: ' + nameList + ' in ' + count);
-            return; // continue
+    ncListArray.forEach(ncList => {
+        nameList = ncList.map(nc => nc.name).sort();
+	let nameListStr = nameList.toString();
+        if (ClueManager.knownSourceMapArray[count][nameListStr]) {
+	    if (srcMap) {
+		if (!_.has(srcMap, nameListStr)) {
+		    srcMap[nameListStr] = new Set();
+		}
+		srcMap[nameListStr].add(ClueManager.knownSourceMapArray[count][nameListStr].clues
+                        .map(clue => clue.name).toString());
+	    }
+            return; // forEach.continue
         }
 
-        if (found) {
-            s += ', ';
-        }
+        if (found) s += ', ';
         ncList.forEach((nc, nclIndex) => {
-            if (nclIndex > 0) {
-                s += ' ';
-            }
+            if (nclIndex > 0) s += ' ';
             s += nc;
         });
         found = true;
     });
-    if (found) {
-        console.log(s);
-    }
+    if (found) console.log(s);
 }
 
 //

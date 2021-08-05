@@ -88,7 +88,7 @@ fi
 _filtered="$_note".filtered
 
 echo "Filtering tmp/$_note to tmp/$_filtered..."
-node filter -$_ct tmp/"$_note" $_article > tmp/"$_filtered" 2>> $_out
+node filter -$_ct "tmp/$_note" $_article > "tmp/$_filtered" 2>> $_out
 _exitcode=$?
 if [ $_exitcode -ne 0 ]
 then

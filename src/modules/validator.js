@@ -24,7 +24,7 @@ const Timing         = require('debug')('timing');
 //
 
 // TODO: options.xp
-const xp = false;
+const xp = true; //false;
 
 //
 // constructor
@@ -242,7 +242,7 @@ Validator.prototype.rvsWorker = function(args) {
           `, nameList: ${args.nameList}`);
     if (xp) {
         Expect(args.name).is.a.String().and.not.empty();
-        Expect(args.count).is.aNumber()
+        Expect(args.count).is.a.Number()
             .aboveOrEqual(1)
             .belowOrEqual(ClueManager.maxClues);
         Expect(args.ncList).is.an.Array();
@@ -524,9 +524,11 @@ Validator.prototype.getCompatibleResults = function(args) {
 //
 Validator.prototype.addCompatibleResult = function(resultList, nameSrcList, args) {
     if (xp) {
-        Expect(resultList).is.a.Array();
-        Expect(nameSrcList).is.a.Array();
-        Expect(args.ncList).is.a.Array();
+        Expect(resultList).is.an.Array();
+        Expect(nameSrcList).is.an.Array();
+        Expect(args.origNcList).is.an.Array();
+        Expect(args.ncList).is.an.Array();
+//        Expect(args.ncNameListPairs).is.an.Array();
     }
 
     resultList.push({
@@ -536,7 +538,7 @@ Validator.prototype.addCompatibleResult = function(resultList, nameSrcList, args
             origNcList:      args.origNcList,
             primaryNcList:   args.ncList,
             nameSrcList:     nameSrcList,
-            ncNameListPairs: args.ncNameListPairs
+//            ncNameListPairs: args.ncNameListPairs
         }).ensureUniquePrimaryLists()
     });
 };
@@ -870,7 +872,7 @@ Validator.prototype.evalFindDuplicateResult = function(result, logPrefix) {
 // compoundNcList:      subset of args.ncList which contains only compound NCs
 //
 // NOTE: is problem below solved now?
-// So there is some potenetial trickiness here for a 100% correct solution.
+// So there is some potential trickiness here for a 100% correct solution.
 // If a clue has multiple source combinations, we technically need to build
 // a separate clueNameList for each possible combination. if two or more clues
 // have multiples source combinations, we need to build all combinations of those

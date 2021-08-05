@@ -272,6 +272,7 @@ function matchAnyNcList (ncList, matchNcLists) {
 }
 
 function allCountUnique (nameSrcList1, nameSrcList2) {
+    // Uh. use a Set? This is called from within an inner loop.
     let hash = {};
     for (let nameSrc of nameSrcList1) {
 	hash[nameSrc.count] = true;
