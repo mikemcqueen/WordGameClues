@@ -36,6 +36,7 @@
     "xmldom": "^0.1.31"
   },
   "devDependencies": {
+    "@types/node": "^16.11.7",
     "mocha": "^5.2.0"
   },
   "scripts": {
