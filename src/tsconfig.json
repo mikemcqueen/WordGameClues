@@ -1,0 +1,7 @@
+{
+    "compilerOptions": {
+	"alwaysStrict": true,
+	"module": "commonjs",
+	"target": "es2020"
+    }
+}
