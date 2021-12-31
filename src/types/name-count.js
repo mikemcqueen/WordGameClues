@@ -93,6 +93,10 @@ function makeCanonicalName(name, count, index) {
     return s;
 }
 
+function listToString (ncList) {
+    return ncList.map(nc => nc.toString()).toString();
+}
+
 //
 
 function makeNameMap(ncList) {
@@ -213,17 +217,18 @@ NameCount.prototype.logList = function(list) {
 //
 
 module.exports = {
-    count                : count,
-    makeNew              : makeNew,
-    makeCopy             : makeCopy,
-    makeNameList         : makeNameList,
-    makeCountList        : makeCountList,
-    makeListFromNameList : makeListFromNameList,
-    makeListFromCsv      : makeListFromCsv,
-    makeCanonicalName    : makeCanonicalName,
-    makeNameMap          : makeNameMap,
-    makeCountMap         : makeCountMap,
-    listToJSON           : listToJSON,
-    listContains         : listContains,
-    listContainsAll      : listContainsAll
+    count,
+    makeNew,
+    makeCopy,
+    makeNameList,
+    makeCountList,
+    makeListFromNameList,
+    makeListFromCsv,
+    makeCanonicalName,
+    makeNameMap,
+    makeCountMap,
+    listToString,
+    listToJSON,
+    listContains,
+    listContainsAll
 };

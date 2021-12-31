@@ -18,10 +18,14 @@ const Duration    = require('duration');
 const Expect      = require('should/as-function');
 const Log         = require('./log')('combo-maker');
 const NameCount   = require('../types/name-count');
+const OS          = require('os');
+const Parallel    = require('paralleljs');
 const Peco        = require('./peco');
+const PrettyHrTime = require('pretty-hrtime');
 const PrettyMs    = require('pretty-ms');
 const ResultMap   = require('../types/result-map');
 //const Stringify   = require('stringify-object');
+const WorkerBootstrap = require('./combo-maker-worker-bootstrap');
 const Validator   = require('./validator');
 const stringify = require('javascript-stringify').stringify;
 //let Stringify = stringify;
@@ -35,6 +39,20 @@ function Stringify(val) {
 
 
 let logging = 0;
+let mcsl_timing = 0n;
+let mcsl_iter = 0;
+let ms_iter = 0;
+let mcsl_count = 0;
+let sl_timing = 0n;
+let maus_timing = 0n;
+const MILLY = 1000000n;
+
+let usenc_count = 0;
+let usenc_size = 0;
+let usenc_sources_count = 0;
+let usenc_sources_size = 0;
+let sources_count = 0;
+let sources_size = 0;
 
 
 const Op = { 'and':1, 'or':2, 'xor':3 };
@@ -178,6 +196,9 @@ function mergeSources (sources1, sources2, mergedPrimaryNameSrcList, prefix = ''
     //if (logging>3) console.log(`${prefix} srcNcLists2: ${showNcLists(srcNcLists2)}`);
     mergedSources.srcNcLists = [...srcNcLists1, ...srcNcLists2]; // TODO: _uniqBy(, _.toString)? maybe not necessary here
     //if (logging>2) console.log(`  ${prefix} merged: ${showNcLists(mergedSources.srcNcLists)}`);
+
+    ms_iter += 1;
+
     return mergedSources;
 }
 
@@ -198,6 +219,7 @@ function setsEqualOrDistinct(set1, set2, prefix = '') {
     //
     // console.log(`arr2: ${arr2}`);
     //
+    /*
     let it = 'red:1';
     let hasit1 = set1.has(it); // _.includes(arr1, it);
     let hasit2 = set2.has(it); // _.includes(arr2, it);
@@ -205,7 +227,8 @@ function setsEqualOrDistinct(set1, set2, prefix = '') {
     if ((hasit1 || hasit2) && logging) {
 	console.log(`${prefix} - ${arr1}.has(it) = ${hasit1}, ${arr2}.has(it) = ${hasit2}`);
     }
-
+    */
+    
     if (set1.size !== set2.size) equal = false;
     let eod = set1.forEach(nameSrc => {
 	//console.log(`  ns: ${nameSrc}`);
@@ -216,9 +239,11 @@ function setsEqualOrDistinct(set1, set2, prefix = '') {
 	}
 	//return equal || distinct;
     });
+    /*
     if (logging && (hasit1 || hasit2)) {
 	console.log(`  eod: ${eod} equal: ${equal} distinct: ${distinct}`);
     }
+    */
     return { equal, distinct };
 }
 
@@ -284,43 +309,40 @@ function allCountUnique (nameSrcList1, nameSrcList2) {
 }
 
 //
-// useNcLists:
-//
-//
-// useNcList:
-//
-//
-// sourcesList, list of:
-//   ncList    (primary NC list)
-//   resultMap
-//   primaryNameSrcLists = list of all possible primary NameSrcLists which ncList resolves to
-//   primarySrcLists = list of all SrcLists derived from NameSrcLists
-//   srcNcLists = result.resultMap ? buildSrcNcLists(result.resultMap.map()) : [ result.ncList ];
-//
-// sources:
-//   one entry from sources list
-//
-// useSourcesList:
-//
-//
-// useSources:
-//
-//
 
-function mergeAllUsedSources (sourcesList, useNcDataList, op) {
+function mergeAllUsedSources (sourcesList, useNcDataList, op, options) {
+    for (let useNcData of useNcDataList) {
+	if (!useNcData.sourcesList) {
+            useNcData.sourcesList = mergeAllCompatibleSources(useNcData.ncList, 'mAUS');
+	}
+    }
+
+    usenc_count +=1;
+    usenc_size += useNcDataList.length;
+    let maus_start = process.hrtime.bigint();
+
     for (let useNcData of useNcDataList) {
         let mergedSourcesList = [];
 
+	/*
 	if (!useNcData.sourcesList) {
 	    let start = new Date();
             useNcData.sourcesList = mergeAllCompatibleSources(useNcData.ncList, 'mAUS');
 	    timing += new Duration(start, new Date()).milliseconds;
 	}
+	*/
+
+	usenc_sources_count +=1;
+	usenc_sources_size += useNcData.sourcesList.length;
 
         // we can ignore this error because some useSources entries may be invalid, in particular if the sources
         // that were provided without a [:COUNT] were mapped to all possible counts.
         //if (_.isEmpty(useSourcesList)) throw new Error(`sources not compatible: ${useNcList}`);
         for (let useSources of useNcData.sourcesList) {
+
+	    sources_count +=1;
+	    sources_size += sourcesList.length;
+
             for (let sources of sourcesList) {
 		const allUnique = allCountUnique(sources.primaryNameSrcList, useSources.primaryNameSrcList);
                 const singlePrimaryNc = useNcData.ncList.length === 1 && useNcData.ncList[0].count === 1;
@@ -378,16 +400,22 @@ function mergeAllUsedSources (sourcesList, useNcDataList, op) {
         }
         sourcesList = mergedSourcesList;
     }
+
+    let maus_end = process.hrtime.bigint();
+    maus_timing += maus_end - maus_start;
+
     if (logging>3) console.log(`  mergeUsed, op: ${OpName(op)}, count: ${sourcesList.length}`);
     return sourcesList;
 }
 
-function isCompatibleWithUseNcLists (sourcesList, args, nameList) {
+//
+
+function isCompatibleWithUseNcLists (sourcesList, args, nameList, options) {
     // XOR first
     for (let xorNcDataList of args.allXorNcDataLists) {
         let xorSources = sourcesList;
         if (!_.isEmpty(xorNcDataList)) {
-            xorSources = mergeAllUsedSources(xorSources, xorNcDataList, Op.xor);
+            xorSources = mergeAllUsedSources(xorSources, xorNcDataList, Op.xor, options);
             if (logging) console.log(`  compatible with XOR: ${!_.isEmpty(xorSources)}, ${nameList}`);
             if (_.isEmpty(xorSources)) continue;
         }
@@ -395,7 +423,7 @@ function isCompatibleWithUseNcLists (sourcesList, args, nameList) {
         for (let andNcData of args.allAndNcDataLists) {
             let andSources = xorSources;
             if (!_.isEmpty(andNcData)) {
-                andSources = mergeAllUsedSources(andSources, andNcData, Op.and);
+                andSources = mergeAllUsedSources(andSources, andNcData, Op.and, options);
                 if (logging) console.log(`  compatible with AND: ${!_.isEmpty(andSources)}, ${nameList}`);
                 if (_.isEmpty(andSources)) continue;
             }
@@ -403,7 +431,7 @@ function isCompatibleWithUseNcLists (sourcesList, args, nameList) {
             for (let orNcData of args.allOrNcDataLists) {
                 let orSources = andSources;
                 if (!_.isEmpty(orNcData)) {
-                    let mergedOrSources = mergeAllUsedSources(orSources, orNcData, Op.or);
+                    let mergedOrSources = mergeAllUsedSources(orSources, orNcData, Op.or, options);
                     if (!_.isEmpty(mergedOrSources)) {
                         if (logging>2) console.log(`  before OR sources: ${Stringify(orSources)}`);
                         if (logging>2) console.log(`  after OR sources: ${Stringify(mergedOrSources)}`);
@@ -420,25 +448,25 @@ function isCompatibleWithUseNcLists (sourcesList, args, nameList) {
 
 let hash = {};
 
-ComboMaker.prototype.getCombosForUseNcLists = function(args, options = {}) {
-    let combos = [];
+//
 
-    let comboCount = 0;
-    let totalVariationCount = 0;
-    let cacheHitCount = 0;
-    
+ComboMaker.prototype.getCandidates = function(args, options) {
+    let candidates = new Set();
+
     // for each sourceList in sourceListArray
-    ClueManager.getClueSourceListArray({
+    let listOfClueSourceLists = ClueManager.getClueSourceListArray({
         sum: args.sum,
         max: args.max
     }).forEach(clueSourceList => {
-	comboCount += 1;
+	console.log(`${Stringify(clueSourceList)}`);
+
+	//comboCount += 1;
         let sourceIndexes = [];
 
 	//console.log(`sum(${args.sum}) max(${args.max}) clueSrcList: ${Stringify(clueSourceList)}`);
 
         let result = this.first(clueSourceList, sourceIndexes);
-        if (result.done) return; // continue; 
+        if (result.done) return; // continue
 
 	let variationCount = 1;
 
@@ -455,50 +483,58 @@ ComboMaker.prototype.getCombosForUseNcLists = function(args, options = {}) {
 		// we could optimize this.next for this condition?
 
 		
-		// timed; 58s in 2
+		// timed; 58ms in 2
                 result = this.next(clueSourceList, sourceIndexes, options);
                 if (result.done) break;
 		variationCount += 1;
             } else {
                 first = false;
             }
-            //console.log(`result.nameList: ${result.nameList}`);
-            //console.log(`result.ncList: ${result.ncList}`);
-
-	    //if (result.ncList.length == 2 && result.ncList[0].name == "red" && result.ncList[1].name == "red") logging = 5;
 
 	    // TODO problem 2:
 	    // wouldn't it (generally) be (a lot) faster to check for UseNcList compatability before
 	    // merging all compatible sources? (We'd have to do it again after merging, presumably).
 
-	    const strList = result.ncList.toString();
-	    //const strList = _.sortBy(result.ncList, _.toString).toString();
-	    let sources;
-	    if (!hash[strList]) {
-		sources = mergeAllCompatibleSources(result.ncList, 'c4UNCL');
-		hash[strList] = { sources };
-	    } else {
-		cacheHitCount += 1;
-	    }
-	    sources = hash[strList].sources;
-	    logging = 0;
-
-            if (logging) console.log(`  found compatible sources: ${!_.isEmpty(sources)}`);
-
-            // failed to find any compatible combos
-            if (_.isEmpty(sources)) continue;
-
-	    if (_.isUndefined(hash[strList].useNcCompatible)) {
-		hash[strList].useNcCompatible = isCompatibleWithUseNcLists(sources, args, result.nameList);
-	    }
-	    if (hash[strList].useNcCompatible) {
-                combos.push(result.nameList.toString());
-            }
-        }
-	totalVariationCount += variationCount;
+	    // TODO: typescript NameNumberList with overridden toString
+	    const ncListStr = NameCount.listToString(result.ncList);
+	    candidates.add(result.ncListStr);
+	}
     }, this);
+    return candidates;
+};
 
-    Debug(`combos(${comboCount}), variations(${totalVariationCount}), AVG variations/combo(${totalVariationCount/comboCount}), cacheHits(${cacheHitCount})`);
+//
+
+let splitToChunks = (array, parts) => {
+    let result = [];
+    for (let i = parts; i > 0; --i) {
+        result.push(array.splice(0, Math.ceil(array.length / i)));
+    }
+    return result;
+};
+
+//
+
+ComboMaker.prototype.getCombosForUseNcLists = function(args, options = {}) {
+    let combos = [];
+
+    let comboCount = 0;
+    let totalVariationCount = 0;
+    let compatibleVariations = 0;
+    let cacheHitCount = 0;
+    
+    const d = new Date();
+
+    let candidates = this.getCandidates(args, options);
+    console.log(`candidates(${candidates.size})`);
+
+    let chunks = splitToChunks([...candidates], OS.cpus().length);
+
+    let p = new Parallel(chunks, {
+    	evalPath: '${__dirname}/../../modules/combo-maker-worker-bootstrap.js'
+    });
+
+    p.map(WorkerBootstrap.entrypoint).then(_ => { console.log('end'); });
 
     return combos;
 };
@@ -533,6 +569,8 @@ ComboMaker.prototype.makeCombos = function(args, options = {}) {
     this.hash = {};
     let allCombos = [];
 
+    // TODO: push out parallelization a level, compute these once per process
+
     let allXorNcDataLists = args.xor ? buildAllUseNcDataLists(args.xor) : [ [] ];
     let allAndNcDataLists = args.and ? buildAllUseNcDataLists(args.and) : [ [] ];
     let allOrNcDataLists = args.or ? buildAllUseNcDataLists(args.or) : [ [] ];
@@ -556,7 +594,11 @@ ComboMaker.prototype.makeCombos = function(args, options = {}) {
     //`, dupeSrc(${this.nextDupeSrc})` +
     //`, dupeCombo(${this.nextDupeCombo})`);
 
-    Debug(`timing: ${PrettyMs(timing)}  one: ${PrettyMs(one)} two: ${PrettyMs(two)} three: ${PrettyMs(three)} four: ${PrettyMs(four)}`);
+    console.error(`timing: ${PrettyMs(timing)} mcsl: ${mcsl_timing/MILLY}ms sl: ${sl_timing/MILLY}ms maus: ${maus_timing/MILLY}ms`);
+//    console.error(`mcsl iter: ${mcsl_iter} ms iter: ${ms_iter} avg ms/mscl: ${_.toInteger(ms_iter / mcsl_iter)}`);
+    console.error(`usenc count: ${usenc_count} size: ${usenc_size} avg: ${_.toInteger(usenc_size/usenc_count)}`);
+    console.error(`usenc sources count: ${usenc_sources_count} size: ${usenc_sources_size} avg: ${_.toInteger(usenc_sources_size/usenc_sources_count)}`);
+    console.error(`sources count: ${sources_count} size: ${sources_size} avg: ${_.toInteger(sources_size/sources_count)}`);
 
     return allCombos;
 };
