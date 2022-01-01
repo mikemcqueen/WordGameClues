@@ -433,268 +433,6 @@ function isCompatibleWithUseNcLists (sourcesList, args, nameList, options) {
     return false;
 }
 
-let hash = {};
-
-//
-
-let getCandidates = function(args, options) {
-    let candidates = new Set();
-
-    // for each sourceList in sourceListArray
-    let listOfClueSourceLists = ClueManager.getClueSourceListArray({
-        sum: args.sum,
-        max: args.max
-    }).forEach(clueSourceList => {
-	//console.log(`sum(${args.sum}) max(${args.max}) clueSrcList: ${Stringify(clueSourceList)}`);
-
-	let variationCount = 0;
-
-        let sourceIndexes = [];
-        let result = first(clueSourceList, sourceIndexes);
-
-        // this is effectively Peco.getCombinations().forEach()
-	let first = true;
-        while (!result.done) {
-            if (!first) {
-
-		// TODO problem 1:
-		// problem1: why is this (apparently) considering the first two entries of the same
-		// clue count (e.g. red, red). It doesn't matter when the clue counts are different,
-		// but when they're the same, we're wasting time. Is there some way to determine if
-		// the two lists are equal at time of get'ing (getClueSourceListArray) such that
-		// we could optimize next for this condition?
-
-		
-		// timed; 58ms in 2
-                result = next(clueSourceList, sourceIndexes, options);
-                if (result.done) break;
-		variationCount += 1;
-            } else {
-                first = false;
-            }
-
-	    // TODO problem 2:
-	    // wouldn't it (generally) be (a lot) faster to check for UseNcList compatability before
-	    // merging all compatible sources? (We'd have to do it again after merging, presumably).
-
-	    // TODO: typescript NameNumberList with overridden toString
-	    const ncListStr = NameCount.listToString(result.ncList);
-	    candidates.add(ncListStr);
-	}
-	//console.log(`variations(${variationCount})`);
-    }, this);
-    return candidates;
-};
-
-//
-
-let splitToChunks = (array, parts) => {
-    let result = [];
-    for (let i = parts; i > 0; --i) {
-        result.push(array.splice(0, Math.ceil(array.length / i)));
-    }
-    return result;
-};
-
-//
-
-let parallel_getCombosForUseNcLists = function(args, options = {}) {
-    let combos = [];
-
-    let comboCount = 0;
-    let totalVariationCount = 0;
-    let compatibleVariations = 0;
-    let cacheHitCount = 0;
-    
-    const d = new Date();
-
-    let candidates = getCandidates(args, options);
-    console.log(`candidates(${candidates.size})`);
-
-    let chunks = splitToChunks([...candidates], OS.cpus().length);
-
-    let p = new Parallel(chunks, {
-    	evalPath: '${__dirname}/../../modules/combo-maker-worker-bootstrap.js'
-    });
-
-    p.map(WorkerBootstrap.entrypoint).then(_ => { console.log('end'); });
-
-    return combos;
-};
-
-let getCombosForUseNcLists = function(args, options = {}) {
-    let combos = [];
-    let hash = {};
-
-    let comboCount = 0;
-    let totalVariationCount = 0;
-    let cacheHitCount = 0;
-    
-    // for each sourceList in sourceListArray
-    ClueManager.getClueSourceListArray({
-        sum: args.sum,
-        max: args.max
-    }).forEach(clueSourceList => {
-	comboCount += 1;
-        let sourceIndexes = [];
-
-	//console.log(`sum(${args.sum}) max(${args.max}) clueSrcList: ${Stringify(clueSourceList)}`);
-
-        let result = first(clueSourceList, sourceIndexes);
-        if (result.done) return; // continue; 
-
-	let variationCount = 1;
-
-        // this is effectively Peco.getCombinations().forEach()
-	let first = true;
-        while (!result.done) {
-            if (!first) {
-
-		// TODO problem 1:
-		// problem1: why is this (apparently) considering the first two entries of the same
-		// clue count (e.g. red, red). It doesn't matter when the clue counts are different,
-		// but when they're the same, we're wasting time. Is there some way to determine if
-		// the two lists are equal at time of get'ing (getClueSourceListArray) such that
-		// we could optimize this.next for this condition?
-
-		
-		// timed; 58s in 2
-                result = next(clueSourceList, sourceIndexes, options);
-                if (result.done) break;
-		variationCount += 1;
-            } else {
-                first = false;
-            }
-            //console.log(`result.nameList: ${result.nameList}`);
-            //console.log(`result.ncList: ${result.ncList}`);
-
-	    //if (result.ncList.length == 2 && result.ncList[0].name == "red" && result.ncList[1].name == "red") logging = 5;
-
-	    // TODO problem 2:
-	    // wouldn't it (generally) be (a lot) faster to check for UseNcList compatability before
-	    // merging all compatible sources? (We'd have to do it again after merging, presumably).
-
-
-	    const strList = NameCount.listToString(result.ncList); // result.ncList.toString();
-	    //const strList = _.sortBy(result.ncList, _.toString).toString();
-	    let sources;
-	    if (!hash[strList]) {
-		sources = mergeAllCompatibleSources(result.ncList, 'c4UNCL');
-		hash[strList] = { sources };
-	    } else {
-		cacheHitCount += 1;
-	    }
-	    sources = hash[strList].sources;
-
-            // failed to find any compatible combos
-            if (_.isEmpty(sources)) continue;
-
-	    if (_.isUndefined(hash[strList].useNcCompatible)) {
-		hash[strList].useNcCompatible = isCompatibleWithUseNcLists(sources, args, result.nameList);
-	    }
-	    if (hash[strList].useNcCompatible) {
-                combos.push(result.nameList.toString());
-            }
-        }
-	totalVariationCount += variationCount;
-    }, this);
-
-//    Debug(`combos(${comboCount}), variations(${totalVariationCount}), AVG variations/combo(${totalVariationCount/comboCount}), cacheHits(${cacheHitCount})`);
-
-    return combos;
-};
-
-//
-// args:
-//  count:   # of primary clues to combine
-//  max:     max # of sources to use
-//  use:     list of clue names and name:counts, also allowing pairs, e.g. ['john:1','bob','red,bird']
-//  // not supported: require: required clue counts, e.g. [3,5,8]
-//  // not supported: limit to these primary sources, e.g. [1,9,14]
-//
-// A "clueSourceList" is a list (array) where each element is a
-// object that contains a list (cluelist) and a count, such as
-// [ { list:clues1, count:1 },{ list:clues2, count:2 }].
-//
-let makeCombos = function(args, options = {}) {
-    // TODO USE "validateArgs" 
-
-    /*
-    let require = args.require ? _.clone(args.require) : [];
-    if (!_.isEmpty(args.require)) throw new Error('require not yet supported');
-    if (args.sources) throw new Error('sources not yet supported');
-    */
-
-    //this.hash = {};
-    let allCombos = [];
-
-    // TODO: push out parallelization a level, compute these once per process
-
-    let allXorNcDataLists = args.xor ? buildAllUseNcDataLists(args.xor) : [ [] ];
-    let allAndNcDataLists = args.and ? buildAllUseNcDataLists(args.and) : [ [] ];
-    let allOrNcDataLists = args.or ? buildAllUseNcDataLists(args.or) : [ [] ];
-
-    //let allXorNcLists = args.xor ? buildAllUseNcLists(args.xor) : [ [] ];
-    //console.log(`allXorNcDataLists: ${Stringify(allXorNcDataLists)}`);
-    //console.log(`allXorNcDataLists[0]: ${Stringify(allXorNcDataLists[0])}`);
-
-    let comboArgs = {
-        sum: args.sum,
-        max: args.max,
-	allXorNcDataLists,
-	allAndNcDataLists,
-	allOrNcDataLists
-    };
-    
-    let combos = getCombosForUseNcLists(comboArgs, options);
-    allCombos.push(...combos);
-
-//    console.error(`timing: ${PrettyMs(timing)} mcsl: ${mcsl_timing/MILLY}ms sl: ${sl_timing/MILLY}ms maus: ${maus_timing/MILLY}ms`);
-//    console.error(`mcsl iter: ${mcsl_iter} ms iter: ${ms_iter} avg ms/mscl: ${_.toInteger(ms_iter / mcsl_iter)}`);
-//    console.error(`usenc count: ${usenc_count} size: ${usenc_size} avg: ${_.toInteger(usenc_size/usenc_count)}`);
-//    console.error(`usenc sources count: ${usenc_sources_count} size: ${usenc_sources_size} avg: ${_.toInteger(usenc_sources_size/usenc_sources_count)}`);
-//    console.error(`sources count: ${sources_count} size: ${sources_size} avg: ${_.toInteger(sources_size/sources_count)}`);
-
-    return allCombos;
-};
-
-let makeCombosForRange = (first, last, args) => {
-    let total = 0;
-    let known = 0;
-    let reject = 0;
-    let duplicate  = 0;
-    let comboMap = {};
-    let range = [...Array(last + 1).keys()].slice(first)
-	.map(sum => { return {
-	    sum,
-            max: (args.max > sum) ? sum : args.max,
-	    xor: args.xor,
-	    and: args.and,
-	    or: args.or
-	};});
-
-    let p = new Parallel(range, {
-    	evalPath: '${__dirname}/../../modules/combo-maker-worker-bootstrap.js'
-    });
-    let entrypoint = WorkerBootstrap.entrypoint;
-    let entryargs = {
-	xor: args.xor,
-	and: args.and,
-	or: args.or
-    };
-
-    p.map(data => entrypoint(data) // (args.max > sum) ? sum : args.max, entryargs)
-/*
-    p.map(sum => WorkerBootstrap.entrypoint({
-        sum,
-        max: (args.max > sum) ? sum : args.max,
-	xor: args.xor,
-	and: args.and,
-	or:  args.or
-    })*/
-	 ).then(_ => { console.log('end'); });
-};
-
 // As long as one final result has only primary sources from 'sources'
 // array, we're good.
 
@@ -706,6 +444,91 @@ let checkPrimarySources = function(resultList, sources) {
             });
     });
 };
+
+//
+//
+let nextIndex = function(clueSourceList, sourceIndexes) {
+    let index = sourceIndexes.length - 1;
+
+    // increment last index
+    ++sourceIndexes[index];
+
+    // if last index is maxed reset to zero, increment next-to-last index, etc.
+    while (sourceIndexes[index] === clueSourceList[index].list.length) {
+        sourceIndexes[index] = 0;
+        index -= 1;
+        if (index < 0) {
+            return false;
+        }
+        sourceIndexes[index] += 1;
+    }
+    return true;
+};
+
+//
+
+let next = (clueSourceList, sourceIndexes, options = {}) => {
+    for (;;) {
+        if (!nextIndex(clueSourceList, sourceIndexes, options)) {
+            return { done: true };
+        }
+        let ncList = [];          // e.g. [ { name: "pollock", count: 2 }, { name: "jackson", count: 4 } ]
+        let nameList = [];        // e.g. [ "pollock", "jackson" ]
+        let srcCountStrList = []; // e.g. [ "white,fish:2", "moon,walker:4" ]
+        if (!clueSourceList.every((clueSource, index) => {
+            let clue = clueSource.list[sourceIndexes[index]];
+            if (clue.ignore || clue.skip) {
+                return false; // every.exit
+            }
+            nameList.push(clue.name);
+            // I think this is right
+            ncList.push(NameCount.makeNew(clue.name, clueSource.count));
+            srcCountStrList.push(NameCount.makeCanonicalName(clue.src, clueSource.count));
+            return true; // every.continue;
+        })) {
+            continue;
+        }
+
+        nameList.sort();
+	/*
+        // skip combinations we've already checked
+        let skip = false;
+
+        if (skip && !addComboToFoundHash(nameList.toString())) continue; // already checked
+
+        // skip combinations that have duplicate source:count
+        if (!options.allow_dupe_src) {
+            if (skip && _.uniq(srcCountStrList).length !== srcCountStrList.length) {
+                //Debug('skipping duplicate clue src: ' + srcCountStrList);
+                ++nextDupeSrc;
+                continue;
+            }
+        }
+
+        // skip combinations that have duplicate names
+        if (skip && _.sortedUniq(nameList).length !== nameList.length) {
+            //Debug('skipping duplicate clue name: ' + nameList);
+            ++nextDupeClue; // TODO: DupeName
+            continue;
+        }
+	*/
+
+        return {
+            done:     false,
+            ncList:   ncList.sort(),
+            nameList: nameList
+        };
+    }
+};
+
+let first = (clueSourceList, sourceIndexes, options = {}) => {
+    for (let index = 0; index < clueSourceList.length; ++index) {
+        sourceIndexes[index] = 0;
+    }
+    sourceIndexes[sourceIndexes.length - 1] = -1;
+    return next(clueSourceList, sourceIndexes, options);
+};
+
 
 function getKnownNcListForName (name) {
     const countList = ClueManager.getCountListForName(name);
@@ -836,72 +659,164 @@ let displaySourceListArray = function(sourceListArray) {
     });
 };
 
-//
+let hash = {};
 
-let first = function(clueSourceList, sourceIndexes, options = {}) {
-    for (let index = 0; index < clueSourceList.length; ++index) {
-        sourceIndexes[index] = 0;
-    }
-    sourceIndexes[sourceIndexes.length - 1] = -1;
-    return next(clueSourceList, sourceIndexes, options);
+let getCombosForUseNcLists = function(args, options = {}) {
+    let combos = [];
+    let hash = {};
+
+    let comboCount = 0;
+    let totalVariationCount = 0;
+    let cacheHitCount = 0;
+    
+    // for each sourceList in sourceListArray
+    ClueManager.getClueSourceListArray({
+        sum: args.sum,
+        max: args.max
+    }).forEach(clueSourceList => {
+	comboCount += 1;
+        let sourceIndexes = [];
+
+	//console.log(`sum(${args.sum}) max(${args.max}) clueSrcList: ${Stringify(clueSourceList)}`);
+
+        let result = first(clueSourceList, sourceIndexes);
+        if (result.done) return; // continue; 
+
+	let variationCount = 1;
+
+        // this is effectively Peco.getCombinations().forEach()
+	let notfirst = false;
+        while (!result.done) {
+            if (notfirst) {
+		// TODO problem 1:
+		// problem1: why is this (apparently) considering the first two entries of the same
+		// clue count (e.g. red, red). It doesn't matter when the clue counts are different,
+		// but when they're the same, we're wasting time. Is there some way to determine if
+		// the two lists are equal at time of get'ing (getClueSourceListArray) such that
+		// we could optimize this.next for this condition?
+		
+		// timed; 58s in 2
+                result = next(clueSourceList, sourceIndexes, options);
+                if (result.done) break;
+		variationCount += 1;
+            } else {
+                notfirst = true;
+            }
+            //console.log(`result.nameList: ${result.nameList}`);
+            //console.log(`result.ncList: ${result.ncList}`);
+
+	    //if (result.ncList.length == 2 && result.ncList[0].name == "red" && result.ncList[1].name == "red") logging = 5;
+
+	    // TODO problem 2:
+	    // wouldn't it (generally) be (a lot) faster to check for UseNcList compatability before
+	    // merging all compatible sources? (We'd have to do it again after merging, presumably).
+
+
+	    const strList = NameCount.listToString(result.ncList); // result.ncList.toString();
+	    //const strList = _.sortBy(result.ncList, _.toString).toString();
+	    let sources;
+	    if (!hash[strList]) {
+		sources = mergeAllCompatibleSources(result.ncList, 'c4UNCL');
+		hash[strList] = { sources };
+	    } else {
+		cacheHitCount += 1;
+	    }
+	    sources = hash[strList].sources;
+
+            // failed to find any compatible combos
+            if (_.isEmpty(sources)) continue;
+
+	    if (_.isUndefined(hash[strList].useNcCompatible)) {
+		hash[strList].useNcCompatible = isCompatibleWithUseNcLists(sources, args, result.nameList);
+	    }
+	    if (hash[strList].useNcCompatible) {
+                combos.push(result.nameList.toString());
+            }
+        }
+	totalVariationCount += variationCount;
+    });
+
+//    Debug(`combos(${comboCount}), variations(${totalVariationCount}), AVG variations/combo(${totalVariationCount/comboCount}), cacheHits(${cacheHitCount})`);
+
+    return combos;
 };
 
 //
+// args:
+//  count:   # of primary clues to combine
+//  max:     max # of sources to use
+//  use:     list of clue names and name:counts, also allowing pairs, e.g. ['john:1','bob','red,bird']
+//  // not supported: require: required clue counts, e.g. [3,5,8]
+//  // not supported: limit to these primary sources, e.g. [1,9,14]
+//
+// A "clueSourceList" is a list (array) where each element is a
+// object that contains a list (cluelist) and a count, such as
+// [ { list:clues1, count:1 },{ list:clues2, count:2 }].
+//
+let makeCombos = function(args, options = {}) {
+    // TODO USE "validateArgs" 
 
-let next = function(clueSourceList, sourceIndexes, options = {}) {
-    for (;;) {
-        if (!nextIndex(clueSourceList, sourceIndexes, options)) {
-            return { done: true };
-        }
-        let ncList = [];          // e.g. [ { name: "pollock", count: 2 }, { name: "jackson", count: 4 } ]
-        let nameList = [];        // e.g. [ "pollock", "jackson" ]
-        let srcCountStrList = []; // e.g. [ "white,fish:2", "moon,walker:4" ]
-        if (!clueSourceList.every((clueSource, index) => {
-            let clue = clueSource.list[sourceIndexes[index]];
-            if (clue.ignore || clue.skip) {
-                return false; // every.exit
-            }
-            nameList.push(clue.name);
-            // I think this is right
-            ncList.push(NameCount.makeNew(clue.name, clueSource.count));
-            srcCountStrList.push(NameCount.makeCanonicalName(clue.src, clueSource.count));
-            return true; // every.continue;
-        })) {
-            continue;
-        }
+    /*
+    let require = args.require ? _.clone(args.require) : [];
+    if (!_.isEmpty(args.require)) throw new Error('require not yet supported');
+    if (args.sources) throw new Error('sources not yet supported');
+    */
 
-        nameList.sort();
-	/*
-        // skip combinations we've already checked
-        let skip = false;
+    //this.hash = {};
+    let allCombos = [];
 
-        if (skip && !addComboToFoundHash(nameList.toString())) continue; // already checked
+    // TODO: push out parallelization a level, compute these once per process
 
-        // skip combinations that have duplicate source:count
-        if (!options.allow_dupe_src) {
-            if (skip && _.uniq(srcCountStrList).length !== srcCountStrList.length) {
-                //Debug('skipping duplicate clue src: ' + srcCountStrList);
-                ++nextDupeSrc;
-                continue;
-            }
-        }
+    let allXorNcDataLists = args.xor ? buildAllUseNcDataLists(args.xor) : [ [] ];
+    let allAndNcDataLists = args.and ? buildAllUseNcDataLists(args.and) : [ [] ];
+    let allOrNcDataLists = args.or ? buildAllUseNcDataLists(args.or) : [ [] ];
 
-        // skip combinations that have duplicate names
-        if (skip && _.sortedUniq(nameList).length !== nameList.length) {
-            //Debug('skipping duplicate clue name: ' + nameList);
-            ++nextDupeClue; // TODO: DupeName
-            continue;
-        }
-	*/
+    //let allXorNcLists = args.xor ? buildAllUseNcLists(args.xor) : [ [] ];
+    //console.log(`allXorNcDataLists: ${Stringify(allXorNcDataLists)}`);
+    //console.log(`allXorNcDataLists[0]: ${Stringify(allXorNcDataLists[0])}`);
 
-        return {
-            done:     false,
-            ncList:   ncList.sort(),
-            nameList: nameList
-        };
-    }
+    let comboArgs = {
+        sum: args.sum,
+        max: args.max,
+	allXorNcDataLists,
+	allAndNcDataLists,
+	allOrNcDataLists
+    };
+    
+    let combos = getCombosForUseNcLists(comboArgs, options);
+    allCombos.push(...combos);
+
+//    console.error(`timing: ${PrettyMs(timing)} mcsl: ${mcsl_timing/MILLY}ms sl: ${sl_timing/MILLY}ms maus: ${maus_timing/MILLY}ms`);
+//    console.error(`mcsl iter: ${mcsl_iter} ms iter: ${ms_iter} avg ms/mscl: ${_.toInteger(ms_iter / mcsl_iter)}`);
+//    console.error(`usenc count: ${usenc_count} size: ${usenc_size} avg: ${_.toInteger(usenc_size/usenc_count)}`);
+//    console.error(`usenc sources count: ${usenc_sources_count} size: ${usenc_sources_size} avg: ${_.toInteger(usenc_sources_size/usenc_sources_count)}`);
+//    console.error(`sources count: ${sources_count} size: ${sources_size} avg: ${_.toInteger(sources_size/sources_count)}`);
+
+    return allCombos;
 };
 
+let makeCombosForRange = (first, last, args, options) => {
+    let range = [...Array(last + 1).keys()].slice(first)
+	.map(sum => { return {
+	    apple: args.apple,
+	    final: args.final,
+	    meta:  args.meta,
+	    sum,
+            max: (args.max > sum) ? sum : args.max,
+	    xor: args.xor,
+	    and: args.and,
+	    or: args.or
+	};});
+
+    let p = new Parallel(range, {
+    	evalPath: '${__dirname}/../../modules/combo-maker-worker-bootstrap.js'
+    });
+    let entrypoint = WorkerBootstrap.entrypoint;
+    console.log('makeCombos++');
+    p.map(entrypoint).then(data => { console.log('makeCombos--'); return data; });
+};
+
+//
 //
 //
 /*
@@ -915,26 +830,6 @@ let addComboToFoundHash = function(nameListCsv) {
     return false;
 };
 */
-
-//
-//
-let nextIndex = function(clueSourceList, sourceIndexes) {
-    let index = sourceIndexes.length - 1;
-
-    // increment last index
-    ++sourceIndexes[index];
-
-    // if last index is maxed reset to zero, increment next-to-last index, etc.
-    while (sourceIndexes[index] === clueSourceList[index].list.length) {
-        sourceIndexes[index] = 0;
-        index -= 1;
-        if (index < 0) {
-            return false;
-        }
-        sourceIndexes[index] += 1;
-    }
-    return true;
-};
 
 //
 //
