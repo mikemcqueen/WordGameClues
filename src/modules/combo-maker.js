@@ -19,9 +19,9 @@ const PrettyHrTime = require('pretty-hrtime');
 const PrettyMs    = require('pretty-ms');
 const ResultMap   = require('../types/result-map');
 //const Stringify   = require('stringify-object');
-const WorkerBootstrap = require('./combo-maker-worker-bootstrap');
+const BootstrapCM = require('./bootstrap-combo-maker');
 const Validator   = require('./validator');
-const stringify = require('javascript-stringify').stringify;
+const stringify   = require('javascript-stringify').stringify;
 //let Stringify = stringify;
 
 function Stringify(val) {
@@ -664,7 +664,7 @@ let getCombosForUseNcLists = function(args, options = {}) {
 
     let comboCount = 0;
     let totalVariationCount = 0;
-    let cacheHitCount = 0;
+    let cacheHits = 0;
     
     // for each sourceList in sourceListArray
     ClueManager.getClueSourceListArray({
@@ -716,9 +716,9 @@ let getCombosForUseNcLists = function(args, options = {}) {
 		sources = mergeAllCompatibleSources(result.ncList, 'c4UNCL');
 		hash[strList] = { sources };
 	    } else {
-		cacheHitCount += 1;
+		++cacheHits;
+		sources = hash[strList].sources;
 	    }
-	    sources = hash[strList].sources;
 
             // failed to find any compatible combos
             if (_.isEmpty(sources)) continue;
@@ -733,7 +733,8 @@ let getCombosForUseNcLists = function(args, options = {}) {
 	totalVariationCount += variationCount;
     });
 
-//    Debug(`combos(${comboCount}), variations(${totalVariationCount}), AVG variations/combo(${totalVariationCount/comboCount}), cacheHits(${cacheHitCount})`);
+//    Debug(`combos(${comboCount}), variations(${totalVariationCount}), AVG variations/combo(${totalVariationCount/comboCount}), cacheHits(${cacheHits})`);
+    console.error(`combos(${comboCount}), variations(${totalVariationCount}), cacheHits(${cacheHits}), merges(${totalVariationCount - cacheHits})`);
 
     return combos;
 };
@@ -810,9 +811,9 @@ let makeCombosForRange = (first, last, args, options) => {
     console.error(`cpus: ${cpus} used: ${cpus_used}`);
     let p = new Parallel(range, {
 //	maxWorkers: OS.cpus().length + 1,
-    	evalPath: '${__dirname}/../../modules/combo-maker-worker-bootstrap.js'
+    	evalPath: '${__dirname}/../../modules/bootstrap-combo-maker.js'
     });
-    let entrypoint = WorkerBootstrap.entrypoint;
+    let entrypoint = BootstrapCM.entrypoint;
     console.log('makeCombos++');
     let beginDate = new Date();
     p.map(entrypoint).then(data => {

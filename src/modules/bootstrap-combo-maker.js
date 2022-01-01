@@ -24,18 +24,35 @@ let loadClues = (clues, max) =>  {
     return true;
 };
 
+const MILLY = 1000000n;
+let last = 0n;
+
+let log = (prefix) => {
+    let stamp = process.hrtime.bigint();
+    if (last) {
+	let since = (stamp - last) / MILLY;
+	console.error(`${prefix} ${since}ms`); // pass/use index in args
+    }
+    else console.error(prefix);
+    last = stamp;
+};
+
+let logEnd = () => {
+    let end = process.hrtime.bigint();
+    let since = (end - last) / MILLY;
+    console.error(`-- ${since}ms`); // pass/use index in args
+    last = end;
+};
+
 let bootstrap = (args) => {
     if (logging) console.log(`bootstrapping sum(${args.sum}) max(${args.max}) args: ${Stringify(args)}`);
     ClueManager.logging = false;
     if (!ClueManager.loaded) {
 	loadClues(Clues.getByOptions(args), 15); // sum - 1; TODO: task item
     }
-    const MILLY = 1000000n;
-    let start = process.hrtime.bigint();
+    log('++');
     let combos = ComboMaker.makeCombos(args);
-    let end = process.hrtime.bigint();
-    let ms = (end - start) / MILLY;
-    console.error(`. ${ms}ms`); // pass/use index in args
+    log('--');
     //process.stderr.write('.');
     return combos;
 };
