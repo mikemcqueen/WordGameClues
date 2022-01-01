@@ -30,8 +30,13 @@ let bootstrap = (args) => {
     if (!ClueManager.loaded) {
 	loadClues(Clues.getByOptions(args), 15); // sum - 1; TODO: task item
     }
+    const MILLY = 1000000n;
+    let start = process.hrtime.bigint();
     let combos = ComboMaker.makeCombos(args);
-    process.stderr.write('.');
+    let end = process.hrtime.bigint();
+    let ms = (end - start) / MILLY;
+    console.error(`. ${ms}ms`); // pass/use index in args
+    //process.stderr.write('.');
     return combos;
 };
 

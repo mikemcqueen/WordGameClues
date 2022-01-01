@@ -31,7 +31,6 @@ function Stringify(val) {
     }, " ");
 }
 
-
 let logging = 0;
 let mcsl_timing = 0n;
 let mcsl_iter = 0;
@@ -47,7 +46,6 @@ let usenc_sources_count = 0;
 let usenc_sources_size = 0;
 let sources_count = 0;
 let sources_size = 0;
-
 
 const Op = { 'and':1, 'or':2, 'xor':3 };
 Object.freeze(Op);
@@ -663,7 +661,6 @@ let hash = {};
 
 let getCombosForUseNcLists = function(args, options = {}) {
     let combos = [];
-    let hash = {};
 
     let comboCount = 0;
     let totalVariationCount = 0;
@@ -809,6 +806,7 @@ let makeCombosForRange = (first, last, args, options) => {
 	};});
 
     let p = new Parallel(range, {
+//	maxWorkers: OS.cpus().length + 1,
     	evalPath: '${__dirname}/../../modules/combo-maker-worker-bootstrap.js'
     });
     let entrypoint = WorkerBootstrap.entrypoint;
