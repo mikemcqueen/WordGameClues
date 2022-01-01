@@ -4,10 +4,11 @@
 
 const ClueManager = require('./clue-manager');
 const Clues       = require('./clue-types');
-const ComboWorker = require('./combo-maker-worker');
+const ComboMaker  = require('./combo-maker');
 const Stringify   = require('stringify-object');
 
 let logging = true;
+let iter = 0;
 
 //
 
@@ -26,8 +27,12 @@ let loadClues = (clues, max) =>  {
 let bootstrap = (args) => {
     if (logging) console.log(`bootstrapping sum(${args.sum}) max(${args.max}) args: ${Stringify(args)}`);
     ClueManager.logging = false;
-    loadClues(Clues.getByOptions(args), 10); // sum - 1; TODO: task item
-    return ComboWorker.doWork(args);
+    if (!ClueManager.loaded) {
+	loadClues(Clues.getByOptions(args), 15); // sum - 1; TODO: task item
+    }
+    let combos = ComboMaker.makeCombos(args);
+    process.stderr.write('.');
+    return combos;
 };
 
 let entrypoint = (args) => {

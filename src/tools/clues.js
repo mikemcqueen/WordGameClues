@@ -188,8 +188,13 @@ function doCombos(args, options) {
     let first = sumRange[0];
     let last = sumRange.length > 1 ? sumRange[1] : first;
     let beginDate = new Date();
-    let comboMap = ComboMaker.makeCombosForRange(first, last, args, options);
+    let comboList = ComboMaker.makeCombosForRange(first, last, args, options);
     let d = new Duration(beginDate, new Date()).milliseconds;
+
+    console.log(comboList);
+
+    let comboMap = {};
+//    const filterResult = ClueManager.filter(comboList, args.sum, comboMap);
     _.keys(comboMap).forEach(nameCsv => console.log(nameCsv));
     //console.log(`${Stringify(comboMap)}`);
     
@@ -205,6 +210,7 @@ function doCombos(args, options) {
         Debug('WARNING: amounts to not add up!');
     }
 */
+    console.log(`--combos: ${PrettyMs(d)}`);
 }
 
 //

@@ -813,7 +813,15 @@ let makeCombosForRange = (first, last, args, options) => {
     });
     let entrypoint = WorkerBootstrap.entrypoint;
     console.log('makeCombos++');
-    p.map(entrypoint).then(data => { console.log('makeCombos--'); return data; });
+    let beginDate = new Date();
+    p.map(entrypoint).then(data => {
+	console.log(`chunks: ${data.length} combos: ${data[0].length}`);
+	let d = new Duration(beginDate, new Date()).milliseconds;
+	console.error(`--makeCombos: ${PrettyMs(d)}`);
+    });
+    // TODO: call filter on each data element, return map
+    // check if range == data and /or if .then(return) passes thru
+    //const filterResult = ClueManager.filter(data[i], args.sum, comboMap);
 };
 
 //
