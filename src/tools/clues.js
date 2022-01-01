@@ -44,6 +44,7 @@ const CmdLineOptions = Opt.create(_.concat(Clues.Options, [
     ['',  'xor=NAME[:COUNT][,NAME[:COUNT]]+',  '  combos must not have, and must be compatible with, source NAME[:COUNT]s'],
     ['',  'or=NAME[:COUNT][,NAME[:COUNT]]+',   '  combos may either have, or be compatible with, source NAME[:COUNT]s'],
     ['',  'primary',                           '  show combos as primary source clues' ],
+    ['l', 'parallel',                          '  use paralelljs' ],
     ['',  'copy-from=SOURCE',                  'copy clues from source cluetype; e.g. p1.1'],
     ['',  'save',                              '  save clue files'],
     ['',  'allow-dupe-source',                 '  allow duplicate sources'],
@@ -168,6 +169,8 @@ function doCombos(args, options) {
 	// is _chain even necessary here?
         args.require = _.chain(args.require).split(',').map(_.toNumber).value();
     }
+    // TODO: move the sumrange shit to makeCombosForRange
+
     let sumRange;
     if (!_.isUndefined(args.sum)) {
 	// is _chain even necessary here?
@@ -180,31 +183,17 @@ function doCombos(args, options) {
 //          `, require: ${args.require}` +
 //          `, sources: ${args.sources}` +
           `, use: ${args.use}`);
-    
+
     let total = 0;
-    let known = 0;
-    let reject = 0;
-    let duplicate  = 0;
-    let comboMap = {};
+    let first = sumRange[0];
+    let last = sumRange.length > 1 ? sumRange[1] : first;
     let beginDate = new Date();
-    let lastSum = sumRange.length > 1 ? sumRange[1] : sumRange[0];
-    for (let sum = sumRange[0]; sum <= lastSum; ++sum) {
-        args.sum = sum;
-        let max = args.max;
-        if (args.max > args.sum) args.max = args.sum;
-        // TODO: return # of combos filtered due to note name match
-        const comboList = ComboMaker.makeCombos(args, options);
-        args.max = max;
-        total += comboList.length;
-        const filterResult = ClueManager.filter(comboList, args.sum, comboMap);
-        known += filterResult.known;
-        reject += filterResult.reject;
-        duplicate += filterResult.duplicate;
-    }
+    let comboMap = ComboMaker.makeCombosForRange(first, last, args, options);
     let d = new Duration(beginDate, new Date()).milliseconds;
     _.keys(comboMap).forEach(nameCsv => console.log(nameCsv));
     //console.log(`${Stringify(comboMap)}`);
     
+/*
     Debug(`total: ${total}` +
                 ', filtered: ' + _.size(comboMap) +
                 ', known: ' + known +
@@ -215,6 +204,7 @@ function doCombos(args, options) {
     if (total !== _.size(comboMap) + known + reject + duplicate) {
         Debug('WARNING: amounts to not add up!');
     }
+*/
 }
 
 //
@@ -476,7 +466,7 @@ async function main () {
             sources = ClueManager.getInversePrimarySources(sources.split(',')).join(',');
             console.log(`inverse sources: ${sources}`);
         }
-	let combo_options = {};
+	let combo_options = { parallel: options.parallel };
         return combo_maker({
             sum:     options.count,
             max:     maxArg,
@@ -484,6 +474,8 @@ async function main () {
             sources,
             use:     useClueList,
             primary: options.primary,
+	    apple:   options.apple,
+	    final:   options.final,
 	    and:     options.and,
 	    or:      options.or,
 	    xor:     options.xor
