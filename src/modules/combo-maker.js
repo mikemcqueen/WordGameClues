@@ -4,12 +4,6 @@
 
 'use strict';
 
-// export a singleton
-
-module.exports = exports = new ComboMaker();
-
-//
-
 const _           = require('lodash');
 const ClueManager = require('./clue-manager');
 const ClueList    = require('../types/clue-list');
@@ -60,13 +54,6 @@ Object.freeze(Op);
 
 function OpName (opValue) {
     return _.findKey(Op, (v) => opValue === v);
-}
-
-//
-//
-
-function ComboMaker() {
-    this.hash = {};
 }
 
 //
@@ -450,7 +437,7 @@ let hash = {};
 
 //
 
-ComboMaker.prototype.getCandidates = function(args, options) {
+let getCandidates = function(args, options) {
     let candidates = new Set();
 
     // for each sourceList in sourceListArray
@@ -458,17 +445,12 @@ ComboMaker.prototype.getCandidates = function(args, options) {
         sum: args.sum,
         max: args.max
     }).forEach(clueSourceList => {
-	console.log(`${Stringify(clueSourceList)}`);
-
-	//comboCount += 1;
-        let sourceIndexes = [];
-
 	//console.log(`sum(${args.sum}) max(${args.max}) clueSrcList: ${Stringify(clueSourceList)}`);
 
-        let result = this.first(clueSourceList, sourceIndexes);
-        if (result.done) return; // continue
+	let variationCount = 0;
 
-	let variationCount = 1;
+        let sourceIndexes = [];
+        let result = first(clueSourceList, sourceIndexes);
 
         // this is effectively Peco.getCombinations().forEach()
 	let first = true;
@@ -480,11 +462,11 @@ ComboMaker.prototype.getCandidates = function(args, options) {
 		// clue count (e.g. red, red). It doesn't matter when the clue counts are different,
 		// but when they're the same, we're wasting time. Is there some way to determine if
 		// the two lists are equal at time of get'ing (getClueSourceListArray) such that
-		// we could optimize this.next for this condition?
+		// we could optimize next for this condition?
 
 		
 		// timed; 58ms in 2
-                result = this.next(clueSourceList, sourceIndexes, options);
+                result = next(clueSourceList, sourceIndexes, options);
                 if (result.done) break;
 		variationCount += 1;
             } else {
@@ -497,8 +479,9 @@ ComboMaker.prototype.getCandidates = function(args, options) {
 
 	    // TODO: typescript NameNumberList with overridden toString
 	    const ncListStr = NameCount.listToString(result.ncList);
-	    candidates.add(result.ncListStr);
+	    candidates.add(ncListStr);
 	}
+	//console.log(`variations(${variationCount})`);
     }, this);
     return candidates;
 };
@@ -515,7 +498,7 @@ let splitToChunks = (array, parts) => {
 
 //
 
-ComboMaker.prototype.getCombosForUseNcLists = function(args, options = {}) {
+let getCombosForUseNcLists = function(args, options = {}) {
     let combos = [];
 
     let comboCount = 0;
@@ -525,7 +508,7 @@ ComboMaker.prototype.getCombosForUseNcLists = function(args, options = {}) {
     
     const d = new Date();
 
-    let candidates = this.getCandidates(args, options);
+    let candidates = getCandidates(args, options);
     console.log(`candidates(${candidates.size})`);
 
     let chunks = splitToChunks([...candidates], OS.cpus().length);
@@ -539,74 +522,35 @@ ComboMaker.prototype.getCombosForUseNcLists = function(args, options = {}) {
     return combos;
 };
 
-//
-// args:
-//  count:   # of primary clues to combine
-//  max:     max # of sources to use
-//  use:     list of clue names and name:counts, also allowing pairs, e.g. ['john:1','bob','red,bird']
-//  // not supported: require: required clue counts, e.g. [3,5,8]
-//  // not supported: limit to these primary sources, e.g. [1,9,14]
-//
-// A "clueSourceList" is a list (array) where each element is a
-// object that contains a list (cluelist) and a count, such as
-// [ { list:clues1, count:1 },{ list:clues2, count:2 }].
-//
-ComboMaker.prototype.makeCombos = function(args, options = {}) {
-    this.nextDupeClue = 0;
-    this.nextDupeSrc = 0;
-    this.nextDupeCombo = 0;
+let makeCombosForRange = (first, last, args) => {
+    let total = 0;
+    let known = 0;
+    let reject = 0;
+    let duplicate  = 0;
+    let comboMap = {};
+    let range = [...Array(last + 1).keys()].slice(first);
 
-    if (_.isUndefined(args.maxResults)) {
-        args.maxResults = 50000;
-    }
+    p = new Parallel(range, {
+    	evalPath: '${__dirname}/../../modules/combo-maker-worker-bootstrap.js'
+    });
+    p.map(sum => {
+        let max = (args.max > sum) ? sum : args.max;
+	let comboArgs = {
+            sum,
+            max,
+	    xor: args.xor,
+	    and: args.and,
+	    or:  args.or
+	};
+	return WorkerBootstrap.entrypoint(comboArgs);
+    }).then(_ => { console.log('end'); });
 
-    // TODO USE "validateArgs" 
-
-    let require = args.require ? _.clone(args.require) : [];
-    if (!_.isEmpty(args.require)) throw new Error('require not yet supported');
-    if (args.sources) throw new Error('sources not yet supported');
-
-    this.hash = {};
-    let allCombos = [];
-
-    // TODO: push out parallelization a level, compute these once per process
-
-    let allXorNcDataLists = args.xor ? buildAllUseNcDataLists(args.xor) : [ [] ];
-    let allAndNcDataLists = args.and ? buildAllUseNcDataLists(args.and) : [ [] ];
-    let allOrNcDataLists = args.or ? buildAllUseNcDataLists(args.or) : [ [] ];
-
-    //let allXorNcLists = args.xor ? buildAllUseNcLists(args.xor) : [ [] ];
-    //console.log(`allXorNcDataLists: ${Stringify(allXorNcDataLists)}`);
-    //console.log(`allXorNcDataLists[0]: ${Stringify(allXorNcDataLists[0])}`);
-
-    let comboArgs = {
-        sum: args.sum,
-        max: args.max,
-	allXorNcDataLists,
-	allAndNcDataLists,
-	allOrNcDataLists
-    };
-    
-    let combos = this.getCombosForUseNcLists(comboArgs, options);
-    allCombos.push(...combos);
-
-    //Debug(`dupeClue(${this.nextDupeClue})` +
-    //`, dupeSrc(${this.nextDupeSrc})` +
-    //`, dupeCombo(${this.nextDupeCombo})`);
-
-    console.error(`timing: ${PrettyMs(timing)} mcsl: ${mcsl_timing/MILLY}ms sl: ${sl_timing/MILLY}ms maus: ${maus_timing/MILLY}ms`);
-//    console.error(`mcsl iter: ${mcsl_iter} ms iter: ${ms_iter} avg ms/mscl: ${_.toInteger(ms_iter / mcsl_iter)}`);
-    console.error(`usenc count: ${usenc_count} size: ${usenc_size} avg: ${_.toInteger(usenc_size/usenc_count)}`);
-    console.error(`usenc sources count: ${usenc_sources_count} size: ${usenc_sources_size} avg: ${_.toInteger(usenc_sources_size/usenc_sources_count)}`);
-    console.error(`sources count: ${sources_count} size: ${sources_size} avg: ${_.toInteger(sources_size/sources_count)}`);
-
-    return allCombos;
 };
 
 // As long as one final result has only primary sources from 'sources'
 // array, we're good.
 
-ComboMaker.prototype.checkPrimarySources = function(resultList, sources) {
+let checkPrimarySources = function(resultList, sources) {
     return resultList.some(result => {
         return NameCount.makeCountList(result.nameSrcList)
             .every(source => {
@@ -707,7 +651,7 @@ function buildUseNcLists (useArgsList) {
 
 //
 //
-ComboMaker.prototype.hasUniqueClues = function(clueList) {
+let hasUniqueClues = function(clueList) {
     let sourceMap = {};
     for (let clue of clueList) {
         if (isNaN(clue.count)) {
@@ -716,7 +660,7 @@ ComboMaker.prototype.hasUniqueClues = function(clueList) {
         else if (clue.count > 1) {
             // nothing?
         }
-        else if (!this.testSetKey(sourceMap, clue.src)) {
+        else if (!testSetKey(sourceMap, clue.src)) {
             return false; // forEach.continue... ..why?
         }
     }
@@ -725,7 +669,7 @@ ComboMaker.prototype.hasUniqueClues = function(clueList) {
 
 //
 
-ComboMaker.prototype.testSetKey = function(map, key, value = true) {
+let testSetKey = function(map, key, value = true) {
     if (_.has(map, key)) return false;
     map[key] = value;
     return true;
@@ -733,7 +677,7 @@ ComboMaker.prototype.testSetKey = function(map, key, value = true) {
 
 //
 
-ComboMaker.prototype.displaySourceListArray = function(sourceListArray) {
+let displaySourceListArray = function(sourceListArray) {
     console.log('-----\n');
     sourceListArray.forEach(function(sourceList) {
         sourceList.forEach(function(source) {
@@ -746,19 +690,19 @@ ComboMaker.prototype.displaySourceListArray = function(sourceListArray) {
 
 //
 
-ComboMaker.prototype.first = function(clueSourceList, sourceIndexes, options = {}) {
+let first = function(clueSourceList, sourceIndexes, options = {}) {
     for (let index = 0; index < clueSourceList.length; ++index) {
         sourceIndexes[index] = 0;
     }
     sourceIndexes[sourceIndexes.length - 1] = -1;
-    return this.next(clueSourceList, sourceIndexes, options);
+    return next(clueSourceList, sourceIndexes, options);
 };
 
 //
 
-ComboMaker.prototype.next = function(clueSourceList, sourceIndexes, options = {}) {
+let next = function(clueSourceList, sourceIndexes, options = {}) {
     for (;;) {
-        if (!this.nextIndex(clueSourceList, sourceIndexes, options)) {
+        if (!nextIndex(clueSourceList, sourceIndexes, options)) {
             return { done: true };
         }
         let ncList = [];          // e.g. [ { name: "pollock", count: 2 }, { name: "jackson", count: 4 } ]
@@ -779,16 +723,17 @@ ComboMaker.prototype.next = function(clueSourceList, sourceIndexes, options = {}
         }
 
         nameList.sort();
+	/*
         // skip combinations we've already checked
         let skip = false;
 
-        if (skip && !this.addComboToFoundHash(nameList.toString())) continue; // already checked
+        if (skip && !addComboToFoundHash(nameList.toString())) continue; // already checked
 
         // skip combinations that have duplicate source:count
         if (!options.allow_dupe_src) {
             if (skip && _.uniq(srcCountStrList).length !== srcCountStrList.length) {
                 //Debug('skipping duplicate clue src: ' + srcCountStrList);
-                ++this.nextDupeSrc;
+                ++nextDupeSrc;
                 continue;
             }
         }
@@ -796,9 +741,10 @@ ComboMaker.prototype.next = function(clueSourceList, sourceIndexes, options = {}
         // skip combinations that have duplicate names
         if (skip && _.sortedUniq(nameList).length !== nameList.length) {
             //Debug('skipping duplicate clue name: ' + nameList);
-            ++this.nextDupeClue; // TODO: DupeName
+            ++nextDupeClue; // TODO: DupeName
             continue;
         }
+	*/
 
         return {
             done:     false,
@@ -810,19 +756,21 @@ ComboMaker.prototype.next = function(clueSourceList, sourceIndexes, options = {}
 
 //
 //
-ComboMaker.prototype.addComboToFoundHash = function(nameListCsv) {
-    if (this.testSetKey(this.hash, nameListCsv)) {
-        this.hash[nameListCsv] = true;
+/*
+let addComboToFoundHash = function(nameListCsv) {
+    if (testSetKey(hash, nameListCsv)) {
+        hash[nameListCsv] = true;
         return true;
     }
     //Debug('skipping duplicate combo: ' + nameListCsv);
-    this.nextDupeCombo += 1;
+    nextDupeCombo += 1;
     return false;
 };
+*/
 
 //
 //
-ComboMaker.prototype.nextIndex = function(clueSourceList, sourceIndexes) {
+let nextIndex = function(clueSourceList, sourceIndexes) {
     let index = sourceIndexes.length - 1;
 
     // increment last index
@@ -842,7 +790,7 @@ ComboMaker.prototype.nextIndex = function(clueSourceList, sourceIndexes) {
 
 //
 //
-ComboMaker.prototype.displayCombos = function(clueListArray) {
+let displayCombos = function(clueListArray) {
     console.log('\n-----\n');
     let count = 0;
     clueListArray.forEach(function(clueList) {
@@ -854,7 +802,7 @@ ComboMaker.prototype.displayCombos = function(clueListArray) {
 
 //
 //
-ComboMaker.prototype.clueListToString = function(clueList) {
+let clueListToString = function(clueList) {
     let str = '';
     clueList.forEach(function(clue) {
         if (str.length > 0) {
@@ -868,3 +816,7 @@ ComboMaker.prototype.clueListToString = function(clueList) {
     return str;
 };
 
+module.exports = {
+    makeCombos,
+    makeCombosForRange,
+};

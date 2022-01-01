@@ -2,11 +2,12 @@
 
 'use strict';
 
-const ComboMakerWorker = require('./combo-maker-worker');
+const ComboWorker = require('./combo-maker-worker');
+const Stringify   = require('stringify-object');
 
 let bootstrap = (data) => {
-    console.log(`bootstrapping ${data}`);
-    ComboMakerWorker.doWork(data);
+    console.log(`bootstrapping`);  //${Stringify(data)}`);
+    ComboWorker.doWork(data);
     return 0;
 };
 
@@ -17,7 +18,6 @@ let entrypoint = (data) => {
 process.once('message', code => {
     let d = JSON.parse(code).data;
     //console.log(d);
-    // TODO: assign env.global to actual global state somehow (within stringify'd code probably)
     eval(d);
 });
 
