@@ -5,14 +5,14 @@
 const ComboWorker = require('./combo-maker-worker');
 const Stringify   = require('stringify-object');
 
-let bootstrap = (data) => {
-    console.log(`bootstrapping`);  //${Stringify(data)}`);
-    ComboWorker.doWork(data);
+let bootstrap = (args) => {
+    console.log(`bootstrapping sum(${args.sum}) max(${args.max}) args: ${Stringify(args)}`);
+    ComboWorker.doWork(args);
     return 0;
 };
 
-let entrypoint = (data) => {
-    return bootstrap(data);
+let entrypoint = (args) => {
+    return bootstrap(args);
 };
 
 process.once('message', code => {
