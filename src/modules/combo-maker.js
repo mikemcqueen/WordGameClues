@@ -805,6 +805,7 @@ let makeCombosForRange = (first, last, args, options) => {
 	    or: args.or
 	};});
 
+    console.error(`cpus: ${OS.cpus().length}`);
     let p = new Parallel(range, {
 //	maxWorkers: OS.cpus().length + 1,
     	evalPath: '${__dirname}/../../modules/combo-maker-worker-bootstrap.js'
