@@ -810,7 +810,7 @@ let makeCombosForRange = (first, last, args, options) => {
     let cpus_used = cpus <= 6 ? cpus: cpus / 2;
     console.error(`cpus: ${cpus} used: ${cpus_used}`);
     let p = new Parallel(range, {
-//	maxWorkers: OS.cpus().length + 1,
+	maxWorkers: cpus_used,
     	evalPath: '${__dirname}/../../modules/bootstrap-combo-maker.js'
     });
     let entrypoint = BootstrapCM.entrypoint;
