@@ -295,7 +295,8 @@ function mergeAllCompatibleSources (ncList, prefix = "") {
     Expect(ncList.length).is.above(0).and.below(3); // because broken for > 2 below
     //console.log(Stringify(ncList));
     let sources = getSourcesList(ncList[0]);
-    if (0) {
+    let loggy = 0 && ncList[0].name == "wood";
+    if (loggy) {
 	console.log('*******************MERGE ACS***********************');
 	console.log(`** ncList: ${ncList}`);
 	console.log('***************************************************');
@@ -474,15 +475,19 @@ let getCompatibleUseNcDataSources = (args) => {
 	let sourcesLists = [];
 	// TODO: map
 	for (let xorNcData of xorNcDataList) {
+	    //console.log(`ncList: ${NameCount.listToString(xorNcData.ncList)}`);
 	    // this might be wrong
-	    sourcesLists.push(mergeAllCompatibleSources(xorNcData.ncList, 'gCuNcDS'));
+	    let sourcesList = mergeAllCompatibleSources(xorNcData.ncList, 'gCuNcDS');
+	    //console.log(`sourcesList: ${Stringify2(sourcesList)}`);
+	    sourcesLists.push(sourcesList);
 	    // could just generate list of primarySourceLists (or primaryNameSrcLists) here
 	}
 	candidateXorSourcesLists.push(sourcesLists);
 	listArray.push([...Array(sourcesLists.length).keys()]);
     }
-    //    console.log(`listArray: ${Stringify2(listArray)}`);    
+    //console.log(`listArray: ${Stringify2(listArray)}`);    
 
+    Peco.setLogging(false);
     let peco = Peco.makeNew({
 	listArray,
 	max: 99999
@@ -490,34 +495,35 @@ let getCompatibleUseNcDataSources = (args) => {
 
     let xorSourcesList = [];
     for (let indexList = peco.firstCombination(); indexList; indexList = peco.nextCombination()) {
+	//console.log(`indexList: ${stringify(indexList)}`);
 	// TODO: map if possible
-	let primarySrcLists = [];
+	let primaryNameSrcLists = [];
 	for (let [index, value] of indexList.entries()) {
-	    let newPrimarySrcLists = [];
+	    let newPrimaryNameSrcLists = [];
 	    let sourcesList = candidateXorSourcesLists[index][value];
+	    //console.log(Stringify2(sourcesList));
 	    for (let sources of sourcesList) {
-		if (_.isEmpty(primarySrcLists)) {
-		    newPrimarySrcLists.push(NameCount.makeCountList(sources.primaryNameSrcList).sort(function(a, b){return a-b;}));
+		if (_.isEmpty(primaryNameSrcLists)) {
+		    newPrimaryNameSrcLists.push(sources.primaryNameSrcList.sort((a, b) => { return a.count - b.count; }));
 		} else {
-		    for (let primarySrcList of primarySrcLists) {
-			let concatSrcList = primarySrcList.concat(NameCount.makeCountList(sources.primaryNameSrcList));
-			if (_.uniq(concatSrcList)) {
-			    newPrimarySrcLists.push(concatSrcList.sort(function(a, b){return a-b;}));
+		    for (let primaryNameSrcList of primaryNameSrcLists) {
+			let concatNameSrcList = primaryNameSrcList.concat(sources.primaryNameSrcList);
+			if (_.uniqBy(concatNameSrcList, NameCount.count)) {
+			    newPrimaryNameSrcLists.push(concatNameSrcList.sort((a, b) => { return a.count - b.count; }));
 			}
 		    }
 		}
 	    }
-	    primarySrcLists = newPrimarySrcLists;
+	    primaryNameSrcLists = newPrimaryNameSrcLists;
 	}
-	console.log(stringify(primarySrcLists));
-	for (let psl of primarySrcLists) {
-	    let sources = {
-		primaryNameSrcList: [...psl.map(ps => NameCount.makeNew('abc', ps))]
-	    };
-	    xorSourcesList.push(sources);
+	//console.log(showNcLists(primaryNameSrcLists));
+	for (let primaryNameSrcList of primaryNameSrcLists) {
+	    xorSourcesList.push({ primaryNameSrcList });
 	}
     }
-//    console.log(`%% xorSourcesLists(${xorSourcesLists.length}): ${Stringify2(xorSourcesLists)}`);
+    Peco.setLogging(false);
+
+    //console.log(`%% xorSourcesLists(${xorSourcesLists.length}): ${Stringify2(xorSourcesLists)}`);
     return xorSourcesList;
 /*
             for (let xorSources of xorNcData.sourcesList) {

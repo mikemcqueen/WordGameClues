@@ -20,7 +20,8 @@ const Debug       = require('debug')('peco');
 //
 
 const FORCE_QUIET = false;
-const LOGGING = false;
+let LOGGING = false;
+
 
 const Flag = {
     Combinations: 1,
@@ -174,7 +175,7 @@ Peco.prototype.firstCombination = function () {
 Peco.prototype.nextCombination = function () {
     return this.buildNextResult({
         listArray: this.listArray,
-        flags: Flag.Combinations | Flag.NoDuplicates
+        flags: Flag.Combinations // | Flag.NoDuplicates
     });
 };
 
