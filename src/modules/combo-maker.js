@@ -1,4 +1,4 @@
-///
+//
 // combo-maker.js
 //
 
@@ -21,7 +21,7 @@ const NameCount   = require('../types/name-count');
 const Peco        = require('./peco');
 const PrettyMs    = require('pretty-ms');
 const ResultMap   = require('../types/result-map');
-const Stringify2   = require('stringify-object');
+const Stringify2  = require('stringify-object');
 const Validator   = require('./validator');
 const stringify = require('javascript-stringify').stringify;
 //let Stringify = stringify;
@@ -509,6 +509,20 @@ let getCompatibleUseNcDataSources = (args) => {
 
 let hash = {};
 
+// likely there is plenty of opportunity to optimize this. 
+let isCompatibleWithUseSources = (sources, useSources) => {
+    for (let source of sources) {
+	for (let useSource of useSources) {
+	    const allUnique = allCountUnique(source.primaryNameSrcList, useSource.primaryNameSrcList);
+	    if (allUnique) return true;
+	}
+    }
+    return false;
+};
+
+//
+// NEW NEW NEW
+//
 ComboMaker.prototype.getCombosForUseNcLists = function(args, options = {}) {
     let combos = [];
 
@@ -517,9 +531,11 @@ ComboMaker.prototype.getCombosForUseNcLists = function(args, options = {}) {
     let cacheHitCount = 0;
     let numIncompatible = 0;
     
-    let sources = getCompatibleUseNcDataSources(args);
+    let useSources = getCompatibleUseNcDataSources(args);
     //console.log(`@@@ sources: ${Stringify2(sources)}`);
 
+//    for (let source of sources) {
+	
     // for each sourceList in sourceListArray
     ClueManager.getClueSourceListArray({
         sum: args.sum,
@@ -561,16 +577,18 @@ ComboMaker.prototype.getCombosForUseNcLists = function(args, options = {}) {
 	    // wouldn't it (generally) be (a lot) faster to check for UseNcList compatability before
 	    // merging all compatible sources? (We'd have to do it again after merging, presumably).
 
-	    const strList = result.ncList.toString();
+	    const key = NameCount.listToString(result.ncList);
 	    //const strList = _.sortBy(result.ncList, _.toString).toString();
 	    let sources;
-	    if (!hash[strList]) {
+	    // TOOD: removing hash would be nice. filter "list" for uniqueness. (requires we have a list first)
+	    if (!hash[key]) {
 		sources = mergeAllCompatibleSources(result.ncList, 'c4UNCL');
-		hash[strList] = { sources };
+		//console.log(`$$ sources: ${Stringify2(sources)}`);
+		hash[key] = { sources };
 	    } else {
+		sources = hash[key].sources;
 		cacheHitCount += 1;
 	    }
-	    sources = hash[strList].sources;
 	    logging = 0;
 
             if (logging) console.log(`  found compatible sources: ${!_.isEmpty(sources)}`);
@@ -578,10 +596,10 @@ ComboMaker.prototype.getCombosForUseNcLists = function(args, options = {}) {
             // failed to find any compatible combos
             if (_.isEmpty(sources)) continue;
 
-	    if (_.isUndefined(hash[strList].isUseNcCompatible)) {
-		hash[strList].isUseNcCompatible = isCompatibleWithUseNcLists(sources, args, result.nameList);
+	    if (_.isUndefined(hash[key].isUseNcCompatible)) {
+		hash[key].isUseNcCompatible = isCompatibleWithUseSources(sources, useSources);
 	    }
-	    if (hash[strList].isUseNcCompatible) {
+	    if (hash[key].isUseNcCompatible) {
                 combos.push(result.nameList.toString());
             } else {
 		++numIncompatible;
@@ -591,9 +609,9 @@ ComboMaker.prototype.getCombosForUseNcLists = function(args, options = {}) {
     }, this);
 
     Debug(`combos(${comboCount}) variations(${totalVariationCount}) cacheHits(${cacheHitCount}) incompatible(${numIncompatible}) ` +
-	  `merged(${totalVariationCount - cacheHitCount - numIncompatible})`);
+	  `actual(${totalVariationCount - cacheHitCount - numIncompatible})`);
     console.error(`combos(${comboCount}) variations(${totalVariationCount}) cacheHits(${cacheHitCount}) incompatible(${numIncompatible}) ` +
-	      `merged(${totalVariationCount - cacheHitCount - numIncompatible})`);
+	      `actual(${totalVariationCount - cacheHitCount - numIncompatible})`);
 
     return combos;
 };
@@ -877,19 +895,17 @@ ComboMaker.prototype.addComboToFoundHash = function(nameListCsv) {
 //
 //
 ComboMaker.prototype.nextIndex = function(clueSourceList, sourceIndexes) {
-    let index = sourceIndexes.length - 1;
-
     // increment last index
+    let index = sourceIndexes.length - 1;
     ++sourceIndexes[index];
 
-    // if last index is maxed reset to zero, increment next-to-last index, etc.
+    // while last index is maxed reset to zero, increment next-to-last index, etc.
     while (sourceIndexes[index] === clueSourceList[index].list.length) {
         sourceIndexes[index] = 0;
-        index -= 1;
-        if (index < 0) {
+        if (--index < 0) {
             return false;
         }
-        sourceIndexes[index] += 1;
+        ++sourceIndexes[index];
     }
     return true;
 };

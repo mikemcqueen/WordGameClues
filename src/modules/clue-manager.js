@@ -680,24 +680,12 @@ ClueManager.prototype.filter = function (srcCsvList, clueCount, map = {}) {
     };
 };
 
-function old_singleEntry (nc, sources) {
-    //console.log(`  singleEntry ${nc} sources: ${Stringify(sources)}`);
-    return {
-	results: [
-	    {
-		ncList: [ nc ],
-		nameSrcList: [ NameCount.makeNew(nc.name, sources[0]) ]
-	    }
-	]
-    };
-};
-
 function singleEntry (nc, source) {
     return {
 	results: [
 	    {
-		ncList: [ nc ],
-		nameSrcList: [ NameCount.makeNew(nc.name, source) ]
+		ncList: [nc],
+		nameSrcList: [NameCount.makeNew(nc.name, source)]
 	    }
 	]
     };
