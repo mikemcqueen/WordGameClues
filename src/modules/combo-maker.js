@@ -466,13 +466,60 @@ function isCompatibleWithUseNcLists (sourcesList, args, nameList) {
 }
 
 let getCompatibleUseNcDataSources = (args) => {
-    let sources = [];
+    let candidateXorSourcesLists = [];
+    let listArray = [];
     // XOR first
+    //console.log(`allxorncdatalists count(${args.allXorNcDataLists.length})`);
     for (let xorNcDataList of args.allXorNcDataLists) {
+	let sourcesLists = [];
+	// TODO: map
 	for (let xorNcData of xorNcDataList) {
-	    if (!xorNcData.sourcesList) {
-		xorNcData.sourcesList = mergeAllCompatibleSources(xorNcData.ncList, 'gCuNcDS');
+	    // this might be wrong
+	    sourcesLists.push(mergeAllCompatibleSources(xorNcData.ncList, 'gCuNcDS'));
+	    // could just generate list of primarySourceLists (or primaryNameSrcLists) here
+	}
+	candidateXorSourcesLists.push(sourcesLists);
+	listArray.push([...Array(sourcesLists.length).keys()]);
+    }
+    //    console.log(`listArray: ${Stringify2(listArray)}`);    
+
+    let peco = Peco.makeNew({
+	listArray,
+	max: 99999
+    });
+
+    let xorSourcesList = [];
+    for (let indexList = peco.firstCombination(); indexList; indexList = peco.nextCombination()) {
+	// TODO: map if possible
+	let primarySrcLists = [];
+	for (let [index, value] of indexList.entries()) {
+	    let newPrimarySrcLists = [];
+	    let sourcesList = candidateXorSourcesLists[index][value];
+	    for (let sources of sourcesList) {
+		if (_.isEmpty(primarySrcLists)) {
+		    newPrimarySrcLists.push(NameCount.makeCountList(sources.primaryNameSrcList).sort(function(a, b){return a-b;}));
+		} else {
+		    for (let primarySrcList of primarySrcLists) {
+			let concatSrcList = primarySrcList.concat(NameCount.makeCountList(sources.primaryNameSrcList));
+			if (_.uniq(concatSrcList)) {
+			    newPrimarySrcLists.push(concatSrcList.sort(function(a, b){return a-b;}));
+			}
+		    }
+		}
 	    }
+	    primarySrcLists = newPrimarySrcLists;
+	}
+	console.log(stringify(primarySrcLists));
+	for (let psl of primarySrcLists) {
+	    let sources = {
+		primaryNameSrcList: [...psl.map(ps => NameCount.makeNew('abc', ps))]
+	    };
+	    xorSourcesList.push(sources);
+	}
+    }
+//    console.log(`%% xorSourcesLists(${xorSourcesLists.length}): ${Stringify2(xorSourcesLists)}`);
+    return xorSourcesList;
+/*
             for (let xorSources of xorNcData.sourcesList) {
 		// AND next
 		for (let andNcData of args.allAndNcDataLists) {
@@ -505,6 +552,51 @@ let getCompatibleUseNcDataSources = (args) => {
         }
     }
     return sources;
+*/
+};
+
+let old_getCompatibleUseNcDataSources = (args) => {
+    let sources = [];
+    // XOR first
+    for (let xorNcDataList of args.allXorNcDataLists) {
+	for (let xorNcData of xorNcDataList) {
+	    if (!xorNcData.sourcesList) {
+		xorNcData.sourcesList = mergeAllCompatibleSources(xorNcData.ncList, 'gCuNcDS');
+	    }
+/*
+            for (let xorSources of xorNcData.sourcesList) {
+		// AND next
+		for (let andNcData of args.allAndNcDataLists) {
+		    let andSources = xorSources;
+		    if (!_.isEmpty(andNcData)) {
+			andSources = mergeAllUsedSources(andSources, andNcData, Op.and);
+			if (logging) console.log(`  compatible with AND: ${!_.isEmpty(andSources)}`);
+			if (_.isEmpty(andSources)) continue;
+		    }
+		    // OR last
+		    for (let orNcData of args.allOrNcDataLists) {
+			let orSources = andSources;
+			if (!_.isEmpty(orNcData)) {
+			    let mergedOrSources = mergeAllUsedSources(orSources, orNcData, Op.or);
+			    if (!_.isEmpty(mergedOrSources)) {
+				if (logging>2) console.log(`  before OR sources: ${Stringify(orSources)}`);
+				if (logging>2) console.log(`  after OR sources: ${Stringify(mergedOrSources)}`);
+				if (logging>2) console.log(`  compatible with OR: ${!_.isEmpty(mergedOrSources)}`);
+			    }
+			    if (_.isEmpty(mergedOrSources)) continue;
+			    orSources = mergedOrSources;
+			    // TODO
+			    // TODO: if OR merged successfully, add once without merge, once with merge
+			    // TODO
+			}
+			sources.push(orSources);
+		    }
+		}
+            }
+*/
+        }
+    }
+    return sources;
 };
 
 let hash = {};
@@ -532,7 +624,7 @@ ComboMaker.prototype.getCombosForUseNcLists = function(args, options = {}) {
     let numIncompatible = 0;
     
     let useSources = getCompatibleUseNcDataSources(args);
-    //console.log(`@@@ sources: ${Stringify2(sources)}`);
+    if (0) console.log(`compatibleUseNcDataSources: ${Stringify2(useSources)}`);
 
 //    for (let source of sources) {
 	
