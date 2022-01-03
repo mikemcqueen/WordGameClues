@@ -93,6 +93,11 @@ function makeCanonicalName(name, count, index) {
     return s;
 }
 
+function listToString (ncList) {
+    if (!ncList) return _.toString(ncList);
+    return ncList.map(nc => nc.toString()).toString();
+}
+
 //
 
 function makeNameMap(ncList) {
@@ -167,14 +172,14 @@ NameCount.prototype.toString = function() {
     return makeCanonicalName(this.name, this.count, this.index);
 //    this.cachedCanonicalName = this.cashedCanonicalName || 
 //    return this.cachedCanonicalName;
-}
+};
 
 //
 //
 
 NameCount.prototype.setIndex = function(index) {
     this.index = index;
-}
+};
 
 //
 
@@ -194,7 +199,7 @@ NameCount.prototype.log = function() {
 
 NameCount.prototype.toJSON = function() {
     return '{ "name": ' + this.name + ', "count": ' + this.count + ' }';
-}
+};
 
 //
 
@@ -208,22 +213,23 @@ NameCount.prototype.logList = function(list) {
         str += nc;
     });
     console.log(str);
-}
+};
 
 //
 
 module.exports = {
-    count                : count,
-    makeNew              : makeNew,
-    makeCopy             : makeCopy,
-    makeNameList         : makeNameList,
-    makeCountList        : makeCountList,
-    makeListFromNameList : makeListFromNameList,
-    makeListFromCsv      : makeListFromCsv,
-    makeCanonicalName    : makeCanonicalName,
-    makeNameMap          : makeNameMap,
-    makeCountMap         : makeCountMap,
-    listToJSON           : listToJSON,
-    listContains         : listContains,
-    listContainsAll      : listContainsAll
+    count,
+    makeNew,
+    makeCopy,
+    makeNameList,
+    makeCountList,
+    makeListFromNameList,
+    makeListFromCsv,
+    makeCanonicalName,
+    makeNameMap,
+    makeCountMap,
+    listToString,
+    listToJSON,
+    listContains,
+    listContainsAll
 };
