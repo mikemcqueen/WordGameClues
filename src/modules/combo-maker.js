@@ -467,25 +467,35 @@ function isCompatibleWithUseNcLists (sourcesList, args, nameList) {
 }
 
 let getCompatibleUseNcDataSources = (args) => {
-    let candidateXorSourcesLists = [];
-    let listArray = [];
-    // XOR first
-    //console.log(`allxorncdatalists count(${args.allXorNcDataLists.length})`);
-    for (let xorNcDataList of args.allXorNcDataLists) {
-	let sourcesLists = [];
+    let hashList = [];
+    let sourcesLists = [];
+    //console.log(`allxorncdatalists(${args.allXorNcDataLists.length}): ${Stringify2(args.allXorNcDataLists)}`);
+    for (let [whichDataList, xorNcDataList] of args.allXorNcDataLists.entries()) {
 	// TODO: map
-	for (let xorNcData of xorNcDataList) {
+	for (let [sourcesListIndex, xorNcData] of xorNcDataList.entries()) {
+	    if (!sourcesLists[sourcesListIndex]) sourcesLists.push([]);
+	    if (!hashList[sourcesListIndex]) hashList.push({});
 	    //console.log(`ncList: ${NameCount.listToString(xorNcData.ncList)}`);
 	    // this might be wrong
 	    let sourcesList = mergeAllCompatibleSources(xorNcData.ncList, 'gCuNcDS');
-	    //console.log(`sourcesList: ${Stringify2(sourcesList)}`);
-	    sourcesLists.push(sourcesList);
+	    for (let sources of sourcesList) {
+		let key = sources.primaryNameSrcList.map(_.toString).sort().toString();
+		if (!hashList[sourcesListIndex][key]) {
+		    sourcesLists[sourcesListIndex].push(sources); /// ... ?
+		    hashList[sourcesListIndex][key] = true;
+		}
+	    }
+	    //if (sourcesListIndex === 0) console.log(`sourcesList(0): ${Stringify2(sourcesList)}`);
+	    //console.log(`sourcesList(${whichDataList}): ${Stringify2(sourcesList)}`);
+	    //sourcesLists.push(sourcesList);
 	    // could just generate list of primarySourceLists (or primaryNameSrcLists) here
 	}
-	candidateXorSourcesLists.push(sourcesLists);
-	listArray.push([...Array(sourcesLists.length).keys()]);
+	//candidateXorSourcesLists.push(sourcesLists);
+	//listArray.push([...Array(sourcesLists.length).keys()]);
     }
-    //console.log(`listArray: ${Stringify2(listArray)}`);    
+    let listArray = sourcesLists.map(sl => [...Array(sl.length).keys()]);
+    //console.log(`listArray(${listArray.length}): ${Stringify2(listArray)}`);
+    //console.log(`candidates(${sourcesLists.length}): ${Stringify2(sourcesLists)}`);
 
     Peco.setLogging(false);
     let peco = Peco.makeNew({
@@ -493,31 +503,46 @@ let getCompatibleUseNcDataSources = (args) => {
 	max: 99999
     });
 
+    const factor = 1000000;
+    let iter = 0;
     let xorSourcesList = [];
     for (let indexList = peco.firstCombination(); indexList; indexList = peco.nextCombination()) {
+	if (!(++iter % factor)) process.stderr.write('.');
 	//console.log(`indexList: ${stringify(indexList)}`);
 	// TODO: map if possible
-	let primaryNameSrcLists = [];
-	for (let [index, value] of indexList.entries()) {
-	    let newPrimaryNameSrcLists = [];
-	    let sourcesList = candidateXorSourcesLists[index][value];
-	    //console.log(Stringify2(sourcesList));
+	let primaryNameSrcList = [];
+	for (let [whichList, whichSource] of indexList.entries()) {
+	    let sources = sourcesLists[whichList][whichSource];
+	    //console.log(Stringify2(sources));
+	    if (_.isEmpty(primaryNameSrcList)) {
+		primaryNameSrcList.push(...sources.primaryNameSrcList); // .sort((a, b) => { return a.count - b.count; }));
+	    } else {
+		let concatNameSrcList = primaryNameSrcList.concat(sources.primaryNameSrcList);
+		if (_.uniqBy(concatNameSrcList, NameCount.count)) {
+		    primaryNameSrcList = newPrimaryNameSrcList;
+		} else {
+		    primaryNameSrcList = [];
+		    break;
+		}
+	    }
+	}
+/*
 	    for (let sources of sourcesList) {
-		if (_.isEmpty(primaryNameSrcLists)) {
-		    newPrimaryNameSrcLists.push(sources.primaryNameSrcList.sort((a, b) => { return a.count - b.count; }));
+		if (index === 0) {//(_.isEmpty(primaryNameSrcLists)) {
+		    newPrimaryNameSrcLists.push(sources.primaryNameSrcList); // .sort((a, b) => { return a.count - b.count; }));
 		} else {
 		    for (let primaryNameSrcList of primaryNameSrcLists) {
 			let concatNameSrcList = primaryNameSrcList.concat(sources.primaryNameSrcList);
 			if (_.uniqBy(concatNameSrcList, NameCount.count)) {
-			    newPrimaryNameSrcLists.push(concatNameSrcList.sort((a, b) => { return a.count - b.count; }));
+			    newPrimaryNameSrcLists.push(concatNameSrcList); // .sort((a, b) => { return a.count - b.count; }));
 			}
 		    }
 		}
 	    }
 	    primaryNameSrcLists = newPrimaryNameSrcLists;
-	}
+*/
 	//console.log(showNcLists(primaryNameSrcLists));
-	for (let primaryNameSrcList of primaryNameSrcLists) {
+	if (!_.isEmpty(primaryNameSrcList)) {
 	    xorSourcesList.push({ primaryNameSrcList });
 	}
     }
