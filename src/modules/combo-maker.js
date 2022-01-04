@@ -515,11 +515,12 @@ let getCompatibleUseNcDataSources = (args) => {
 	    let sources = sourcesLists[whichList][whichSource];
 	    //console.log(Stringify2(sources));
 	    if (_.isEmpty(primaryNameSrcList)) {
+		// or just = sources.pnsl.sort(); ?
 		primaryNameSrcList.push(...sources.primaryNameSrcList); // .sort((a, b) => { return a.count - b.count; }));
 	    } else {
 		let concatNameSrcList = primaryNameSrcList.concat(sources.primaryNameSrcList);
-		if (_.uniqBy(concatNameSrcList, NameCount.count)) {
-		    primaryNameSrcList = newPrimaryNameSrcList;
+		if (_.uniqBy(concatNameSrcList, NameCount.count).length === concatNameSrcList.length) {
+		    primaryNameSrcList = concatNameSrcList; // .sort
 		} else {
 		    primaryNameSrcList = [];
 		    break;
