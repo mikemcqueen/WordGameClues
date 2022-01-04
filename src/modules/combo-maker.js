@@ -4,12 +4,6 @@
 
 'use strict';
 
-// export a singleton
-
-module.exports = exports = new ComboMaker();
-
-//
-
 const _           = require('lodash');
 const ClueManager = require('./clue-manager');
 const ClueList    = require('../types/clue-list');
@@ -24,7 +18,6 @@ const ResultMap   = require('../types/result-map');
 const Stringify2  = require('stringify-object');
 const Validator   = require('./validator');
 const stringify = require('javascript-stringify').stringify;
-//let Stringify = stringify;
 
 function Stringify(val) {
     return stringify(val, (value, indent, stringify) => {
@@ -33,9 +26,8 @@ function Stringify(val) {
     }, " ");
 }
 
-
 let logging = 0;
-
+let loggy = false;
 
 const Op = { 'and':1, 'or':2, 'xor':3 };
 Object.freeze(Op);
@@ -43,32 +35,6 @@ Object.freeze(Op);
 function OpName (opValue) {
     return _.findKey(Op, (v) => opValue === v);
 }
-
-//
-//
-
-function ComboMaker() {
-    this.hash = {};
-}
-
-//
-
-/** not used
-function getCompatiblePrimaryNameSrcLists (nameSrcLists1, nameSrcLists2) {
-    let nameSrcLists = [];
-    for (const nameSrcList1 of nameSrcLists1) {
-        for (const nameSrcList2 of nameSrcLists2) {
-            Debug(`nameSrcList1: ${nameSrcList1}, nameSrcList2: ${nameSrcList2}`);
-            let countList1 = NameCount.makeCountList(nameSrcList1);
-            let countList2 = NameCount.makeCountList(nameSrcList2);
-            if (_.isEmpty(_.intersectionBy(countList1, countList2, _.toNumber))) {
-                nameSrcLists.push(_.concat(nameSrcList1, nameSrcList2));
-            }
-        }
-    }
-    return nameSrcLists;
-}
-*/
 
 //{
 // A:
@@ -94,8 +60,6 @@ function getCompatiblePrimaryNameSrcLists (nameSrcLists1, nameSrcLists2) {
 //     'face:10'
 //   ]
 // }
-
-let loggy = false;
 
 function recursiveAddSrcNcLists (list, resultMap, top) {
     let keys = _.flatMap(_.keys(resultMap), key => {
@@ -178,11 +142,10 @@ let two = 0;
 let three =  0;
 let four =  0;
 
-// this is the innermost function of some nasty complexity nested loops.
+// called in inner (inner inner) loops
 function mergeSources (sources1, sources2, mergedPrimaryNameSrcList, prefix = '') {
     let mergedSources = {};
-    // timed, 133ms in 2
-    mergedSources.ncList = [...sources1.ncList,...sources2.ncList];
+    mergedSources.ncList = [...sources1.ncList, ...sources2.ncList];
     mergedSources.primaryNameSrcList = mergedPrimaryNameSrcList
 	? mergedPrimaryNameSrcList
 	: [...sources1.primaryNameSrcList, ...sources2.primaryNameSrcList];
@@ -295,13 +258,14 @@ function mergeAllCompatibleSources (ncList, prefix = "") {
     Expect(ncList.length).is.above(0).and.below(3); // because broken for > 2 below
     //console.log(Stringify(ncList));
     let sources = getSourcesList(ncList[0]);
-    let loggy = 0 && ncList[0].name == "wood";
+    loggy = 0 && ncList[0].name == "wood";
     if (loggy) {
 	console.log('*******************MERGE ACS***********************');
 	console.log(`** ncList: ${ncList}`);
 	console.log('***************************************************');
 	console.log(`** sources:\n${stringifySources(sources)}`);
     }
+    loggy = false;
     for (let ncIndex = 1; ncIndex < ncList.length; ncIndex += 1) {
         const nextSources = getSourcesList(ncList[ncIndex]);
 	// already timed, 30ms
@@ -348,7 +312,7 @@ function allCountUnique (nameSrcList1, nameSrcList2) {
 //   resultMap
 //   primaryNameSrcLists = list of all possible primary NameSrcLists which ncList resolves to
 //   primarySrcLists = list of all SrcLists derived from NameSrcLists
-//   srcNcLists = result.resultMap ? buildSrcNcLists(result.resultMap.map()) : [ result.ncList ];
+//   srcNcLists = result.resultMap ? buildSrcNcLists(result.resultMap.map()) : [result.ncList];
 //
 // sources:
 //   one entry from sources list
@@ -366,21 +330,14 @@ function mergeAllUsedSources (sourcesList, useNcDataList, op) {
 	if (!useNcData.sourcesList) {
             useNcData.sourcesList = mergeAllCompatibleSources(useNcData.ncList, 'mAUS');
 	}
-        // we can ignore this error because some useSources entries may be invalid, in particular if the sources
-        // that were provided without a [:COUNT] were mapped to all possible counts.
-        //if (_.isEmpty(useSourcesList)) throw new Error(`sources not compatible: ${useNcList}`);
         for (let useSources of useNcData.sourcesList) {
             for (let sources of sourcesList) {
 		const allUnique = allCountUnique(sources.primaryNameSrcList, useSources.primaryNameSrcList);
                 const singlePrimaryNc = useNcData.ncList.length === 1 && useNcData.ncList[0].count === 1;
-                // the problem here is that i'm not ANDing or XORing with only the original clue combos, but
-                // with the accumulation of previously merged used clues
-                // (actually i'm not sure that's a problem at all. that might be by design)
-                
-		// timed; 400ms in 2
+
                 let valid = false;
                 if ((op !== Op.and) && allUnique) { // or, xor
-                    mergedSourcesList.push(mergeSources(sources, useSources, false,/*combined,*/ 'mAUS'));
+                    mergedSourcesList.push(mergeSources(sources, useSources, false, 'mAUS'));
                     valid = true;
                 }
                 if (!valid && (op === Op.or)) { // or, (and if:  op !== Op.xor)
@@ -403,25 +360,12 @@ function mergeAllUsedSources (sourcesList, useNcDataList, op) {
 			}
 		    }
                 }
-                /* don't remove
-                if (valid) {
-                    // TODO: i get the feeling that is merging ncList is not working here, doubling up ncList when merging face,card
-                    //
-                    // need to think deeply here. the correct logic is an optimization
-                    //
-                    if (op === Op.xor || ((op === Op.or) && !allCommonPrimarySources)) {
-                        mergedSourcesList.push(mergeSources(sources, useSources));
-                    }
-                }
-                */
-		/*
                 if (logging>3 || (valid && logging>2)) {
                     console.log(`  valid: ${valid}, useNcList: ${useNcData.ncList}, op: ${OpName(op)}`);
                     console.log(`    sources:   ${showNcLists(sources.srcNcLists)}, primary: ${sources.primaryNameSrcList}`);
                     console.log(`    useNcList: ${useNcData.ncList}, primary: ${useSources.primaryNameSrcList}`);
                     //console.log(`    distinct: ${distinct}, singlePrimaryNc: ${singlePrimaryNc}`);
                 }
-		*/
             }
         }
         sourcesList = mergedSourcesList;
@@ -431,7 +375,7 @@ function mergeAllUsedSources (sourcesList, useNcDataList, op) {
 }
 
 // TODO: call once per outer iteration (from clues.js) vs. every iteration
-
+//
 let getCompatibleUseNcDataSources = (args) => {
     let hashList = [];
     let sourcesLists = [];
@@ -489,7 +433,98 @@ let getCompatibleUseNcDataSources = (args) => {
     return xorSourcesList;
 };
 
-let hash = {};
+//
+//
+let nextIndex = function(clueSourceList, sourceIndexes) {
+    // increment last index
+    let index = sourceIndexes.length - 1;
+    ++sourceIndexes[index];
+
+    // while last index is maxed reset to zero, increment next-to-last index, etc.
+    while (sourceIndexes[index] === clueSourceList[index].list.length) {
+        sourceIndexes[index] = 0;
+        if (--index < 0) {
+            return false;
+        }
+        ++sourceIndexes[index];
+    }
+    return true;
+};
+
+//
+//
+let next = function(clueSourceList, sourceIndexes, options = {}) {
+    for (;;) {
+        if (!nextIndex(clueSourceList, sourceIndexes, options)) {
+            return { done: true };
+        }
+        let ncList = [];          // e.g. [ { name: "pollock", count: 2 }, { name: "jackson", count: 4 } ]
+        let nameList = [];        // e.g. [ "pollock", "jackson" ]
+        let srcCountStrList = []; // e.g. [ "white,fish:2", "moon,walker:4" ]
+        if (!clueSourceList.every((clueSource, index) => {
+            let clue = clueSource.list[sourceIndexes[index]];
+            if (clue.ignore || clue.skip) {
+                return false; // every.exit
+            }
+            nameList.push(clue.name);
+            // I think this is right
+            ncList.push(NameCount.makeNew(clue.name, clueSource.count));
+            srcCountStrList.push(NameCount.makeCanonicalName(clue.src, clueSource.count));
+            return true; // every.continue;
+        })) {
+            continue;
+        }
+        nameList.sort();
+
+	/*
+        // skip combinations we've already checked
+        let skip = false;
+
+        if (skip && !addComboToFoundHash(nameList.toString())) continue; // already checked
+
+        // skip combinations that have duplicate source:count
+        if (!options.allow_dupe_src) {
+            if (skip && _.uniq(srcCountStrList).length !== srcCountStrList.length) {
+                continue;
+            }
+        }
+        // skip combinations that have duplicate names
+        if (skip && _.sortedUniq(nameList).length !== nameList.length) {
+            continue;
+        }
+	*/
+
+        return {
+            done:     false,
+            ncList:   ncList.sort(),
+            nameList: nameList
+        };
+    }
+};
+
+//
+//
+let first = function(clueSourceList, sourceIndexes, options = {}) {
+    for (let index = 0; index < clueSourceList.length; ++index) {
+        sourceIndexes[index] = 0;
+    }
+    sourceIndexes[sourceIndexes.length - 1] = -1;
+    return next(clueSourceList, sourceIndexes, options);
+};
+
+/*
+//
+//
+let addComboToFoundHash = function(nameListCsv) {
+    if (testSetKey(hash, nameListCsv)) {
+        hash[nameListCsv] = true;
+        return true;
+    }
+    //Debug('skipping duplicate combo: ' + nameListCsv);
+    nextDupeCombo += 1;
+    return false;
+};
+*/
 
 let isCompatibleWithUseSources = (sources, useSources) => {
     for (let source of sources) {
@@ -504,7 +539,8 @@ let isCompatibleWithUseSources = (sources, useSources) => {
 //
 // NEW NEW NEW
 //
-ComboMaker.prototype.getCombosForUseNcLists = function(args, options = {}) {
+let getCombosForUseNcLists = function(args, options = {}) {
+    let hash = {};
     let combos = [];
 
     let comboCount = 0;
@@ -512,7 +548,10 @@ ComboMaker.prototype.getCombosForUseNcLists = function(args, options = {}) {
     let cacheHitCount = 0;
     let numIncompatible = 0;
     
-    let useSources = getCompatibleUseNcDataSources(args);
+    let MILLY = 1000000n;
+    let start = process.hrtime.bigint();
+
+    let useSources = args.useSources;
     if (0) console.log(`compatibleUseNcDataSources: ${Stringify2(useSources)}`);
 
     // for each sourceList in sourceListArray
@@ -525,15 +564,15 @@ ComboMaker.prototype.getCombosForUseNcLists = function(args, options = {}) {
 
 	//console.log(`sum(${args.sum}) max(${args.max}) clueSrcList: ${Stringify(clueSourceList)}`);
 
-        let result = this.first(clueSourceList, sourceIndexes);
+        let result = first(clueSourceList, sourceIndexes);
         if (result.done) return; // continue; 
 
 	let variationCount = 1;
 
         // this is effectively Peco.getCombinations().forEach()
-	let first = true;
+	let firstIter = true;
         while (!result.done) {
-            if (!first) {
+            if (!firstIter) {
 		// TODO problem 1:
 		// problem1: why is this (apparently) considering the first two entries of the same
 		// clue count (e.g. red, red). It doesn't matter when the clue counts are different,
@@ -541,23 +580,20 @@ ComboMaker.prototype.getCombosForUseNcLists = function(args, options = {}) {
 		// the two lists are equal at time of get'ing (getClueSourceListArray) such that
 		// we could optimize this.next for this condition?
 		// timed; 58s in 2
-                result = this.next(clueSourceList, sourceIndexes, options);
+                result = next(clueSourceList, sourceIndexes, options);
                 if (result.done) break;
 		variationCount += 1;
             } else {
-                first = false;
+		firstIter = false;
             }
             //console.log(`result.nameList: ${result.nameList}`);
             //console.log(`result.ncList: ${result.ncList}`);
-
-	    //if (result.ncList.length == 2 && result.ncList[0].name == "red" && result.ncList[1].name == "red") logging = 5;
 
 	    // TODO problem 2:
 	    // wouldn't it (generally) be (a lot) faster to check for UseNcList compatability before
 	    // merging all compatible sources? (We'd have to do it again after merging, presumably).
 
 	    const key = NameCount.listToString(result.ncList);
-	    //const strList = _.sortBy(result.ncList, _.toString).toString();
 	    let sources;
 	    // TOOD: removing hash would be nice. filter "list" for uniqueness. (requires we have a list first)
 	    if (!hash[key]) {
@@ -587,10 +623,13 @@ ComboMaker.prototype.getCombosForUseNcLists = function(args, options = {}) {
 	totalVariationCount += variationCount;
     }, this);
 
+    let duration = (process.hrtime.bigint() - start) / MILLY;
+
     Debug(`combos(${comboCount}) variations(${totalVariationCount}) cacheHits(${cacheHitCount}) incompatible(${numIncompatible}) ` +
 	  `actual(${totalVariationCount - cacheHitCount - numIncompatible})`);
     console.error(`combos(${comboCount}) variations(${totalVariationCount}) cacheHits(${cacheHitCount}) incompatible(${numIncompatible}) ` +
-	      `actual(${totalVariationCount - cacheHitCount - numIncompatible})`);
+		  `actual(${totalVariationCount - cacheHitCount - numIncompatible}) ${duration}ms`);
+    //process.stderr.write('.');
 
     return combos;
 };
@@ -607,49 +646,99 @@ ComboMaker.prototype.getCombosForUseNcLists = function(args, options = {}) {
 // object that contains a list (cluelist) and a count, such as
 // [ { list:clues1, count:1 },{ list:clues2, count:2 }].
 //
-ComboMaker.prototype.makeCombos = function(args, options = {}) {
-    this.nextDupeClue = 0;
-    this.nextDupeSrc = 0;
-    this.nextDupeCombo = 0;
-
+let makeCombosForSum = function(args, options = {}) {
     if (_.isUndefined(args.maxResults)) {
         args.maxResults = 50000;
     }
 
     // TODO USE "validateArgs" 
-
     let require = args.require ? _.clone(args.require) : [];
     if (!_.isEmpty(args.require)) throw new Error('require not yet supported');
     if (args.sources) throw new Error('sources not yet supported');
 
-    this.hash = {};
     let allCombos = [];
-
-    let allXorNcDataLists = args.xor ? buildAllUseNcDataLists(args.xor) : [ [] ];
-//    console.log(`allXorNcDataLists: ${Stringify2(allXorNcDataLists)}`);
-    let allAndNcDataLists = args.and ? buildAllUseNcDataLists(args.and) : [ [] ];
-    let allOrNcDataLists = args.or ? buildAllUseNcDataLists(args.or) : [ [] ];
 
     let comboArgs = {
         sum: args.sum,
         max: args.max,
-	allXorNcDataLists,
-	allAndNcDataLists,
-	allOrNcDataLists
+	allXorNcDataLists: args.allXorNcDataLists,
+	allAndNcDataLists: args.allAndNcDataLists,
+	allOrNcDataLists: args.allOrNcDataLists,
+	useSources: args.useSources
     };
     
-    let combos = this.getCombosForUseNcLists(comboArgs, options);
+    let combos = getCombosForUseNcLists(comboArgs, options);
     allCombos.push(...combos);
 
     Debug(`timing: ${PrettyMs(timing)}  one: ${PrettyMs(one)} two: ${PrettyMs(two)} three: ${PrettyMs(three)} four: ${PrettyMs(four)}`);
-
     return allCombos;
+};
+
+//
+//
+let makeCombos = (args, options) => {
+    let sumRange;
+    if (!_.isUndefined(args.sum)) {
+	// is _chain even necessary here?
+        sumRange = _.chain(args.sum).split(',').map(_.toNumber).value();
+    }
+    Expect(sumRange).is.an.Array().with.property('length').below(3); // of.at.most(2);
+    Debug('++combos' +
+          `, sum: ${sumRange}` +
+          `, max: ${args.max}` +
+//          `, require: ${args.require}` +
+//          `, sources: ${args.sources}` +
+          `, use: ${args.use}`);
+    
+    let total = 0;
+    let known = 0;
+    let reject = 0;
+    let duplicate  = 0;
+    let comboMap = {};
+    let beginDate = new Date();
+
+    args.allXorNcDataLists = args.xor ? buildAllUseNcDataLists(args.xor) : [ [] ];
+    //console.log(`allXorNcDataLists: ${Stringify2(args.allXorNcDataLists)}`);
+    args.allAndNcDataLists = args.and ? buildAllUseNcDataLists(args.and) : [ [] ];
+    args.allOrNcDataLists = args.or ? buildAllUseNcDataLists(args.or) : [ [] ];
+    args.useSources = getCompatibleUseNcDataSources(args);
+
+    let lastSum = sumRange.length > 1 ? sumRange[1] : sumRange[0];
+    for (let sum = sumRange[0]; sum <= lastSum; ++sum) {
+        args.sum = sum;
+        let max = args.max;
+        if (args.max > args.sum) args.max = args.sum;
+        // TODO: return # of combos filtered due to note name match
+        const comboList = makeCombosForSum(args, options);
+        args.max = max;
+        total += comboList.length;
+        const filterResult = ClueManager.filter(comboList, args.sum, comboMap);
+        known += filterResult.known;
+        reject += filterResult.reject;
+        duplicate += filterResult.duplicate;
+    }
+    let d = new Duration(beginDate, new Date()).milliseconds;
+    _.keys(comboMap).forEach(nameCsv => console.log(nameCsv));
+    //console.log(`${Stringify(comboMap)}`);
+    
+    //process.stderr.write('\n');
+
+    Debug(`total: ${total}` +
+                ', filtered: ' + _.size(comboMap) +
+                ', known: ' + known +
+                ', reject: ' + reject +
+                ', duplicate: ' + duplicate);
+    Debug(`--combos: ${PrettyMs(d)}`);
+
+    if (total !== _.size(comboMap) + known + reject + duplicate) {
+        Debug('WARNING: amounts to not add up!');
+    }
 };
 
 // As long as one final result has only primary sources from 'sources'
 // array, we're good.
 
-ComboMaker.prototype.checkPrimarySources = function(resultList, sources) {
+let checkPrimarySources = function(resultList, sources) {
     return resultList.some(result => {
         return NameCount.makeCountList(result.nameSrcList)
             .every(source => {
@@ -732,7 +821,7 @@ function buildAllUseNcDataLists (useArgsList) {
 }
 
 //
-
+//
 function buildUseNcLists (useArgsList) {
     let useNcLists = [];
     useArgsList.forEach(useArg =>  {
@@ -750,7 +839,7 @@ function buildUseNcLists (useArgsList) {
 
 //
 //
-ComboMaker.prototype.hasUniqueClues = function(clueList) {
+let hasUniqueClues = function(clueList) {
     let sourceMap = {};
     for (let clue of clueList) {
         if (isNaN(clue.count)) {
@@ -759,7 +848,7 @@ ComboMaker.prototype.hasUniqueClues = function(clueList) {
         else if (clue.count > 1) {
             // nothing?
         }
-        else if (!this.testSetKey(sourceMap, clue.src)) {
+        else if (!testSetKey(sourceMap, clue.src)) {
             return false; // forEach.continue... ..why?
         }
     }
@@ -767,16 +856,16 @@ ComboMaker.prototype.hasUniqueClues = function(clueList) {
 };
 
 //
-
-ComboMaker.prototype.testSetKey = function(map, key, value = true) {
+//
+let testSetKey = function(map, key, value = true) {
     if (_.has(map, key)) return false;
     map[key] = value;
     return true;
 };
 
 //
-
-ComboMaker.prototype.displaySourceListArray = function(sourceListArray) {
+//
+let displaySourceListArray = function(sourceListArray) {
     console.log('-----\n');
     sourceListArray.forEach(function(sourceList) {
         sourceList.forEach(function(source) {
@@ -788,102 +877,8 @@ ComboMaker.prototype.displaySourceListArray = function(sourceListArray) {
 };
 
 //
-
-ComboMaker.prototype.first = function(clueSourceList, sourceIndexes, options = {}) {
-    for (let index = 0; index < clueSourceList.length; ++index) {
-        sourceIndexes[index] = 0;
-    }
-    sourceIndexes[sourceIndexes.length - 1] = -1;
-    return this.next(clueSourceList, sourceIndexes, options);
-};
-
 //
-
-ComboMaker.prototype.next = function(clueSourceList, sourceIndexes, options = {}) {
-    for (;;) {
-        if (!this.nextIndex(clueSourceList, sourceIndexes, options)) {
-            return { done: true };
-        }
-        let ncList = [];          // e.g. [ { name: "pollock", count: 2 }, { name: "jackson", count: 4 } ]
-        let nameList = [];        // e.g. [ "pollock", "jackson" ]
-        let srcCountStrList = []; // e.g. [ "white,fish:2", "moon,walker:4" ]
-        if (!clueSourceList.every((clueSource, index) => {
-            let clue = clueSource.list[sourceIndexes[index]];
-            if (clue.ignore || clue.skip) {
-                return false; // every.exit
-            }
-            nameList.push(clue.name);
-            // I think this is right
-            ncList.push(NameCount.makeNew(clue.name, clueSource.count));
-            srcCountStrList.push(NameCount.makeCanonicalName(clue.src, clueSource.count));
-            return true; // every.continue;
-        })) {
-            continue;
-        }
-
-        nameList.sort();
-        // skip combinations we've already checked
-        let skip = false;
-
-        if (skip && !this.addComboToFoundHash(nameList.toString())) continue; // already checked
-
-        // skip combinations that have duplicate source:count
-        if (!options.allow_dupe_src) {
-            if (skip && _.uniq(srcCountStrList).length !== srcCountStrList.length) {
-                //Debug('skipping duplicate clue src: ' + srcCountStrList);
-                ++this.nextDupeSrc;
-                continue;
-            }
-        }
-
-        // skip combinations that have duplicate names
-        if (skip && _.sortedUniq(nameList).length !== nameList.length) {
-            //Debug('skipping duplicate clue name: ' + nameList);
-            ++this.nextDupeClue; // TODO: DupeName
-            continue;
-        }
-
-        return {
-            done:     false,
-            ncList:   ncList.sort(),
-            nameList: nameList
-        };
-    }
-};
-
-//
-//
-ComboMaker.prototype.addComboToFoundHash = function(nameListCsv) {
-    if (this.testSetKey(this.hash, nameListCsv)) {
-        this.hash[nameListCsv] = true;
-        return true;
-    }
-    //Debug('skipping duplicate combo: ' + nameListCsv);
-    this.nextDupeCombo += 1;
-    return false;
-};
-
-//
-//
-ComboMaker.prototype.nextIndex = function(clueSourceList, sourceIndexes) {
-    // increment last index
-    let index = sourceIndexes.length - 1;
-    ++sourceIndexes[index];
-
-    // while last index is maxed reset to zero, increment next-to-last index, etc.
-    while (sourceIndexes[index] === clueSourceList[index].list.length) {
-        sourceIndexes[index] = 0;
-        if (--index < 0) {
-            return false;
-        }
-        ++sourceIndexes[index];
-    }
-    return true;
-};
-
-//
-//
-ComboMaker.prototype.displayCombos = function(clueListArray) {
+let displayCombos = function(clueListArray) {
     console.log('\n-----\n');
     let count = 0;
     clueListArray.forEach(function(clueList) {
@@ -895,7 +890,7 @@ ComboMaker.prototype.displayCombos = function(clueListArray) {
 
 //
 //
-ComboMaker.prototype.clueListToString = function(clueList) {
+let clueListToString = function(clueList) {
     let str = '';
     clueList.forEach(function(clue) {
         if (str.length > 0) {
@@ -907,4 +902,8 @@ ComboMaker.prototype.clueListToString = function(clueList) {
         }
     });
     return str;
+};
+
+module.exports = {
+    makeCombos
 };
