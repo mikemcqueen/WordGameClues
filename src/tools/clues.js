@@ -168,53 +168,7 @@ function doCombos(args, options) {
 	// is _chain even necessary here?
         args.require = _.chain(args.require).split(',').map(_.toNumber).value();
     }
-    let sumRange;
-    if (!_.isUndefined(args.sum)) {
-	// is _chain even necessary here?
-        sumRange = _.chain(args.sum).split(',').map(_.toNumber).value();
-    }
-    Expect(sumRange).is.an.Array().with.property('length').below(3); // of.at.most(2);
-    Debug('++combos' +
-          `, sum: ${sumRange}` +
-          `, max: ${args.max}` +
-//          `, require: ${args.require}` +
-//          `, sources: ${args.sources}` +
-          `, use: ${args.use}`);
-    
-    let total = 0;
-    let known = 0;
-    let reject = 0;
-    let duplicate  = 0;
-    let comboMap = {};
-    let beginDate = new Date();
-    let lastSum = sumRange.length > 1 ? sumRange[1] : sumRange[0];
-    for (let sum = sumRange[0]; sum <= lastSum; ++sum) {
-        args.sum = sum;
-        let max = args.max;
-        if (args.max > args.sum) args.max = args.sum;
-        // TODO: return # of combos filtered due to note name match
-        const comboList = ComboMaker.makeCombos(args, options);
-        args.max = max;
-        total += comboList.length;
-        const filterResult = ClueManager.filter(comboList, args.sum, comboMap);
-        known += filterResult.known;
-        reject += filterResult.reject;
-        duplicate += filterResult.duplicate;
-    }
-    let d = new Duration(beginDate, new Date()).milliseconds;
-    _.keys(comboMap).forEach(nameCsv => console.log(nameCsv));
-    //console.log(`${Stringify(comboMap)}`);
-    
-    Debug(`total: ${total}` +
-                ', filtered: ' + _.size(comboMap) +
-                ', known: ' + known +
-                ', reject: ' + reject +
-                ', duplicate: ' + duplicate);
-    Debug(`--combos: ${PrettyMs(d)}`);
-
-    if (total !== _.size(comboMap) + known + reject + duplicate) {
-        Debug('WARNING: amounts to not add up!');
-    }
+    ComboMaker.makeCombos(args, options);
 }
 
 //
