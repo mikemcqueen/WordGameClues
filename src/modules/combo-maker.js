@@ -15,21 +15,25 @@ const NameCount   = require('../types/name-count');
 const Peco        = require('./peco');
 const PrettyMs    = require('pretty-ms');
 const ResultMap   = require('../types/result-map');
+const stringify   = require('javascript-stringify').stringify;
 const Stringify2  = require('stringify-object');
 const Validator   = require('./validator');
-const stringify = require('javascript-stringify').stringify;
 
 function Stringify(val) {
     return stringify(val, (value, indent, stringify) => {
-	if (typeof value == 'function') return "function";
-	return stringify(value);
+        if (typeof value == 'function') return "function";
+        return stringify(value);
     }, " ");
 }
 
 let logging = 0;
 let loggy = false;
 
-const Op = { 'and':1, 'or':2, 'xor':3 };
+const Op = {
+    'and':1,
+    'or':2,
+    'xor':3
+};
 Object.freeze(Op);
 
 function OpName (opValue) {
@@ -60,7 +64,6 @@ function OpName (opValue) {
 //     'face:10'
 //   ]
 // }
-
 function recursiveAddSrcNcLists (list, resultMap, top) {
     let keys = _.flatMap(_.keys(resultMap), key => {
         let val = resultMap[key];
@@ -84,8 +87,8 @@ function recursiveAddSrcNcLists (list, resultMap, top) {
         keys.forEach(key => {
             let val = resultMap[key];
             if (val && !_.isArray(val)) {
-		recursiveAddSrcNcLists(list, val, false);
-	    }
+                recursiveAddSrcNcLists(list, val, false);
+            }
         });
     }
     return list;
@@ -100,24 +103,24 @@ function getSourcesList (nc) {
     ClueManager.getKnownSourceMapEntries(nc).forEach(entry => {
         entry.results.forEach(result => {
             ClueManager.primaryNcListToNameSrcLists(result.ncList).forEach(primaryNameSrcList => {
-		let ncStr = nc.toString();
-		if (0 && (ncStr == 'berry:2')) loggy = true;
+                let ncStr = nc.toString();
+                if (0 && (ncStr == 'berry:2')) loggy = true;
                 let source = {
                     ncList: result.ncList,
-		    primaryNameSrcList,
+                    primaryNameSrcList,
                     srcNcLists: result.resultMap ? buildSrcNcLists(result.resultMap.map()) : [result.ncList]
-		};
-		if (NameCount.count(nc) > 1) {
-		    // TODO: for completeness' sake, i suppose I should find all peers (same count) of 'nc' that have same primary sources.
-		    // Achievable by just looking at resultMap?
-		    if (loggy) console.log(`$(ncStr): srcNcLists: ${Stringify2(source.srcNcLists)}\n,resultMap: ${Stringify2(result.resultMap.map())}`);
+                };
+                if (NameCount.count(nc) > 1) {
+                    // TODO: for completeness' sake, i suppose I should find all peers (same count) of 'nc' that have same primary sources.
+                    // Achievable by just looking at resultMap?
+                    if (loggy) console.log(`$(ncStr): srcNcLists: ${Stringify2(source.srcNcLists)}\n,resultMap: ${Stringify2(result.resultMap.map())}`);
                     source.srcNcLists.push([ncStr]);
-		}
+                }
                 if (loggy || logging > 3) {
                     console.log(`getSourcesList() ncList: ${source.ncList}, srcNcLists: ${showNcLists(source.srcNcLists)}`);
                     if (_.isEmpty(source.srcNcLists)) console.log(`empty srcNcList: ${Stringify(result.resultMap.map())}`);
                 }
-		loggy = false;
+                loggy = false;
                 sources.push(source);
             });
         });
@@ -142,144 +145,94 @@ let two = 0;
 let three =  0;
 let four =  0;
 
-// called in inner (inner inner) loops
-function mergeSources (sources1, sources2, mergedPrimaryNameSrcList, prefix = '') {
+let mergeSources = (sources1, sources2) => {
     let mergedSources = {};
     mergedSources.ncList = [...sources1.ncList, ...sources2.ncList];
-    mergedSources.primaryNameSrcList = mergedPrimaryNameSrcList
-	? mergedPrimaryNameSrcList
-	: [...sources1.primaryNameSrcList, ...sources2.primaryNameSrcList];
-    // move to getSourcesLists
-    const srcNcLists1 = sources1.srcNcLists;
-    const srcNcLists2 = sources2.srcNcLists;
-    //if (logging>3) console.log(`${prefix} srcNcLists1: ${showNcLists(srcNcLists1)}`);
-    //if (logging>3) console.log(`${prefix} srcNcLists2: ${showNcLists(srcNcLists2)}`);
-    mergedSources.srcNcLists = [...srcNcLists1, ...srcNcLists2]; // TODO: _uniqBy(, _.toString)? maybe not necessary here
-    //if (logging>2) console.log(`  ${prefix} merged: ${showNcLists(mergedSources.srcNcLists)}`);
+    mergedSources.primaryNameSrcList = [...sources1.primaryNameSrcList, ...sources2.primaryNameSrcList];
+    mergedSources.srcNcLists = [...sources1.srcNcLists, ...sources1.srcNcLists];
     return mergedSources;
-}
+};
 
-// make primaryNameSrcList a set, created in clue-manager
-// instead of intersectionBy, use something like this:
 //
-// TODO: (equal)subsetOrDistinct
 //
-function setsEqualOrDistinct(set1, set2, prefix = '') {
-    let equal = true;
-    let distinct = true;
+let mergeCompatibleSources = (sources1, sources2) => {
+    if (0 || logging>2) console.log(`mergeCompat: nameSrcList1: ${sources1.primaryNameSrcList}, nameSrcList2: ${sources2.primaryNameSrcList}`);
+    const allUnique = allCountUnique(sources1.primaryNameSrcList, sources2.primaryNameSrcList);
+    // wrap one element in an array to simplify !allUnique failure/null condition at caller site
+    return allUnique ? [mergeSources(sources1, sources2, false)] : [];
+};
 
-    let arr1 = [...set1].map(key => key.toString());
-    let arr2 = [...set2].map(key => key.toString());
-    //
-    // Really nice to see this output.  i think there's an optimization here to eliminate calls
-    // with set combinations where either set's total count > N in -cM,N
-    //
-    // console.log(`arr2: ${arr2}`);
-    //
-    let it = 'red:1';
-    let hasit1 = set1.has(it); // _.includes(arr1, it);
-    let hasit2 = set2.has(it); // _.includes(arr2, it);
-    
-    if ((hasit1 || hasit2) && logging) {
-	console.log(`${prefix} - ${arr1}.has(it) = ${hasit1}, ${arr2}.has(it) = ${hasit2}`);
-    }
-
-    if (set1.size !== set2.size) equal = false;
-    let eod = set1.forEach(nameSrc => {
-	//console.log(`  ns: ${nameSrc}`);
-	if (set2.has(nameSrc)) {
-	    distinct = false;
-	} else {
-	    equal = false;
-	}
-	//return equal || distinct;
-    });
-    if (logging && (hasit1 || hasit2)) {
-	console.log(`  eod: ${eod} equal: ${equal} distinct: ${distinct}`);
-    }
-    return { equal, distinct };
-}
-
-function mergeCompatibleSourcesLists (sources1, sources2, prefix = '') { // TODO sourcesList1, sourcesList2
-    let mergedSources = []; // TODO mergedSourcesList
-    for (const entry1 of sources1) { // TODO sources1 of sourcesList1
-        for (const entry2 of sources2) { // TODO sources2 of sourcesList2
-            if (0 || logging>2) console.log(`mergeCompat: nameSrcList1: ${entry1.primaryNameSrcList}, nameSrcList2: ${entry2.primaryNameSrcList}`);
-	    
-	    // Same "partial match" trap exists here as in mergeAllUsedSources below.
-	    // Here, we are merging multiple comma-separated sources.
-	    // Example --or pink --or card.
- 	    // red:1 is common, and duplicate so should be allowed, but I believe it won't be.
-	    // Also, out of curiousity, do reults for --or card include robin?
-
-	    //const { equal, distinct } = setsEqualOrDistinct(entry1.primaryNameSrcSet, entry2.primaryNameSrcSet, prefix + '-mCSL');
-	    //if (distinct) {
-	    // if (logging) console.log(`  distinct: ${[...entry1.primaryNameSrcSet]}, ${[...entry2.primaryNameSrcSet]}`);
-
-	    //let allUnique = _.isEmpty(_.intersectionBy(entry1.primaryNameSrcList, entry2.primaryNameSrcList, NameCount.count);
-	    //const uniq = _.uniqBy([...entry1.primaryNameSrcList, ...entry2.primaryNameSrcList], NameCount.count);
-	    //let allUnique = uniq.length === entry1.primaryNameSrcList.length + entry2.primaryNameSrcList.length;
-	    const allUnique = allCountUnique(entry1.primaryNameSrcList, entry2.primaryNameSrcList);
-	    if (allUnique) {
-                mergedSources.push(mergeSources(entry1, entry2, false,/*combined,*/ prefix + '-mCSL'));
-            }
+//
+//
+function mergeCompatibleSourcesLists (sourcesList1, sourcesList2) { // TODO sourcesList1, sourcesList2
+    let mergedSourcesList = [];
+    for (const sources1 of sourcesList1) {
+        for (const sources2 of sourcesList2) {
+            mergedSourcesList.push(...mergeCompatibleSources(sources1, sources2));
         }
     }
-    return mergedSources;
+    return mergedSourcesList;
 }
 
+//
 // see: showNcLists
 let listOfNcListsToString = (listOfNcLists) => {
     if (!listOfNcLists) return _.toString(listOfNcLists);
     let result = "";
     listOfNcLists.forEach((ncList, index) => {
-	if (index > 0) result += ' - ';
-	result += NameCount.listToString(ncList);
+        if (index > 0) result += ' - ';
+        result += NameCount.listToString(ncList);
     });
     return result;
 };
 
+//
+//
 let stringifySources = (sources) => {
     let result = "[\n";
     let first = true;
     for (let source of sources) {
-	if (!first) result += ',\n';
-	else first = false;
-	result += '  {\n';
-	result += `    ncList: ${NameCount.listToString(source.ncList)}\n`;
-	result += `    primaryNameSrcList: ${NameCount.listToString(source.primaryNameSrcList)}\n`;
-	result += `    srcNcLists: ${listOfNcListsToString(source.srcNcLists)}\n`;
-	result += '  }';
+        if (!first) result += ',\n';
+        else first = false;
+        result += '  {\n';
+        result += `    ncList: ${NameCount.listToString(source.ncList)}\n`;
+        result += `    primaryNameSrcList: ${NameCount.listToString(source.primaryNameSrcList)}\n`;
+        result += `    srcNcLists: ${listOfNcListsToString(source.srcNcLists)}\n`;
+        result += '  }';
     }
     return result + "\n]";
 };
 
+//
+//
 function mergeAllCompatibleSources (ncList, prefix = "") {
     Expect(ncList.length).is.above(0).and.below(3); // because broken for > 2 below
     //console.log(Stringify(ncList));
     let sources = getSourcesList(ncList[0]);
     loggy = 0 && ncList[0].name == "wood";
     if (loggy) {
-	console.log('*******************MERGE ACS***********************');
-	console.log(`** ncList: ${ncList}`);
-	console.log('***************************************************');
-	console.log(`** sources:\n${stringifySources(sources)}`);
+        console.log('*******************MERGE ACS***********************');
+        console.log(`** ncList: ${ncList}`);
+        console.log('***************************************************');
+        console.log(`** sources:\n${stringifySources(sources)}`);
     }
     loggy = false;
     for (let ncIndex = 1; ncIndex < ncList.length; ncIndex += 1) {
         const nextSources = getSourcesList(ncList[ncIndex]);
-	// already timed, 30ms
+        // already timed, 30ms
         sources = mergeCompatibleSourcesLists(sources, nextSources, prefix + '-mACS');
-	if (0) {
-	    console.log(`** merging index: ${ncIndex}, ${ncList[ncIndex]} as nextSources:`);
-	    console.log(`${stringifySources(nextSources)}`);
-	    console.log(`** result:\n${stringifySources(sources)}`);
-	}
+        if (0) {
+            console.log(`** merging index: ${ncIndex}, ${ncList[ncIndex]} as nextSources:`);
+            console.log(`${stringifySources(nextSources)}`);
+            console.log(`** result:\n${stringifySources(sources)}`);
+        }
         if (_.isEmpty(sources)) break; // this is broken for > 2; should be something like: if (sources.length !== ncIndex + 1) 
     }
     return sources;
 }
 
+//
+//
 function matchAnyNcList (ncList, matchNcLists) {
     for (const matchNcList of matchNcLists) {
         const matchLength = _.intersectionBy(ncList, matchNcList, _.toString).length;
@@ -288,77 +241,61 @@ function matchAnyNcList (ncList, matchNcLists) {
     return false;
 }
 
+//
+//
 function allCountUnique (nameSrcList1, nameSrcList2) {
     // Uh. use a Set? This is called from within an inner loop.
     let hash = {};
     for (let nameSrc of nameSrcList1) {
-	hash[nameSrc.count] = true;
+        hash[nameSrc.count] = true;
     }
     for (let nameSrc of nameSrcList2) {
-	if (hash[nameSrc.count] === true) return false;
+        if (hash[nameSrc.count] === true) return false;
     }
     return true;
 }
 
-//
-// useNcLists:
-//
-//
-// useNcList:
-//
-//
 // sourcesList, list of:
-//   ncList    (primary NC list)
-//   resultMap
+//   ncList = NC list
 //   primaryNameSrcLists = list of all possible primary NameSrcLists which ncList resolves to
-//   primarySrcLists = list of all SrcLists derived from NameSrcLists
 //   srcNcLists = result.resultMap ? buildSrcNcLists(result.resultMap.map()) : [result.ncList];
-//
-// sources:
-//   one entry from sources list
-//
-// useSourcesList:
-//
-//
-// useSources:
-//
 //
 function mergeAllUsedSources (sourcesList, useNcDataList, op) {
     for (let useNcData of useNcDataList) {
         let mergedSourcesList = [];
 
-	if (!useNcData.sourcesList) {
-            useNcData.sourcesList = mergeAllCompatibleSources(useNcData.ncList, 'mAUS');
-	}
+        if (!useNcData.sourcesList) {
+            useNcData.sourcesList = mergeAllCompatibleSources(useNcData.ncList);
+        }
         for (let useSources of useNcData.sourcesList) {
             for (let sources of sourcesList) {
-		const allUnique = allCountUnique(sources.primaryNameSrcList, useSources.primaryNameSrcList);
+                const allUnique = allCountUnique(sources.primaryNameSrcList, useSources.primaryNameSrcList);
                 const singlePrimaryNc = useNcData.ncList.length === 1 && useNcData.ncList[0].count === 1;
 
                 let valid = false;
                 if ((op !== Op.and) && allUnique) { // or, xor
-                    mergedSourcesList.push(mergeSources(sources, useSources, false, 'mAUS'));
+                    mergedSourcesList.push(mergeSources(sources, useSources, false));
                     valid = true;
                 }
                 if (!valid && (op === Op.or)) { // or, (and if:  op !== Op.xor)
-		    // this appears to be an optimization.  this will match primary clues which have multiple names but same source #
-		    // i.e. synonyms/homonyms/different defintions. probably a better way, but probably rare that this matters.
-		    const numCommonPrimaryCount = _.intersectionBy(sources.primaryNameSrcList, useSources.primaryNameSrcList, NameCount.count).length;
-		    if (numCommonPrimaryCount === useSources.primaryNameSrcList.length) {
-			// technically, there is a possibility here that that --or sources
-			// could split across matching/not matching primary sources, in the
-			// case where there is a duplicate entry for a particular source
-			// component's COUNT value.
-			// Example: --or card = red:1,bird:1, matching sources red:1,anotherword:1 
-			// Because red:1 is a partial match, I believe we'd fail to merge
-			// the remaining source (anotherword:1).
-			// I think we fall into the same trap in mergeCompatibleSourcesLists.
-			if (singlePrimaryNc || matchAnyNcList(useNcData.ncList, sources.srcNcLists)) {
-			    Debug(`--or match: ${useNcData.ncList} with something`);
-			    mergedSourcesList.push(sources);
+                    // this appears to be an optimization.  this will match primary clues which have multiple names but same source #
+                    // i.e. synonyms/homonyms/different defintions. probably a better way, but probably rare that this matters.
+                    const numCommonPrimaryCount = _.intersectionBy(sources.primaryNameSrcList, useSources.primaryNameSrcList, NameCount.count).length;
+                    if (numCommonPrimaryCount === useSources.primaryNameSrcList.length) {
+                        // technically, there is a possibility here that that --or sources
+                        // could split across matching/not matching primary sources, in the
+                        // case where there is a duplicate entry for a particular source
+                        // component's COUNT value.
+                        // Example: --or card = red:1,bird:1, matching sources red:1,anotherword:1 
+                        // Because red:1 is a partial match, I believe we'd fail to merge
+                        // the remaining source (anotherword:1).
+                        // I think we fall into the same trap in mergeCompatibleSourcesLists.
+                        if (singlePrimaryNc || matchAnyNcList(useNcData.ncList, sources.srcNcLists)) {
+                            Debug(`--or match: ${useNcData.ncList} with something`);
+                            mergedSourcesList.push(sources);
                             valid = true;
-			}
-		    }
+                        }
+                    }
                 }
                 if (logging>3 || (valid && logging>2)) {
                     console.log(`  valid: ${valid}, useNcList: ${useNcData.ncList}, op: ${OpName(op)}`);
@@ -374,63 +311,238 @@ function mergeAllUsedSources (sourcesList, useNcDataList, op) {
     return sourcesList;
 }
 
-// TODO: call once per outer iteration (from clues.js) vs. every iteration
 //
-let getCompatibleUseNcDataSources = (args) => {
-    let hashList = [];
+//
+let buildUseSourcesLists = (useNcDataLists) => {
     let sourcesLists = [];
-    //console.log(`allxorncdatalists(${args.allXorNcDataLists.length}): ${Stringify2(args.allXorNcDataLists)}`);
-    for (let [dataListIndex, xorNcDataList] of args.allXorNcDataLists.entries()) {
-	for (let [sourcesListIndex, xorNcData] of xorNcDataList.entries()) {
-	    if (!sourcesLists[sourcesListIndex]) sourcesLists.push([]);
-	    if (!hashList[sourcesListIndex]) hashList.push({});
-	    //console.log(`ncList: ${NameCount.listToString(xorNcData.ncList)}`);
-	    let sourcesList = mergeAllCompatibleSources(xorNcData.ncList, 'gCuNcDS');
-	    for (let sources of sourcesList) {
-		let key = sources.primaryNameSrcList.map(_.toString).sort().toString();
-		if (!hashList[sourcesListIndex][key]) {
-		    sourcesLists[sourcesListIndex].push(sources);
-		    hashList[sourcesListIndex][key] = true;
-		}
-	    }
-	}
+    let hashList = [];
+    //console.log(`useNcDataLists(${useNcDataLists.length}): ${Stringify2(useNcDataLists)}`);
+    for (let [dataListIndex, useNcDataList] of useNcDataLists.entries()) {
+        for (let [sourcesListIndex, useNcData] of useNcDataList.entries()) {
+            if (!sourcesLists[sourcesListIndex]) sourcesLists.push([]);
+            if (!hashList[sourcesListIndex]) hashList.push({});
+            //console.log(`ncList: ${NameCount.listToString(useNcData.ncList)}`);
+            let sourcesList = mergeAllCompatibleSources(useNcData.ncList);
+            //console.log(`sourcesList(${sourcesList.length}): ${Stringify2(sourcesList)}`);
+            for (let sources of sourcesList) {
+                let key = sources.primaryNameSrcList.map(_.toString).sort().toString();
+                if (!hashList[sourcesListIndex][key]) {
+                    sourcesLists[sourcesListIndex].push(sources);
+                    hashList[sourcesListIndex][key] = true;
+                }
+            }
+        }
     }
-    let listArray = sourcesLists.map(sl => [...Array(sl.length).keys()]);
+    return sourcesLists;
+};
+
+//
+//
+let mergeCompatibleUseSources = (sourcesLists, op) => {
+    ///
+    // TODO: so I think i can share a lot of this
+    // Pass OpType here, if Xor, same as always, if Or:
+    // *X  add 1 to each array;
+    // *X  index 0 = continue
+    // *X  index sourcesList array by sourceIndex - 1
+    // No:? It's looking like Yes Maybe
+    // *  call mergeSources on successful combinedNameSrcList
+    // *    and add those mergedSources to the final result entry
+    // Sorta:? Yah Maybe
+    // *  in effect "primaryNameSrcList" now becomes "sources"
+    // *    as a result of calling mergeSources (which does the 
+    // *    primary merge for us
+    //
+    // return list of primaryNameSrc+sources lists as always.
+
+    // TODO: sometimes a sourcesList is empty, like if doing $(cat required) with a
+    // low clue count range (e.g. -c2,4). should that even be allowed?
+    let pad = (op === Op.or) ? 1 : 0;
+    let listArray = sourcesLists.map(sl => [...Array(sl.length + pad).keys()]);
     //console.log(`listArray(${listArray.length}): ${Stringify2(listArray)}`);
     //console.log(`sourcesLists(${sourcesLists.length}): ${Stringify2(sourcesLists)}`);
 
     let peco = Peco.makeNew({
-	listArray,
-	max: 99999
+        listArray,
+        max: 99999
     });
 
-    let xorSourcesList = [];
+    // resultList? 
+    let sourcesList = [];
     for (let indexList = peco.firstCombination(); indexList; indexList = peco.nextCombination()) {
-	//console.log(`indexList: ${stringify(indexList)}`);
-	let primaryNameSrcList = [];
-	for (let [listIndex, sourceIndex] of indexList.entries()) {
-	    let sources = sourcesLists[listIndex][sourceIndex];
-	    //console.log(Stringify2(sources));
-	    if (_.isEmpty(primaryNameSrcList)) {
-		// or just = sources.pnsl.sort(); ?
-		primaryNameSrcList.push(...sources.primaryNameSrcList); // .sort((a, b) => { return a.count - b.count; }));
-	    } else {
-		let combinedNameSrcList = primaryNameSrcList.concat(sources.primaryNameSrcList);
-		if (_.uniqBy(combinedNameSrcList, NameCount.count).length === combinedNameSrcList.length) {
-		    primaryNameSrcList = combinedNameSrcList; // .sort
-		} else {
-		    primaryNameSrcList = [];
-		    break;
-		}
-	    }
-	}
-	if (!_.isEmpty(primaryNameSrcList)) {
-	    xorSourcesList.push({ primaryNameSrcList });
-	}
-    }
+        //console.log(`indexList: ${stringify(indexList)}`);
+        let primaryNameSrcList = [];
+        let result = {
+            primaryNameSrcList: [],
+            sourcesLists: []
+        };
+        for (let [listIndex, sourceIndex] of indexList.entries()) {
+            if (op === Op.or) {
+                if (sourceIndex === 0) {
+                    result.sourcesLists.push(sourcesLists[listIndex]);
+                    continue;
+                }
+                --sourceIndex;
+            }
+            let sources = sourcesLists[listIndex][sourceIndex];
+            //console.log(Stringify2(sources));
 
-    //console.log(`%% xorSourcesLists(${xorSourcesLists.length}): ${Stringify2(xorSourcesLists)}`);
-    return xorSourcesList;
+            //
+            // TODO: I think i can combine these easily, just separating to not break --xor for now
+            //
+            if (op === Op.xor) {
+                if (_.isEmpty(primaryNameSrcList)) {
+                    // or just = sources.pnsl.sort(); ?
+                    primaryNameSrcList.push(...sources.primaryNameSrcList); // .sort((a, b) => { return a.count - b.count; }));
+                } else {
+                    // TODO: hash of primary sources would be faster here.  inside inner loop.
+                    let combinedNameSrcList = primaryNameSrcList.concat(sources.primaryNameSrcList);
+                    if (_.uniqBy(combinedNameSrcList, NameCount.count).length === combinedNameSrcList.length) {
+                        primaryNameSrcList = combinedNameSrcList; // .sort
+                    } else {
+                        primaryNameSrcList = []; // needed for _.isEmpty() below
+                        break;
+                    }
+                }
+            } else {
+                if (_.isEmpty(result.primaryNameSrcList)) {
+                    // or just = sources.pnsl.sort(); ?
+                    result.primaryNameSrcList.push(...sources.primaryNameSrcList); // .sort((a, b) => { return a.count - b.count; }));
+                    // TODO: might need additional array of something like "primaryNameSrcListParts: []" (for 'or' at least)
+                    // TODO: I think what i actually want to push here, are the sourcesList(s) for the
+                    // --or NCs that did NOT make it into this iteration, e.g. the ones with sourceIndex zero.
+                    // maybe i can just do that at the if sourceIndex === 0 block above.
+                    // result.sourcesList.push(sources);
+                } else {
+                    //
+                    // TODO: 
+                    // add/merge the rest of the sources stuff here too, specifically srcNameList for --or at least
+                    // can maybe be achieved via mergeSources, or a mergeCompatibleSources wrapper around it.
+                    // (the inner loop code of mergeCompatibleSourcesLists)
+                    // something like:
+                    //
+                    // result = mergeCompatibleSource(result, sources);
+                    //
+                    // NOTE: result.primaryNameSrcList will not exist in this case.  should change logic
+                    // in this function to either not require a primaryNameSrcList as the "success" indicator
+                    // (better) or to include an empty-array primaryNameSrcList in the mergeCompatibleSources
+                    // failure return value (worse)
+
+                    // TODO: hash of primary sources would be faster here.  inside inner loop.
+                    let combinedNameSrcList = result.primaryNameSrcList.concat(sources.primaryNameSrcList);
+                    if (_.uniqBy(combinedNameSrcList, NameCount.count).length === combinedNameSrcList.length) {
+                        result.primaryNameSrcList = combinedNameSrcList; // .sort
+                    } else {
+                        result.primaryNameSrcList = []; // needed for _.isEmpty() below
+                        break;
+                    }
+                }
+            }
+        }
+	// ugh. getting uglier by the minute.
+	let pnsl = (op === Op.or) ? result.primaryNameSrcList : primaryNameSrcList;
+        if (!_.isEmpty(pnsl)) {
+            sourcesList.push((op === Op.or) ? result : { primaryNameSrcList });
+        }
+    }
+    //console.log(`%% sourcesList(${sourcesList.length}): ${Stringify2(sourcesList)}`);
+    return sourcesList;
+};
+
+//
+//
+let getUseSourcesList = (ncDataLists, op) => {
+    let loggy = 0; // op === Op.or;
+    if (loggy) console.log(`ncDataLists: ${Stringify2(ncDataLists)}`);
+    if (_.isEmpty(ncDataLists[0])) return [];
+    let sourcesLists = buildUseSourcesLists(ncDataLists);
+    if (loggy) console.log(`buildUseSourcesLists: ${Stringify2(sourcesLists)}`);
+    return mergeCompatibleUseSources(sourcesLists, op);
+};
+
+//
+//
+let getOrSourcesList = (orNcDataLists, xorSourcesList) => {
+    let sourcesLists = buildUseSourcesLists(orNcDataLists);
+    let listArray = sourcesLists.map(sl => [...Array(sl.length).keys()]);
+    //console.log(`listArray(${listArray.length}): ${Stringify2(listArray)}`);
+    //console.log(`sourcesLists(${sourcesLists.length}): ${Stringify2(sourcesLists)}`);
+    let peco = Peco.makeNew({
+        listArray,
+        max: 99999
+    });
+    let orSourcesList = [];
+    for (let indexList = peco.firstCombination(); indexList; indexList = peco.nextCombination()) {
+        //console.log(`indexList: ${stringify(indexList)}`);
+        let primaryNameSrcList = [];
+        for (let [listIndex, sourceIndex] of indexList.entries()) {
+            let sources = sourcesLists[listIndex][sourceIndex];
+            //console.log(Stringify2(sources));
+            if (_.isEmpty(primaryNameSrcList)) {
+                // or just = sources.pnsl.sort(); ?
+                primaryNameSrcList.push(...sources.primaryNameSrcList); // .sort((a, b) => { return a.count - b.count; }));
+            } else {
+                // TODO: hash of primary sources would be faster here.  inside inner loop.
+                let combinedNameSrcList = primaryNameSrcList.concat(sources.primaryNameSrcList);
+                if (_.uniqBy(combinedNameSrcList, NameCount.count).length === combinedNameSrcList.length) {
+                    primaryNameSrcList = combinedNameSrcList; // .sort
+                } else {
+                    primaryNameSrcList = []; // needed for _.isEmpty() below
+                    break;
+                }
+            }
+        }
+        if (!_.isEmpty(primaryNameSrcList)) {
+            orSourcesList.push({ primaryNameSrcList });
+        }
+    }
+    return orSourcesList;
+};
+
+//
+//
+let mergeOrSourcesList = (sourcesList, orSourcesList) => {
+    // nested loops over XorSources, OrSources primaryNameSrcLists,
+    // looking for compatible lists
+    
+    // NOTE: optimization, can be implemented with separate loop, 
+    // (can start with LAST item in list as that should be the one with all
+    // --or options, and if that fails, we can bail)
+    let mergedSourcesList = [];
+    for (let sources of sourcesList) {
+        for (let orSources of orSourcesList) {
+            //
+            // TODO:  call mergeCompatibleSources
+            //
+            let combinedNameSrcList = sources.primaryNameSrcList.concat(orSources.primaryNameSrcList);
+            // possible faulty (rarish) optimization, only checking clue count
+            if (_.uniqBy(combinedNameSrcList, NameCount.count).length === combinedNameSrcList.length) {
+                mergedSourcesList.push({
+                    primaryNameSrcList: combinedNameSrcList,
+                    orSourcesLists: orSources.orSourcesLists  // yeah this terminology will confuse pretty much anymore
+                });
+            }
+        }
+    }
+    return mergedSourcesList;
+};
+
+//
+//
+let getCompatibleUseSourcesFromNcData = (args) => {
+    // XOR first
+    let xorSourcesList = getUseSourcesList(args.allXorNcDataLists, Op.xor);
+    // NOTE: orSourcesList is currently a little different than xor
+    // OR next
+    let orSourcesList = getUseSourcesList(args.allOrNcDataLists, Op.or);
+    //console.log(`orSourcesList: ${Stringify2(orSourcesList)}`);
+
+    // final: merge or with xor
+    let sourcesList = mergeOrSourcesList(xorSourcesList, orSourcesList);
+    //console.log(`mergedOrSourcesList: ${Stringify2(sourcesList)}`);
+    
+    // probably only return one list here, and must check if it's empty in caller
+    return xorSourcesList; //, orSourcesList };
 };
 
 //
@@ -476,7 +588,7 @@ let next = function(clueSourceList, sourceIndexes, options = {}) {
         }
         nameList.sort();
 
-	/*
+        /*
         // skip combinations we've already checked
         let skip = false;
 
@@ -492,7 +604,7 @@ let next = function(clueSourceList, sourceIndexes, options = {}) {
         if (skip && _.sortedUniq(nameList).length !== nameList.length) {
             continue;
         }
-	*/
+        */
 
         return {
             done:     false,
@@ -528,10 +640,10 @@ let addComboToFoundHash = function(nameListCsv) {
 
 let isCompatibleWithUseSources = (sources, useSources) => {
     for (let source of sources) {
-	for (let useSource of useSources) {
-	    const allUnique = allCountUnique(source.primaryNameSrcList, useSource.primaryNameSrcList);
-	    if (allUnique) return true;
-	}
+        for (let useSource of useSources) {
+            const allUnique = allCountUnique(source.primaryNameSrcList, useSource.primaryNameSrcList);
+            if (allUnique) return true;
+        }
     }
     return false;
 };
@@ -559,76 +671,76 @@ let getCombosForUseNcLists = function(args, options = {}) {
         sum: args.sum,
         max: args.max
     }).forEach(clueSourceList => {
-	comboCount += 1;
+        comboCount += 1;
         let sourceIndexes = [];
 
-	//console.log(`sum(${args.sum}) max(${args.max}) clueSrcList: ${Stringify(clueSourceList)}`);
+        //console.log(`sum(${args.sum}) max(${args.max}) clueSrcList: ${Stringify(clueSourceList)}`);
 
         let result = first(clueSourceList, sourceIndexes);
         if (result.done) return; // continue; 
 
-	let variationCount = 1;
+        let variationCount = 1;
 
         // this is effectively Peco.getCombinations().forEach()
-	let firstIter = true;
+        let firstIter = true;
         while (!result.done) {
             if (!firstIter) {
-		// TODO problem 1:
-		// problem1: why is this (apparently) considering the first two entries of the same
-		// clue count (e.g. red, red). It doesn't matter when the clue counts are different,
-		// but when they're the same, we're wasting time. Is there some way to determine if
-		// the two lists are equal at time of get'ing (getClueSourceListArray) such that
-		// we could optimize this.next for this condition?
-		// timed; 58s in 2
+                // TODO problem 1:
+                // problem1: why is this (apparently) considering the first two entries of the same
+                // clue count (e.g. red, red). It doesn't matter when the clue counts are different,
+                // but when they're the same, we're wasting time. Is there some way to determine if
+                // the two lists are equal at time of get'ing (getClueSourceListArray) such that
+                // we could optimize this.next for this condition?
+                // timed; 58s in 2
                 result = next(clueSourceList, sourceIndexes, options);
                 if (result.done) break;
-		variationCount += 1;
+                variationCount += 1;
             } else {
-		firstIter = false;
+                firstIter = false;
             }
             //console.log(`result.nameList: ${result.nameList}`);
             //console.log(`result.ncList: ${result.ncList}`);
 
-	    // TODO problem 2:
-	    // wouldn't it (generally) be (a lot) faster to check for UseNcList compatability before
-	    // merging all compatible sources? (We'd have to do it again after merging, presumably).
+            // TODO problem 2:
+            // wouldn't it (generally) be (a lot) faster to check for UseNcList compatability before
+            // merging all compatible sources? (We'd have to do it again after merging, presumably).
 
-	    const key = NameCount.listToString(result.ncList);
-	    let sources;
-	    // TOOD: removing hash would be nice. filter "list" for uniqueness. (requires we have a list first)
-	    if (!hash[key]) {
-		sources = mergeAllCompatibleSources(result.ncList, 'c4UNCL');
-		//console.log(`$$ sources: ${Stringify2(sources)}`);
-		hash[key] = { sources };
-	    } else {
-		sources = hash[key].sources;
-		cacheHitCount += 1;
-	    }
-	    logging = 0;
+            const key = NameCount.listToString(result.ncList);
+            let sources;
+            // TOOD: removing hash would be nice. filter "list" for uniqueness. (requires we have a list first)
+            if (!hash[key]) {
+                sources = mergeAllCompatibleSources(result.ncList);
+                //console.log(`$$ sources: ${Stringify2(sources)}`);
+                hash[key] = { sources };
+            } else {
+                sources = hash[key].sources;
+                cacheHitCount += 1;
+            }
+            logging = 0;
 
             if (logging) console.log(`  found compatible sources: ${!_.isEmpty(sources)}`);
 
             // failed to find any compatible combos
             if (_.isEmpty(sources)) continue;
 
-	    if (_.isUndefined(hash[key].isUseNcCompatible)) {
-		hash[key].isUseNcCompatible = isCompatibleWithUseSources(sources, useSources);
-	    }
-	    if (hash[key].isUseNcCompatible) {
+            if (_.isUndefined(hash[key].isUseNcCompatible)) {
+                hash[key].isUseNcCompatible = isCompatibleWithUseSources(sources, useSources);
+            }
+            if (hash[key].isUseNcCompatible) {
                 combos.push(result.nameList.toString());
             } else {
-		++numIncompatible;
-	    }
+                ++numIncompatible;
+            }
         }
-	totalVariationCount += variationCount;
+        totalVariationCount += variationCount;
     }, this);
 
     let duration = (process.hrtime.bigint() - start) / MILLY;
 
     Debug(`combos(${comboCount}) variations(${totalVariationCount}) cacheHits(${cacheHitCount}) incompatible(${numIncompatible}) ` +
-	  `actual(${totalVariationCount - cacheHitCount - numIncompatible})`);
+          `actual(${totalVariationCount - cacheHitCount - numIncompatible})`);
     console.error(`combos(${comboCount}) variations(${totalVariationCount}) cacheHits(${cacheHitCount}) incompatible(${numIncompatible}) ` +
-		  `actual(${totalVariationCount - cacheHitCount - numIncompatible}) ${duration}ms`);
+                  `actual(${totalVariationCount - cacheHitCount - numIncompatible}) ${duration}ms`);
     //process.stderr.write('.');
 
     return combos;
@@ -661,10 +773,10 @@ let makeCombosForSum = function(args, options = {}) {
     let comboArgs = {
         sum: args.sum,
         max: args.max,
-	allXorNcDataLists: args.allXorNcDataLists,
-	allAndNcDataLists: args.allAndNcDataLists,
-	allOrNcDataLists: args.allOrNcDataLists,
-	useSources: args.useSources
+        allXorNcDataLists: args.allXorNcDataLists,
+        allAndNcDataLists: args.allAndNcDataLists,
+        allOrNcDataLists: args.allOrNcDataLists,
+        useSources: args.useSources
     };
     
     let combos = getCombosForUseNcLists(comboArgs, options);
@@ -679,7 +791,7 @@ let makeCombosForSum = function(args, options = {}) {
 let makeCombos = (args, options) => {
     let sumRange;
     if (!_.isUndefined(args.sum)) {
-	// is _chain even necessary here?
+        // is _chain even necessary here?
         sumRange = _.chain(args.sum).split(',').map(_.toNumber).value();
     }
     Expect(sumRange).is.an.Array().with.property('length').below(3); // of.at.most(2);
@@ -701,7 +813,11 @@ let makeCombos = (args, options) => {
     //console.log(`allXorNcDataLists: ${Stringify2(args.allXorNcDataLists)}`);
     args.allAndNcDataLists = args.and ? buildAllUseNcDataLists(args.and) : [ [] ];
     args.allOrNcDataLists = args.or ? buildAllUseNcDataLists(args.or) : [ [] ];
-    args.useSources = getCompatibleUseNcDataSources(args);
+    args.useSources = getCompatibleUseSourcesFromNcData(args);
+    if (_.isEmpty(args.useSources)) {
+        console.error('incompatible --xor/--or params');
+        process.exit(-1);
+    }
 
     let lastSum = sumRange.length > 1 ? sumRange[1] : sumRange[0];
     for (let sum = sumRange[0]; sum <= lastSum; ++sum) {
