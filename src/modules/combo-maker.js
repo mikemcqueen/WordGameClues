@@ -521,7 +521,10 @@ let mergeOrSourcesList = (sourcesList, orSourcesList) => {
                     primaryNameSrcList: combinedNameSrcList,
                     orSourcesLists: orSources.orSourcesLists  // yeah this terminology will confuse pretty much anymore
                 });
-            }
+            } else {
+		console.log(`not unique, sources: ${NameCount.listToString(sources.primaryNameSrcList)}, ` +
+			    `orSources: ${NameCount.listToString(orSources.primaryNameSrcList)}`);
+	    }
         }
     }
     return mergedSourcesList;
@@ -531,18 +534,22 @@ let mergeOrSourcesList = (sourcesList, orSourcesList) => {
 //
 let getCompatibleUseSourcesFromNcData = (args) => {
     // XOR first
-    let xorSourcesList = getUseSourcesList(args.allXorNcDataLists, Op.xor);
+    let sourcesList = getUseSourcesList(args.allXorNcDataLists, Op.xor);
+    //console.log(`xorSourcesList(${xorSourcesList.length): ${Stringify2(xorSourcesList)}`);
+
     // NOTE: orSourcesList is currently a little different than xor
     // OR next
     let orSourcesList = getUseSourcesList(args.allOrNcDataLists, Op.or);
-    //console.log(`orSourcesList: ${Stringify2(orSourcesList)}`);
+    //console.log(`orSourcesList(${orSourcesList.length): ${Stringify2(orSourcesList)}`);
 
     // final: merge or with xor
-    let sourcesList = mergeOrSourcesList(xorSourcesList, orSourcesList);
-    //console.log(`mergedOrSourcesList: ${Stringify2(sourcesList)}`);
+    if (!_.isEmpty(orSourcesList)) {
+	sourcesList = mergeOrSourcesList(sourcesList, orSourcesList);
+	//console.log(`orSourcesList(${orSourcesList.length}), mergedSources(${sourcesList.length}): ${Stringify2(sourcesList)}`);
+    }
     
     // probably only return one list here, and must check if it's empty in caller
-    return xorSourcesList; //, orSourcesList };
+    return sourcesList; // xorSourcesList;
 };
 
 //
