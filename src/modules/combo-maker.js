@@ -760,9 +760,12 @@ let getCombosForUseNcLists = function(args, options = {}) {
 
     Debug(`combos(${comboCount}) variations(${totalVariationCount}) cacheHits(${cacheHitCount}) incompatible(${numIncompatible}) ` +
           `actual(${totalVariationCount - cacheHitCount - numIncompatible})`);
-    console.error(`combos(${comboCount}) variations(${totalVariationCount}) cacheHits(${cacheHitCount}) incompatible(${numIncompatible}) ` +
-                  `actual(${totalVariationCount - cacheHitCount - numIncompatible}) ${duration}ms`);
-    //process.stderr.write('.');
+    if (1) {
+	console.error(`combos(${comboCount}) variations(${totalVariationCount}) cacheHits(${cacheHitCount}) incompatible(${numIncompatible}) ` +
+                      `actual(${totalVariationCount - cacheHitCount - numIncompatible}) ${duration}ms`);
+    } else {
+	process.stderr.write('.');
+    }
 
     return combos;
 };
@@ -859,7 +862,7 @@ let makeCombos = (args, options) => {
                 ', known: ' + known +
                 ', reject: ' + reject +
                 ', duplicate: ' + duplicate);
-    Debug(`--combos: ${PrettyMs(d)}`);
+    console.error(`--combos: ${PrettyMs(d)}`);
 
     if (total !== _.size(comboMap) + known + reject + duplicate) {
         Debug('WARNING: amounts to not add up!');
