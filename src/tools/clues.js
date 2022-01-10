@@ -40,10 +40,11 @@ const CmdLineOptions = Opt.create(_.concat(Clues.Options, [
     ['o', 'output',                            '  output json -or- clues(huh?)'],
     ['c', 'count=COUNT[LO,COUNTHI]',           'show combos of the specified COUNT; if COUNTHI, treat as range'],
     ['x', 'max=COUNT',                         '  maximum # of sources to combine'],
-    ['',  'and=NAME[:COUNT][,NAME[:COUNT]]+',  '  combos must have source NAME[:COUNT]'],
+//    ['',  'and=NAME[:COUNT][,NAME[:COUNT]]+',  '  combos must have source NAME[:COUNT]'],
     ['',  'xor=NAME[:COUNT][,NAME[:COUNT]]+',  '  combos must not have, and must be compatible with, source NAME[:COUNT]s'],
     ['',  'or=NAME[:COUNT][,NAME[:COUNT]]+',   '  combos may either have, or be compatible with, source NAME[:COUNT]s'],
     ['',  'primary',                           '  show combos as primary source clues' ],
+    ['l', 'parallel',                          '  use paralelljs' ],
     ['',  'copy-from=SOURCE',                  'copy clues from source cluetype; e.g. p1.1'],
     ['',  'save',                              '  save clue files'],
     ['',  'allow-dupe-source',                 '  allow duplicate sources'],
@@ -160,7 +161,7 @@ function convertUseToPrimarySources (args) {
 //  use:     useClueList
 //
 
-function doCombos(args, options) {
+function doCombos(args) {
     if (!_.isUndefined(args.sources)) {
         args.sources = _.chain(args.sources).split(',').map(_.toNumber).value();
     }
@@ -168,7 +169,7 @@ function doCombos(args, options) {
 	// is _chain even necessary here?
         args.require = _.chain(args.require).split(',').map(_.toNumber).value();
     }
-    ComboMaker.makeCombos(args, options);
+    ComboMaker.makeCombos(args);
 }
 
 //
@@ -194,14 +195,14 @@ async function getNamedNoteNames(options) {
 
 //
 
-function combo_maker(args, options) {
-    return Promise.resolve(options.remaining ? getNamedNoteNames(options) : false)
+function combo_maker(args) {
+    return Promise.resolve(args.remaining ? getNamedNoteNames(args) : false)
         .then(noteNames => {
             if (noteNames) {
                 Log.info(`note names: ${noteNames}`);
-                options.note_names = noteNames;
+                args.note_names = noteNames;
             }
-            return doCombos(args, options);
+            return doCombos(args);
         });
 }
 
@@ -430,7 +431,6 @@ async function main () {
             sources = ClueManager.getInversePrimarySources(sources.split(',')).join(',');
             console.log(`inverse sources: ${sources}`);
         }
-	let combo_options = {};
         return combo_maker({
             sum:     options.count,
             max:     maxArg,
@@ -438,11 +438,15 @@ async function main () {
             sources,
             use:     useClueList,
             primary: options.primary,
-	    and:     options.and,
+	    apple:   options.apple,
+	    final:   options.final,
+//	    and:     options.and,
 	    or:      options.or,
-	    xor:     options.xor
-        }, combo_options);
+	    xor:     options.xor,
+	    parallel: options.parallel
+        });
     }
+    return 0;
 }
 
 //

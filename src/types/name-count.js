@@ -198,8 +198,14 @@ NameCount.prototype.log = function() {
 //
 
 NameCount.prototype.toJSON = function() {
-    return '{ "name": ' + this.name + ', "count": ' + this.count + ' }';
+    return {"name": `"${this.name}"`, "count": this.count};
 };
+
+/*
+NameCount.prototype.toJSON = function() {
+    return this.toJSON(`{"name": "${this.name}", "count": ${this.count}}`;
+};
+*/
 
 //
 

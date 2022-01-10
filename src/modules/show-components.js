@@ -41,6 +41,7 @@ function show (options) {
 
     // TODO: move buildAllUseNcDataLists to clue-manager?  currently in combo-maker
 
+    // why not .or?
     if (!_.isEmpty(options.or)) {
 	options.fast = true; // force fast
     }

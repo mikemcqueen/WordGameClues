@@ -10,6 +10,7 @@ const _               = require('lodash');
 const Debug           = require('debug')('result-map');
 const Expect          = require('should/as-function');
 const NameCount       = require('./name-count');
+const Stringify  = require("stringify-object");
 
 //
 
@@ -81,7 +82,7 @@ function addPrimaryLists (ncList, nameSrcList) {
         _.pullAt(nameSrcList, [ index ]);
     });
     if (!_.isEmpty(nameSrcList)) {
-        throw new Error('nameSrcList has items remaining, ' + nameSrcList);
+        throw new Error(`addPrimaryLists, removed (${ncList}) from nameSrcList, items remaining, (${nameSrcList})`);
     }
     return this;
 }
@@ -487,17 +488,16 @@ function resolvePrimary (ncPrimaryStr, required = false) {
 //
 
 function merge (fromMap, ncList) {
-    let rootKey;
-    let subKey;
-    let key;
-    let map;
-    let list;
+    let loggy = false;
+    //if (ncList == 'oak:5,mayor:4,polar bear:5') loggy = true;
 
-    Debug('++merge' + ', ncList: ' + ncList);
-    Debug('before resultMap:');
-    this.dump();
-    Debug('before fromMap:');
-    fromMap.dump();
+    if (loggy) {
+	console.log(`++merge: ncList(${ncList})`);
+	console.log(`before resultMap: ${Stringify(this.map())}`);
+	//this.dump();
+	console.log(`before fromMap: ${Stringify(fromMap.map())}`);
+	//fromMap.dump();
+    }
 
     if (ncList) {
         this.mergeNcList(fromMap, ncList);
@@ -506,21 +506,23 @@ function merge (fromMap, ncList) {
         this.recursiveMergeMaps(this.map(), fromMap.map());
     }
 
-    Debug('--merge');
-    Debug('  after resultMap:');
-    this.dump();
+    if (loggy) {
+	console.log('--merge');
+	console.log(`  after resultMap: ${Stringify(this.map())}`);
+	//this.dump();
+    }
 
     return this;
 }
 
 //
 //
-
 function mergeNcList (fromMap, ncList) {
-    Debug('++mergeNcList' +
-             ', this.keys: ' + _.keys(this.map()) +
-             ', fromMap.keys: ' + _.keys(fromMap.map()) +
-             ', ncList: ' + ncList);
+    let loggy = false;
+    //if (ncList == 'oak:5,mayor:4,polar bear:5') loggy = true;
+
+    if (loggy) console.log(`++mergeNcList, this: ${Stringify(this.map())}, fromMap: ${Stringify(fromMap.map())}, ncList: ${ncList}`);
+    Debug('++mergeNcList, this.keys: ' + _.keys(this.map()) + ', fromMap.keys: ' + _.keys(fromMap.map()) + ', ncList: ' + ncList);
 
     ncList.forEach(nc => {
         const map = this.map()[nc];
@@ -546,16 +548,21 @@ function mergeNcList (fromMap, ncList) {
             // if this is actually an array (of primary clues), do some magic
             if (_.isArray(fromObj)) {
                 Expect(fromObj).is.not.empty();
+		if (loggy) console.log(`magic:`);
                 let newObj = {};
                 newObj[fromKey] = [fromObj[0]];
+		if (loggy) console.log(`  before fromObj: ${Stringify(fromObj)}`);
                 fromObj.shift(0);
-                if (!_.isEmpty(fromObj)) {
+		if (loggy) console.log(`  after fromObj: ${Stringify(fromObj)}`);
+                if (!_.isEmpty(fromObj) && !_.isEmpty(fromObj[0])) { // HACK: adding fromObj[0] test to make copy-from work.
+		    if (loggy) console.log(`  not deleting key: ${fromKey}`);
                     deleteKey = false;
                 }
                 fromObj = newObj;
             }                
             if (deleteKey) {
                 // delete sub-map in fromMap;
+		if (loggy) console.log(`deleting '${fromKey}' from fromMap`);
                 delete fromMap.map()[fromKey];
             }
 
