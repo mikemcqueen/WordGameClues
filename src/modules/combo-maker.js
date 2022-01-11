@@ -61,13 +61,13 @@ function OpName (opValue) {
 //  }
 //}
 //
-// {
+//{
 // D:
-//   'face:1': [              // single top-level primary source with array value type, allow
-//     'face:10'
-//   ]
-// }
-function recursiveAddSrcNcLists (list, resultMap, top) {
+//  'face:1': [              // single top-level primary source with array value type, allow
+//    'face:10'
+//  ]
+//}
+function recursiveAddSrcNcLists (list, resultMap, top = true) {
     let keys = _.flatMap(_.keys(resultMap), key => {
         let val = resultMap[key];
         if (_.isObject(val)) {
@@ -78,7 +78,10 @@ function recursiveAddSrcNcLists (list, resultMap, top) {
             // B: comma separated key with array value type: split; TODO assert primary?
             if (splitKeys.length > 1) return splitKeys;
             // D: single top-level key with array value type: allow; TODO assert primary?
-            if (top) { if (loggy) console.log(`D: ${key}`); return key; }
+            if (top) {
+		if (loggy) console.log(`D: ${key}`);
+		return key;
+	    }
             // C: single nested key with array value type: ignore; TODO assert primary?
         }
         if (loggy) console.log(`F: ${key}`);
@@ -86,7 +89,8 @@ function recursiveAddSrcNcLists (list, resultMap, top) {
     });
     if (loggy) console.log(keys);
     if (!_.isEmpty(keys)) {
-        list.push(keys);
+//XXX        list.push(keys);
+        list.push(keys.sort().toString());
         keys.forEach(key => {
             let val = resultMap[key];
             if (val && !_.isArray(val)) {
@@ -98,7 +102,7 @@ function recursiveAddSrcNcLists (list, resultMap, top) {
 }
 
 function buildSrcNcLists (resultMap) {
-    return recursiveAddSrcNcLists([], resultMap, true);
+    return recursiveAddSrcNcLists([], resultMap);
 }
 
 function getSourcesList (nc) {
@@ -106,17 +110,20 @@ function getSourcesList (nc) {
     ClueManager.getKnownSourceMapEntries(nc).forEach(entry => {
         entry.results.forEach(result => {
             ClueManager.primaryNcListToNameSrcLists(result.ncList).forEach(primaryNameSrcList => {
-                if (0 && (nc == 'bat:3')) loggy = true;
+		//
+		// TODO: if (!result.resultMap) Expect(result.nClist.lenght === 1 && result.ncList[0].count === 1);
+		//
                 let source = {
                     ncList: [nc],
                     primaryNameSrcList,
-                    srcNcLists: result.resultMap ? buildSrcNcLists(result.resultMap.map()) : [result.ncList]
+                    srcNcLists: result.resultMap ? buildSrcNcLists(result.resultMap.map()) : [NameCount.listToString(result.ncList)]
                 };
-                if (NameCount.count(nc) > 1) {
+                if (nc.count > 1) {
                     if (loggy) console.log(`(${nc}): srcNcLists: ${showNcLists(source.srcNcLists)}\n,resultMap: ${Stringify2(result.resultMap.map())}`);
                     // TODO: there is possibly some operator (different than --or) where I should add all peers
 		    // (same count) of 'nc' that have same primary sources. Achievable by just looking at resultMap? 
-                    source.srcNcLists.push([nc.toString()]);
+                    source.srcNcLists.push(nc.toString());
+//XXX                    source.srcNcLists.push([nc.toString()]);
                 }
                 if (loggy || logging > 3) {
                     console.log(`getSourcesList() ncList: ${source.ncList}, srcNcLists: ${showNcLists(source.srcNcLists)}`);
@@ -252,6 +259,15 @@ function matchAnyNcList (ncList, matchNcLists) {
 	//let intersection = matchNcList.filter(nc => ncSet.has(nc.toString()));
 	//const matchCount = intersection.length;
         if (matchCount === ncList.length) return true;
+    }
+    return false;
+}
+
+//
+//
+function matchAnyNcCsv (ncCsv, matchNcCsvs) {
+    for (const matchNcCsv of matchNcCsvs) {
+	if (matchNcCsv.includes(ncCsv)) return true;
     }
     return false;
 }
@@ -640,6 +656,7 @@ return false;
 
 //
 //
+let XX = true;
 let isCompatibleWithOrSourcesLists = (sources, orSourcesLists) => {
     // TODO: yes this happens. why I don't know.
     //if (_.isEmpty(orSourcesLists)) console.error(`empty orSourcesList!`);
@@ -664,12 +681,16 @@ let isCompatibleWithOrSourcesLists = (sources, orSourcesLists) => {
 	    let intersection = orSources.primaryNameSrcList.filter(nameSrc => sourcesCountSet.has(nameSrc.count));
 	    const numCommonPrimarySources = intersection.length;
 	    if (numCommonPrimarySources === orSources.primaryNameSrcList.length) {
-		if (loggy) {
+		if (XX) {
+		    XX = false;
+		    console.log(`sources: ${Stringify2(sources)}`);
+		    console.log(`orSources: ${Stringify2(orSources)}`);
 		    console.log(`--or matching ${NameCount.listToString(sources.ncList)} to ${orSources.ncList}`);
 		    console.log(`     srcNcLists ${showNcLists(sources.srcNcLists)}`);
 		}
-		if (singlePrimaryNc || matchAnyNcList(orSources.ncList, sources.srcNcLists)) {
-		//pif (singlePrimaryNc || matchAnyNcSet(orSources.ncList, sourcesSrcNcSetList)) {
+		//old pif (singlePrimaryNc || matchAnyNcSet(orSources.ncList, sourcesSrcNcSetList)) {
+		//XXXif (singlePrimaryNc || matchAnyNcList(orSources.ncList, sources.srcNcLists)) {
+		if (singlePrimaryNc || matchAnyNcCsv(orSources.ncList.toString(), sources.srcNcLists)) {
 		    if (loggy) console.log(`     MATCHED: ${orSources.ncList} with something`);
 		    match = true;
 		    break;
