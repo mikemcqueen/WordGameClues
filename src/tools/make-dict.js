@@ -16,6 +16,10 @@ const Opt = require('node-getopt')
           'Usage: node make-dict <text-file>'
       );
 
+const skipped = new Set();
+let total_skipped = 0;
+let total_duplicates = 0;
+
 //
 //
 //
@@ -63,7 +67,9 @@ function keep (word) {
 
 function valid (word) {
     if (keep(word)) return true;
-    console.error(`skip: ${word}`);
+    Debug(`skip: ${word}`);
+    skipped.add(word);
+    total_skipped += 1;
     return false;
 }
 
@@ -96,7 +102,14 @@ function process (filename, set) {
                 Debug(`line: ${line}`);
                 const words = get_words(line);
                 Debug(`before set: ${_.size(set)}, words: ${_.size(words)}`);
-                words.forEach(word => set.add(word));
+                words.forEach(word => {
+		    if (set.has(word)) {
+			Debug(`Duplicate: ${word}`);
+			total_duplicates += 1;
+		    } else {
+			set.add(word);
+		    }
+		});
                 Debug(`after set: ${_.size(set)}`);
                 
                 // resume the readstream, possibly from a callback
@@ -130,6 +143,9 @@ async function main() {
 
     console.error('words:');
     set.forEach(word => { console.log(word); });
+    console.error(`  skipped unique: ${skipped.size}`);
+    console.error(`   skipped total: ${total_skipped}`);
+    console.error(`duplicates total: ${total_duplicates}`);
 }
 
 main().catch(err =>  {
