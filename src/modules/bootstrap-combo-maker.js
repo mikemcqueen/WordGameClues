@@ -52,7 +52,7 @@ let bootstrap = (args) => {
     if (!ClueManager.loaded) {
 	loadClues(Clues.getByOptions(args), 30); // sum - 1; TODO: task item
     }
-    let combos = ComboMaker.makeCombosForSum(args);
+    let combos = ComboMaker.makeCombosForSum(args.sum, args.max, args);
     return combos;
 };
 
