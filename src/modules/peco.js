@@ -69,6 +69,9 @@ function Peco(args) {
         if (!this.max) {
             throw new Error('Peco: must specify max with listArray');
         }
+	if (_.isEmpty(this.listArray)) {
+            throw new Error('Peco: empty listArray');
+	}
     }
     else {
         if (!this.sum) {
@@ -171,7 +174,8 @@ Peco.prototype.firstCombination = function () {
 };
 
 //
-
+//
+//
 Peco.prototype.nextCombination = function () {
     return this.buildNextResult({
         listArray: this.listArray,

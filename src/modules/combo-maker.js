@@ -305,8 +305,10 @@ let buildUseSourcesLists = (useNcDataLists) => {
 // and [b, b] would be filtered out as incompatible.
 //
 let getCompatibleOrSourcesLists = (primaryNameSrcList, orSourcesLists) => {
+    if (_.isEmpty(orSourcesLists)) return [];
+
     let listArray = orSourcesLists.map(sourcesList => [...Array(sourcesList.length).keys()]);
-    //console.log(`listArray(${listArray.length}): ${Stringify2(listArray)}`);
+    console.log(`listArray(${listArray.length}): ${Stringify2(listArray)}`);
     //console.log(`sourcesLists(${orSourcesLists.length}): ${Stringify2(orSourcesLists)}`);
 
     let peco = Peco.makeNew({
@@ -316,7 +318,7 @@ let getCompatibleOrSourcesLists = (primaryNameSrcList, orSourcesLists) => {
     
     let sourcesLists = [];
     for (let indexList = peco.firstCombination(); indexList; indexList = peco.nextCombination()) {
-        //console.log(`indexList: ${stringify(indexList)}`);
+        console.log(`indexList: ${stringify(indexList)}`);
 	let sourcesList = [];
 	let primarySrcSet = new Set(primaryNameSrcList.map(nameSrc => NameCount.count));
         for (let [listIndex, sourceIndex] of indexList.entries()) {
@@ -416,7 +418,8 @@ let mergeCompatibleUseSources = (sourcesLists, op) => {
 		result.sourcesLists = getCompatibleOrSourcesLists(primaryNameSrcList, orSourcesLists.filter(sourcesList => !_.isEmpty(sourcesList)));
 		result.sourcesNcCsvList = buildSourcesNcCsvList(result.sourcesLists);
 		//console.log(result.sourcesNcCsvList);
-		if (_.isEmpty(result.sourcesLists)) throw new Error('empty');
+		// this is possible and allowed. check was put here during debugging.
+		//if (_.isEmpty(result.sourcesLists)) throw new Error('empty');
 	    }
             sourcesList.push(result);
         }
