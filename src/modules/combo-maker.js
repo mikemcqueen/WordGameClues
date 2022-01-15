@@ -619,18 +619,21 @@ let isCompatibleWithOrSources = (sources, useSources) => {
     for (let [listIndex, orSourcesList] of orSourcesLists.entries()) {
 	let ncCsv = useSources.orSourcesNcCsvList[listIndex];
 	if (sources.srcNcMap[ncCsv]) {
-	    // essentially "subtract all orSources.pnsl from sources.pnsl". probably not fast.
+	    //:: orSources ncCsv matches sources ncCsv
+
+	    // essentially, subtract all orSources.primaryNameSrcList entries from from sources.primaryNameSrcList
+	    // based on primary source. probably not fast.
 	    // TODO: profile, speed this shit up.
 	    const orSourcesPrimaryNameSrcList = _.flatten(orSourcesList.map(orSources => orSources.primaryNameSrcList));
-	    const xorPrimaryNameSrcList = _.xor(sources.primaryNameSrcList, orSourcesPrimaryNameSrcList);
+	    const xorPrimaryNameSrcList = _.xor(sources.primaryNameSrcList, orSourcesPrimaryNameSrcList, NameCount.count);
 	    if (xorPrimaryNameSrcList.length === sources.primaryNameSrcList.length - orSourcesPrimaryNameSrcList.length) {
+		//:: orSources primary sources match sources primary sources
 		if (allCountUnique(xorPrimaryNameSrcList, useSources.primaryNameSrcList)) {
 		    return true;
 		}
-		// orSources primary sources matched sources primary sources, but the remaining primary sources
-		// were not compatible with useSources primary sources
+		//:: the remaining primary sources were not compatible with useSources primary sources
 		console.error(`NOT allowing ${sources.ncCsv} even though ${ncCsv} is in srcNcMap, due to primary source incompatability`);
-	    } // else - orSources primary sources did not match sources primary sources.
+	    } //:: else - orSources primary sources did not match sources primary sources.
 	}
     }
     return false;
