@@ -605,16 +605,6 @@ let isCompatibleWithOrSources = (sources, useSources) => {
 	// or maybe just a method name change.
 	return false;
     }
-    /** DEBUG **/
-    if (XX) {
-	console.log(`sources: ${Stringify2(sources)}`);
-	console.log(`orSourcesNcCsvList: ${useSources.orSourcesNcCsvList}`);
-	XX = false;
-    }
-    if (XX) {
-	console.log(`orSourcesNcCsvList: ${useSources.orSourcesNcCsvList}`);
-	XX = false;
-    }
     //console.log(`orSourcesLists(${orSourcesLists.length}): ${Stringify2(orSourcesLists)}`);
     for (let [listIndex, orSourcesList] of orSourcesLists.entries()) {
 	let ncCsv = useSources.orSourcesNcCsvList[listIndex];
@@ -625,15 +615,20 @@ let isCompatibleWithOrSources = (sources, useSources) => {
 	    // based on primary source. probably not fast.
 	    // TODO: profile, speed this shit up.
 	    const orSourcesPrimaryNameSrcList = _.flatten(orSourcesList.map(orSources => orSources.primaryNameSrcList));
-	    const xorPrimaryNameSrcList = _.xor(sources.primaryNameSrcList, orSourcesPrimaryNameSrcList, NameCount.count);
+	    const xorPrimaryNameSrcList = _.xorBy(sources.primaryNameSrcList, orSourcesPrimaryNameSrcList, NameCount.count);
+	    if (XX) {
+		console.log(`sources: ${sources.primaryNameSrcList}`);
+		console.log(`or: ${orSourcesPrimaryNameSrcList}`);
+		console.log(`xor: ${xorPrimaryNameSrcList}`);
+		XX = false;
+	    }
 	    if (xorPrimaryNameSrcList.length === sources.primaryNameSrcList.length - orSourcesPrimaryNameSrcList.length) {
 		//:: orSources primary sources match sources primary sources
 		if (allCountUnique(xorPrimaryNameSrcList, useSources.primaryNameSrcList)) {
+		    //:: sources' remaining primary sources are compatible with useSources' primary sources
 		    return true;
 		}
-		//:: the remaining primary sources were not compatible with useSources primary sources
-		console.error(`NOT allowing ${sources.ncCsv} even though ${ncCsv} is in srcNcMap, due to primary source incompatability`);
-	    } //:: else - orSources primary sources did not match sources primary sources.
+	    }
 	}
     }
     return false;
