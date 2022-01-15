@@ -418,7 +418,6 @@ let mergeCompatibleUseSources = (sourcesLists, op) => {
                 }
             }
         }
-	//if (!_.isEmpty(primaryNameSrcList)) {
 	if (success) {
 	    if (ZZ) console.log(`pnsl, final: ${primaryNameSrcList}`);
 	    let result = { primaryNameSrcList };
@@ -426,7 +425,6 @@ let mergeCompatibleUseSources = (sourcesLists, op) => {
 		let nonEmptyOrSourcesLists = orSourcesLists.filter(sourcesList => !_.isEmpty(sourcesList));
 		result.sourcesLists = getCompatibleOrSourcesLists(primaryNameSrcList, nonEmptyOrSourcesLists);
 		result.sourcesNcCsvList = buildSourcesNcCsvList(result.sourcesLists);
-		//console.log(result.sourcesNcCsvList);
 		if (ZZ && _.isEmpty(result.sourcesLists) && !_.isEmpty(nonEmptyOrSourcesLists)) {
 		    console.log(`before: orSourcesLists(${orSourcesLists.length}): ${Stringify2(orSourcesLists)}`);
 		    console.log(`after: result.sourcesLists(${result.sourcesLists.length}): ${Stringify2(result.sourcesLists)}`);
@@ -434,14 +432,8 @@ let mergeCompatibleUseSources = (sourcesLists, op) => {
 		}
 	    }
             sourcesList.push(result);
-        } else {
-	    if (ZZ) console.log(`pnsl, final empty: ${primaryNameSrcList}`);
-	}
+        }
 	++iter;
-    }
-    if (0 && op === Op.or) {
-	//console.log(`%% sourcesList(${sourcesList.length}): ${Stringify2(sourcesList)}`);
-	//console.log(`%% orSourcesLists(${orSourcesListsArray.length}): ${Stringify2(orSourcesListsArray)}`);
     }
     return sourcesList;
 };
@@ -599,7 +591,7 @@ let first = (clueSourceList, sourceIndexes) => {
 //
 //
 let XX = 0;
-let isCompatibleWithOrSources = (sources, useSources /*orSourcesLists*/) => {
+let isCompatibleWithOrSources = (sources, useSources) => {
     // TODO: yes this happens. why I don't know.
     const orSourcesLists = useSources.orSourcesLists;
     //if (_.isEmpty(orSourcesLists)) console.error(`empty orSourcesList!`);
@@ -614,7 +606,6 @@ let isCompatibleWithOrSources = (sources, useSources /*orSourcesLists*/) => {
 	return false;
     }
     /** DEBUG **/
-    //if (sources.ncList.filter(nc => { return (nc.name == 'major' || nc.name == 'minor'); }).length) {
     if (XX) {
 	console.log(`sources: ${Stringify2(sources)}`);
 	console.log(`orSourcesNcCsvList: ${useSources.orSourcesNcCsvList}`);
@@ -647,20 +638,12 @@ let isCompatibleWithOrSources = (sources, useSources /*orSourcesLists*/) => {
 
 //
 //
-let YY = 0;
 let isCompatibleWithUseSources = (sourcesList, useSourcesList) => {
     if (_.isEmpty(useSourcesList)) return true;
     for (let sources of sourcesList) {
         for (let useSources of useSourcesList) {
             const allUnique = allCountUnique(sources.primaryNameSrcList, useSources.primaryNameSrcList);
-	    if (YY && sources.ncList.filter(nc => { return (nc.name == 'major' || nc.name == 'minor'); }).length) {
-		if (useSources.primaryNameSrcList.filter(nc => { return (nc.name == 'gold leaf'); }).length === 0) {
-		    console.log(`sources: ${Stringify2(sources)}`);
-		    console.log(`useSources: ${Stringify2(useSources)}`);
-		    YY = false;
-		}
-	    }
-            if (allUnique || isCompatibleWithOrSources(sources, useSources /*.orSourcesLists*/)) {
+            if (allUnique || isCompatibleWithOrSources(sources, useSources)) {
 		return true;
 	    }
         }
