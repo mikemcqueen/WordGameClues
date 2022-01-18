@@ -18,7 +18,7 @@ let total_duplicates = 0;
 //
 //
 
-function base (word) {
+function base (word: string) {
     // strip l' prefix
     const l_apo = 'l\'';
     if (_.startsWith(word, l_apo)) {
@@ -44,7 +44,7 @@ function base (word) {
     return word;
 }
 
-function keep (word) {
+function keep (word: string) {
     //const allowed = [];
     // keep allowed words
     //if (_.includes(allowed, word)) return true;
@@ -59,7 +59,7 @@ function keep (word) {
     return true;
 }
 
-function valid (word) {
+function valid (word: string): boolean {
     if (keep(word)) return true;
     Debug(`skip: ${word}`);
     skipped.add(word);
@@ -67,20 +67,20 @@ function valid (word) {
     return false;
 }
 
-function clean (word) {
+function clean (word: string) {
     Debug(`clean in : ${word}`);
-    const repl = _.flatMap(word.replace(/[0-9,.:;\"\?\!\(\)_]+/g, ' ').split(' '), x => x)
-              .filter(x => !_.isEmpty(x))
-              .map(x => base(x))
-              .filter(x => valid(x));
+    const repl = _.flatMap(word.replace(/[0-9,.:;\"\?\!\(\)_]+/g, ' ').split(' '), (x: string) => x)
+        .filter((x: string) => !_.isEmpty(x))
+        .map((x: string) => base(x))
+        .filter((x: string) => valid(x));
     Debug(`clean out: ${repl}`);
     return repl;
 }
 
-function get_words (line) {
-    let words = _.flatMap(line.split(' '), word => word.split('-'));
+function get_words (line: string) {
+    let words: string[] = _.flatMap(line.split(' '), (word: string) => word.split('-'));
     Debug(`words: ${words}, ${words.length}`);
-    return _.flatMap(words, word  => clean(_.toLower(word)));
+    return _.flatMap(words, (word: string) => clean(_.toLower(word)));
 }
 
 interface Dict {
@@ -100,7 +100,7 @@ let load = (filename: string, func: LoadFunc, arg: LoadArg): Promise<LoadArg> =>
     return new Promise((resolve, reject) => {
         const s = Fs.createReadStream(filename)
             .pipe(Es.split())
-            .pipe(Es.mapSync(line => {
+            .pipe(Es.mapSync((line: string) => {
                 
                 // pause the readstream
                 s.pause();
@@ -109,7 +109,7 @@ let load = (filename: string, func: LoadFunc, arg: LoadArg): Promise<LoadArg> =>
 
                 // resume the readstream, possibly from a callback
                 s.resume();
-            })).on('error', err => {
+            })).on('error', (err: any) => {
                 console.error('Error while reading file.', err);
                 reject();
             }).on('end', () => {
@@ -120,7 +120,7 @@ let load = (filename: string, func: LoadFunc, arg: LoadArg): Promise<LoadArg> =>
 };
 
 let load_dict_line_func = (line: string, arg: Dict): void => {  
-    const words = get_words(line);
+    const words: string[] = get_words(line);
     words.forEach(word => {
 	arg.dict.add(word);
     });

@@ -32,6 +32,10 @@ interface StringBoolMap {
     [key: string]: boolean; // for now; eventually maybe array of string (sorted primary nameSrcCsv)
 }
 
+interface StringAnyMap {
+    [key: string]: any;
+}
+
 //
 //
 interface NCData {
@@ -92,7 +96,7 @@ const Op = {
 Object.freeze(Op);
 
 function OpName (opValue: number): string {
-    return _.findKey(Op, (v) => opValue === v);
+    return _.findKey(Op, (v: number) => opValue === v);
 }
 
 // key types:
@@ -121,7 +125,7 @@ function OpName (opValue: number): string {
 //  ]
 //}
 let recursiveAddSrcNcLists = (obj: any, resultMap: any, top = true): any => {
-    let keys: string[] = _.flatMap(_.keys(resultMap), key => {
+    let keys: string[] = _.flatMap(_.keys(resultMap), (key: string) => {
         let val = resultMap[key];
         if (_.isObject(val)) {
             // A: non-array object value type: allow
@@ -167,8 +171,8 @@ function buildSrcNcLists (resultMap: any): any {
 
 function getSourceList (nc: NameCount): SourceList {
     const sources: SourceList = [];
-    ClueManager.getKnownSourceMapEntries(nc).forEach(entry => {
-        entry.results.forEach(result => {
+    ClueManager.getKnownSourceMapEntries(nc).forEach((entry: any) => {
+        entry.results.forEach((result: any) => {
             ClueManager.primaryNcListToNameSrcLists(result.ncList).forEach((primaryNameSrcList: NCList) => {
                 let srcNcLists: string[];
                 let srcNcMap: StringBoolMap = {};
@@ -226,8 +230,8 @@ let mergeSources = (source1: SourceData, source2: SourceData): SourceData => {
         srcNcMap: {}
     };
     mergedSources.ncCsv= mergedSources.ncList.sort().toString();
-    _.keys(source1.srcNcMap).forEach(key => { mergedSources.srcNcMap[key] = true; });
-    _.keys(source2.srcNcMap).forEach(key => { mergedSources.srcNcMap[key] = true; });
+    _.keys(source1.srcNcMap).forEach((key: string) => { mergedSources.srcNcMap[key] = true; });
+    _.keys(source2.srcNcMap).forEach((key: string) => { mergedSources.srcNcMap[key] = true; });
     mergedSources.srcNcMap[mergedSources.ncCsv] = true;
     return mergedSources;
 };
@@ -304,16 +308,15 @@ let mergeAllCompatibleSources = (ncList: NCList): SourceList => {
     return sourceList;
 };
 
-// TODO: use new Set() here for god's sake
+//
 //
 function allCountUnique (nameSrcList1: NCList, nameSrcList2: NCList): boolean {
-    // Uh. use a Set? This is called from within an inner loop.
-    let hash = {};
+    let set: Set<number> = new Set<number>();
     for (let nameSrc of nameSrcList1) {
-        hash[nameSrc.count] = true;
+        set.add(nameSrc.count);
     }
     for (let nameSrc of nameSrcList2) {
-        if (hash[nameSrc.count] === true) return false;
+        if (set.has(nameSrc.count)) return false;
     }
     return true;
 }
@@ -599,7 +602,7 @@ let next = (clueSourceList: any, sourceIndexes: number[]): FirstNextResult => {
         let ncList: NCList = [];            // e.g. [ { name: "pollock", count: 2 }, { name: "jackson", count: 4 } ]
         let nameList: string[] = [];        // e.g. [ "pollock", "jackson" ]
         let srcCountStrList: string[] = []; // e.g. [ "white,fish:2", "moon,walker:4" ]
-        if (!clueSourceList.every((clueSource, index) => {
+        if (!clueSourceList.every((clueSource: any, index: number) => {
             let clue = clueSource.list[sourceIndexes[index]];
             if (clue.ignore || clue.skip) {
                 return false; // every.exit
@@ -653,7 +656,7 @@ let first = (clueSourceList: any, sourceIndexes: number[]): FirstNextResult => {
 //
 //
 let XX = 0;
-let isCompatibleWithOrSources = (sources: SourceData, useSources): boolean => {
+let isCompatibleWithOrSources = (sources: SourceData, useSources: UseSource): boolean => {
     // TODO: yes this happens. why I don't know.
     const orSourceLists = useSources.orSourceLists;
     //if (_.isEmpty(orSourceLists)) console.error(`empty orSourceList!`);
@@ -669,7 +672,7 @@ let isCompatibleWithOrSources = (sources: SourceData, useSources): boolean => {
     }
     //console.log(`orSourceLists(${orSourceLists.length}): ${Stringify2(orSourceLists)}`);
     for (let [listIndex, orSourceList] of orSourceLists.entries()) {
-        let ncCsv = useSources.orSourcesNcCsvList[listIndex];
+        let ncCsv = useSources.orSourcesNcCsvList![listIndex];
         if (sources.srcNcMap[ncCsv]) {
             //:: orSources ncCsv matches sources ncCsv
 
@@ -714,7 +717,7 @@ let isCompatibleWithUseSources = (sourceList: SourceList, useSourcesList: Source
 //
 //
 let getCombosForUseNcLists = (sum: number, max: number, args: any): any => {
-    let hash = {};
+    let hash: StringAnyMap = {};
     let combos: string[] = [];
 
     let comboCount = 0;
@@ -733,7 +736,7 @@ let getCombosForUseNcLists = (sum: number, max: number, args: any): any => {
         comboCount += 1;
 
         //console.log(`sum(${sum}) max(${max}) clueSrcList: ${Stringify(clueSourceList)}`);
-        let sourceIndexes = [];
+        let sourceIndexes: number[] = [];
         let result = first(clueSourceList, sourceIndexes);
         if (result.done) return; // continue; 
 
@@ -760,15 +763,15 @@ let getCombosForUseNcLists = (sum: number, max: number, args: any): any => {
             //console.log(`result.ncList: ${result.ncList}`);
 
             //const key = NameCount.listToString(result.ncList);
-            const key = result.ncList!.sort().toString();
+            const key: string = result.ncList!.sort().toString();
             let cacheHit = false;
             let sourceList: SourceList;
             if (!hash[key]) {
                 sourceList = mergeAllCompatibleSources(result.ncList!);
-                //console.log(`$$ sources: ${Stringify2(sources)}`);
+                //console.log(`$$ sources: ${Stringify2(sourceList)}`);
                 hash[key] = { sourceList };
             } else {
-                sourceList = hash[key].sources;
+                sourceList = hash[key].sourceList;
                 cacheHit = true;
                 numCacheHits += 1;
             }
@@ -856,7 +859,7 @@ let parallel_makeCombosForRange = (first: number, last: number, args: any): any 
     let entrypoint = BootstrapComboMaker.entrypoint;
     //console.error('++makeCombosForRange');
     let beginDate = new Date();
-    return p.map(entrypoint).then(data => {
+    return p.map(entrypoint).then((data: any[]) => {
         //console.log(`data = ${typeof data} array: ${_.isArray(data)}, data[${0}] = ${Stringify(data[0])}`);
         let d = new Duration(beginDate, new Date()).milliseconds;
         console.error(`time: ${PrettyMs(d)} chunks: ${data.length}`);
@@ -966,7 +969,7 @@ let makeCombos = (args: any): any => {
         d = new Duration(begin, new Date()).milliseconds;
         console.error(`--combos: ${PrettyMs(d)}`);
         Debug(`total: ${total}, filtered(${_.size(comboMap)})`);
-        _.keys(comboMap).forEach(nameCsv => console.log(nameCsv));
+        _.keys(comboMap).forEach((nameCsv: string) => console.log(nameCsv));
         //console.log(`${Stringify(comboMap)}`);
         //process.stderr.write('\n');
     }
@@ -974,7 +977,7 @@ let makeCombos = (args: any): any => {
 };
 
 function getKnownNcListForName (name: string): NCList {
-    const countList = ClueManager.getCountListForName(name);
+    const countList: number[] = ClueManager.getCountListForName(name);
     if (_.isEmpty(countList)) throw new Error(`not a valid clue name: '${name}'`);
     return countList.map(count => NameCount.makeNew(name, count));
 }
@@ -997,11 +1000,11 @@ function nameOrNcStrListToKnownNcLists (nameOrNcStrList: string[]): NCList[] {
 }
 
 function combinationNcList (combo: any, ncLists: NCList[]): NCList {
-    return combo.map((ncIndex, listIndex) => ncLists[listIndex][ncIndex]);
+    return combo.map((ncIndex: number, listIndex: number) => ncLists[listIndex][ncIndex]);
 }
 
 function combinationNcDataList (combo: any, ncLists: NCList[]): NCDataList {
-    return combo.map((ncIndex, listIndex) => Object({ ncList: ncLists[listIndex][ncIndex]}));
+    return combo.map((ncIndex: number, listIndex: number) => Object({ ncList: ncLists[listIndex][ncIndex]}));
 }
 
 function ncListsToCombinations (ncLists: NCList[]): any {
@@ -1009,10 +1012,10 @@ function ncListsToCombinations (ncLists: NCList[]): any {
         listArray: ncLists.map(ncList => [...Array(ncList.length).keys()]),       // keys of array are 0..ncList.length
         max: ncLists.reduce((sum, ncList) => sum + ncList.length, 0)
     }).getCombinations()
-        .map(combo => combinationNcList(combo, ncLists));
+        .map((combo: any) => combinationNcList(combo, ncLists));
 }
 
-function getCombinationNcLists (useArgsList: any): NCList[] {
+function getCombinationNcLists (useArgsList: string[]): NCList[] {
     Debug(`useArgsList: ${Stringify(useArgsList)}`);
     return useArgsList.map(useArg => useArg.split(','))
         .map(nameOrNcStrList => nameOrNcStrListToKnownNcLists(nameOrNcStrList))
@@ -1025,7 +1028,7 @@ function combinationsToNcLists (combinationNcLists: NCList[]): NCList[] {
         listArray: combinationNcLists.map(ncList => [...Array(ncList.length).keys()]),
         max: combinationNcLists.reduce((sum, ncList) => sum + ncList.length, 0)       // sum of lengths of nclists
     }).getCombinations()
-      .map(combo => combinationNcList(combo, combinationNcLists));
+	.map((combo: any) => combinationNcList(combo, combinationNcLists));
 }
 
 // TODO: get rid of this and combinationsToNCLists, and add extra map step in buildAllUseNCData
@@ -1035,20 +1038,20 @@ function combinationsToNcDataLists (combinationNcLists: NCList[]): NCDataList[] 
         listArray: combinationNcLists.map(ncList => [...Array(ncList.length).keys()]),
         max: combinationNcLists.reduce((sum, ncList) => sum + ncList.length, 0)       // sum of lengths of nclists
     }).getCombinations()
-      .map(combo => combinationNcDataList(combo, combinationNcLists));
+	.map((combo: any) => combinationNcDataList(combo, combinationNcLists));
 }
 
-function buildAllUseNcLists (useArgsList: any): NCList[] {
+function buildAllUseNcLists (useArgsList: string[]): NCList[] {
     return combinationsToNcLists(getCombinationNcLists(useArgsList));
 }
 
-function buildAllUseNcDataLists (useArgsList): NCDataList[] {
+function buildAllUseNcDataLists (useArgsList: string[]): NCDataList[] {
     return combinationsToNcDataLists(getCombinationNcLists(useArgsList));
 }
 
 //
 //
-function buildUseNcLists (useArgsList: any): NCList[] {
+function buildUseNcLists (useArgsList: string[]): NCList[] {
     let useNcLists: NCList[] = [];
     useArgsList.forEach((useArg: string) =>  {
         let args = useArg.split(',');
