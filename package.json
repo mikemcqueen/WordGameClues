@@ -25,6 +25,7 @@
     "n-readlines": "^0.2.8",
     "node-dir": "^0.1.17",
     "node-getopt": "^0.2.4",
+    "paralleljs": "^1.1.0",
     "pretty-ms": "^2.1.0",
     "retry": "^0.10.1",
     "should": "^11.2.1",
