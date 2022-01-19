@@ -36,6 +36,10 @@ interface StringAnyMap {
     [key: string]: any;
 }
 
+// TODO
+//
+type ValidateResult = any;
+
 //
 //
 interface NCData {
@@ -51,18 +55,25 @@ interface SourceBase {
 
 //
 //
+interface LazySourceData extends SourceBase {
+    ncList: NameCount[];
+    validateResultList: ValidateResult[];
+}
+
+//
+//
 interface SourceData extends SourceBase {
     ncList: NCList;
-    ncCsv?: string;
     srcNcLists: string[];
     srcNcMap: StringBoolMap;
+    ncCsv?: string;
 }
 type SourceList = SourceData[];
+type AnySourceData = LazySourceData | SourceData;
 
 //
 //
 interface XorSource extends SourceBase {
-//    primaryNameSrcList: NCList;
 }
 
 interface OrSource extends SourceBase {
@@ -97,6 +108,47 @@ Object.freeze(Op);
 
 function OpName (opValue: number): string {
     return _.findKey(Op, (v: number) => opValue === v);
+}
+
+
+//
+// see: showNcLists
+let listOfNcListsToString = (listOfNcLists: NCList[]): string => {
+    if (!listOfNcLists) return _.toString(listOfNcLists);
+    let result = "";
+    listOfNcLists.forEach((ncList, index) => {
+        if (index > 0) result += ' - ';
+        result += NameCount.listToString(ncList);
+    });
+    return result;
+};
+
+//
+//
+let stringifySourceList = (sourceList: SourceList): string => {
+    let result = "[\n";
+    let first = true;
+    for (let source of sourceList) {
+        if (!first) result += ',\n';
+        else first = false;
+        result += '  {\n';
+        result += `    ncList: ${source.ncList}\n`;
+        result += `    primaryNameSrcList: ${source.primaryNameSrcList}\n`;
+        result += `    srcNcLists: ${Stringify2(source.srcNcLists)}\n`;
+        result += '  }';
+    }
+    return result + "\n]";
+};
+
+function showNcLists (ncLists: NCList[]): string {
+    let str = "";
+    let first = true;
+    for (let ncList of ncLists) {
+        if (!first) str += ' - ';
+        str += ncList;
+        first = false;
+    }
+    return _.isEmpty(str) ? "[]" : str;
 }
 
 // key types:
@@ -165,142 +217,152 @@ let recursiveAddSrcNcLists = (obj: any, resultMap: any, top = true): any => {
     return obj;
 };
 
+//
+//
 function buildSrcNcLists (resultMap: any): any {
     return recursiveAddSrcNcLists({ list: [], map: {} }, resultMap);
 }
 
-function getSourceList (nc: NameCount): SourceList {
-    const sources: SourceList = [];
+//
+//
+let populateSourceData = (lazySource: SourceBase, nc: NameCount, validateResult: ValidateResult): SourceData => {
+    let source: SourceData = lazySource /*as SourceBase*/ as SourceData;
+    if (validateResult.resultMap) {
+        let srcNcData = buildSrcNcLists(validateResult.resultMap.map());
+        source.srcNcLists = srcNcData.list;
+        source.srcNcMap = srcNcData.map;
+    } else {
+        if (validateResult.ncList.length !== 1 || validateResult.ncList[0].count !== 1) throw new Error("wrong assumption");
+	let ncCsv = validateResult.ncList.toString();
+        source.srcNcLists = [ncCsv];
+        source.srcNcMap = { "${ncCsv}": true };
+    }
+    if (nc.count > 1) {
+	let ncStr = nc.toString();
+        source.srcNcLists.push(ncStr);
+        source.srcNcMap[ncStr] = true;
+    }
+    source.ncList = [nc]; // TODO i could try getting rid of "LazySource.nc" and just make this part of LazySouceData
+    //source.srcNcLists = srcNcLists;
+    //source.srcNcMap = srcNcMap;
+    
+    /*
+    let source: SourceData = {
+        primaryNameSrcList,
+        ncList: [nc],
+        srcNcLists,
+        srcNcMap
+    };
+    */
+    if (loggy || logging > 3) {
+        console.log(`getSourceList() ncList: ${source.ncList}, srcNcLists: ${source.srcNcLists}`);
+        if (_.isEmpty(source.srcNcLists)) console.log(`empty srcNcList: ${Stringify(validateResult.resultMap.map())}`);
+    }
+    return source;
+};
+
+//
+//
+let getSourceData = (nc: NameCount, validateResult: ValidateResult, lazy: boolean): AnySourceData => {
+    const primaryNameSrcList: NCList = validateResult.nameSrcList;
+    return lazy
+	? { primaryNameSrcList,	ncList: [nc], validateResultList: [validateResult] }
+	: populateSourceData({ primaryNameSrcList }, nc, validateResult);
+};
+
+//
+//
+let getSourceList = (nc: NameCount, lazy: boolean): AnySourceData[] => {
+    const sourceList: AnySourceData[] = [];
     ClueManager.getKnownSourceMapEntries(nc).forEach((entry: any) => {
-        entry.results.forEach((result: any) => {
-            ClueManager.primaryNcListToNameSrcLists(result.ncList).forEach((primaryNameSrcList: NCList) => {
-                let srcNcLists: string[];
-                let srcNcMap: StringBoolMap = {};
-                if (result.resultMap) {
-                    let srcNcData = buildSrcNcLists(result.resultMap.map());
-                    srcNcLists = srcNcData.list;// as NCList;
-                    srcNcMap = srcNcData.map;// as StringBoolMap;
-                } else {
-                    if (result.ncList.length !== 1 || result.ncList[0].count !== 1) throw new Error("wrong assumption");
-                    srcNcLists = [result.ncList.toString()];
-                    srcNcMap[result.ncList.toString()] = true;
-                }
-                let source = {
-                    ncList: [nc],
-                    primaryNameSrcList,
-                    srcNcLists,
-                    srcNcMap
-                };
-                if (nc.count > 1) {
-                    // TODO: there is possibly some operator (different than --or) where I should add all peers
-                    // (same count) of 'nc' that have same primary sources. Achievable by just looking at resultMap? 
-                    source.srcNcLists.push(nc.toString());
-                    source.srcNcMap[nc.toString()] = true;
-                }
-                if (loggy || logging > 3) {
-                    console.log(`getSourceList() ncList: ${source.ncList}, srcNcLists: ${source.srcNcLists}`);
-                    if (_.isEmpty(source.srcNcLists)) console.log(`empty srcNcList: ${Stringify(result.resultMap.map())}`);
-                }
-                loggy = false;
-                sources.push(source);
-            });
+        entry.results.forEach((result: ValidateResult) => {
+            sourceList.push(getSourceData(nc, result, lazy));
         });
     });
-    return sources;
-}
+    return sourceList;
+};
 
-function showNcLists (ncLists: NCList[]): string {
-    let str = "";
-    let first = true;
-    for (let ncList of ncLists) {
-        if (!first) str += ' - ';
-        str += ncList;
-        first = false;
+//
+//
+let mergeSources = (source1: AnySourceData, source2: AnySourceData, lazy: boolean): AnySourceData => {
+    let primaryNameSrcList = [...source1.primaryNameSrcList, ...source2.primaryNameSrcList];
+    let ncList = [...source1.ncList, ...source2.ncList];
+    if (lazy) {
+	if (ncList.length !== 2) throw new Error(`ncList.length(${ncList.length})`);
+	source1 = source1 as LazySourceData;
+	source2 = source2 as LazySourceData;
+	let result: LazySourceData = {
+	    primaryNameSrcList,
+	    ncList,
+	    validateResultList: [source1.validateResultList[0], source2.validateResultList[0]]
+	};
+	return result;
     }
-    return _.isEmpty(str) ? "[]" : str;
-}
-
-//
-//
-let mergeSources = (source1: SourceData, source2: SourceData): SourceData => {
-    let mergedSources: SourceData = {
-        ncList: [...source1.ncList, ...source2.ncList],
-        primaryNameSrcList: [...source1.primaryNameSrcList, ...source2.primaryNameSrcList],
+    source1 = source1 as SourceData;
+    source2 = source2 as SourceData;
+    let mergedSource: SourceData = {
+	primaryNameSrcList,
+	ncList,
         srcNcLists: [...source1.srcNcLists, ...source2.srcNcLists],
         srcNcMap: {}
     };
-    mergedSources.ncCsv= mergedSources.ncList.sort().toString();
-    _.keys(source1.srcNcMap).forEach((key: string) => { mergedSources.srcNcMap[key] = true; });
-    _.keys(source2.srcNcMap).forEach((key: string) => { mergedSources.srcNcMap[key] = true; });
-    mergedSources.srcNcMap[mergedSources.ncCsv] = true;
-    return mergedSources;
+    mergedSource.ncCsv = mergedSource.ncList.sort().toString();
+    _.keys(source1.srcNcMap).forEach((key: string) => { mergedSource.srcNcMap[key] = true; });
+    _.keys(source2.srcNcMap).forEach((key: string) => { mergedSource.srcNcMap[key] = true; });
+    mergedSource.srcNcMap[mergedSource.ncCsv] = true;
+    return mergedSource;
 };
 
 //
 //
-let mergeCompatibleSources = (source1: SourceData, source2: SourceData): SourceList => {
+let mergeCompatibleSources = (source1: AnySourceData, source2: AnySourceData, lazy: boolean): AnySourceData[] => {
     if (0 || logging>2) console.log(`mergeCompat: nameSrcList1: ${source1.primaryNameSrcList}, nameSrcList2: ${source2.primaryNameSrcList}`);
-    const allUnique = allCountUnique(source1.primaryNameSrcList, source2.primaryNameSrcList);
-    // wrap one element in an array to simplify !allUnique failure/null condition at caller site
-    return allUnique ? [mergeSources(source1, source2)] : [];
+    // TODO: this logic could be part of mergeSources
+    return allCountUnique(source1.primaryNameSrcList, source2.primaryNameSrcList)
+	? [mergeSources(source1, source2, lazy)]
+	: [];
 };
 
 //
 //
-function mergeCompatibleSourceLists (sourceList1: SourceList, sourceList2: SourceList): SourceList {
-    let mergedSourcesList: SourceList = [];
+let mergeCompatibleSourceLists = (sourceList1: AnySourceData[], sourceList2: AnySourceData[], lazy: boolean): AnySourceData[] => {
+    let mergedSourcesList: AnySourceData[] = [];
     for (const source1 of sourceList1) {
         for (const source2 of sourceList2) {
-            mergedSourcesList.push(...mergeCompatibleSources(source1, source2));
+            mergedSourcesList.push(...mergeCompatibleSources(source1, source2, lazy));
         }
     }
     return mergedSourcesList;
-}
-
-//
-// see: showNcLists
-let listOfNcListsToString = (listOfNcLists: NCList[]): string => {
-    if (!listOfNcLists) return _.toString(listOfNcLists);
-    let result = "";
-    listOfNcLists.forEach((ncList, index) => {
-        if (index > 0) result += ' - ';
-        result += NameCount.listToString(ncList);
-    });
-    return result;
 };
 
 //
 //
-let stringifySourceList = (sourceList: SourceList): string => {
-    let result = "[\n";
-    let first = true;
-    for (let source of sourceList) {
-        if (!first) result += ',\n';
-        else first = false;
-        result += '  {\n';
-        result += `    ncList: ${source.ncList}\n`;
-        result += `    primaryNameSrcList: ${source.primaryNameSrcList}\n`;
-        result += `    srcNcLists: ${Stringify2(source.srcNcLists)}\n`;
-        result += '  }';
+let mergeAllCompatibleSources = (ncList: NCList, lazy = false): AnySourceData[] => {
+    if (ncList.length > 2) { // because **maybe** broken for > 2 below
+        throw new Error(`${ncList} length > 2 (${ncList.length})`);
     }
-    return result + "\n]";
-};
+    // TODO:
+    // Take a lazy flag parameter to this function.
+    // **if Lazy**, Don't populate all the fields in each source here,
+    // just primaryNameSrcList (and probably primarySrcArray), and
+    // **result** - that is, attach the result object in to the source
+    // in getSourceList. So we can do a post-compatible-check merge.
+    // Need to figure out how to parameterize the SourceList type to
+    // either contain all of the data or just the "fast" data.
+    // Need to pass lazy flag to mergeCompatibleSourceLists/Sources/mergeSources
+    // Probably can use narrowing using ReturnType(this) != SourceBase
+    // to copy all the other shit.
+    // 
+    // reduce might work well here I think as well.
 
-//
-//
-let mergeAllCompatibleSources = (ncList: NCList): SourceList => {
-    if (ncList.length > 2) { // because broken for > 2 below
-        console.log(ncList.toString());
-        throw new Error(`ncList.length > 2 (${ncList.length})`);
-    }
-    let sourceList = getSourceList(ncList[0]);
+    let sourceList = getSourceList(ncList[0], lazy);
     for (let ncIndex = 1; ncIndex < ncList.length; ncIndex += 1) {
-        const nextSourceList = getSourceList(ncList[ncIndex]);
-        sourceList = mergeCompatibleSourceLists(sourceList, nextSourceList);
-        if (loggy) {
+        const nextSourceList = getSourceList(ncList[ncIndex], lazy);
+        sourceList = mergeCompatibleSourceLists(sourceList, nextSourceList, lazy);
+        if (0 || loggy) {
             console.log(`** merging index: ${ncIndex}, ${ncList[ncIndex]} as nextSourceList:`);
-            console.log(`${stringifySourceList(nextSourceList)}`);
-            console.log(`** result:\n${stringifySourceList(sourceList)}`);
+            //console.log(`${stringifySourceList(nextSourceList)}`);
+            //console.log(`** result:\n${stringifySourceList(sourceList)}`);
         }
         if (_.isEmpty(sourceList)) break; // TODO BUG this is broken for > 2; should be something like: if (sourceList.length !== ncIndex + 1) 
     }
@@ -310,7 +372,7 @@ let mergeAllCompatibleSources = (ncList: NCList): SourceList => {
 
 //
 //
-function allCountUnique (nameSrcList1: NCList, nameSrcList2: NCList): boolean {
+let allCountUnique = (nameSrcList1: NCList, nameSrcList2: NCList): boolean => {
     let set: Set<number> = new Set<number>();
     for (let nameSrc of nameSrcList1) {
         set.add(nameSrc.count);
@@ -319,7 +381,7 @@ function allCountUnique (nameSrcList1: NCList, nameSrcList2: NCList): boolean {
         if (set.has(nameSrc.count)) return false;
     }
     return true;
-}
+};
 
 //
 //
@@ -338,7 +400,7 @@ let buildUseSourcesLists = (useNcDataLists: NCDataList[]): SourceList[] => {
                 //let key = sources.primaryNameSrcList.map(_.toString).sort().toString();
                 let key = source.primaryNameSrcList.sort().toString();
                 if (!hashList[sourceListIndex][key]) {
-                    sourceLists[sourceListIndex].push(source);
+                    sourceLists[sourceListIndex].push(source as SourceData);
                     hashList[sourceListIndex][key] = true;
                 }
             }
@@ -714,6 +776,22 @@ let isCompatibleWithUseSources = (sourceList: SourceList, useSourcesList: Source
     return false;
 };
 
+// Lazy-load and merge all of the sources in lazySourceList.
+//
+let loadAndMergeSourceList = (lazySourceList: LazySourceData[]): SourceList => {
+    let sourceList: SourceList = []
+    for (let lazySource of lazySourceList) {
+	if (lazySource.ncList.length !== 2) throw new Error(`lazySource.ncList.length(${lazySource.ncList.length})`);
+	if (lazySource.validateResultList.length !== 2) throw new Error(`lazySource.validateResultList.length(${lazySource.validateResultList.length})`);
+	let sourcesToMerge: AnySourceData[] = []; // TODO: not ideal, would prefer SourceData here
+	for (let index = 0; index < 2; ++index) {
+	    sourcesToMerge.push(getSourceData(lazySource.ncList[index], lazySource.validateResultList[index], false));
+	}
+	sourceList.push(mergeSources(sourcesToMerge[0], sourcesToMerge[1], false) as SourceData);
+    }
+    return sourceList;
+};
+
 //
 //
 let getCombosForUseNcLists = (sum: number, max: number, args: any): any => {
@@ -723,7 +801,8 @@ let getCombosForUseNcLists = (sum: number, max: number, args: any): any => {
     let comboCount = 0;
     let totalVariations = 0;
     let numCacheHits = 0;
-    let numIncompatible = 0;
+    let numMergeIncompatible = 0;
+    let numUseIncompatible = 0;
     
     let MILLY = 1000000n;
     let start = process.hrtime.bigint();
@@ -765,9 +844,10 @@ let getCombosForUseNcLists = (sum: number, max: number, args: any): any => {
             //const key = NameCount.listToString(result.ncList);
             const key: string = result.ncList!.sort().toString();
             let cacheHit = false;
-            let sourceList: SourceList;
+            let sourceList: LazySourceData[];
             if (!hash[key]) {
-                sourceList = mergeAllCompatibleSources(result.ncList!);
+                sourceList = mergeAllCompatibleSources(result.ncList!, true) as LazySourceData[];
+		if (_.isEmpty(sourceList)) ++numMergeIncompatible;
                 //console.log(`$$ sources: ${Stringify2(sourceList)}`);
                 hash[key] = { sourceList };
             } else {
@@ -782,24 +862,26 @@ let getCombosForUseNcLists = (sum: number, max: number, args: any): any => {
             if (_.isEmpty(sourceList)) continue;
 
             if (_.isUndefined(hash[key].isCompatible)) {
-                hash[key].isCompatible = isCompatibleWithUseSources(sourceList, useSourcesList);
+                hash[key].isCompatible = isCompatibleWithUseSources(loadAndMergeSourceList(sourceList), useSourcesList);
             }
             if (hash[key].isCompatible) {
                 combos.push(result.nameList!.toString());
             } else if (!cacheHit) {
-                numIncompatible += 1;
+                numUseIncompatible += 1;
             }
         }
         totalVariations += numVariations;
     });
 
     let duration = (process.hrtime.bigint() - start) / MILLY;
-    Debug(`combos(${comboCount}) variations(${totalVariations}) cacheHits(${numCacheHits}) incompatible(${numIncompatible}) ` +
-          `actual(${totalVariations - numCacheHits - numIncompatible}) ${duration}ms`);
+    Debug(`combos(${comboCount}) variations(${totalVariations}) cacheHits(${numCacheHits}) ` +
+	`merge-incompatible(${numMergeIncompatible}) use-incompatible(${numUseIncompatible}) ` +
+        `actual(${totalVariations - numCacheHits - numUseIncompatible}) ${duration}ms`);
 
     if (1) {
-        console.error(`combos(${comboCount}) variations(${totalVariations}) cacheHits(${numCacheHits}) incompatible(${numIncompatible}) ` +
-                      `actual(${totalVariations - numCacheHits - numIncompatible}) ${duration}ms`);
+        console.error(`combos(${comboCount}) variations(${totalVariations}) cacheHits(${numCacheHits}) ` +
+	    `merge-incompatible(${numMergeIncompatible}) use-incompatible(${numUseIncompatible}) ` +
+            `actual(${totalVariations - numCacheHits - numUseIncompatible}) ${duration}ms`);
     } else {
         process.stderr.write('.');
     }

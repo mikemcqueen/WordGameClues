@@ -264,7 +264,7 @@ function copyClues (fromType, options = {}) {
 	    }
 	    let countSet = ncLists.reduce((countSet, ncList) => {
 		let sum = ncList.reduce((sum, nc) => { return sum + nc.count; }, 0);
-		countSet.add(sum);
+		if (sum <= max) countSet.add(sum);
 		return countSet;
 	    }, new Set());
 
@@ -367,9 +367,12 @@ async function main () {
     }
 
     setLogging(_.includes(options.verbose, VERBOSE_FLAG_LOAD));
+    let loadBegin = new Date();
     if (!loadClues(clueSource, ignoreLoadErrors, load_max)) {
         return 1;
     }
+    let loadMillis = new Duration(loadBegin, new Date()).milliseconds;
+    console.error(`loadClues(${PrettyMs(loadMillis)})`);
     setLogging(options.verbose);
 
     options.notebook = options.notebook || Note.getWorksheetName(clueSource);
