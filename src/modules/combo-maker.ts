@@ -73,18 +73,23 @@ type AnySourceData = LazySourceData | SourceData;
 
 //
 //
-interface XorSource extends SourceBase {
+
+type CountArray = Int32Array;
+
+interface UseSourceBase extends SourceBase {
+    primarySrcArray: CountArray;
 }
 
-interface OrSource extends SourceBase {
+interface XorSource extends UseSourceBase {
+}
+
+interface OrSource extends UseSourceBase {
     sourceLists: SourceList[];
     sourceNcCsvList: string[];
 }
-type OrSourceList = OrSource[];
 
-// optional properties until I can think of a better way.  mergeOrSourcesList.
-//
-interface UseSource extends SourceBase {
+// optional properties until I can think of a better way.  mergeOrSourceList.
+interface UseSource extends UseSourceBase {
     orSourceLists?: SourceList[];
     orSourcesNcCsvList?: string[];
 }
@@ -149,6 +154,38 @@ function showNcLists (ncLists: NCList[]): string {
         first = false;
     }
     return _.isEmpty(str) ? "[]" : str;
+}
+
+//
+//
+let allCountUnique = (nameSrcList1: NCList, nameSrcList2: NCList): boolean => {
+    let set: Set<number> = new Set<number>();
+    for (let nameSrc of nameSrcList1) {
+        set.add(nameSrc.count);
+    }
+    for (let nameSrc of nameSrcList2) {
+        if (set.has(nameSrc.count)) return false;
+    }
+    return true;
+};
+
+//
+//
+let noCountsInArray = (ncList: NCList, countArray: CountArray): boolean => {
+    for (let nc of ncList) {
+        if (countArray[nc.count] === nc.count) return false;
+    }
+    return true;
+};
+
+//
+//
+let getCountArray = (ncList: NCList): CountArray => {
+    let arr = new Int32Array(255);
+    for (let nc of ncList) {
+	arr[nc.count] = nc.count;
+    }
+    return arr;
 }
 
 // key types:
@@ -289,12 +326,13 @@ let mergeSources = (source1: AnySourceData, source2: AnySourceData, lazy: boolea
     let ncList = [...source1.ncList, ...source2.ncList];
     if (lazy) {
 	if (ncList.length !== 2) throw new Error(`ncList.length(${ncList.length})`);
-	source1 = source1 as LazySourceData;
-	source2 = source2 as LazySourceData;
 	let result: LazySourceData = {
 	    primaryNameSrcList,
 	    ncList,
-	    validateResultList: [source1.validateResultList[0], source2.validateResultList[0]]
+	    validateResultList: [
+		(source1 as LazySourceData).validateResultList[0],
+		(source2 as LazySourceData).validateResultList[0]
+	    ]
 	};
 	return result;
     }
@@ -303,8 +341,11 @@ let mergeSources = (source1: AnySourceData, source2: AnySourceData, lazy: boolea
     let mergedSource: SourceData = {
 	primaryNameSrcList,
 	ncList,
-        srcNcLists: [...source1.srcNcLists, ...source2.srcNcLists],
-        srcNcMap: {}
+        srcNcMap: {},
+        srcNcLists: [
+	    ...source1.srcNcLists,
+	    ...source2.srcNcLists
+	]
     };
     mergedSource.ncCsv = mergedSource.ncList.sort().toString();
     _.keys(source1.srcNcMap).forEach((key: string) => { mergedSource.srcNcMap[key] = true; });
@@ -316,7 +357,6 @@ let mergeSources = (source1: AnySourceData, source2: AnySourceData, lazy: boolea
 //
 //
 let mergeCompatibleSources = (source1: AnySourceData, source2: AnySourceData, lazy: boolean): AnySourceData[] => {
-    if (0 || logging>2) console.log(`mergeCompat: nameSrcList1: ${source1.primaryNameSrcList}, nameSrcList2: ${source2.primaryNameSrcList}`);
     // TODO: this logic could be part of mergeSources
     return allCountUnique(source1.primaryNameSrcList, source2.primaryNameSrcList)
 	? [mergeSources(source1, source2, lazy)]
@@ -341,29 +381,11 @@ let mergeAllCompatibleSources = (ncList: NCList, lazy = false): AnySourceData[] 
     if (ncList.length > 2) { // because **maybe** broken for > 2 below
         throw new Error(`${ncList} length > 2 (${ncList.length})`);
     }
-    // TODO:
-    // Take a lazy flag parameter to this function.
-    // **if Lazy**, Don't populate all the fields in each source here,
-    // just primaryNameSrcList (and probably primarySrcArray), and
-    // **result** - that is, attach the result object in to the source
-    // in getSourceList. So we can do a post-compatible-check merge.
-    // Need to figure out how to parameterize the SourceList type to
-    // either contain all of the data or just the "fast" data.
-    // Need to pass lazy flag to mergeCompatibleSourceLists/Sources/mergeSources
-    // Probably can use narrowing using ReturnType(this) != SourceBase
-    // to copy all the other shit.
-    // 
-    // reduce might work well here I think as well.
-
+    // TODO: reduce might work well here I think as well.
     let sourceList = getSourceList(ncList[0], lazy);
     for (let ncIndex = 1; ncIndex < ncList.length; ncIndex += 1) {
         const nextSourceList = getSourceList(ncList[ncIndex], lazy);
         sourceList = mergeCompatibleSourceLists(sourceList, nextSourceList, lazy);
-        if (0 || loggy) {
-            console.log(`** merging index: ${ncIndex}, ${ncList[ncIndex]} as nextSourceList:`);
-            //console.log(`${stringifySourceList(nextSourceList)}`);
-            //console.log(`** result:\n${stringifySourceList(sourceList)}`);
-        }
         if (_.isEmpty(sourceList)) break; // TODO BUG this is broken for > 2; should be something like: if (sourceList.length !== ncIndex + 1) 
     }
     loggy = false;
@@ -372,20 +394,7 @@ let mergeAllCompatibleSources = (ncList: NCList, lazy = false): AnySourceData[] 
 
 //
 //
-let allCountUnique = (nameSrcList1: NCList, nameSrcList2: NCList): boolean => {
-    let set: Set<number> = new Set<number>();
-    for (let nameSrc of nameSrcList1) {
-        set.add(nameSrc.count);
-    }
-    for (let nameSrc of nameSrcList2) {
-        if (set.has(nameSrc.count)) return false;
-    }
-    return true;
-};
-
-//
-//
-let buildUseSourcesLists = (useNcDataLists: NCDataList[]): SourceList[] => {
+let buildSourceListsForUseNcData = (useNcDataLists: NCDataList[]): SourceList[] => {
     let sourceLists: SourceList[] = [];
     let hashList: StringBoolMap[] = [];
     //console.log(`useNcDataLists(${useNcDataLists.length}): ${Stringify2(useNcDataLists)}`);
@@ -409,11 +418,11 @@ let buildUseSourcesLists = (useNcDataLists: NCDataList[]): SourceList[] => {
     return sourceLists;
 };
 
-// Here we have primaryNameSrcList which is the combined compatible primary sources of
-// one or more --or arguments.
+// Here primaryNameSrcList the combined compatible primary sources of one or more --or
+// arguments.
 //
-// And we have orSourceLists, which is a list of sourceLists: one list for each --or
-// argument that is *not* included in primaryNameSrcList.
+// And orSourceLists is a list of sourceLists: one list for each --or argument that is
+// *not* included in primaryNameSrcList.
 //          
 // Whittle down these lists of separate --or argument sources into lists of combined
 // compatible sources, with each result list containing one element from each source list.
@@ -467,17 +476,15 @@ let getCompatibleOrSourcesLists = (primaryNameSrcList: NCList, orSourceLists: So
 // It'd be preferable to embed this ncCsv within each sourceList itself. I'd need to
 // wrap it in an object like { sourceList, ncCsv }.
 //
-let buildSourcesNcCsvList = (orSourceLists: SourceList[]): string[] => {
+let buildSourceNcCsvList = (orSourceLists: SourceList[]): string[] => {
     return orSourceLists.map(sourceList => 
             _.flatMap(sourceList.map(sources => sources.ncList)).sort().toString());
 };
 
 //
 //
-// use generic here
-
 let ZZ = 0;
-let mergeCompatibleUseSources = <SourceType extends SourceBase>(sourceLists: SourceList[], op: any): SourceType[] => {
+let mergeCompatibleUseSources = <SourceType extends UseSourceBase>(sourceLists: SourceList[], op: any): SourceType[] => {
     // TODO: sometimes a sourceList is empty, like if doing $(cat required) with a
     // low clue count range (e.g. -c2,4). should that even be allowed?
     let pad = (op === Op.or) ? 1 : 0;
@@ -539,13 +546,16 @@ let mergeCompatibleUseSources = <SourceType extends SourceBase>(sourceLists: Sou
         }
         if (success) {
             if (ZZ) console.log(`pnsl, final: ${primaryNameSrcList}`);
-            let result: SourceBase = { primaryNameSrcList }; // ugly
+            let result: UseSourceBase = {
+		primaryNameSrcList,
+		primarySrcArray: getCountArray(primaryNameSrcList)
+	    };
             if (op === Op.or) {
-                let nonEmptyOrSourcesLists = orSourceLists.filter(sourceList => !_.isEmpty(sourceList));
+                let nonEmptyOrSourceLists = orSourceLists.filter(sourceList => !_.isEmpty(sourceList));
 		let orResult: OrSource = result as OrSource;
-                orResult.sourceLists = getCompatibleOrSourcesLists(primaryNameSrcList, nonEmptyOrSourcesLists);
-                orResult.sourceNcCsvList = buildSourcesNcCsvList(orResult.sourceLists);
-                if (ZZ && _.isEmpty(orResult.sourceLists) && !_.isEmpty(nonEmptyOrSourcesLists)) {
+                orResult.sourceLists = getCompatibleOrSourcesLists(primaryNameSrcList, nonEmptyOrSourceLists);
+                orResult.sourceNcCsvList = buildSourceNcCsvList(orResult.sourceLists);
+                if (ZZ && _.isEmpty(orResult.sourceLists) && !_.isEmpty(nonEmptyOrSourceLists)) {
                     console.log(`before: orSourceLists(${orSourceLists.length}): ${Stringify2(orSourceLists)}`);
                     console.log(`after: result.sourceLists(${orResult.sourceLists.length}): ${Stringify2(orResult.sourceLists)}`);
                     ZZ = 0;
@@ -560,12 +570,10 @@ let mergeCompatibleUseSources = <SourceType extends SourceBase>(sourceLists: Sou
 
 //
 //
-// use generic here
-
-let getUseSourcesList = <SourceType extends SourceBase>(ncDataLists: NCDataList[], op: any): SourceType[] => {
+let getUseSourcesList = <SourceType extends UseSourceBase>(ncDataLists: NCDataList[], op: any): SourceType[] => {
     //console.log(`ncDataLists: ${Stringify2(ncDataLists)}`);
     if (_.isEmpty(ncDataLists[0])) return [];
-    let sourceLists = buildUseSourcesLists(ncDataLists);
+    let sourceLists = buildSourceListsForUseNcData(ncDataLists);
     //console.log(`buildUseSourcesLists: ${Stringify2(sourceLists)}`);
     return mergeCompatibleUseSources<SourceType>(sourceLists, op);
 };
@@ -574,39 +582,38 @@ let getUseSourcesList = <SourceType extends SourceBase>(ncDataLists: NCDataList[
 // nested loops over XorSources, OrSources primaryNameSrcLists,
 // looking for compatible lists
 //
-let mergeOrSourcesList = (sourceList: XorSource[], orSourceList: OrSource[]): UseSource[] => {
+let mergeOrSourceList = (sourceList: XorSource[], orSourceList: OrSource[]): UseSource[] => {
     // NOTE: optimization, can be implemented with separate loop, 
     // (can start with LAST item in list as that should be the one with all
     // --or options, and if that fails, we can bail)
-    let mergedSourcesList: UseSource[] = [];
-    for (let sources of sourceList) {
-        for (let orSources of orSourceList) {
+    let mergedSourceList: UseSource[] = [];
+    for (let source of sourceList) {
+        for (let orSource of orSourceList) {
             //
             // TODO:  call mergeCompatibleSources.  still? or..
             //
-            let combinedNameSrcList = sources.primaryNameSrcList.concat(orSources.primaryNameSrcList);
+            let combinedNameSrcList = source.primaryNameSrcList.concat(orSource.primaryNameSrcList);
             // 
             // TODO: hash of primary sources faster here?
             //
             // possible faulty (rarish) optimization, only checking clue count
-            // TODO: not 100% sure this change is correct...
-            // if (_.uniqBy(combinedNameSrcList, NameCount.count).length === combinedNameSrcList.length) {
             const numUnique = _.uniqBy(combinedNameSrcList, NameCount.count).length;
-            if (numUnique === orSources.primaryNameSrcList.length) {
-                console.error('an --or value is implicitly compatible with an --xor value, making this --or value unnecessary');
-            } else if (numUnique === combinedNameSrcList.length) {
-                mergedSourcesList.push({
+            if (numUnique === combinedNameSrcList.length) {
+                mergedSourceList.push({
                     primaryNameSrcList: combinedNameSrcList,
-                    orSourceLists: orSources.sourceLists,  // yeah this terminology will confuse pretty much anymore
-                    orSourcesNcCsvList: orSources.sourceNcCsvList
+		    primarySrcArray: getCountArray(combinedNameSrcList),
+                    orSourceLists: orSource.sourceLists,
+                    orSourcesNcCsvList: orSource.sourceNcCsvList
                 });
-            } else if (0) {
-                console.error(`not unique, sources: ${NameCount.listToString(sources.primaryNameSrcList)}, ` +
-                              `orSources: ${NameCount.listToString(orSources.primaryNameSrcList)}`);
+            } else if (numUnique === orSource.primaryNameSrcList.length) {
+                console.error('an --or value is implicitly compatible with an --xor value, making this --or value unnecessary');
+	    } else if (0) {
+                console.error(`not unique, source: ${NameCount.listToString(source.primaryNameSrcList)}, ` +
+                              `orSource: ${NameCount.listToString(orSource.primaryNameSrcList)}`);
             }
         }
     }
-    return mergedSourcesList;
+    return mergedSourceList;
 };
 
 //
@@ -620,14 +627,13 @@ let getCompatibleUseSourcesFromNcData = (args: any): UseSource[] => {
     let orSourceList = getUseSourcesList<OrSource>(args.allOrNcDataLists, Op.or);
     //console.log(`orSourceList(${orSourceList.length}) ${Stringify2(orSourceList)}`);
 
-    // final: merge or with xor
+    // final: merge OR with XOR
     if (!_.isEmpty(orSourceList)) {
-        sourceList = mergeOrSourcesList(sourceList, orSourceList);
+        sourceList = mergeOrSourceList(sourceList, orSourceList);
         //console.log(`orSourceList(${orSourceList.length}), mergedSources(${sourceList.length}): ${Stringify2(sourceList)}`);
     }
     console.error(`orSourceList(${orSourceList.length})`);
-
-    return sourceList; // xorSourceList;
+    return sourceList;
 };
 
 //
@@ -736,7 +742,7 @@ let isCompatibleWithOrSources = (sources: SourceData, useSources: UseSource): bo
     for (let [listIndex, orSourceList] of orSourceLists.entries()) {
         let ncCsv = useSources.orSourcesNcCsvList![listIndex];
         if (sources.srcNcMap[ncCsv]) {
-            //:: orSources ncCsv matches sources ncCsv
+            // orSources ncCsv matches sources ncCsv
 
             // essentially, subtract all orSources.primaryNameSrcList entries from from sources.primaryNameSrcList
             // based on primary source. probably not fast.
@@ -750,9 +756,9 @@ let isCompatibleWithOrSources = (sources: SourceData, useSources: UseSource): bo
                 XX = 0;
             }
             if (xorPrimaryNameSrcList.length === sources.primaryNameSrcList.length - orSourcesPrimaryNameSrcList.length) {
-                //:: orSources primary sources match sources primary sources
+                // orSources primary sources match sources primary sources
                 if (allCountUnique(xorPrimaryNameSrcList, useSources.primaryNameSrcList)) {
-                    //:: sources' remaining primary sources are compatible with useSources' primary sources
+                    // sources' remaining primary sources are compatible with useSources' primary sources
                     return true;
                 }
             }
@@ -763,12 +769,14 @@ let isCompatibleWithOrSources = (sources: SourceData, useSources: UseSource): bo
 
 //
 //
-let isCompatibleWithUseSources = (sourceList: SourceList, useSourcesList: SourceList): boolean => {
-    if (_.isEmpty(useSourcesList)) return true;
-    for (let sources of sourceList) {
-        for (let useSources of useSourcesList) {
-            const allUnique = allCountUnique(sources.primaryNameSrcList, useSources.primaryNameSrcList);
-            if (allUnique || isCompatibleWithOrSources(sources, useSources)) {
+let isCompatibleWithUseSources = (sourceList: SourceList, useSourceList: UseSource[]): boolean => {
+    if (_.isEmpty(useSourceList)) return true;
+    for (let source of sourceList) {
+        for (let useSource of useSourceList) {
+            //const allUnique = allCountUnique(source.primaryNameSrcList, useSource.primaryNameSrcList);
+	    const allUnique = noCountsInArray(source.primaryNameSrcList, useSource.primarySrcArray);
+	    // something fucky here, i'm sending a SourceData to a UseSource
+            if (allUnique || isCompatibleWithOrSources(source, useSource)) {
                 return true;
             }
         }
@@ -776,7 +784,12 @@ let isCompatibleWithUseSources = (sourceList: SourceList, useSourcesList: Source
     return false;
 };
 
-// Lazy-load and merge all of the sources in lazySourceList.
+// Here lazySourceList is a list of lazy-merged sources.
+//
+// Construct and fully populate exactly 2 new component sources for each lazy-merged
+// source, then perform a full merge on those sources.
+//
+// Return a list fully merged sources.
 //
 let loadAndMergeSourceList = (lazySourceList: LazySourceData[]): SourceList => {
     let sourceList: SourceList = []
@@ -807,7 +820,8 @@ let getCombosForUseNcLists = (sum: number, max: number, args: any): any => {
     let MILLY = 1000000n;
     let start = process.hrtime.bigint();
 
-    let useSourcesList = args.useSourcesList;
+    // TODO: typify this
+    let useSourcesList: UseSource[] = args.useSourcesList;
     if (0) console.log(`useSourcesList: ${Stringify2(useSourcesList)}`);
 
     // for each sourceList in sourceListArray
