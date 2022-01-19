@@ -1,8 +1,9 @@
-//
+///
 // combo-maker.ts
 //
 
-const _           = require('lodash');
+//const _           = require('lodash');
+import _ from 'lodash';
 const BootstrapComboMaker = require('./bootstrap-combo-maker');
 const ClueManager = require('./clue-manager');
 const ClueList    = require('../types/clue-list');
@@ -111,7 +112,7 @@ const Op = {
 };
 Object.freeze(Op);
 
-function OpName (opValue: number): string {
+function OpName (opValue: number): string | undefined {
     return _.findKey(Op, (v: number) => opValue === v);
 }
 
@@ -773,10 +774,8 @@ let isCompatibleWithUseSources = (sourceList: SourceList, useSourceList: UseSour
     if (_.isEmpty(useSourceList)) return true;
     for (let source of sourceList) {
         for (let useSource of useSourceList) {
-            //const allUnique = allCountUnique(source.primaryNameSrcList, useSource.primaryNameSrcList);
-	    const allUnique = noCountsInArray(source.primaryNameSrcList, useSource.primarySrcArray);
-	    // something fucky here, i'm sending a SourceData to a UseSource
-            if (allUnique || isCompatibleWithOrSources(source, useSource)) {
+	    const allUniqueSrc = noCountsInArray(source.primaryNameSrcList, useSource.primarySrcArray);
+            if (allUniqueSrc || isCompatibleWithOrSources(source, useSource)) {
                 return true;
             }
         }
