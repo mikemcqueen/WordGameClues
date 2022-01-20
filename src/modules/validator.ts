@@ -165,7 +165,6 @@ let uniqueResult = (success: boolean, list: any = undefined): RvsResult => {
 //  nameSrcList:
 //  pendingMap:
 //  validateAll:
-//  ncNameListPairs:
 //
 let getCompatibleResults = (args: any): Result[] => {
     // no duplicates, and all clues are primary, success!
@@ -568,7 +567,6 @@ let buildSrcNameList = (args): any => {
     let clueCount = 0;
     let compoundNcList: NCList = [];
     let compoundSrcNameList: any[] = [];
-    let compoundNcNameListPairs: any[] = [];
     let primaryNcList: NCList = [];
     let primarySrcNameList: any[] = [];
     let primaryPathList: any[] = []; //  TODO: i had half an idea here
@@ -578,9 +576,7 @@ let buildSrcNameList = (args): any => {
         let src = args.allPrimary ? 1 : nc.count;
         // i.e. srcNameCsvArray
         let srcList = ClueManager.knownClueMapArray[src][nc.name]; // e.g. [ 'src1,src2,src3', 'src2,src3,src4' ]
-        if (!srcList) {
-            throw new Error('kind of impossible but missing clue!');
-        }
+        if (!srcList) throw new Error('kind of impossible but missing clue!');
 
         // only do indexing if all clues are primary, or if this
         // is a compound clue
@@ -614,7 +610,6 @@ let buildSrcNameList = (args): any => {
         }
         
         // nc is a compound clue
-        compoundNcNameListPairs.push([nc, _.clone(srcNameList)]);
         let map = resultMap.map()[nc] = {};
         // if sources for this nc are all primary clues
         if (_.size(srcNameList) === nc.count) {
@@ -649,7 +644,6 @@ let buildSrcNameList = (args): any => {
     Debug(`  count: ${clueCount}`);
     Debug(`  primarySrcNameList: ${primarySrcNameList}`);
     Debug(`__primaryNcList: ${primaryNcList}`);
-    // indentNewline() + '  compoundNcNameListPairs: ' + compoundNcNameListPairs +
 
     if (!_.isEmpty(resultMap.map())) {
         Debug(`resultMap:`);
@@ -658,7 +652,6 @@ let buildSrcNameList = (args): any => {
         Debug(`resultMap: empty`);
     }
     return {
-        compoundNcNameListPairs,
         compoundSrcNameList,
         compoundNcList,
         primaryNcList,
@@ -836,22 +829,8 @@ let addAllCompatible = (compatList: Result[], resultList: Result[]): void => {
     }
 }
 
-// args:
-//  nameSrcList:
-//  excludeSrcList: list of excluded primary sources
-//
-// TODO: NameCount.containsAnyCount(ncList-or-nc, count-or-countlist)
-//
-/*
-let hasExcludedSource = function(nameSrcList: NCList, excludeSrcList: NCList) {
-    return _.isUndefined(excludeSrcList) ? false :
-        !_.isEmpty(_.intersection(excludeSrcList, nameSrcList.map(nc => nc.count)));
-};
-*/
-
 //
 //
-
 let dumpIndexMap = function(indexMap: any): void {
     let s = '';
     _.keys(indexMap).forEach((key: any) => {
@@ -974,6 +953,8 @@ let checkUniqueSources = (nameCountList: NCList, args: any): any => {
                 // also merge buildResults data into resultMap.
                 candidateResultList = vsResult.list.map(result => Object({
                     ncList:    _.concat(result.ncList, buildResult.primaryNcList),
+		    // TODO: I don't think i need to clone buildResult.resultmap here.
+		    // it's a new copy every iteration.
                     resultMap: _.cloneDeep(buildResult.resultMap).merge(result.resultMap, buildResult.compoundNcList)
                 }));
             }
@@ -991,7 +972,6 @@ let checkUniqueSources = (nameCountList: NCList, args: any): any => {
                     nameSrcList:    getNameSrcList(findResult.srcMap),
                     pendingMap:     result.resultMap, 
                     validateAll:    args.validateAll,
-                    ncNameListPairs: buildResult.compoundNcNameListPairs // TODO: remove here and in build()
                 });
                 if (!_.isEmpty(compatList)) {
                     anyCandidate = true;
@@ -1198,6 +1178,7 @@ let validateSources = (args: any): any => {
         max:     args.max,
         quiet:   args.quiet
     }).getCombinations().some((clueCountList: number[]) => {
+	//console.log(`nameList: ${args.nameList}, countList: ${clueCountList}`);
         let rvsResult = recursiveValidateSources({
             clueNameList:   args.nameList,
             clueCountList,

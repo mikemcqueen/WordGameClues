@@ -20,6 +20,11 @@ const FINAL_KEY     = '__final';
 
 //
 
+let dumpy = false;
+let xp = false;
+
+//
+
 function makeNew () {
     return new ResultMap(); //assignMethods(Object({}));
 }
@@ -112,9 +117,9 @@ function addResult (args) {
           indentNewline() + '  nameSrcList: ' + nameSrcList);
     this.dump();
 
-    Expect(_.size(primaryNcList)).is.equal(_.size(nameSrcList));
+    if (xp) Expect(_.size(primaryNcList)).is.equal(_.size(nameSrcList));
     this.addAllPrimary(args.origNcList, primaryNcList, nameSrcList);
-    Expect(_.size(primaryNcList)).is.equal(_.size(nameSrcList));
+    if (xp) Expect(_.size(primaryNcList)).is.equal(_.size(nameSrcList));
     /*
     if (args.rootKey) {
         this.addResultAtRoot({
@@ -547,7 +552,7 @@ function mergeNcList (fromMap, ncList) {
             let deleteKey = true;
             // if this is actually an array (of primary clues), do some magic
             if (_.isArray(fromObj)) {
-                Expect(fromObj).is.not.empty();
+                if (xp) Expect(fromObj).is.not.empty();
 		if (loggy) console.log(`magic:`);
                 let newObj = {};
                 newObj[fromKey] = [fromObj[0]];
@@ -643,9 +648,8 @@ function ensureUniquePrimaryLists () {
 
 //
 //
-
 function dump () {
-    dumpMap(this.map());
+    if (dumpy) dumpMap(this.map());
     return this;
 }
 

@@ -275,7 +275,7 @@ ClueManager.prototype.addKnownClue = function (count, name, source, nothrow) {
     let clueMap = this.knownClueMapArray[count];
     if (!_.has(clueMap, name)) {
         this.log(`clueMap[${name}] = [ ${source} ]`);
-        clueMap[name] = [ source ];
+        clueMap[name] = [source];
     } else if (!clueMap[name].includes(source)) {
         this.log(`clueMap[${name}] += ${source} (${count})`);
         clueMap[name].push(source);
