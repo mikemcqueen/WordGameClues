@@ -2,7 +2,7 @@
   "name": "clues",
   "version": "0.0.1",
   "description": "Word-game clue manager",
-  "main": "clues.js",
+  "main": "./src/tools/clues.js",
   "type": "commonjs",
   "dependencies": {
     "array-peek": "^1.0.112",

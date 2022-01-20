@@ -20,6 +20,11 @@ const ResultMap   = require('../types/result-map');
 const Stringify   = require('stringify-object');
 const Timing      = require('debug')('timing');
 
+
+// TODO: options.xp
+const xp = false;
+
+
 let rvsSuccessSeconds = 0;
 let rvsFailDuration  = 0;
     
@@ -44,15 +49,21 @@ interface NameCount {
 }
 type NCList = NameCount[];
 
-type Result = any;
+type CountArray = Int32Array;
+
+interface Result {
+    ncList: NCList;
+    nameSrcList?: NCList;
+    primarySrcArray?: CountArray;
+    nameSrcCsv?: string;
+    resultMap: any;
+}
 
 interface RvsResult {
     success: boolean;
-    list: Result[];
+    list: Result[] | undefined;
 }
 
-// TODO: options.xp
-const xp = true;
 
 /*
 let log = function (text) {
@@ -118,6 +129,26 @@ let setAllowDupeFlags = (args: any): void => {
     }
 };
 
+
+//
+//
+let noCountsInArray = (ncList: NCList, countArray: CountArray): boolean => {
+    for (let nc of ncList) {
+        if (countArray[nc.count] === nc.count) return false;
+    }
+    return true;
+};
+
+//
+//
+let getCountArray = (ncList: NCList): CountArray => {
+    let arr = new Int32Array(255);
+    for (let nc of ncList) {
+	arr[nc.count] = nc.count;
+    }
+    return arr;
+}
+
 // in a word: unnecessary
 
 let uniqueResult = (success: boolean, list: any = undefined): RvsResult => {
@@ -136,7 +167,7 @@ let uniqueResult = (success: boolean, list: any = undefined): RvsResult => {
 //  validateAll:
 //  ncNameListPairs:
 //
-let getCompatibleResults = (args: any): any => {
+let getCompatibleResults = (args: any): Result[] => {
     // no duplicates, and all clues are primary, success!
     Debug('++allUniquePrimary' +
           `${indentNewline()}  origNcList:  ${args.origNcList}` +
@@ -149,7 +180,7 @@ let getCompatibleResults = (args: any): any => {
     }
 
     let logit = false;
-    let resultList: any[] = [];
+    let resultList: Result[] = [];
     if (logit) {
         Debug(`aUP: adding primary result`);
         Debug(`  ${args.ncList}`);
@@ -157,7 +188,7 @@ let getCompatibleResults = (args: any): any => {
     }
     addCompatibleResult(resultList, args.nameSrcList, args);
     if (_.isEmpty(resultList) || args.validateAll) {
-        cyclePrimaryClueSources({ ncList:args.ncList }).some((nameSrcList: NCList) => {
+        cyclePrimaryClueSources({ ncList: args.ncList }).some((nameSrcList: NCList) => {
             // check if nameSrcList is already in result list
             if (hasNameSrcList(resultList, nameSrcList)) {
                 if (logit) {
@@ -178,23 +209,20 @@ let getCompatibleResults = (args: any): any => {
 };
 
 //
-let addCompatibleResult = (resultList: any, nameSrcList: NCList, args: any): void => {
+let addCompatibleResult = (resultList: Result[], nameSrcList: NCList, args: any): void => {
     if (xp) {
         Expect(resultList).is.an.Array();
         Expect(nameSrcList).is.an.Array();
         Expect(args.origNcList).is.an.Array();
         Expect(args.ncList).is.an.Array();
-//        Expect(args.ncNameListPairs).is.an.Array();
     }
-
     resultList.push({
-        ncList:      args.ncList,
-        nameSrcList: nameSrcList,
-        resultMap:   _.cloneDeep(args.pendingMap).addResult({
-            origNcList:      args.origNcList,
-            primaryNcList:   args.ncList,
-            nameSrcList:     nameSrcList,
-//            ncNameListPairs: args.ncNameListPairs
+        ncList: args.ncList,
+        nameSrcList,
+        resultMap: _.cloneDeep(args.pendingMap).addResult({
+            origNcList: args.origNcList,
+            primaryNcList: args.ncList,
+            nameSrcList
         }).ensureUniquePrimaryLists()
     });
 };
@@ -206,14 +234,14 @@ let addCompatibleResult = (resultList: any, nameSrcList: NCList, args: any): voi
 //  ncList:
 //  exclueSrcList:
 //
-let cyclePrimaryClueSources = (args: any): Result[] => {
+let cyclePrimaryClueSources = (args: any): NCList[] => {
     if (xp) Expect(args.ncList).is.an.Array().and.not.empty();
 
     Debug(`++cyclePrimaryClueSources`);
 
     // must copy the NameCount objects within the list
     let localNcList = _.cloneDeep(args.ncList);
-    let resultList: any[] = [];
+    let resultList: NCList[] = [];
     let buildArgs: any = {
         ncList:     args.ncList,   // always pass same unmodified ncList
         allPrimary: true
@@ -255,7 +283,6 @@ let cyclePrimaryClueSources = (args: any): Result[] => {
     resultList.forEach((result: any) => {
         Debug(`  list: ${result}`);
     });
-
     return resultList;
 };
 
@@ -783,13 +810,31 @@ let chop = (list: any, removeValue: any): any => {
 
 //
 //
-let hasNameSrcList = (resultList: any, nameSrcList: NCList): boolean => {
-    return resultList.some((result: any) => {
-        return result.nameSrcList.every((nameSrc, nsIndex) => {
-            return nameSrc.equals(nameSrcList[nsIndex]);
+let hasNameSrcList = (resultList: Result[], nameSrcList: NCList): boolean => {
+    return resultList.some(result => {
+        return result.nameSrcList!.every((nameSrc, nsIndex: number) => {
+            return nameSrc == nameSrcList[nsIndex];
         });
     });
 };
+
+//
+//
+let isCompatible = (compatResult: Result, result: Result): boolean => {
+    return noCountsInArray(compatResult.nameSrcList!, result.primarySrcArray!);
+}
+
+//
+//
+let addAllCompatible = (compatList: Result[], resultList: Result[]): void => {
+    for (let compatResult of compatList) {
+	compatResult.nameSrcCsv = compatResult.nameSrcList!.toString(); // sorted?
+        if (resultList.every(result => compatResult.nameSrcCsv! != result.nameSrcCsv!)) {
+	    //compatResult.primarySrcArray = getCountArray(compatResult.nameSrcList!);
+	    resultList.push(compatResult);
+        }
+    }
+}
 
 // args:
 //  nameSrcList:
@@ -874,9 +919,9 @@ let checkUniqueSources = (nameCountList: NCList, args: any): any => {
 
     let resultMap;
     let buildResult;
-    let candidateResultList;
+    let candidateResultList: Result[];
     let anyFlag = false;
-    let resultList: any[] = [];
+    let resultList: Result[] = [];
     let buildArgs: any = {
         ncList: nameCountList
     };
@@ -950,24 +995,16 @@ let checkUniqueSources = (nameCountList: NCList, args: any): any => {
                 });
                 if (!_.isEmpty(compatList)) {
                     anyCandidate = true;
-                    compatList.forEach((result: any) => {
-                        if (!hasNameSrcList(resultList, result.nameSrcList)) {
-                            resultList.push(result);
-                        }
-                    });
+		    addAllCompatible(compatList, resultList);
                     // TODO: remove duplicates in uniqueResults()
                     //resultList = _.concat(resultList, compatList);
                     return !args.validateAll; // some.exit if !validateAll, else some.continue
                 }
                 return false; // some.continue;
             });
-            if (!anyCandidate) {
-                break; // none of those results were good, try other combos
-            }
+            if (!anyCandidate) break; // none of those results were good, try other combos
             anyFlag = true;
-            if (args.validateAll) {
-                break; // success , but keep searching for other combos
-            }
+            if (args.validateAll) break; // success , but keep searching for other combos
             Debug(`--checkUniqueSources, single validate, success: ${anyFlag}`);
             return uniqueResult(anyFlag, resultList); // success , exit function
         }
@@ -1085,7 +1122,7 @@ let recursiveValidateSources = (args: any): RvsResult => {
     let ncList = args.nameCountList || [];
     let nameIndex = 0;
     let clueName = args.clueNameList[nameIndex];
-    let resultList;
+    let resultList: Result[] = [];
 
     // optimization: could have a map of count:boolean entries here
     // on a per-name basis (new map for each outer loop; once a
@@ -1123,7 +1160,7 @@ let recursiveValidateSources = (args: any): RvsResult => {
 
     return {
         success: someResult,
-        list:    someResult ? resultList : undefined
+        list: someResult ? resultList : undefined
     };
 };
 
@@ -1168,7 +1205,7 @@ let validateSources = (args: any): any => {
         });
         if (rvsResult.success) {
             Debug('validateSources: VALIDATE SUCCESS!');
-            resultList.push(...rvsResult.list);
+            if (rvsResult.list !== undefined) resultList.push(...rvsResult.list); // TODO: return empty array, get rid of .success
             found = true;
             if (!args.validateAll) return true; // found a match; some.exit
             // validatingg all, continue searching
@@ -1178,13 +1215,10 @@ let validateSources = (args: any): any => {
     }, this);
     Debug('--validateSources');
 
-    const result = {
-        success:     found,
-        list:        found ? resultList : undefined
+    return {
+        success: found,
+        list: found ? resultList : undefined
     };
-
-    //hash[key] = result;
-    return result;
 };
 
 module.exports = {
