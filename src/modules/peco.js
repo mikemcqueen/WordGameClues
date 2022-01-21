@@ -40,9 +40,9 @@ function makeNew(args) {
 // -or-
 //
 //  sum       
-//  count     create lists of this length
-//    -or-
-//  max       create lists of max length
+//    count     create lists of this length
+//      -or-
+//    max       create lists of max length
 //
 //
 //  require:  list of required numbers, e.g. [2, 4]
@@ -64,6 +64,7 @@ function Peco(args) {
     this.max        = args.max;
     this.require    = args.require; // list of required numbers
     this.exclude    = args.exclude; // list of exluded numbers
+    this.noDuplicates = args.noDuplicates;
 
     if (this.listArray) {
         if (!this.max) {
@@ -177,9 +178,11 @@ Peco.prototype.firstCombination = function () {
 //
 //
 Peco.prototype.nextCombination = function () {
+    let flags = Flag.Combinations;
+    if (this.noDuplicates) flags |= Flag.NoDuplicates;
     return this.buildNextResult({
         listArray: this.listArray,
-        flags: Flag.Combinations // | Flag.NoDuplicates
+        flags,
     });
 };
 

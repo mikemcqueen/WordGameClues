@@ -695,7 +695,8 @@ let getCompatibleUseSourcesFromNcData = (args: any): UseSource[] => {
 	sourceList = mergeOrSourceList(sourceList, orSourceList);
 	//console.log(`orSourceList(${orSourceList.length}), mergedSources(${sourceList.length}): ${Stringify2(sourceList)}`);
     }
-    console.error(`orSourceList(${orSourceList.length})`);
+    console.error(`useSourceList(${sourceList.length})`);
+    console.error(` orSourceList(${orSourceList.length})`);
     return sourceList;
 };
 
@@ -788,62 +789,25 @@ let first = (clueSourceList: any, sourceIndexes: number[]): FirstNextResult => {
 //
 let XX = 0;
 let isCompatibleWithAnyOrSource = (source: SourceData, useSource: UseSource): boolean => {
-    // TODO: yes this happens. why I don't know.
-    const orSourceLists = useSource.orSourceLists;
-    //if (_.isEmpty(orSourceLists)) console.error(`empty orSourceList!`);
-    if (!orSourceLists || _.isEmpty(orSourceLists)) {
-	// Return false because the caller's presumption is that sources is not
-	// wholly compatible with the useSources currently under consideration,
-	// and thus called this function seeking an exception due to an orSources
-	// match. If there are no orSources that match, we revert to the original
-	// presumption (incompatible). The semantics could be made a little cleaner
-	// by e.g. returning an empty array here, and a populated array for a match.
-	// or maybe just a method name change.
-	return false;
-    }
-    //console.log(`orSourceLists(${orSourceLists.length}): ${Stringify2(orSourceLists)}`);
-//    for (let [index, orSourceList] of orSourceLists.entries()) {
-    return orSourceLists.some((orSourceList, index) => {
+    // for (let [index, orSourceList] of useSource.orSourceLists!.entries()) {  // 6s, 2x as slow
+    // for (let orSourceList of useSource.orSourceLists!) {  // 3.6-4s, 5% to 15% slowerr
+    return useSource.orSourceLists!.some((orSourceList, index) => { // 3.5s
+	if (1) {
 	let ncCsv = useSource.orSourcesNcCsvList![index];
 	if (source.srcNcMap[ncCsv]) {
-	    // orSources ncCsv matches sources ncCsv
-	    let primarySrcArrayAndSize = useSource.orSourcesPrimarySrcArrayAndSizeList![index];
+	// orSources ncCsv matches sources ncCsv
+            let primarySrcArrayAndSize = useSource.orSourcesPrimarySrcArrayAndSizeList![index];
 	    let numCountsInArray = getNumCountsInArray(source.primaryNameSrcList, primarySrcArrayAndSize.array);
 	    if (numCountsInArray === primarySrcArrayAndSize.size) {
 		const uniqPrimarySrcList = getCountListNotInArray(source.primaryNameSrcList, primarySrcArrayAndSize.array);
 		const allUniqueSrc = noNumbersInArray(uniqPrimarySrcList, useSource.primarySrcArray);
 		//const allUniqueSrc = noCountsNotInOneAreInTwo(source.primaryNameSrcList, primarySrcArrayAndSize, useSource.primarySrcArray);
-		if (allUniqueSrc) {
-		    return true; // some.exit
-		}
+		if (allUniqueSrc) return true; // some.exit
 	    }
+	}
 	}
 	return false; // some.continue
     });
-
-/*
-	    // essentially, subtract all orSources.primaryNameSrcList entries from from sources.primaryNameSrcList
-	    // based on primary source. probably not fast.
-	    // TODO: profile, speed this shit up.
-	    const orSourcesPrimaryNameSrcList = _.flatten(orSourceList.map(orSources => orSources.primaryNameSrcList));
-	    const xorPrimaryNameSrcList = _.xorBy(sources.primaryNameSrcList, orSourcesPrimaryNameSrcList, NameCount.count);
-	    if (XX) {
-		console.log(`sources: ${sources.primaryNameSrcList}`);
-		console.log(`or: ${orSourcesPrimaryNameSrcList}`);
-		console.log(`xor: ${xorPrimaryNameSrcList}`);
-		XX = 0;
-	    }
-	    if (xorPrimaryNameSrcList.length === sources.primaryNameSrcList.length - orSourcesPrimaryNameSrcList.length) {
-		// orSources primary sources match sources primary sources
-		if (allCountUnique(xorPrimaryNameSrcList, useSources.primaryNameSrcList)) {
-		    // sources' remaining primary sources are compatible with useSources' primary sources
-		    return true;
-		}
-	    }
-	}
-    }
-    return false;
- */
 };
 
 //
@@ -852,10 +816,15 @@ let isCompatibleWithUseSources = (sourceList: SourceList, useSourceList: UseSour
     if (_.isEmpty(useSourceList)) return true;
     for (let source of sourceList) {
 	for (let useSource of useSourceList) {
-	    const allUniqueSrc = noCountsInArray(source.primaryNameSrcList, useSource.primarySrcArray);
-	    if (allUniqueSrc || isCompatibleWithAnyOrSource(source, useSource)) {
-		return true;
+	    let compatible = noCountsInArray(source.primaryNameSrcList, useSource.primarySrcArray);
+	    if (!compatible) {
+		if (useSource.orSourceLists && useSource.orSourceLists.length > 0) {
+		    if (isCompatibleWithAnyOrSource(source, useSource)) {
+			compatible = true;
+		    }
+		}
 	    }
+	    if (compatible) return true;
 	}
     }
     return false;
@@ -1043,34 +1012,47 @@ let parallel_makeCombosForRange = (first: number, last: number, args: any): any 
 
 //
 //
-let test = (sum: number, max: number, args: any): any => {
-    // buildOrSourcesSet (part of buildUseSourcesList perhaps)
-    
+let getAllPrimarySrcCombos = (orSource: OrSource, size: number): string[] => {
+    let combos: string[] = [];
+    let list = [...Array(orSource.primaryNameSrcList.length).keys()];
+    Peco.makeNew({
+	listArray: [ list, list ], // TODO: fix for arbitrary "size"
+	max: 99999,
+	noDuplicates: true
+    }).getCombinations().forEach(indexList => {
+	// TODO: fix for arbitrary "size"
+	if (indexList[0] === indexList[1]) return; // TODO: fix for arbitrary "size"
+	let combo = indexList.map(index => orSource.primaryNameSrcList[index].count).sort().toString();
+	combos.push(combo);
+    });
+    return combos;
+}
+
+//
+//
+let test = (sum: number, max: number, args: any): void => {
     let useSourcesList = args.useSourcesList;
     let numUseSources = useSourcesList.length;
     let numOrSourcesLists = 0;
     let numOrSources = 0;
 
-    let show = true;
-
+    let map = new Map<string, number>();
     for (let useSources of useSourcesList) {
-	if (show) {
-	    //console.log(`${Stringify2(useSources)}`);
-	    show = false;
-	}
 	let orSourceLists = useSources.orSourceLists;
-	numOrSourcesLists += orSourceLists.length;
 	if (!orSourceLists || _.isEmpty(orSourceLists)) continue;
+	numOrSourcesLists += orSourceLists.length;
 	for (let orSourceList of orSourceLists) {
 	    numOrSources += orSourceList.length;
-	    /*
-	    console.log('----------------');
-	    for (let orSources of orSourceList) {
-		console.log(`${orSources.ncList}`);
+	    for (let orSource of orSourceList) {
+		let primarySrcComboStrList = getAllPrimarySrcCombos(orSource, 2); // TODO rename fn
+		for (let key of primarySrcComboStrList) {
+		    let value: number = map.get(key) || 0;
+		    map.set(key, value + 1);
+		}
 	    }
-	    */
 	}
     }
+    //[...map.entries()].sort((a,b) => b[1] - a[1]).forEach(e => console.log(`${e[0]}: ${e[1]}`));
     console.error(`useSources(${numUseSources}) orSourceLists(${numOrSourcesLists}) orSources(${numOrSources})`);
 };
 
@@ -1098,8 +1080,15 @@ let makeCombos = (args: any): any => {
     args.useSourcesList = getCompatibleUseSourcesFromNcData(args);
 
     // test
-    //let lastSum = sumRange.length > 1 ? sumRange[1] : sumRange[0];
-    //test(sumRange[0], lastSum, args);
+    if (1) {
+	let lastSum = sumRange.length > 1 ? sumRange[1] : sumRange[0];
+	test(sumRange[0], lastSum, args);
+	if (0) {
+	    let d = new Duration(begin, new Date()).milliseconds;
+	    console.error(`Precompute(${PrettyMs(d)})`);
+	    process.exit(0);
+	}
+    }
 
     let d = new Duration(begin, new Date()).milliseconds;
     console.error(`Precompute(${PrettyMs(d)})`);
