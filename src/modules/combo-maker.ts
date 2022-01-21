@@ -96,6 +96,7 @@ interface OrSource extends UseSourceBase {
 }
 
 // optional properties until I can think of a better way.  mergeOrSourceList.
+// OrSourceData includes all of this, and is only field in OrSource, and optional field here.
 interface UseSource extends UseSourceBase {
     orSourceLists?: SourceList[];
     orSourcesNcCsvList?: string[];
@@ -235,6 +236,8 @@ let  getNumCountsInArray = (ncList: NCList, countArray: CountArray): number => {
     return count;
 };
 
+//
+//
 let noCountsNotInOneAreInTwo = (ncList: NCList, xorCountArrayAndSize: CountArrayAndSize, uniqCountArray: CountArray): boolean => {
     let xorCount = 0;
     for (let nc of ncList) {
@@ -247,6 +250,12 @@ let noCountsNotInOneAreInTwo = (ncList: NCList, xorCountArrayAndSize: CountArray
     return xorCount === xorCountArrayAndSize.size;
 }
     
+//
+//
+let anyNumberInCountArray = (numberLists: NumberList[], countArray: CountArray): boolean => {
+    return numberLists.some(numberList =>
+	numberList.some(num => countArray[num] === num));
+};
 
 // key types:
 //{
@@ -795,7 +804,7 @@ let isCompatibleWithAnyOrSource = (source: SourceData, useSource: UseSource): bo
 	if (1) {
 	let ncCsv = useSource.orSourcesNcCsvList![index];
 	if (source.srcNcMap[ncCsv]) {
-	// orSources ncCsv matches sources ncCsv
+	    // orSources ncCsv matches sources ncCsv
             let primarySrcArrayAndSize = useSource.orSourcesPrimarySrcArrayAndSizeList![index];
 	    let numCountsInArray = getNumCountsInArray(source.primaryNameSrcList, primarySrcArrayAndSize.array);
 	    if (numCountsInArray === primarySrcArrayAndSize.size) {
@@ -1012,7 +1021,7 @@ let parallel_makeCombosForRange = (first: number, last: number, args: any): any 
 
 //
 //
-let getAllPrimarySrcCombos = (orSource: OrSource, size: number): string[] => {
+let getAllPrimarySrcCombos = (orSource: SourceBase, size: number): string[] => {
     let combos: string[] = [];
     let list = [...Array(orSource.primaryNameSrcList.length).keys()];
     Peco.makeNew({
@@ -1028,33 +1037,100 @@ let getAllPrimarySrcCombos = (orSource: OrSource, size: number): string[] => {
     return combos;
 }
 
+type NumberList = number[];
+
+// there might be a better way to do this.
+// it's possible the orSources spread out across all the useSources contain a lot of duplicates.
+// so we are iterating over a lot of duplicates (potentially)
+// and then what we're doing here is just cutting the total (including duplicates) in half to
+// reduce iterations. when in fact it may yield a better result by just removing duplicates.
+// or at least, remove duplicates first.  then do the half-splitting combo frequency checks
+// if it still makes sense (it probably will).
 //
+// how to check for duplicates:
+// in IsCompatibleWithOrSources, build a local map of [[ncListStr: count]] for every source
+// we evaluate. then sort the map by value and take a look.
+
+// returns, e.g. [ ['6,14', 12345], ['19,64', 6789], ... ]
 //
-let test = (sum: number, max: number, args: any): void => {
-    let useSourcesList = args.useSourcesList;
-    let numUseSources = useSourcesList.length;
+
+type StringNumberTuple = [string, number];
+
+interface StringNumberTupleListAndCount {
+    list: StringNumberTuple[];
+    count: number;
+}
+
+let getOrSrcComboFrequencyList = (useSourcesList: UseSource[], size: number, srcComboList: NumberList[], log = false): StringNumberTupleListAndCount => {
     let numOrSourcesLists = 0;
     let numOrSources = 0;
 
+    console.log(`srcComboList: ${Stringify(srcComboList)}`);
+
     let map = new Map<string, number>();
-    for (let useSources of useSourcesList) {
-	let orSourceLists = useSources.orSourceLists;
+    for (let useSource of useSourcesList) {
+	let orSourceLists = useSource.orSourceLists;
 	if (!orSourceLists || _.isEmpty(orSourceLists)) continue;
 	numOrSourcesLists += orSourceLists.length;
-	for (let orSourceList of orSourceLists) {
-	    numOrSources += orSourceList.length;
+	orSourceLists.forEach((orSourceList, listIndex) => {
 	    for (let orSource of orSourceList) {
-		let primarySrcComboStrList = getAllPrimarySrcCombos(orSource, 2); // TODO rename fn
+		if (anyNumberInCountArray(srcComboList, useSource.orSourcesPrimarySrcArrayAndSizeList![listIndex].array)) continue;
+		++numOrSources;
+		let primarySrcComboStrList = getAllPrimarySrcCombos(orSource, size); // TODO rename fn
 		for (let key of primarySrcComboStrList) {
 		    let value: number = map.get(key) || 0;
 		    map.set(key, value + 1);
 		}
 	    }
-	}
+	});
     }
-    //[...map.entries()].sort((a,b) => b[1] - a[1]).forEach(e => console.log(`${e[0]}: ${e[1]}`));
-    console.error(`useSources(${numUseSources}) orSourceLists(${numOrSourcesLists}) orSources(${numOrSources})`);
+    if (log) console.error(`useSources(${useSourcesList.length}) orSourceLists(${numOrSourcesLists}) orSources(${numOrSources})`);
+    let list: StringNumberTuple[] = [...map.entries()].sort((a,b) => b[1] - a[1]);
+    //list.forEach(e => console.log(`${e[0]}: ${e[1]}`));
+    return { list, count: numOrSources };
 };
+
+//
+// srcComboFrequency [ ['6,14', 12345], ['19,64', 6789], ... ]
+//
+// WithValueClosestTo
+let getComboListIndexClosestTo = (srcCsvFreqTupleList: StringNumberTuple[], target: number): number => {
+    let closestIndex = 0;
+    let lastDiff = target * 2;
+    srcCsvFreqTupleList.some((srcCsvFreqTuple, index) => {
+	let diff = Math.abs(srcCsvFreqTuple[1] - target);
+	let closestDiff = Math.abs(srcCsvFreqTupleList[closestIndex][1] - target);
+	if (diff < closestDiff) {
+	    closestIndex = index;
+	} else if (diff > lastDiff) {
+	    return true; // some.exit;
+	}
+	lastDiff = diff;
+	return false;
+    });
+    return closestIndex;
+};
+
+//
+//
+let test = (sum: number, max: number, args: any): void => {
+    let srcLists: NumberList[] = [];
+    let result = getOrSrcComboFrequencyList(args.useSourcesList, 2, srcLists, true);
+    let index = getComboListIndexClosestTo(result.list, result.count / 2);
+    let srcCsv = result.list[index][0]
+    let freq = result.list[index][1];
+    console.error(`index(${index}): ${srcCsv} ${freq} ${Math.floor(freq / result.count * 100)}%`);
+    let srcList: number[] = srcCsv.split(',').map(srcStr => _.toNumber(srcStr));
+    srcLists.push(srcList);
+
+    result = getOrSrcComboFrequencyList(args.useSourcesList, 2, srcLists, true);
+    index = getComboListIndexClosestTo(result.list, result.count / 2);
+    srcCsv = result.list[index][0]
+    freq = result.list[index][1];
+    console.error(`index(${index}): ${srcCsv} ${freq} ${Math.floor(freq / result.count * 100)}%`);
+    srcList = srcCsv.split(',').map(srcStr => _.toNumber(srcStr));
+    srcLists.push(srcList);
+}
 
 //
 //
@@ -1083,7 +1159,7 @@ let makeCombos = (args: any): any => {
     if (1) {
 	let lastSum = sumRange.length > 1 ? sumRange[1] : sumRange[0];
 	test(sumRange[0], lastSum, args);
-	if (0) {
+	if (1) {
 	    let d = new Duration(begin, new Date()).milliseconds;
 	    console.error(`Precompute(${PrettyMs(d)})`);
 	    process.exit(0);
