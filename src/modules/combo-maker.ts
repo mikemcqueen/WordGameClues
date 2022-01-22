@@ -98,9 +98,7 @@ interface OrSource extends UseSourceBase {
 // optional properties until I can think of a better way.  mergeOrSourceList.
 // OrSourceData includes all of this, and is only field in OrSource, and optional field here.
 interface UseSource extends UseSourceBase {
-    orSourceLists?: SourceList[];
-    orSourcesNcCsvList?: string[];
-    orSourcesPrimarySrcArrayAndSizeList?: CountArrayAndSize[];
+    orSource?: OrSource;
 }
 
 function Stringify(val: any) {
@@ -673,9 +671,7 @@ let mergeOrSourceList = (sourceList: XorSource[], orSourceList: OrSource[]): Use
 		mergedSourceList.push({
 		    primaryNameSrcList: combinedNameSrcList,
 		    primarySrcArray: getCountArray(combinedNameSrcList),
-		    orSourceLists: orSource.sourceLists,
-		    orSourcesNcCsvList: orSource.sourceNcCsvList,
-		    orSourcesPrimarySrcArrayAndSizeList: orSource.primarySrcArrayAndSizeList
+		    orSource
 		});
 	    } else if (numUnique === orSource.primaryNameSrcList.length) {
 		console.error('an --or value is implicitly compatible with an --xor value, making this --or value unnecessary');
@@ -801,13 +797,13 @@ let isCompatibleWithAnyOrSource = (source: SourceData, useSource: UseSource
 				   , orSourcesNcCsvMap: Map<string, number>
 				   ): boolean => {
     if (!source.srcNcLists.some(ncCsv => orSourcesNcCsvMap.has(ncCsv))) return false;
-
-    return useSource.orSourceLists!.some((orSourceList, index) => {
-	if (1) {
-	let ncCsv = useSource.orSourcesNcCsvList![index];
+    let orSource = useSource.orSource!;
+    return orSource.sourceLists.some((sourceList, index) => {
+	//if (1) {
+	let ncCsv = orSource.sourceNcCsvList[index];
 	if (source.srcNcMap[ncCsv]) {
 	    // orSources ncCsv matches sources ncCsv
-            let primarySrcArrayAndSize = useSource.orSourcesPrimarySrcArrayAndSizeList![index];
+            let primarySrcArrayAndSize = orSource.primarySrcArrayAndSizeList[index];
 	    let numCountsInArray = getNumCountsInArray(source.primaryNameSrcList, primarySrcArrayAndSize.array);
 	    if (numCountsInArray === primarySrcArrayAndSize.size) {
 		const uniqPrimarySrcList = getCountListNotInArray(source.primaryNameSrcList, primarySrcArrayAndSize.array);
@@ -816,7 +812,7 @@ let isCompatibleWithAnyOrSource = (source: SourceData, useSource: UseSource
 		if (allUniqueSrc) return true; // some.exit
 	    }
 	}
-	}
+	//}
 	return false; // some.continue
     });
 };
@@ -831,7 +827,9 @@ let isCompatibleWithUseSources = (sourceList: SourceList, useSourceList: UseSour
 	for (let useSource of useSourceList) {
 	    let compatible = noCountsInArray(source.primaryNameSrcList, useSource.primarySrcArray);
 	    if (!compatible) {
-		if (useSource.orSourceLists && useSource.orSourceLists.length > 0) {
+		// TODO: is sourceLists ever empty if orSource is set? shouldn't be, but check & disable if so
+		let orSource = useSource.orSource!;
+		if (orSource && orSource.sourceLists && orSource.sourceLists.length > 0) {
 		    if (isCompatibleWithAnyOrSource(source, useSource, orSourcesNcCsvMap)) {
 			compatible = true;
 		    }
@@ -1073,14 +1071,17 @@ let getOrSrcComboFrequencyList = (useSourcesList: UseSource[], size: number, src
 
     let map = new Map<string, number>();
     for (let useSource of useSourcesList) {
-	let orSourceLists = useSource.orSourceLists;
+	let orSource = useSource.orSource!
+	if (!orSource) continue;
+	let orSourceLists = orSource.sourceLists;
+	// TODO same as above is this even possible
 	if (!orSourceLists || _.isEmpty(orSourceLists)) continue;
 	numOrSourcesLists += orSourceLists.length;
-	orSourceLists.forEach((orSourceList, listIndex) => {
-	    for (let orSource of orSourceList) {
-		if (anyNumberInCountArray(srcComboList, useSource.orSourcesPrimarySrcArrayAndSizeList![listIndex].array)) continue;
+	orSourceLists.forEach((sourceList, listIndex) => {
+	    for (let source of sourceList) {
+		if (anyNumberInCountArray(srcComboList, orSource.primarySrcArrayAndSizeList[listIndex].array)) continue;
 		++numOrSources;
-		let primarySrcComboStrList = getAllPrimarySrcCombos(orSource, size); // TODO rename fn
+		let primarySrcComboStrList = getAllPrimarySrcCombos(source, size); // TODO rename fn
 		for (let key of primarySrcComboStrList) {
 		    let value: number = map.get(key) || 0;
 		    map.set(key, value + 1);
@@ -1148,8 +1149,9 @@ let test = (sum: number, max: number, args: any): void => {
 let test_getOrSourcesNcCsvCountMap = (useSourcesList: UseSource[]): Map<string, number> => {
     let map = new Map<string, number>();
     for (let useSource of useSourcesList) {
-	if (!useSource.orSourcesNcCsvList) continue;
-	for (let ncCsv of useSource.orSourcesNcCsvList!) {
+	let orSource = useSource.orSource!;
+	if (!orSource || !orSource.sourceNcCsvList) continue;
+	for (let ncCsv of orSource.sourceNcCsvList) {
 	    let value = map.get(ncCsv) || 0;
 	    map.set(ncCsv, value + 1);
 	}
