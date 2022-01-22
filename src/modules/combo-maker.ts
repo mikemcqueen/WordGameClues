@@ -65,7 +65,7 @@ interface LazySourceData extends SourceBase {
 //
 interface SourceData extends SourceBase {
     ncList: NCList;
-    srcNcLists: string[];
+    sourceNcCsvList: string[];
     srcNcMap: StringBoolMap;
     ncCsv?: string;
 }
@@ -89,9 +89,11 @@ interface UseSourceBase extends SourceBase {
 interface XorSource extends UseSourceBase {
 }
 
+type SourceNcCsvMap = Record<string, number[]>;
+
 interface OrSource extends UseSourceBase {
     sourceLists: SourceList[];
-    sourceNcCsvList: string[];
+    sourceNcCsvMap: SourceNcCsvMap;
     primarySrcArrayAndSizeList: CountArrayAndSize[];
 }
 
@@ -146,7 +148,7 @@ let stringifySourceList = (sourceList: SourceList): string => {
 	result += '  {\n';
 	result += `    ncList: ${source.ncList}\n`;
 	result += `    primaryNameSrcList: ${source.primaryNameSrcList}\n`;
-	result += `    srcNcLists: ${Stringify2(source.srcNcLists)}\n`;
+	result += `    sourcNcCsvList: ${Stringify2(source.sourceNcCsvList)}\n`;
 	result += '  }';
     }
     return result + "\n]";
@@ -333,34 +335,23 @@ let populateSourceData = (lazySource: SourceBase, nc: NameCount, validateResult:
     let source: SourceData = lazySource /*as SourceBase*/ as SourceData;
     if (validateResult.resultMap) {
 	let srcNcData = buildSrcNcLists(validateResult.resultMap.map());
-	source.srcNcLists = srcNcData.list;
+	source.sourceNcCsvList = srcNcData.list;
 	source.srcNcMap = srcNcData.map;
     } else {
 	if (validateResult.ncList.length !== 1 || validateResult.ncList[0].count !== 1) throw new Error("wrong assumption");
 	let ncCsv = validateResult.ncList.toString();
-	source.srcNcLists = [ncCsv];
+	source.sourceNcCsvList = [ncCsv];
 	source.srcNcMap = { "${ncCsv}": true };
     }
     if (nc.count > 1) {
 	let ncStr = nc.toString();
-	source.srcNcLists.push(ncStr);
+	source.sourceNcCsvList.push(ncStr);
 	source.srcNcMap[ncStr] = true;
     }
     source.ncList = [nc]; // TODO i could try getting rid of "LazySource.nc" and just make this part of LazySouceData
-    //source.srcNcLists = srcNcLists;
-    //source.srcNcMap = srcNcMap;
-    
-    /*
-    let source: SourceData = {
-	primaryNameSrcList,
-	ncList: [nc],
-	srcNcLists,
-	srcNcMap
-    };
-    */
     if (loggy || logging > 3) {
-	console.log(`getSourceList() ncList: ${source.ncList}, srcNcLists: ${source.srcNcLists}`);
-	if (_.isEmpty(source.srcNcLists)) console.log(`empty srcNcList: ${Stringify(validateResult.resultMap.map())}`);
+	console.log(`getSourceList() ncList: ${source.ncList}, sourceNcCsvList: ${source.sourceNcCsvList}`);
+	if (_.isEmpty(source.sourceNcCsvList)) console.log(`empty sourceNcCsvList: ${Stringify(validateResult.resultMap.map())}`);
     }
     return source;
 };
@@ -409,9 +400,9 @@ let mergeSources = (source1: AnySourceData, source2: AnySourceData, lazy: boolea
 	primaryNameSrcList,
 	ncList,
 	srcNcMap: {},
-	srcNcLists: [
-	    ...source1.srcNcLists,
-	    ...source2.srcNcLists
+	sourceNcCsvList: [
+	    ...source1.sourceNcCsvList,
+	    ...source2.sourceNcCsvList
 	]
     };
     mergedSource.ncCsv = mergedSource.ncList.sort().toString();
@@ -538,14 +529,18 @@ let getCompatibleOrSourcesLists = (primaryNameSrcList: NCList, orSourceLists: So
 // Here we have 'orSourceLists', created from getUseSourcesList(Op.or).
 //
 // Generate a sorted ncCsv from the combined NCs of each ncList across all sources
-// in each sourceList. Return a list of ncCsvs.
+// in each sourceList. Return a map of ncCsvs : sourceList index.
 //
 // It'd be preferable to embed this ncCsv within each sourceList itself. I'd need to
 // wrap it in an object like { sourceList, ncCsv }.
 //
-let buildSourceNcCsvList = (orSourceLists: SourceList[]): string[] => {
-    return orSourceLists.map(sourceList => 
-	    _.flatMap(sourceList.map(sources => sources.ncList)).sort().toString());
+let buildSourceNcCsvMap = (orSourceLists: SourceList[]): SourceNcCsvMap => {
+    return orSourceLists.reduce((map: SourceNcCsvMap, sourceList: SourceList, index: number) => {
+	const key = _.flatMap(sourceList.map(sources => sources.ncList)).sort().toString();
+	if (!map[key]) map[key] = [];
+	map[key].push(index);
+	return map;
+    }, {});
 };
 
 //
@@ -621,7 +616,7 @@ let mergeCompatibleUseSources = <SourceType extends UseSourceBase>(sourceLists: 
 		let nonEmptyOrSourceLists = orSourceLists.filter(sourceList => !_.isEmpty(sourceList));
 		let orResult: OrSource = result as OrSource;
 		orResult.sourceLists = getCompatibleOrSourcesLists(primaryNameSrcList, nonEmptyOrSourceLists);
-		orResult.sourceNcCsvList = buildSourceNcCsvList(orResult.sourceLists);
+		orResult.sourceNcCsvMap = buildSourceNcCsvMap(orResult.sourceLists);
 		orResult.primarySrcArrayAndSizeList = orResult.sourceLists.map(sourceList =>
 		    getCountArrayAndSizeForSourceList(sourceList));
 		if (ZZ && _.isEmpty(orResult.sourceLists) && !_.isEmpty(nonEmptyOrSourceLists)) {
@@ -792,8 +787,56 @@ let first = (clueSourceList: any, sourceIndexes: number[]): FirstNextResult => {
 
 //
 //
+let __sum = 0;
+let __count = 0;
 let XX = 0;
 let isCompatibleWithAnyOrSource = (source: SourceData, useSource: UseSource
+				   , orSourcesNcCsvMap: Map<string, number>
+				   ): boolean => {
+    // #1 only add entries to source.srcNcMap/Lists if it's in the orSourcesNcCsvMap. then map.has() is implied. - TODO
+    // #2 iterate over source.sourceNcCsvList - DONE
+    //      (rename to sourceNcCsvList) - DONE
+    // #3 make OrSource.sourceNcCsvList a string:number or string:number[] map - DONE
+    //    the value containing the sourceList index(es) for sources with that NC. - DONE
+    //
+
+    // #4 potential further opt (questionable, but worth trying)
+    //    a. make source.srcNcMap a map of string:string[], where the value is a list of all
+    //       valid nameSrcCsv for the specified (key) sourceNC.  SourceNcCsv(ToNameSrcCsv)Map
+    //    b. make OrSource.sourceNcCsvMap (from #3) a string:object map, where value is type
+    //       nameSrcToIndexMap.
+    //    c. then, first we do lookup by ncCsv. that returns another map; iterate over nameSrcCsvs
+    //       from (a) to find indexes to orSources in sourceList to check.
+    //    d. by doing so, we do 2 lookups, followed by the "is this source still valid after removing
+    //       these primarySrc's from it" logic.
+
+    let orSource = useSource.orSource!;
+    __sum += source.sourceNcCsvList.length;
+    __count += 1;
+    if (0) {
+    return source.sourceNcCsvList.some(ncCsv => {
+	if (!orSourcesNcCsvMap.has(ncCsv)) return false; // can remove after (1) above
+	if (!orSource.sourceNcCsvMap[ncCsv]) return false;
+	if (0) {
+	return orSource.sourceNcCsvMap[ncCsv].some(index => {
+	    if (0) {
+            let primarySrcArrayAndSize = orSource.primarySrcArrayAndSizeList[index];
+	    let numCountsInArray = getNumCountsInArray(source.primaryNameSrcList, primarySrcArrayAndSize.array);
+	    if (numCountsInArray === primarySrcArrayAndSize.size) {
+		const uniqPrimarySrcList = getCountListNotInArray(source.primaryNameSrcList, primarySrcArrayAndSize.array);
+		const allUniqueSrc = noNumbersInArray(uniqPrimarySrcList, useSource.primarySrcArray);
+		//const allUniqueSrc = noCountsNotInOneAreInTwo(source.primaryNameSrcList, primarySrcArrayAndSize, useSource.primarySrcArray);
+		if (allUniqueSrc) return true; // some.exit
+	    }
+	    } else return false;
+	});
+	} else return false;
+    });
+    } else return false;
+};
+
+/*
+let OLD_isCompatibleWithAnyOrSource = (source: SourceData, useSource: UseSource
 				   , orSourcesNcCsvMap: Map<string, number>
 				   ): boolean => {
     if (!source.srcNcLists.some(ncCsv => orSourcesNcCsvMap.has(ncCsv))) return false;
@@ -816,6 +859,7 @@ let isCompatibleWithAnyOrSource = (source: SourceData, useSource: UseSource
 	return false; // some.continue
     });
 };
+*/
 
 //
 //
@@ -1150,8 +1194,8 @@ let test_getOrSourcesNcCsvCountMap = (useSourcesList: UseSource[]): Map<string, 
     let map = new Map<string, number>();
     for (let useSource of useSourcesList) {
 	let orSource = useSource.orSource!;
-	if (!orSource || !orSource.sourceNcCsvList) continue;
-	for (let ncCsv of orSource.sourceNcCsvList) {
+	if (!orSource) continue;
+	for (let ncCsv of _.keys(orSource.sourceNcCsvMap)) {
 	    let value = map.get(ncCsv) || 0;
 	    map.set(ncCsv, value + 1);
 	}
@@ -1247,6 +1291,7 @@ let makeCombos = (args: any): any => {
 	}
 	d = new Duration(begin, new Date()).milliseconds;
 	console.error(`--combos: ${PrettyMs(d)}`);
+	console.error(`source.sourceNcCsvs, sum(${__sum}), count(${__count}), avg(${__sum/__count})`);
 	Debug(`total: ${total}, filtered(${_.size(comboMap)})`);
 	_.keys(comboMap).forEach((nameCsv: string) => console.log(nameCsv));
 	//console.log(`${Stringify(comboMap)}`);
