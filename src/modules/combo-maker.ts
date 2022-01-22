@@ -797,10 +797,12 @@ let first = (clueSourceList: any, sourceIndexes: number[]): FirstNextResult => {
 //
 //
 let XX = 0;
-let isCompatibleWithAnyOrSource = (source: SourceData, useSource: UseSource): boolean => {
-    // for (let [index, orSourceList] of useSource.orSourceLists!.entries()) {  // 6s, 2x as slow
-    // for (let orSourceList of useSource.orSourceLists!) {  // 3.6-4s, 5% to 15% slowerr
-    return useSource.orSourceLists!.some((orSourceList, index) => { // 3.5s
+let isCompatibleWithAnyOrSource = (source: SourceData, useSource: UseSource
+				   , orSourcesNcCsvMap: Map<string, number>
+				   ): boolean => {
+    if (!source.srcNcLists.some(ncCsv => orSourcesNcCsvMap.has(ncCsv))) return false;
+
+    return useSource.orSourceLists!.some((orSourceList, index) => {
 	if (1) {
 	let ncCsv = useSource.orSourcesNcCsvList![index];
 	if (source.srcNcMap[ncCsv]) {
@@ -821,14 +823,16 @@ let isCompatibleWithAnyOrSource = (source: SourceData, useSource: UseSource): bo
 
 //
 //
-let isCompatibleWithUseSources = (sourceList: SourceList, useSourceList: UseSource[]): boolean => {
+let isCompatibleWithUseSources = (sourceList: SourceList, useSourceList: UseSource[]
+				  , orSourcesNcCsvMap: Map<string, number>
+				 ): boolean => {
     if (_.isEmpty(useSourceList)) return true;
     for (let source of sourceList) {
 	for (let useSource of useSourceList) {
 	    let compatible = noCountsInArray(source.primaryNameSrcList, useSource.primarySrcArray);
 	    if (!compatible) {
 		if (useSource.orSourceLists && useSource.orSourceLists.length > 0) {
-		    if (isCompatibleWithAnyOrSource(source, useSource)) {
+		    if (isCompatibleWithAnyOrSource(source, useSource, orSourcesNcCsvMap)) {
 			compatible = true;
 		    }
 		}
@@ -931,7 +935,7 @@ let getCombosForUseNcLists = (sum: number, max: number, args: any): any => {
 	    if (_.isEmpty(sourceList)) continue;
 
 	    if (_.isUndefined(hash[key].isCompatible)) {
-		hash[key].isCompatible = isCompatibleWithUseSources(loadAndMergeSourceList(sourceList), useSourcesList);
+		hash[key].isCompatible = isCompatibleWithUseSources(loadAndMergeSourceList(sourceList), useSourcesList, args.OrSourcesNcCsvMap);
 	    }
 	    if (hash[key].isCompatible) {
 		combos.push(result.nameList!.toString());
@@ -1115,22 +1119,43 @@ let getComboListIndexClosestTo = (srcCsvFreqTupleList: StringNumberTuple[], targ
 //
 let test = (sum: number, max: number, args: any): void => {
     let srcLists: NumberList[] = [];
+
+    let begin = new Date();
     let result = getOrSrcComboFrequencyList(args.useSourcesList, 2, srcLists, true);
+    let d = new Duration(begin, new Date()).milliseconds;
+    console.error(` FreqList(${PrettyMs(d)})`);
     let index = getComboListIndexClosestTo(result.list, result.count / 2);
     let srcCsv = result.list[index][0]
     let freq = result.list[index][1];
-    console.error(`index(${index}): ${srcCsv} ${freq} ${Math.floor(freq / result.count * 100)}%`);
+    console.error(` index(${index}): ${srcCsv} ${freq} ${Math.floor(freq / result.count * 100)}%`);
     let srcList: number[] = srcCsv.split(',').map(srcStr => _.toNumber(srcStr));
     srcLists.push(srcList);
 
+    begin = new Date();
     result = getOrSrcComboFrequencyList(args.useSourcesList, 2, srcLists, true);
+    d = new Duration(begin, new Date()).milliseconds;
+    console.error(` FreqList(${PrettyMs(d)})`);
     index = getComboListIndexClosestTo(result.list, result.count / 2);
     srcCsv = result.list[index][0]
     freq = result.list[index][1];
-    console.error(`index(${index}): ${srcCsv} ${freq} ${Math.floor(freq / result.count * 100)}%`);
+    console.error(` index(${index}): ${srcCsv} ${freq} ${Math.floor(freq / result.count * 100)}%`);
     srcList = srcCsv.split(',').map(srcStr => _.toNumber(srcStr));
     srcLists.push(srcList);
 }
+
+//
+//
+let test_getOrSourcesNcCsvCountMap = (useSourcesList: UseSource[]): Map<string, number> => {
+    let map = new Map<string, number>();
+    for (let useSource of useSourcesList) {
+	if (!useSource.orSourcesNcCsvList) continue;
+	for (let ncCsv of useSource.orSourcesNcCsvList!) {
+	    let value = map.get(ncCsv) || 0;
+	    map.set(ncCsv, value + 1);
+	}
+    }
+    return map;
+};
 
 //
 //
@@ -1156,14 +1181,28 @@ let makeCombos = (args: any): any => {
     args.useSourcesList = getCompatibleUseSourcesFromNcData(args);
 
     // test
-    if (1) {
+    if (0) {
 	let lastSum = sumRange.length > 1 ? sumRange[1] : sumRange[0];
 	test(sumRange[0], lastSum, args);
-	if (1) {
+	if (0) {
 	    let d = new Duration(begin, new Date()).milliseconds;
 	    console.error(`Precompute(${PrettyMs(d)})`);
 	    process.exit(0);
 	}
+    }
+
+    if (1) {
+	let map = test_getOrSourcesNcCsvCountMap(args.useSourcesList);
+	let list: StringNumberTuple[] = [...map.entries()].sort((a,b) => b[1] - a[1]);
+	console.error(`NcCsvCount(${list.length})`);
+	if (0) {
+	    list.some((entry, index) => {
+		console.error(` ${entry[0]}: ${entry[1]}`);
+		return false; // index >= 10;
+	    })
+	}
+	// TODO: there is a faster way to generate this map, in mergeOrSources or something.
+	args.OrSourcesNcCsvMap = map;
     }
 
     let d = new Duration(begin, new Date()).milliseconds;
