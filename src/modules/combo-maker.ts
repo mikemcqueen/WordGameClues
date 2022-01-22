@@ -331,21 +331,23 @@ function buildSrcNcLists (resultMap: any): any {
 
 //
 //
-let populateSourceData = (lazySource: SourceBase, nc: NameCount, validateResult: ValidateResult): SourceData => {
+let populateSourceData = (lazySource: SourceBase, nc: NameCount, validateResult: ValidateResult
+			  , orSourcesNcCsvMap: Map<string, number>
+			 ): SourceData => {
     let source: SourceData = lazySource /*as SourceBase*/ as SourceData;
     if (validateResult.resultMap) {
 	let srcNcData = buildSrcNcLists(validateResult.resultMap.map());
-	source.sourceNcCsvList = srcNcData.list;
+	source.sourceNcCsvList = srcNcData.list.filter(ncCsv => orSourcesNcCsvMap ? orSourcesNcCsvMap.has(ncCsv) : ncCsv);
 	source.srcNcMap = srcNcData.map;
     } else {
 	if (validateResult.ncList.length !== 1 || validateResult.ncList[0].count !== 1) throw new Error("wrong assumption");
-	let ncCsv = validateResult.ncList.toString();
-	source.sourceNcCsvList = [ncCsv];
-	source.srcNcMap = { "${ncCsv}": true };
+	let ncListCsv = validateResult.ncList.toString();
+	source.sourceNcCsvList = [ncListCsv].filter(ncCsv => orSourcesNcCsvMap ? orSourcesNcCsvMap.has(ncCsv) : ncCsv);
+	source.srcNcMap = { "${ncListCsv}": true };
     }
     if (nc.count > 1) {
 	let ncStr = nc.toString();
-	source.sourceNcCsvList.push(ncStr);
+	source.sourceNcCsvList.push(...[ncStr].filter(ncCsv => orSourcesNcCsvMap ? orSourcesNcCsvMap.has(ncCsv) : ncCsv));
 	source.srcNcMap[ncStr] = true;
     }
     source.ncList = [nc]; // TODO i could try getting rid of "LazySource.nc" and just make this part of LazySouceData
@@ -358,11 +360,13 @@ let populateSourceData = (lazySource: SourceBase, nc: NameCount, validateResult:
 
 //
 //
-let getSourceData = (nc: NameCount, validateResult: ValidateResult, lazy: boolean): AnySourceData => {
+let getSourceData = (nc: NameCount, validateResult: ValidateResult, lazy: boolean
+		     , orSourcesNcCsvMap: Map<string, number> | undefined = undefined
+		    ): AnySourceData => {
     const primaryNameSrcList: NCList = validateResult.nameSrcList;
     return lazy
 	? { primaryNameSrcList,	ncList: [nc], validateResultList: [validateResult] }
-	: populateSourceData({ primaryNameSrcList }, nc, validateResult);
+	: populateSourceData({ primaryNameSrcList }, nc, validateResult, orSourcesNcCsvMap!);
 };
 
 //
@@ -813,7 +817,7 @@ let isCompatibleWithAnyOrSource = (source: SourceData, useSource: UseSource
     let orSource = useSource.orSource!;
     __sum += source.sourceNcCsvList.length;
     __count += 1;
-    if (0) {
+    if (1) {
     return source.sourceNcCsvList.some(ncCsv => {
 	if (!orSourcesNcCsvMap.has(ncCsv)) return false; // can remove after (1) above
 	if (!orSource.sourceNcCsvMap[ncCsv]) return false;
@@ -870,7 +874,7 @@ let isCompatibleWithUseSources = (sourceList: SourceList, useSourceList: UseSour
     for (let source of sourceList) {
 	for (let useSource of useSourceList) {
 	    let compatible = noCountsInArray(source.primaryNameSrcList, useSource.primarySrcArray);
-	    if (!compatible) {
+	    if (!compatible && source.sourceNcCsvList.length > 0) {
 		// TODO: is sourceLists ever empty if orSource is set? shouldn't be, but check & disable if so
 		let orSource = useSource.orSource!;
 		if (orSource && orSource.sourceLists && orSource.sourceLists.length > 0) {
@@ -892,14 +896,16 @@ let isCompatibleWithUseSources = (sourceList: SourceList, useSourceList: UseSour
 //
 // Return a list fully merged sources.
 //
-let loadAndMergeSourceList = (lazySourceList: LazySourceData[]): SourceList => {
+let loadAndMergeSourceList = (lazySourceList: LazySourceData[]
+			      , orSourcesNcCsvMap: Map<string, number>
+			     ): SourceList => {
     let sourceList: SourceList = []
     for (let lazySource of lazySourceList) {
 	if (lazySource.ncList.length !== 2) throw new Error(`lazySource.ncList.length(${lazySource.ncList.length})`);
 	if (lazySource.validateResultList.length !== 2) throw new Error(`lazySource.validateResultList.length(${lazySource.validateResultList.length})`);
 	let sourcesToMerge: AnySourceData[] = []; // TODO: not ideal, would prefer SourceData here
 	for (let index = 0; index < 2; ++index) {
-	    sourcesToMerge.push(getSourceData(lazySource.ncList[index], lazySource.validateResultList[index], false));
+	    sourcesToMerge.push(getSourceData(lazySource.ncList[index], lazySource.validateResultList[index], false, orSourcesNcCsvMap));
 	}
 	sourceList.push(mergeSources(sourcesToMerge[0], sourcesToMerge[1], false) as SourceData);
     }
@@ -977,7 +983,9 @@ let getCombosForUseNcLists = (sum: number, max: number, args: any): any => {
 	    if (_.isEmpty(sourceList)) continue;
 
 	    if (_.isUndefined(hash[key].isCompatible)) {
-		hash[key].isCompatible = isCompatibleWithUseSources(loadAndMergeSourceList(sourceList), useSourcesList, args.OrSourcesNcCsvMap);
+		hash[key].isCompatible = isCompatibleWithUseSources(
+		    loadAndMergeSourceList(sourceList, args.orSourcesNcCsvMap),
+		    useSourcesList, args.orSourcesNcCsvMap);
 	    }
 	    if (hash[key].isCompatible) {
 		combos.push(result.nameList!.toString());
@@ -1248,7 +1256,7 @@ let makeCombos = (args: any): any => {
 	    })
 	}
 	// TODO: there is a faster way to generate this map, in mergeOrSources or something.
-	args.OrSourcesNcCsvMap = map;
+	args.orSourcesNcCsvMap = map;
     }
 
     let d = new Duration(begin, new Date()).milliseconds;
