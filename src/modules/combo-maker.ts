@@ -57,7 +57,7 @@ interface SourceBase {
 //
 //
 interface LazySourceData extends SourceBase {
-    ncList: NameCount[];
+    ncList: NCList;
     validateResultList: ValidateResult[];
 }
 
@@ -84,6 +84,7 @@ interface CountArrayAndSize {
 
 interface UseSourceBase extends SourceBase {
     primarySrcArray: CountArray;
+    ncList: NCList;
 }
 
 interface XorSource extends UseSourceBase {
@@ -337,17 +338,17 @@ let populateSourceData = (lazySource: SourceBase, nc: NameCount, validateResult:
     let source: SourceData = lazySource /*as SourceBase*/ as SourceData;
     if (validateResult.resultMap) {
 	let srcNcData = buildSrcNcLists(validateResult.resultMap.map());
-	source.sourceNcCsvList = srcNcData.list.filter(ncCsv => orSourcesNcCsvMap ? orSourcesNcCsvMap.has(ncCsv) : ncCsv);
+	source.sourceNcCsvList = srcNcData.list.filter(ncCsv => orSourcesNcCsvMap ? orSourcesNcCsvMap.has(ncCsv) : true);
 	source.srcNcMap = srcNcData.map;
     } else {
 	if (validateResult.ncList.length !== 1 || validateResult.ncList[0].count !== 1) throw new Error("wrong assumption");
 	let ncListCsv = validateResult.ncList.toString();
-	source.sourceNcCsvList = [ncListCsv].filter(ncCsv => orSourcesNcCsvMap ? orSourcesNcCsvMap.has(ncCsv) : ncCsv);
+	source.sourceNcCsvList = [ncListCsv].filter(ncCsv => orSourcesNcCsvMap ? orSourcesNcCsvMap.has(ncCsv) : true);
 	source.srcNcMap = { "${ncListCsv}": true };
     }
     if (nc.count > 1) {
 	let ncStr = nc.toString();
-	source.sourceNcCsvList.push(...[ncStr].filter(ncCsv => orSourcesNcCsvMap ? orSourcesNcCsvMap.has(ncCsv) : ncCsv));
+	source.sourceNcCsvList.push(...[ncStr].filter(ncCsv => orSourcesNcCsvMap ? orSourcesNcCsvMap.has(ncCsv) : true));
 	source.srcNcMap[ncStr] = true;
     }
     source.ncList = [nc]; // TODO i could try getting rid of "LazySource.nc" and just make this part of LazySouceData
@@ -358,7 +359,7 @@ let populateSourceData = (lazySource: SourceBase, nc: NameCount, validateResult:
     return source;
 };
 
-//
+// TODO: get rid of lazy flag. if map provided, it's not lazy.
 //
 let getSourceData = (nc: NameCount, validateResult: ValidateResult, lazy: boolean
 		     , orSourcesNcCsvMap: Map<string, number> | undefined = undefined
@@ -420,6 +421,7 @@ let mergeSources = (source1: AnySourceData, source2: AnySourceData, lazy: boolea
 //
 let mergeCompatibleSources = (source1: AnySourceData, source2: AnySourceData, lazy: boolean): AnySourceData[] => {
     // TODO: this logic could be part of mergeSources
+    // also, uh, isn't there are primarySrcArray I can be using here?
     return allCountUnique(source1.primaryNameSrcList, source2.primaryNameSrcList)
 	? [mergeSources(source1, source2, lazy)]
 	: [];
@@ -480,8 +482,8 @@ let buildSourceListsForUseNcData = (useNcDataLists: NCDataList[]): SourceList[] 
     return sourceLists;
 };
 
-// Here primaryNameSrcList the combined compatible primary sources of one or more --or
-// arguments.
+// Here primaryNameSrcList is the combined compatible primary NameSrc's of one or more
+// --or arguments.
 //
 // And orSourceLists is a list of sourceLists: one list for each --or argument that is
 // *not* included in primaryNameSrcList.
@@ -489,7 +491,7 @@ let buildSourceListsForUseNcData = (useNcDataLists: NCDataList[]): SourceList[] 
 // Whittle down these lists of separate --or argument sources into lists of combined
 // compatible sources, with each result list containing one element from each source list.
 //
-// So for [ [ a, b], [b, d] ] the candidates would be [a, b], [a, d], [b, b], [b, d],
+// So for [ [a, b], [b, d] ] the candidates would be [a, b], [a, d], [b, b], [b, d],
 // and [b, b] would be filtered out as incompatible.
 //
 let getCompatibleOrSourcesLists = (primaryNameSrcList: NCList, orSourceLists: SourceList[]): SourceList[] => {
@@ -509,19 +511,20 @@ let getCompatibleOrSourcesLists = (primaryNameSrcList: NCList, orSourceLists: So
 	//console.log(`indexList: ${stringify(indexList)}`);
 	let sourceList: SourceList = [];
 	let primarySrcSet = new Set(primaryNameSrcList.map(nameSrc => NameCount.count));
+	// TODO: list.some()
 	for (let [listIndex, sourceIndex] of indexList.entries()) {
-	    let sources = orSourceLists[listIndex][sourceIndex];
+	    let source = orSourceLists[listIndex][sourceIndex];
 	    //console.log(`sources: ${Stringify2(sources)}`);
 	    // TODO: if (!allArrayElemsInSet(sources.primaryNameSrcList, primarySrcSet))
 	    let prevSetSize = primarySrcSet.size;
-	    for (let nameSrc of sources.primaryNameSrcList) {
+	    for (let nameSrc of source.primaryNameSrcList) {
 		primarySrcSet.add(nameSrc.count);
 	    }
-	    if (primarySrcSet.size !== prevSetSize + sources.primaryNameSrcList.length) {
+	    if (primarySrcSet.size !== prevSetSize + source.primaryNameSrcList.length) {
 		sourceList = [];
 		break;
 	    }
-	    sourceList.push(sources);
+	    sourceList.push(source);
 	}
 	if (!_.isEmpty(sourceList)) {
 	    sourceLists.push(sourceList);
@@ -538,9 +541,21 @@ let getCompatibleOrSourcesLists = (primaryNameSrcList: NCList, orSourceLists: So
 // It'd be preferable to embed this ncCsv within each sourceList itself. I'd need to
 // wrap it in an object like { sourceList, ncCsv }.
 //
-let buildSourceNcCsvMap = (orSourceLists: SourceList[]): SourceNcCsvMap => {
+let buildOrSourceNcCsvMap = (orSourceLists: SourceList[]): SourceNcCsvMap => {
     return orSourceLists.reduce((map: SourceNcCsvMap, sourceList: SourceList, index: number) => {
 	const key = _.flatMap(sourceList.map(sources => sources.ncList)).sort().toString();
+	if (!map[key]) map[key] = [];
+	map[key].push(index);
+	return map;
+    }, {});
+};
+
+//
+//
+let buildUseSourceNcCsvMap = (useSourceList: UseSource[]): SourceNcCsvMap => {
+    return useSourceList.reduce((map: SourceNcCsvMap, source: UseSource, index: number) => {
+	console.log(Stringify2(source));
+	const key = source.ncList.sort().toString();
 	if (!map[key]) map[key] = [];
 	map[key].push(index);
 	return map;
@@ -573,9 +588,12 @@ let mergeCompatibleUseSources = <SourceType extends UseSourceBase>(sourceLists: 
 	// assign result.sourceLists inside indexList.entries() loop. 
 	//
 	let primaryNameSrcList: NCList = [];
+	let ncList: NCList = []; // TODO: xor only
 	let orSourceLists: SourceList[] = [];
 	let success = true;
+	// TODO: indexList.some()
 	for (let [listIndex, sourceIndex] of indexList.entries()) {
+	    // TODO: move inside op === Op.or block?
 	    if (!orSourceLists[listIndex]) orSourceLists.push([]);
 	    const orSourceList = orSourceLists[listIndex];
 	    if (ZZ) console.log(`iter(${iter}) listIndex(${listIndex}) sourceIndex(${sourceIndex}), orSourceList(${orSourceList.length})`);
@@ -593,15 +611,19 @@ let mergeCompatibleUseSources = <SourceType extends UseSourceBase>(sourceLists: 
 	    let source = sourceLists[listIndex][sourceIndex];
 	    if (_.isEmpty(primaryNameSrcList)) {
 		primaryNameSrcList.push(...source.primaryNameSrcList);
+		ncList.push(...source.ncList);
 		if (ZZ) console.log(`pnsl, initial: ${primaryNameSrcList}`);
 	    } else {
 		// 
 		// TODO: hash of primary sources would be faster here.	inside inner loop.
+		// TODO: vv
 		// TODO: or use push instead of concat
-		//
+		// TODO: ^^
 		let combinedNameSrcList = primaryNameSrcList.concat(source.primaryNameSrcList);
+		// TODO: uniqBy da debil
 		if (_.uniqBy(combinedNameSrcList, NameCount.count).length === combinedNameSrcList.length) {
 		    primaryNameSrcList = combinedNameSrcList;
+		    ncList.push(...source.ncList);
 		    if (ZZ) console.log(`pnsl, combined: ${primaryNameSrcList}`);
 		} else {
 		    if (ZZ) console.log(`pnsl, emptied: ${primaryNameSrcList}`);
@@ -614,21 +636,24 @@ let mergeCompatibleUseSources = <SourceType extends UseSourceBase>(sourceLists: 
 	    if (ZZ) console.log(`pnsl, final: ${primaryNameSrcList}`);
 	    let result: UseSourceBase = {
 		primaryNameSrcList,
-		primarySrcArray: getCountArray(primaryNameSrcList)
+		primarySrcArray: getCountArray(primaryNameSrcList),
+		ncList
 	    };
 	    if (op === Op.or) {
 		let nonEmptyOrSourceLists = orSourceLists.filter(sourceList => !_.isEmpty(sourceList));
 		let orResult: OrSource = result as OrSource;
 		orResult.sourceLists = getCompatibleOrSourcesLists(primaryNameSrcList, nonEmptyOrSourceLists);
-		orResult.sourceNcCsvMap = buildSourceNcCsvMap(orResult.sourceLists);
-		orResult.primarySrcArrayAndSizeList = orResult.sourceLists.map(sourceList =>
-		    getCountArrayAndSizeForSourceList(sourceList));
+		orResult.sourceNcCsvMap = buildOrSourceNcCsvMap(orResult.sourceLists);
+		orResult.primarySrcArrayAndSizeList = orResult.sourceLists.map(sourceList => getCountArrayAndSizeForSourceList(sourceList));
 		if (ZZ && _.isEmpty(orResult.sourceLists) && !_.isEmpty(nonEmptyOrSourceLists)) {
 		    console.log(`before: orSourceLists(${orSourceLists.length}): ${Stringify2(orSourceLists)}`);
 		    console.log(`after: result.sourceLists(${orResult.sourceLists.length}): ${Stringify2(orResult.sourceLists)}`);
 		    ZZ = 0;
 		}
-	    }
+	    }/* else if (op === Op.xor) {
+		let xorResult: XorSource = result as OrSource;
+		xorResult.ncList = ncList;
+	    }*/
 	    sourceList.push(result as SourceType);
 	}
 	++iter;
@@ -665,11 +690,13 @@ let mergeOrSourceList = (sourceList: XorSource[], orSourceList: OrSource[]): Use
 	    // TODO: hash of primary sources faster here?
 	    //
 	    // possible faulty (rarish) optimization, only checking clue count
-	    const numUnique = _.uniqBy(combinedNameSrcList, NameCount.count).length;
+	    // TODO: uniqBy da debil
+	    let numUnique = _.uniqBy(combinedNameSrcList, NameCount.count).length;
 	    if (numUnique === combinedNameSrcList.length) {
 		mergedSourceList.push({
 		    primaryNameSrcList: combinedNameSrcList,
 		    primarySrcArray: getCountArray(combinedNameSrcList),
+		    ncList: source.ncList.concat(orSource.ncList),
 		    orSource
 		});
 	    } else if (numUnique === orSource.primaryNameSrcList.length) {
@@ -752,25 +779,6 @@ let next = (clueSourceList: any, sourceIndexes: number[]): FirstNextResult => {
 	    continue;
 	}
 	nameList.sort();
-
-	/*
-	// skip combinations we've already checked
-	let skip = false;
-
-	if (skip && !addComboToFoundHash(nameList.toString())) continue; // already checked
-
-	// skip combinations that have duplicate source:count
-	if (!options.allow_dupe_src) {
-	if (skip && _.uniq(srcCountStrList).length !== srcCountStrList.length) {
-	continue;
-	}
-	}
-	// skip combinations that have duplicate names
-	if (skip && _.sortedUniq(nameList).length !== nameList.length) {
-	continue;
-	}
-	*/
-
 	return {
 	    done:     false,
 	    ncList:   ncList.sort(),
@@ -797,7 +805,7 @@ let XX = 0;
 let isCompatibleWithAnyOrSource = (source: SourceData, useSource: UseSource
 				   , orSourcesNcCsvMap: Map<string, number>
 				   ): boolean => {
-    // #1 only add entries to source.srcNcMap/Lists if it's in the orSourcesNcCsvMap. then map.has() is implied. - TODO
+    // #1 only add entries to source.srcNcMap/Lists if it's in the orSourcesNcCsvMap. then map.has() is implied. - DONE
     // #2 iterate over source.sourceNcCsvList - DONE
     //      (rename to sourceNcCsvList) - DONE
     // #3 make OrSource.sourceNcCsvList a string:number or string:number[] map - DONE
@@ -814,58 +822,33 @@ let isCompatibleWithAnyOrSource = (source: SourceData, useSource: UseSource
     //    d. by doing so, we do 2 lookups, followed by the "is this source still valid after removing
     //       these primarySrc's from it" logic.
 
-    let orSource = useSource.orSource!;
     __sum += source.sourceNcCsvList.length;
     __count += 1;
-    if (1) {
-    return source.sourceNcCsvList.some(ncCsv => {
-	if (!orSourcesNcCsvMap.has(ncCsv)) return false; // can remove after (1) above
-	if (!orSource.sourceNcCsvMap[ncCsv]) return false;
-	if (0) {
-	return orSource.sourceNcCsvMap[ncCsv].some(index => {
-	    if (0) {
-            let primarySrcArrayAndSize = orSource.primarySrcArrayAndSizeList[index];
-	    let numCountsInArray = getNumCountsInArray(source.primaryNameSrcList, primarySrcArrayAndSize.array);
-	    if (numCountsInArray === primarySrcArrayAndSize.size) {
-		const uniqPrimarySrcList = getCountListNotInArray(source.primaryNameSrcList, primarySrcArrayAndSize.array);
-		const allUniqueSrc = noNumbersInArray(uniqPrimarySrcList, useSource.primarySrcArray);
-		//const allUniqueSrc = noCountsNotInOneAreInTwo(source.primaryNameSrcList, primarySrcArrayAndSize, useSource.primarySrcArray);
-		if (allUniqueSrc) return true; // some.exit
-	    }
-	    } else return false;
-	});
-	} else return false;
-    });
-    } else return false;
-};
 
-/*
-let OLD_isCompatibleWithAnyOrSource = (source: SourceData, useSource: UseSource
-				   , orSourcesNcCsvMap: Map<string, number>
-				   ): boolean => {
-    if (!source.srcNcLists.some(ncCsv => orSourcesNcCsvMap.has(ncCsv))) return false;
     let orSource = useSource.orSource!;
-    return orSource.sourceLists.some((sourceList, index) => {
-	//if (1) {
-	let ncCsv = orSource.sourceNcCsvList[index];
-	if (source.srcNcMap[ncCsv]) {
-	    // orSources ncCsv matches sources ncCsv
+    return source.sourceNcCsvList.some(ncCsv => {
+	if (!orSource.sourceNcCsvMap[ncCsv]) return false;
+	return orSource.sourceNcCsvMap[ncCsv].some(index => {
             let primarySrcArrayAndSize = orSource.primarySrcArrayAndSizeList[index];
 	    let numCountsInArray = getNumCountsInArray(source.primaryNameSrcList, primarySrcArrayAndSize.array);
 	    if (numCountsInArray === primarySrcArrayAndSize.size) {
 		const uniqPrimarySrcList = getCountListNotInArray(source.primaryNameSrcList, primarySrcArrayAndSize.array);
 		const allUniqueSrc = noNumbersInArray(uniqPrimarySrcList, useSource.primarySrcArray);
-		//const allUniqueSrc = noCountsNotInOneAreInTwo(source.primaryNameSrcList, primarySrcArrayAndSize, useSource.primarySrcArray);
 		if (allUniqueSrc) return true; // some.exit
 	    }
-	}
-	//}
-	return false; // some.continue
+	});
     });
 };
-*/
 
+// Before I do #4 above, can I apply the same 1-3 here as I did to OrSources?
 //
+// #0 presumably i need to build a "UseSourcesNcCsvMap" similar to the OrSources map. and pass them
+//    both around where required. 
+// #1 only add entries to source.srcNcMap/Lists if it's in the orSourcesNcCsvMap. then map.has() is implied.
+// #2 iterate over source.sourceNcCsvList
+//      (rename to sourceNcCsvList)
+// #3 make OrSource.sourceNcCsvList a string:number or string:number[] map
+//    the value containing the sourceList index(es) for sources with that NC.
 //
 let isCompatibleWithUseSources = (sourceList: SourceList, useSourceList: UseSource[]
 				  , orSourcesNcCsvMap: Map<string, number>
@@ -1109,6 +1092,7 @@ type NumberList = number[];
 //
 
 type StringNumberTuple = [string, number];
+type StringNumberListTuple = [string, number[]];
 
 interface StringNumberTupleListAndCount {
     list: StringNumberTuple[];
@@ -1246,9 +1230,10 @@ let makeCombos = (args: any): any => {
     }
 
     if (1) {
+	// OR
 	let map = test_getOrSourcesNcCsvCountMap(args.useSourcesList);
 	let list: StringNumberTuple[] = [...map.entries()].sort((a,b) => b[1] - a[1]);
-	console.error(`NcCsvCount(${list.length})`);
+	console.error(`orSourcesNcCsvCount(${list.length})`);
 	if (0) {
 	    list.some((entry, index) => {
 		console.error(` ${entry[0]}: ${entry[1]}`);
@@ -1257,6 +1242,21 @@ let makeCombos = (args: any): any => {
 	}
 	// TODO: there is a faster way to generate this map, in mergeOrSources or something.
 	args.orSourcesNcCsvMap = map;
+
+	if (0) {
+	    // XOR
+	    let map = buildUseSourceNcCsvMap(args.useSourcesList);
+	    //map = test_getUseSourcesNcCsvCountMap(args.useSourcesList);
+	    let list: StringNumberListTuple[] = [...Object.entries(map)].sort((a, b) => b[1].length - a[1].length);
+	    console.error(`useSourcesNcCsvCount(${list.length})`);
+	    if (1) {
+		list.some((entry, index) => {
+		    console.error(` ${entry[0]}: ${entry[1]}`);
+		    return false; // index >= 10;
+		});
+	    }
+	}
+	if (0) process.exit(0);
     }
 
     let d = new Duration(begin, new Date()).milliseconds;
