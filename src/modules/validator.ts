@@ -17,8 +17,16 @@ const Expect      = require('should/as-function');
 const NameCount   = require('../types/name-count');
 const Peco        = require('./peco');
 const ResultMap   = require('../types/result-map');
-const Stringify   = require('stringify-object');
+const stringify	  = require('javascript-stringify').stringify;
+const Stringify2  = require('stringify-object');
 const Timing      = require('debug')('timing');
+
+function Stringify(val: any) {
+    return stringify(val, (value: any, indent: any, stringify: any) => {
+	if (typeof value == 'function') return "function";
+	return stringify(value);
+    }, " ");
+}
 
 
 // TODO: options.xp
@@ -34,9 +42,6 @@ let allowDupeName    = true;
 
 let logLevel         = 0;
     
-let count = 0;
-let dupe = 0;
-
     // TODO: these are duplicated in ResultMap
 let PRIMARY_KEY      = '__primary';
 let SOURCES_KEY      = '__sources';
@@ -54,14 +59,14 @@ type CountArray = Int32Array;
 interface Result {
     ncList: NCList;
     nameSrcList?: NCList;
-    primarySrcArray?: CountArray;
     nameSrcCsv?: string;
     resultMap: any;
+//    primarySrcArray?: CountArray;
 }
 
 interface RvsResult {
     success: boolean;
-    list: Result[] | undefined;
+    list?: Result[];
 }
 
 
@@ -813,9 +818,11 @@ let hasNameSrcList = (resultList: Result[], nameSrcList: NCList): boolean => {
 
 //
 //
+/*
 let isCompatible = (compatResult: Result, result: Result): boolean => {
     return noCountsInArray(compatResult.nameSrcList!, result.primarySrcArray!);
 }
+*/
 
 //
 //
@@ -864,7 +871,7 @@ let dumpIndexMap = function(indexMap: any): void {
 //   ncList:
 //   validateAll:
 ///
-let checkUniqueSources = (nameCountList: NCList, args: any): any => {
+let checkUniqueSources = (nameCountList: NCList, args: any): RvsResult => {
     let origNcList = nameCountList;
 
     // assert(nameCountList) && Array.isArray(nameCountList)
@@ -927,6 +934,11 @@ let checkUniqueSources = (nameCountList: NCList, args: any): any => {
                     resultMap: buildResult.resultMap // no need to merge?
                 }];
             } else {
+		// the opportunity we have here, is that all compound clues should already
+		// have a result attached to them in KnownSrcMapArray (somehow? right?).
+		// so, can't we spin off to a test_ method here, and do something special?
+		// or, since we're calling validateSources, should we do the check there?
+
                 // call validateSources recursively with compound clues
                 let vsResult = validateSources({
                     sum:            buildResult.count,
@@ -998,6 +1010,93 @@ let checkUniqueSources = (nameCountList: NCList, args: any): any => {
     }
 };
 
+let getClueSources = (name: string): number[] => {
+    let clueList = ClueManager.clueListArray[1];
+    let sources: number[] = clueList.filter(clue => clue.name == name).map(clue => clue.src);
+    if (_.isEmpty(sources)) throw new Error(`can't find: ${name}`);
+    return sources;
+}
+
+/*
+interface Result {
+    ncList: NCList;
+    nameSrcList?: NCList;
+    primarySrcArray?: CountArray;
+    nameSrcCsv?: string;
+    resultMap: any;
+}
+*/
+
+let MM = 0;
+let NN = false;
+let mergeNcListResults = (ncListToMerge: NCList, args: any): RvsResult => {
+    let resultList: Result[] = [];
+    let listArray = ncListToMerge.map(nc => {
+	let ncResultMap = ClueManager.ncResultMapList[nc.count];
+	// TODO: not "1", but the number of occurences of that name in primary clue list
+	if (nc.count === 1) {
+	    return getClueSources(nc.name);
+	} else {
+	    return [...Array(ncResultMap[nc.toString()].list.length).keys()];
+	}
+    });
+    //console.log(`${ncListToMerge}:`)
+    //console.log(Stringify(listArray));
+    Peco.makeNew({
+	listArray,
+	max: 99999
+    }).getCombinations().forEach(indexList => {
+	//if (++MM % 100 === 0) NN = true;
+	let ncList: NCList = [];
+	let nameSrcList: NCList = [];
+        let resultMap = ResultMap.makeNew();
+	indexList.forEach((resultIndex, ncIndex) => {
+	    let nc = ncListToMerge[ncIndex];
+	    if (nc.count > 1) {
+		let result = ClueManager.ncResultMapList[nc.count][nc.toString()].list[resultIndex];
+		if (NN) console.log(`merging: ${Stringify(result)}`);
+		ncList.push(...result.ncList);
+		nameSrcList.push(...result.nameSrcList);
+		resultMap = resultMap.merge(result.resultMap); // , ncList? or result.ncList);
+	    } else {
+		if (NN) console.log(`merging nc: ${nc}`);
+		ncList.push(nc);
+		nameSrcList.push(NameCount.makeNew(nc.name, resultIndex));
+	    }
+	});
+	// TODO: uniqBy da debil
+	if (_.uniqBy(nameSrcList, NameCount.count)) {
+	    let nameSrcCsv = nameSrcList.sort().toString();
+	    let result: Result = {
+		ncList,
+		nameSrcList,
+		nameSrcCsv,
+		resultMap
+	    };
+	    resultList.push(result);
+	    if (NN) console.log(`result: ${Stringify(result)}`);
+	}
+	NN = false;
+    });
+    return { list: resultList, success: !_.isEmpty(resultList) };
+};
+
+//
+//
+let test = (ncList: NCList, args: any): RvsResult => {
+    // can remove this.
+    if (!ncList.every(nc => {
+	let ncResultMap = ClueManager.ncResultMapList[nc.count];
+	let ncStr = nc.toString();
+	if (nc.count === 1 || (ncResultMap[ncStr] && ncResultMap[ncStr].list)) {
+	    return true;
+	}
+	return false;
+    })) throw new Error('no result list');
+    return mergeNcListResults(ncList, args);
+};
+
+
 // args:
 //   name     : clueName,
 //   count    : count,
@@ -1012,7 +1111,7 @@ let checkUniqueSources = (nameCountList: NCList, args: any): any => {
 //
 // TODO: ForName
 
-let rvsWorker = (args: any): any => {
+let rvsWorker = (args: any): RvsResult => {
     Debug('++rvsWorker' +
           `, name: ${args.name}` +
           `, count: ${args.count}` +
@@ -1043,8 +1142,14 @@ let rvsWorker = (args: any): any => {
     // If only one name & count remain, we're done.
     // (name & count lists are equal length, just test one)
     if (args.nameList.length === 1) {
-        let result = checkUniqueSources(newNameCountList, args);
-        Debug(`checkUniqueSources --- ${result.success ? 'success!' : 'failure'}`);
+	let result: RvsResult;
+	if (args.fast && args.validateAll) {
+	    if (NN) console.log('fast');
+	    result = mergeNcListResults(newNameCountList, args);
+	} else {
+            result = checkUniqueSources(newNameCountList, args);
+            Debug(`checkUniqueSources --- ${result.success ? 'success!' : 'failure'}`);
+	}
         if (result.success) {
             args.ncList.push(NameCount.makeNew(args.name, args.count));
             Debug(`add1, ${args.name}:${args.count}` +
@@ -1061,24 +1166,22 @@ let rvsWorker = (args: any): any => {
         clueNameList:  chop(args.nameList, args.name),
         clueCountList: chop(args.countList, args.count),
         nameCountList: newNameCountList,
+	fast: args.fast,
         validateAll:   args.validateAll
     });
     if (!rvsResult.success) {
         Debug('--rvsWorker, recursiveValidateSources failed');
-        return { success: false }; // fail
+        return rvsResult;
     }
     // does this achieve anything? modifies args.ncList.
     // TODO: probably need to remove why that matters.
     // TODO2: use _clone() until then
     args.ncList.length = 0;
-    newNameCountList.forEach((nc: NameCount) => args.ncList.push(nc));
+    newNameCountList.forEach(nc => args.ncList.push(nc));
     Debug(`--rvsWorker, add ${args.name}:${args.count}` +
           `, newNcList(${newNameCountList.length})` +
           `, ${newNameCountList}`);
-    return {
-        success: true,
-        list:    rvsResult.list
-    };
+    return rvsResult;
 };
 
 // args:
@@ -1109,18 +1212,16 @@ let recursiveValidateSources = (args: any): RvsResult => {
     // count is checked for a name, no need to check it again
 
     let someResult = args.clueCountList.some((count: number) => {
-        Debug(`looking for ${clueName} in ${count}`);
         if (!_.has(ClueManager.knownClueMapArray[count], clueName)) {
-            Debug(` not found, ${clueName}:${count}`);
             return false; // some.continue
         }
-        Debug(' found');
         let rvsResult = rvsWorker({
             name:           clueName,
             count:          count,
             nameList:       args.clueNameList,
             countList:      args.clueCountList,
             ncList:         ncList,
+	    fast: args.fast,
             validateAll:    args.validateAll
         });
         if (!rvsResult.success) {
@@ -1133,7 +1234,7 @@ let recursiveValidateSources = (args: any): RvsResult => {
             // can i check vs. clueNameList.length?
             // throw new Error('list should have at least two entries1');
         }
-        resultList = rvsResult.list;
+        resultList = rvsResult.list!;
         return true; // success: some.exit
     });
     --logLevel;
@@ -1144,9 +1245,6 @@ let recursiveValidateSources = (args: any): RvsResult => {
     };
 };
 
-let hash = {};
-let hash_size = 0;
-
 //
 //
 let validateSources = (args: any): any => {
@@ -1156,20 +1254,6 @@ let validateSources = (args: any): any => {
           `, count(${args.count})` +
           `, validateAll: ${args.validateAll}`);
 
-    ++count;
-    let is_dupe = false;
-    let key = `${args.namelist}:${args.sum}:${args.count}`;
-    if (key in hash) {
-	dupe += 1;
-	is_dupe = true;
-	const result = hash[key];
-	//if (!result.success) return result;
-    } else {
-	hash_size += 1;
-    }
-    if (!(count % 10000)) {
-	Timing(`++validateSources (${++count}): ${args.nameList}, hash(${hash_size}) ${is_dupe ? '(dupe)' : ''}`);
-    }
     let found = false;
     let resultList: Result[] = [];
     Peco.makeNew({
@@ -1182,6 +1266,7 @@ let validateSources = (args: any): any => {
         let rvsResult = recursiveValidateSources({
             clueNameList:   args.nameList,
             clueCountList,
+	    fast: args.fast,
             validateAll:    args.validateAll
         });
         if (rvsResult.success) {

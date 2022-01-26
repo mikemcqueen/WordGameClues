@@ -92,13 +92,14 @@ function usage (msg) {
 
 //
 
-function loadClues (clues, ignoreErrors, max) {
+function loadClues (clues, ignoreErrors, max, fast) {
     log('loading all clues...');
     ClueManager.loadAllClues({
         clues,
         ignoreErrors,
 	max,
         validateAll:  true,
+	fast
     });
     log('done.');
     return true;
@@ -368,7 +369,7 @@ async function main () {
 
     setLogging(_.includes(options.verbose, VERBOSE_FLAG_LOAD));
     let loadBegin = new Date();
-    if (!loadClues(clueSource, ignoreLoadErrors, load_max)) {
+    if (!loadClues(clueSource, ignoreLoadErrors, load_max, options.fast)) {
         return 1;
     }
     let loadMillis = new Duration(loadBegin, new Date()).milliseconds;

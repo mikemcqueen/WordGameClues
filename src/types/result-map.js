@@ -41,6 +41,10 @@ function ResultMap () {
 }
 
 
+let toString = () => {
+    return this.map().toString();
+};
+
 //
 //
 
@@ -61,6 +65,7 @@ function assignMethods (obj) {
     obj.ensureUniquePrimaryLists    = ensureUniquePrimaryLists;
     obj.dump                        = dump;
     obj.map                         = map;
+    obj.toString = toString;
 
     return obj;
 }

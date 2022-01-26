@@ -22,6 +22,7 @@ const Peco           = require('./peco');
 const PrettyMs       = require('pretty-ms');
 const Validator      = require('./validator');
 
+const Stringify2 = require('stringify-object').stringify;
 const stringify = require('javascript-stringify').stringify;
 //let Stringify = stringify;
 
@@ -45,6 +46,7 @@ function ClueManager () {
     this.rejectListArray = [];       // the JSON reject files in an array
     this.knownClueMapArray = [];     // map clue name to clue src
     this.knownSourceMapArray = [];   // map known source to list of clues
+    this.ncResultMapList = [];       // map known NCs to result list
     this.rejectSourceMap = {};       // map reject source to true/false (currently)
 
     this.rvsSuccessSeconds = 0;
@@ -127,7 +129,7 @@ ClueManager.prototype.loadAllClues = function (args) {
             this.addKnownPrimaryClues(knownClueList);
         }
         else {
-            this.addKnownCompoundClues(knownClueList, count, args.validateAll);
+            this.addKnownCompoundClues(knownClueList, count, args.validateAll, args.fast);
         }
     }
 
@@ -203,17 +205,9 @@ ClueManager.prototype.getRejectFilename = function (count) {
     });
 };
 
-
-function validateAndSaveResults (dst, args) {
-    let vsResult = Validator.validateSources(args);
-    if (args.validateAll) {
-        // this is where the magic happens
-        dst.results = vsResult.list;
-    }
-    return vsResult;
-}
-
-ClueManager.prototype.addCompoundClue = function (clue, count, validateAll = true) {
+//
+//
+ClueManager.prototype.addCompoundClue = function (clue, count, validateAll = true, fast = false) {
     //Expect(clue).is.an.Object();
     //Expect(count).is.a.Number();
     let nameList = clue.src.split(',').sort();
@@ -224,12 +218,51 @@ ClueManager.prototype.addCompoundClue = function (clue, count, validateAll = tru
     if (!_.has(srcMap, srcKey)) {
         srcMap[srcKey] = { clues: [] };
         Debug(`## validating Known compound clue: ${srcKey}:${count}`);
-	vsResult = validateAndSaveResults(srcMap[srcKey], {
+	if ("polar bear" == clue.name) {
+	    vsResult = Validator.validateSources({
+		sum: count,
+		nameList,
+		count: nameList.length,
+		fast: true,
+		validateAll
+	    });
+	    console.log(`fast: ${Stringify2(vsResult.list)}`);
+	    vsResult = Validator.validateSources({
+		sum: count,
+		nameList,
+		count: nameList.length,
+		fast: false,
+		validateAll
+	    });
+	    console.log(`slow: ${Stringify2(vsResult.list)}`);
+	}
+	vsResult = Validator.validateSources({
 	    sum: count,
 	    nameList,
 	    count: nameList.length,
+	    fast,
 	    validateAll
 	});
+        // this is where the magic happens
+	if (vsResult.success && validateAll) {
+            srcMap[srcKey].results = vsResult.list;
+	}
+    } else if (validateAll) {
+	vsResult.list = srcMap[srcKey].results;
+    }
+
+    if (vsResult.success && validateAll) {
+	let ncResultMap = this.ncResultMapList[count];
+	if (!ncResultMap) {
+	    ncResultMap = this.ncResultMapList[count] = {};
+	}
+	let ncStr = NameCount.makeNew(clue.name, count).toString();
+	if (!ncResultMap[ncStr]) {
+	    //console.log(`adding ${ncStr} to ncResultMap`);
+	    ncResultMap[ncStr] = {
+		list: vsResult.list
+	    };
+	}
     }
     srcMap[srcKey].clues.push(clue);
     return vsResult;
@@ -237,7 +270,7 @@ ClueManager.prototype.addCompoundClue = function (clue, count, validateAll = tru
 
 //
 
-ClueManager.prototype.addKnownCompoundClues = function (clueList, clueCount, validateAll) {
+ClueManager.prototype.addKnownCompoundClues = function (clueList, clueCount, validateAll, fast) {
     // so this is currently only callable once per clueCount.
     //Expect(this.knownClueMapArray[clueCount]).is.undefined();
     //Expect(clueCount > 1);
@@ -253,7 +286,7 @@ ClueManager.prototype.addKnownCompoundClues = function (clueList, clueCount, val
 	let nameList = clue.src.split(',').sort();
 	clue.src = nameList.toString();
 	//if (clueCount > 1) {
-	let result = this.addCompoundClue(clue, clueCount, validateAll);
+	let result = this.addCompoundClue(clue, clueCount, validateAll, fast);
         if (!this.ignoreLoadErrors) {
 	    if (!result.success) {
 		console.log(`VALIDATE FAILED KNOWN COMPOUND CLUE: '${clue.src}':${clueCount}`);
