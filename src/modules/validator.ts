@@ -1030,10 +1030,17 @@ interface Result {
 let MM = 0;
 let NN = false;
 let mergeNcListResults = (ncListToMerge: NCList, args: any): RvsResult => {
+    let ncStr = ncListToMerge.toString();
+//    console.log(`merging: ${ncStr}`);
+    if (0 && ncStr == 'bear:2,polar:3') {
+//    if (1 && ncStr == 'gold leaf:1,oak:2') {
+//    if (ncStr == 'coffee:1,bean:1') {
+	console.log(`merging: ${ncStr}\n-----------------------------------`);
+	NN = true;
+    }
     let resultList: Result[] = [];
     let listArray = ncListToMerge.map(nc => {
 	let ncResultMap = ClueManager.ncResultMapList[nc.count];
-	// TODO: not "1", but the number of occurences of that name in primary clue list
 	if (nc.count === 1) {
 	    return getClueSources(nc.name);
 	} else {
@@ -1050,23 +1057,32 @@ let mergeNcListResults = (ncListToMerge: NCList, args: any): RvsResult => {
 	let ncList: NCList = [];
 	let nameSrcList: NCList = [];
         let resultMap = ResultMap.makeNew();
-	indexList.forEach((resultIndex, ncIndex) => {
+	if (NN) console.log ('****************************************************************');
+	indexList.forEach((resultIndex, ncIndex) => { // TODO: resultIndex kinda bad name, can also be clue index
 	    let nc = ncListToMerge[ncIndex];
 	    if (nc.count > 1) {
 		let result = ClueManager.ncResultMapList[nc.count][nc.toString()].list[resultIndex];
-		if (NN) console.log(`merging: ${Stringify(result)}`);
+		if (NN) console.log(`merging ${nc} as ${result.ncList}: ${Stringify(result)}`);
 		ncList.push(...result.ncList);
 		nameSrcList.push(...result.nameSrcList);
-		resultMap = resultMap.merge(result.resultMap); // , ncList? or result.ncList);
+		resultMap.newMapFromNcSource(nc, result.resultMap);
 	    } else {
 		if (NN) console.log(`merging nc: ${nc}`);
 		ncList.push(nc);
-		nameSrcList.push(NameCount.makeNew(nc.name, resultIndex));
+		let nameSrc = NameCount.makeNew(nc.name, resultIndex);
+		nameSrcList.push(nameSrc);
+		// compare berry:2 resultmap from clue-manager addcompound
+		// it's possible we need to do something besides just 'merge' above, like supply an ncList
+		// some bizarre fucking stoned logic in resultMap.mergeNcList.
+		// see SOURCES_KEY below. we couldn't add the map entry using the old way because
+		// we don't know the parent NC. we know it here. so just add it?  like 'bear:2' : { 'coffee:1': ..., 'bean:1': ... }
+		// again, compare to berry:2
+		resultMap.addPrimarySource(nc, nameSrc);
 	    }
 	});
 	// TODO: uniqBy da debil
-	if (_.uniqBy(nameSrcList, NameCount.count)) {
-	    let nameSrcCsv = nameSrcList.sort().toString();
+	if (_.uniqBy(nameSrcList, NameCount.count).length === nameSrcList.length) {
+	    let nameSrcCsv = _.sortBy(nameSrcList, NameCount.count).toString();
 	    let result: Result = {
 		ncList,
 		nameSrcList,
@@ -1075,9 +1091,9 @@ let mergeNcListResults = (ncListToMerge: NCList, args: any): RvsResult => {
 	    };
 	    resultList.push(result);
 	    if (NN) console.log(`result: ${Stringify(result)}`);
-	}
-	NN = false;
+	} else if (NN) console.log ('skipped - above not unique');
     });
+    NN = false;
     return { list: resultList, success: !_.isEmpty(resultList) };
 };
 

@@ -22,7 +22,7 @@ const Peco           = require('./peco');
 const PrettyMs       = require('pretty-ms');
 const Validator      = require('./validator');
 
-const Stringify2 = require('stringify-object').stringify;
+const Stringify2 = require('stringify-object');
 const stringify = require('javascript-stringify').stringify;
 //let Stringify = stringify;
 
@@ -218,7 +218,8 @@ ClueManager.prototype.addCompoundClue = function (clue, count, validateAll = tru
     if (!_.has(srcMap, srcKey)) {
         srcMap[srcKey] = { clues: [] };
         Debug(`## validating Known compound clue: ${srcKey}:${count}`);
-	if ("polar bear" == clue.name) {
+	if (0 && ("polar bear" == clue.name || "polar" == clue.name || "bear" == clue.name)) {
+	    //if (clue.name == 'berry' || clue.name == 'major' || clue.name == 'gold leaf') {
 	    vsResult = Validator.validateSources({
 		sum: count,
 		nameList,
@@ -226,7 +227,7 @@ ClueManager.prototype.addCompoundClue = function (clue, count, validateAll = tru
 		fast: true,
 		validateAll
 	    });
-	    console.log(`fast: ${Stringify2(vsResult.list)}`);
+	    console.log(`fast: ${Stringify(vsResult.list)}`);
 	    vsResult = Validator.validateSources({
 		sum: count,
 		nameList,
@@ -234,7 +235,7 @@ ClueManager.prototype.addCompoundClue = function (clue, count, validateAll = tru
 		fast: false,
 		validateAll
 	    });
-	    console.log(`slow: ${Stringify2(vsResult.list)}`);
+	    console.log(`slow: ${Stringify(vsResult.list)}`);
 	}
 	vsResult = Validator.validateSources({
 	    sum: count,
@@ -260,9 +261,10 @@ ClueManager.prototype.addCompoundClue = function (clue, count, validateAll = tru
 	if (!ncResultMap[ncStr]) {
 	    //console.log(`adding ${ncStr} to ncResultMap`);
 	    ncResultMap[ncStr] = {
-		list: vsResult.list
+		list: [] // vsResult.list
 	    };
 	}
+	ncResultMap[ncStr].list.push(...vsResult.list);
     }
     srcMap[srcKey].clues.push(clue);
     return vsResult;

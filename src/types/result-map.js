@@ -49,6 +49,8 @@ let toString = () => {
 //
 
 function assignMethods (obj) {
+    obj.newMapFromNcSource          = newMapFromNcSource;
+    obj.addPrimarySource            = addPrimarySource;
     obj.addPrimaryLists             = addPrimaryLists;
     obj.addResult                   = addResult;
     obj.addResultAtNcList           = addResultAtNcList;
@@ -67,6 +69,9 @@ function assignMethods (obj) {
     obj.map                         = map;
     obj.toString = toString;
 
+    // private
+
+
     return obj;
 }
 
@@ -76,15 +81,65 @@ function map () {
     return this.internal_map;
 }
 
+function isPrimaryArrayValueKey(key, obj) {
+    return key.split(':')[1] == '1' && _.isArray(obj[key]);
+}
+
+// Rules:
+// if resultMap consists as a single primary NC -- not possible 
+//    addPrimarySource
+// if resultMap consists of multiple primary NCs
+//    wrap in object and combine all into single csv for key and value (nc and nameSrc)
+// if resultMap consists of one or more primary NCs + at least one compound NCs
+//    wrap each NC in an object
+//
+function getAsValueObject(resultMap) {
+    let resultMapKeys =_.keys(resultMap.map());
+    let primaryArrayValueKeys = resultMapKeys.filter(key => isPrimaryArrayValueKey(key, resultMap.map()));
+    // if resultMap consists of only primary NCs with array value types
+    //    wrap in object and combine all into single csv for key and value (nc and nameSrc)
+    if (resultMapKeys.length === primaryArrayValueKeys.length) {
+	let key = resultMapKeys.sort().toString();
+	// [0] to extract the "first element" (nc) from something that looks like: [{ name: 'bean', count: 11 }]
+	let value = resultMapKeys.map(key => resultMap.map()[key][0].toString()).sort().toString();
+	return { [key]: [`${value}`] };
+    }
+    // if resultMap consists of one or more primary NCs + at least one compound NCs (we could/should confirm this)
+    //    wrap each primary array-value-type NC in an object
+    return resultMapKeys.reduce((obj, key) => {
+	if (isPrimaryArrayValueKey(key, resultMap.map())) {
+	    obj[key] = { [key]: resultMap.map()[key] };
+	} else {
+	    obj[key] = resultMap.map()[key];
+	}
+	return obj;
+    }, {});
+}
+
+//
+//
+function newMapFromNcSource (nc, resultMap) {
+    this.map()[nc] = getAsValueObject(resultMap);
+    return this;
+}
+
+//
+//
+function addPrimarySource (nc, nameSrc) {
+    if (nc.name != nameSrc.name) {
+        throw new Error(`names don't match ${nc.name}, ${nameSrc.name}`);
+    }
+    this.map()[nc] = [nameSrc];
+    return this;
+}
+
 //
 //
 
 function addPrimaryLists (ncList, nameSrcList) {
     nameSrcList = _.clone(nameSrcList);
     ncList.forEach(nc => {
-        let index;
-    
-        index = _.findIndex(nameSrcList, { name: nc.name });
+        let index = _.findIndex(nameSrcList, { name: nc.name });
         if (index === -1) {
             throw new Error('no ' + nc.name + ' in ' + nameSrcList);
         }
