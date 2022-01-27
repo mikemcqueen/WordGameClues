@@ -1017,24 +1017,13 @@ let getClueSources = (name: string): number[] => {
     return sources;
 }
 
-/*
-interface Result {
-    ncList: NCList;
-    nameSrcList?: NCList;
-    primarySrcArray?: CountArray;
-    nameSrcCsv?: string;
-    resultMap: any;
-}
-*/
-
-let MM = 0;
 let NN = false;
 let mergeNcListResults = (ncListToMerge: NCList, args: any): RvsResult => {
     let ncStr = ncListToMerge.toString();
-//    console.log(`merging: ${ncStr}`);
+    //console.log(`merging: ${ncStr}`);
+    //if (1 && ncStr == 'gold leaf:1,oak:2') {
+    //if (1 && ncStr == 'coffee:1,bean:1') {
     if (0 && ncStr == 'bear:2,polar:3') {
-//    if (1 && ncStr == 'gold leaf:1,oak:2') {
-//    if (ncStr == 'coffee:1,bean:1') {
 	console.log(`merging: ${ncStr}\n-----------------------------------`);
 	NN = true;
     }
@@ -1053,7 +1042,6 @@ let mergeNcListResults = (ncListToMerge: NCList, args: any): RvsResult => {
 	listArray,
 	max: 99999
     }).getCombinations().forEach(indexList => {
-	//if (++MM % 100 === 0) NN = true;
 	let ncList: NCList = [];
 	let nameSrcList: NCList = [];
         let resultMap = ResultMap.makeNew();
@@ -1065,19 +1053,13 @@ let mergeNcListResults = (ncListToMerge: NCList, args: any): RvsResult => {
 		if (NN) console.log(`merging ${nc} as ${result.ncList}: ${Stringify(result)}`);
 		ncList.push(...result.ncList);
 		nameSrcList.push(...result.nameSrcList);
-		resultMap.newMapFromNcSource(nc, result.resultMap);
+		resultMap.addNcMapSource(nc, result.resultMap);
 	    } else {
 		if (NN) console.log(`merging nc: ${nc}`);
 		ncList.push(nc);
 		let nameSrc = NameCount.makeNew(nc.name, resultIndex);
 		nameSrcList.push(nameSrc);
-		// compare berry:2 resultmap from clue-manager addcompound
-		// it's possible we need to do something besides just 'merge' above, like supply an ncList
-		// some bizarre fucking stoned logic in resultMap.mergeNcList.
-		// see SOURCES_KEY below. we couldn't add the map entry using the old way because
-		// we don't know the parent NC. we know it here. so just add it?  like 'bear:2' : { 'coffee:1': ..., 'bean:1': ... }
-		// again, compare to berry:2
-		resultMap.addPrimarySource(nc, nameSrc);
+		resultMap.addPrimarySource(nameSrc); // TODO: "nc" is redundant here, as we could build it from nameSrc.name:1
 	    }
 	});
 	// TODO: uniqBy da debil

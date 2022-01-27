@@ -82,7 +82,7 @@ function makeNameList(ncList) {
 
 //
 
-function makeCanonicalName(name, count, index) {
+function makeCanonicalName(name, count, index = undefined) {
     let s = name;
     if (count) {
         s += ':' + count;

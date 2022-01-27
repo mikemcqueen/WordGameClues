@@ -49,7 +49,7 @@ let toString = () => {
 //
 
 function assignMethods (obj) {
-    obj.newMapFromNcSource          = newMapFromNcSource;
+    obj.addNcMapSource              = addNcMapSource;
     obj.addPrimarySource            = addPrimarySource;
     obj.addPrimaryLists             = addPrimaryLists;
     obj.addResult                   = addResult;
@@ -118,18 +118,15 @@ function getAsValueObject(resultMap) {
 
 //
 //
-function newMapFromNcSource (nc, resultMap) {
+function addNcMapSource (nc, resultMap) {
     this.map()[nc] = getAsValueObject(resultMap);
     return this;
 }
 
 //
 //
-function addPrimarySource (nc, nameSrc) {
-    if (nc.name != nameSrc.name) {
-        throw new Error(`names don't match ${nc.name}, ${nameSrc.name}`);
-    }
-    this.map()[nc] = [nameSrc];
+function addPrimarySource (nameSrc) {
+    this.map()[NameCount.makeCanonicalName(nameSrc.name, 1)] = [nameSrc];
     return this;
 }
 

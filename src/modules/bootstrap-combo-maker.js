@@ -19,6 +19,7 @@ let loadClues = (clues, max) =>  {
 	max,
 	ignoreLoadErrors: false,
         validateAll: true,
+	fast: true
     });
     if (logging) console.log('done.');
     return true;

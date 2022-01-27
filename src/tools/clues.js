@@ -45,6 +45,7 @@ const CmdLineOptions = Opt.create(_.concat(Clues.Options, [
     ['',  'or=NAME[:COUNT][,NAME[:COUNT]]+',   '  combos may either have, or be compatible with, source NAME[:COUNT]s'],
     ['',  'primary',                           '  show combos as primary source clues' ],
     ['l', 'parallel',                          '  use paralelljs' ],
+    ['',  'slow',                              '  use (old) slow method of loading clues' ],
     ['',  'copy-from=SOURCE',                  'copy clues from source cluetype; e.g. p1.1'],
     ['',  'save',                              '  save clue files'],
     ['',  'allow-dupe-source',                 '  allow duplicate sources'],
@@ -369,7 +370,7 @@ async function main () {
 
     setLogging(_.includes(options.verbose, VERBOSE_FLAG_LOAD));
     let loadBegin = new Date();
-    if (!loadClues(clueSource, ignoreLoadErrors, load_max, options.fast)) {
+    if (!loadClues(clueSource, ignoreLoadErrors, load_max, !options.slow)) {
         return 1;
     }
     let loadMillis = new Duration(loadBegin, new Date()).milliseconds;
