@@ -1,15 +1,10 @@
 //
-// validator.js
+// validator.ts
 //
 
 'use strict';
 
-// export a singleton, for no particular reason.
-
-//
-
-//const _           = require('lodash');
-import _ from 'lodash';
+import _ from 'lodash'; // import statement to signal that we are a "module"
 const ClueList    = require('../types/clue-list');
 const ClueManager = require('./clue-manager');
 const Debug       = require('debug')('validator');
@@ -1010,6 +1005,21 @@ let checkUniqueSources = (nameCountList: NCList, args: any): RvsResult => {
     }
 };
 
+//
+//
+let getRestrictedPrimaryClueNumber = (nameSrc: NameCount): number => {
+    let clue = ClueManager.getPrimaryClue(nameSrc);
+    return clue.restrictToSameClueNumber ? clue.num : 0;
+};
+
+//
+//
+let allHaveSameClueNumber = (nameSrcList: NCList, clueNumber: number): boolean => {
+    return nameSrcList.every(nameSrc => ClueManager.getPrimaryClue(nameSrc).num === clueNumber);
+};
+
+//
+//
 let getClueSources = (name: string): number[] => {
     let clueList = ClueManager.clueListArray[1];
     let sources: number[] = clueList.filter(clue => clue.name == name).map(clue => clue.src);
@@ -1017,6 +1027,8 @@ let getClueSources = (name: string): number[] => {
     return sources;
 }
 
+//
+//
 let NN = false;
 let mergeNcListResults = (ncListToMerge: NCList, args: any): RvsResult => {
     let ncStr = ncListToMerge.toString();
@@ -1045,8 +1057,9 @@ let mergeNcListResults = (ncListToMerge: NCList, args: any): RvsResult => {
 	let ncList: NCList = [];
 	let nameSrcList: NCList = [];
         let resultMap = ResultMap.makeNew();
+	let restrictToClueNumber = 0;
 	if (NN) console.log ('****************************************************************');
-	indexList.forEach((resultIndex, ncIndex) => { // TODO: resultIndex kinda bad name, can also be clue index
+	indexList.forEach((resultIndex, ncIndex) => { // TODO: resultIndex kinda bad name, can also be clue source for primary clues
 	    let nc = ncListToMerge[ncIndex];
 	    if (nc.count > 1) {
 		let result = ClueManager.ncResultMapList[nc.count][nc.toString()].list[resultIndex];
@@ -1059,9 +1072,21 @@ let mergeNcListResults = (ncListToMerge: NCList, args: any): RvsResult => {
 		ncList.push(nc);
 		let nameSrc = NameCount.makeNew(nc.name, resultIndex);
 		nameSrcList.push(nameSrc);
-		resultMap.addPrimarySource(nameSrc); // TODO: "nc" is redundant here, as we could build it from nameSrc.name:1
+		resultMap.addPrimarySource(nameSrc);
+		let clueNumber = getRestrictedPrimaryClueNumber(nameSrc);
+		if (clueNumber) {
+		    //console.log(`restricting ${ncListToMerge} to clueNumber(${clueNumber}) due to ${nameSrc}`);
+		    restrictToClueNumber = clueNumber;
+		}
 	    }
 	});
+	if (restrictToClueNumber) {
+	    if (!allHaveSameClueNumber(nameSrcList, restrictToClueNumber)) {
+		//console.log(`  restriction failed`);
+		return; // forEach.continue;
+	    }
+	    //console.log(`  restriction passed`);
+	}
 	// TODO: uniqBy da debil
 	if (_.uniqBy(nameSrcList, NameCount.count).length === nameSrcList.length) {
 	    let nameSrcCsv = _.sortBy(nameSrcList, NameCount.count).toString();

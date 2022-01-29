@@ -2,8 +2,9 @@
 // combo-maker.ts
 //
 
-//const _	    = require('lodash');
-import _ from 'lodash';
+'use strict';
+
+import _ from 'lodash'; // import statement to signal that we are a "module"
 const BootstrapComboMaker = require('./bootstrap-combo-maker');
 const ClueManager = require('./clue-manager');
 const ClueList	  = require('../types/clue-list');
@@ -200,7 +201,7 @@ let noNumbersInArray = (countList: number[], countArray: CountArray): boolean =>
 //
 //
 let getCountArray = (ncList: NCList): CountArray => {
-    let arr = new Int32Array(255);
+    let arr = new Int32Array(ClueManager.numPrimarySources); // 255
     for (let nc of ncList) {
 	arr[nc.count] = nc.count;
     }
@@ -210,7 +211,7 @@ let getCountArray = (ncList: NCList): CountArray => {
 //
 //
 let getCountArrayAndSizeForSourceList = (sourceList: SourceList): CountArrayAndSize => {
-    let array = new Int32Array(255);
+    let array = new Int32Array(ClueManager.numPrimarySources); // 255
     let size = 0;
     for (let source of sourceList) {
 	for (let nc of source.primaryNameSrcList) {
@@ -344,7 +345,7 @@ let populateSourceData = (lazySource: SourceBase, nc: NameCount, validateResult:
 	if (validateResult.ncList.length !== 1 || validateResult.ncList[0].count !== 1) throw new Error("wrong assumption");
 	let ncListCsv = validateResult.ncList.toString();
 	source.sourceNcCsvList = [ncListCsv].filter(ncCsv => orSourcesNcCsvMap ? orSourcesNcCsvMap.has(ncCsv) : true);
-	source.srcNcMap = { "${ncListCsv}": true };
+	source.srcNcMap = { [ncListCsv]: true };
     }
     if (nc.count > 1) {
 	let ncStr = nc.toString();
@@ -727,6 +728,11 @@ let getCompatibleUseSourcesFromNcData = (args: any): UseSource[] => {
 	//console.log(`orSourceList(${orSourceList.length}), mergedSources(${sourceList.length}): ${Stringify2(sourceList)}`);
     }
     console.error(`useSourceList(${sourceList.length})`);
+    if (0) {
+	sourceList.forEach((source, index) => {
+	    console.log(`${source.primaryNameSrcList}`);
+	});
+    }
     console.error(` orSourceList(${orSourceList.length})`);
     return sourceList;
 };
@@ -799,32 +805,9 @@ let first = (clueSourceList: any, sourceIndexes: number[]): FirstNextResult => {
 
 //
 //
-let __sum = 0;
-let __count = 0;
-let XX = 0;
 let isCompatibleWithAnyOrSource = (source: SourceData, useSource: UseSource
 				   , orSourcesNcCsvMap: Map<string, number>
 				   ): boolean => {
-    // #1 only add entries to source.srcNcMap/Lists if it's in the orSourcesNcCsvMap. then map.has() is implied. - DONE
-    // #2 iterate over source.sourceNcCsvList - DONE
-    //      (rename to sourceNcCsvList) - DONE
-    // #3 make OrSource.sourceNcCsvList a string:number or string:number[] map - DONE
-    //    the value containing the sourceList index(es) for sources with that NC. - DONE
-    //
-
-    // #4 potential further opt (questionable, but worth trying)
-    //    a. make source.srcNcMap a map of string:string[], where the value is a list of all
-    //       valid nameSrcCsv for the specified (key) sourceNC.  SourceNcCsv(ToNameSrcCsv)Map
-    //    b. make OrSource.sourceNcCsvMap (from #3) a string:object map, where value is type
-    //       nameSrcToIndexMap.
-    //    c. then, first we do lookup by ncCsv. that returns another map; iterate over nameSrcCsvs
-    //       from (a) to find indexes to orSources in sourceList to check.
-    //    d. by doing so, we do 2 lookups, followed by the "is this source still valid after removing
-    //       these primarySrc's from it" logic.
-
-    __sum += source.sourceNcCsvList.length;
-    __count += 1;
-
     let orSource = useSource.orSource!;
     return source.sourceNcCsvList.some(ncCsv => {
 	if (!orSource.sourceNcCsvMap[ncCsv]) return false;
@@ -836,19 +819,12 @@ let isCompatibleWithAnyOrSource = (source: SourceData, useSource: UseSource
 		const allUniqueSrc = noNumbersInArray(uniqPrimarySrcList, useSource.primarySrcArray);
 		if (allUniqueSrc) return true; // some.exit
 	    }
+	    return false;
 	});
     });
 };
 
-// Before I do #4 above, can I apply the same 1-3 here as I did to OrSources?
 //
-// #0 presumably i need to build a "UseSourcesNcCsvMap" similar to the OrSources map. and pass them
-//    both around where required. 
-// #1 only add entries to source.srcNcMap/Lists if it's in the orSourcesNcCsvMap. then map.has() is implied.
-// #2 iterate over source.sourceNcCsvList
-//      (rename to sourceNcCsvList)
-// #3 make OrSource.sourceNcCsvList a string:number or string:number[] map
-//    the value containing the sourceList index(es) for sources with that NC.
 //
 let isCompatibleWithUseSources = (sourceList: SourceList, useSourceList: UseSource[]
 				  , orSourcesNcCsvMap: Map<string, number>
@@ -1261,6 +1237,7 @@ let makeCombos = (args: any): any => {
 
     let d = new Duration(begin, new Date()).milliseconds;
     console.error(`Precompute(${PrettyMs(d)})`);
+    if (0) process.exit(0);
 
     if (_.isEmpty(args.useSourcesList)) {
 	if (args.xor || args.or) {
@@ -1299,7 +1276,6 @@ let makeCombos = (args: any): any => {
 	}
 	d = new Duration(begin, new Date()).milliseconds;
 	console.error(`--combos: ${PrettyMs(d)}`);
-	console.error(`source.sourceNcCsvs, sum(${__sum}), count(${__count}), avg(${__sum/__count})`);
 	Debug(`total: ${total}, filtered(${_.size(comboMap)})`);
 	_.keys(comboMap).forEach((nameCsv: string) => console.log(nameCsv));
 	//console.log(`${Stringify(comboMap)}`);

@@ -95,14 +95,18 @@ ClueManager.prototype.saveClueList = function (list, count, options = {}) {
 const autoSource = (clueList) => {
     let result = [];
     let source = 0;
+    let clueNumber = 0;
     for (let clue of clueList) {
+	// clue.num check must happen before clue.ignore check
+	if (clue.num) clueNumber = _.toNumber(clue.num);
 	if (clue.ignore) continue;
 	if (clue.src != 'same') source += 1;
 	clue.src = `${source}`;
+	if (clueNumber) clue.num = clueNumber;
 	result.push(clue);
     }
     Debug(`autoSource: ${source} primary clues, ${result.reduce((resultList, clue) => { resultList.push(clue.src); return resultList; }, [])}`);
-    return result;
+    return [result, source];
 };
 
 
@@ -122,7 +126,9 @@ ClueManager.prototype.loadAllClues = function (args) {
     for (let count = 1; count <= this.maxClues; ++count) {
         let knownClueList = this.loadClueList(count);
         if ((count === 1) && (knownClueList[0].src == 'auto')) {
-	    knownClueList = autoSource(knownClueList);
+	    let numPrimarySources;
+	    [knownClueList, numPrimarySources] = autoSource(knownClueList);
+	    this.numPrimarySources = numPrimarySources;
 	}
 	this.clueListArray[count] = knownClueList;
         if (count === 1) {
@@ -840,6 +846,15 @@ ClueManager.prototype.getCountList = function (nameOrList) {
 };
 
 //
+//
+ClueManager.prototype.getPrimaryClue = function (nameSrc) {
+    for (const clue of this.clueListArray[1]) {
+	if (clue.name == nameSrc.name && clue.src == nameSrc.count) return clue;
+    }
+    throw new Error(`can't find clue: ${nameSrc}`);
+};
+
+//
 
 ClueManager.prototype.getPrimarySources = function () {
     let primarySources = [];
@@ -1053,7 +1068,7 @@ ClueManager.prototype.getListOfPrimaryNameSrcLists = function (ncList) {
 	    // TODO BUGG skip this part for primary clues?
 	    const sources = entries[currIndex].sources;
 	    
-	    console.log(`adding nc: ${nc}, sources ${sources}`); // entries: ${Stringify(entries)}`);
+	    //console.log(`adding nc: ${nc}, sources ${sources}`); // entries: ${Stringify(entries)}`);
 
 	    const clue = { name: nc.name, src: sources };
 	    this.addCompoundClue(clue, nc.count, true);
@@ -1135,7 +1150,7 @@ ClueManager.prototype.fast_getCountListArrays = function (nameCsv, options) {
     /// TODO, check if existing sourcelist (knownSourceMapArray)
 
     const ncLists = this.buildNcListsFromNameList(nameList);
-    console.log(`ncLists: ${ncLists}`);
+    //console.log(`ncLists: ${ncLists}`);
     if (_.isEmpty(ncLists)) {
 	console.log(`No ncLists for ${nameList}`);
 	return [];
