@@ -118,6 +118,7 @@ const autoSource = (clueList) => {
 //
 
 ClueManager.prototype.loadAllClues = function (args) {
+    //console.error(`fast: ${args.fast}`);
     this.dir = Clues.getDirectory(args.clues);
     if (args.ignoreErrors) {
         this.ignoreLoadErrors = true;

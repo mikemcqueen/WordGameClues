@@ -105,6 +105,19 @@ interface UseSource extends UseSourceBase {
     orSource?: OrSource;
 }
 
+type NumberList = number[];
+type StringNumberTuple = [string, number];
+type StringNumberMap = Map<string, number>;
+
+interface PreComputedData {
+    orSourcesNcCsvMap: StringNumberMap;
+    useSourcesList: UseSource[];
+}
+
+let PCD: PreComputedData | undefined = undefined;
+
+//
+//
 function Stringify(val: any) {
     return stringify(val, (value: any, indent: any, stringify: any) => {
 	if (typeof value == 'function') return "function";
@@ -713,32 +726,6 @@ let mergeOrSourceList = (sourceList: XorSource[], orSourceList: OrSource[]): Use
 
 //
 //
-let getCompatibleUseSourcesFromNcData = (args: any): UseSource[] => {
-    // XOR first
-    let sourceList = getUseSourcesList<XorSource>(args.allXorNcDataLists, Op.xor);
-    //console.log(`xorSourceList(${xorSourceList.length): ${Stringify2(xorSourceList)}`);
-
-    // OR next
-    let orSourceList = getUseSourcesList<OrSource>(args.allOrNcDataLists, Op.or);
-    //console.log(`orSourceList(${orSourceList.length}) ${Stringify2(orSourceList)}`);
-
-    // final: merge OR with XOR
-    if (!_.isEmpty(orSourceList)) {
-	sourceList = mergeOrSourceList(sourceList, orSourceList);
-	//console.log(`orSourceList(${orSourceList.length}), mergedSources(${sourceList.length}): ${Stringify2(sourceList)}`);
-    }
-    console.error(`useSourceList(${sourceList.length})`);
-    if (0) {
-	sourceList.forEach((source, index) => {
-	    console.log(`${source.primaryNameSrcList}`);
-	});
-    }
-    console.error(` orSourceList(${orSourceList.length})`);
-    return sourceList;
-};
-
-//
-//
 let nextIndex = function(clueSourceList: any, sourceIndexes: any): boolean {
     // increment last index
     let index = sourceIndexes.length - 1;
@@ -992,7 +979,11 @@ let makeCombosForSum = (sum: number, max: number, args: any): any => {
     if (!_.isEmpty(args.require)) throw new Error('require not yet supported');
     if (args.sources) throw new Error('sources not yet supported');
 
-    let combos = getCombosForUseNcLists(sum, max, args);
+    if (!PCD) {
+	PCD = preCompute(args);
+    }
+
+    let combos = getCombosForUseNcLists(sum, max, PCD);
     return combos;
 };
 
@@ -1009,8 +1000,10 @@ let parallel_makeCombosForRange = (first: number, last: number, args: any): any 
 	    xor: args.xor,
 	    //and: args.and,
 	    or: args.or,
-	    useSourcesList: args.useSourcesList,
-	    parallel: true
+	    //useSourcesList: args.useSourcesList,
+	    fast: args.fast,
+	    load_max: ClueManager.maxClues,
+	    parallel: true,
 	}));
 
     let cpus = OS.cpus().length;
@@ -1050,127 +1043,6 @@ let getAllPrimarySrcCombos = (orSource: SourceBase, size: number): string[] => {
     return combos;
 }
 
-type NumberList = number[];
-
-// there might be a better way to do this.
-// it's possible the orSources spread out across all the useSources contain a lot of duplicates.
-// so we are iterating over a lot of duplicates (potentially)
-// and then what we're doing here is just cutting the total (including duplicates) in half to
-// reduce iterations. when in fact it may yield a better result by just removing duplicates.
-// or at least, remove duplicates first.  then do the half-splitting combo frequency checks
-// if it still makes sense (it probably will).
-//
-// how to check for duplicates:
-// in IsCompatibleWithOrSources, build a local map of [[ncListStr: count]] for every source
-// we evaluate. then sort the map by value and take a look.
-
-// returns, e.g. [ ['6,14', 12345], ['19,64', 6789], ... ]
-//
-
-type StringNumberTuple = [string, number];
-type StringNumberListTuple = [string, number[]];
-
-interface StringNumberTupleListAndCount {
-    list: StringNumberTuple[];
-    count: number;
-}
-
-let getOrSrcComboFrequencyList = (useSourcesList: UseSource[], size: number, srcComboList: NumberList[], log = false): StringNumberTupleListAndCount => {
-    let numOrSourcesLists = 0;
-    let numOrSources = 0;
-
-    console.log(`srcComboList: ${Stringify(srcComboList)}`);
-
-    let map = new Map<string, number>();
-    for (let useSource of useSourcesList) {
-	let orSource = useSource.orSource!
-	if (!orSource) continue;
-	let orSourceLists = orSource.sourceLists;
-	// TODO same as above is this even possible
-	if (!orSourceLists || _.isEmpty(orSourceLists)) continue;
-	numOrSourcesLists += orSourceLists.length;
-	orSourceLists.forEach((sourceList, listIndex) => {
-	    for (let source of sourceList) {
-		if (anyNumberInCountArray(srcComboList, orSource.primarySrcArrayAndSizeList[listIndex].array)) continue;
-		++numOrSources;
-		let primarySrcComboStrList = getAllPrimarySrcCombos(source, size); // TODO rename fn
-		for (let key of primarySrcComboStrList) {
-		    let value: number = map.get(key) || 0;
-		    map.set(key, value + 1);
-		}
-	    }
-	});
-    }
-    if (log) console.error(`useSources(${useSourcesList.length}) orSourceLists(${numOrSourcesLists}) orSources(${numOrSources})`);
-    let list: StringNumberTuple[] = [...map.entries()].sort((a,b) => b[1] - a[1]);
-    //list.forEach(e => console.log(`${e[0]}: ${e[1]}`));
-    return { list, count: numOrSources };
-};
-
-//
-// srcComboFrequency [ ['6,14', 12345], ['19,64', 6789], ... ]
-//
-// WithValueClosestTo
-let getComboListIndexClosestTo = (srcCsvFreqTupleList: StringNumberTuple[], target: number): number => {
-    let closestIndex = 0;
-    let lastDiff = target * 2;
-    srcCsvFreqTupleList.some((srcCsvFreqTuple, index) => {
-	let diff = Math.abs(srcCsvFreqTuple[1] - target);
-	let closestDiff = Math.abs(srcCsvFreqTupleList[closestIndex][1] - target);
-	if (diff < closestDiff) {
-	    closestIndex = index;
-	} else if (diff > lastDiff) {
-	    return true; // some.exit;
-	}
-	lastDiff = diff;
-	return false;
-    });
-    return closestIndex;
-};
-
-//
-//
-let test = (sum: number, max: number, args: any): void => {
-    let srcLists: NumberList[] = [];
-
-    let begin = new Date();
-    let result = getOrSrcComboFrequencyList(args.useSourcesList, 2, srcLists, true);
-    let d = new Duration(begin, new Date()).milliseconds;
-    console.error(` FreqList(${PrettyMs(d)})`);
-    let index = getComboListIndexClosestTo(result.list, result.count / 2);
-    let srcCsv = result.list[index][0]
-    let freq = result.list[index][1];
-    console.error(` index(${index}): ${srcCsv} ${freq} ${Math.floor(freq / result.count * 100)}%`);
-    let srcList: number[] = srcCsv.split(',').map(srcStr => _.toNumber(srcStr));
-    srcLists.push(srcList);
-
-    begin = new Date();
-    result = getOrSrcComboFrequencyList(args.useSourcesList, 2, srcLists, true);
-    d = new Duration(begin, new Date()).milliseconds;
-    console.error(` FreqList(${PrettyMs(d)})`);
-    index = getComboListIndexClosestTo(result.list, result.count / 2);
-    srcCsv = result.list[index][0]
-    freq = result.list[index][1];
-    console.error(` index(${index}): ${srcCsv} ${freq} ${Math.floor(freq / result.count * 100)}%`);
-    srcList = srcCsv.split(',').map(srcStr => _.toNumber(srcStr));
-    srcLists.push(srcList);
-}
-
-//
-//
-let test_getOrSourcesNcCsvCountMap = (useSourcesList: UseSource[]): Map<string, number> => {
-    let map = new Map<string, number>();
-    for (let useSource of useSourcesList) {
-	let orSource = useSource.orSource!;
-	if (!orSource) continue;
-	for (let ncCsv of _.keys(orSource.sourceNcCsvMap)) {
-	    let value = map.get(ncCsv) || 0;
-	    map.set(ncCsv, value + 1);
-	}
-    }
-    return map;
-};
-
 //
 //
 let makeCombos = (args: any): any => {
@@ -1187,67 +1059,8 @@ let makeCombos = (args: any): any => {
 	  //`, sources: ${args.sources}` +
 	  `, use: ${args.use}`);
     
-    let begin = new Date();
-    args.allXorNcDataLists = args.xor ? buildAllUseNcDataLists(args.xor) : [ [] ];
-    //console.log(`allXorNcDataLists: ${Stringify2(args.allXorNcDataLists)}`);
-    //args.allAndNcDataLists = args.and ? buildAllUseNcDataLists(args.and) : [ [] ];
-    args.allOrNcDataLists = args.or ? buildAllUseNcDataLists(args.or) : [ [] ];
-    args.useSourcesList = getCompatibleUseSourcesFromNcData(args);
-
-    // test
-    if (0) {
-	let lastSum = sumRange.length > 1 ? sumRange[1] : sumRange[0];
-	test(sumRange[0], lastSum, args);
-	if (0) {
-	    let d = new Duration(begin, new Date()).milliseconds;
-	    console.error(`Precompute(${PrettyMs(d)})`);
-	    process.exit(0);
-	}
-    }
-
-    if (1) {
-	// OR
-	let map = test_getOrSourcesNcCsvCountMap(args.useSourcesList);
-	let list: StringNumberTuple[] = [...map.entries()].sort((a,b) => b[1] - a[1]);
-	console.error(`orSourcesNcCsvCount(${list.length})`);
-	if (0) {
-	    list.some((entry, index) => {
-		console.error(` ${entry[0]}: ${entry[1]}`);
-		return false; // index >= 10;
-	    })
-	}
-	// TODO: there is a faster way to generate this map, in mergeOrSources or something.
-	args.orSourcesNcCsvMap = map;
-
-	if (0) {
-	    // XOR
-	    let map = buildUseSourceNcCsvMap(args.useSourcesList);
-	    //map = test_getUseSourcesNcCsvCountMap(args.useSourcesList);
-	    let list: StringNumberListTuple[] = [...Object.entries(map)].sort((a, b) => b[1].length - a[1].length);
-	    console.error(`useSourcesNcCsvCount(${list.length})`);
-	    if (1) {
-		list.some((entry, index) => {
-		    console.error(` ${entry[0]}: ${entry[1]}`);
-		    return false; // index >= 10;
-		});
-	    }
-	}
-	if (0) process.exit(0);
-    }
-
-    let d = new Duration(begin, new Date()).milliseconds;
-    console.error(`Precompute(${PrettyMs(d)})`);
-    if (0) process.exit(0);
-
-    if (_.isEmpty(args.useSourcesList)) {
-	if (args.xor || args.or) {
-	    console.error('incompatible --xor/--or params');
-	    process.exit(-1);
-	}
-    }
-
     let total = 0;
-    begin = new Date();
+    let begin = new Date();
     if (args.parallel) {
 	let first = sumRange[0];
 	let last = sumRange.length > 1 ? sumRange[1] : first;
@@ -1274,7 +1087,7 @@ let makeCombos = (args: any): any => {
 	    total += comboList.length;
 	    const filterResult = ClueManager.filter(comboList, sum, comboMap);
 	}
-	d = new Duration(begin, new Date()).milliseconds;
+	let d = new Duration(begin, new Date()).milliseconds;
 	console.error(`--combos: ${PrettyMs(d)}`);
 	Debug(`total: ${total}, filtered(${_.size(comboMap)})`);
 	_.keys(comboMap).forEach((nameCsv: string) => console.log(nameCsv));
@@ -1349,13 +1162,87 @@ function combinationsToNcDataLists (combinationNcLists: NCList[]): NCDataList[] 
 	.map((combo: any) => combinationNcDataList(combo, combinationNcLists));
 }
 
+//
+//
 function buildAllUseNcLists (useArgsList: string[]): NCList[] {
     return combinationsToNcLists(getCombinationNcLists(useArgsList));
 }
 
+//
+//
 function buildAllUseNcDataLists (useArgsList: string[]): NCDataList[] {
     return combinationsToNcDataLists(getCombinationNcLists(useArgsList));
 }
+
+//
+//
+let getCompatibleUseSourcesFromNcData = (args: any): UseSource[] => {
+    // XOR first
+    let sourceList = getUseSourcesList<XorSource>(args.allXorNcDataLists, Op.xor);
+    //console.error(`xorSourceList(${sourceList.length})`); // : ${Stringify2(xorSourceList)}`);
+
+    // OR next
+    let orSourceList = getUseSourcesList<OrSource>(args.allOrNcDataLists, Op.or);
+    //console.error(`orSourceList(${orSourceList.length})`); // : ${Stringify2(orSourceList)}`);
+
+    // final: merge OR with XOR
+    if (!_.isEmpty(orSourceList)) {
+	sourceList = mergeOrSourceList(sourceList, orSourceList);
+	//console.log(`orSourceList(${orSourceList.length}), mergedSources(${sourceList.length}): ${Stringify2(sourceList)}`);
+    }
+    console.error(`useSourceList(${sourceList.length})`);
+    if (0) {
+	sourceList.forEach((source, index) => {
+	    console.log(`${source.primaryNameSrcList}`);
+	});
+    }
+    console.error(` orSourceList(${orSourceList.length})`);
+    return sourceList;
+};
+
+//
+//
+    let getOrSourcesNcCsvCountMap = (useSourcesList: UseSource[]): StringNumberMap => {
+    let map = new Map<string, number>();
+    for (let useSource of useSourcesList) {
+	let orSource = useSource.orSource!;
+	if (!orSource) continue;
+	for (let ncCsv of _.keys(orSource.sourceNcCsvMap)) {
+	    let value = map.get(ncCsv) || 0;
+	    map.set(ncCsv, value + 1);
+	}
+    }
+    return map;
+};
+
+//
+//
+let preCompute = (args: any): PreComputedData => {
+    let begin = new Date();
+    args.allXorNcDataLists = args.xor ? buildAllUseNcDataLists(args.xor) : [ [] ];
+    console.error(`allXorNcDataLists(${args.allXorNcDataLists.length})`);
+    //args.allAndNcDataLists = args.and ? buildAllUseNcDataLists(args.and) : [ [] ];
+    args.allOrNcDataLists = args.or ? buildAllUseNcDataLists(args.or) : [ [] ];
+    
+    let useSourcesList = getCompatibleUseSourcesFromNcData(args);
+    let orSourcesNcCsvMap = getOrSourcesNcCsvCountMap(useSourcesList);
+
+    let list: StringNumberTuple[] = [...orSourcesNcCsvMap.entries()].sort((a,b) => b[1] - a[1]);
+    console.error(`orSourcesNcCsvCount(${list.length})`);
+    // TODO: there is a faster way to generate this map, in mergeOrSources or something.
+    
+    let d = new Duration(begin, new Date()).milliseconds;
+    console.error(`Precompute(${PrettyMs(d)})`);
+
+    if (_.isEmpty(useSourcesList)) {
+	if (args.xor || args.or) {
+	    console.error('incompatible --xor/--or params');
+	    process.exit(-1);
+	}
+    }
+    if (0) process.exit(0);
+    return { useSourcesList, orSourcesNcCsvMap };
+};
 
 //
 //
@@ -1372,6 +1259,22 @@ function buildUseNcLists (useArgsList: string[]): NCList[] {
 	useNcLists.push(ncList);
     });
     return useNcLists;
+}
+
+let formatListOfListCounts = (listOfLists: any[][]): string => {
+    let total = listOfLists.reduce((sum, list) => {
+	sum += list.length;
+	return sum;
+    }, 0);
+    return `(${listOfLists.length}) total(${total})`;
+}
+
+let formatListOfNcDataCounts = (ncDataList: NCDataList): string => {
+    let total = ncDataList.reduce((sum, ncData) => {
+	sum += ncData.ncList.length;
+	return sum;
+    }, 0);
+    return `(${ncDataList.length}) total(${total})`;
 }
 
 module.exports = {

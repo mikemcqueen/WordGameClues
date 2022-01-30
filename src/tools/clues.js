@@ -99,7 +99,7 @@ function loadClues (clues, ignoreErrors, max, fast) {
         clues,
         ignoreErrors,
 	max,
-        validateAll:  true,
+        validateAll: true,
 	fast
     });
     log('done.');
