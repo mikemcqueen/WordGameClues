@@ -67,7 +67,7 @@ interface LazySourceData extends SourceBase {
 interface SourceData extends SourceBase {
     ncList: NCList;
     sourceNcCsvList: string[];
-    srcNcMap: StringBoolMap;
+    srcNcMap: StringBoolMap; // TODO: not used
     ncCsv?: string;
 }
 type SourceList = SourceData[];
@@ -420,9 +420,10 @@ let mergeSources = (source1: AnySourceData, source2: AnySourceData, lazy: boolea
 	    ...source2.sourceNcCsvList
 	]
     };
-    mergedSource.ncCsv = mergedSource.ncList.sort().toString();
     _.keys(source1.srcNcMap).forEach((key: string) => { mergedSource.srcNcMap[key] = true; });
     _.keys(source2.srcNcMap).forEach((key: string) => { mergedSource.srcNcMap[key] = true; });
+    // TODO: still used?
+    mergedSource.ncCsv = mergedSource.ncList.sort().toString();
     mergedSource.srcNcMap[mergedSource.ncCsv] = true;
     return mergedSource;
 };
@@ -462,7 +463,6 @@ let mergeAllCompatibleSources = (ncList: NCList, lazy = false): AnySourceData[] 
 	sourceList = mergeCompatibleSourceLists(sourceList, nextSourceList, lazy);
 	if (_.isEmpty(sourceList)) break; // TODO BUG this is broken for > 2; should be something like: if (sourceList.length !== ncIndex + 1) 
     }
-    loggy = false;
     return sourceList;
 };
 
