@@ -187,6 +187,7 @@ let allCountUnique = (nameSrcList1: NCList, nameSrcList2: NCList): boolean => {
     for (let nameSrc of nameSrcList1) {
 	set.add(nameSrc.count);
     }
+    // TODO: some
     for (let nameSrc of nameSrcList2) {
 	if (set.has(nameSrc.count)) return false;
     }
@@ -196,6 +197,7 @@ let allCountUnique = (nameSrcList1: NCList, nameSrcList2: NCList): boolean => {
 //
 //
 let noCountsInArray = (ncList: NCList, countArray: CountArray): boolean => {
+    // TODO: some
     for (let nc of ncList) {
 	if (countArray[nc.count] === nc.count) return false;
     }
@@ -204,9 +206,10 @@ let noCountsInArray = (ncList: NCList, countArray: CountArray): boolean => {
 
 //
 //
-let noNumbersInArray = (countList: number[], countArray: CountArray): boolean => {
-    for (let count of countList) {
-	if (countArray[count] === count) return false;
+let noNumberInArray = (numberList: number[], countArray: CountArray): boolean => {
+    // TODO: some
+    for (let num of numberList) {
+	if (countArray[num] === num) return false;
     }
     return true;
 };
@@ -214,6 +217,7 @@ let noNumbersInArray = (countList: number[], countArray: CountArray): boolean =>
 //
 //
 let getCountArray = (ncList: NCList): CountArray => {
+    // TODO: reduce
     let arr = new Int32Array(ClueManager.numPrimarySources); // 255
     for (let nc of ncList) {
 	arr[nc.count] = nc.count;
@@ -244,6 +248,7 @@ let getCountListNotInArray = (ncList: NCList, countArray: CountArray): number[] 
 //
 //
 let  getNumCountsInArray = (ncList: NCList, countArray: CountArray): number => {
+    // TODO: reduce
     let count = 0;
     for (let nc of ncList) {
 	if (countArray[nc.count] === nc.count) ++count;
@@ -265,13 +270,6 @@ let noCountsNotInOneAreInTwo = (ncList: NCList, xorCountArrayAndSize: CountArray
     return xorCount === xorCountArrayAndSize.size;
 }
     
-//
-//
-let anyNumberInCountArray = (numberLists: NumberList[], countArray: CountArray): boolean => {
-    return numberLists.some(numberList =>
-	numberList.some(num => countArray[num] === num));
-};
-
 // key types:
 //{
 // A:
@@ -346,9 +344,8 @@ function buildSrcNcLists (resultMap: any): any {
 
 //
 //
-let populateSourceData = (lazySource: SourceBase, nc: NameCount, validateResult: ValidateResult
-			  , orSourcesNcCsvMap: Map<string, number>
-			 ): SourceData => {
+let populateSourceData = (lazySource: SourceBase, nc: NameCount, validateResult: ValidateResult,
+			  orSourcesNcCsvMap: Map<string, number>): SourceData => {
     let source: SourceData = lazySource /*as SourceBase*/ as SourceData;
     if (validateResult.resultMap) {
 	let srcNcData = buildSrcNcLists(validateResult.resultMap.map());
@@ -375,9 +372,8 @@ let populateSourceData = (lazySource: SourceBase, nc: NameCount, validateResult:
 
 // TODO: get rid of lazy flag. if map provided, it's not lazy.
 //
-let getSourceData = (nc: NameCount, validateResult: ValidateResult, lazy: boolean
-		     , orSourcesNcCsvMap: Map<string, number> | undefined = undefined
-		    ): AnySourceData => {
+let getSourceData = (nc: NameCount, validateResult: ValidateResult, lazy: boolean,
+		     orSourcesNcCsvMap: StringNumberMap | undefined = undefined): AnySourceData => {
     const primaryNameSrcList: NCList = validateResult.nameSrcList;
     return lazy
 	? { primaryNameSrcList,	ncList: [nc], validateResultList: [validateResult] }
@@ -476,6 +472,7 @@ let buildSourceListsForUseNcData = (useNcDataLists: NCDataList[]): SourceList[] 
     let sourceLists: SourceList[] = [];
     let hashList: StringBoolMap[] = [];
     //console.log(`useNcDataLists(${useNcDataLists.length}): ${Stringify2(useNcDataLists)}`);
+    // TODO: forEach
     for (let [dataListIndex, useNcDataList] of useNcDataLists.entries()) {
 	for (let [sourceListIndex, useNcData] of useNcDataList.entries()) {
 	    if (!sourceLists[sourceListIndex]) sourceLists.push([]);
@@ -792,30 +789,28 @@ let first = (clueSourceList: any, sourceIndexes: number[]): FirstNextResult => {
 
 //
 //
-let isCompatibleWithAnyOrSource = (source: SourceData, useSource: UseSource
-				   , orSourcesNcCsvMap: Map<string, number>
-				   ): boolean => {
+let isCompatibleWithAnyOrSource = (source: SourceData, useSource: UseSource,
+				   orSourcesNcCsvMap: Map<string, number>): boolean => {
     let orSource = useSource.orSource!;
     return source.sourceNcCsvList.some(ncCsv => {
-	if (!orSource.sourceNcCsvMap[ncCsv]) return false;
+	if (!orSource.sourceNcCsvMap[ncCsv]) return false; // some.continue
 	return orSource.sourceNcCsvMap[ncCsv].some(index => {
             let primarySrcArrayAndSize = orSource.primarySrcArrayAndSizeList[index];
 	    let numCountsInArray = getNumCountsInArray(source.primaryNameSrcList, primarySrcArrayAndSize.array);
 	    if (numCountsInArray === primarySrcArrayAndSize.size) {
 		const uniqPrimarySrcList = getCountListNotInArray(source.primaryNameSrcList, primarySrcArrayAndSize.array);
-		const allUniqueSrc = noNumbersInArray(uniqPrimarySrcList, useSource.primarySrcArray);
+		const allUniqueSrc = noNumberInArray(uniqPrimarySrcList, useSource.primarySrcArray);
 		if (allUniqueSrc) return true; // some.exit
 	    }
-	    return false;
+	    return false; // some.continue
 	});
     });
 };
 
 //
 //
-let isCompatibleWithUseSources = (sourceList: SourceList, useSourceList: UseSource[]
-				  , orSourcesNcCsvMap: Map<string, number>
-				 ): boolean => {
+let isCompatibleWithUseSources = (sourceList: SourceList, useSourceList: UseSource[],
+				  orSourcesNcCsvMap: Map<string, number>): boolean => {
     if (_.isEmpty(useSourceList)) return true;
     for (let source of sourceList) {
 	for (let useSource of useSourceList) {
@@ -842,9 +837,7 @@ let isCompatibleWithUseSources = (sourceList: SourceList, useSourceList: UseSour
 //
 // Return a list fully merged sources.
 //
-let loadAndMergeSourceList = (lazySourceList: LazySourceData[]
-			      , orSourcesNcCsvMap: Map<string, number>
-			     ): SourceList => {
+let loadAndMergeSourceList = (lazySourceList: LazySourceData[], orSourcesNcCsvMap: Map<string, number>): SourceList => {
     let sourceList: SourceList = []
     for (let lazySource of lazySourceList) {
 	if (lazySource.ncList.length !== 2) throw new Error(`lazySource.ncList.length(${lazySource.ncList.length})`);
@@ -860,7 +853,7 @@ let loadAndMergeSourceList = (lazySourceList: LazySourceData[]
 
 //
 //
-let getCombosForUseNcLists = (sum: number, max: number, args: any): any => {
+let getCombosForUseNcLists = (sum: number, max: number, args: PreComputedData): any => {
     let hash: StringAnyMap = {};
     let combos: string[] = [];
 
@@ -974,17 +967,13 @@ let makeCombosForSum = (sum: number, max: number, args: any): any => {
     if (_.isUndefined(args.maxResults)) {
 	args.maxResults = 50000;
     }
-
     // TODO move this a layer or two out; use "validateArgs" 
     if (!_.isEmpty(args.require)) throw new Error('require not yet supported');
     if (args.sources) throw new Error('sources not yet supported');
-
     if (!PCD) {
 	PCD = preCompute(args);
     }
-
-    let combos = getCombosForUseNcLists(sum, max, PCD);
-    return combos;
+    return getCombosForUseNcLists(sum, max, PCD);
 };
 
 //
@@ -1014,10 +1003,8 @@ let parallel_makeCombosForRange = (first: number, last: number, args: any): any 
 	evalPath: '${__dirname}/../../modules/bootstrap-combo-maker.js'
     });
     let entrypoint = BootstrapComboMaker.entrypoint;
-    //console.error('++makeCombosForRange');
     let beginDate = new Date();
     return p.map(entrypoint).then((data: any[]) => {
-	//console.log(`data = ${typeof data} array: ${_.isArray(data)}, data[${0}] = ${Stringify(data[0])}`);
 	let d = new Duration(beginDate, new Date()).milliseconds;
 	console.error(`time: ${PrettyMs(d)} chunks: ${data.length}`);
     });
@@ -1202,7 +1189,7 @@ let getCompatibleUseSourcesFromNcData = (args: any): UseSource[] => {
 
 //
 //
-    let getOrSourcesNcCsvCountMap = (useSourcesList: UseSource[]): StringNumberMap => {
+let getOrSourcesNcCsvCountMap = (useSourcesList: UseSource[]): StringNumberMap => {
     let map = new Map<string, number>();
     for (let useSource of useSourcesList) {
 	let orSource = useSource.orSource!;
@@ -1220,7 +1207,7 @@ let getCompatibleUseSourcesFromNcData = (args: any): UseSource[] => {
 let preCompute = (args: any): PreComputedData => {
     let begin = new Date();
     args.allXorNcDataLists = args.xor ? buildAllUseNcDataLists(args.xor) : [ [] ];
-    console.error(`allXorNcDataLists(${args.allXorNcDataLists.length})`);
+    //console.error(`allXorNcDataLists(${args.allXorNcDataLists.length})`);
     //args.allAndNcDataLists = args.and ? buildAllUseNcDataLists(args.and) : [ [] ];
     args.allOrNcDataLists = args.or ? buildAllUseNcDataLists(args.or) : [ [] ];
     
