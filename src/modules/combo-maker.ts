@@ -896,7 +896,7 @@ let getCombosForUseNcLists = (sum: number, max: number, args: PreComputedData): 
 	    //console.log(`result.nameList: ${result.nameList}`);
 	    //console.log(`result.ncList: ${result.ncList}`);
 
-	    if (0 && result.nameList!.toString() == "major,tree") {
+	    if (0) { //  && result.nameList!.toString() == "two,word") {
 		console.log(`hit: ${result.nameList}`);
 		AA = true;
 	    }

@@ -225,25 +225,6 @@ ClueManager.prototype.addCompoundClue = function (clue, count, validateAll = tru
     if (!_.has(srcMap, srcKey)) {
         srcMap[srcKey] = { clues: [] };
         Debug(`## validating Known compound clue: ${srcKey}:${count}`);
-	if (0 && ("polar bear" == clue.name || "polar" == clue.name || "bear" == clue.name)) {
-	    //if (clue.name == 'berry' || clue.name == 'major' || clue.name == 'gold leaf') {
-	    vsResult = Validator.validateSources({
-		sum: count,
-		nameList,
-		count: nameList.length,
-		fast: true,
-		validateAll
-	    });
-	    console.log(`fast: ${Stringify(vsResult.list)}`);
-	    vsResult = Validator.validateSources({
-		sum: count,
-		nameList,
-		count: nameList.length,
-		fast: false,
-		validateAll
-	    });
-	    console.log(`slow: ${Stringify(vsResult.list)}`);
-	}
 	vsResult = Validator.validateSources({
 	    sum: count,
 	    nameList,
