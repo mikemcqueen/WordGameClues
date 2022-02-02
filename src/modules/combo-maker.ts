@@ -67,7 +67,6 @@ interface LazySourceData extends SourceBase {
 interface SourceData extends SourceBase {
     ncList: NCList;
     sourceNcCsvList: string[];
-    srcNcMap: StringBoolMap; // TODO: not used
     ncCsv?: string;
 }
 type SourceList = SourceData[];
@@ -99,8 +98,6 @@ interface OrSource extends UseSourceBase {
     primarySrcArrayAndSizeList: CountArrayAndSize[];
 }
 
-// optional properties until I can think of a better way.  mergeOrSourceList.
-// OrSourceData includes all of this, and is only field in OrSource, and optional field here.
 interface UseSource extends UseSourceBase {
     orSource?: OrSource;
 }
@@ -127,6 +124,8 @@ function Stringify(val: any) {
 
 let logging = 0;
 let loggy = false;
+let ZZ = 0;
+let AA = false;
 
 const Op = {
     'and':1,
@@ -194,41 +193,32 @@ let allCountUnique = (nameSrcList1: NCList, nameSrcList2: NCList): boolean => {
     return true;
 };
 
+// 
 //
-//
-let noCountsInArray = (ncList: NCList, countArray: CountArray): boolean => {
-    // TODO: some
-    for (let nc of ncList) {
-	if (countArray[nc.count] === nc.count) return false;
-    }
-    return true;
+let anyCountInArray = (ncList: NCList, countArray: CountArray): boolean => {
+    return ncList.some(nc => countArray[nc.count] === nc.count);
 };
 
 //
 //
-let noNumberInArray = (numberList: number[], countArray: CountArray): boolean => {
-    // TODO: some
-    for (let num of numberList) {
-	if (countArray[num] === num) return false;
-    }
-    return true;
+let anyNumberInArray = (numberList: number[], countArray: CountArray): boolean => {
+    return numberList.some(num => countArray[num] === num);
 };
 
 //
 //
 let getCountArray = (ncList: NCList): CountArray => {
-    // TODO: reduce
-    let arr = new Int32Array(ClueManager.numPrimarySources); // 255
-    for (let nc of ncList) {
-	arr[nc.count] = nc.count;
-    }
-    return arr;
+    return ncList.reduce((array, nc) => {
+	array[nc.count] = nc.count;
+	return array;
+    }, new Int32Array(ClueManager.numPrimarySources));
 };
 
 //
 //
-let getCountArrayAndSizeForSourceList = (sourceList: SourceList): CountArrayAndSize => {
-    let array = new Int32Array(ClueManager.numPrimarySources); // 255
+let getCountArrayAndSize = (sourceList: SourceList): CountArrayAndSize => {
+    // NO: reduce
+    let array = new Int32Array(ClueManager.numPrimarySources);
     let size = 0;
     for (let source of sourceList) {
 	for (let nc of source.primaryNameSrcList) {
@@ -295,7 +285,7 @@ let noCountsNotInOneAreInTwo = (ncList: NCList, xorCountArrayAndSize: CountArray
 //    'face:10'
 //  ]
 //}
-let recursiveAddSrcNcLists = (obj: any, resultMap: any, top = true): any => {
+let recursiveAddSrcNcLists = (list: string[], resultMap: any, top = true): string[] => {
     let keys: string[] = _.flatMap(_.keys(resultMap), (key: string) => {
 	let val = resultMap[key];
 	if (_.isObject(val)) {
@@ -320,26 +310,26 @@ let recursiveAddSrcNcLists = (obj: any, resultMap: any, top = true): any => {
 	// push combined sorted keys for multi-key case
 	if (keys.length > 1) {
 	    let sortedKeys = keys.sort().toString();
-	    obj.list.push(sortedKeys);
-	    obj.map[sortedKeys] = true;
+	    list.push(sortedKeys);
+	    //obj.map[sortedKeys] = true;
 	}
 	keys.forEach(key => {
 	    // push individual keys
-	    obj.list.push(key);
-	    obj.map[key] = true;
+	    list.push(key);
+	    //obj.map[key] = true;
 	    let val = resultMap[key];
 	    if (val && !_.isArray(val)) {
-		recursiveAddSrcNcLists(obj, val, false);
+		recursiveAddSrcNcLists(list, val, false);
 	    }
 	});
     }
-    return obj;
+    return list;
 };
 
 //
 //
-function buildSrcNcLists (resultMap: any): any {
-    return recursiveAddSrcNcLists({ list: [], map: {} }, resultMap);
+function buildSrcNcList (resultMap: any): string[] {
+    return recursiveAddSrcNcLists([], resultMap);
 }
 
 //
@@ -348,19 +338,16 @@ let populateSourceData = (lazySource: SourceBase, nc: NameCount, validateResult:
 			  orSourcesNcCsvMap: Map<string, number>): SourceData => {
     let source: SourceData = lazySource /*as SourceBase*/ as SourceData;
     if (validateResult.resultMap) {
-	let srcNcData = buildSrcNcLists(validateResult.resultMap.map());
-	source.sourceNcCsvList = srcNcData.list.filter(ncCsv => orSourcesNcCsvMap ? orSourcesNcCsvMap.has(ncCsv) : true);
-	source.srcNcMap = srcNcData.map;
+	const ncCsvList = buildSrcNcList(validateResult.resultMap.map());
+	source.sourceNcCsvList = ncCsvList.filter(ncCsv => orSourcesNcCsvMap ? orSourcesNcCsvMap.has(ncCsv) : true);
     } else {
 	if (validateResult.ncList.length !== 1 || validateResult.ncList[0].count !== 1) throw new Error("wrong assumption");
 	let ncListCsv = validateResult.ncList.toString();
 	source.sourceNcCsvList = [ncListCsv].filter(ncCsv => orSourcesNcCsvMap ? orSourcesNcCsvMap.has(ncCsv) : true);
-	source.srcNcMap = { [ncListCsv]: true };
     }
     if (nc.count > 1) {
 	let ncStr = nc.toString();
 	source.sourceNcCsvList.push(...[ncStr].filter(ncCsv => orSourcesNcCsvMap ? orSourcesNcCsvMap.has(ncCsv) : true));
-	source.srcNcMap[ncStr] = true;
     }
     source.ncList = [nc]; // TODO i could try getting rid of "LazySource.nc" and just make this part of LazySouceData
     if (loggy || logging > 3) {
@@ -384,11 +371,16 @@ let getSourceData = (nc: NameCount, validateResult: ValidateResult, lazy: boolea
 //
 let getSourceList = (nc: NameCount, lazy: boolean): AnySourceData[] => {
     const sourceList: AnySourceData[] = [];
+    // NO: reduce
     ClueManager.getKnownSourceMapEntries(nc).forEach((entry: any) => {
 	entry.results.forEach((result: ValidateResult) => {
 	    sourceList.push(getSourceData(nc, result, lazy));
 	});
     });
+    if (AA) {
+	console.log(`getSourceList ${nc} (${sourceList.length}):`);
+	for (let source of sourceList) console.log(` ncList: ${source.ncList}`);
+    }
     return sourceList;
 };
 
@@ -414,17 +406,10 @@ let mergeSources = (source1: AnySourceData, source2: AnySourceData, lazy: boolea
     let mergedSource: SourceData = {
 	primaryNameSrcList,
 	ncList,
-	srcNcMap: {},
-	sourceNcCsvList: [
-	    ...source1.sourceNcCsvList,
-	    ...source2.sourceNcCsvList
-	]
+	sourceNcCsvList: [...source1.sourceNcCsvList, ...source2.sourceNcCsvList]
     };
-    _.keys(source1.srcNcMap).forEach((key: string) => { mergedSource.srcNcMap[key] = true; });
-    _.keys(source2.srcNcMap).forEach((key: string) => { mergedSource.srcNcMap[key] = true; });
     // TODO: still used?
     mergedSource.ncCsv = mergedSource.ncList.sort().toString();
-    mergedSource.srcNcMap[mergedSource.ncCsv] = true;
     return mergedSource;
 };
 
@@ -442,6 +427,7 @@ let mergeCompatibleSources = (source1: AnySourceData, source2: AnySourceData, la
 //
 let mergeCompatibleSourceLists = (sourceList1: AnySourceData[], sourceList2: AnySourceData[], lazy: boolean): AnySourceData[] => {
     let mergedSourcesList: AnySourceData[] = [];
+    // TODO: reduce
     for (const source1 of sourceList1) {
 	for (const source2 of sourceList2) {
 	    mergedSourcesList.push(...mergeCompatibleSources(source1, source2, lazy));
@@ -456,7 +442,7 @@ let mergeAllCompatibleSources = (ncList: NCList, lazy = false): AnySourceData[] 
     if (ncList.length > 2) { // because **maybe** broken for > 2 below
 	throw new Error(`${ncList} length > 2 (${ncList.length})`);
     }
-    // TODO: reduce might work well here I think as well.
+    // TODO: reduce (or some) here
     let sourceList = getSourceList(ncList[0], lazy);
     for (let ncIndex = 1; ncIndex < ncList.length; ncIndex += 1) {
 	const nextSourceList = getSourceList(ncList[ncIndex], lazy);
@@ -575,7 +561,6 @@ let buildUseSourceNcCsvMap = (useSourceList: UseSource[]): SourceNcCsvMap => {
 
 //
 //
-let ZZ = 0;
 let mergeCompatibleUseSources = <SourceType extends UseSourceBase>(sourceLists: SourceList[], op: any): SourceType[] => {
     // TODO: sometimes a sourceList is empty, like if doing $(cat required) with a
     // low clue count range (e.g. -c2,4). should that even be allowed?
@@ -645,6 +630,7 @@ let mergeCompatibleUseSources = <SourceType extends UseSourceBase>(sourceLists: 
 	}
 	if (success) {
 	    if (ZZ) console.log(`pnsl, final: ${primaryNameSrcList}`);
+	    //if (_.isEmpty(primaryNameSrcList)) throw new Error ('empty primaryNameSrcList');
 	    let result: UseSourceBase = {
 		primaryNameSrcList,
 		primarySrcArray: getCountArray(primaryNameSrcList),
@@ -655,16 +641,13 @@ let mergeCompatibleUseSources = <SourceType extends UseSourceBase>(sourceLists: 
 		let orResult: OrSource = result as OrSource;
 		orResult.sourceLists = getCompatibleOrSourcesLists(primaryNameSrcList, nonEmptyOrSourceLists);
 		orResult.sourceNcCsvMap = buildOrSourceNcCsvMap(orResult.sourceLists);
-		orResult.primarySrcArrayAndSizeList = orResult.sourceLists.map(sourceList => getCountArrayAndSizeForSourceList(sourceList));
+		orResult.primarySrcArrayAndSizeList = orResult.sourceLists.map(sourceList => getCountArrayAndSize(sourceList));
 		if (ZZ && _.isEmpty(orResult.sourceLists) && !_.isEmpty(nonEmptyOrSourceLists)) {
 		    console.log(`before: orSourceLists(${orSourceLists.length}): ${Stringify2(orSourceLists)}`);
 		    console.log(`after: result.sourceLists(${orResult.sourceLists.length}): ${Stringify2(orResult.sourceLists)}`);
 		    ZZ = 0;
 		}
-	    }/* else if (op === Op.xor) {
-		let xorResult: XorSource = result as OrSource;
-		xorResult.ncList = ncList;
-	    }*/
+	    }
 	    sourceList.push(result as SourceType);
 	}
 	++iter;
@@ -780,6 +763,7 @@ let next = (clueSourceList: any, sourceIndexes: number[]): FirstNextResult => {
 //
 //
 let first = (clueSourceList: any, sourceIndexes: number[]): FirstNextResult => {
+    // TODO: _.fill?
     for (let index = 0; index < clueSourceList.length; ++index) {
 	sourceIndexes[index] = 0;
     }
@@ -792,14 +776,23 @@ let first = (clueSourceList: any, sourceIndexes: number[]): FirstNextResult => {
 let isCompatibleWithAnyOrSource = (source: SourceData, useSource: UseSource,
 				   orSourcesNcCsvMap: Map<string, number>): boolean => {
     let orSource = useSource.orSource!;
+    if (0 && AA) {
+	console.log(`orSource: ${Stringify2(orSource)}`);
+    }
     return source.sourceNcCsvList.some(ncCsv => {
-	if (!orSource.sourceNcCsvMap[ncCsv]) return false; // some.continue
+	if (!orSource.sourceNcCsvMap[ncCsv]) {
+	    if (AA) console.log( `  no ${ncCsv} in orSourceMap`);
+	    return false; // some.continue
+	}
+	if (AA) console.log(` found ${ncCsv} in orSourceMap`);
 	return orSource.sourceNcCsvMap[ncCsv].some(index => {
             let primarySrcArrayAndSize = orSource.primarySrcArrayAndSizeList[index];
 	    let numCountsInArray = getNumCountsInArray(source.primaryNameSrcList, primarySrcArrayAndSize.array);
+	    if (AA) console.log(` matching counts (${numCountsInArray}) out of (${primarySrcArrayAndSize.size})`);
 	    if (numCountsInArray === primarySrcArrayAndSize.size) {
 		const uniqPrimarySrcList = getCountListNotInArray(source.primaryNameSrcList, primarySrcArrayAndSize.array);
-		const allUniqueSrc = noNumberInArray(uniqPrimarySrcList, useSource.primarySrcArray);
+		const allUniqueSrc = !anyNumberInArray(uniqPrimarySrcList, useSource.primarySrcArray);
+		if (AA) console.log(` allUnique: ${allUniqueSrc}`);
 		if (allUniqueSrc) return true; // some.exit
 	    }
 	    return false; // some.continue
@@ -812,17 +805,17 @@ let isCompatibleWithAnyOrSource = (source: SourceData, useSource: UseSource,
 let isCompatibleWithUseSources = (sourceList: SourceList, useSourceList: UseSource[],
 				  orSourcesNcCsvMap: Map<string, number>): boolean => {
     if (_.isEmpty(useSourceList)) return true;
+    // TODO: some
     for (let source of sourceList) {
+	if (AA) console.log(`source nc: ${source.ncList}`);
 	for (let useSource of useSourceList) {
-	    let compatible = noCountsInArray(source.primaryNameSrcList, useSource.primarySrcArray);
-	    if (!compatible && source.sourceNcCsvList.length > 0) {
-		// TODO: is sourceLists ever empty if orSource is set? shouldn't be, but check & disable if so
-		let orSource = useSource.orSource!;
-		if (orSource && orSource.sourceLists && orSource.sourceLists.length > 0) {
-		    if (isCompatibleWithAnyOrSource(source, useSource, orSourcesNcCsvMap)) {
-			compatible = true;
-		    }
-		}
+	    let compatible = !anyCountInArray(source.primaryNameSrcList, useSource.primarySrcArray);
+	    if (AA) console.log(` -xorCompatible: ${compatible}, sourceLists: ${useSource.orSource?.sourceLists.length}`);
+	    // Base case: --xor arguments only. Wether we're compatible or not is known at this point.
+	    // --or case: if orSource.sourceLists is non-empty, we must check them for --or compatibility.
+	    if (compatible && useSource.orSource?.sourceLists.length) {
+		compatible = isCompatibleWithAnyOrSource(source, useSource, orSourcesNcCsvMap);
+		if (AA) console.log(` -orCompatible: ${compatible}`);
 	    }
 	    if (compatible) return true;
 	}
@@ -872,6 +865,7 @@ let getCombosForUseNcLists = (sum: number, max: number, args: PreComputedData): 
 
     // for each sourceList in sourceListArray
     ClueManager.getClueSourceListArray({ sum, max }).forEach((clueSourceList: any) => {
+	AA = false;
 	comboCount += 1;
 
 	//console.log(`sum(${sum}) max(${max}) clueSrcList: ${Stringify(clueSourceList)}`);
@@ -884,6 +878,7 @@ let getCombosForUseNcLists = (sum: number, max: number, args: PreComputedData): 
 	// this is effectively Peco.getCombinations().forEach()
 	let firstIter = true;
 	while (!result.done) {
+	    AA = false;
 	    if (!firstIter) {
 		// TODO problem 1:
 		// problem1: why is this (apparently) considering the first two entries of the same
@@ -900,6 +895,11 @@ let getCombosForUseNcLists = (sum: number, max: number, args: PreComputedData): 
 	    }
 	    //console.log(`result.nameList: ${result.nameList}`);
 	    //console.log(`result.ncList: ${result.ncList}`);
+
+	    if (0 && result.nameList!.toString() == "major,tree") {
+		console.log(`hit: ${result.nameList}`);
+		AA = true;
+	    }
 
 	    //const key = NameCount.listToString(result.ncList);
 	    const key: string = result.ncList!.sort().toString();
@@ -1021,7 +1021,7 @@ let getAllPrimarySrcCombos = (orSource: SourceBase, size: number): string[] => {
 	listArray: [ list, list ], // TODO: fix for arbitrary "size"
 	max: 99999,
 	noDuplicates: true
-    }).getCombinations().forEach(indexList => {
+    }).getCombinations().forEach((indexList: number[]) => {
 	// TODO: fix for arbitrary "size"
 	if (indexList[0] === indexList[1]) return; // TODO: fix for arbitrary "size"
 	let combo = indexList.map(index => orSource.primaryNameSrcList[index].count).sort().toString();
@@ -1033,12 +1033,10 @@ let getAllPrimarySrcCombos = (orSource: SourceBase, size: number): string[] => {
 //
 //
 let makeCombos = (args: any): any => {
-    let sumRange;
-    if (!_.isUndefined(args.sum)) {
-	// is _chain even necessary here?
-	sumRange = _.chain(args.sum).split(',').map(_.toNumber).value();
-    }
-    Expect(sumRange).is.an.Array().with.property('length').below(3); // of.at.most(2);
+    if (!args.sum) throw new Error('missing sum');
+    let sumRange: number[] = args.sum.split(',').map(_.toNumber);
+    if (sumRange.length > 2) throw new Error('funny sum');
+
     Debug('++combos' +
 	  `, sum: ${sumRange}` +
 	  `, max: ${args.max}` +

@@ -245,7 +245,7 @@ let cyclePrimaryClueSources = (args: any): NCList[] => {
         ncList:     args.ncList,   // always pass same unmodified ncList
         allPrimary: true
     };
-    let buildResult;
+    let buildResult: any;
     do {
         // build src name list of any duplicate-sourced primary clues
         if (buildResult) {
@@ -349,9 +349,9 @@ let findPrimarySourceConflicts = (args: any): any => {
     if (xp) Expect(args.ncList, 'args.ncList').is.ok();
 
     let allPrimary = true;
-    let nameMap = {};
-    let srcMap = {};
-    let conflictSrcMap = {};
+    let nameMap: { [key: string]: boolean } = {};
+    let srcMap: { [key: string]: string } = {};
+    let conflictSrcMap: { [key: string]: string[] } = {};
 
     args.ncList.forEach((nc: NameCount) => {
         if (nc.count > 1) {
@@ -379,10 +379,11 @@ let findPrimarySourceConflicts = (args: any): any => {
             return false; // not found; some.continue
         })) {
             // unused src not found: add to conflict map, resolve later
-            if (!_.has(conflictSrcMap, srcList)) {
-                conflictSrcMap[srcList] = [];
+            let srcListStr = srcList.toString();
+            if (!_.has(conflictSrcMap, srcListStr)) {
+                conflictSrcMap[srcListStr] = [];
             }
-            conflictSrcMap[srcList].push(nc.name);
+            conflictSrcMap[srcListStr].push(nc.name);
         }
     }, this);
 
@@ -557,7 +558,7 @@ let evalFindDuplicateResult = (result: any, logPrefix: string): boolean => {
 // have multiples source combinations, we need to build all combinations of those
 // combinations. for the second case, punt until it happens.
 //
-let buildSrcNameList = (args): any => {
+let buildSrcNameList = (args: any): any => {
     Debug(`++buildSrcNameList, ncList(${args.ncList.length})` +
           `${indentNewline()}  ncList: ${args.ncList}` +
           `${indentNewline()}  allPrimary: ${args.allPrimary}`);
@@ -573,9 +574,9 @@ let buildSrcNameList = (args): any => {
     let resultMap = ResultMap.makeNew();
 
     args.ncList.forEach((nc: /*NameCount*/ any, ncIndex: number) => {
-        let src = args.allPrimary ? 1 : nc.count;
+        let src: number = args.allPrimary ? 1 : nc.count;
         // i.e. srcNameCsvArray
-        let srcList = ClueManager.knownClueMapArray[src][nc.name]; // e.g. [ 'src1,src2,src3', 'src2,src3,src4' ]
+        let srcList: string[] = ClueManager.knownClueMapArray[src][nc.name]; // e.g. [ 'src1,src2,src3', 'src2,src3,src4' ]
         if (!srcList) throw new Error('kind of impossible but missing clue!');
 
         // only do indexing if all clues are primary, or if this
@@ -610,13 +611,13 @@ let buildSrcNameList = (args): any => {
         }
         
         // nc is a compound clue
-        let map = resultMap.map()[nc] = {};
+        let map: { [key: string]: string[] } = resultMap.map()[nc] = {};
         // if sources for this nc are all primary clues
         if (_.size(srcNameList) === nc.count) {
             // build component primary NC list
             let localPrimaryNcList = srcNameList.map(name => NameCount.makeNew(name, 1));
             // add map entry for list of (eventual) primary name:sources
-            map[localPrimaryNcList] = [];
+            map[localPrimaryNcList.toString()] = [];
             primaryNcList.push(...localPrimaryNcList);
             return; // forEach.next;
         }
@@ -678,7 +679,7 @@ let getIndexMap = (indexMap: any): any => {
 //
 //
 
-let getSrcListIndex = (indexMap: any, nc: /*NameCount*/ any, srcList: number[]): number => {
+let getSrcListIndex = (indexMap: any, nc: /*NameCount*/ any, srcList: string[]): number => {
     let slIndex;
     if (_.has(indexMap, nc)) {
         slIndex = indexMap[nc].index;
@@ -899,7 +900,7 @@ let checkUniqueSources = (nameCountList: NCList, args: any): RvsResult => {
     }
 
     let resultMap;
-    let buildResult;
+    let buildResult: any;
     let candidateResultList: Result[];
     let anyFlag = false;
     let resultList: Result[] = [];
@@ -929,11 +930,6 @@ let checkUniqueSources = (nameCountList: NCList, args: any): RvsResult => {
                     resultMap: buildResult.resultMap // no need to merge?
                 }];
             } else {
-		// the opportunity we have here, is that all compound clues should already
-		// have a result attached to them in KnownSrcMapArray (somehow? right?).
-		// so, can't we spin off to a test_ method here, and do something special?
-		// or, since we're calling validateSources, should we do the check there?
-
                 // call validateSources recursively with compound clues
                 let vsResult = validateSources({
                     sum:            buildResult.count,
@@ -958,7 +954,7 @@ let checkUniqueSources = (nameCountList: NCList, args: any): RvsResult => {
                 // we only sent compound clues to validateSources, so add the primary
                 // clues that were filtered out by build(), to make a complete list.
                 // also merge buildResults data into resultMap.
-                candidateResultList = vsResult.list.map(result => Object({
+                candidateResultList = vsResult.list.map((result: any) => Object({
                     ncList:    _.concat(result.ncList, buildResult.primaryNcList),
 		    // TODO: I don't think i need to clone buildResult.resultmap here.
 		    // it's a new copy every iteration.
@@ -1020,9 +1016,9 @@ let allHaveSameClueNumber = (nameSrcList: NCList, clueNumber: number): boolean =
 
 //
 //
-let getClueSources = (name: string): number[] => {
-    let clueList = ClueManager.clueListArray[1];
-    let sources: number[] = clueList.filter(clue => clue.name == name).map(clue => clue.src);
+let getClueSources = (name: string): string[] => {
+    let clueList: { name: string, src: string }[] = ClueManager.clueListArray[1];
+    let sources: string[] = clueList.filter(clue => clue.name == name).map(clue => clue.src);
     if (_.isEmpty(sources)) throw new Error(`can't find: ${name}`);
     return sources;
 }
@@ -1053,7 +1049,7 @@ let mergeNcListResults = (ncListToMerge: NCList, args: any): RvsResult => {
     Peco.makeNew({
 	listArray,
 	max: 99999
-    }).getCombinations().forEach(indexList => {
+    }).getCombinations().forEach((indexList: number[]) => {
 	let ncList: NCList = [];
 	let nameSrcList: NCList = [];
         let resultMap = ResultMap.makeNew();
