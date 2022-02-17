@@ -64,6 +64,9 @@ interface RvsResult {
     list?: Result[];
 }
 
+type NumberArray = number[]; // TODO: Int32Array
+type NumberArrayList = NumberArray[];
+
 
 /*
 let log = function (text) {
@@ -1016,9 +1019,9 @@ let allHaveSameClueNumber = (nameSrcList: NCList, clueNumber: number): boolean =
 
 //
 //
-let getClueSources = (name: string): string[] => {
+let getPrimaryClueSources = (name: string): number[] => {
     let clueList: { name: string, src: string }[] = ClueManager.clueListArray[1];
-    let sources: string[] = clueList.filter(clue => clue.name == name).map(clue => clue.src);
+    let sources: number[] = clueList.filter(clue => clue.name == name).map(clue => _.toNumber(clue.src));
     if (_.isEmpty(sources)) throw new Error(`can't find: ${name}`);
     return sources;
 }
@@ -1028,7 +1031,8 @@ let getClueSources = (name: string): string[] => {
 let NN = false;
 let mergeNcListResults = (ncListToMerge: NCList, args: any): RvsResult => {
     let ncStr = ncListToMerge.toString();
-    //console.log(`merging: ${ncStr}`);
+    //NN = true;
+    if (NN) console.log(`merging: ${ncStr}`);
     //if (1 && ncStr == 'gold leaf:1,oak:2') {
     //if (1 && ncStr == 'coffee:1,bean:1') {
     if (0 && ncStr == 'bear:2,polar:3') {
@@ -1036,18 +1040,18 @@ let mergeNcListResults = (ncListToMerge: NCList, args: any): RvsResult => {
 	NN = true;
     }
     let resultList: Result[] = [];
-    let listArray = ncListToMerge.map(nc => {
+    let arrayList: NumberArrayList = ncListToMerge.map(nc => {
 	let ncResultMap = ClueManager.ncResultMapList[nc.count];
 	if (nc.count === 1) {
-	    return getClueSources(nc.name);
+	    return getPrimaryClueSources(nc.name);
 	} else {
-	    return [...Array(ncResultMap[nc.toString()].list.length).keys()];
+	    return [...Array(ncResultMap[nc.toString()].list.length).keys()].map(_.toNumber);
 	}
     });
-    //console.log(`${ncListToMerge}:`)
-    //console.log(Stringify(listArray));
+    if (NN) console.log(`${ncListToMerge}:`)
+    if (NN) console.log(Stringify(arrayList));
     Peco.makeNew({
-	listArray,
+	listArray: arrayList,
 	max: 99999
     }).getCombinations().forEach((indexList: number[]) => {
 	let ncList: NCList = [];
@@ -1071,17 +1075,17 @@ let mergeNcListResults = (ncListToMerge: NCList, args: any): RvsResult => {
 		resultMap.addPrimarySource(nameSrc);
 		let clueNumber = getRestrictedPrimaryClueNumber(nameSrc);
 		if (clueNumber) {
-		    //console.log(`restricting ${ncListToMerge} to clueNumber(${clueNumber}) due to ${nameSrc}`);
+		    if (NN) console.log(`restricting ${ncListToMerge} to clueNumber(${clueNumber}) due to ${nameSrc}`);
 		    restrictToClueNumber = clueNumber;
 		}
 	    }
 	});
 	if (restrictToClueNumber) {
 	    if (!allHaveSameClueNumber(nameSrcList, restrictToClueNumber)) {
-		//console.log(`  restriction failed`);
+		if (NN) console.log(`  restriction failed`);
 		return; // forEach.continue;
 	    }
-	    //console.log(`  restriction passed`);
+	    if (NN) console.log(`  restriction passed`);
 	}
 	// TODO: uniqBy da debil
 	if (_.uniqBy(nameSrcList, NameCount.count).length === nameSrcList.length) {

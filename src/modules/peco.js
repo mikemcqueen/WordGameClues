@@ -16,6 +16,7 @@
 
 const _           = require('lodash');
 const Debug       = require('debug')('peco');
+const Stringify   = require('stringify-object');
 
 //
 
@@ -290,7 +291,7 @@ Peco.prototype.listFirst = function (listArray, flags) {
     //console.log(`lastList: ${this.indexList.map(entry => entry.last)}`);
 
     if (LOGGING) {
-        this.log ('srcCount: ' + srcCount + ' indexList.length: ' + this.indexList.length);
+        this.log (`srcCount: ${srcCount} indexList: ${Stringify(this.indexList)}`);
     }
 
     const sum = this.getIndexSum();
@@ -298,7 +299,7 @@ Peco.prototype.listFirst = function (listArray, flags) {
 	this.log(`pecoList, getIndexSum ${sum}`);
         list = this.getPecoList();
     } else {
-	this.log(`next, getIndexSum ${sum}, max ${this.max}`);
+	this.log(`next, getIndexSum ${sum}, typeof sum ${typeof sum} max ${this.max}`);
         list = this.listNext(flags);
     }
     return list;
