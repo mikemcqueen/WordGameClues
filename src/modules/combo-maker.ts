@@ -20,7 +20,7 @@ const PrettyMs	  = require('pretty-ms');
 const ResultMap	  = require('../types/result-map');
 const stringify	  = require('javascript-stringify').stringify;
 const Stringify2  = require('stringify-object');
-const Validator	  = require('./validator');
+//const Validator	  = require('./validator');
 
 //
 //

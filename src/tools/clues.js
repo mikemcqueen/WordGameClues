@@ -259,23 +259,49 @@ function copyClues (fromType, options = {}) {
 	total += _.size(list);
 	for (let clue of list) {
 	    const nameList = clue.src.split(',').sort();
-	    const ncLists = ClueManager.fast_getCountListArrays(clue.src, { add: true });
-	    if (_.isEmpty(ncLists)) {
-		Debug(`No matches for: ${clue.src}`);
-		continue;
-	    }
-	    let countSet = ncLists.reduce((countSet, ncList) => {
-		let sum = ncList.reduce((sum, nc) => { return sum + nc.count; }, 0);
-		if (sum <= max) countSet.add(sum);
-		return countSet;
-	    }, new Set());
+            let countSet;
+            let compound = false;
+            if (0) { // fast, but no respeto restrictToSameClueNumberOnly flag
+                const ncLists = ClueManager.fast_getCountListArrays(clue.src, { add: true, fast: true });
+	        if (_.isEmpty(ncLists)) {
+		    Debug(`No matches for: ${clue.src}`);
+		    continue;
+	        }
+	        countSet = ncLists.reduce((countSet, ncList) => {
+		    let sum = ncList.reduce((sum, nc) => { return sum + nc.count; }, 0);
+		    if (sum <= max) countSet.add(sum);
+		    return countSet;
+	        }, new Set());
+            } else { // slower, with respect
+	        const result = ClueManager.getCountListArrays(clue.src, { add: true, fast: true });
+                if (!result) continue;
+                //{ valid, known, rejects, invalid, clues, addRemoveSet };
+                console.log(` valid(${_.size(result.valid)}) known(${_.size(result.known)}) invalid(${_.size(result.invalid)}) clues(${_.size(result.clues)})`);
+                if (_.isEmpty(result.known) && _.isEmpty(result.valid)) continue;
+                countSet = new Set();
+	        countSet = result.valid.reduce((countSet, countList) => {
+		    let sum = countList.reduce((sum, count) => sum + count, 0);
+		    if (sum <= max) countSet.add(sum);
+                    // only add for the current count
+		    //if (sum === count) countSet.add(sum);
+		    return countSet;
+	        }, countSet);
+	        countSet = result.known.reduce((countSet, obj) => {
+		    let sum = obj.countList.reduce((sum, count) => sum + count, 0);
+		    if (sum <= max) countSet.add(sum);
+                    // only add for the current count
+		    //if (sum === count) countSet.add(sum);
+		    return countSet;
+	        }, countSet);
+                compound = true;
+            }
 
 	    Debug(`Adding ${clue.name}:${clue.src}, counts: ${Array.from(countSet)}`);
-	    const count = ClueManager.addRemoveOrReject({
+	    const added = ClueManager.addRemoveOrReject({
 		add: clue.name,
 		isReject: false,
-	    }, nameList, countSet, { save: options.save });
-	    copied += count;
+	    }, nameList, countSet, { save: options.save, compound });
+	    copied += added;
 	}
     }
     console.log(`total: ${total}, copied: ${copied}`);

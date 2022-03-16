@@ -1033,13 +1033,11 @@ let mergeNcListResults = (ncListToMerge: NCList, args: any): RvsResult => {
     let ncStr = ncListToMerge.toString();
     //NN = true;
     if (NN) console.log(`merging: ${ncStr}`);
-    //if (1 && ncStr == 'gold leaf:1,oak:2') {
-    //if (1 && ncStr == 'coffee:1,bean:1') {
-    if (0 && ncStr == 'bear:2,polar:3') {
+    let resultList: Result[] = [];
+    if (0 && ncStr == 'word:1,word:2') {
 	console.log(`merging: ${ncStr}\n-----------------------------------`);
 	NN = true;
     }
-    let resultList: Result[] = [];
     let arrayList: NumberArrayList = ncListToMerge.map(nc => {
 	let ncResultMap = ClueManager.ncResultMapList[nc.count];
 	if (nc.count === 1) {
@@ -1166,7 +1164,7 @@ let rvsWorker = (args: any): RvsResult => {
     // (name & count lists are equal length, just test one)
     if (args.nameList.length === 1) {
 	let result: RvsResult;
-	if (args.fast && args.validateAll) {
+	if (args.fast && args.validateAll) { // NOTE getting rid of this validateAll check might fix --copy-from, --add, etc.
 	    if (NN) console.log('fast');
 	    result = mergeNcListResults(newNameCountList, args);
 	} else {

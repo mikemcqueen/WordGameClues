@@ -868,11 +868,13 @@ ClueManager.prototype.addClueForCounts = function (countSet, name, src, options)
     //Expect(countSet).is.instanceof(Set);
     //Expect(name).is.a.String();
     //Expect(src).is.a.String();
+    const clue = { name, src };
     return Array.from(countSet).reduce((added, count) => {
-        if (this.addClue(count, {
-            name: name,
-            src:  src
-        }, options.save, true)) { // save, nothrow
+        if (options.compound) {
+	    let result = this.addCompoundClue(clue, count, true, true);
+            if (!result.success) throw new Error(`addCompoundclue failed, ${clue}:${count}`);
+        }
+        if (this.addClue(count, clue, options.save, true)) { // save, nothrow
             console.log(`${count}: added ${name} as ${src}`);
 	    added += 1;
         } else {
@@ -1108,21 +1110,31 @@ function getCompatiblePrimaryNameSrcList (listOfListOfPrimaryNameSrcLists) {
     }).getCombinations();
 
     return comboLists.some(comboList => {
-	const nameSrcList = comboList.reduce((nameSrcList, comboListValue, comboListIndex) => {
-	    let nsList = listOfListOfPrimaryNameSrcLists[comboListIndex][comboListValue];
-	    //console.log(`nameSrcList: ${nameSrcList}, clValue ${comboListValue}, clIndex ${comboListIndex}, nsList: ${nsList}`);
+	const nameSrcList = comboList.reduce((nameSrcList, element, index) => {
+	    let nsList = listOfListOfPrimaryNameSrcLists[index][element];
+	    //console.log(`nameSrcList: ${nameSrcList}, element ${element}, index ${index}, nsList: ${nsList}`);
 	    if (nsList) {
 		nameSrcList.push(...nsList);
 	    } else {
-		console.log(`no nsList for index: ${comboListIndex}, value: ${comboListValue}`);
+		console.log(`no nsList for index: ${index}, element: ${element}`);
 	    }
 	    return nameSrcList;
 	}, []);
-	const uniqLen = _.uniqBy(nameSrcList, NameCount.count).length;
-	return (uniqLen === nameSrcList.length) ? nameSrcList : undefined;
+	const numUniq = _.uniqBy(nameSrcList, NameCount.count).length;
+	return (numUniq === nameSrcList.length) ? nameSrcList : undefined;
     });
 };
 
+//
+// So it seems i added a "fast" version of getCountListArrays specifically for the copy-from
+// use case, that does not use Validator (and hence is faster).
+// Since that time, I pretty significantly optimized the Validator. So maybe we can go back
+// to using the old one (have to supply fast:true or default to fast).
+// The problem with not using the old one, is I need to replicate enforcement of the
+// "restrictToSameClueNumber" flag for primary NameSrcs. Not an unachievable task necessarily,
+// but there is definitely some benefit to having that logic in only one spot.
+// Or I suppose I could just throw a "validateSources()" call into the "fast" method and
+// that might be a good compromise (have to supply fast:true or default to fast).
 //
 
 ClueManager.prototype.fast_getCountListArrays = function (nameCsv, options) {
@@ -1179,11 +1191,12 @@ ClueManager.prototype.getCountListArrays = function (nameCsv, options) {
 
     for (const clueCountList of resultList) {
         const sum = clueCountList.reduce((a, b) => a + b);
-	//console.log(`sum: ${sum}, list: ${clueCountList}`);
 	const start = new Date();
-	//console.log(`${nameList}`);
-
 	let x = _.uniqBy(clueCountList, _.toNumber);
+        if (1) {
+	    console.log(`${nameList}`);
+	    console.log(` sum: ${sum}, countList: ${clueCountList}, x: ${x}`);
+        }
 	let ncListStr = clueCountList.map((count, index) => NameCount.makeNew(nameList[index], count)).toString();
 	let result;
 	result = invalidHash[ncListStr];
@@ -1193,6 +1206,7 @@ ClueManager.prototype.getCountListArrays = function (nameCsv, options) {
 		nameList:    nameList,
 		count:       nameList.length,
 		require:     x, //clueCountList
+                fast: options.fast,
 		validateAll
             });
 	}
