@@ -5,16 +5,17 @@
 'use strict';
 
 import _ from 'lodash'; // import statement to signal that we are a "module"
-const ClueList    = require('../types/clue-list');
 const ClueManager = require('./clue-manager');
 const Debug       = require('debug')('validator');
 const Expect      = require('should/as-function');
-const NameCount   = require('../types/name-count');
 const Peco        = require('./peco');
 const ResultMap   = require('../types/result-map');
 const stringify	  = require('javascript-stringify').stringify;
 const Stringify2  = require('stringify-object');
 const Timing      = require('debug')('timing');
+
+import * as ClueList from '../types/clue-list';
+import * as NameCount from '../types/name-count';
 
 function Stringify(val: any) {
     return stringify(val, (value: any, indent: any, stringify: any) => {
@@ -23,10 +24,11 @@ function Stringify(val: any) {
     }, " ");
 }
 
+//
+//
 
 // TODO: options.xp
 const xp = false;
-
 
 let rvsSuccessSeconds = 0;
 let rvsFailDuration  = 0;
@@ -43,28 +45,23 @@ let SOURCES_KEY      = '__sources';
 
 //
 //
-interface NameCount {
-    name: string;
-    count: number;
-}
-type NCList = NameCount[];
 
 type CountArray = Int32Array;
 
-interface Result {
-    ncList: NCList;
-    nameSrcList?: NCList;
+export interface ValidateResult {
+    ncList: NameCount.List;
+    nameSrcList?: NameCount.List;
     nameSrcCsv?: string;
     resultMap: any;
 //    primarySrcArray?: CountArray;
 }
 
-interface RvsResult {
+export interface ValidateSourcesResult {
     success: boolean;
-    list?: Result[];
+    list?: ValidateResult[];
 }
 
-type NumberArray = number[]; // TODO: Int32Array
+export type NumberArray = number[]; // TODO: Int32Array
 type NumberArrayList = NumberArray[];
 
 
@@ -135,7 +132,7 @@ let setAllowDupeFlags = (args: any): void => {
 
 //
 //
-let noCountsInArray = (ncList: NCList, countArray: CountArray): boolean => {
+let noCountsInArray = (ncList: NameCount.List, countArray: CountArray): boolean => {
     for (let nc of ncList) {
         if (countArray[nc.count] === nc.count) return false;
     }
@@ -144,7 +141,7 @@ let noCountsInArray = (ncList: NCList, countArray: CountArray): boolean => {
 
 //
 //
-let getCountArray = (ncList: NCList): CountArray => {
+let getCountArray = (ncList: NameCount.List): CountArray => {
     let arr = new Int32Array(255);
     for (let nc of ncList) {
 	arr[nc.count] = nc.count;
@@ -154,7 +151,7 @@ let getCountArray = (ncList: NCList): CountArray => {
 
 // in a word: unnecessary
 
-let uniqueResult = (success: boolean, list: any = undefined): RvsResult => {
+let uniqueResult = (success: boolean, list: any = undefined): ValidateSourcesResult => {
     return {
 	success,
         list
@@ -169,7 +166,7 @@ let uniqueResult = (success: boolean, list: any = undefined): RvsResult => {
 //  pendingMap:
 //  validateAll:
 //
-let getCompatibleResults = (args: any): Result[] => {
+let getCompatibleResults = (args: any): ValidateResult[] => {
     // no duplicates, and all clues are primary, success!
     Debug('++allUniquePrimary' +
           `${indentNewline()}  origNcList:  ${args.origNcList}` +
@@ -182,7 +179,7 @@ let getCompatibleResults = (args: any): Result[] => {
     }
 
     let logit = false;
-    let resultList: Result[] = [];
+    let resultList: ValidateResult[] = [];
     if (logit) {
         Debug(`aUP: adding primary result`);
         Debug(`  ${args.ncList}`);
@@ -190,7 +187,7 @@ let getCompatibleResults = (args: any): Result[] => {
     }
     addCompatibleResult(resultList, args.nameSrcList, args);
     if (_.isEmpty(resultList) || args.validateAll) {
-        cyclePrimaryClueSources({ ncList: args.ncList }).some((nameSrcList: NCList) => {
+        cyclePrimaryClueSources({ ncList: args.ncList }).some((nameSrcList: NameCount.List) => {
             // check if nameSrcList is already in result list
             if (hasNameSrcList(resultList, nameSrcList)) {
                 if (logit) {
@@ -211,7 +208,7 @@ let getCompatibleResults = (args: any): Result[] => {
 };
 
 //
-let addCompatibleResult = (resultList: Result[], nameSrcList: NCList, args: any): void => {
+let addCompatibleResult = (resultList: ValidateResult[], nameSrcList: NameCount.List, args: any): void => {
     if (xp) {
         Expect(resultList).is.an.Array();
         Expect(nameSrcList).is.an.Array();
@@ -236,14 +233,14 @@ let addCompatibleResult = (resultList: Result[], nameSrcList: NCList, args: any)
 //  ncList:
 //  exclueSrcList:
 //
-let cyclePrimaryClueSources = (args: any): NCList[] => {
+let cyclePrimaryClueSources = (args: any): NameCount.List[] => {
     if (xp) Expect(args.ncList).is.an.Array().and.not.empty();
 
     Debug(`++cyclePrimaryClueSources`);
 
     // must copy the NameCount objects within the list
     let localNcList = _.cloneDeep(args.ncList);
-    let resultList: NCList[] = [];
+    let resultList: NameCount.List[] = [];
     let buildArgs: any = {
         ncList:     args.ncList,   // always pass same unmodified ncList
         allPrimary: true
@@ -257,7 +254,7 @@ let cyclePrimaryClueSources = (args: any): NCList[] => {
         buildResult = buildSrcNameList(buildArgs);
 
         // change local copy of ncList sources to buildResult's sources
-        localNcList.forEach((nc: NameCount, index: number) => {
+        localNcList.forEach((nc: NameCount.Type, index: number) => {
             localNcList[index].count = buildResult.primarySrcNameList[index];
         });
 
@@ -288,7 +285,7 @@ let cyclePrimaryClueSources = (args: any): NCList[] => {
     return resultList;
 };
 
-// ncList:              nameCountList
+// ncList: NameCount.List
 //
 let findDuplicatePrimaryClue = (args: any): any => {
     let duplicateName;
@@ -356,7 +353,7 @@ let findPrimarySourceConflicts = (args: any): any => {
     let srcMap: { [key: string]: string } = {};
     let conflictSrcMap: { [key: string]: string[] } = {};
 
-    args.ncList.forEach((nc: NameCount) => {
+    args.ncList.forEach((nc: NameCount.Type) => {
         if (nc.count > 1) {
             Debug(`fPSC: non-primary, ${nc}`);
             allPrimary = false;
@@ -489,7 +486,7 @@ let findDuplicatePrimarySource = (args: any): any => {
     let duplicateSrcName;
     let duplicateSrc;
 
-    args.ncList.some((nc: NameCount) => {
+    args.ncList.some((nc: NameCount.Type) => {
         let src = nc.count;
         if (_.has(args.srcMap, src)) {
             // duplicate source
@@ -569,14 +566,14 @@ let buildSrcNameList = (args: any): any => {
     let indexMap = getIndexMap(args.indexMap);
     let allPrimary = true;
     let clueCount = 0;
-    let compoundNcList: NCList = [];
+    let compoundNcList: NameCount.List = [];
     let compoundSrcNameList: any[] = [];
-    let primaryNcList: NCList = [];
+    let primaryNcList: NameCount.List = [];
     let primarySrcNameList: any[] = [];
     let primaryPathList: any[] = []; //  TODO: i had half an idea here
     let resultMap = ResultMap.makeNew();
 
-    args.ncList.forEach((nc: /*NameCount*/ any, ncIndex: number) => {
+    args.ncList.forEach((nc: /*NameCount.Type*/ any, ncIndex: number) => {
         let src: number = args.allPrimary ? 1 : nc.count;
         // i.e. srcNameCsvArray
         let srcList: string[] = ClueManager.knownClueMapArray[src][nc.name]; // e.g. [ 'src1,src2,src3', 'src2,src3,src4' ]
@@ -682,7 +679,7 @@ let getIndexMap = (indexMap: any): any => {
 //
 //
 
-let getSrcListIndex = (indexMap: any, nc: /*NameCount*/ any, srcList: string[]): number => {
+let getSrcListIndex = (indexMap: any, nc: /*NameCount.Type*/ any, srcList: string[]): number => {
     let slIndex;
     if (_.has(indexMap, nc)) {
         slIndex = indexMap[nc].index;
@@ -750,14 +747,14 @@ let indexMapToJSON = (map: any): string => {
 //
 //
 
-let copyAddNcList = (ncList: NCList, name: string, count: number): NCList => {
+let copyAddNcList = (ncList: NameCount.List, name: string, count: number): NameCount.List => {
     // for non-primary check for duplicate name:count entry
     // technically this is allowable for count > 1 if the there are
     // multiple entries of this clue name in the clueList[count].
     // (at least as many entries as there are copies of name in ncList)
     // TODO: make knownSourceMapArray store a count instead of boolean
 
-    if (!ncList.every((nc: NameCount) => {
+    if (!ncList.every(nc => {
         if (nc.count > 1) {
             if ((name === nc.name) && (count === nc.count)) {
                 return false;
@@ -769,7 +766,7 @@ let copyAddNcList = (ncList: NCList, name: string, count: number): NCList => {
     }
 
     // TODO: _.clone()
-    let newNcList = Array.from(ncList);
+    let newNcList = Array.from(ncList); // TODO: [...ncList];
     newNcList.push(NameCount.makeNew(name, count));
     return newNcList;
 }
@@ -777,8 +774,8 @@ let copyAddNcList = (ncList: NCList, name: string, count: number): NCList => {
 //
 //
 
-let getDiffNcList = (origNcList: NCList, nameCountList: NCList): NCList => {
-    let ncList: NCList = [];
+let getDiffNcList = (origNcList: NameCount.List, nameCountList: NameCount.List): NameCount.List => {
+    let ncList: NameCount.List = [];
     for (let index = origNcList.length; index < nameCountList.length; ++index) {
         ncList.push(nameCountList[index]);
     }
@@ -787,8 +784,8 @@ let getDiffNcList = (origNcList: NCList, nameCountList: NCList): NCList => {
 
 //
 //
-let getNameSrcList = (srcMap: any): NCList => {
-    return _.keys(srcMap).map(key => NameCount.makeNew(srcMap[key], key));
+let getNameSrcList = (srcMap: any): NameCount.List => {
+    return _.keys(srcMap).map(key => NameCount.makeNew(srcMap[key], _.toNumber(key)));
 };
 
 //
@@ -807,7 +804,7 @@ let chop = (list: any, removeValue: any): any => {
 
 //
 //
-let hasNameSrcList = (resultList: Result[], nameSrcList: NCList): boolean => {
+let hasNameSrcList = (resultList: ValidateResult[], nameSrcList: NameCount.List): boolean => {
     return resultList.some(result => {
         return result.nameSrcList!.every((nameSrc, nsIndex: number) => {
             return nameSrc == nameSrcList[nsIndex];
@@ -818,14 +815,14 @@ let hasNameSrcList = (resultList: Result[], nameSrcList: NCList): boolean => {
 //
 //
 /*
-let isCompatible = (compatResult: Result, result: Result): boolean => {
+let isCompatible = (compatResult: ValidateResult, result: ValidateResult): boolean => {
     return noCountsInArray(compatResult.nameSrcList!, result.primarySrcArray!);
 }
 */
 
 //
 //
-let addAllCompatible = (compatList: Result[], resultList: Result[]): void => {
+let addAllCompatible = (compatList: ValidateResult[], resultList: ValidateResult[]): void => {
     for (let compatResult of compatList) {
 	compatResult.nameSrcCsv = compatResult.nameSrcList!.toString(); // sorted?
         if (resultList.every(result => compatResult.nameSrcCsv! != result.nameSrcCsv!)) {
@@ -870,7 +867,7 @@ let dumpIndexMap = function(indexMap: any): void {
 //   ncList:
 //   validateAll:
 ///
-let checkUniqueSources = (nameCountList: NCList, args: any): RvsResult => {
+let checkUniqueSources = (nameCountList: NameCount.List, args: any): ValidateSourcesResult => {
     let origNcList = nameCountList;
 
     // assert(nameCountList) && Array.isArray(nameCountList)
@@ -904,9 +901,9 @@ let checkUniqueSources = (nameCountList: NCList, args: any): RvsResult => {
 
     let resultMap;
     let buildResult: any;
-    let candidateResultList: Result[];
+    let candidateResultList: ValidateResult[];
     let anyFlag = false;
-    let resultList: Result[] = [];
+    let resultList: ValidateResult[] = [];
     let buildArgs: any = {
         ncList: nameCountList
     };
@@ -934,7 +931,7 @@ let checkUniqueSources = (nameCountList: NCList, args: any): RvsResult => {
                 }];
             } else {
                 // call validateSources recursively with compound clues
-                let vsResult = validateSources({
+                let vsResult: ValidateSourcesResult = validateSources({
                     sum:            buildResult.count,
                     nameList:       buildResult.compoundSrcNameList,
                     count:          buildResult.compoundSrcNameList.length,
@@ -949,7 +946,7 @@ let checkUniqueSources = (nameCountList: NCList, args: any): RvsResult => {
                 Debug(`  compoundSrcNameList: ${buildResult.compoundSrcNameList}`);
                 Debug(`  compoundNcList: ${buildResult.compoundNcList}`);
                 Debug(`  list.size: ${_.size(vsResult.list)}`);
-                vsResult.list.forEach((result: any) => {
+                vsResult.list?.forEach((result: any) => {
                     Debug(`   ncList:      ${result.ncList}`);
                     Debug(`   nameSrcList: ${result.nameSrcList}`);
                     Debug(`   -----------`);
@@ -957,7 +954,7 @@ let checkUniqueSources = (nameCountList: NCList, args: any): RvsResult => {
                 // we only sent compound clues to validateSources, so add the primary
                 // clues that were filtered out by build(), to make a complete list.
                 // also merge buildResults data into resultMap.
-                candidateResultList = vsResult.list.map((result: any) => Object({
+                candidateResultList = vsResult.list!.map(result => Object({
                     ncList:    _.concat(result.ncList, buildResult.primaryNcList),
 		    // TODO: I don't think i need to clone buildResult.resultmap here.
 		    // it's a new copy every iteration.
@@ -1006,14 +1003,14 @@ let checkUniqueSources = (nameCountList: NCList, args: any): RvsResult => {
 
 //
 //
-let getRestrictedPrimaryClueNumber = (nameSrc: NameCount): number => {
+let getRestrictedPrimaryClueNumber = (nameSrc: NameCount.Type): number => {
     let clue = ClueManager.getPrimaryClue(nameSrc);
     return clue.restrictToSameClueNumber ? clue.num : 0;
 };
 
 //
 //
-let allHaveSameClueNumber = (nameSrcList: NCList, clueNumber: number): boolean => {
+let allHaveSameClueNumber = (nameSrcList: NameCount.List, clueNumber: number): boolean => {
     return nameSrcList.every(nameSrc => ClueManager.getPrimaryClue(nameSrc).num === clueNumber);
 };
 
@@ -1029,11 +1026,11 @@ let getPrimaryClueSources = (name: string): number[] => {
 //
 //
 let NN = false;
-let mergeNcListResults = (ncListToMerge: NCList, args: any): RvsResult => {
+let mergeNcListResults = (ncListToMerge: NameCount.List, args: any): ValidateSourcesResult => {
     let ncStr = ncListToMerge.toString();
     //NN = true;
     if (NN) console.log(`merging: ${ncStr}`);
-    let resultList: Result[] = [];
+    let resultList: ValidateResult[] = [];
     if (0 && ncStr == 'word:1,word:2') {
 	console.log(`merging: ${ncStr}\n-----------------------------------`);
 	NN = true;
@@ -1052,8 +1049,8 @@ let mergeNcListResults = (ncListToMerge: NCList, args: any): RvsResult => {
 	listArray: arrayList,
 	max: 99999
     }).getCombinations().forEach((indexList: number[]) => {
-	let ncList: NCList = [];
-	let nameSrcList: NCList = [];
+	let ncList: NameCount.List = [];
+	let nameSrcList: NameCount.List = [];
         let resultMap = ResultMap.makeNew();
 	let restrictToClueNumber = 0;
 	if (NN) console.log ('****************************************************************');
@@ -1088,7 +1085,7 @@ let mergeNcListResults = (ncListToMerge: NCList, args: any): RvsResult => {
 	// TODO: uniqBy da debil
 	if (_.uniqBy(nameSrcList, NameCount.count).length === nameSrcList.length) {
 	    let nameSrcCsv = _.sortBy(nameSrcList, NameCount.count).toString();
-	    let result: Result = {
+	    let result: ValidateResult = {
 		ncList,
 		nameSrcList,
 		nameSrcCsv,
@@ -1104,7 +1101,7 @@ let mergeNcListResults = (ncListToMerge: NCList, args: any): RvsResult => {
 
 //
 //
-let test = (ncList: NCList, args: any): RvsResult => {
+let test = (ncList: NameCount.List, args: any): ValidateSourcesResult => {
     // can remove this.
     if (!ncList.every(nc => {
 	let ncResultMap = ClueManager.ncResultMapList[nc.count];
@@ -1132,7 +1129,7 @@ let test = (ncList: NCList, args: any): RvsResult => {
 //
 // TODO: ForName
 
-let rvsWorker = (args: any): RvsResult => {
+let rvsWorker = (args: any): ValidateSourcesResult => {
     Debug('++rvsWorker' +
           `, name: ${args.name}` +
           `, count: ${args.count}` +
@@ -1163,7 +1160,7 @@ let rvsWorker = (args: any): RvsResult => {
     // If only one name & count remain, we're done.
     // (name & count lists are equal length, just test one)
     if (args.nameList.length === 1) {
-	let result: RvsResult;
+	let result: ValidateSourcesResult;
 	if (args.fast && args.validateAll) { // NOTE getting rid of this validateAll check might fix --copy-from, --add, etc.
 	    if (NN) console.log('fast');
 	    result = mergeNcListResults(newNameCountList, args);
@@ -1212,7 +1209,7 @@ let rvsWorker = (args: any): RvsResult => {
 //  validateAll:
 //
 // TODO: ForNameList
-let recursiveValidateSources = (args: any): RvsResult => {
+let recursiveValidateSources = (args: any): ValidateSourcesResult => {
     if (xp) {
         Expect(args.clueNameList).is.an.Array().and.not.empty();
         Expect(args.clueCountList).is.an.Array().and.not.empty();
@@ -1226,7 +1223,7 @@ let recursiveValidateSources = (args: any): RvsResult => {
     let ncList = args.nameCountList || [];
     let nameIndex = 0;
     let clueName = args.clueNameList[nameIndex];
-    let resultList: Result[] = [];
+    let resultList: ValidateResult[] = [];
 
     // optimization: could have a map of count:boolean entries here
     // on a per-name basis (new map for each outer loop; once a
@@ -1268,7 +1265,7 @@ let recursiveValidateSources = (args: any): RvsResult => {
 
 //
 //
-let validateSources = (args: any): any => {
+let validateSources = (args: any): ValidateSourcesResult => {
     Debug('++validateSources' +
           `${indentNewline()}  nameList(${args.nameList.length}): ${args.nameList}` +
           `, sum(${args.sum})` +
@@ -1276,7 +1273,7 @@ let validateSources = (args: any): any => {
           `, validateAll: ${args.validateAll}`);
 
     let found = false;
-    let resultList: Result[] = [];
+    let resultList: ValidateResult[] = [];
     Peco.makeNew({
         sum:     args.sum,
         count:   args.count,
