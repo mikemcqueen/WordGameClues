@@ -1,6 +1,5 @@
 //
-//
-// clue-manager.js
+// clue-manager.ts
 //
 
 'use strict';

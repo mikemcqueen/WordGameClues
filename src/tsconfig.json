@@ -1,12 +1,18 @@
 {
     "compilerOptions": {
+	"target": "es2020",
+	"module": "commonjs",
+
 	"strict": true,
 	"alwaysStrict": true,
-        "noImplicitAny": false,
 	"esModuleInterop": true,
+
 	"noImplicitThis": false,
+        "noImplicitAny": false,
+        "noImplicitReturns": true,
 	
-	"target": "es2020",
-	"module": "commonjs"
-    }
+        "outDir": "dist"
+    },
+    "include": ["**/*.ts"],
+    "exclude": ["node_modules", ".vscode"]
 }

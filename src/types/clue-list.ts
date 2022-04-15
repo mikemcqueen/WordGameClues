@@ -15,11 +15,17 @@ const Stringify = require('stringify-object');
 
 import * as Clue from './clue';
 
+//
+// exported types
+
 type ClueList = Clue.Type[];
 export type Type = ClueList;
 
 type PrimaryClueList = Clue.PrimaryType[];
 export type PrimaryType = PrimaryClueList;
+
+//
+// exported, uh? , values?
 
 export const Schema = {
     "$id": "https://wordgameclues.com/schemas/clue-list",
@@ -33,6 +39,8 @@ export const PrimarySchema = {
     "items": { "$ref": "https://wordgameclues.com/schemas/primary-clue" }
 };
 
+//
+//
 
 const ajv = new Ajv({schemas: [Clue.Schema, Clue.PrimarySchema, Schema, PrimarySchema]});
 const validateList = ajv.compile(Schema);
