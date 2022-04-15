@@ -119,8 +119,8 @@ ClueManager.prototype.saveClueList = function (list, count, options?: SaveClueLi
 };
 
 
-const autoSource = (clueList: ClueList.Type) => {
-    let result: ClueList.Type = [];
+const autoSource = (clueList: ClueList.PrimaryType): any => {
+    let result: ClueList.PrimaryType = [];
     let source = 0;
     let clueNumber = 0;
     for (let clue of clueList) {
@@ -132,7 +132,7 @@ const autoSource = (clueList: ClueList.Type) => {
 	if (clueNumber) clue.num = clueNumber;
 	result.push(clue);
     }
-    Debug(`autoSource: ${source} primary clues, ${result.reduce((srcList: string[], clue: Clue.Type) => { srcList.push(clue.src); return srcList; }, [])}`);
+    Debug(`autoSource: ${source} primary clues, ${result.reduce((srcList: string[], clue: Clue.PrimaryType) => { srcList.push(clue.src||"undefined"); return srcList; }, [])}`);
     return [result, source];
 };
 
@@ -169,6 +169,7 @@ ClueManager.prototype.loadAllClues = function (args) {
 
     for (let count = 2; count <= this.maxClues; ++count) {
         let rejectClueList;
+        /*
         try {
             rejectClueList = ClueList.makeFrom({
                 filename : this.getRejectFilename(count)
@@ -177,6 +178,7 @@ ClueManager.prototype.loadAllClues = function (args) {
         catch (err) {
             console.log(`WARNING! reject file: ${this.getRejectFilename(count)}, ${err}`);
         }
+        */
         if (rejectClueList) {
             this.rejectListArray[count] = rejectClueList;
             this.addRejectCombos(rejectClueList, count);
@@ -196,7 +198,8 @@ interface LoadClueListOptions {
 
 ClueManager.prototype.loadClueList = function (count, options?: LoadClueListOptions) {
     return ClueList.makeFrom({
-        filename : this.getKnownFilename(count, options?.dir)
+        filename: this.getKnownFilename(count, options?.dir),
+        primary: count === 1
     });
 };
 

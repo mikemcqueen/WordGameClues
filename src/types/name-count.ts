@@ -67,7 +67,7 @@ export function count (nc: NameCount): number {
 
 //
 
-function makeListFromCsv (csv) {
+export function makeListFromCsv (csv) {
     return makeListFromNameList(csv.split(','));
 }
 
@@ -160,13 +160,13 @@ function listToJSON(ncList) {
 
 //
 
-function listContains(ncListContains, nc) {
+export function listContains(ncListContains, nc) {
     return _.find(ncListContains, ['name', nc.name, 'count', nc.count]);
 }
 
 //
     
-function listContainsAll(ncListContains, ncList) {
+export function listContainsAll(ncListContains, ncList) {
     return ncList.every(nc => {
         return _.find(ncListContains, ['name', nc.name, 'count', nc.count]);
     });

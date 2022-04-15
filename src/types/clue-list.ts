@@ -1,20 +1,44 @@
 //
-// clue-list.js
+// clue-list.ts
 //
 
 'use strict';
 
 //
 
-const _       = require('lodash');
-const Debug   = require('debug')('clue-list');
-const Expect  = require('should/as-function');
-const Fs      = require('fs-extra');
+const _         = require('lodash');
+const Ajv       = require("ajv")
+const Debug     = require('debug')('clue-list');
+const Expect    = require('should/as-function');
+const Fs        = require('fs-extra');
 const Stringify = require('stringify-object');
 
 import * as Clue from './clue';
 
-export type Type = Clue.Type[];
+type ClueList = Clue.Type[];
+export type Type = ClueList;
+
+type PrimaryClueList = Clue.PrimaryType[];
+export type PrimaryType = PrimaryClueList;
+
+export const Schema = {
+    "$id": "https://wordgameclues.com/schemas/clue-list",
+    "type": "array",
+    "items": { "$ref": "https://wordgameclues.com/schemas/clue" }
+};
+
+export const PrimarySchema = {
+    "$id": "https://wordgameclues.com/schemas/primary-clue-list",
+    "type": "array",
+    "items": { "$ref": "https://wordgameclues.com/schemas/primary-clue" }
+};
+
+
+const ajv = new Ajv({schemas: [Clue.Schema, Clue.PrimarySchema, Schema, PrimarySchema]});
+const validateList = ajv.compile(Schema);
+const validatePrimaryList = ajv.compile(PrimarySchema);
+//const serialize = ajv.compileSerializer(Clue.ListSchema);
+//const parse = ajv.compileParser(Clue.ListSchema);
 
 //
 //
@@ -33,7 +57,7 @@ function display () {
 //
 //
 
-function persist(filename) {
+function persist (filename: string) {
     if (Fs.exists(filename)) {
         throw new Error('file already exists: ' + filename);
     }
@@ -42,7 +66,7 @@ function persist(filename) {
 
 //
 
-function toJSON () {
+function toJSON (): string {
     let result = '[\n';
     let first = true;
 
@@ -53,7 +77,7 @@ function toJSON () {
         else { 
             first = false;
         }
-        result += "  " + clueToJSON(clue);
+        result += `  ${Clue.toJSON(clue)}`;
     });
     if (!first) {
         result += '\n';
@@ -65,47 +89,11 @@ function toJSON () {
 
 //
 
-function save (filename) {
+function save (filename: string) {
     Fs.writeFileSync(filename, this.toJSON(), { encoding: 'utf8' });
 }
 
 //
-
-function clueToJSON (clue) {
-    let s = '{';
-
-    if (clue.name) {
-        s += ` "name": "${clue.name}", ${format2(clue.name, 15)}`;
-    }
-    s += `"src": "${clue.src}"`;
-    if (clue.actual) {
-        s += `, ${format2(clue.src, 2)}"actual": "${clue.actual}"`;
-    }
-    if (clue.note) {
-        s+= ', "note" : "' + clue.note + '"';
-    }
-    if (clue.x) {
-        s+= ', "x" : ' + clue.x;
-    }
-    if (clue.ignore) {
-        s+= ', "ignore" : ' + clue.ignore;
-    }
-    else if (clue.skip) {
-        s+= ', "skip" : ' + clue.skip;
-    }
-    s += ' }';
-
-    return s;
-}
-
-//
-
-function format2 (text, span)
-{
-    let result = "";
-    for (let len = text.toString().length; len < span; ++len) { result += " "; }
-    return result;
-}
 
 //
 //
@@ -299,12 +287,27 @@ function assignMethods (list) {
 //
 // args: see makeFrom()
 
-function objectFrom (args) {
-    let clueList = [];
+function objectFrom (args: any) {
+    let clueList: ClueList = [];
 
     if (args.filename) {
         try {
-            clueList = JSON.parse(Fs.readFileSync(args.filename, 'utf8'));
+            const json = Fs.readFileSync(args.filename, 'utf8');
+            clueList = JSON.parse(json);
+            //console.error(`${args.filename}, primary=${args.primary}`);
+            const validate =  args.primary ? validatePrimaryList : validateList;
+            const valid = validate(clueList);
+            if (!valid) {
+                console.error(validate.errors);
+                throw new Error(`invalid json`);
+            }
+            /*
+            clueList = parse(json);
+            if (clueList === undefined) {
+                console.log(parse.message); // error message from the last parse call
+                console.log(` position(${parse.position})`); // error position in string
+            }
+            */
         }
         catch(e) {
 	    throw new Error(`${args.filename}, ${e}`);
@@ -323,8 +326,7 @@ function objectFrom (args) {
         });
         throw new Error('missing argument');
     }
-    
-    return Object(clueList);
+    return Object(clueList); // TODO:  why Object() ?
 }
 
 //
@@ -341,7 +343,7 @@ export function makeNew () {
 //   optional: optional flag suppresses file error
 //   array:    js array
 
-export function makeFrom (args) {
+export function makeFrom (args: any) {
     let object = objectFrom(args);
     return assignMethods(Object(object)).init();
 }
