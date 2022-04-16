@@ -28,8 +28,7 @@ function Stringify (val) {
 
 //
 let SCLA = 0;
-function showCountListArray (countListArray, text, hasNameList = false) {
-    
+function showCountListArray (param, countListArray, text, hasNameList = false) {
     for (const elem of countListArray) {
         const countList = hasNameList ? elem.countList : elem;
         let sources = '';
@@ -41,6 +40,11 @@ function showCountListArray (countListArray, text, hasNameList = false) {
             const count = countList[0];
             const srcMap = ClueManager.knownSourceMapArray[count];
             if (count === 1) {
+                const source = elem.nameList[0];
+                const clue = _.find(ClueManager.getClueList(count), { name: param, src: source });
+                console.log(clue);
+                const synCount = clue.synonym ? 1 : 0;
+                sources += `${source} syn(${synCount})`;
             } else {
                 sources += elem.nameList.map(source => {
                     const results = srcMap[source].results;
@@ -50,11 +54,8 @@ function showCountListArray (countListArray, text, hasNameList = false) {
                                 console.log(Stringify(result.resultMap.internal_map));
                             }
                         }
-                        //SCLA = 0;
+                        SCLA = 0;
                     }
-                    //if (results.length > 1) throw new Error('results > 1');
-                    //const ncStrList = results[0].ncList.toString();
-                    // TODO: use map here to get list of counts, 
                     const synCounts = results.map(result => ClueManager.recursiveGetCluePropertyCount(result.resultMap.internal_map, "synonym"));
                     source += ` syn(${synCounts})`;
                     return source;
@@ -166,11 +167,11 @@ function show (options) {
     }
     */
 
-    showCountListArray(result.rejects, 'REJECTED');
-    showCountListArray(result.invalid, 'INVALID');
-    showCountListArray(result.known, 'PRESENT as', true);
-    showCountListArray(result.clues, 'PRESENT as clue with source:', true);
-    showCountListArray(result.valid, 'VALID');
+    showCountListArray(null, result.rejects, 'REJECTED');
+    showCountListArray(null, result.invalid, 'INVALID');
+    showCountListArray(options.test, result.known, 'PRESENT as', true);
+    showCountListArray(options.test, result.clues, 'PRESENT as clue with source:', true);
+    showCountListArray(null, result.valid, 'VALID');
 
     const save = _.isUndefined(options.save) ? true : options.save;
     const count = ClueManager.addRemoveOrReject({
@@ -485,7 +486,6 @@ function readlines(filename) {
 //
 
 module.exports = {
-//    countListArray: showCountListArray,
     show,
     validate
 };
