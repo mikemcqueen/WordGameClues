@@ -11,12 +11,13 @@ module.exports = exports = new AltSources();
 //
 
 const _                     = require('lodash');
-const ClueManager           = require('./clue-manager');
+const ClueManager           = require('../dist/modules/clue-manager');
+const NameCount             = require('../dist/types/name-count');
+
 const ComboSearch           = require('./combo-search');
 const Debug                 = require('debug')('alt-sources');
 const Duration              = require('duration');
-const Expect         = require('should/as-function');
-const NameCount             = require('../types/name-count');
+const Expect                = require('should/as-function');
 const PrettyMs              = require('pretty-ms');
 
 //

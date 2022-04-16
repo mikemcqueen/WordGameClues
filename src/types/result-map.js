@@ -6,17 +6,20 @@
 
 //
 
-const _               = require('lodash');
-const Debug           = require('debug')('result-map');
-const Expect          = require('should/as-function');
-const NameCount       = require('./name-count');
-const Stringify  = require("stringify-object");
+const _           = require('lodash');
+
+const ClueManager = require('../dist/modules/clue-manager'); // hacky
+const NameCount   = require('../dist/types/name-count');
+
+const Debug       = require('debug')('result-map');
+const Expect      = require('should/as-function');
+const Stringify   = require("stringify-object");
 
 //
 
-const PRIMARY_KEY   = '__primary';
-const SOURCES_KEY   = '__sources';
-const FINAL_KEY     = '__final';
+const PRIMARY_KEY = '__primary';
+const SOURCES_KEY = '__sources';
+const FINAL_KEY   = '__final';
 
 //
 
@@ -24,6 +27,31 @@ let dumpy = false;
 let xp = false;
 
 //
+// key types:
+//{
+// A:
+//  'jack:3': {             // non-array object value type
+//    'card:2': {
+// B:
+//	'bird:1,red:1': [   // multiple primary NCs with array value type, split them
+//	  'bird:2,red:8'
+//	]
+//    },
+//    'face:1': {
+// C:
+//	'face:1': [	    // single primary NC with array value type, ignore
+//	  'face:10'
+//	]
+//    }
+//  }
+//}
+//
+//{
+// D:
+//  'face:1': [		     // single top-level primary NC with array value type, allow
+//    'face:10'
+//  ]
+//}
 
 function makeNew () {
     return new ResultMap(); //assignMethods(Object({}));
@@ -40,10 +68,26 @@ function ResultMap () {
     return obj;
 }
 
+//
 
 let toString = () => {
     return this.map().toString();
 };
+
+//
+// this is a dirty hack because it requires access to clue-manager.
+// but it seemed like the easiest thing to do at the time.
+// (probably better? faster? to wedge the logic into validator.
+let getCluePropertyCount = (property) => {
+    return ClueManager.recursiveGetCluePropertyCount(this.map(), property);
+};
+
+//
+
+let getSynonymCount = () => {
+    return this.getCluePropertyCount("synonym");
+};
+
 
 //
 //
@@ -67,7 +111,9 @@ function assignMethods (obj) {
     obj.ensureUniquePrimaryLists    = ensureUniquePrimaryLists;
     obj.dump                        = dump;
     obj.map                         = map;
-    obj.toString = toString;
+    obj.toString                    = toString;
+    obj.getCluePropertyCount        = getCluePropertyCount;
+    obj.getSynonymCount             = getSynonymCount;
 
     // private
 

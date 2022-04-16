@@ -102,19 +102,25 @@ function format2 (text: string, span: number) {
 
 export function toJSON (clue: Clue) {
     let s = '{';
-
     if (clue.name) {
         s += ` "name": "${clue.name}", ${format2(clue.name, 15)}`;
     }
     s += `"src": "${clue.src}"`;
+    // TODO: loop
     if (clue.note) {
         s+= `, "note": "${clue.note}"`;
     }
     if (clue.ignore) {
         s+= `, "ignore": ${clue.ignore}`;
     }
-    else if (clue.skip) {
+    if (clue.skip) {
         s+= `, "skip": ${clue.skip}`;
+    }
+    if (clue.synonym) {
+        s+= `, "synonym": ${clue.synonym}`;
+    }
+    if (clue.homonym) {
+        s+= `, "homonym": ${clue.homonym}`;
     }
     s += ' }';
 

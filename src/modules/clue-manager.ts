@@ -9,16 +9,17 @@
 module.exports = new ClueManager();
 
 import _ from 'lodash'; // import statement to signal that we are a "module"
-//const ClueList       = require('../types/clue-list');
-const Clues          = require('./clue-types');
+
+const Log            = require('../../modules/log')('clue-manager');
+const Peco           = require('../../modules/peco');
+const Clues          = require('../../modules/clue-types');
+
+const Validator      = require('./validator');
 const Debug          = require('debug')('clue-manager');
 const Duration       = require('duration');
 const Expect         = require('should/as-function');
-const Log            = require('./log')('clue-manager');
 const Path           = require('path');
-const Peco           = require('./peco');
 const PrettyMs       = require('pretty-ms');
-const Validator      = require('./validator');
 
 const Stringify2 = require('stringify-object');
 const stringify = require('javascript-stringify').stringify;
@@ -1193,14 +1194,19 @@ ClueManager.prototype.fast_getCountListArrays = function (nameCsv, options) {
     }, []);
 };
 
+// getCountListArrays
+// 
 // Probably not the most unique function name possible.
+//
+// Document what this does.
+//
 
-let invalidHash = {};
+let invalidHash = {}; // hax
 
-ClueManager.prototype.getCountListArrays = function (nameCsv, options) {
+ClueManager.prototype.getCountListArrays = function (nameCsv: string, options: any) {
     const validateAll = options.any ? false : true;
     const nameList = nameCsv.split(',').sort();
-    Debug(`getValidCountLists for ${nameList}`);
+    Debug(`++getCountListArrays(${nameList})`);
 
     /// TODO, check if existing sourcelist (knownSourceMapArray)
 
@@ -1221,47 +1227,40 @@ ClueManager.prototype.getCountListArrays = function (nameCsv, options) {
     let invalid: any[] = [];
 
     //console.log(`size ${resultList.length}`);
-    let totalElapsed = 0;
 
     for (const clueCountList of resultList) {
         const sum = clueCountList.reduce((a, b) => a + b);
 	const start = new Date();
-	let x = _.uniqBy(clueCountList, _.toNumber);
-        if (1) {
+	let uniqueCounts = _.uniqBy(clueCountList, _.toNumber);
+        if (0) {
 	    console.log(`${nameList}`);
-	    console.log(` sum: ${sum}, countList: ${clueCountList}, x: ${x}`);
+	    console.log(` sum: ${sum}, countList: ${clueCountList}, uniqueCounts: ${uniqueCounts}`);
         }
 	let ncListStr = clueCountList.map((count, index) => NameCount.makeNew(nameList[index], count)).toString();
-	let result: ValidateSourcesResult;
-	result = invalidHash[ncListStr];
+	let result: ValidateSourcesResult = invalidHash[ncListStr];
 	if (!result) {
             result = Validator.validateSources({
 		sum:         sum,
 		nameList:    nameList,
 		count:       nameList.length,
-		require:     x, //clueCountList
-                fast: options.fast,
+		require:     uniqueCounts,
+                fast:        options.fast,
 		validateAll
             });
 	}
-	const elapsed = new Duration(start, new Date()).milliseconds;
-	totalElapsed += elapsed;
 	invalidHash[ncListStr] = result;
 
-	//console.log(`validate: ${PrettyMs(elapsed)}, total: ${PrettyMs(totalElapsed)}`);
-        
         if (!result.success) {
 	    //console.log(`invalid: ${nameList}  CL ${clueCountList}  x ${x} sum ${sum}  validateAll=${validateAll}`);
             invalid.push(clueCountList);
         } else if (this.isRejectSource(nameList)) {
             rejects.push(clueCountList);
         } else if (nameList.length === 1) {
-	    //console.log('hereLen1');
             let name = nameList[0];
-            let nameSrcList = this.clueListArray[sum]
-                    .filter(clue => clue.name === name)
-                    .map(clue => clue.src);
-            if (nameSrcList.length > 0) {
+            let srcList = this.clueListArray[sum]
+                .filter(clue => clue.name === name)
+                .map(clue => clue.src);
+            if (srcList.length > 0) {
                 //let clueNameList = this.clueListArray[sum].map(clue => clue.name);
                 //if (clueNameList.includes(name)) {
                 //
@@ -1273,26 +1272,136 @@ ClueManager.prototype.getCountListArrays = function (nameCsv, options) {
                  }
                  });
                  */
-                clues.push({ countList: clueCountList, nameList: nameSrcList });
+                clues.push({ countList: clueCountList, nameList: srcList });
             }
         } else {
-            let any = this.knownSourceMapArray[sum][nameList];
+            let any = this.knownSourceMapArray[sum][nameList.toString()];
             if (any) {
                 known.push({ countList: clueCountList, nameList: any.clues.map(clue => clue.name) });
             } else {
                 valid.push(clueCountList);
             }
-	    //console.log('hereValid1');
             if (options.add || options.remove) {
-		//console.log('hereAdd1');
                 addRemoveSet.add(sum);
             }
         }
     }
-    //console.log('--getCountList');
     return { valid, known, rejects, invalid, clues, addRemoveSet };
 };
 
 ClueManager.prototype.getClueList = function (count) {
     return this.clueListArray[count];
 };
+
+// haxy
+interface ClueIndex extends NameCount.Type {
+    source: string;  // csv of names, or primary source #
+}
+
+interface ResultMapNode extends ClueIndex {
+    recurse: boolean;
+}
+
+ClueManager.prototype.getClue = function (clueIndex: ClueIndex): Clue.Type {
+    const list = this.getClueList(clueIndex.count);
+    let clue = _.find(list, { name: clueIndex.name, src: clueIndex.source });
+    if (!clue) {
+        console.error(`no clue for ${clueIndex.name}:${clueIndex.count} as ${clueIndex.source}(${typeof clueIndex.source})`);
+        clue = _.find(list, { name: clueIndex.name });
+        if (clue) console.error(`  found ${clueIndex.name} in ${clueIndex.count} as ${Stringify(clue)}`);
+        throw new Error(`no clue`);
+    }
+    return clue;
+};
+
+//
+// key types:
+//   if value is non-array object value-type
+// A.  if key has more than one subkey, source is sortedSubKeyNames
+//   - else key has only one subkey,
+//     - confirm subkey value type is array
+// B.    if key is non-primary, source is splitSubkeyNames
+// C.    else key is primary, sources is val[key][0].split(',')[1].toNumber();
+//   else array value-type
+// D.  array value type, add one node for each value[0].split(',') name:_.toNumber(src) entry, no subkeys
+
+//{
+// A.
+//  'jack:3': {             // non-array value type, more than one subkey, source is sortedSubKeyNames, recurse
+// B:
+//    'card:2': {           // non-array value type, one subkey, key is non-primary, source is splitSubkeyNames, recurse
+// D:
+//	'bird:1,red:1': [   // array value type: add one node for each value[0].split(',') name:_.toNumber(src) entry, no recurse
+//	  'bird:2,red:8'
+//	]
+//    },
+// C:                       
+//    'face:1': {           // non-array value type, one subkey, key is primary, sources is val[key][0].split(':')[1].toNumber(), no recurse
+//	'face:1': [
+//	  'face:10'
+//	]
+//    }
+//  }
+//}
+//
+//{
+// D:
+//  'face:1': [
+//    'face:10'
+//  ]
+//}
+//
+ClueManager.prototype.recursiveGetCluePropertyCount = function (resultMap: any, property: string, top: boolean = true): number {
+    const loggy = 0;
+    let nodes: ResultMapNode[] = _.flatMap(_.keys(resultMap), key => {
+        // TODO: BUG:: key may be a ncCsv
+	let val: any = resultMap[key];
+	if (_.isObject(val)) {
+	    // A,B,C: non-array object value type
+	    if (!_.isArray(val)) {
+                let nc: NameCount.Type = NameCount.makeNew(key);
+                let source: string|number;
+                let subkeys: string[] = _.keys(val);
+                let recurse = true;
+                if (subkeys.length > 1) {
+                    // A: more than one subkey
+                    source = NameCount.nameListFromStrList(subkeys).sort().toString();
+                } else { // only one subkey
+                    if (nc.count !== 1) {
+                        // B. non-primary key
+                        source = NameCount.nameListFromCsv(subkeys[0]).toString();
+                    } else {
+                        // C. primary key
+                        // first array element
+                        source = `${val[key][0].count}`;
+                        recurse = false;
+                    }
+                }
+                return { name: nc.name, count: nc.count, source, recurse };
+            } else {
+                // D: array value type 
+                // first array element
+                let csv = val[0].toString();
+                let list = NameCount.makeListFromCsv(csv);
+                //console.error(`csv: ${csv}, list: ${stringify(list)}`);
+                //return NameCount.makeListFromCsv(val[0].toString()).map(sourceNc => {
+                return list.map(sourceNc => {
+                    return { name: sourceNc.name, count: 1, source: `${sourceNc.count}`, recurse: false };
+                });
+            }
+	}
+	console.error(`Mystery key: ${key}`);
+        throw new Error(`Mystery key: ${key}`);
+    });
+    let total = 0;
+    for (let node of nodes) {
+        if (loggy) console.log(Stringify(node));
+        if (this.getClue(node)[property]) total += 1;
+        if (node.recurse) {
+	    let val = resultMap[NameCount.makeCanonicalName(node.name, node.count)];
+	    total += this.recursiveGetCluePropertyCount(val, false);
+        }
+    }
+    return total;
+};
+

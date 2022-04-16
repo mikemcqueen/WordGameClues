@@ -10,13 +10,15 @@ module.exports = exports = new ComboSearch();
 
 
 const _              = require('lodash');
-const ClueManager    = require('./clue-manager');
+
+const ClueManager    = require('../dist/modules/clue-manager');
+const Validator      = require('../dist/modules/validator');
+const ClueList       = require('../dist/types/clue-list');
+const NameCount      = require('../dist/types/name-count');
+
+const Peco           = require('./peco');
 const Debug          = require('debug')('combo-maker');
 const Duration       = require('duration');
-const Validator      = require('./validator');
-const ClueList       = require('../types/clue-list');
-const NameCount      = require('../types/name-count');
-const Peco           = require('./peco');
 
 //
 

@@ -23,7 +23,7 @@ export type List = NameCount[];
 //
 //
 
-export function makeNew (name: string, count: number, index?: number): NameCount {
+export function makeNew (name: string, count?: number, index?: number): NameCount {
     return new NameCount_t(name, count, index);
 }
 
@@ -67,33 +67,46 @@ export function count (nc: NameCount): number {
 
 //
 
-export function makeListFromCsv (csv) {
-    return makeListFromNameList(csv.split(','));
+export function makeListFromCsv (csv: string): NameCount[] {
+    return listFromStrList(csv.split(','));
 }
 
 //
 
-function makeListFromNameList (nameList: string[]): NameCount[] {
-    let ncList: NameCount[] = [];
-    nameList.forEach(name => {
+export function nameListFromCsv (csv: string): string[] {
+    return nameListFromStrList(csv.split(','));
+}
+
+//
+
+export function listFromStrList (strList: string[]): NameCount[] {
+    return strList.map(ncStr => new NameCount_t(ncStr));
+/*
+    let ncList: NameCount[] = nameList.map(nameOrNcStr => {
         ncList.push(new NameCount_t(name));
     });
     return ncList;
+*/
+}
+
+export function nameListFromStrList (strList: string[]): string[] {
+    return listFromStrList(strList).map(nc => nc.name);
 }
 
 //
 
-function makeCountList(ncList) {
-    return ncList.map(nc => count(nc));
-}
-
-//
-
-function makeNameList(ncList) {
+export function listToNameList (ncList: NameCount[]): string[] {
     return ncList.map(nc => nc.name);
 }
 
 //
+
+export function listToCountList (ncList: NameCount[]): number[] {
+    return ncList.map(nc => nc.count);
+}
+
+//
+
 
 export function makeCanonicalName (name: string, count: number, index?: number): string {
     let s = name;

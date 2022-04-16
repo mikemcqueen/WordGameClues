@@ -2,9 +2,10 @@
 
 'use strict';
 
-const ClueManager = require('./clue-manager');
+const ClueManager = require('../dist/modules/clue-manager');
+const ComboMaker  = require('../dist/modules/combo-maker');
+
 const Clues       = require('./clue-types');
-const ComboMaker  = require('./combo-maker');
 const Stringify   = require('stringify-object');
 
 let logging = false;

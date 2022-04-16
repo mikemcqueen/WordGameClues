@@ -5,23 +5,63 @@
 'use strict';
 
 const _           = require('lodash');
-const ClueManager = require('./clue-manager');
+
+const ClueManager = require('../dist/modules/clue-manager');
+const NameCount   = require('../dist/types/name-count');
+const Validator   = require('../dist/modules/validator');
+
 const Debug       = require('debug')('show-components');
 const Expect      = require('should/as-function');
-const NameCount   = require('../types/name-count');
 const Path        = require('path');
 const Peco        = require('./peco');
 const Readlines   = require('n-readlines');
-const Stringify   = require('stringify-object');
+const stringify   = require('javascript-stringify').stringify;
+const Stringify2   = require('stringify-object');
 const Timing      = require('debug')('timing');
-const Validator   = require('./validator');
+
+function Stringify (val) {
+    return stringify(val, (value, indent, stringify) => {
+	if (typeof value == 'function') return "function";
+	return stringify(value);
+    }, " ");
+}
 
 //
-
+let SCLA = 0;
 function showCountListArray (countListArray, text, hasNameList = false) {
+    
     for (const elem of countListArray) {
         const countList = hasNameList ? elem.countList : elem;
-        console.log(`${countList} ${text} ${hasNameList ? elem.nameList.join(' - ') : ''}`);
+        let sources = '';
+        if (hasNameList) {
+            if (countList.length !== 1) {
+                console.error(`odd countList: ${Stringify(countList)}`);
+                throw new Error('odd countList');
+            }
+            const count = countList[0];
+            const srcMap = ClueManager.knownSourceMapArray[count];
+            if (count === 1) {
+            } else {
+                sources += elem.nameList.map(source => {
+                    const results = srcMap[source].results;
+                    if (SCLA) {
+                        if (results.length > 1) {
+                            for (const result of results) {
+                                console.log(Stringify(result.resultMap.internal_map));
+                            }
+                        }
+                        //SCLA = 0;
+                    }
+                    //if (results.length > 1) throw new Error('results > 1');
+                    //const ncStrList = results[0].ncList.toString();
+                    // TODO: use map here to get list of counts, 
+                    const synCounts = results.map(result => ClueManager.recursiveGetCluePropertyCount(result.resultMap.internal_map, "synonym"));
+                    source += ` syn(${synCounts})`;
+                    return source;
+                }).join(' - ');
+            }
+        }
+        console.log(`${countList} ${text} ${sources}`);
     }
 }
 
@@ -405,7 +445,7 @@ function valid_combos(combo_list, options = {}) {
 }
 
 function all_combos(input_list, word_list) {
-    const combos = [];
+    const combos =u< [];
     for (const csvInput of input_list) {
 	const input = csvInput.split(',');
 	for (const word of word_list) {

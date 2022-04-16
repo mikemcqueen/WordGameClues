@@ -5,18 +5,21 @@
 'use strict';
 
 const _           = require('lodash');
+
+const ClueList    = require('../dist/types/clue-list');
+const ClueManager = require('../dist/modules/clue-manager');
+const ComboMaker  = require('../dist/modules/combo-maker');
+const NameCount   = require('../dist/types/name-count');
+const Validator   = require('../dist/modules/validator');
+
 const AltSources  = require('../modules/alt-sources');
-const ClueList    = require('../types/clue-list');
-const ClueManager = require('../modules/clue-manager');
 const Clues       = require('../modules/clue-types');
-const ComboMaker  = require('../modules/combo-maker');
 const ComboSearch = require('../modules/combo-search');
 const Components  = require('../modules/show-components');
 const Debug       = require('debug')('clues');
 const Duration    = require('duration');
 const Expect      = require('should/as-function');
 const Log         = require('../modules/log')('clues');
-const NameCount   = require('../types/name-count');
 const Note        = require('../modules/note');
 const Opt         = require('node-getopt');
 const Peco        = require('../modules/peco');
@@ -25,7 +28,6 @@ const Show        = require('../modules/show');
 const Stringify   = require('stringify-object');
 const ResultMap   = require('../types/result-map');
 const Timing      = require('debug')('timing');
-const Validator   = require('../modules/validator');
 
 // initialize command line options.  do this before logger.
 //

@@ -1,13 +1,15 @@
 'use strict';
 
 const _              = require('lodash');
-const ClueManager    = require('./clue-manager');
+
+const ClueManager    = require('../dist/modules/clue-manager');
+const Validator      = require('../dist/modules/validator');
+const NameCount      = require('../dist/types/name-count');
+
 const Clues          = require('./clue-types');
 const Debug          = require('debug')('show');
 const Expect         = require('should/as-function');
-const NameCount      = require('../types/name-count');
 const SearchResult   = require('./search-result');
-const Validator      = require('./validator');
 
 //
 

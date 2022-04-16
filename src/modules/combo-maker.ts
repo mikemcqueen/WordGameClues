@@ -5,19 +5,21 @@
 'use strict';
 
 import _ from 'lodash'; // import statement to signal that we are a "module"
-const BootstrapComboMaker = require('./bootstrap-combo-maker');
+
+const BootstrapComboMaker = require('../../modules/bootstrap-combo-maker');
+const ResultMap	  = require('../../types/result-map');
+const Peco	  = require('../../modules/peco');
+const Log	  = require('../../modules/log')('combo-maker');
+
 const ClueManager = require('./clue-manager');
 const ClueList	  = require('../types/clue-list');
 const Debug	  = require('debug')('combo-maker');
 const Duration	  = require('duration');
 const Expect	  = require('should/as-function');
-const Log	  = require('./log')('combo-maker');
 const NameCount	  = require('../types/name-count');
 const OS	  = require('os');
 const Parallel	  = require('paralleljs');
-const Peco	  = require('./peco');
 const PrettyMs	  = require('pretty-ms');
-const ResultMap	  = require('../types/result-map');
 const stringify	  = require('javascript-stringify').stringify;
 const Stringify2  = require('stringify-object');
 //const Validator	  = require('./validator');
@@ -263,7 +265,7 @@ let noCountsNotInOneAreInTwo = (ncList: NCList, xorCountArrayAndSize: CountArray
 // key types:
 //{
 // A:
-//  'jack:3': {
+//  'jack:3': {             // non-array object value type
 //    'card:2': {
 // B:
 //	'bird:1,red:1': [   // multiple primary NCs with array value type, split them
@@ -326,7 +328,7 @@ let recursiveAddSrcNcLists = (list: string[], resultMap: any, top = true): strin
     return list;
 };
 
-//
+// NOTE: resultMap here is a not actually a ResultMap, it's a resultMap.map().
 //
 function buildSrcNcList (resultMap: any): string[] {
     return recursiveAddSrcNcLists([], resultMap);

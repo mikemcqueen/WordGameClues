@@ -5,11 +5,13 @@
 'use strict';
 
 import _ from 'lodash'; // import statement to signal that we are a "module"
+
+const Peco        = require('../../modules/peco');
+const ResultMap   = require('../../types/result-map');
+
 const ClueManager = require('./clue-manager');
 const Debug       = require('debug')('validator');
 const Expect      = require('should/as-function');
-const Peco        = require('./peco');
-const ResultMap   = require('../types/result-map');
 const stringify	  = require('javascript-stringify').stringify;
 const Stringify2  = require('stringify-object');
 const Timing      = require('debug')('timing');
@@ -19,7 +21,7 @@ import * as NameCount from '../types/name-count';
 
 function Stringify(val: any) {
     return stringify(val, (value: any, indent: any, stringify: any) => {
-	if (typeof value == 'function') return "function";
+	if (typeof value === 'function') return "function";
 	return stringify(value);
     }, " ");
 }
@@ -48,11 +50,14 @@ let SOURCES_KEY      = '__sources';
 
 type CountArray = Int32Array;
 
-export interface ValidateResult {
+interface CandidateResult {
     ncList: NameCount.List;
-    nameSrcList?: NameCount.List;
-    nameSrcCsv?: string;
     resultMap: any;
+}
+
+export interface ValidateResult extends CandidateResult {
+    nameSrcList: NameCount.List;
+    nameSrcCsv?: string;
 //    primarySrcArray?: CountArray;
 }
 
@@ -158,24 +163,30 @@ let uniqueResult = (success: boolean, list: any = undefined): ValidateSourcesRes
     };
 };
 
+interface CompatibleResultArgs {
+    origNcList: NameCount.List,
+    ncList: NameCount.List,
+    nameSrcList: NameCount.List,
+    pendingMap: any,
+    validateAll: boolean
+}
+
 //
+// args:
+//   origNcList:
+//   ncList:
+//   nameSrcList:
+//   pendingMap:
+//   validateAll:
 //
-//  origNcList:
-//  ncList:
-//  nameSrcList:
-//  pendingMap:
-//  validateAll:
-//
-let getCompatibleResults = (args: any): ValidateResult[] => {
+let getCompatibleResults = (args: CompatibleResultArgs): ValidateResult[] => {
     // no duplicates, and all clues are primary, success!
     Debug('++allUniquePrimary' +
           `${indentNewline()}  origNcList:  ${args.origNcList}` +
           `${indentNewline()}  ncList:      ${args.ncList}` +
           `${indentNewline()}  nameSrcList: ${args.nameSrcList}`);
-    if (xp) {
-        Expect(args.origNcList).is.an.Array().and.not.empty();
-        Expect(args.ncList).is.an.Array().and.not.empty();
-        Expect(args.nameSrcList).is.an.Array().and.not.empty();
+    if (_.isEmpty(args.origNcList) || _.isEmpty(args.ncList) || _.isEmpty(args.nameSrcList)) {
+        throw new Error('Empty list');
     }
 
     let logit = false;
@@ -185,9 +196,13 @@ let getCompatibleResults = (args: any): ValidateResult[] => {
         Debug(`  ${args.ncList}`);
         Debug(`  -as- ${args.nameSrcList}`);
     }
-    addCompatibleResult(resultList, args.nameSrcList, args);
+    resultList.push(buildValidateResult(args.nameSrcList, args));
+    // TODO:
+    // I don't think the "isEmpty" condition is necessary or can ever be met
+    // in which case, we can call cycle.every (or forEach, for of) below
+    if (_.isEmpty(resultList)) throw new Error("empty resultList I didn't think was possible");
     if (_.isEmpty(resultList) || args.validateAll) {
-        cyclePrimaryClueSources({ ncList: args.ncList }).some((nameSrcList: NameCount.List) => {
+        cyclePrimaryClueSources(args.ncList).some((nameSrcList: NameCount.List) => {
             // check if nameSrcList is already in result list
             if (hasNameSrcList(resultList, nameSrcList)) {
                 if (logit) {
@@ -200,7 +215,7 @@ let getCompatibleResults = (args: any): ValidateResult[] => {
                 Debug(`  ${args.ncList}`);
                 Debug(`  -as- ${nameSrcList}`);
             }
-            addCompatibleResult(resultList, nameSrcList, args);
+            resultList.push(buildValidateResult(args.nameSrcList, args));
             return !args.validateAll; // some.exit if !validateAll, else some.continue
         });
     }
@@ -208,14 +223,13 @@ let getCompatibleResults = (args: any): ValidateResult[] => {
 };
 
 //
-let addCompatibleResult = (resultList: ValidateResult[], nameSrcList: NameCount.List, args: any): void => {
-    if (xp) {
-        Expect(resultList).is.an.Array();
-        Expect(nameSrcList).is.an.Array();
-        Expect(args.origNcList).is.an.Array();
-        Expect(args.ncList).is.an.Array();
-    }
-    resultList.push({
+// args:
+//   origNcList
+//   ncList
+//   pendingMap
+
+let buildValidateResult = (nameSrcList: NameCount.List, args: CompatibleResultArgs): ValidateResult => {
+    return {
         ncList: args.ncList,
         nameSrcList,
         resultMap: _.cloneDeep(args.pendingMap).addResult({
@@ -223,7 +237,7 @@ let addCompatibleResult = (resultList: ValidateResult[], nameSrcList: NameCount.
             primaryNcList: args.ncList,
             nameSrcList
         }).ensureUniquePrimaryLists()
-    });
+    };
 };
 
 // Simplified version of checkUniqueSources, for all-primary clues.
@@ -233,16 +247,15 @@ let addCompatibleResult = (resultList: ValidateResult[], nameSrcList: NameCount.
 //  ncList:
 //  exclueSrcList:
 //
-let cyclePrimaryClueSources = (args: any): NameCount.List[] => {
-    if (xp) Expect(args.ncList).is.an.Array().and.not.empty();
-
+let cyclePrimaryClueSources = (ncList: NameCount.List): NameCount.List[] => {
     Debug(`++cyclePrimaryClueSources`);
+    if (_.isEmpty(ncList)) throw new Error ('Empty ncList');
 
     // must copy the NameCount objects within the list
-    let localNcList = _.cloneDeep(args.ncList);
+    let localNcList = _.cloneDeep(ncList);
     let resultList: NameCount.List[] = [];
     let buildArgs: any = {
-        ncList:     args.ncList,   // always pass same unmodified ncList
+        ncList,   // always pass same unmodified ncList
         allPrimary: true
     };
     let buildResult: any;
@@ -262,7 +275,7 @@ let cyclePrimaryClueSources = (args: any): NameCount.List[] => {
         let srcMap = {};
         let findResult = findDuplicatePrimarySource({
             ncList: localNcList,
-            srcMap: srcMap
+            srcMap
         });
         if (findResult.duplicateSrc) {
             continue;
@@ -273,7 +286,7 @@ let cyclePrimaryClueSources = (args: any): NameCount.List[] => {
         Debug(`[srcMap] primary keys: ${nameSrcList}`);
         // all the source clues we just validated are primary clues
         Debug(`cycle: adding result: ` +
-            `${indentNewline()} ${args.ncList} = ` +
+            `${indentNewline()} ${ncList} = ` +
             `${indentNewline()}   ${nameSrcList}`);
         resultList.push(nameSrcList);
     } while (incrementIndexMap(buildResult.indexMap));
@@ -318,7 +331,7 @@ let findDuplicatePrimaryClue = (args: any): any => {
           `, srcMap.size: ${_.size(findResult.srcMap)}`);
 
     if (findResult.allPrimary && _.isUndefined(duplicateSrc) &&
-        (_.size(findResult.srcMap) != _.size(args.ncList)))
+        (_.size(findResult.srcMap) !== _.size(args.ncList)))
     {
         Debug(`ncList: ${args.ncList}`);
         Debug(`srcMap.keys: ${_.keys(findResult.srcMap)}`);
@@ -601,7 +614,7 @@ let buildSrcNameList = (args: any): any => {
         if (xp) Expect(resultMap.map()[nc]).is.undefined();
 
         // if nc is a primary clue
-        if (nc.count == 1) {
+        if (nc.count === 1) {
             // add map entry for list of primary name:sources
             if (!_.has(resultMap.map(), PRIMARY_KEY)) {
                 resultMap.map()[PRIMARY_KEY] = [];
@@ -634,7 +647,7 @@ let buildSrcNameList = (args: any): any => {
         compoundNcList.push(nc);
     }, this);
 
-    if (args.allPrimary && (primarySrcNameList.length != args.ncList.length)) {
+    if (args.allPrimary && (primarySrcNameList.length !== args.ncList.length)) {
         throw new Error(`something went wrong, primary: ${primarySrcNameList.length}` +
                         `, ncList: ${args.ncList.length}`);
     }
@@ -820,12 +833,17 @@ let isCompatible = (compatResult: ValidateResult, result: ValidateResult): boole
 }
 */
 
+// TODO:
+// ugly complexity here. list probably never grows too big? local hash coupled with a
+// ValidateResult[] would make this faster.  not sure it matters though.
 //
+// as far as I can tell this is _.xorBy(list1, list2, nameSrcCsv!) ?
 //
+// also , return list, push(...result) at call site
 let addAllCompatible = (compatList: ValidateResult[], resultList: ValidateResult[]): void => {
     for (let compatResult of compatList) {
 	compatResult.nameSrcCsv = compatResult.nameSrcList!.toString(); // sorted?
-        if (resultList.every(result => compatResult.nameSrcCsv! != result.nameSrcCsv!)) {
+        if (resultList.every(result => compatResult.nameSrcCsv! !== result.nameSrcCsv!)) {
 	    //compatResult.primarySrcArray = getCountArray(compatResult.nameSrcList!);
 	    resultList.push(compatResult);
         }
@@ -901,7 +919,7 @@ let checkUniqueSources = (nameCountList: NameCount.List, args: any): ValidateSou
 
     let resultMap;
     let buildResult: any;
-    let candidateResultList: ValidateResult[];
+    let candidateResultList: CandidateResult[];
     let anyFlag = false;
     let resultList: ValidateResult[] = [];
     let buildArgs: any = {
@@ -1018,7 +1036,7 @@ let allHaveSameClueNumber = (nameSrcList: NameCount.List, clueNumber: number): b
 //
 let getPrimaryClueSources = (name: string): number[] => {
     let clueList: { name: string, src: string }[] = ClueManager.clueListArray[1];
-    let sources: number[] = clueList.filter(clue => clue.name == name).map(clue => _.toNumber(clue.src));
+    let sources: number[] = clueList.filter(clue => clue.name === name).map(clue => _.toNumber(clue.src));
     if (_.isEmpty(sources)) throw new Error(`can't find: ${name}`);
     return sources;
 }
@@ -1031,7 +1049,7 @@ let mergeNcListResults = (ncListToMerge: NameCount.List, args: any): ValidateSou
     //NN = true;
     if (NN) console.log(`merging: ${ncStr}`);
     let resultList: ValidateResult[] = [];
-    if (0 && ncStr == 'word:1,word:2') {
+    if (0 && ncStr === 'word:1,word:2') {
 	console.log(`merging: ${ncStr}\n-----------------------------------`);
 	NN = true;
     }
