@@ -26,40 +26,60 @@ function Stringify (val) {
     }, " ");
 }
 
+function getSourceClues (source, countList, nameList) {
+    source = source.split(',').sort().toString();
+    const count = countList.reduce((sum, count) => sum + count, 0);
+    // for each name in namelist, get propertyCount(s) of knownSrcMap[count][param]
+    const srcMap = ClueManager.knownSourceMapArray[count];
+    const results = srcMap[source].results;
+    console.error(`results ${Stringify(results)} len(${results.length})`);
+    const synCounts = results.map(result => ClueManager.recursiveGetCluePropertyCount(result.resultMap.internal_map, "synonym"));
+    return `${nameList.join(' - ')}, syn(${synCounts})`;
+}
+
+let GCS = 0;
+function getClueSources (name, countList, nameList) {
+    let sources = '';
+    const count = countList[0];
+    const srcMap = ClueManager.knownSourceMapArray[count];
+    if (count === 1) {
+        const source = nameList[0];
+        const clue = _.find(ClueManager.getClueList(count), { name, src: source });
+        //console.log(clue);
+        const synCount = clue.synonym ? 1 : 0;
+        sources += `${source} syn(${synCount})`;
+    } else {
+        sources += nameList.map(source => {
+            const results = srcMap[source].results;
+            if (GCS) {
+                if (results.length > 1) {
+                    for (const result of results) {
+                        console.log(Stringify(result.resultMap.internal_map));
+                    }
+                }
+                GCS = 0;
+            }
+            const synCounts = results.map(result => ClueManager.recursiveGetCluePropertyCount(result.resultMap.internal_map, "synonym"));
+            source += ` syn(${synCounts})`;
+            return source;
+        }).join(' - ');
+    }
+    return sources;
+}
+
 //
-let SCLA = 0;
 function showCountListArray (param, countListArray, text, hasNameList = false) {
     for (const elem of countListArray) {
         const countList = hasNameList ? elem.countList : elem;
         let sources = '';
-        if (hasNameList) {
-            if (countList.length !== 1) {
-                console.error(`odd countList: ${Stringify(countList)}`);
-                throw new Error('odd countList');
+        if (param) {
+            if (countList.length > 1) {
+                // -t xxx,yyy[,zzz] (more than 1 word)
+                sources += getSourceClues(param, countList, elem.nameList);
             }
-            const count = countList[0];
-            const srcMap = ClueManager.knownSourceMapArray[count];
-            if (count === 1) {
-                const source = elem.nameList[0];
-                const clue = _.find(ClueManager.getClueList(count), { name: param, src: source });
-                console.log(clue);
-                const synCount = clue.synonym ? 1 : 0;
-                sources += `${source} syn(${synCount})`;
-            } else {
-                sources += elem.nameList.map(source => {
-                    const results = srcMap[source].results;
-                    if (SCLA) {
-                        if (results.length > 1) {
-                            for (const result of results) {
-                                console.log(Stringify(result.resultMap.internal_map));
-                            }
-                        }
-                        SCLA = 0;
-                    }
-                    const synCounts = results.map(result => ClueManager.recursiveGetCluePropertyCount(result.resultMap.internal_map, "synonym"));
-                    source += ` syn(${synCounts})`;
-                    return source;
-                }).join(' - ');
+            else {
+                // -t xxx (1 word only)
+                sources += getClueSources(param, countList, elem.nameList);
             }
         }
         console.log(`${countList} ${text} ${sources}`);

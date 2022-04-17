@@ -1396,10 +1396,16 @@ ClueManager.prototype.recursiveGetCluePropertyCount = function (resultMap: any, 
     let total = 0;
     for (let node of nodes) {
         if (loggy) console.log(Stringify(node));
-        if (this.getClue(node)[property]) total += 1;
+        const clue = this.getClue(node)
+        if (clue[property]) {
+            total += 1;
+            if (loggy) console.log(`^^${property}! ${total}`);
+        } else {
+            if (loggy) console.log(`${Clue.toJSON(clue)}, clue[${property}]=${clue[property]}`);
+        }
         if (node.recurse) {
 	    let val = resultMap[NameCount.makeCanonicalName(node.name, node.count)];
-	    total += this.recursiveGetCluePropertyCount(val, false);
+	    total += this.recursiveGetCluePropertyCount(val, property, false);
         }
     }
     return total;
