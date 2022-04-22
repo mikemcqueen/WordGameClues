@@ -118,22 +118,50 @@ ClueManager.prototype.saveClueList = function (list, count, options?: SaveClueLi
     list.save(this.getKnownFilename(count, options?.dir));
 };
 
+const initCluePropertyCounts = (clueList: ClueList.PrimaryType, ignoreList: ClueList.PrimaryType) : void => {
+    // forEach clue
+    //   if clue.source
+    //     forEach source name
+    //       lookup source in ignoreList._.find( { name, src: source })
+    //       for each property
+    //         sourceClue.property clue[property] = true
+    for (const clue of clueList) {
+        Clue.initPropertyCounts(clue);
+        const sources = clue.source?.split(',') || [];
+        sources.filter(source => source[0] !== '(').forEach(source => {
+            Clue.addAllPropertyCounts(clue, _.find(ignoreList, {name: source, src: source})!);
+        });
+    }
+};
 
-const autoSource = (clueList: ClueList.PrimaryType): any => {
-    let result: ClueList.PrimaryType = [];
+const autoSource = (clueList: ClueList.PrimaryType): any[] => {
     let source = 0;
     let clueNumber = 0;
+    let ignoredClues: ClueList.PrimaryType = [];
+    let actualClues: ClueList.PrimaryType = []
+
     for (let clue of clueList) {
 	// clue.num check must happen before clue.ignore check
-	if (clue.num) clueNumber = _.toNumber(clue.num);
-	if (clue.ignore) continue;
+	if (clue.num) clueNumber = Number(clue.num);
+	if (clue.ignore) {
+            // this is a hack for property count propagation from dependent to parent ignored clues
+            if (clue.name) {
+                clue.src = clue.name; 
+                ignoredClues.push(clue);
+            }
+            continue;
+        }
 	if (clue.src != 'same') source += 1;
 	clue.src = `${source}`;
-	if (clueNumber) clue.num = clueNumber;
-	result.push(clue);
+	clue.num = clueNumber;
+        actualClues.push(clue);
     }
-    Debug(`autoSource: ${source} primary clues, ${result.reduce((srcList: string[], clue: Clue.PrimaryType) => { srcList.push(clue.src||"undefined"); return srcList; }, [])}`);
-    return [result, source];
+    initCluePropertyCounts(ignoredClues, ignoredClues);
+    initCluePropertyCounts(actualClues, ignoredClues);
+    // propagateIgnoredClueProperties(actualClues, ignoredClues, properties);
+    
+    Debug(`autoSource: ${source} primary clues, ${actualClues.reduce((srcList: string[], clue: Clue.PrimaryType) => { srcList.push(clue.src||"undefined"); return srcList; }, [])}`);
+    return [actualClues, source];
 };
 
 

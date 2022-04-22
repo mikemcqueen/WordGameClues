@@ -26,6 +26,8 @@ function Stringify (val) {
     }, " ");
 }
 
+//
+
 function getSourceClues (source, countList, nameList) {
     source = source.split(',').sort().toString();
     const count = countList.reduce((sum, count) => sum + count, 0);
@@ -36,6 +38,8 @@ function getSourceClues (source, countList, nameList) {
     const synCounts = results.map(result => ClueManager.recursiveGetCluePropertyCount(result.resultMap.internal_map, "synonym"));
     return `${nameList.join(' - ')}, syn(${synCounts})`;
 }
+
+//
 
 let GCS = 0;
 function getClueSources (name, countList, nameList) {
