@@ -137,7 +137,7 @@ const initCluePropertyCounts = (clueList: ClueList.PrimaryType, ignoreList: Clue
 const autoSource = (clueList: ClueList.PrimaryType): any[] => {
     let source = 0;
     let clueNumber = 0;
-    let ignoredClues: ClueList.PrimaryType = [];
+    let ignoredClues: ClueList.PrimaryType = [];;
     let actualClues: ClueList.PrimaryType = []
 
     for (let clue of clueList) {
@@ -156,9 +156,17 @@ const autoSource = (clueList: ClueList.PrimaryType): any[] => {
 	clue.num = clueNumber;
         actualClues.push(clue);
     }
+    let loggy = false;
     initCluePropertyCounts(ignoredClues, ignoredClues);
+    if (loggy) {
+        console.log('Ignored:');
+        ClueList.display(ignoredClues, { synonym: true });
+    }
     initCluePropertyCounts(actualClues, ignoredClues);
-    // propagateIgnoredClueProperties(actualClues, ignoredClues, properties);
+    if (loggy) {
+        console.log('Actual:');
+        ClueList.display(actualClues, { synonym: true });
+    }
     
     Debug(`autoSource: ${source} primary clues, ${actualClues.reduce((srcList: string[], clue: Clue.PrimaryType) => { srcList.push(clue.src||"undefined"); return srcList; }, [])}`);
     return [actualClues, source];
@@ -1038,11 +1046,16 @@ ClueManager.prototype.addRemoveOrReject = function (args: any, nameList: string[
 };
 
 let isAnySubListEmpty = (listOfLists) => {
-    console.log('listOfLists:');
-    console.log(listOfLists);
+    let loggy = false;
+    if (loggy) {
+        console.log('listOfLists:');
+        console.log(listOfLists);
+    }
     for (const list of listOfLists) {
-	console.log('  list:');
-	console.log(list);
+        if (loggy) {
+	    console.log('  list:');
+	    console.log(list);
+        }
 	if (_.isEmpty(list)) return true;
     }
     return false;
@@ -1379,7 +1392,7 @@ ClueManager.prototype.getClue = function (clueIndex: ClueIndex): Clue.Type {
 //  ]
 //}
 //
-ClueManager.prototype.recursiveGetCluePropertyCount = function (resultMap: any, property: string, top: boolean = true): number {
+ClueManager.prototype.recursiveGetCluePropertyCount = function (resultMap: any, property: Clue.CountedPropertyName, top: boolean = true): Clue.TotalPrimary {
     const loggy = 0;
     let nodes: ResultMapNode[] = _.flatMap(_.keys(resultMap), key => {
         // TODO: BUG:: key may be a ncCsv
@@ -1412,7 +1425,6 @@ ClueManager.prototype.recursiveGetCluePropertyCount = function (resultMap: any, 
                 let csv = val[0].toString();
                 let list = NameCount.makeListFromCsv(csv);
                 //console.error(`csv: ${csv}, list: ${stringify(list)}`);
-                //return NameCount.makeListFromCsv(val[0].toString()).map(sourceNc => {
                 return list.map(sourceNc => {
                     return { name: sourceNc.name, count: 1, source: `${sourceNc.count}`, recurse: false };
                 });
@@ -1421,21 +1433,45 @@ ClueManager.prototype.recursiveGetCluePropertyCount = function (resultMap: any, 
 	console.error(`Mystery key: ${key}`);
         throw new Error(`Mystery key: ${key}`);
     });
-    let total = 0;
+    let totalPrimary: Clue.TotalPrimary = { total: 0, primary: 0 };
     for (let node of nodes) {
         if (loggy) console.log(Stringify(node));
         const clue = this.getClue(node)
-        if (clue[property]) {
-            total += 1;
-            if (loggy) console.log(`^^${property}! ${total}`);
-        } else {
-            if (loggy) console.log(`${Clue.toJSON(clue)}, clue[${property}]=${clue[property]}`);
+        // TODO: there is a subtle difference here between "adding two PropertyCount.Type together"
+        // and "adding the actual property(s) of the clue" (e.g. .synonym, !.source)
+        // I could do:
+        //   Clue.PropertyCount.add
+        // and that would mirror the code below - i'd have to either do the if() check here or
+        // accept |undefined.
+        // But what I really want to do is just pass the clue, and have the function itself check
+        // if clue.propertyCounts is valid. What do I name such a function to differentiate it from
+        // addFromClue()
+        // I think that the answer is addFromClue() should be here.
+        // the other method is just add(PropertyCount.Type, PropertyCount.Type) which takes a PropertyCount.Type
+        // then I have a Clue.PropertyCount.init(clue: Clue, propertyName: ): PropertyCount.Type
+        // and Clue.PropertyCount.empty() : PropertyCount.Type
+        if (clue.propertyCounts) {
+            Clue.addTotalPrimary(totalPrimary, clue.propertyCounts[property]);
         }
+        //Clue.addTotalPrimary(totalPrimary, Clue.initTotalPrimary(clue, property));
+        //Clue.PropertyCount.add(totalPrimary, Clue.PropertyCount.init(clue, property));
+        // TODO: remove once verified
+        //totalPrimary.total += 1;
+        //if (!clue["source"]) totalPrimary.primary += 1;
+
+        if (loggy) {
+            if (clue[property]) {
+                console.log(`^^${property}! total${totalPrimary.total} primary(${totalPrimary.primary}`);
+            } else {
+                console.log(`${Clue.toJSON(clue)}, clue[${property}]=${clue[property]}`);
+            }
+        }
+
         if (node.recurse) {
 	    let val = resultMap[NameCount.makeCanonicalName(node.name, node.count)];
-	    total += this.recursiveGetCluePropertyCount(val, property, false);
+            Clue.addTotalPrimary(totalPrimary, this.recursiveGetCluePropertyCount(val, property, false));
         }
     }
-    return total;
+    return totalPrimary;
 };
 

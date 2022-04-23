@@ -4,16 +4,20 @@
 
 'use strict';
 
-import _ from 'lodash';
+import _ from 'lodash'; // TODO: need a smaller dummy import
 
-type CountedPropertyName = "synonym" | "homonym";
+// TODO: namespace CountedProperty { Name/Enum/CountMap }
+
+export type CountedPropertyName = "synonym" | "homonym";
 
 enum CountedPropertyEnum {
     Synonym = "synonym",
     Homonym = "homonym"
 }
 
-interface TotalPrimary {
+// TODO: namespace Count; export type Type 
+
+export interface TotalPrimary {
     total: number;
     primary: number;
 }
@@ -105,15 +109,36 @@ export const PrimarySchema = {
     "additionalProperties": false
 };
 
+namespace CountedProperty {
+}
+
+export namespace PropertyCount {
+    export type Type = TotalPrimary;
+
+    export function init (clue: PrimaryClue, propertyName: CountedPropertyName): PropertyCount.Type {
+        const hasProperty = Boolean(clue[propertyName]);
+        return {
+            total: hasProperty ? 1 : 0,
+            primary: hasProperty && !clue["sources"] ? 1 : 0
+        }
+    }
+
+    export function add (to: PropertyCount.Type, from: PropertyCount.Type): void {
+        to.total += from.total;
+        to.primary += from.primary;
+    };
+}
+
 function initTotalPrimary(clue: PrimaryClue, propertyName: CountedPropertyName): TotalPrimary {
     //console.error(`init: ${clue.name}`);
+    const hasProperty = Boolean(clue[propertyName]);
     return {
-        total: clue[propertyName] ? 1 : 0,
-        primary: clue["sources"] ? 0 : 1
+        total: hasProperty ? 1 : 0,
+        primary: hasProperty && !clue["sources"] ? 1 : 0
     }
 }
 
-function addTotalPrimary(toTotalPrimary: TotalPrimary, fromTotalPrimary: TotalPrimary): void {
+export function addTotalPrimary(toTotalPrimary: TotalPrimary, fromTotalPrimary: TotalPrimary): void {
     toTotalPrimary.total += fromTotalPrimary.total;
     toTotalPrimary.primary += fromTotalPrimary.primary;
 }
@@ -152,7 +177,7 @@ function format2 (text: string, span: number) {
 
 //
 
-export function toJSON (clue: Clue): string {
+export function toJSON (clue: Clue, options: any = {}): string {
     let s = '{';
     if (clue.name) {
         s += ` "name": "${clue.name}", ${format2(clue.name, 15)}`;
@@ -160,22 +185,24 @@ export function toJSON (clue: Clue): string {
     s += `"src": "${clue.src}"`;
     // TODO: loop
     if (clue.note) {
-        s+= `, "note": "${clue.note}"`;
+        s += `, "note": "${clue.note}"`;
     }
     if (clue.ignore) {
-        s+= `, "ignore": ${clue.ignore}`;
+        s += `, "ignore": ${clue.ignore}`;
     }
     if (clue.skip) {
-        s+= `, "skip": ${clue.skip}`;
+        s += `, "skip": ${clue.skip}`;
     }
     if (clue.synonym) {
-        s+= `, "synonym": ${clue.synonym}`;
+        s += `, "synonym": ${clue.synonym}`;
     }
     if (clue.homonym) {
-        s+= `, "homonym": ${clue.homonym}`;
+        s += `, "homonym": ${clue.homonym}`;
+    }
+    if (options.synonym) {
+        s += `, "syn total": ${clue.propertyCounts!.synonym.total}, "syn primary": ${clue.propertyCounts!.synonym.primary}`;
     }
     s += ' }';
 
     return s;
 }
-

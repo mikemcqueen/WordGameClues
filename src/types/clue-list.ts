@@ -6,7 +6,7 @@
 
 //
 
-const _         = require('lodash');
+import _ from 'lodash';
 const Ajv       = require("ajv")
 const Debug     = require('debug')('clue-list');
 const Expect    = require('should/as-function');
@@ -51,7 +51,9 @@ const validatePrimaryList = ajv.compile(PrimarySchema);
 //
 //
 
-function display () {
+export function display (clueList: PrimaryClueList, options: any = {}): void {
+    clueList.forEach(clue => console.log(Clue.toJSON(clue! as Clue.Type, options)));
+    /*
     let arr: string[] = [];
     
     this.forEach(function(clue) {
@@ -60,6 +62,7 @@ function display () {
     console.log(arr.toString());
     
     return this;
+    */
 }
 
 //
@@ -113,7 +116,7 @@ function init () {
 //
 //
 
-function makeKey () {
+export function makeKey (): string {
     return this.map(clue => clue.name).sort().toString();
 }
 
@@ -128,13 +131,12 @@ function sortSources () {
 
 //
 
-function getSameSrcList (startIndex, options: any = {}) {
-    Expect(startIndex).is.a.Number();
+function getSameSrcList (startIndex: number, options: any = {}) {
     let list = makeNew();
     let mismatch = -1;
     if (startIndex >=0 && startIndex < this.length) {
         let src = this[startIndex].src;
-        list.push(..._.filter(this, (clue, index) => {
+        list.push(..._.filter(this, (clue, index: number) => {
             if (index < startIndex) return false;
             if (mismatch >= 0 && !options.allowMismatch) return false;
             if (clue.src === src) return true;
@@ -155,7 +157,7 @@ function sortedBySrc () {
         let src = this[index].src
         if (_.has(srcHash, src)) continue;
         srcHash[src] = true;
-        sorted.push(..._.filter(this, (value, innerIdx) => {
+        sorted.push(..._.filter(this, (value, innerIdx: number) => {
             return innerIdx >= index && this[innerIdx].src === src;
         }));
     }
@@ -277,9 +279,9 @@ function mergeFrom (fromList, options = {}) {
 //
 
 function assignMethods (list) {
-    list.display          = display;
+//    list.display          = display;
     list.getSameSrcList   = getSameSrcList;
-    list.init             = init;
+//    list.init             = init;
     list.makeKey          = makeKey;
     list.mergeFrom        = mergeFrom;
     list.toJSON           = toJSON;
@@ -334,13 +336,13 @@ function objectFrom (args: any) {
         });
         throw new Error('missing argument');
     }
-    return Object(clueList); // TODO:  why Object() ?
+    return clueList; // TODO:  why Object() ?
 }
 
 //
 //
 
-export function makeNew () {
+export function makeNew (): ClueList {
     return assignMethods(Object([]));
 }
 
@@ -351,16 +353,18 @@ export function makeNew () {
 //   optional: optional flag suppresses file error
 //   array:    js array
 
-export function makeFrom (args: any) {
+export function makeFrom (args: any): ClueList {
     let object = objectFrom(args);
-    return assignMethods(Object(object)).init();
+    return assignMethods(Object(object)); // .init();
 }
 
 //
 
+/*
 module.exports = {
-    makeNew:  makeNew,
-    makeFrom: makeFrom,
+//    makeNew:  makeNew,
+//    makeFrom: makeFrom,
     makeKey:  makeKey
 };
 
+*/

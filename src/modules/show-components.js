@@ -16,8 +16,10 @@ const Path        = require('path');
 const Peco        = require('./peco');
 const Readlines   = require('n-readlines');
 const stringify   = require('javascript-stringify').stringify;
-const Stringify2   = require('stringify-object');
+const Stringify2  = require('stringify-object');
 const Timing      = require('debug')('timing');
+
+//import { TotalPrimary } from '../dist/types/clue';
 
 function Stringify (val) {
     return stringify(val, (value, indent, stringify) => {
@@ -34,9 +36,12 @@ function getSourceClues (source, countList, nameList) {
     // for each name in namelist, get propertyCount(s) of knownSrcMap[count][param]
     const srcMap = ClueManager.knownSourceMapArray[count];
     const results = srcMap[source].results;
-    console.error(`results ${Stringify(results)} len(${results.length})`);
-    const synCounts = results.map(result => ClueManager.recursiveGetCluePropertyCount(result.resultMap.internal_map, "synonym"));
-    return `${nameList.join(' - ')}, syn(${synCounts})`;
+    //console.error(`results ${Stringify(results)} len(${results.length})`);
+    const totalPrimaryList = results.map(result => ClueManager.recursiveGetCluePropertyCount(result.resultMap.internal_map, "synonym"));
+    // TODO: duplicated in getSourceClues
+    const totals = totalPrimaryList.map(tp => tp.total);
+    const primarys = totalPrimaryList.map(tp => tp.primary);
+    return `${nameList.join(' - ')}  : syn totals(${totals}) primarys(${primarys})`;
 }
 
 //
@@ -50,8 +55,10 @@ function getClueSources (name, countList, nameList) {
         const source = nameList[0];
         const clue = _.find(ClueManager.getClueList(count), { name, src: source });
         //console.log(clue);
-        const synCount = clue.synonym ? 1 : 0;
-        sources += `${source} syn(${synCount})`;
+        // TODO: ??
+        //const synCount = clue.synonym ? 1 : 0;
+        const totalPrimary = clue.propertyCounts.synonym;
+        sources += `${source} : syn total(${totalPrimary.total}) primary(${totalPrimary.primary})`;
     } else {
         sources += nameList.map(source => {
             const results = srcMap[source].results;
@@ -63,8 +70,11 @@ function getClueSources (name, countList, nameList) {
                 }
                 GCS = 0;
             }
-            const synCounts = results.map(result => ClueManager.recursiveGetCluePropertyCount(result.resultMap.internal_map, "synonym"));
-            source += ` syn(${synCounts})`;
+            const totalPrimaryList = results.map(result => ClueManager.recursiveGetCluePropertyCount(result.resultMap.internal_map, "synonym"));
+            // TODO: duplicated in getSourceClues
+            const totals = totalPrimaryList.map(tp => tp.total);
+            const primarys = totalPrimaryList.map(tp => tp.primary);
+            source += ` : syn totals(${totals}) primarys(${primarys})`;
             return source;
         }).join(' - ');
     }
