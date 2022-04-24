@@ -6,42 +6,43 @@
 
 import _ from 'lodash'; // TODO: need a smaller dummy import
 
-// TODO: namespace CountedProperty { Name/Enum/CountMap }
+export namespace CountedProperty {
+    export enum Enum {
+        Synonym = "synonym",
+        Homonym = "homonym"
+    };
 
-export type CountedPropertyName = "synonym" | "homonym";
+//    export type Name = "synonym" | "homonym"; // TODO: Enum.Synonym |  Enum.Homonym;
 
-enum CountedPropertyEnum {
-    Synonym = "synonym",
-    Homonym = "homonym"
+    export interface Counts {
+        total: number;
+        primary: number;
+    };
+
+    export type Map = {
+        [key in Enum]: Counts;
+    };
+
+    //export type Map = Record<CountedProperty.Name, PropertyCount.Type>;
 }
 
-// TODO: namespace Count; export type Type 
-
-export interface TotalPrimary {
-    total: number;
-    primary: number;
-}
-
-// try instead:  interface { [key: CountedPropertyName]: TotalPrimary }
-export type PropertyCountMap = Record<CountedPropertyName, TotalPrimary>;
-
-interface ClueCommon {
+interface Common {
     note?: string;
     ignore?: boolean;
     skip?: boolean;
     synonym?: boolean;
     homonym?: boolean;
 
-    propertyCounts?: PropertyCountMap;
+    propertyCounts?: CountedProperty.Map;
 }
 
-interface Clue extends ClueCommon {
+interface Clue extends Common {
     name: string;
     src: string;
 }
 
 // for primary sources only
-interface PrimaryClue extends ClueCommon {
+interface PrimaryClue extends Common {
     name?: string;
     src?: string;
 
@@ -109,60 +110,37 @@ export const PrimarySchema = {
     "additionalProperties": false
 };
 
-namespace CountedProperty {
-}
+export namespace CountedProperty {
+    export function initAll (clue: PrimaryClue): void {
+        let propertyCounts = {};
+        for (let propertyName of Object.values(CountedProperty.Enum)) {
+            //console.error(`propertyName: ${propertyName}`);
+            propertyCounts[propertyName] = get(clue, propertyName);
+        }
+        clue.propertyCounts = propertyCounts as Map;
+    }
 
-export namespace PropertyCount {
-    export type Type = TotalPrimary;
-
-    export function init (clue: PrimaryClue, propertyName: CountedPropertyName): PropertyCount.Type {
-        const hasProperty = Boolean(clue[propertyName]);
+    function get (clue: PrimaryClue, property: Enum): Counts {
+        const hasProperty = Boolean(clue[property]);
         return {
             total: hasProperty ? 1 : 0,
             primary: hasProperty && !clue["sources"] ? 1 : 0
         }
     }
 
-    export function add (to: PropertyCount.Type, from: PropertyCount.Type): void {
-        to.total += from.total;
-        to.primary += from.primary;
-    };
-}
-
-function initTotalPrimary(clue: PrimaryClue, propertyName: CountedPropertyName): TotalPrimary {
-    //console.error(`init: ${clue.name}`);
-    const hasProperty = Boolean(clue[propertyName]);
-    return {
-        total: hasProperty ? 1 : 0,
-        primary: hasProperty && !clue["sources"] ? 1 : 0
+    export function addAll (toClue: PrimaryClue, fromClue: PrimaryClue): void {
+        //console.error(`add: to ${toClue.name} from ${fromClue.name}`);
+        Object.values(Enum).forEach((propertyName: string) => {
+            //console.error(`add: to[name](${toClue[propertyName]}) from[name](${fromClue[propertyName]})`);
+            add(toClue.propertyCounts![propertyName], fromClue.propertyCounts![propertyName]);
+        });
     }
-}
 
-export function addTotalPrimary(toTotalPrimary: TotalPrimary, fromTotalPrimary: TotalPrimary): void {
-    toTotalPrimary.total += fromTotalPrimary.total;
-    toTotalPrimary.primary += fromTotalPrimary.primary;
-}
-
-export function addAllPropertyCounts(toClue: PrimaryClue, fromClue: PrimaryClue): void {
-    //console.error(`add: to ${toClue.name} from ${fromClue.name}`);
-    Object.values(CountedPropertyEnum).forEach((propertyName: string) => {
-        //console.error(`add: to[name](${toClue[propertyName]}) from[name](${fromClue[propertyName]})`);
-        addTotalPrimary(toClue.propertyCounts![propertyName], fromClue.propertyCounts![propertyName]);
-    });
-}
-
-export function initPropertyCounts (clue: PrimaryClue): void {
-    clue.propertyCounts = {
-        synonym: {
-            total: 0, primary: 0
-        },
-        homonym: {
-            total: 0, primary: 0
+    export function add (to: Counts, from: Counts | undefined): void {
+        if (from) {
+            to.total += from.total;
+            to.primary += from.primary;
         }
-    };
-    for (let propertyName of Object.values(CountedPropertyEnum)) {
-        //console.error(`propertyName: ${propertyName}`);
-        clue.propertyCounts![propertyName] = initTotalPrimary(clue, propertyName);
     }
 }
 
@@ -200,7 +178,7 @@ export function toJSON (clue: Clue, options: any = {}): string {
         s += `, "homonym": ${clue.homonym}`;
     }
     if (options.synonym) {
-        s += `, "syn total": ${clue.propertyCounts!.synonym.total}, "syn primary": ${clue.propertyCounts!.synonym.primary}`;
+        s += `, "syn total": ${clue.propertyCounts!.synonym!.total}, "syn primary": ${clue.propertyCounts!.synonym!.primary}`;
     }
     s += ' }';
 
