@@ -4,6 +4,7 @@
 
 'use strict';
 
+//import _ from 'lodash';
 const _           = require('lodash');
 
 const ClueManager = require('../dist/modules/clue-manager');
@@ -19,7 +20,8 @@ const stringify   = require('javascript-stringify').stringify;
 const Stringify2  = require('stringify-object');
 const Timing      = require('debug')('timing');
 
-//import { TotalPrimary } from '../dist/types/clue';
+const Clue = require('../dist/types/clue');
+//import { CountedProperty } from '../dist/types/clue';
 
 function Stringify (val) {
     return stringify(val, (value, indent, stringify) => {
@@ -29,7 +31,7 @@ function Stringify (val) {
 }
 
 //
-
+// TODO: not actually using nameList here except for output? i guess that's ok?
 function getSourceClues (source, countList, nameList) {
     source = source.split(',').sort().toString();
     const count = countList.reduce((sum, count) => sum + count, 0);
@@ -37,31 +39,30 @@ function getSourceClues (source, countList, nameList) {
     const srcMap = ClueManager.knownSourceMapArray[count];
     const results = srcMap[source].results;
     //console.error(`results ${Stringify(results)} len(${results.length})`);
-    const totalPrimaryList = results.map(result => ClueManager.recursiveGetCluePropertyCount(result.resultMap.internal_map, "synonym"));
     // TODO: duplicated in getSourceClues
-    const totals = totalPrimaryList.map(tp => tp.total);
-    const primarys = totalPrimaryList.map(tp => tp.primary);
+    const countsList = results.map(result =>
+        ClueManager.recursiveGetCluePropertyCount(null, result.resultMap.internal_map, Clue.CountedProperty.Enum.Synonym));
+    const totals = countsList.map(tp => tp.total);
+    const primarys = countsList.map(tp => tp.primary);
     return `${nameList.join(' - ')}  : syn totals(${totals}) primarys(${primarys})`;
 }
 
 //
 
 let GCS = 0;
-function getClueSources (name, countList, nameList) {
+function getClueSources (name, count, nameList) {
     let sources = '';
-    const count = countList[0];
     const srcMap = ClueManager.knownSourceMapArray[count];
     if (count === 1) {
         const source = nameList[0];
         const clue = _.find(ClueManager.getClueList(count), { name, src: source });
-        //console.log(clue);
-        // TODO: ??
-        //const synCount = clue.synonym ? 1 : 0;
-        const totalPrimary = clue.propertyCounts.synonym;
-        sources += `${source} : syn total(${totalPrimary.total}) primary(${totalPrimary.primary})`;
+        //console.error(clue);
+        const counts = clue.propertyCounts.synonym;
+        sources += `${source} : syn total(${counts.total}) primary(${counts.primary})`;
     } else {
         sources += nameList.map(source => {
             const results = srcMap[source].results;
+            /*
             if (GCS) {
                 if (results.length > 1) {
                     for (const result of results) {
@@ -70,10 +71,12 @@ function getClueSources (name, countList, nameList) {
                 }
                 GCS = 0;
             }
-            const totalPrimaryList = results.map(result => ClueManager.recursiveGetCluePropertyCount(result.resultMap.internal_map, "synonym"));
+            */
+            const countsList = results.map(result =>
+                ClueManager.recursiveGetCluePropertyCount({ name, count }, result.resultMap.internal_map, Clue.CountedProperty.Enum.Synonym));
             // TODO: duplicated in getSourceClues
-            const totals = totalPrimaryList.map(tp => tp.total);
-            const primarys = totalPrimaryList.map(tp => tp.primary);
+            const totals = countsList.map(tp => tp.total);
+            const primarys = countsList.map(tp => tp.primary);
             source += ` : syn totals(${totals}) primarys(${primarys})`;
             return source;
         }).join(' - ');
@@ -82,18 +85,18 @@ function getClueSources (name, countList, nameList) {
 }
 
 //
-function showCountListArray (param, countListArray, text, hasNameList = false) {
+function showCountListArray (name, countListArray, text, hasNameList = false) {
     for (const elem of countListArray) {
         const countList = hasNameList ? elem.countList : elem;
         let sources = '';
-        if (param) {
+        if (name) {
             if (countList.length > 1) {
-                // -t xxx,yyy[,zzz] (more than 1 word)
-                sources += getSourceClues(param, countList, elem.nameList);
+                // -t name1,name2[,name3,...] (multiple names; name == nameCsv here)
+                sources += getSourceClues(name, countList, elem.nameList); // 
             }
             else {
-                // -t xxx (1 word only)
-                sources += getClueSources(param, countList, elem.nameList);
+                // -t name (one name only)
+                sources += getClueSources(name, countList[0], elem.nameList);
             }
         }
         console.log(`${countList} ${text} ${sources}`);

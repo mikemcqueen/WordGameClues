@@ -5,6 +5,7 @@
 'use strict';
 
 import _ from 'lodash'; // TODO: need a smaller dummy import
+//let Stringify = require('stringify-object');
 
 export namespace CountedProperty {
     export enum Enum {
@@ -12,7 +13,7 @@ export namespace CountedProperty {
         Homonym = "homonym"
     };
 
-//    export type Name = "synonym" | "homonym"; // TODO: Enum.Synonym |  Enum.Homonym;
+    export type Name = "synonym" | "homonym"; // TODO: Enum.Synonym |  Enum.Homonym;
 
     export interface Counts {
         total: number;
@@ -22,8 +23,6 @@ export namespace CountedProperty {
     export type Map = {
         [key in Enum]: Counts;
     };
-
-    //export type Map = Record<CountedProperty.Name, PropertyCount.Type>;
 }
 
 interface Common {
@@ -32,38 +31,40 @@ interface Common {
     skip?: boolean;
     synonym?: boolean;
     homonym?: boolean;
-
-    propertyCounts?: CountedProperty.Map;
-}
-
-interface Clue extends Common {
-    name: string;
-    src: string;
 }
 
 // for primary sources only
 interface PrimaryClue extends Common {
     name?: string;
-    src?: string;
+    src: string;
 
-    num?: string | number;
+    num: number;
     source?: string;
     target?: string;
     implied?: string;
     require?: string;
     _?: string;
 
-    restrictToSameClueNumber: boolean;
+    restrictToSameClueNumber?: boolean;
+
+    // runtime only, not in schema
+    propertyCounts?: CountedProperty.Map;
 }
 
-export type Type = Clue;
-export type PrimaryType = PrimaryClue;
+interface CompoundClue extends Common {
+    name: string;
+    src: string;
+}
+
+export type Primary = PrimaryClue;
+export type Compound = CompoundClue;
+export type Any = PrimaryClue | CompoundClue;
 
 //
 //
 
 export const Schema = {
-    "$id": "https://wordgameclues.com/schemas/clue",
+    "$id": "https://wordgameclues.com/schemas/compound-clue",
     "type": "object",
     "properties": {
         "name":    { type: "string" },
@@ -71,7 +72,7 @@ export const Schema = {
 
         "note":    { type: "string" },
         "ignore":  { type: "boolean" },
-        "skip":  { type: "boolean" },
+        "skip":    { type: "boolean" },
         "synonym": { type: "boolean" },
         "homonym": { type: "boolean" },
     },
@@ -101,7 +102,7 @@ export const PrimarySchema = {
 
         "implied": { type: "string" },
         "require": { type: "string" },
-        "_": { type: "string" },
+        "_":       { type: "string" },
         
         "restrictToSameClueNumber": { type: "boolean" },
     },
@@ -113,18 +114,18 @@ export const PrimarySchema = {
 export namespace CountedProperty {
     export function initAll (clue: PrimaryClue): void {
         let propertyCounts = {};
-        for (let propertyName of Object.values(CountedProperty.Enum)) {
+        Object.values(CountedProperty.Enum).forEach((propertyName: Name) => {
             //console.error(`propertyName: ${propertyName}`);
-            propertyCounts[propertyName] = get(clue, propertyName);
-        }
+            propertyCounts[propertyName] = getCounts(clue, propertyName);
+        });
         clue.propertyCounts = propertyCounts as Map;
     }
 
-    function get (clue: PrimaryClue, property: Enum): Counts {
-        const hasProperty = Boolean(clue[property]);
+    export function getCounts (clue: Any, propertyName: Name): Counts {
+        const hasProperty = !!clue[propertyName];
         return {
             total: hasProperty ? 1 : 0,
-            primary: hasProperty && !clue["sources"] ? 1 : 0
+            primary: hasProperty && isPrimary(clue) && !clue.source ? 1 : 0
         }
     }
 
@@ -145,6 +146,16 @@ export namespace CountedProperty {
 }
 
 //
+
+export function isPrimary (clue: Any): clue is PrimaryClue {
+    return (clue as PrimaryClue).num !== undefined;
+}
+
+export function isCompound (clue: Any): clue is CompoundClue {
+    return !isPrimary(clue);
+}
+
+//
 //
 
 function format2 (text: string, span: number) {
@@ -155,7 +166,7 @@ function format2 (text: string, span: number) {
 
 //
 
-export function toJSON (clue: Clue, options: any = {}): string {
+export function toJSON (clue: PrimaryClue, options: any = {}): string {
     let s = '{';
     if (clue.name) {
         s += ` "name": "${clue.name}", ${format2(clue.name, 15)}`;

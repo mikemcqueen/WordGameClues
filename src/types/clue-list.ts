@@ -18,19 +18,21 @@ import * as Clue from './clue';
 //
 // exported types
 
-type ClueList = Clue.Type[];
-export type Type = ClueList;
+type PrimaryClueList = Clue.Primary[];
+export type Primary = PrimaryClueList;
 
-type PrimaryClueList = Clue.PrimaryType[];
-export type PrimaryType = PrimaryClueList;
+type CompoundClueList = Clue.Compound[];
+export type Compound = CompoundClueList;
+
+export type Any = PrimaryClueList | CompoundClueList;
 
 //
 // exported, uh? , values?
 
 export const Schema = {
-    "$id": "https://wordgameclues.com/schemas/clue-list",
+    "$id": "https://wordgameclues.com/schemas/compound-clue-list",
     "type": "array",
-    "items": { "$ref": "https://wordgameclues.com/schemas/clue" }
+    "items": { "$ref": "https://wordgameclues.com/schemas/compound-clue" }
 };
 
 export const PrimarySchema = {
@@ -52,7 +54,7 @@ const validatePrimaryList = ajv.compile(PrimarySchema);
 //
 
 export function display (clueList: PrimaryClueList, options: any = {}): void {
-    clueList.forEach(clue => console.log(Clue.toJSON(clue! as Clue.Type, options)));
+    clueList.forEach(clue => console.log(Clue.toJSON(clue! as Clue.Primary, options)));
     /*
     let arr: string[] = [];
     
@@ -298,7 +300,7 @@ function assignMethods (list) {
 // args: see makeFrom()
 
 function objectFrom (args: any) {
-    let clueList: ClueList = [];
+    let clueList: CompoundClueList = [];
 
     if (args.filename) {
         try {
@@ -342,7 +344,7 @@ function objectFrom (args: any) {
 //
 //
 
-export function makeNew (): ClueList {
+export function makeNew (): CompoundClueList {
     return assignMethods(Object([]));
 }
 
@@ -353,7 +355,7 @@ export function makeNew (): ClueList {
 //   optional: optional flag suppresses file error
 //   array:    js array
 
-export function makeFrom (args: any): ClueList {
+export function makeFrom (args: any): CompoundClueList {
     let object = objectFrom(args);
     return assignMethods(Object(object)); // .init();
 }

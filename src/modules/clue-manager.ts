@@ -89,7 +89,7 @@ function showStrList (strList) {
 
 //
 
-ClueManager.prototype.getClueList = function (index: number) : ClueList.Type {
+ClueManager.prototype.getClueList = function (index: number) : ClueList.Compound {
     return this.clueListArray[index];
 }
 
@@ -118,7 +118,7 @@ ClueManager.prototype.saveClueList = function (list, count: number, options?: Sa
     list.save(this.getKnownFilename(count, options?.dir));
 };
 
-const initCluePropertyCounts = (clueList: ClueList.PrimaryType, ignoreList: ClueList.PrimaryType) : void => {
+const initCluePropertyCounts = (clueList: ClueList.Primary, ignoreList: ClueList.Primary) : void => {
     for (const clue of clueList) {
         Clue.CountedProperty.initAll(clue);
         const sources = clue.source?.split(',') || [];
@@ -129,25 +129,39 @@ const initCluePropertyCounts = (clueList: ClueList.PrimaryType, ignoreList: Clue
     }
 };
 
-const autoSource = (clueList: ClueList.PrimaryType): [ClueList.PrimaryType, number] => {
+const autoSource = (clueList: ClueList.Primary): [ClueList.Primary, number] => {
     let source = 0;
     let clueNumber = 0;
-    let ignoredClues: ClueList.PrimaryType = [];;
-    let actualClues: ClueList.PrimaryType = []
+    let ignoredClues: ClueList.Primary = [];;
+    let actualClues: ClueList.Primary = []
+    let firstClueWithSrc: Clue.Primary | undefined = undefined;
 
     for (let clue of clueList) {
 	// clue.num check must happen before clue.ignore check
 	if (clue.num) clueNumber = Number(clue.num);
-	const sameSrc: boolean = clue.src === "same";
+	const isSameSrc: boolean = clue.src === "same";
+        if (isSameSrc) {
+            // propagate the .source field from the first clue with a specific src
+            // to all subsequent clues with the "same" src.
+            if (clue.source) throw new Error(`${clue.name}.src="same" has source="${clue.source}"`);
+            clue.source = firstClueWithSrc!.source;
+            //console.error(`${clue.name}.source = ${clue.source}`);
+        }
 	if (clue.ignore) {
-            // this is a hack for property count propagation from dependent to parent ignored clues
             if (clue.name) {
+                // setting clue.src = clue.name is a hack for property count propagation from
+                // dependent to parent ignored clues
                 clue.src = clue.name; 
                 ignoredClues.push(clue);
             }
             continue;
         }
-	if (!sameSrc) source += 1;
+	if (!isSameSrc) {
+            source += 1;
+            // save the first clue with a specific src, to enable .source field propagation
+            // to subsequent clues with "same" src, above.
+            firstClueWithSrc = clue;
+        }
 	clue.src = `${source}`;
 	clue.num = clueNumber;
         actualClues.push(clue);
@@ -165,7 +179,7 @@ const autoSource = (clueList: ClueList.PrimaryType): [ClueList.PrimaryType, numb
     }
     
     Debug(`autoSource: ${source} primary clues, ` +
-        `${actualClues.reduce((srcList: string[], clue: Clue.PrimaryType) => { srcList.push(clue.src||"undefined"); return srcList; }, [])}`);
+        `${actualClues.reduce((srcList: string[], clue: Clue.Primary) => { srcList.push(clue.src||"undefined"); return srcList; }, [])}`);
     return [actualClues, source];
 };
 
@@ -238,7 +252,7 @@ ClueManager.prototype.loadClueList = function (count: number, options?: LoadClue
 
 //
 
-ClueManager.prototype.addPrimaryClueToMap = function (clue: Clue.PrimaryType) {
+ClueManager.prototype.addPrimaryClueToMap = function (clue: Clue.Primary) {
     const count = 1;
     const clueMap = this.knownClueMapArray[count];
     if (!_.has(clueMap, clue.name!)) {
@@ -249,7 +263,7 @@ ClueManager.prototype.addPrimaryClueToMap = function (clue: Clue.PrimaryType) {
 
 //
 
-ClueManager.prototype.addKnownPrimaryClues = function (clueList: ClueList.PrimaryType) {
+ClueManager.prototype.addKnownPrimaryClues = function (clueList: ClueList.Primary) {
     const count = 1;
     let clueMap = this.knownClueMapArray[count] = {};
     clueList.forEach(clue => {
@@ -281,7 +295,7 @@ ClueManager.prototype.getRejectFilename = function (count: number) {
 
 //
 //
-ClueManager.prototype.addCompoundClue = function (clue: Clue.Type, count: number, validateAll = true, fast = false) {
+ClueManager.prototype.addCompoundClue = function (clue: Clue.Compound, count: number, validateAll = true, fast = false) {
     //Expect(clue).is.an.Object();
     //Expect(count).is.a.Number();
     let nameList = clue.src.split(',').sort();
@@ -327,7 +341,7 @@ ClueManager.prototype.addCompoundClue = function (clue: Clue.Type, count: number
 
 //
 
-ClueManager.prototype.addKnownCompoundClues = function (clueList: ClueList.Type, clueCount: number, validateAll: boolean, fast: boolean) {
+ClueManager.prototype.addKnownCompoundClues = function (clueList: ClueList.Compound, clueCount: number, validateAll: boolean, fast: boolean) {
     // so this is currently only callable once per clueCount.
     //Expect(this.knownClueMapArray[clueCount]).is.undefined();
     //Expect(clueCount > 1);
@@ -420,11 +434,11 @@ ClueManager.prototype.addClue = function (count: number, clue, save = false, not
 
 //
 
-ClueManager.prototype.removeClue = function (count: number, clue: Clue.Type, save = false, nothrow = false): boolean {
+ClueManager.prototype.removeClue = function (count: number, clue: Clue.Compound, save = false, nothrow = false): boolean {
     // sort src
     clue.src = clue.src.split(',').sort().toString();
     if (this.removeKnownClue(count, clue.name, clue.src, nothrow)) {
-        _.remove(this.clueListArray[count], function (elem: Clue.Type) {
+        _.remove(this.clueListArray[count], function (elem: Clue.Compound) {
             return (elem.name === clue.name) && (elem.src === clue.src);
         });
         if (save) {
@@ -463,7 +477,7 @@ ClueManager.prototype.addMaybe = function (name: string, srcNameList: string | s
 
 //
 
-ClueManager.prototype.addRejectCombos = function (clueList: ClueList.Type, clueCount: number) {
+ClueManager.prototype.addRejectCombos = function (clueList: ClueList.Compound, clueCount: number) {
     clueList.forEach(clue => {
         let srcNameList = clue.src.split(',');
         if (_.size(srcNameList) !== clueCount) {
@@ -875,7 +889,7 @@ ClueManager.prototype.getCountList = function (nameOrList: string | string[]) {
 
 //
 //
-ClueManager.prototype.getPrimaryClue = function (nameSrc: NameCount.Type): Clue.PrimaryType {
+ClueManager.prototype.getPrimaryClue = function (nameSrc: NameCount.Type): Clue.Primary {
     for (const clue of this.clueListArray[1]) {
 	if (clue.name == nameSrc.name && clue.src == nameSrc.count) return clue;
     }
@@ -911,7 +925,7 @@ ClueManager.prototype.getInversePrimarySources = function (sources: any[]): any[
 //
 
 ClueManager.prototype.addClueForCounts = function (countSet: Set<number>, name: string, src: string, options: any) {
-    const clue: Clue.Type = { name, src };
+    const clue: Clue.Compound = { name, src };
     return Array.from(countSet)
         .reduce((added: number, count: number) => {
             if (options.compound) {
@@ -1300,11 +1314,11 @@ ClueManager.prototype.getCountListArrays = function (nameCsv: string, options: a
     return { valid, known, rejects, invalid, clues, addRemoveSet };
 };
 
-ClueManager.prototype.getClueList = function (count: number) {
+ClueManager.prototype.getClueList = function (count: number): ClueList.Any {
     return this.clueListArray[count];
 };
 
-// haxy
+// haxy.  Consider: Extends Clue.Compound + count: number
 interface ClueIndex extends NameCount.Type {
     source: string;  // csv of names, or primary source #
 }
@@ -1313,16 +1327,17 @@ interface ResultMapNode extends ClueIndex {
     recurse: boolean;
 }
 
-ClueManager.prototype.getClue = function (clueIndex: ClueIndex): Clue.Type {
+ClueManager.prototype.getClue = function (clueIndex: ClueIndex): Clue.Any {
     const list = this.getClueList(clueIndex.count);
-    let clue = _.find(list, { name: clueIndex.name, src: clueIndex.source });
-    if (!clue) {
-        console.error(`no clue for ${clueIndex.name}:${clueIndex.count} as ${clueIndex.source}(${typeof clueIndex.source})`);
-        clue = _.find(list, { name: clueIndex.name });
-        if (clue) console.error(`  found ${clueIndex.name} in ${clueIndex.count} as ${Stringify(clue)}`);
-        throw new Error(`no clue`);
-    }
-    return clue;
+    // TODO:consider "restrict fields" to name/src if extend Clue.Compound
+    let clue: Clue.Any = _.find(list, { name: clueIndex.name, src: clueIndex.source });
+    if (clue) return clue;
+    
+    console.error(`no clue for ${clueIndex.name}:${clueIndex.count} as ${clueIndex.source}(${typeof clueIndex.source})`);
+    // TODO:consider "restrict fields" to name if extend Clue.Compound
+    clue = _.find(list, { name: clueIndex.name });
+    if (clue) console.error(`  found ${clueIndex.name} in ${clueIndex.count} as ${Stringify(clue)}`);
+    throw new Error(`no clue`);
 };
 
 //
@@ -1362,18 +1377,24 @@ ClueManager.prototype.getClue = function (clueIndex: ClueIndex): Clue.Type {
 //  ]
 //}
 //
-ClueManager.prototype.recursiveGetCluePropertyCount = function (resultMap: any,
-                                                                property: Clue.CountedProperty.Enum,
-                                                                top: boolean = true): Clue.CountedProperty.Counts {
+ClueManager.prototype.recursiveGetCluePropertyCount = function (
+    nc: NameCount.Type | null,
+    resultMap: any, // object | string[] | NameCount.Type[] ? probably fix resultMap before attempting this.
+    propertyName: Clue.CountedProperty.Name,
+    top: boolean = true): Clue.CountedProperty.Counts
+{
     const loggy = 0;
-    let nodes: ResultMapNode[] = _.flatMap(_.keys(resultMap), key => {
+    if (top && loggy) console.log(`${Stringify(resultMap)}`);
+
+    const keys: string[] = _.keys(resultMap);
+    let nodes: ResultMapNode[] = _.flatMap(keys, key => {
         // TODO: BUG:: key may be a ncCsv
 	let val: any = resultMap[key];
 	if (_.isObject(val)) {
 	    // A,B,C: non-array object value type
 	    if (!_.isArray(val)) {
-                let nc: NameCount.Type = NameCount.makeNew(key);
-                let source: string|number;
+                let nc = NameCount.makeNew(key);
+                let source: string;
                 let subkeys: string[] = _.keys(val);
                 let recurse = true;
                 if (subkeys.length > 1) {
@@ -1398,28 +1419,48 @@ ClueManager.prototype.recursiveGetCluePropertyCount = function (resultMap: any,
                 let list = NameCount.makeListFromCsv(csv);
                 //console.error(`csv: ${csv}, list: ${stringify(list)}`);
                 return list.map(sourceNc => {
-                    return { name: sourceNc.name, count: 1, source: `${sourceNc.count}`, recurse: false };
+                    return {
+                        name: sourceNc.name,
+                        count: 1,
+                        source: `${sourceNc.count}`,
+                        recurse: false
+                    };
                 });
             }
 	}
-	console.error(`Mystery key: ${key}`);
         throw new Error(`Mystery key: ${key}`);
     });
+    // in the case of e.g., -t night, the above code only considers the components of night,
+    // but not night:N itself. that's represented by 'nc' here. nc.count *should never* be 1,
+    // as it's unnecessary to call this function if it is.
+    if (nc) {
+        if (nc.count === 1) throw new Error(`nc.count === 1`);
+        nodes.push({
+            name: nc.name,
+            count: nc.count,
+            source: NameCount.nameListFromStrList(keys).sort().toString(),
+            recurse: false
+        });
+    }
     let counts: Clue.CountedProperty.Counts = { total: 0, primary: 0 };
     for (let node of nodes) {
         if (loggy) console.log(Stringify(node));
         const clue = this.getClue(node);
-        clue.propertyCounts && Clue.CountedProperty.add(counts, clue.propertyCounts[property]);
+        // add pre-compunted propertyCount data to total, if it exists (primary clues only)
+        clue.propertyCounts && Clue.CountedProperty.add(counts, clue.propertyCounts[propertyName]);
+        // if this is a compound clue node, there is no propertyCount data, so just add the
+        // count (1 or 0) of the properties on the clue itself
+        node.count > 1 && Clue.CountedProperty.add(counts, Clue.CountedProperty.getCounts(clue, propertyName));
         if (loggy) {
-            if (clue[property]) {
-                console.log(`^^${property}! total${counts.total} primary(${counts.primary}`);
+            if (clue[propertyName]) {
+                console.log(`^^${propertyName}! total${counts.total} primary(${counts.primary}`);
             } else {
-                console.log(`${Clue.toJSON(clue)}, clue[${property}]=${clue[property]}`);
+                console.log(`${Clue.toJSON(clue)}, clue[${propertyName}]=${clue[propertyName]}`);
             }
         }
         if (node.recurse) {
 	    let val = resultMap[NameCount.makeCanonicalName(node.name, node.count)];
-            Clue.CountedProperty.add(counts, this.recursiveGetCluePropertyCount(val, property, false));
+            Clue.CountedProperty.add(counts, this.recursiveGetCluePropertyCount(null, val, propertyName, false));
         }
     }
     return counts;
