@@ -256,9 +256,12 @@ function copyClues (fromType, options = {}) {
 	    list = ClueManager.loadClueList(count, { dir });
 	} catch (err) {
 	    if (!_.includes(err.message, 'ENOENT')) throw err;
-	    continue;
+	    console.error(err);
+            continue;
 	}
 	total += _.size(list);
+        //Debug(`count ${count}: size(${_.size(list)})`);
+        console.log(`count(${count}):\n${Stringify(list)}`);
 	for (let clue of list) {
 	    const nameList = clue.src.split(',').sort();
             let countSet;
@@ -276,7 +279,10 @@ function copyClues (fromType, options = {}) {
 	        }, new Set());
             } else { // slower, with respect
 	        const result = ClueManager.getCountListArrays(clue.src, { add: true, fast: true });
-                if (!result) continue;
+                if (!result) {
+                    Debug(`No matches for: ${clue.src}`);
+                    continue;
+                }
                 //{ valid, known, rejects, invalid, clues, addRemoveSet };
                 console.log(` valid(${_.size(result.valid)}) known(${_.size(result.known)}) invalid(${_.size(result.invalid)}) clues(${_.size(result.clues)})`);
                 if (_.isEmpty(result.known) && _.isEmpty(result.valid)) continue;

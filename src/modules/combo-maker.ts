@@ -11,7 +11,6 @@ const ResultMap	  = require('../../types/result-map');
 const Peco	  = require('../../modules/peco');
 const Log	  = require('../../modules/log')('combo-maker');
 
-const ClueManager = require('./clue-manager');
 const ClueList	  = require('../types/clue-list');
 const Debug	  = require('debug')('combo-maker');
 const Duration	  = require('duration');
@@ -24,6 +23,11 @@ const stringify	  = require('javascript-stringify').stringify;
 const Stringify2  = require('stringify-object');
 //const Validator	  = require('./validator');
 
+const ClueManager = require('./clue-manager');
+//import { Instance as ClueManager } from './clue-manager';
+//import * as ClueManager from './clue-manager';
+
+// TODO: import * as NameCount from '../types/name-count';
 //
 //
 interface NameCount {

@@ -18,6 +18,13 @@ const Timing      = require('debug')('timing');
 
 import * as ClueList from '../types/clue-list';
 import * as NameCount from '../types/name-count';
+//import { Instance as CM } from './clue-manager';
+let CM;
+
+console.log(`cm: ${Stringify(Object.keys(ClueManager))}`);
+console.log(`cm instance: ${ClueManager.Instance}`);
+console.log(`Instance: ${CM}`);
+
 
 function Stringify(val: any) {
     return stringify(val, (value: any, indent: any, stringify: any) => {
@@ -1248,7 +1255,8 @@ let recursiveValidateSources = (args: any): ValidateSourcesResult => {
     // count is checked for a name, no need to check it again
 
     let someResult = args.clueCountList.some((count: number) => {
-        if (!_.has(ClueManager.knownClueMapArray[count], clueName)) {
+        console.log(`cm: ${Stringify(Object.keys(ClueManager))}`);
+        if (!_.has(ClueManager.getKnownClueMap(count), clueName)) {
             return false; // some.continue
         }
         let rvsResult = rvsWorker({

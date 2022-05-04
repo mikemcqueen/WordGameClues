@@ -4,10 +4,6 @@
 
 'use strict';
 
-// export a singleton
-
-module.exports = new ClueManager();
-
 import _ from 'lodash'; // import statement to signal that we are a "module"
 
 const Log            = require('../../modules/log')('clue-manager');
@@ -31,10 +27,17 @@ import * as ClueList from '../types/clue-list';
 
 import type { ValidateSourcesResult } from './validator';
 
+// export a singleton
+//export const Instance = new ClueManager();
+//export Instance;
+//export default Instance;
+module.exports = new ClueManager();
+//module.exports = Instance;
+
 //
 //
 
-const DATA_DIR              =  Path.normalize(`${Path.dirname(module.filename)}/../../data/`);
+const DATA_DIR              =  Path.normalize(`${Path.dirname(module.filename)}/../../../data/`);
 const REJECTS_DIR           = 'rejects';
 
 //
@@ -120,12 +123,13 @@ ClueManager.prototype.saveClueList = function (list, count: number, options?: Sa
 
 const initCluePropertyCounts = (clueList: ClueList.Primary, ignoreList: ClueList.Primary) : void => {
     for (const clue of clueList) {
+        Debug(`iCPC: ${Stringify(clue)}`);
         Clue.CountedProperty.initAll(clue);
         const sources = clue.source?.split(',') || [];
-        sources.filter(source => source[0] !== '(')
-            .forEach(source => {
-                Clue.CountedProperty.addAll(clue, _.find(ignoreList, { name: source, src: source })!);
-            });
+        sources.forEach(source => {
+            Debug(`iCPC: source: ${source}`);
+            Clue.CountedProperty.addAll(clue, _.find(ignoreList, { name: source, src: source })!);
+        });
     }
 };
 
@@ -244,8 +248,10 @@ interface LoadClueListOptions {
 }
 
 ClueManager.prototype.loadClueList = function (count: number, options?: LoadClueListOptions) {
+    const filename = this.getKnownFilename(count, options?.dir);
+    //console.error(`filename: ${filename}`);
     return ClueList.makeFrom({
-        filename: this.getKnownFilename(count, options?.dir),
+        filename,
         primary: count === 1
     });
 };
@@ -279,7 +285,7 @@ ClueManager.prototype.addKnownPrimaryClues = function (clueList: ClueList.Primar
 
 ClueManager.prototype.getKnownFilename = function (count: number, dir: string | undefined = undefined) {
     return Path.format({
-        dir: this.dir || `${DATA_DIR}${dir}`,
+        dir: !dir ? this.dir : `${DATA_DIR}${dir}`,
         base: `clues${count}.json`
     });
 };
@@ -296,8 +302,6 @@ ClueManager.prototype.getRejectFilename = function (count: number) {
 //
 //
 ClueManager.prototype.addCompoundClue = function (clue: Clue.Compound, count: number, validateAll = true, fast = false) {
-    //Expect(clue).is.an.Object();
-    //Expect(count).is.a.Number();
     let nameList = clue.src.split(',').sort();
     let srcMap = this.knownSourceMapArray[count];
     let srcKey = nameList.toString();
@@ -506,7 +510,6 @@ ClueManager.prototype.addReject = function (srcNameList: string | string[], save
     if (_.isString(srcNameList)) {
         srcNameList = srcNameList.split(',');
     }
-    //Expect(srcNameList).is.an.Array();
     let count = _.size(srcNameList);
     //Expect(count).is.above(1); // at.least(2);
     if (this.addRejectSource(srcNameList)) {
@@ -811,7 +814,6 @@ ClueManager.prototype.getKnownClues = function (nameList: string | string[]): an
     if (_.isString(nameList)) {
         nameList = nameList.split(',');
     }
-    //Expect(nameList).is.an.Array();
     const sourceCsv = nameList.sort().toString();
     let nameClueMap = {};
     this.knownSourceMapArray.forEach(srcMap => {
@@ -913,7 +915,6 @@ ClueManager.prototype.getPrimarySources = function (): any {
 //
 
 ClueManager.prototype.getInversePrimarySources = function (sources: any[]): any[] {
-    //Expect(sources).is.an.Array();
     let inverseSources: string[] = [];
     for (const src of this.getPrimarySources()) {
         if (_.includes(sources, src)) continue;

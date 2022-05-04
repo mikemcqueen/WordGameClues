@@ -525,19 +525,19 @@ const APPLE = {
 
     'f.71': {
         sentence:       10,
-        clueCount:      35,
+        clueCount:      55,
         REQ_CLUE_COUNT: 32
     },
 
     'f.72': {
         sentence:       10,
-        clueCount:      35,
+        clueCount:      55,
         REQ_CLUE_COUNT: 32
     },
 
     'f.73': {
         sentence:       10,
-        clueCount:      35,
+        clueCount:      55,
         REQ_CLUE_COUNT: 32
     },
 

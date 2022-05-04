@@ -119,12 +119,13 @@ function show (options) {
 
     // TODO: move buildAllUseNcDataLists to clue-manager?  currently in combo-maker
 
-    // why not .or?
+    // why only .or? probably because too slow if not
+    console.log(`test: ${options.test}`);
     if (!_.isEmpty(options.or)) {
+        console.error('--or specified: forcing --fast');
 	options.fast = true; // force fast
     }
 
-    console.log(`test: ${options.test}`);
     const nameList = options.test.split(',').sort();
     if (nameList.length > 1 && options.fast) {
 	return fast_combo_wrapper(nameList, options);
@@ -135,81 +136,14 @@ function show (options) {
         return null;
     }
 
-    /*
-    nameList.forEach(name => {
-        console.log('name: ' + name);
-    });
-
-    /// TODO, check if existing sourcelist (knownSourceMapArray)
-
-    let countListArray = ClueManager.getKnownClueIndexLists(nameList);
-    Debug(countListArray);
-    let resultList = Peco.makeNew({
-        listArray: countListArray,
-        max:       ClueManager.maxClues
-    }).getCombinations();
-    if (_.isEmpty(resultList)) {
-        console.log('No matches');
-        return;
-    }
-
-    let addCountSet = new Set();
-    let isKnown = false;
-    let isReject = false;
-    for (const clueCountList of resultList) {
-        const sum = clueCountList.reduce((a, b) => a + b);
-        const result = Validator.validateSources({
-            sum:         sum,
-            nameList:    nameList,
-            count:       nameList.length,
-            validateAll: true
-        });
-        
-        //console.log('validate [' + nameList + ']: ' + result);
-        let msg = clueCountList.toString();
-        if (!result.success) {
-            msg += ': INVALID';
-        } else if (ClueManager.isRejectSource(nameList)) {
-            msg += ': REJECTED';
-            isReject = true;
-        } else if (nameList.length === 1) {
-            let name = nameList[0];
-            let nameSrcList = ClueManager.clueListArray[sum]
-                    .filter(clue => clue.name === name)
-                    .map(clue => clue.src);
-            
-            if (nameSrcList.length > 0) {
-                //let clueNameList = ClueManager.clueListArray[sum].map(clue => clue.name);
-                //if (clueNameList.includes(name)) {
-                //
-                //ClueManager.clueListArray[sum].forEach(clue => {
-                //if (clue.name === name) {
-                //clueSrcList.push(`"${clue.src}"`);
-                //}
-                //});
-
-                msg += ': PRESENT as clue with sources: ' + nameSrcList.join(' - ');
-            }
-        } else {
-            let clueList = ClueManager.knownSourceMapArray[sum][nameList];
-            if (clueList) {
-                msg += ': PRESENT as ' + clueList.map(clue => clue.name);
-                isKnown = true;
-            }
-            if (options.add || options.remove) {
-                addCountSet.add(sum);
-            }
-        }
-        console.log(msg);
-    }
-    */
-
     showCountListArray(null, result.rejects, 'REJECTED');
     showCountListArray(null, result.invalid, 'INVALID');
     showCountListArray(options.test, result.known, 'PRESENT as', true);
     showCountListArray(options.test, result.clues, 'PRESENT as clue with source:', true);
     showCountListArray(null, result.valid, 'VALID');
 
+    // TODO: extract this to helper function, maybe in clue-manager
+    // NOTE: explicit undefined check here is necessary
     const save = _.isUndefined(options.save) ? true : options.save;
     const count = ClueManager.addRemoveOrReject({
         add:      options.add,
@@ -222,6 +156,16 @@ function show (options) {
         console.log(`${options.add ? "added" : "removed"} ${count} clues`);
     }
     return Object.assign(result, { added: count });
+}
+
+function addOrRemove (args, nameList, countSet, options) {
+    if (!options.add && !options.remove) return;
+    const save = _.isUndefined(options.save) ? true : options.save;
+    const count = ClueManager.addRemoveOrReject({
+        add:      options.add,
+        remove:   options.remove
+    }, nameList, countSet, { save });
+    console.log(`${options.add ? "added" : "removed"} ${count} clues`);
 }
 
 //
@@ -264,12 +208,14 @@ function buildSubListFromIndexList (nameList, indexList) {
 function fast_combo_wrapper (nameList, /*allOrNcDataList,*/ options) {
     console.log('fast_combo_wrapper');
     console.log(`--or: ${Stringify(options.or)}`);
+    // I don't know what the hell is going on here. I tried to get --or work with -t or something?
+    // And it made me jump through some extra hoops here? The code doesn't appear to be working.
     if (options.or) {
 	const validResults = {};
 	let clueNameList = [...get_clue_names(options), ...options.or];
 	const min = 2;
 	let max = clueNameList.length;
-	const indexList = [...Array(max).keys()]; // 0..max
+	const indexList = [...Array(max).keys()]; // 0..max (-1?)
 	console.log(`maxArg: ${options.maxArg}`);
 	let maxIter = options.maxArg ? options.maxArg : max;
 	for (let count = maxIter; count >= min; --count) {
@@ -300,7 +246,11 @@ function fast_combo_wrapper (nameList, /*allOrNcDataList,*/ options) {
 	}
 	display_valid_results(validResults);
     } else {
-	return fast_combos(nameList, options);
+	let counts = fast_combos(nameList, options);
+        addOrRemove ({
+            add: options.add,
+            remove: options.remove,
+        }, nameList, counts, options);
     }
 }
 
@@ -317,15 +267,18 @@ function get_clue_names (options) {
 }
 
 function fast_combos (nameList, options) {
+    let counts = new Set();
     fast_combos_list(nameList, options)
 	.forEach(result => {
 	    let message = 'invalid';
 	    if (result.valid) {
 		message = `VALID (${result.sum}) ${result.compatibleNameSrcList} `
                     + `REMAIN(${result.inversePrimarySources.length}): ${result.inversePrimarySources}`;
+                counts.add(result.sum);
 	    }
 	    console.log(`${result.ncList} ${message}`);
 	});
+    return counts;
 }
 
 function fast_combos_list (nameList, options) {
@@ -338,13 +291,8 @@ function fast_combos_list (nameList, options) {
 	return [];
     }
     //console.log(`nameList: ${nameList}`);
-
     //ncLists.forEach(ncList => console.log(`  ncList: ${ncList}`));
-
-    //console.log(`1`);
     const lists = ClueManager.buildListsOfPrimaryNameSrcLists(ncLists);
-    //console.log(`2`);
-    //console.log(`len: ${lists.length}`);
     return lists.reduce((resultList, listOfListOfPrimaryNameSrcLists, index) => {
 	let add = false;
 	let result = {};
@@ -386,44 +334,6 @@ function showNcLists (ncLists) {
     for (let ncList of ncLists) {
 	console.log(`${ncList}`);
     }
-}
-
-function old_fast_combos (name_list, options) {
-    console.log('old_fast_combos');
-/*
-    let list_array = [];
-    const one_max = name_list.length - 1; // not perfect, only works for combos of 2
-    for (let one = 0; one < one_max; one += 1) {
-	for (let two = one + 1; two < name_list.length; two += 1) {
-	    list_array.push([ one, two ]);
-	}
-    }
-    console.log(`list_array: ${Stringify(list_array)}`);
-    for (const index_list of list_array) {
-	const combo_list = [ name_list[index_list[0]], name_list[index_list[1]] ];
-*/
-    const combo_list = [ name_list[0], name_list[1] ];
-    const test  = combo_list.join(',');
-    const addRemove = combo_list.join(' ');
-    const save = false;
-    
-    let result = show({ test, save, add: addRemove });
-	
-    if (!result || !(result.valid.length + result.known.length)) {
-        console.log('No fast matches');
-	return null;
-    }
-
-    let fastresult = show({
-	//test: `${addRemove},${name_list[3 - index_list[0] - index_list[1]]}`,
-	test: `${addRemove},${name_list[2]}`,
-	save
-    });
-    
-    if (result.added) {
-	show({ test, save, remove: addRemove });
-    }
-    return fastresult;
 }
 
 //
