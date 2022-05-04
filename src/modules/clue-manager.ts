@@ -263,22 +263,22 @@ export let loadAllClues = function (args: any) {
         State.ignoreLoadErrors = true;
     }
     State.maxClues = args.max; // args.clues.clueCount;
-    for (let count = 1; count <= State.maxClues; ++count) {
-        let knownClueList: ClueList.Any = loadClueList(count);
-        if ((count === 1) && (knownClueList[0].src === 'auto')) {
-	    let numPrimarySources;
-	    [knownClueList, numPrimarySources] = autoSource(knownClueList as ClueList.Primary);
-	    State.numPrimarySources = numPrimarySources;
-	} else if (count === 1) {
-            throw new Error('numPrimarySources not initialized without src="auto"');
-        }
-	State.clueListArray[count] = knownClueList;
-        if (count === 1) {
-            addKnownPrimaryClues(knownClueList as ClueList.Primary);
-        }
-        else {
-            addKnownCompoundClues(knownClueList as ClueList.Compound, count, args.validateAll, args.fast);
-        }
+
+    let primaryClueList: ClueList.Primary = loadClueList(1) as ClueList.Primary;
+    if (primaryClueList[0].src === 'auto') {
+	let numPrimarySources;
+	[primaryClueList, numPrimarySources] = autoSource(primaryClueList);
+	State.numPrimarySources = numPrimarySources;
+	State.clueListArray[1] = primaryClueList;
+        addKnownPrimaryClues(primaryClueList);
+    } else {
+        throw new Error('numPrimarySources not initialized without src="auto"');
+    }
+
+    for (let count = 2; count <= State.numPrimarySources; ++count) {
+        let compoundClueList: ClueList.Compound = loadClueList(count);
+	State.clueListArray[count] = compoundClueList;
+        addKnownCompoundClues(compoundClueList, count, args.validateAll, args.fast);
     }
 
         /*
@@ -634,8 +634,6 @@ export let getCountListForName = (name: string): CountList => {
     for (const [index, clueMap] of State.knownClueMapArray.entries()) {
         if (_.has(clueMap, name)) {
             countList.push(index);
-        } else {
-            console.log(`${index}: ${clueMap}`);
         }
     };
     return countList;
