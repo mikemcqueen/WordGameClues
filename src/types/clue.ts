@@ -26,6 +26,9 @@ export namespace CountedProperty {
 }
 
 interface Common {
+    name: string;
+    src: string;
+
     note?: string;
     ignore?: boolean;
     skip?: boolean;
@@ -35,9 +38,11 @@ interface Common {
 
 // for primary sources only
 interface PrimaryClue extends Common {
-    name?: string;
+/*
+    name: string;
     src: string;
-
+*/
+    
     num: number;
     source?: string;
     target?: string;
@@ -52,8 +57,10 @@ interface PrimaryClue extends Common {
 }
 
 interface CompoundClue extends Common {
+/*    
     name: string;
     src: string;
+*/
 }
 
 export type Primary = PrimaryClue;
@@ -148,7 +155,7 @@ export namespace CountedProperty {
 //
 
 export function isPrimary (clue: Any): clue is PrimaryClue {
-    return (clue as PrimaryClue).num !== undefined;
+    return 'propertyCounts' in clue; // (clue as PrimaryClue).num !== undefined;
 }
 
 export function isCompound (clue: Any): clue is CompoundClue {
@@ -166,7 +173,7 @@ function format2 (text: string, span: number) {
 
 //
 
-export function toJSON (clue: PrimaryClue, options: any = {}): string {
+export function toJSON (clue: /*PrimaryClue*/ Common, options: any = {}): string {
     let s = '{';
     if (clue.name) {
         s += ` "name": "${clue.name}", ${format2(clue.name, 15)}`;
@@ -189,7 +196,9 @@ export function toJSON (clue: PrimaryClue, options: any = {}): string {
         s += `, "homonym": ${clue.homonym}`;
     }
     if (options.synonym) {
-        s += `, "syn total": ${clue.propertyCounts!.synonym!.total}, "syn primary": ${clue.propertyCounts!.synonym!.primary}`;
+        if (isPrimary(clue)) {
+            s += `, "syn total": ${clue.propertyCounts!.synonym!.total}, "syn primary": ${clue.propertyCounts!.synonym!.primary}`;
+        }
     }
     s += ' }';
 

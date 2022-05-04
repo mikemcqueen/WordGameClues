@@ -280,7 +280,7 @@ function mergeFrom (fromList, options = {}) {
 //
 //
 
-function assignMethods (list) {
+function assignMethods (list: any): any {
 //    list.display          = display;
     list.getSameSrcList   = getSameSrcList;
 //    list.init             = init;
@@ -299,7 +299,7 @@ function assignMethods (list) {
 //
 // args: see makeFrom()
 
-function objectFrom (args: any) {
+function objectFrom (args: any): Any {
     let clueList: CompoundClueList = [];
 
     if (args.filename) {
@@ -344,7 +344,7 @@ function objectFrom (args: any) {
 //
 //
 
-export function makeNew (): CompoundClueList {
+export function makeNew (): Any { //CompoundClueList {
     return assignMethods(Object([]));
 }
 
@@ -355,7 +355,7 @@ export function makeNew (): CompoundClueList {
 //   optional: optional flag suppresses file error
 //   array:    js array
 
-export function makeFrom (args: any): CompoundClueList {
+export function makeFrom (args: any): Any { // CompoundClueList {
     let object = objectFrom(args);
     return assignMethods(Object(object)); // .init();
 }

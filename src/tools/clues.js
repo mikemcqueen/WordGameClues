@@ -121,10 +121,10 @@ function convertUseToPrimarySources (args) {
 
     // TODO: some more clear way to extract just ".count"s into an array, then sum them
     const sum = ncList.reduce((a, b) => Object({ count: (a.count + b.count) })).count;
-    const remain = ClueManager.maxClues - sum;
+    const remain = ClueManager.getMaxClues() - sum;
     if (remain < 1) {
         console.log(`The sum of the specified clue counts (${sum})` +
-                    ` equals or exceeds the maximum clue count (${ClueManager.maxClues})`);
+                    ` equals or exceeds the maximum clue count (${ClueManager.getMaxClues()})`);
         return { success: false };
     }
     
@@ -318,7 +318,7 @@ function copyClues (fromType, options = {}) {
 //
 
 function setLogging (flag) {
-    ClueManager.logging = flag;
+    ClueManager.setLogging(flag);
     ComboMaker.logging  = flag;
     AltSources.logging  = flag;
     ComboSearch.logging = flag;
@@ -430,7 +430,7 @@ async function main () {
         */
         Show.compatibleKnownClues({
             nameList: useClueList,
-            max:      options.count ? _.toNumber(options.count) : ClueManager.maxClues,
+            max:      options.count ? _.toNumber(options.count) : ClueManager.getMaxClues(),
             root:     '../data/results/',
             format:   {
                 csv:   options.csv,

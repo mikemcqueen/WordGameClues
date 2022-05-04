@@ -23,9 +23,9 @@ const stringify	  = require('javascript-stringify').stringify;
 const Stringify2  = require('stringify-object');
 //const Validator	  = require('./validator');
 
-const ClueManager = require('./clue-manager');
+//const ClueManager = require('./clue-manager');
 //import { Instance as ClueManager } from './clue-manager';
-//import * as ClueManager from './clue-manager';
+import * as ClueManager from './clue-manager';
 
 // TODO: import * as NameCount from '../types/name-count';
 //
@@ -217,14 +217,14 @@ let getCountArray = (ncList: NCList): CountArray => {
     return ncList.reduce((array, nc) => {
 	array[nc.count] = nc.count;
 	return array;
-    }, new Int32Array(ClueManager.numPrimarySources));
+    }, new Int32Array(ClueManager.getNumPrimarySources()));
 };
 
 //
 //
 let getCountArrayAndSize = (sourceList: SourceList): CountArrayAndSize => {
     // NO: reduce
-    let array = new Int32Array(ClueManager.numPrimarySources);
+    let array = new Int32Array(ClueManager.getNumPrimarySources());
     let size = 0;
     for (let source of sourceList) {
 	for (let nc of source.primaryNameSrcList) {
@@ -997,7 +997,7 @@ let parallel_makeCombosForRange = (first: number, last: number, args: any): any 
 	    or: args.or,
 	    //useSourcesList: args.useSourcesList,
 	    fast: args.fast,
-	    load_max: ClueManager.maxClues,
+	    load_max: ClueManager.getMaxClues(),
 	    parallel: true,
 	}));
 
@@ -1244,7 +1244,7 @@ function buildUseNcLists (useArgsList: string[]): NCList[] {
 	let ncList: NCList = args.map(arg => {
 	    let nc = NameCount.makeNew(arg);
 	    if (!nc.count) throw new Error(`arg: ${arg} requires a :COUNT`);
-	    if (!_.has(ClueManager.knownClueMapArray[nc.count], nc.name)) throw new Error(`arg: ${nc} does not exist`);
+	    if (!_.has(ClueManager.getKnownClueMap(nc.count), nc.name)) throw new Error(`arg: ${nc} does not exist`);
 	    return nc;
 	});
 	useNcLists.push(ncList);

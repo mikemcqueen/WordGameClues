@@ -36,7 +36,7 @@ function getSourceClues (source, countList, nameList) {
     source = source.split(',').sort().toString();
     const count = countList.reduce((sum, count) => sum + count, 0);
     // for each name in namelist, get propertyCount(s) of knownSrcMap[count][param]
-    const srcMap = ClueManager.knownSourceMapArray[count];
+    const srcMap = ClueManager.getKnownSourceMap(count);
     const results = srcMap[source].results;
     //console.error(`results ${Stringify(results)} len(${results.length})`);
     // TODO: duplicated in getSourceClues
@@ -52,7 +52,7 @@ function getSourceClues (source, countList, nameList) {
 let GCS = 0;
 function getClueSources (name, count, nameList) {
     let sources = '';
-    const srcMap = ClueManager.knownSourceMapArray[count];
+    const srcMap = ClueManager.getKnownSourceMap(count);
     if (count === 1) {
         const source = nameList[0];
         const clue = _.find(ClueManager.getClueList(count), { name, src: source });

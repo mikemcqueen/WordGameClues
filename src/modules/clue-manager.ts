@@ -31,7 +31,7 @@ import type { ValidateSourcesResult } from './validator';
 //export const Instance = new ClueManager();
 //export Instance;
 //export default Instance;
-module.exports = new ClueManager();
+//module.exports = new ClueManager();
 //module.exports = Instance;
 
 //
@@ -45,8 +45,80 @@ const REJECTS_DIR           = 'rejects';
 
 type CountList = number[];
 
+type InternalState = {
+    clueListArray: any[];         // the JSON clue files in an array
+    maybeListArray: any[];        // the JSON maybe files in an array
+    rejectListArray: any[];       // the JSON reject files in an array
+    knownClueMapArray: any[];     // map clue name to clue src
+    knownSourceMapArray: any[];   // map known source to list of clues
+    ncResultMapList: any[];       // map known NCs to result list
+    rejectSourceMap: any;         // map reject source to true/false (currently)
+    
+    dir: string;
+
+    ignoreLoadErrors: boolean;
+    loaded: boolean;
+    logging: boolean;
+    logLevel: number;
+    
+    maxClues: number;
+    numPrimarySources: number;
+}
+
+let initialState = (): InternalState => {
+    return {
+        clueListArray: [],
+        maybeListArray: [],
+        rejectListArray: [],
+        knownClueMapArray: [],
+        knownSourceMapArray: [],
+        ncResultMapList: [],
+        rejectSourceMap: {},
+
+        dir: '',
+        
+        ignoreLoadErrors: false,
+        loaded: false,
+        logging: true,
+        logLevel: 0,
+        
+        maxClues: 0,
+        numPrimarySources: 0
+    };
+}
+
+let State: InternalState = initialState();
+
+export let isLoaded = (): boolean => { return State.loaded; }
+export function getMaxClues (): number { return State.maxClues; }
+export function getNumPrimarySources(): number { return State.numPrimarySources; }
+export function setLogging (onOff: boolean): void { State.logging = onOff; }
+
+export function getClueList (index: number): ClueList.Any {// Compound {
+    return State.clueListArray[index];
+}
+
+/*
+ClueManager.prototype.getClueList = function (count: number): ClueList.Any {
+    return clueListArray[count];
+};
+*/
+
+export function getKnownClueMap (count: number): any {
+    return State.knownClueMapArray[count];
+}
+
+export function getKnownSourceMap (count: number): any {
+    return State.knownSourceMapArray[count];
+}
+
+export function getNcResultMap (count: number): any {
+    return State.ncResultMapList[count];
+}
+
 // constructor
 
+/*
 function ClueManager () {
     this.clueListArray = [];         // the JSON clue files in an array
     this.maybeListArray = [];        // the JSON maybe files in an array
@@ -56,17 +128,14 @@ function ClueManager () {
     this.ncResultMapList = [];       // map known NCs to result list
     this.rejectSourceMap = {};       // map reject source to true/false (currently)
 
-    this.rvsSuccessSeconds = 0;
-    this.rvsFailDuration = 0;
-
     this.loaded = false;
     this.maxClues = 0;
 
 //    this.logging = false;
     this.logging = true;
-
     this.logLevel = 0;
 }
+*/
 
 //
 
@@ -92,21 +161,13 @@ function showStrList (strList) {
 
 //
 
-ClueManager.prototype.getClueList = function (index: number) : ClueList.Compound {
-    return this.clueListArray[index];
-}
-
-ClueManager.prototype.getKnownClueMap = function (count: number) : any {
-    this.knownClueMapArray[count];
-}
-
 //
 
-ClueManager.prototype.log = function (text: string) {
+let log = function (text: string) {
     let pad = '';
     let index;
-    if (this.logging) {
-        for (let index = 0; index < this.logLevel; index += 1) { pad += ' '; }
+    if (State.logging) {
+        for (let index = 0; index < State.logLevel; index += 1) { pad += ' '; }
         console.log(pad + text);
     }
 };
@@ -117,8 +178,8 @@ interface SaveClueListOptions {
     dir : string;
 }
 
-ClueManager.prototype.saveClueList = function (list, count: number, options?: SaveClueListOptions) {
-    list.save(this.getKnownFilename(count, options?.dir));
+let saveClueList = function (list, count: number, options?: SaveClueListOptions) {
+    list.save(getKnownFilename(count, options?.dir));
 };
 
 const initCluePropertyCounts = (clueList: ClueList.Primary, ignoreList: ClueList.Primary) : void => {
@@ -195,50 +256,50 @@ const autoSource = (clueList: ClueList.Primary): [ClueList.Primary, number] => {
 //  validateAll:
 //
 
-ClueManager.prototype.loadAllClues = function (args: any) {
+export let loadAllClues = function (args: any) {
     //console.error(`fast: ${args.fast}`);
-    this.dir = Clues.getDirectory(args.clues);
+    State.dir = Clues.getDirectory(args.clues);
     if (args.ignoreErrors) {
-        this.ignoreLoadErrors = true;
+        State.ignoreLoadErrors = true;
     }
-    this.maxClues = args.max; // args.clues.clueCount;
-    for (let count = 1; count <= this.maxClues; ++count) {
-        let knownClueList = this.loadClueList(count);
-        if ((count === 1) && (knownClueList[0].src == 'auto')) {
+    State.maxClues = args.max; // args.clues.clueCount;
+    for (let count = 1; count <= State.maxClues; ++count) {
+        let knownClueList: ClueList.Any = loadClueList(count);
+        if ((count === 1) && (knownClueList[0].src === 'auto')) {
 	    let numPrimarySources;
-	    [knownClueList, numPrimarySources] = autoSource(knownClueList);
-	    this.numPrimarySources = numPrimarySources;
-	}
-	this.clueListArray[count] = knownClueList;
+	    [knownClueList, numPrimarySources] = autoSource(knownClueList as ClueList.Primary);
+	    State.numPrimarySources = numPrimarySources;
+	} else if (count === 1) {
+            throw new Error('numPrimarySources not initialized without src="auto"');
+        }
+	State.clueListArray[count] = knownClueList;
         if (count === 1) {
-            this.addKnownPrimaryClues(knownClueList);
+            addKnownPrimaryClues(knownClueList as ClueList.Primary);
         }
         else {
-            this.addKnownCompoundClues(knownClueList, count, args.validateAll, args.fast);
+            addKnownCompoundClues(knownClueList as ClueList.Compound, count, args.validateAll, args.fast);
         }
     }
 
-    for (let count = 2; count <= this.maxClues; ++count) {
-        let rejectClueList;
         /*
+    for (let count = 2; count <= State.maxClues; ++count) {
+        let rejectClueList;
         try {
             rejectClueList = ClueList.makeFrom({
-                filename : this.getRejectFilename(count)
+                filename : State.getRejectFilename(count)
             });
         }
         catch (err) {
-            console.log(`WARNING! reject file: ${this.getRejectFilename(count)}, ${err}`);
+            console.log(`WARNING! reject file: ${State.getRejectFilename(count)}, ${err}`);
         }
-        */
         if (rejectClueList) {
-            this.rejectListArray[count] = rejectClueList;
-            this.addRejectCombos(rejectClueList, count);
+            State.rejectListArray[count] = rejectClueList;
+            addRejectCombos(rejectClueList, count);
         }
     }
-
-    this.loaded = true;
-
-    return this;
+        */
+    State.loaded = true;
+//    return this;
 };
 
 //
@@ -247,8 +308,8 @@ interface LoadClueListOptions {
     dir : string;
 }
 
-ClueManager.prototype.loadClueList = function (count: number, options?: LoadClueListOptions) {
-    const filename = this.getKnownFilename(count, options?.dir);
+let loadClueList = function (count: number, options?: LoadClueListOptions) {
+    const filename = getKnownFilename(count, options?.dir);
     //console.error(`filename: ${filename}`);
     return ClueList.makeFrom({
         filename,
@@ -258,9 +319,9 @@ ClueManager.prototype.loadClueList = function (count: number, options?: LoadClue
 
 //
 
-ClueManager.prototype.addPrimaryClueToMap = function (clue: Clue.Primary) {
+let addPrimaryClueToMap = function (clue: Clue.Primary) {
     const count = 1;
-    const clueMap = this.knownClueMapArray[count];
+    const clueMap = State.knownClueMapArray[count];
     if (!_.has(clueMap, clue.name!)) {
         clueMap[clue.name!] = [];
     }
@@ -269,30 +330,30 @@ ClueManager.prototype.addPrimaryClueToMap = function (clue: Clue.Primary) {
 
 //
 
-ClueManager.prototype.addKnownPrimaryClues = function (clueList: ClueList.Primary) {
+let addKnownPrimaryClues = function (clueList: ClueList.Primary) {
     const count = 1;
-    let clueMap = this.knownClueMapArray[count] = {};
+    let clueMap = State.knownClueMapArray[count] = {};
     clueList.forEach(clue => {
         if (clue.ignore) {
             return; // continue
         }
-	this.addPrimaryClueToMap(clue);
+	addPrimaryClueToMap(clue);
     });
     return this;
 };
 
 //
 
-ClueManager.prototype.getKnownFilename = function (count: number, dir: string | undefined = undefined) {
+let getKnownFilename = function (count: number, dir: string | undefined = undefined) {
     return Path.format({
-        dir: !dir ? this.dir : `${DATA_DIR}${dir}`,
+        dir: !dir ? State.dir : `${DATA_DIR}${dir}`,
         base: `clues${count}.json`
     });
 };
 
 //
 
-ClueManager.prototype.getRejectFilename = function (count: number) {
+let getRejectFilename = function (count: number) {
     return Path.format({
         dir:  `${DATA_DIR}${REJECTS_DIR}`,
         base: `rejects${count}.json`
@@ -301,9 +362,9 @@ ClueManager.prototype.getRejectFilename = function (count: number) {
 
 //
 //
-ClueManager.prototype.addCompoundClue = function (clue: Clue.Compound, count: number, validateAll = true, fast = false) {
+let addCompoundClue = function (clue: Clue.Compound, count: number, validateAll = true, fast = false) {
     let nameList = clue.src.split(',').sort();
-    let srcMap = this.knownSourceMapArray[count];
+    let srcMap = State.knownSourceMapArray[count];
     let srcKey = nameList.toString();
     // new sources need to be validated
     let vsResult : ValidateSourcesResult = { success: true };
@@ -326,9 +387,9 @@ ClueManager.prototype.addCompoundClue = function (clue: Clue.Compound, count: nu
     }
 
     if (vsResult.success && validateAll) {
-	let ncResultMap = this.ncResultMapList[count];
+	let ncResultMap = State.ncResultMapList[count];
 	if (!ncResultMap) {
-	    ncResultMap = this.ncResultMapList[count] = {};
+	    ncResultMap = State.ncResultMapList[count] = {};
 	}
 	let ncStr = NameCount.makeNew(clue.name, count).toString();
 	if (!ncResultMap[ncStr]) {
@@ -345,14 +406,14 @@ ClueManager.prototype.addCompoundClue = function (clue: Clue.Compound, count: nu
 
 //
 
-ClueManager.prototype.addKnownCompoundClues = function (clueList: ClueList.Compound, clueCount: number, validateAll: boolean, fast: boolean) {
+let addKnownCompoundClues = function (clueList: ClueList.Compound, clueCount: number, validateAll: boolean, fast: boolean) {
     // so this is currently only callable once per clueCount.
     //Expect(this.knownClueMapArray[clueCount]).is.undefined();
     //Expect(clueCount > 1);
-    this.knownClueMapArray[clueCount] = {};
+    State.knownClueMapArray[clueCount] = {};
     //if (clueCount > 1) {
     //Expect(this.knownSourceMapArray[clueCount]).is.undefined();
-        this.knownSourceMapArray[clueCount] = {};
+        State.knownSourceMapArray[clueCount] = {};
     //}
     clueList.forEach(clue => {
         if (clue.ignore) {
@@ -361,28 +422,28 @@ ClueManager.prototype.addKnownCompoundClues = function (clueList: ClueList.Compo
 	let nameList = clue.src.split(',').sort();
 	clue.src = nameList.toString();
 	//if (clueCount > 1) {
-	let result = this.addCompoundClue(clue, clueCount, validateAll, fast);
-        if (!this.ignoreLoadErrors) {
+	let result = addCompoundClue(clue, clueCount, validateAll, fast);
+        if (!State.ignoreLoadErrors) {
 	    if (!result.success) {
 		console.log(`VALIDATE FAILED KNOWN COMPOUND CLUE: '${clue.src}':${clueCount}`);
 	    }
             //Expect(result.success);
         }
 	//}
-        this.addKnownClue(clueCount, clue.name, clue.src);
+        addKnownClue(clueCount, clue.name, clue.src);
     }, this);
     return this;
 };
 
 //
 
-ClueManager.prototype.addKnownClue = function (count: number, name: string, source: string, nothrow: boolean) {
-    let clueMap = this.knownClueMapArray[count];
+let addKnownClue = function (count: number, name: string, source: string, nothrow: boolean = false) {
+    let clueMap = State.knownClueMapArray[count];
     if (!_.has(clueMap, name)) {
-        this.log(`clueMap[${name}] = [ ${source} ]`);
+        log(`clueMap[${name}] = [ ${source} ]`);
         clueMap[name] = [source];
     } else if (!clueMap[name].includes(source)) {
-        this.log(`clueMap[${name}] += ${source} (${count})`);
+        log(`clueMap[${name}] += ${source} (${count})`);
         clueMap[name].push(source);
     } else {
         if (nothrow) return false;
@@ -395,8 +456,8 @@ ClueManager.prototype.addKnownClue = function (count: number, name: string, sour
 
 //
 
-ClueManager.prototype.removeKnownClue = function (count: number, name: string, source: string, nothrow) {
-    let clueMap = this.knownClueMapArray[count];
+let removeKnownClue = function (count: number, name: string, source: string, nothrow) {
+    let clueMap = State.knownClueMapArray[count];
     if (!_.has(clueMap, name) || !clueMap[name].includes(source)) {
         if (nothrow) return false;
         throw new Error(`removeKnownClue, missing clue: ${name}:${source} at count: ${count}`);
@@ -411,25 +472,25 @@ ClueManager.prototype.removeKnownClue = function (count: number, name: string, s
 
 //
 
-ClueManager.prototype.saveClues = function (counts: number | number[]) {
+let saveClues = function (counts: number | number[]) {
     if (_.isNumber(counts)) {
         counts = [counts];
     }
     Debug(`saving clueLists ${counts}`);
     for (const count of counts) {
-        this.saveClueList(this.clueListArray[count], count);
-        Debug(`saved clueList ${count}, length: ${this.clueListArray[count].length}`);
+        saveClueList(State.clueListArray[count], count);
+        Debug(`saved clueList ${count}, length: ${State.clueListArray[count].length}`);
     }
 };
 
 //
 
-ClueManager.prototype.addClue = function (count: number, clue, save = false, nothrow = false) {
+let addClue = function (count: number, clue, save = false, nothrow = false) {
     clue.src = clue.src.split(',').sort().toString();
-    if (this.addKnownClue(count, clue.name, clue.src, nothrow)) {
-        this.clueListArray[count].push(clue);
+    if (addKnownClue(count, clue.name, clue.src, nothrow)) {
+        State.clueListArray[count].push(clue);
         if (save) {
-            this.saveClues(count);
+            saveClues(count);
         }
         return true;
     }
@@ -438,15 +499,15 @@ ClueManager.prototype.addClue = function (count: number, clue, save = false, not
 
 //
 
-ClueManager.prototype.removeClue = function (count: number, clue: Clue.Compound, save = false, nothrow = false): boolean {
+let removeClue = function (count: number, clue: Clue.Compound, save = false, nothrow = false): boolean {
     // sort src
     clue.src = clue.src.split(',').sort().toString();
-    if (this.removeKnownClue(count, clue.name, clue.src, nothrow)) {
-        _.remove(this.clueListArray[count], function (elem: Clue.Compound) {
+    if (removeKnownClue(count, clue.name, clue.src, nothrow)) {
+        _.remove(State.clueListArray[count], function (elem: Clue.Compound) {
             return (elem.name === clue.name) && (elem.src === clue.src);
         });
         if (save) {
-            this.saveClues(count);
+            saveClues(count);
         }
         return true;
     }
@@ -455,7 +516,7 @@ ClueManager.prototype.removeClue = function (count: number, clue: Clue.Compound,
 
 //
 
-ClueManager.prototype.addMaybe = function (name: string, srcNameList: string | string[], note: string | undefined, save = false) {
+let addMaybe = function (name: string, srcNameList: string | string[], note: string | undefined, save = false) {
     return false;
     /*
     if (typeof srcNameList === "string") {
@@ -481,43 +542,43 @@ ClueManager.prototype.addMaybe = function (name: string, srcNameList: string | s
 
 //
 
-ClueManager.prototype.addRejectCombos = function (clueList: ClueList.Compound, clueCount: number) {
+let addRejectCombos = function (clueList: ClueList.Compound, clueCount: number) {
     clueList.forEach(clue => {
         let srcNameList = clue.src.split(',');
         if (_.size(srcNameList) !== clueCount) {
-            this.log(`WARNING! reject word count mismatch` +
+            log(`WARNING! reject word count mismatch` +
                      `, expected {clueCount}, actual ${_.size(srcNameList)}, ${srcNameList}`);
         }
-        this.addRejectSource(srcNameList);
+        addRejectSource(srcNameList);
     });
     return this;
 };
 
 //
 
-ClueManager.prototype.saveRejects = function (counts: number | number[]): void {
+let saveRejects = function (counts: number | number[]): void {
     if (_.isNumber(counts)) {
         counts = [counts];
     }
     counts.forEach(count => {
-        this.rejectListArray[count].save(this.getRejectFilename(count));
+        State.rejectListArray[count].save(getRejectFilename(count));
     });
 };
 
 //
 
-ClueManager.prototype.addReject = function (srcNameList: string | string[], save = false): boolean {
+let addReject = function (srcNameList: string | string[], save = false): boolean {
     if (_.isString(srcNameList)) {
         srcNameList = srcNameList.split(',');
     }
     let count = _.size(srcNameList);
     //Expect(count).is.above(1); // at.least(2);
-    if (this.addRejectSource(srcNameList)) {
-        this.rejectListArray[count].push({
+    if (addRejectSource(srcNameList)) {
+        State.rejectListArray[count].push({
             src: _.toString(srcNameList)
         });
         if (save) {
-            this.rejectListArray[count].save(this.getRejectFilename(count));
+            State.rejectListArray[count].save(getRejectFilename(count));
         }
         return true;
     }
@@ -526,53 +587,55 @@ ClueManager.prototype.addReject = function (srcNameList: string | string[], save
 
 //
 
-ClueManager.prototype.addRejectSource = function (srcNameList: string | string[]): boolean {
+let addRejectSource = function (srcNameList: string | string[]): boolean {
     if (_.isString(srcNameList)) {
         srcNameList = srcNameList.split(',');
     }
     //Expect(srcNameList).is.an.Array().and.not.empty();
     srcNameList.sort();
-    this.log('addRejectSource: ' + srcNameList);
+    log('addRejectSource: ' + srcNameList);
 
-    if (this.isKnownSource(srcNameList.toString())) {
+    if (isKnownSource(srcNameList.toString())) {
         console.log('WARNING! not rejecting known source, ' + srcNameList);
         return false;
     }
-    if (this.isRejectSource(srcNameList)) {
+    if (isRejectSource(srcNameList)) {
         console.log('WARNING! duplicate reject source, ' + srcNameList);
         // i had this return false commented out for some reason,
         // but it should be here.
         return false;
     }
-    this.rejectSourceMap[srcNameList.toString()] = true;
+    State.rejectSourceMap[srcNameList.toString()] = true;
     return true;
 };
 
 // source is string containing sorted, comma-separated clues
 
-ClueManager.prototype.isKnownSource = function (source: string, count = 0): boolean {
+let isKnownSource = function (source: string, count = 0): boolean {
     // check for supplied count
     if (count > 0) {
-        return _.has(this.knownSourceMapArray[count], source);
+        return _.has(State.knownSourceMapArray[count], source);
     }
     // check for all counts
-    return this.knownSourceMapArray.some(srcMap => _.has(srcMap, source));
+    return State.knownSourceMapArray.some(srcMap => _.has(srcMap, source));
 };
 
 // source: csv string or array of strings
 
-ClueManager.prototype.isRejectSource = function (source: string | string[]): boolean {
-    return _.has(this.rejectSourceMap, source.toString());
+let isRejectSource = function (source: string | string[]): boolean {
+    return _.has(State.rejectSourceMap, source.toString());
 };
 
 //
 
-ClueManager.prototype.getCountListForName = (name: string): CountList => {
+export let getCountListForName = (name: string): CountList => {
     let countList: CountList = [];
     // TODO: HACK this as any
-    for (const [index, clueMap] of (this as any).knownClueMapArray.entries()) {
+    for (const [index, clueMap] of State.knownClueMapArray.entries()) {
         if (_.has(clueMap, name)) {
             countList.push(index);
+        } else {
+            console.log(`${index}: ${clueMap}`);
         }
     };
     return countList;
@@ -580,17 +643,17 @@ ClueManager.prototype.getCountListForName = (name: string): CountList => {
 
 //
 
-ClueManager.prototype.getSrcListForNc = function (nc: NameCount.Type): any { // TODO
-    let clueMap = this.knownClueMapArray[nc.count];
+let getSrcListForNc = function (nc: NameCount.Type): any { // TODO
+    let clueMap = State.knownClueMapArray[nc.count];
     return clueMap[nc.name];
 };
 
 //
 
-ClueManager.prototype.getSrcListMapForName = function (name: string): any {
+let getSrcListMapForName = function (name: string): any {
     let srcListMap = {};
-    for (let index = 1; index < this.maxClues; ++index) {
-        let srcList = this.knownClueMapArray[index][name];
+    for (let index = 1; index < State.maxClues; ++index) {
+        let srcList = State.knownClueMapArray[index][name];
         if (srcList) {
             srcListMap[index] = srcList;
         }
@@ -600,9 +663,9 @@ ClueManager.prototype.getSrcListMapForName = function (name: string): any {
 
 // TODO this is failing with ncList.length > 1
 
-ClueManager.prototype.primaryNcListToNameSrcLists = function (ncList: NameCount.List): any { // TODO
+let primaryNcListToNameSrcLists = function (ncList: NameCount.List): any { // TODO
     let log = 0 && (ncList.length > 1); // nameSrcLists.length > 1) {
-    let srcLists = ncList.map(nc => this.primaryNcToSrcList(nc));
+    let srcLists = ncList.map(nc => primaryNcToSrcList(nc));
     let indexLists = srcLists.map(srcList => [...Array(srcList.length).keys()]);  // e.g. [ [ 0 ], [ 0, 1 ], [ 0 ], [ 0 ] ]
     let nameSrcLists = Peco.makeNew({
         listArray: indexLists,
@@ -623,9 +686,9 @@ ClueManager.prototype.primaryNcListToNameSrcLists = function (ncList: NameCount.
 
 //
 
-ClueManager.prototype.primaryNcListToNameSrcSets = function (ncList: NameCount.List): any { // TODO
+let primaryNcListToNameSrcSets = function (ncList: NameCount.List): any { // TODO
     let log = 0 && (ncList.length > 1); // nameSrcLists.length > 1) {
-    let srcLists = ncList.map(nc => this.primaryNcToSrcList(nc));
+    let srcLists = ncList.map(nc => primaryNcToSrcList(nc));
     let indexLists = srcLists.map(srcList => [...Array(srcList.length).keys()]);  // e.g. [ [ 0 ], [ 0, 1 ], [ 0 ], [ 0 ] ]
     let nameSrcSets = Peco.makeNew({
         listArray: indexLists,
@@ -654,17 +717,17 @@ ClueManager.prototype.primaryNcListToNameSrcSets = function (ncList: NameCount.L
 
 //
 
-ClueManager.prototype.primaryNcToSrcList = function (nc: NameCount.Type): any[] { // TODO
+let primaryNcToSrcList = function (nc: NameCount.Type): any[] { // TODO
     if (nc.count !== 1) throw new Error(`nc.count must be 1 (${nc})`);
-    const source = this.knownClueMapArray[1][nc.name];
+    const source = State.knownClueMapArray[1][nc.name];
     return _.isArray(source) ? source : [ source ];
 };
 
 //
 
-ClueManager.prototype.makeSrcNameListArray = function (nc: NameCount.Type): any[] {
+let makeSrcNameListArray = function (nc: NameCount.Type): any[] {
     let srcNameListArray: any[] = [];
-    this.getSrcListForNc(nc).forEach(src => {
+    getSrcListForNc(nc).forEach(src => {
         srcNameListArray.push(src.split(','));
     });
     return srcNameListArray;
@@ -683,7 +746,7 @@ ClueManager.prototype.makeSrcNameListArray = function (nc: NameCount.Type): any[
 // array of lists of clueLists of the corresponding clue counts, such
 // as [ [clues1, clues2], [clues2, clues1] ].
 
-ClueManager.prototype.getClueSourceListArray = function (args: any): any {
+export let getClueSourceListArray = function (args: any): any {
     Log.info(`++clueSrcListArray` +
              `, sum: ${args.sum}, max: ${args.max}, require: ${args.require}`);
 
@@ -701,11 +764,11 @@ ClueManager.prototype.getClueSourceListArray = function (args: any): any {
         let clueSourceList: any[] = [];
         if (clueCountList.every(count => {
             // empty lists not allowed
-            if (_.isEmpty(this.clueListArray[count])) {
+            if (_.isEmpty(State.clueListArray[count])) {
                 return false;
             }
             clueSourceList.push({ 
-                list:  this.clueListArray[count],
+                list:  State.clueListArray[count],
                 count
             });
             return true;
@@ -725,7 +788,7 @@ ClueManager.prototype.getClueSourceListArray = function (args: any): any {
 
 //
 
-ClueManager.prototype.filterAddends = function (addends: any, sizes: any): any[] {
+let filterAddends = function (addends: any, sizes: any): any[] {
     let filtered: any[] = [];
     addends.forEach(list => {
         if (sizes.every(size => {
@@ -739,21 +802,21 @@ ClueManager.prototype.filterAddends = function (addends: any, sizes: any): any[]
 
 //
 
-ClueManager.prototype.filter = function (srcCsvList: any, clueCount: number, map = {}): any {
+export let filter = function (srcCsvList: any, clueCount: number, map = {}): any {
     let known = 0;
     let reject = 0;
     let duplicate = 0;
     srcCsvList.forEach(srcCsv => {
-        if (this.isRejectSource(srcCsv)) {
-            this.log(`isRejectSource(${clueCount}) ${srcCsv}`);
+        if (isRejectSource(srcCsv)) {
+            log(`isRejectSource(${clueCount}) ${srcCsv}`);
             ++reject;
         } else {
-            if (this.isKnownSource(srcCsv, clueCount)) {
-		this.log(`isKnownSource(${clueCount}) ${srcCsv}`);
+            if (isKnownSource(srcCsv, clueCount)) {
+		log(`isKnownSource(${clueCount}) ${srcCsv}`);
 		++known;
 	    }
             if (_.has(map, srcCsv)) {
-                this.log(`duplicate: ${srcCsv}`);
+                log(`duplicate: ${srcCsv}`);
                 ++duplicate;
             }
             map[srcCsv] = true;
@@ -780,8 +843,8 @@ function singleEntry (nc: NameCount.Type, source: number): any {
 
 //
 
-ClueManager.prototype.getKnownSourceMapEntries = function (nc: NameCount.Type, andSources = false) {
-    const clueMap = this.knownClueMapArray[nc.count];
+export let getKnownSourceMapEntries = function (nc: NameCount.Type, andSources = false) {
+    const clueMap = State.knownClueMapArray[nc.count];
     if (!clueMap) throw new Error(`No clueMap at ${nc.count}`);
     const sourcesList = clueMap[nc.name];
     if (!sourcesList) throw new Error(`No sourcesList at ${nc.name}`);
@@ -802,7 +865,7 @@ ClueManager.prototype.getKnownSourceMapEntries = function (nc: NameCount.Type, a
 
     return sourcesList.map(sources => sources.split(',').sort().toString()) // sort sources
 	.map((sources, index) => {
-	    const entry = (nc.count === 1) ? singleEntry(nc, sourcesList[index]) : this.knownSourceMapArray[nc.count][sources];
+	    const entry = (nc.count === 1) ? singleEntry(nc, sourcesList[index]) : State.knownSourceMapArray[nc.count][sources];
 	    //console.log(` sources: ${sources}`); // entry: ${Stringify(entry)}, entry2: ${Stringify(entry2)}`);
 	    return andSources ? { entry, sources } : entry;
 	}); 
@@ -810,13 +873,13 @@ ClueManager.prototype.getKnownSourceMapEntries = function (nc: NameCount.Type, a
 
 //
 
-ClueManager.prototype.getKnownClues = function (nameList: string | string[]): any {
+let getKnownClues = function (nameList: string | string[]): any {
     if (_.isString(nameList)) {
         nameList = nameList.split(',');
     }
     const sourceCsv = nameList.sort().toString();
     let nameClueMap = {};
-    this.knownSourceMapArray.forEach(srcMap => {
+    State.knownSourceMapArray.forEach(srcMap => {
         if (_.has(srcMap, sourceCsv)) {
             for (const clue of srcMap[sourceCsv].clues) {
                 if (!_.has(nameClueMap, clue.name)) {
@@ -831,18 +894,18 @@ ClueManager.prototype.getKnownClues = function (nameList: string | string[]): an
 
 //
 
-ClueManager.prototype.getKnownClueNames = function (nameList: string | string[]): string[] {
-    return _.keys(this.getKnownClues(nameList));
+let getKnownClueNames = function (nameList: string | string[]): string[] {
+    return _.keys(getKnownClues(nameList));
 };
 
 //
 
-ClueManager.prototype.getClueCountListArray = function (nameList: string[]): CountList[] {
+let getClueCountListArray = function (nameList: string[]): CountList[] {
     // each count list contains the clueMapArray indexes in which
     // each name appears
     let countListArray: CountList[] = Array(_.size(nameList)).fill(0).map(_ => []);
-    for (let count = 1; count <= this.maxClues; ++count) {
-        let map = this.knownClueMapArray[count];
+    for (let count = 1; count <= State.maxClues; ++count) {
+        let map = State.knownClueMapArray[count];
         //Expect(map).is.ok(); // I know this will fail when I move to synth clues
         nameList.forEach((name, index) => {
             if (_.has(map, name)) {
@@ -855,15 +918,15 @@ ClueManager.prototype.getClueCountListArray = function (nameList: string[]): Cou
 
 //
 
-ClueManager.prototype.getValidCounts = function (nameList: string[], countListArray: any): number[] {
-    if ((nameList.length === 1) || this.isRejectSource(nameList)) return [];
+let getValidCounts = function (nameList: string[], countListArray: any): number[] {
+    if ((nameList.length === 1) || isRejectSource(nameList)) return [];
 
     let addCountSet = new Set<number>();
     let known = false;
     let reject = false;
     Peco.makeNew({
         listArray: countListArray,
-        max:       this.maxClues
+        max:       State.maxClues
     }).getCombinations().forEach(clueCountList => {
         Debug(`nameList: ${nameList}, clueCountList: ${clueCountList}`);
         let sum = clueCountList.reduce((a, b) => a + b);
@@ -883,16 +946,16 @@ ClueManager.prototype.getValidCounts = function (nameList: string[], countListAr
 
 //
 
-ClueManager.prototype.getCountList = function (nameOrList: string | string[]) {
+let getCountList = function (nameOrList: string | string[]) {
     return _.isString(nameOrList)
-        ? this.getCountListForName(nameOrList)
-        : this.getValidCounts(nameOrList, this.getClueCountListArray(nameOrList));
+        ? getCountListForName(nameOrList)
+        : getValidCounts(nameOrList, getClueCountListArray(nameOrList));
 };
 
 //
 //
-ClueManager.prototype.getPrimaryClue = function (nameSrc: NameCount.Type): Clue.Primary {
-    for (const clue of this.clueListArray[1]) {
+export let getPrimaryClue = function (nameSrc: NameCount.Type): Clue.Primary {
+    for (const clue of State.clueListArray[1]) {
 	if (clue.name == nameSrc.name && clue.src == nameSrc.count) return clue;
     }
     throw new Error(`can't find clue: ${nameSrc}`);
@@ -900,10 +963,10 @@ ClueManager.prototype.getPrimaryClue = function (nameSrc: NameCount.Type): Clue.
 
 //
 
-ClueManager.prototype.getPrimarySources = function (): any {
+let getPrimarySources = function (): any {
     let primarySources: string[] = [];
     let hash = {};
-    for (const clue of this.getClueList(1)) {
+    for (const clue of getClueList(1)) {
         if (_.has(hash, clue.src)) continue;
         primarySources.push(clue.src);
         hash[clue.src] = true;
@@ -914,9 +977,9 @@ ClueManager.prototype.getPrimarySources = function (): any {
 
 //
 
-ClueManager.prototype.getInversePrimarySources = function (sources: any[]): any[] {
+export let getInversePrimarySources = function (sources: any[]): any[] {
     let inverseSources: string[] = [];
-    for (const src of this.getPrimarySources()) {
+    for (const src of getPrimarySources()) {
         if (_.includes(sources, src)) continue;
         inverseSources.push(src);
     }
@@ -925,15 +988,15 @@ ClueManager.prototype.getInversePrimarySources = function (sources: any[]): any[
 
 //
 
-ClueManager.prototype.addClueForCounts = function (countSet: Set<number>, name: string, src: string, options: any) {
+let addClueForCounts = function (countSet: Set<number>, name: string, src: string, options: any) {
     const clue: Clue.Compound = { name, src };
     return Array.from(countSet)
         .reduce((added: number, count: number) => {
             if (options.compound) {
-	        let result = this.addCompoundClue(clue, count, true, true);
+	        let result = addCompoundClue(clue, count, true, true);
                 if (!result.success) throw new Error(`addCompoundclue failed, ${clue}:${count}`);
             }
-            if (this.addClue(count, clue, options.save, true)) { // save, nothrow
+            if (addClue(count, clue, options.save, true)) { // save, nothrow
                 console.log(`${count}: added ${name} as ${src}`);
 	        added += 1;
             } else {
@@ -945,10 +1008,10 @@ ClueManager.prototype.addClueForCounts = function (countSet: Set<number>, name: 
 
 //
 
-ClueManager.prototype.removeClueForCounts = function (countSet: Set<number>, name: string, src: string, options: any = {}) {
+let removeClueForCounts = function (countSet: Set<number>, name: string, src: string, options: any = {}) {
     let removed = 0;
     for (let count of countSet.keys()) {
-        if (this.removeClue(count, {
+        if (removeClue(count, {
             name: name,
             src:  src
         }, options.save, options.nothrow)) {
@@ -965,11 +1028,11 @@ ClueManager.prototype.removeClueForCounts = function (countSet: Set<number>, nam
 // each count list contains the clueMapArray indexes in which
 // each name appears
 
-ClueManager.prototype.getKnownClueIndexLists = function (nameList: string[]): any[] {
+let getKnownClueIndexLists = function (nameList: string[]): any[] {
     let countListArray: CountList[] = Array(_.size(nameList)).fill(0).map(_ => []);
     //Debug(countListArray);
-    for (let count = 1; count <= this.maxClues; ++count) {
-        const map = this.knownClueMapArray[count];
+    for (let count = 1; count <= State.maxClues; ++count) {
+        const map = State.knownClueMapArray[count];
         if (!_.isUndefined(map)) {
             nameList.forEach((name, index) => {
                 if (_.has(map, name)) {
@@ -997,7 +1060,7 @@ ClueManager.prototype.getKnownClueIndexLists = function (nameList: string[]): an
 //   isReject
 //
 
-ClueManager.prototype.addRemoveOrReject = function (args: any, nameList: string[], countSet: Set<number>, options: any = {}) {
+export let addRemoveOrReject = function (args: any, nameList: string[], countSet: Set<number>, options: any = {}) {
     let count = 0;
     if (args.add) {
         if (nameList.length === 1) {
@@ -1005,7 +1068,7 @@ ClueManager.prototype.addRemoveOrReject = function (args: any, nameList: string[
         } else if (args.isReject) {
             console.log('WARNING! cannot add known clue: already rejected, ' + nameList);
         } else {
-            count = this.addClueForCounts(countSet, args.add, nameList.toString(), options);
+            count = addClueForCounts(countSet, args.add, nameList.toString(), options);
         }
     } else if (args.remove) {
         Debug(`remove [${args.remove}] as ${nameList} from ${[...countSet.values()]}`);
@@ -1013,14 +1076,14 @@ ClueManager.prototype.addRemoveOrReject = function (args: any, nameList: string[
             console.log('WARNING! ignoring --remove due to single source');
         } else {
             let removeOptions = { save: options.save, nothrow: true };
-            count = this.removeClueForCounts(countSet, args.remove, nameList.toString(), removeOptions);
+            count = removeClueForCounts(countSet, args.remove, nameList.toString(), removeOptions);
         }
     } else if (args.reject) {
         if (nameList.length === 1) {
             console.log('WARNING! ignoring --reject due to single source');
         } else if (args.isKnown) {
             console.log('WARNING! cannot add reject clue: already known, ' + nameList);
-        } else if (this.addReject(nameList.toString(), true)) {
+        } else if (addReject(nameList.toString(), true)) {
             console.log('updated');
         }
         else {
@@ -1046,8 +1109,8 @@ let isAnySubListEmpty = (listOfLists: any): boolean => {
     return false;
 };
 
-ClueManager.prototype.getAllCountListCombosForNameList = function (nameList: string[], max = 999): any { // TODO technically, clue-types[variety].max_clues
-    const countListArray = this.getKnownClueIndexLists(nameList);
+let getAllCountListCombosForNameList = function (nameList: string[], max = 999): any { // TODO technically, clue-types[variety].max_clues
+    const countListArray = getKnownClueIndexLists(nameList);
     Debug(countListArray);
     if (isAnySubListEmpty(countListArray)) return [];
     return Peco.makeNew({
@@ -1056,29 +1119,29 @@ ClueManager.prototype.getAllCountListCombosForNameList = function (nameList: str
     }).getCombinations();
 };
 
-ClueManager.prototype.buildNcListFromNameListAndCountList = function (nameList: string[], countList: number[]): NameCount.List {
+let buildNcListFromNameListAndCountList = function (nameList: string[], countList: number[]): NameCount.List {
     return countList.map((count, index) => NameCount.makeNew(nameList[index], count));
 };
 
-ClueManager.prototype.buildNcListsFromNameListAndCountLists = function (nameList: string[], countLists: any[]): NameCount.List[] {
+let buildNcListsFromNameListAndCountLists = function (nameList: string[], countLists: any[]): NameCount.List[] {
     let ncLists: NameCount.List[] = [];
     for (const countList of countLists) {
-	ncLists.push(this.buildNcListFromNameListAndCountList(nameList, countList));
+	ncLists.push(buildNcListFromNameListAndCountList(nameList, countList));
     }
     return ncLists;
 };
 
-ClueManager.prototype.buildNcListsFromNameList = function (nameList: string[]): NameCount.List[] {
-    const countLists = this.getAllCountListCombosForNameList(nameList);
+export let buildNcListsFromNameList = function (nameList: string[]): NameCount.List[] {
+    const countLists = getAllCountListCombosForNameList(nameList);
     if (_.isEmpty(countLists)) {
 	Debug('empty countLists or sublist');
         return [];
     }
     Debug(countLists);
-    return this.buildNcListsFromNameListAndCountLists(nameList, countLists);
+    return buildNcListsFromNameListAndCountLists(nameList, countLists);
 };
 
-ClueManager.prototype.getListOfPrimaryNameSrcLists = function (ncList: NameCount.List): NameCount.List[] {
+let getListOfPrimaryNameSrcLists = function (ncList: NameCount.List): NameCount.List[] {
     // TODO: can use reduce() here too 
     let listOfPrimaryNameSrcLists: NameCount.List[] = [];
     //console.log(`ncList: ${ncList}`);
@@ -1088,7 +1151,7 @@ ClueManager.prototype.getListOfPrimaryNameSrcLists = function (ncList: NameCount
 	let lastIndex = -1;
 	let entries;
 	for (;;) {
-	    entries = this.getKnownSourceMapEntries(nc, true);
+	    entries = getKnownSourceMapEntries(nc, true);
 	    if (!_.isArray(entries) || _.isEmpty(entries)) {
 		console.log(`  explosion, nc: ${nc}, `); //entries: ${Stringify(entries)}`);
 		process.exit(-1);
@@ -1116,12 +1179,12 @@ ClueManager.prototype.getListOfPrimaryNameSrcLists = function (ncList: NameCount
 	    //console.log(`adding nc: ${nc}, sources ${sources}`); // entries: ${Stringify(entries)}`);
 
 	    const clue = { name: nc.name, src: sources };
-	    this.addCompoundClue(clue, nc.count, true);
+	    addCompoundClue(clue, nc.count, true);
 	    //
 	    // TODO
 	    //
 	    // call addClue here too
-	    //this.addClue(clue, nc.count)
+	    //addClue(clue, nc.count)
 	    lastIndex = currIndex;
 	}
 
@@ -1148,13 +1211,13 @@ ClueManager.prototype.getListOfPrimaryNameSrcLists = function (ncList: NameCount
     return listOfPrimaryNameSrcLists;
 };
 
-ClueManager.prototype.origbuildListsOfPrimaryNameSrcLists = function (ncLists: NameCount.List[]): any[] {
-    return ncLists.map(ncList => this.getListOfPrimaryNameSrcLists(ncList));
+export let origbuildListsOfPrimaryNameSrcLists = function (ncLists: NameCount.List[]): any[] {
+    return ncLists.map(ncList => getListOfPrimaryNameSrcLists(ncList));
 };
 
-ClueManager.prototype.buildListsOfPrimaryNameSrcLists = function (ncLists: NameCount.List[]): any[] {
+let buildListsOfPrimaryNameSrcLists = function (ncLists: NameCount.List[]): any[] {
     return ncLists.map(ncList => {
-	let result = this.getListOfPrimaryNameSrcLists(ncList);
+	let result = getListOfPrimaryNameSrcLists(ncList);
 	if (!result[0][0]) {
 	    console.log(`ncList ${ncList}`);
 	}
@@ -1198,19 +1261,19 @@ function getCompatiblePrimaryNameSrcList (listOfListOfPrimaryNameSrcLists: any[]
 // that might be a good compromise (have to supply fast:true or default to fast).
 //
 
-ClueManager.prototype.fast_getCountListArrays = function (nameCsv: string, options: any): any[] {
+export let fast_getCountListArrays = function (nameCsv: string, options: any): any[] {
     const nameList = nameCsv.split(',').sort();
     Debug(`fast_getCountListArrays for ${nameList}`);
 
     /// TODO, check if existing sourcelist (knownSourceMapArray)
 
-    const ncLists = this.buildNcListsFromNameList(nameList);
+    const ncLists = buildNcListsFromNameList(nameList);
     //console.log(`ncLists: ${ncLists}`);
     if (_.isEmpty(ncLists)) {
 	console.log(`No ncLists for ${nameList}`);
 	return [];
     }
-    return this.buildListsOfPrimaryNameSrcLists(ncLists).reduce((compatibleNcLists, listOfListOfPrimaryNameSrcLists, index) => {
+    return buildListsOfPrimaryNameSrcLists(ncLists).reduce((compatibleNcLists, listOfListOfPrimaryNameSrcLists, index) => {
 	const compatibleNameSrcList = getCompatiblePrimaryNameSrcList(listOfListOfPrimaryNameSrcLists);
 	console.log(`${ncLists[index]}  ${compatibleNameSrcList ? 'VALID' : 'invalid'}`);
 	if (compatibleNameSrcList) {
@@ -1229,14 +1292,14 @@ ClueManager.prototype.fast_getCountListArrays = function (nameCsv: string, optio
 
 let invalidHash = {}; // hax
 
-ClueManager.prototype.getCountListArrays = function (nameCsv: string, options: any): any {
+export let getCountListArrays = function (nameCsv: string, options: any): any {
     const validateAll = options.any ? false : true;
     const nameList = nameCsv.split(',').sort();
     Debug(`++getCountListArrays(${nameList})`);
 
     /// TODO, check if existing sourcelist (knownSourceMapArray)
 
-    const resultList = this.getAllCountListCombosForNameList(nameList);
+    const resultList = getAllCountListCombosForNameList(nameList);
     if (_.isEmpty(resultList)) {
         console.log(`No matches for ${nameList}`);
         return null;
@@ -1279,11 +1342,11 @@ ClueManager.prototype.getCountListArrays = function (nameCsv: string, options: a
         if (!result.success) {
 	    //console.log(`invalid: ${nameList}  CL ${clueCountList}  x ${x} sum ${sum}  validateAll=${validateAll}`);
             invalid.push(clueCountList);
-        } else if (this.isRejectSource(nameList)) {
+        } else if (isRejectSource(nameList)) {
             rejects.push(clueCountList);
         } else if (nameList.length === 1) {
             let name = nameList[0];
-            let srcList = this.clueListArray[sum]
+            let srcList = State.clueListArray[sum]
                 .filter(clue => clue.name === name)
                 .map(clue => clue.src);
             if (srcList.length > 0) {
@@ -1301,7 +1364,7 @@ ClueManager.prototype.getCountListArrays = function (nameCsv: string, options: a
                 clues.push({ countList: clueCountList, nameList: srcList });
             }
         } else {
-            let any = this.knownSourceMapArray[sum][nameList.toString()];
+            let any = State.knownSourceMapArray[sum][nameList.toString()];
             if (any) {
                 known.push({ countList: clueCountList, nameList: any.clues.map(clue => clue.name) });
             } else {
@@ -1315,10 +1378,6 @@ ClueManager.prototype.getCountListArrays = function (nameCsv: string, options: a
     return { valid, known, rejects, invalid, clues, addRemoveSet };
 };
 
-ClueManager.prototype.getClueList = function (count: number): ClueList.Any {
-    return this.clueListArray[count];
-};
-
 // haxy.  Consider: Extends Clue.Compound + count: number
 interface ClueIndex extends NameCount.Type {
     source: string;  // csv of names, or primary source #
@@ -1328,15 +1387,15 @@ interface ResultMapNode extends ClueIndex {
     recurse: boolean;
 }
 
-ClueManager.prototype.getClue = function (clueIndex: ClueIndex): Clue.Any {
-    const list = this.getClueList(clueIndex.count);
+let getClue = function (clueIndex: ClueIndex): Clue.Any {
+    const list = getClueList(clueIndex.count);
     // TODO:consider "restrict fields" to name/src if extend Clue.Compound
-    let clue: Clue.Any = _.find(list, { name: clueIndex.name, src: clueIndex.source });
+    let clue: Clue.Any = _.find(list, { name: clueIndex.name, src: clueIndex.source }) as Clue.Any;
     if (clue) return clue;
     
     console.error(`no clue for ${clueIndex.name}:${clueIndex.count} as ${clueIndex.source}(${typeof clueIndex.source})`);
     // TODO:consider "restrict fields" to name if extend Clue.Compound
-    clue = _.find(list, { name: clueIndex.name });
+    clue = _.find(list, { name: clueIndex.name }) as Clue.Any;
     if (clue) console.error(`  found ${clueIndex.name} in ${clueIndex.count} as ${Stringify(clue)}`);
     throw new Error(`no clue`);
 };
@@ -1378,7 +1437,7 @@ ClueManager.prototype.getClue = function (clueIndex: ClueIndex): Clue.Any {
 //  ]
 //}
 //
-ClueManager.prototype.recursiveGetCluePropertyCount = function (
+export let recursiveGetCluePropertyCount = function (
     nc: NameCount.Type | null,
     resultMap: any, // object | string[] | NameCount.Type[] ? probably fix resultMap before attempting this.
     propertyName: Clue.CountedProperty.Name,
@@ -1446,12 +1505,17 @@ ClueManager.prototype.recursiveGetCluePropertyCount = function (
     let counts: Clue.CountedProperty.Counts = { total: 0, primary: 0 };
     for (let node of nodes) {
         if (loggy) console.log(Stringify(node));
-        const clue = this.getClue(node);
-        // add pre-compunted propertyCount data to total, if it exists (primary clues only)
-        clue.propertyCounts && Clue.CountedProperty.add(counts, clue.propertyCounts[propertyName]);
-        // if this is a compound clue node, there is no propertyCount data, so just add the
-        // count (1 or 0) of the properties on the clue itself
-        node.count > 1 && Clue.CountedProperty.add(counts, Clue.CountedProperty.getCounts(clue, propertyName));
+        const clue = getClue(node);
+        // primary clues only: add pre-compunted propertyCount data to total, if it exists
+        if (Clue.isPrimary(clue)) {
+            clue.propertyCounts && Clue.CountedProperty.add(counts, clue.propertyCounts[propertyName]);
+        } else {
+            // sanity:
+            if (node.count <= 1) throw new Error('wat');
+            // compound clue: there is no propertyCount data, so just add the  count (1 or 0)
+            // of the properties on the clue itself
+            /*node.count > 1 && */ Clue.CountedProperty.add(counts, Clue.CountedProperty.getCounts(clue, propertyName));
+        }
         if (loggy) {
             if (clue[propertyName]) {
                 console.log(`^^${propertyName}! total${counts.total} primary(${counts.primary}`);
@@ -1461,7 +1525,7 @@ ClueManager.prototype.recursiveGetCluePropertyCount = function (
         }
         if (node.recurse) {
 	    let val = resultMap[NameCount.makeCanonicalName(node.name, node.count)];
-            Clue.CountedProperty.add(counts, this.recursiveGetCluePropertyCount(null, val, propertyName, false));
+            Clue.CountedProperty.add(counts, recursiveGetCluePropertyCount(null, val, propertyName, false));
         }
     }
     return counts;

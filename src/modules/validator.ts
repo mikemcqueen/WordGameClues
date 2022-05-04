@@ -9,7 +9,7 @@ import _ from 'lodash'; // import statement to signal that we are a "module"
 const Peco        = require('../../modules/peco');
 const ResultMap   = require('../../types/result-map');
 
-const ClueManager = require('./clue-manager');
+//const ClueManager = require('./clue-manager');
 const Debug       = require('debug')('validator');
 const Expect      = require('should/as-function');
 const stringify	  = require('javascript-stringify').stringify;
@@ -17,13 +17,13 @@ const Stringify2  = require('stringify-object');
 const Timing      = require('debug')('timing');
 
 import * as ClueList from '../types/clue-list';
+import * as ClueManager from './clue-manager';
 import * as NameCount from '../types/name-count';
-//import { Instance as CM } from './clue-manager';
-let CM;
 
-console.log(`cm: ${Stringify(Object.keys(ClueManager))}`);
-console.log(`cm instance: ${ClueManager.Instance}`);
-console.log(`Instance: ${CM}`);
+//let CM;
+//console.log(`cm: ${Stringify(Object.keys(ClueManager))}`);
+//console.log(`cm instance: ${ClueManager.Instance}`);
+//console.log(`Instance: ${CM}`);
 
 
 function Stringify(val: any) {
@@ -388,7 +388,7 @@ let findPrimarySourceConflicts = (args: any): any => {
             nameMap[nc.name] = true;
         }
 
-        let srcList = ClueManager.knownClueMapArray[1][nc.name];
+        let srcList = ClueManager.getKnownClueMap(1)[nc.name];
         //console.log(`srcList for ${nc.name}:1, ${srcList}`);
         // look for an as-yet-unused src for the given clue name
         if (!srcList.some((src: any) => {
@@ -457,7 +457,7 @@ let resolvePrimarySourceConflicts = (args: any): any => {
         if (!srcList.some((src: any) => {
             // look for alternate unused sources for candidateName
             let candidateName = args.srcMap[src];
-            let candidateSrcList = ClueManager.knownClueMapArray[1][candidateName];
+            let candidateSrcList = ClueManager.getKnownClueMap(1)[candidateName];
             Debug(`Candidate sources for ${candidateName}:${src} are [${candidateSrcList}]`);
             if (candidateSrcList.some((candidateSrc: any) => {
                 if (!_.has(args.srcMap, candidateSrc)) {
@@ -596,7 +596,7 @@ let buildSrcNameList = (args: any): any => {
     args.ncList.forEach((nc: /*NameCount.Type*/ any, ncIndex: number) => {
         let src: number = args.allPrimary ? 1 : nc.count;
         // i.e. srcNameCsvArray
-        let srcList: string[] = ClueManager.knownClueMapArray[src][nc.name]; // e.g. [ 'src1,src2,src3', 'src2,src3,src4' ]
+        let srcList: string[] = ClueManager.getKnownClueMap(src)[nc.name]; // e.g. [ 'src1,src2,src3', 'src2,src3,src4' ]
         if (!srcList) throw new Error('kind of impossible but missing clue!');
 
         // only do indexing if all clues are primary, or if this
@@ -943,7 +943,7 @@ let checkUniqueSources = (nameCountList: NameCount.List, args: any): ValidateSou
             // break down all compound clues into source components
             buildArgs.ncList = nameCountList;
             buildResult = buildSrcNameList(buildArgs);
-            if (xp) Expect(buildResult.count).is.belowOrEqual(ClueManager.maxClues);
+            if (xp) Expect(buildResult.count).is.belowOrEqual(ClueManager.getMaxClues());
 
             // skip recursive call to validateSources if we have all primary clues
             if (buildResult.allPrimary) {
@@ -1042,7 +1042,7 @@ let allHaveSameClueNumber = (nameSrcList: NameCount.List, clueNumber: number): b
 //
 //
 let getPrimaryClueSources = (name: string): number[] => {
-    let clueList: { name: string, src: string }[] = ClueManager.clueListArray[1];
+    let clueList: { name: string, src: string }[] = ClueManager.getClueList(1);
     let sources: number[] = clueList.filter(clue => clue.name === name).map(clue => _.toNumber(clue.src));
     if (_.isEmpty(sources)) throw new Error(`can't find: ${name}`);
     return sources;
@@ -1061,7 +1061,7 @@ let mergeNcListResults = (ncListToMerge: NameCount.List, args: any): ValidateSou
 	NN = true;
     }
     let arrayList: NumberArrayList = ncListToMerge.map(nc => {
-	let ncResultMap = ClueManager.ncResultMapList[nc.count];
+	let ncResultMap = ClueManager.getNcResultMap(nc.count);
 	if (nc.count === 1) {
 	    return getPrimaryClueSources(nc.name);
 	} else {
@@ -1082,7 +1082,7 @@ let mergeNcListResults = (ncListToMerge: NameCount.List, args: any): ValidateSou
 	indexList.forEach((resultIndex, ncIndex) => { // TODO: resultIndex kinda bad name, can also be clue source for primary clues
 	    let nc = ncListToMerge[ncIndex];
 	    if (nc.count > 1) {
-		let result = ClueManager.ncResultMapList[nc.count][nc.toString()].list[resultIndex];
+		let result = ClueManager.getNcResultMap(nc.count)[nc.toString()].list[resultIndex];
 		if (NN) console.log(`merging ${nc} as ${result.ncList}: ${Stringify(result)}`);
 		ncList.push(...result.ncList);
 		nameSrcList.push(...result.nameSrcList);
@@ -1129,7 +1129,7 @@ let mergeNcListResults = (ncListToMerge: NameCount.List, args: any): ValidateSou
 let test = (ncList: NameCount.List, args: any): ValidateSourcesResult => {
     // can remove this.
     if (!ncList.every(nc => {
-	let ncResultMap = ClueManager.ncResultMapList[nc.count];
+	let ncResultMap = ClueManager.getNcResultMap(nc.count);
 	let ncStr = nc.toString();
 	if (nc.count === 1 || (ncResultMap[ncStr] && ncResultMap[ncStr].list)) {
 	    return true;
@@ -1165,7 +1165,7 @@ let rvsWorker = (args: any): ValidateSourcesResult => {
         Expect(args.name).is.a.String().and.not.empty();
         Expect(args.count).is.a.Number()
             .aboveOrEqual(1)
-            .belowOrEqual(ClueManager.maxClues);
+            .belowOrEqual(ClueManager.getMaxClues());
         Expect(args.ncList).is.an.Array();
         Expect(args.nameList).is.an.Array();
     }
@@ -1255,7 +1255,6 @@ let recursiveValidateSources = (args: any): ValidateSourcesResult => {
     // count is checked for a name, no need to check it again
 
     let someResult = args.clueCountList.some((count: number) => {
-        console.log(`cm: ${Stringify(Object.keys(ClueManager))}`);
         if (!_.has(ClueManager.getKnownClueMap(count), clueName)) {
             return false; // some.continue
         }
