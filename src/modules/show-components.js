@@ -7,6 +7,7 @@
 //import _ from 'lodash';
 const _           = require('lodash');
 
+const Clue        = require('../dist/types/clue');
 const ClueManager = require('../dist/modules/clue-manager');
 const NameCount   = require('../dist/types/name-count');
 const Validator   = require('../dist/modules/validator');
@@ -19,9 +20,6 @@ const Readlines   = require('n-readlines');
 const stringify   = require('javascript-stringify').stringify;
 const Stringify2  = require('stringify-object');
 const Timing      = require('debug')('timing');
-
-const Clue = require('../dist/types/clue');
-//import { CountedProperty } from '../dist/types/clue';
 
 function Stringify (val) {
     return stringify(val, (value, indent, stringify) => {
@@ -148,6 +146,7 @@ function show (options) {
     const count = ClueManager.addRemoveOrReject({
         add:      options.add,
         remove:   options.remove,
+        property: options.property,
         reject:   options.reject,
         isKnown:  !_.isEmpty(result.known),
         isReject: !_.isEmpty(result.reject)
@@ -163,7 +162,8 @@ function addOrRemove (args, nameList, countSet, options) {
     const save = _.isUndefined(options.save) ? true : options.save;
     const count = ClueManager.addRemoveOrReject({
         add:      options.add,
-        remove:   options.remove
+        remove:   options.remove,
+        property: options.property,
     }, nameList, countSet, { save });
     console.log(`${options.add ? "added" : "removed"} ${count} clues`);
 }
@@ -248,8 +248,9 @@ function fast_combo_wrapper (nameList, /*allOrNcDataList,*/ options) {
     } else {
 	let counts = fast_combos(nameList, options);
         addOrRemove ({
-            add: options.add,
-            remove: options.remove,
+            add:      options.add,
+            remove:   options.remove,
+            property: options.property
         }, nameList, counts, options);
     }
 }
@@ -393,7 +394,7 @@ function valid_combos(combo_list, options = {}) {
 }
 
 function all_combos(input_list, word_list) {
-    const combos =u< [];
+    const combos = [];
     for (const csvInput of input_list) {
 	const input = csvInput.split(',');
 	for (const word of word_list) {

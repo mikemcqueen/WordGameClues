@@ -48,8 +48,8 @@ let bootstrap = (args) => {
 	console.log(`bootstrap sources: ${Stringify(onesources)}`);
 	console.log(`JSON.stringify bootstrap sources: ${JSON.stringify(onesources)}`);
     }
-    ClueManager.logging = false;
-    if (!ClueManager.loaded) {
+    ClueManager.setLogging(true);
+    if (!ClueManager.isLoaded()) {
 	loadClues(Clues.getByOptions(args), args.load_max);
     }
     let combos = ComboMaker.makeCombosForSum(args.sum, args.max, args);

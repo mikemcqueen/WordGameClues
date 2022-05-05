@@ -79,7 +79,7 @@ let initialState = (): InternalState => {
         
         ignoreLoadErrors: false,
         loaded: false,
-        logging: true,
+        logging: false,
         logLevel: 0,
         
         maxClues: 0,
@@ -440,7 +440,7 @@ let addKnownCompoundClues = function (clueList: ClueList.Compound, clueCount: nu
 let addKnownClue = function (count: number, name: string, source: string, nothrow: boolean = false) {
     let clueMap = State.knownClueMapArray[count];
     if (!_.has(clueMap, name)) {
-        log(`clueMap[${name}] = [ ${source} ]`);
+        log(`clueMap[${name}] = [${source}]`);
         clueMap[name] = [source];
     } else if (!clueMap[name].includes(source)) {
         log(`clueMap[${name}] += ${source} (${count})`);
@@ -986,38 +986,55 @@ export let getInversePrimarySources = function (sources: any[]): any[] {
 
 //
 
-let addClueForCounts = function (countSet: Set<number>, name: string, src: string, options: any) {
+let addClueForCounts = function (countSet: Set<number>, name: string, src: string, propertyName: string, options: any) {
     const clue: Clue.Compound = { name, src };
     return Array.from(countSet)
         .reduce((added: number, count: number) => {
-            if (options.compound) {
-	        let result = addCompoundClue(clue, count, true, true);
-                if (!result.success) throw new Error(`addCompoundclue failed, ${clue}:${count}`);
-            }
-            if (addClue(count, clue, options.save, true)) { // save, nothrow
-                console.log(`${count}: added ${name} as ${src}`);
-	        added += 1;
+            if (!propertyName) {
+                if (options.compound) {
+	            let result = addCompoundClue(clue, count, true, true);
+                    if (!result.success) throw new Error(`addCompoundclue failed, ${clue}:${count}`);
+                }
+                if (addClue(count, clue, options.save, true)) { // save, nothrow
+                    console.log(`${count}: added ${name} as ${src}`);
+	            added += 1;
+                } else {
+                    console.log(`${count}: ${name} already present`);
+	        }
             } else {
-                console.log(`${count}: ${name} already present`);
-	    }
+                const list = getClueList(count);
+                let foundClue: Clue.Compound | undefined = _.find(list, clue);
+                if (foundClue) {
+                    foundClue[propertyName] = true;
+                    console.log(`${count}: added '${propertyName}' property to ${name}:${src}`);
+	            added += 1;
+                }
+            }
 	    return added;
         }, 0);
 };
 
 //
 
-let removeClueForCounts = function (countSet: Set<number>, name: string, src: string, options: any = {}) {
+let removeClueForCounts = function (countSet: Set<number>, name: string, src: string, propertyName: string, options: any = {}) {
     let removed = 0;
     for (let count of countSet.keys()) {
-        if (removeClue(count, {
-            name: name,
-            src:  src
-        }, options.save, options.nothrow)) {
-            Debug(`removed ${name}:${count}`);
-            removed += 1;
+        if (!propertyName) {
+            if (removeClue(count, { name, src }, options.save, options.nothrow)) {
+                Debug(`removed ${name}:${count}`);
+                removed += 1;
+            } else {
+                // not sure this should ever happen. removeClue throws atm.
+                Debug(`${name}:${count} not present`);
+            }
         } else {
-            // not sure this should ever happen. removeClue throws atm.
-            Debug(`${name}:${count} not present`);
+            const list = getClueList(count);
+            let foundClue: Clue.Compound | undefined = _.find(list, { name, src });
+            if (foundClue) {
+                delete foundClue[propertyName];
+                console.log(`${count}: removed '${propertyName}' property from ${name}:${src}`);
+	        removed += 1;
+            }
         }
     }
     return removed;
@@ -1060,13 +1077,14 @@ let getKnownClueIndexLists = function (nameList: string[]): any[] {
 
 export let addRemoveOrReject = function (args: any, nameList: string[], countSet: Set<number>, options: any = {}) {
     let count = 0;
+    nameList = nameList.sort();
     if (args.add) {
         if (nameList.length === 1) {
             console.log('WARNING! ignoring --add due to single source');
         } else if (args.isReject) {
             console.log('WARNING! cannot add known clue: already rejected, ' + nameList);
         } else {
-            count = addClueForCounts(countSet, args.add, nameList.toString(), options);
+            count = addClueForCounts(countSet, args.add, nameList.toString(), args.property, options);
         }
     } else if (args.remove) {
         Debug(`remove [${args.remove}] as ${nameList} from ${[...countSet.values()]}`);
@@ -1074,7 +1092,7 @@ export let addRemoveOrReject = function (args: any, nameList: string[], countSet
             console.log('WARNING! ignoring --remove due to single source');
         } else {
             let removeOptions = { save: options.save, nothrow: true };
-            count = removeClueForCounts(countSet, args.remove, nameList.toString(), removeOptions);
+            count = removeClueForCounts(countSet, args.remove, nameList.toString(), args.property, removeOptions);
         }
     } else if (args.reject) {
         if (nameList.length === 1) {
