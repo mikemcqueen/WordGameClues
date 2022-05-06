@@ -24,28 +24,9 @@ import * as ClueManager from './clue-manager';
 import * as NameCount from '../types/name-count';
 import { ValidateResult } from './validator';
 
-/*
-// TODO: import * as NameCount from '../types/name-count';
-//
-//
-interface NameCount {
-    name: string;
-    count: number;
-}
-type NCList = NameCount[];
-*/
-
 interface StringBoolMap {
     [key: string]: boolean; // for now; eventually maybe array of string (sorted primary nameSrcCsv)
 }
-
-interface StringAnyMap {
-    [key: string]: any;
-}
-
-// TODO
-//
-//type ValidateResult = any;
 
 //
 //
@@ -76,6 +57,23 @@ interface SourceData extends SourceBase {
 }
 type SourceList = SourceData[];
 type AnySourceData = LazySourceData | SourceData;
+
+
+/* TODO:
+interface LazySourceHashEntry { 
+    sourceList: LazySourceData[];
+    isCompatible: boolean;
+}
+
+interface LazySourceHashMap {
+    [key: string]: LazySourceHashEntry;
+}
+
+replaces: StringAnyMap
+*/
+interface StringAnyMap {
+    [key: string]: any;
+}
 
 //
 //
@@ -108,10 +106,9 @@ interface UseSource extends UseSourceBase {
 }
 
 type StrNumTuple = [str: string, num: number];
-type StringNumberMap = Map<string, number>;
 
 interface PreComputedData {
-    orSourcesNcCsvMap: StringNumberMap;
+    orSourcesNcCsvMap: Map<string, number>;
     useSourcesList: UseSource[];
 }
 
@@ -131,6 +128,7 @@ let loggy = false;
 let ZZ = 0;
 let AA = false;
 
+// TODO: as const;
 const Op = {
     'and':1,
     'or':2,
@@ -141,7 +139,6 @@ Object.freeze(Op);
 function OpName (opValue: number): string | undefined {
     return _.findKey(Op, (v: number) => opValue === v);
 }
-
 
 //
 // see: showNcLists
@@ -339,7 +336,7 @@ function buildSrcNcList (resultMap: any): string[] {
 //
 //
 let populateSourceData = (lazySource: SourceBase, nc: NameCount.Type, validateResult: ValidateResult,
-			  orSourcesNcCsvMap: StringNumberMap): SourceData => {
+			  orSourcesNcCsvMap: Map<string, number>): SourceData => {
     let source: SourceData = lazySource /*as SourceBase*/ as SourceData;
     if (validateResult.resultMap) {
 	const ncCsvList = buildSrcNcList(validateResult.resultMap.map());
@@ -361,10 +358,10 @@ let populateSourceData = (lazySource: SourceBase, nc: NameCount.Type, validateRe
     return source;
 };
 
-// TODO: get rid of lazy flag. if map provided, it's not lazy.
+//
 //
 let getSourceData = (nc: NameCount.Type, validateResult: ValidateResult, lazy: boolean,
-		     orSourcesNcCsvMap: StringNumberMap | undefined = undefined): AnySourceData => {
+		     orSourcesNcCsvMap?: Map<string, number>): AnySourceData => {
     const primaryNameSrcList: NameCount.List = validateResult.nameSrcList;
     return lazy
 	? { primaryNameSrcList,	ncList: [nc], validateResultList: [validateResult] }
@@ -443,7 +440,8 @@ let mergeCompatibleSourceLists = (sourceList1: AnySourceData[], sourceList2: Any
 //
 //
 let mergeAllCompatibleSources = (ncList: NameCount.List, lazy = false): AnySourceData[] => {
-    if (ncList.length > 2) { // because **maybe** broken for > 2 below
+    // because **maybe** broken for > 2 below
+    if (ncList.length > 2) { 
 	throw new Error(`${ncList} length > 2 (${ncList.length})`);
     }
     // TODO: reduce (or some) here
@@ -451,7 +449,8 @@ let mergeAllCompatibleSources = (ncList: NameCount.List, lazy = false): AnySourc
     for (let ncIndex = 1; ncIndex < ncList.length; ncIndex += 1) {
 	const nextSourceList = getSourceList(ncList[ncIndex], lazy);
 	sourceList = mergeCompatibleSourceLists(sourceList, nextSourceList, lazy);
-	if (_.isEmpty(sourceList)) break; // TODO BUG this is broken for > 2; should be something like: if (sourceList.length !== ncIndex + 1) 
+        // TODO BUG this is broken for > 2; should be something like: if (sourceList.length !== ncIndex + 1) 
+	if (_.isEmpty(sourceList)) break;
     }
     return sourceList;
 };
@@ -776,7 +775,7 @@ let first = (countList: number[], sourceIndexes: number[]): FirstNextResult => {
 //
 //
 let isCompatibleWithAnyOrSource = (source: SourceData, useSource: UseSource,
-				   orSourcesNcCsvMap: StringNumberMap): boolean => {
+				   orSourcesNcCsvMap: Map<string, number>): boolean => {
     let orSource = useSource.orSource!;
     if (0 && AA) {
 	console.log(`orSource: ${Stringify2(orSource)}`);
@@ -805,7 +804,7 @@ let isCompatibleWithAnyOrSource = (source: SourceData, useSource: UseSource,
 //
 //
 let isCompatibleWithUseSources = (sourceList: SourceList, useSourceList: UseSource[],
-				  orSourcesNcCsvMap: StringNumberMap): boolean => {
+				  orSourcesNcCsvMap: Map<string, number>): boolean => {
     if (_.isEmpty(useSourceList)) return true;
     // TODO: some
     for (let source of sourceList) {
@@ -832,7 +831,7 @@ let isCompatibleWithUseSources = (sourceList: SourceList, useSourceList: UseSour
 //
 // Return a list of fully merged sources.
 //
-let loadAndMergeSourceList = (lazySourceList: LazySourceData[], orSourcesNcCsvMap: StringNumberMap): SourceList => {
+let loadAndMergeSourceList = (lazySourceList: LazySourceData[], orSourcesNcCsvMap: Map<string, number>): SourceList => {
     let sourceList: SourceList = []
     for (let lazySource of lazySourceList) {
 	if (lazySource.ncList.length !== 2) throw new Error(`lazySource.ncList.length(${lazySource.ncList.length})`);
@@ -873,7 +872,7 @@ let getCombosForUseNcLists = (sum: number, max: number, args: PreComputedData): 
 	AA = false;
 	comboCount += 1;
 
-	//console.log(`sum(${sum}) max(${max}) clueSrcList: ${Stringify(clueSourceList)}`);
+	//console.log(`sum(${sum}) max(${max}) countList: ${Stringify(countList)}`);
 	let sourceIndexes: number[] = [];
 	let result = first(countList, sourceIndexes);
 	if (result.done) return; // continue; 
@@ -907,6 +906,7 @@ let getCombosForUseNcLists = (sum: number, max: number, args: PreComputedData): 
 	    }
 
 	    //const key = NameCount.listToString(result.ncList);
+            // TODO: ncList.sort is bad mojo. NameCount.sort(ncList) is better
 	    const key: string = result.ncList!.sort().toString();
 	    let cacheHit = false;
 	    let sourceList: LazySourceData[];
@@ -1183,7 +1183,7 @@ let getCompatibleUseSourcesFromNcData = (args: any): UseSource[] => {
 
 //
 //
-let getOrSourcesNcCsvCountMap = (useSourcesList: UseSource[]): StringNumberMap => {
+let getOrSourcesNcCsvCountMap = (useSourcesList: UseSource[]): Map<string, number> => {
     let map = new Map<string, number>();
     for (let useSource of useSourcesList) {
 	let orSource = useSource.orSource!;

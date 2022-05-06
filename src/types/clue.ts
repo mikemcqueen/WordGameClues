@@ -34,6 +34,9 @@ interface Common {
     skip?: boolean;
     synonym?: boolean;
     homonym?: boolean;
+
+    // runtime only, not in schema
+    propertyCounts?: CountedProperty.Map;
 }
 
 // for primary sources only
@@ -51,9 +54,6 @@ interface PrimaryClue extends Common {
     _?: string;
 
     restrictToSameClueNumber?: boolean;
-
-    // runtime only, not in schema
-    propertyCounts?: CountedProperty.Map;
 }
 
 interface CompoundClue extends Common {
@@ -172,6 +172,7 @@ function format2 (text: string, span: number) {
 }
 
 //
+// uh. this is named wrong. toString() ?
 
 export function toJSON (clue: /*PrimaryClue*/ Common, options: any = {}): string {
     let s = '{';
@@ -195,8 +196,8 @@ export function toJSON (clue: /*PrimaryClue*/ Common, options: any = {}): string
     if (clue.homonym) {
         s += `, "homonym": ${clue.homonym}`;
     }
-    if (options.synonym) {
-        if (isPrimary(clue)) {
+    if (isPrimary(clue)) {
+        if (options.synonym) {
             s += `, "syn total": ${clue.propertyCounts!.synonym!.total}, "syn primary": ${clue.propertyCounts!.synonym!.primary}`;
         }
     }

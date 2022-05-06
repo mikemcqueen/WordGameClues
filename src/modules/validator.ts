@@ -16,15 +16,10 @@ const stringify	  = require('javascript-stringify').stringify;
 const Stringify2  = require('stringify-object');
 const Timing      = require('debug')('timing');
 
+import * as Clue from '../types/clue';
 import * as ClueList from '../types/clue-list';
 import * as ClueManager from './clue-manager';
 import * as NameCount from '../types/name-count';
-
-//let CM;
-//console.log(`cm: ${Stringify(Object.keys(ClueManager))}`);
-//console.log(`cm instance: ${ClueManager.Instance}`);
-//console.log(`Instance: ${CM}`);
-
 
 function Stringify(val: any) {
     return stringify(val, (value: any, indent: any, stringify: any) => {
@@ -66,6 +61,7 @@ export interface ValidateResult extends CandidateResult {
     nameSrcList: NameCount.List;
     nameSrcCsv?: string;
 //    primarySrcArray?: CountArray;
+    propertyCounts?: Clue.CountedProperty.Map;
 }
 
 export interface ValidateSourcesResult {
@@ -74,16 +70,9 @@ export interface ValidateSourcesResult {
 }
 
 export type NumberArray = number[]; // TODO: Int32Array
-type NumberArrayList = NumberArray[];
 
-
-/*
-let log = function (text) {
-    Debug(`${indent()}${text}`);
-}
- */
-
-
+//
+//
 let spaces = (length: number): string => {
     return ' '.repeat(length);
 };
@@ -1060,7 +1049,7 @@ let mergeNcListResults = (ncListToMerge: NameCount.List, args: any): ValidateSou
 	console.log(`merging: ${ncStr}\n-----------------------------------`);
 	NN = true;
     }
-    let arrayList: NumberArrayList = ncListToMerge.map(nc => {
+    let arrayList: NumberArray[] = ncListToMerge.map(nc => {
 	let ncResultMap = ClueManager.getNcResultMap(nc.count);
 	if (nc.count === 1) {
 	    return getPrimaryClueSources(nc.name);

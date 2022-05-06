@@ -71,7 +71,8 @@ function getClueSources (name, count, nameList) {
             }
             */
             const countsList = results.map(result =>
-                ClueManager.recursiveGetCluePropertyCount({ name, count }, result.resultMap.internal_map, Clue.CountedProperty.Enum.Synonym));
+                ClueManager.recursiveGetCluePropertyCount({ name, count }, result.resultMap.internal_map,
+                                                          Clue.CountedProperty.Enum.Synonym));
             // TODO: duplicated in getSourceClues
             const totals = countsList.map(tp => tp.total);
             const primarys = countsList.map(tp => tp.primary);
@@ -110,10 +111,6 @@ function show (options) {
     if (options.reject) {
         Expect(options.add).is.undefined();
     }
-
-    //
-    // TODO: call ClueManager.getCountLists
-    //
 
     // TODO: move buildAllUseNcDataLists to clue-manager?  currently in combo-maker
 
@@ -172,11 +169,13 @@ function addOrRemove (args, nameList, countSet, options) {
 
 function getCompatiblePrimaryNameSrcList (listOfListOfPrimaryNameSrcLists) {
     //console.log(`${Stringify(listOfListOfPrimaryNameSrcLists)}`);
-    const listArray = listOfListOfPrimaryNameSrcLists.map(listOfNameSrcLists => [...Array(listOfNameSrcLists.length).keys()]); // 0..nameSrcList.length
+    const listArray = listOfListOfPrimaryNameSrcLists.map(listOfNameSrcLists =>
+        [...Array(listOfNameSrcLists.length).keys()]); // 0..nameSrcList.length
     //console.log(`++++ ListArray\n${Stringify(listArray)}\n---- ListArray`);
     let comboLists = Peco.makeNew({
         listArray,
-        max: listOfListOfPrimaryNameSrcLists.reduce((sum, listOfNameSrcLists) => sum + listOfNameSrcLists.length, 0)
+        max: listOfListOfPrimaryNameSrcLists.reduce((sum, listOfNameSrcLists) =>
+            sum + listOfNameSrcLists.length, 0)
     }).getCombinations();
 
     //console.log(`${Stringify(comboLists)}`);
@@ -186,7 +185,8 @@ function getCompatiblePrimaryNameSrcList (listOfListOfPrimaryNameSrcLists) {
 	    let nsList = listOfListOfPrimaryNameSrcLists[comboListIndex][comboListValue];
 	    //console.log(`nameSrcList: ${nameSrcList}, clValue ${comboListValue}, clIndex ${comboListIndex}, nsList: ${nsList}`);
 	    if (!nsList || !_.isArray(nsList)) {
-		console.log(`nsList: ${nsList}, value ${comboListValue} index ${comboListIndex} lolPnsl(${comboListIndex}): ${Stringify(listOfListOfPrimaryNameSrcLists[comboListIndex])} nameSrcList ${Stringify(nameSrcList)}`);
+		console.log(`nsList: ${nsList}, value ${comboListValue} index ${comboListIndex} lolPnsl(${comboListIndex}):` +
+                            ` ${Stringify(listOfListOfPrimaryNameSrcLists[comboListIndex])} nameSrcList ${Stringify(nameSrcList)}`);
 		console.log(`lolopnsl: ${Stringify(listOfListOfPrimaryNameSrcLists)}`);
 	    }
 	    nameSrcList.push(...nsList);
@@ -236,7 +236,8 @@ function fast_combo_wrapper (nameList, /*allOrNcDataList,*/ options) {
 		let subList = buildSubListFromIndexList(clueNameList, comboList);
 		let comboNameList = [...nameList, ...subList];
 		//console.log(`comboNameList: ${comboNameList}`);
-		let validResultList = fast_combos_list(comboNameList, Object.assign(_.clone(options), { quiet: true, skip_invalid: true }));
+		let validResultList = fast_combos_list(comboNameList, Object.assign(
+                    _.clone(options), { quiet: true, skip_invalid: true }));
 		addValidResults(validResults, validResultList, { slice_index: nameList.length });
 	    }
 	    Timing(`comboCount: ${comboCount}`);
