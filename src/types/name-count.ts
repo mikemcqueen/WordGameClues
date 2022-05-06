@@ -119,7 +119,7 @@ export function makeCanonicalName (name: string, count: number, index?: number):
     return s;
 }
 
-function listToString (ncList) {
+export function listToString (ncList: List): string {
     if (!ncList) return _.toString(ncList);
     return ncList.map(nc => nc.toString()).toString();
 }

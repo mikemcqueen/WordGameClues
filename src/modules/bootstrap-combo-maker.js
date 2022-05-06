@@ -48,7 +48,7 @@ let bootstrap = (args) => {
 	console.log(`bootstrap sources: ${Stringify(onesources)}`);
 	console.log(`JSON.stringify bootstrap sources: ${JSON.stringify(onesources)}`);
     }
-    ClueManager.setLogging(true);
+    ClueManager.setLogging(false);
     if (!ClueManager.isLoaded()) {
 	loadClues(Clues.getByOptions(args), args.load_max);
     }

@@ -1,4 +1,4 @@
-///
+//
 // combo-maker.ts
 //
 
@@ -15,26 +15,14 @@ const ClueList	  = require('../types/clue-list');
 const Debug	  = require('debug')('combo-maker');
 const Duration	  = require('duration');
 const Expect	  = require('should/as-function');
-const NameCount	  = require('../types/name-count');
 const OS	  = require('os');
 const Parallel	  = require('paralleljs');
 const PrettyMs	  = require('pretty-ms');
 const stringify	  = require('javascript-stringify').stringify;
 const Stringify2  = require('stringify-object');
-//const Validator	  = require('./validator');
 
-//const ClueManager = require('./clue-manager');
-//import { Instance as ClueManager } from './clue-manager';
 import * as ClueManager from './clue-manager';
-
-// TODO: import * as NameCount from '../types/name-count';
-//
-//
-interface NameCount {
-    name: string;
-    count: number;
-}
-type NCList = NameCount[];
+import * as NameCount from '../types/name-count';
 
 interface StringBoolMap {
     [key: string]: boolean; // for now; eventually maybe array of string (sorted primary nameSrcCsv)
@@ -51,27 +39,27 @@ type ValidateResult = any;
 //
 //
 interface NCData {
-    ncList: NCList;
+    ncList: NameCount.List;
 }
 type NCDataList = NCData[];
 
 //
 //
 interface SourceBase {
-    primaryNameSrcList: NCList;
+    primaryNameSrcList: NameCount.List;
 }
 
 //
 //
 interface LazySourceData extends SourceBase {
-    ncList: NCList;
+    ncList: NameCount.List;
     validateResultList: ValidateResult[];
 }
 
 //
 //
 interface SourceData extends SourceBase {
-    ncList: NCList;
+    ncList: NameCount.List;
     sourceNcCsvList: string[];
     ncCsv?: string;
 }
@@ -90,7 +78,7 @@ interface CountArrayAndSize {
 
 interface UseSourceBase extends SourceBase {
     primarySrcArray: CountArray;
-    ncList: NCList;
+    ncList: NameCount.List;
 }
 
 interface XorSource extends UseSourceBase {
@@ -147,7 +135,7 @@ function OpName (opValue: number): string | undefined {
 
 //
 // see: showNcLists
-let listOfNcListsToString = (listOfNcLists: NCList[]): string => {
+let listOfNcListsToString = (listOfNcLists: NameCount.List[]): string => {
     if (!listOfNcLists) return _.toString(listOfNcLists);
     let result = "";
     listOfNcLists.forEach((ncList, index) => {
@@ -174,7 +162,7 @@ let stringifySourceList = (sourceList: SourceList): string => {
     return result + "\n]";
 };
 
-function showNcLists (ncLists: NCList[]): string {
+function showNcLists (ncLists: NameCount.List[]): string {
     let str = "";
     let first = true;
     for (let ncList of ncLists) {
@@ -187,7 +175,7 @@ function showNcLists (ncLists: NCList[]): string {
 
 //
 //
-let allCountUnique = (nameSrcList1: NCList, nameSrcList2: NCList): boolean => {
+let allCountUnique = (nameSrcList1: NameCount.List, nameSrcList2: NameCount.List): boolean => {
     let set: Set<number> = new Set<number>();
     for (let nameSrc of nameSrcList1) {
 	set.add(nameSrc.count);
@@ -201,7 +189,7 @@ let allCountUnique = (nameSrcList1: NCList, nameSrcList2: NCList): boolean => {
 
 // 
 //
-let anyCountInArray = (ncList: NCList, countArray: CountArray): boolean => {
+let anyCountInArray = (ncList: NameCount.List, countArray: CountArray): boolean => {
     return ncList.some(nc => countArray[nc.count] === nc.count);
 };
 
@@ -213,7 +201,7 @@ let anyNumberInArray = (numberList: number[], countArray: CountArray): boolean =
 
 //
 //
-let getCountArray = (ncList: NCList): CountArray => {
+let getCountArray = (ncList: NameCount.List): CountArray => {
     return ncList.reduce((array, nc) => {
 	array[nc.count] = nc.count;
 	return array;
@@ -237,13 +225,13 @@ let getCountArrayAndSize = (sourceList: SourceList): CountArrayAndSize => {
 
 //
 //
-let getCountListNotInArray = (ncList: NCList, countArray: CountArray): number[] => {
+let getCountListNotInArray = (ncList: NameCount.List, countArray: CountArray): number[] => {
     return ncList.map(nc => nc.count).filter(count => countArray[count] !== count);
 };
 
 //
 //
-let  getNumCountsInArray = (ncList: NCList, countArray: CountArray): number => {
+let  getNumCountsInArray = (ncList: NameCount.List, countArray: CountArray): number => {
     // TODO: reduce
     let count = 0;
     for (let nc of ncList) {
@@ -254,7 +242,7 @@ let  getNumCountsInArray = (ncList: NCList, countArray: CountArray): number => {
 
 //
 //
-let noCountsNotInOneAreInTwo = (ncList: NCList, xorCountArrayAndSize: CountArrayAndSize, uniqCountArray: CountArray): boolean => {
+let noCountsNotInOneAreInTwo = (ncList: NameCount.List, xorCountArrayAndSize: CountArrayAndSize, uniqCountArray: CountArray): boolean => {
     let xorCount = 0;
     for (let nc of ncList) {
 	if (xorCountArrayAndSize.array[nc.count] === nc.count) {
@@ -340,7 +328,7 @@ function buildSrcNcList (resultMap: any): string[] {
 
 //
 //
-let populateSourceData = (lazySource: SourceBase, nc: NameCount, validateResult: ValidateResult,
+let populateSourceData = (lazySource: SourceBase, nc: NameCount.Type, validateResult: ValidateResult,
 			  orSourcesNcCsvMap: Map<string, number>): SourceData => {
     let source: SourceData = lazySource /*as SourceBase*/ as SourceData;
     if (validateResult.resultMap) {
@@ -365,9 +353,9 @@ let populateSourceData = (lazySource: SourceBase, nc: NameCount, validateResult:
 
 // TODO: get rid of lazy flag. if map provided, it's not lazy.
 //
-let getSourceData = (nc: NameCount, validateResult: ValidateResult, lazy: boolean,
+let getSourceData = (nc: NameCount.Type, validateResult: ValidateResult, lazy: boolean,
 		     orSourcesNcCsvMap: StringNumberMap | undefined = undefined): AnySourceData => {
-    const primaryNameSrcList: NCList = validateResult.nameSrcList;
+    const primaryNameSrcList: NameCount.List = validateResult.nameSrcList;
     return lazy
 	? { primaryNameSrcList,	ncList: [nc], validateResultList: [validateResult] }
 	: populateSourceData({ primaryNameSrcList }, nc, validateResult, orSourcesNcCsvMap!);
@@ -375,7 +363,7 @@ let getSourceData = (nc: NameCount, validateResult: ValidateResult, lazy: boolea
 
 //
 //
-let getSourceList = (nc: NameCount, lazy: boolean): AnySourceData[] => {
+let getSourceList = (nc: NameCount.Type, lazy: boolean): AnySourceData[] => {
     const sourceList: AnySourceData[] = [];
     // NO: reduce
     ClueManager.getKnownSourceMapEntries(nc).forEach((entry: any) => {
@@ -444,7 +432,7 @@ let mergeCompatibleSourceLists = (sourceList1: AnySourceData[], sourceList2: Any
 
 //
 //
-let mergeAllCompatibleSources = (ncList: NCList, lazy = false): AnySourceData[] => {
+let mergeAllCompatibleSources = (ncList: NameCount.List, lazy = false): AnySourceData[] => {
     if (ncList.length > 2) { // because **maybe** broken for > 2 below
 	throw new Error(`${ncList} length > 2 (${ncList.length})`);
     }
@@ -497,7 +485,7 @@ let buildSourceListsForUseNcData = (useNcDataLists: NCDataList[]): SourceList[] 
 // So for [ [a, b], [b, d] ] the candidates would be [a, b], [a, d], [b, b], [b, d],
 // and [b, b] would be filtered out as incompatible.
 //
-let getCompatibleOrSourcesLists = (primaryNameSrcList: NCList, orSourceLists: SourceList[]): SourceList[] => {
+let getCompatibleOrSourcesLists = (primaryNameSrcList: NameCount.List, orSourceLists: SourceList[]): SourceList[] => {
     if (_.isEmpty(orSourceLists)) return [];
 
     let listArray = orSourceLists.map(sourceList => [...Array(sourceList.length).keys()]);
@@ -513,7 +501,7 @@ let getCompatibleOrSourcesLists = (primaryNameSrcList: NCList, orSourceLists: So
     for (let indexList = peco.firstCombination(); indexList; indexList = peco.nextCombination()) {
 	//console.log(`indexList: ${stringify(indexList)}`);
 	let sourceList: SourceList = [];
-	let primarySrcSet = new Set(primaryNameSrcList.map(nameSrc => NameCount.count));
+	let primarySrcSet = new Set(primaryNameSrcList.map(nameSrc => nameSrc.count));
 	// TODO: list.some()
 	for (let [listIndex, sourceIndex] of indexList.entries()) {
 	    let source = orSourceLists[listIndex][sourceIndex];
@@ -589,8 +577,8 @@ let mergeCompatibleUseSources = <SourceType extends UseSourceBase>(sourceLists: 
 	// TODO: list of sourceLists outside of this loop. 
 	// assign result.sourceLists inside indexList.entries() loop. 
 	//
-	let primaryNameSrcList: NCList = [];
-	let ncList: NCList = []; // TODO: xor only
+	let primaryNameSrcList: NameCount.List = [];
+	let ncList: NameCount.List = []; // TODO: xor only
 	let orSourceLists: SourceList[] = [];
 	let success = true;
 	// TODO: indexList.some()
@@ -730,7 +718,7 @@ let nextIndex = function(clueSourceList: any, sourceIndexes: any): boolean {
 
 interface FirstNextResult {
     done: boolean;
-    ncList?: NCList;
+    ncList?: NameCount.List;
     nameList?: string[];
 }
 
@@ -741,7 +729,7 @@ let next = (clueSourceList: any, sourceIndexes: number[]): FirstNextResult => {
 	if (!nextIndex(clueSourceList, sourceIndexes)) {
 	    return { done: true };
 	}
-	let ncList: NCList = [];	    // e.g. [ { name: "pollock", count: 2 }, { name: "jackson", count: 4 } ]
+	let ncList: NameCount.List = [];	    // e.g. [ { name: "pollock", count: 2 }, { name: "jackson", count: 4 } ]
 	let nameList: string[] = [];	    // e.g. [ "pollock", "jackson" ]
 	let srcCountStrList: string[] = []; // e.g. [ "white,fish:2", "moon,walker:4" ]
 	if (!clueSourceList.every((clueSource: any, index: number) => {
@@ -1088,7 +1076,7 @@ let makeCombos = (args: any): any => {
     return 1;
 };
 
-function getKnownNcListForName (name: string): NCList {
+function getKnownNcListForName (name: string): NameCount.List {
     const countList: number[] = ClueManager.getCountListForName(name);
     if (_.isEmpty(countList)) throw new Error(`not a valid clue name: '${name}'`);
     return countList.map(count => NameCount.makeNew(name, count));
@@ -1106,20 +1094,20 @@ function getKnownNcListForName (name: string): NCList {
 
 // ..ToListOfKnownNcLists
 
-function nameOrNcStrListToKnownNcLists (nameOrNcStrList: string[]): NCList[] {
+function nameOrNcStrListToKnownNcLists (nameOrNcStrList: string[]): NameCount.List[] {
     return nameOrNcStrList.map(nameOrNcStr => NameCount.makeNew(nameOrNcStr))
 	.map(nc => nc.count ? [nc] : getKnownNcListForName(nc.name));
 }
 
-function combinationNcList (combo: any, ncLists: NCList[]): NCList {
+function combinationNcList (combo: any, ncLists: NameCount.List[]): NameCount.List {
     return combo.map((ncIndex: number, listIndex: number) => ncLists[listIndex][ncIndex]);
 }
 
-function combinationNcDataList (combo: any, ncLists: NCList[]): NCDataList {
+function combinationNcDataList (combo: any, ncLists: NameCount.List[]): NCDataList {
     return combo.map((ncIndex: number, listIndex: number) => Object({ ncList: ncLists[listIndex][ncIndex]}));
 }
 
-function ncListsToCombinations (ncLists: NCList[]): any {
+function ncListsToCombinations (ncLists: NameCount.List[]): any {
     return Peco.makeNew({
 	listArray: ncLists.map(ncList => [...Array(ncList.length).keys()]),	  // keys of array are 0..ncList.length
 	max: ncLists.reduce((sum, ncList) => sum + ncList.length, 0)
@@ -1127,7 +1115,7 @@ function ncListsToCombinations (ncLists: NCList[]): any {
 	.map((combo: any) => combinationNcList(combo, ncLists));
 }
 
-function getCombinationNcLists (useArgsList: string[]): NCList[] {
+function getCombinationNcLists (useArgsList: string[]): NameCount.List[] {
     Debug(`useArgsList: ${Stringify(useArgsList)}`);
     return useArgsList.map(useArg => useArg.split(','))
 	.map(nameOrNcStrList => nameOrNcStrListToKnownNcLists(nameOrNcStrList))
@@ -1135,7 +1123,7 @@ function getCombinationNcLists (useArgsList: string[]): NCList[] {
 }
 
 // This is the exact same method as ncListsToCombinations? except for final map method. could pass as parameter.
-function combinationsToNcLists (combinationNcLists: NCList[]): NCList[] {
+function combinationsToNcLists (combinationNcLists: NameCount.List[]): NameCount.List[] {
     return Peco.makeNew({
 	listArray: combinationNcLists.map(ncList => [...Array(ncList.length).keys()]),
 	max: combinationNcLists.reduce((sum, ncList) => sum + ncList.length, 0)	      // sum of lengths of nclists
@@ -1144,7 +1132,7 @@ function combinationsToNcLists (combinationNcLists: NCList[]): NCList[] {
 }
 
 // TODO: get rid of this and combinationsToNCLists, and add extra map step in buildAllUseNCData
-function combinationsToNcDataLists (combinationNcLists: NCList[]): NCDataList[] {
+function combinationsToNcDataLists (combinationNcLists: NameCount.List[]): NCDataList[] {
     Debug(`combToNcDataLists() combinationNcLists: ${Stringify(combinationNcLists)}`);
     return Peco.makeNew({
 	listArray: combinationNcLists.map(ncList => [...Array(ncList.length).keys()]),
@@ -1155,7 +1143,7 @@ function combinationsToNcDataLists (combinationNcLists: NCList[]): NCDataList[] 
 
 //
 //
-function buildAllUseNcLists (useArgsList: string[]): NCList[] {
+function buildAllUseNcLists (useArgsList: string[]): NameCount.List[] {
     return combinationsToNcLists(getCombinationNcLists(useArgsList));
 }
 
@@ -1237,11 +1225,11 @@ let preCompute = (args: any): PreComputedData => {
 
 //
 //
-function buildUseNcLists (useArgsList: string[]): NCList[] {
-    let useNcLists: NCList[] = [];
+function buildUseNcLists (useArgsList: string[]): NameCount.List[] {
+    let useNcLists: NameCount.List[] = [];
     useArgsList.forEach((useArg: string) =>  {
 	let args = useArg.split(',');
-	let ncList: NCList = args.map(arg => {
+	let ncList: NameCount.List = args.map(arg => {
 	    let nc = NameCount.makeNew(arg);
 	    if (!nc.count) throw new Error(`arg: ${arg} requires a :COUNT`);
 	    if (!_.has(ClueManager.getKnownClueMap(nc.count), nc.name)) throw new Error(`arg: ${nc} does not exist`);

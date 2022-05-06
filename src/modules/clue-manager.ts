@@ -27,18 +27,11 @@ import * as ClueList from '../types/clue-list';
 
 import type { ValidateSourcesResult } from './validator';
 
-// export a singleton
-//export const Instance = new ClueManager();
-//export Instance;
-//export default Instance;
-//module.exports = new ClueManager();
-//module.exports = Instance;
-
 //
 //
 
-const DATA_DIR              =  Path.normalize(`${Path.dirname(module.filename)}/../../../data/`);
-const REJECTS_DIR           = 'rejects';
+const DATA_DIR     =  Path.normalize(`${Path.dirname(module.filename)}/../../../data/`);
+const REJECTS_DIR  = 'rejects';
 
 //
 //
@@ -736,17 +729,16 @@ let makeSrcNameListArray = function (nc: NameCount.Type): any[] {
 //  max:     args.max,
 //  require: args.require
 //
-// A "clueSourceList" is a list (array) where each element is a
-// cluelist, such as [clues1,clues1,clues2].
+// A "clueListArray" is an array where each element is a cluelist,
+// such as [clues1, clues1, clues2].
 //
-// Given a sum, such as 3, generate an array of lists of addends that
+// Given a sum, such as 3, generate an array of addend arrays that
 // that add up to that sum, such as [ [1, 2], [2, 1] ], and return an
-// array of lists of clueLists of the corresponding clue counts, such
+// array of clueListArrays of the corresponding clue counts, such
 // as [ [clues1, clues2], [clues2, clues1] ].
 
 export let getClueSourceListArray = function (args: any): any {
-    Log.info(`++clueSrcListArray` +
-             `, sum: ${args.sum}, max: ${args.max}, require: ${args.require}`);
+    Log.info(`++clueSrcListArray, sum: ${args.sum}, max: ${args.max}, require: ${args.require}`);
 
     let clueCountListArray: CountList[] = Peco.makeNew({
         sum:     args.sum,
@@ -800,7 +792,7 @@ let filterAddends = function (addends: any, sizes: any): any[] {
 
 //
 
-export let filter = function (srcCsvList: any, clueCount: number, map = {}): any {
+export let filter = function (srcCsvList: string[], clueCount: number, map = {}): any {
     let known = 0;
     let reject = 0;
     let duplicate = 0;
@@ -820,12 +812,7 @@ export let filter = function (srcCsvList: any, clueCount: number, map = {}): any
             map[srcCsv] = true;
         }
     });
-    return {
-        map:       map,
-        known:     known,
-        reject:    reject,
-        duplicate: duplicate
-    };
+    return { map, known, reject, duplicate };
 };
 
 function singleEntry (nc: NameCount.Type, source: number): any {
@@ -846,21 +833,6 @@ export let getKnownSourceMapEntries = function (nc: NameCount.Type, andSources =
     if (!clueMap) throw new Error(`No clueMap at ${nc.count}`);
     const sourcesList = clueMap[nc.name];
     if (!sourcesList) throw new Error(`No sourcesList at ${nc.name}`);
-    // TODO: single entry, really? what if same primary clue name is used twice?
-    // TODO. BUGG.
-    /*
-    if (nc.count === 1) {
-	const entry = singleEntry(nc, sourcesList);
-	return andSources ? [ { entry } ] : [ entry ];
-    }
-    */
-
-    /*
-      if (nc.toString() == 'washington:5') {
-        console.log(`sourcesList: ${showStrList(sourcesList)}`);
-      }
-    */
-
     return sourcesList.map(sources => sources.split(',').sort().toString()) // sort sources
 	.map((sources, index) => {
 	    const entry = (nc.count === 1) ? singleEntry(nc, sourcesList[index]) : State.knownSourceMapArray[nc.count][sources];
