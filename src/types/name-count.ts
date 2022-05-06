@@ -32,8 +32,6 @@ function makeCopy(nc: NameCount): NameCount {
 }
 
 function NameCount_t (name: string, count?: number, index?: number) {
-    let splitList;
-    
     if (!name) return;
 
     this.name  = name;
@@ -47,7 +45,7 @@ function NameCount_t (name: string, count?: number, index?: number) {
 */
     
     if (!this.count) {
-        splitList = name.split(':');
+        let splitList = name.split(':');
         if (splitList.length > 1) {
             this.name = splitList[0];
             this.count = _.toNumber(splitList[1]);
@@ -126,36 +124,7 @@ export function listToString (ncList: List): string {
 
 //
 
-function makeNameMap(ncList) {
-    let nameMap = {};
-    ncList.forEach(nc => {
-        if (!nameMap[nc.name]) {
-            nameMap[nc.name] = [ nc.src ]; 
-        }
-        else {
-            nameMap[nc.name].push(nc.src);
-        }
-    });
-    return nameMap;
-}
-
-//
-
-function makeCountMap(ncList) {
-    let countMap = {};
-    ncList.forEach(nc => {
-        if (!countMap[nc.src]) {
-            countMap[nc.src] = [ nc.name ]; 
-        }
-        else {
-            countMap[nc.src].push(nc.name);
-        }
-    });
-}
-
-//
-
-function listToJSON(ncList) {
+function listToJSON (ncList: List) {
     let s;
 
     if (!ncList.length) { return '[]'; }
@@ -165,7 +134,7 @@ function listToJSON(ncList) {
         if (index > 0) {
             s += ',\n';
         }
-        s += nc.toJSON();
+        s += toJSON(nc);
     });
     s += ']';
     return s;
@@ -173,13 +142,13 @@ function listToJSON(ncList) {
 
 //
 
-export function listContains(ncListContains, nc) {
+export function listContains (ncListContains: List, nc: NameCount) {
     return _.find(ncListContains, ['name', nc.name, 'count', nc.count]);
 }
 
 //
     
-export function listContainsAll(ncListContains, ncList) {
+export function listContainsAll (ncListContains: List, ncList: List) {
     return ncList.every(nc => {
         return _.find(ncListContains, ['name', nc.name, 'count', nc.count]);
     });
@@ -203,39 +172,25 @@ NameCount_t.prototype.toString = function(): string {
 //
 //
 
-NameCount_t.prototype.setIndex = function(index) {
+NameCount_t.prototype.setIndex = function(index: number) {
     this.index = index;
 };
 
 //
 
-NameCount_t.prototype.equals = function(nc) {
+NameCount_t.prototype.equals = function(nc: NameCount) {
     return (nc.count === this.count) && (nc.name == this.name);
 }
 
 //
 
-/*
-NameCount_t.prototype.log = function() {
-    console.log('NameCount: ' + this);
-}
-*/
+let toJSON = function (nc: NameCount): NameCount {
+    return { name: `"${nc.name}"`, count: nc.count };
+};
 
 //
 
-NameCount_t.prototype.toJSON = function() {
-    return {"name": `"${this.name}"`, "count": this.count};
-};
-
-/*
-NameCount_t.prototype.toJSON = function() {
-    return this.toJSON(`{"name": "${this.name}", "count": ${this.count}}`;
-};
-*/
-
-//
-
-NameCount_t.prototype.logList = function(list) {
+NameCount_t.prototype.logList = function (list: List) {
     let str;
 
     list.forEach(nc => {
