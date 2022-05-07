@@ -71,9 +71,16 @@ interface LazySourceHashMap {
 
 replaces: StringAnyMap
 */
+
 interface StringAnyMap {
     [key: string]: any;
 }
+
+type MergeArgs = {
+    min_synonyms: number;
+    max_synonyms: number;
+    lazy: boolean | undefined;
+};
 
 //
 //
@@ -360,7 +367,7 @@ let populateSourceData = (lazySource: SourceBase, nc: NameCount.Type, validateRe
 
 //
 //
-let getSourceData = (nc: NameCount.Type, validateResult: ValidateResult, lazy: boolean,
+let getSourceData = (nc: NameCount.Type, validateResult: ValidateResult, lazy: boolean | undefined,
 		     orSourcesNcCsvMap?: Map<string, number>): AnySourceData => {
     const primaryNameSrcList: NameCount.List = validateResult.nameSrcList;
     return lazy
@@ -370,14 +377,15 @@ let getSourceData = (nc: NameCount.Type, validateResult: ValidateResult, lazy: b
 
 //
 //
-let getSourceList = (nc: NameCount.Type, lazy: boolean): AnySourceData[] => {
+let getSourceList = (nc: NameCount.Type, args: MergeArgs): AnySourceData[] => {
     const sourceList: AnySourceData[] = [];
     // NO: reduce
-    ClueManager.getKnownSourceMapEntries(nc).forEach((entry: any) => {
-	entry.results.forEach((result: ValidateResult) => {
-	    sourceList.push(getSourceData(nc, result, lazy));
-	});
-    });
+    ClueManager.getKnownSourceMapEntries(nc)
+        .forEach(entry => {
+	    entry.results.forEach(result => {
+	        sourceList.push(getSourceData(nc, result, args.lazy));
+	    });
+        });
     if (AA) {
 	console.log(`getSourceList ${nc} (${sourceList.length}):`);
 	for (let source of sourceList) console.log(` ncList: ${source.ncList}`);
@@ -387,7 +395,7 @@ let getSourceList = (nc: NameCount.Type, lazy: boolean): AnySourceData[] => {
 
 //
 //
-let mergeSources = (source1: AnySourceData, source2: AnySourceData, lazy: boolean): AnySourceData => {
+let mergeSources = (source1: AnySourceData, source2: AnySourceData, lazy: boolean | undefined): AnySourceData => {
     let primaryNameSrcList = [...source1.primaryNameSrcList, ...source2.primaryNameSrcList];
     let ncList = [...source1.ncList, ...source2.ncList];
     if (lazy) {
@@ -416,22 +424,22 @@ let mergeSources = (source1: AnySourceData, source2: AnySourceData, lazy: boolea
 
 //
 //
-let mergeCompatibleSources = (source1: AnySourceData, source2: AnySourceData, lazy: boolean): AnySourceData[] => {
+let mergeCompatibleSources = (source1: AnySourceData, source2: AnySourceData, args: MergeArgs): AnySourceData[] => {
     // TODO: this logic could be part of mergeSources
     // also, uh, isn't there are primarySrcArray I can be using here?
     return allCountUnique(source1.primaryNameSrcList, source2.primaryNameSrcList)
-	? [mergeSources(source1, source2, lazy)]
+	? [mergeSources(source1, source2, args.lazy)]
 	: [];
 };
 
 //
 //
-let mergeCompatibleSourceLists = (sourceList1: AnySourceData[], sourceList2: AnySourceData[], lazy: boolean): AnySourceData[] => {
+let mergeCompatibleSourceLists = (sourceList1: AnySourceData[], sourceList2: AnySourceData[], args: MergeArgs): AnySourceData[] => {
     let mergedSourcesList: AnySourceData[] = [];
     // TODO: reduce
     for (const source1 of sourceList1) {
 	for (const source2 of sourceList2) {
-	    mergedSourcesList.push(...mergeCompatibleSources(source1, source2, lazy));
+	    mergedSourcesList.push(...mergeCompatibleSources(source1, source2, args));
 	}
     }
     return mergedSourcesList;
@@ -439,16 +447,16 @@ let mergeCompatibleSourceLists = (sourceList1: AnySourceData[], sourceList2: Any
 
 //
 //
-let mergeAllCompatibleSources = (ncList: NameCount.List, lazy = false): AnySourceData[] => {
+let mergeAllCompatibleSources = (ncList: NameCount.List, args: MergeArgs): AnySourceData[] => {
     // because **maybe** broken for > 2 below
     if (ncList.length > 2) { 
 	throw new Error(`${ncList} length > 2 (${ncList.length})`);
     }
     // TODO: reduce (or some) here
-    let sourceList = getSourceList(ncList[0], lazy);
+    let sourceList = getSourceList(ncList[0], args);
     for (let ncIndex = 1; ncIndex < ncList.length; ncIndex += 1) {
-	const nextSourceList = getSourceList(ncList[ncIndex], lazy);
-	sourceList = mergeCompatibleSourceLists(sourceList, nextSourceList, lazy);
+	const nextSourceList = getSourceList(ncList[ncIndex], args);
+	sourceList = mergeCompatibleSourceLists(sourceList, nextSourceList, args);
         // TODO BUG this is broken for > 2; should be something like: if (sourceList.length !== ncIndex + 1) 
 	if (_.isEmpty(sourceList)) break;
     }
@@ -457,7 +465,7 @@ let mergeAllCompatibleSources = (ncList: NameCount.List, lazy = false): AnySourc
 
 //
 //
-let buildSourceListsForUseNcData = (useNcDataLists: NCDataList[]): SourceList[] => {
+let buildSourceListsForUseNcData = (useNcDataLists: NCDataList[], args: MergeArgs): SourceList[] => {
     let sourceLists: SourceList[] = [];
     let hashList: StringBoolMap[] = [];
     //console.log(`useNcDataLists(${useNcDataLists.length}): ${Stringify2(useNcDataLists)}`);
@@ -467,7 +475,7 @@ let buildSourceListsForUseNcData = (useNcDataLists: NCDataList[]): SourceList[] 
 	    if (!sourceLists[sourceListIndex]) sourceLists.push([]);
 	    if (!hashList[sourceListIndex]) hashList.push({});
 	    //console.log(`ncList: ${NameCount.listToString(useNcData.ncList)}`);
-	    let sourceList = mergeAllCompatibleSources(useNcData.ncList);
+	    let sourceList = mergeAllCompatibleSources(useNcData.ncList, args);
 	    //console.log(`sourceList(${sourceList.length}): ${Stringify2(sourceList)}`);
 	    for (let source of sourceList) {
 		//let key = sources.primaryNameSrcList.map(_.toString).sort().toString();
@@ -564,7 +572,7 @@ let buildUseSourceNcCsvMap = (useSourceList: UseSource[]): SourceNcCsvMap => {
 
 //
 //
-let mergeCompatibleUseSources = <SourceType extends UseSourceBase>(sourceLists: SourceList[], op: any): SourceType[] => {
+let mergeCompatibleUseSources = <SourceType extends UseSourceBase>(sourceLists: SourceList[], op: any, args: MergeArgs): SourceType[] => {
     // TODO: sometimes a sourceList is empty, like if doing $(cat required) with a
     // low clue count range (e.g. -c2,4). should that even be allowed?
     let pad = (op === Op.or) ? 1 : 0;
@@ -660,12 +668,18 @@ let mergeCompatibleUseSources = <SourceType extends UseSourceBase>(sourceLists: 
 
 //
 //
-let getUseSourcesList = <SourceType extends UseSourceBase>(ncDataLists: NCDataList[], op: any): SourceType[] => {
+let getUseSourcesList = <SourceType extends UseSourceBase>(ncDataLists: NCDataList[], op: any, args: any): SourceType[] => {
+    let mergeArgs: MergeArgs = {
+        min_synonyms: args.min_synonyms,
+        max_synonyms: args.max_synonyms,
+        lazy: false
+    }
+
     //console.log(`ncDataLists: ${Stringify2(ncDataLists)}`);
     if (_.isEmpty(ncDataLists[0])) return [];
-    let sourceLists = buildSourceListsForUseNcData(ncDataLists);
+    let sourceLists = buildSourceListsForUseNcData(ncDataLists, mergeArgs);
     //console.log(`buildUseSourcesLists: ${Stringify2(sourceLists)}`);
-    return mergeCompatibleUseSources<SourceType>(sourceLists, op);
+    return mergeCompatibleUseSources<SourceType>(sourceLists, op, mergeArgs);
 };
 
 //
@@ -846,8 +860,11 @@ let loadAndMergeSourceList = (lazySourceList: LazySourceData[], orSourcesNcCsvMa
 };
 
 //
+// args:
+//   min_synonyms
+//   max_synonyms
 //
-let getCombosForUseNcLists = (sum: number, max: number, args: PreComputedData): string[] => {
+let getCombosForUseNcLists = (sum: number, max: number, pcd: PreComputedData, args: any): string[] => {
     let hash: StringAnyMap = {};
     let combos: string[] = [];
 
@@ -860,8 +877,14 @@ let getCombosForUseNcLists = (sum: number, max: number, args: PreComputedData): 
     let MILLY = 1000000n;
     let start = process.hrtime.bigint();
 
-    let useSourcesList: UseSource[] = args.useSourcesList;
+    let useSourcesList: UseSource[] = pcd.useSourcesList;
     if (0) console.log(`useSourcesList: ${Stringify2(useSourcesList)}`);
+
+    const mergeArgs = {
+        min_synonyms: args.min_synonyms,
+        max_synonyms: args.max_synonyms,
+        lazy: true
+    };
 
     // Given a sum, such as 3, generate an array of addend arrays ("count lists") that
     // that add up to that sum, such as [ [1, 2], [2, 1] ]
@@ -911,7 +934,7 @@ let getCombosForUseNcLists = (sum: number, max: number, args: PreComputedData): 
 	    let cacheHit = false;
 	    let sourceList: LazySourceData[];
 	    if (!hash[key]) {
-		sourceList = mergeAllCompatibleSources(result.ncList!, true) as LazySourceData[];
+		sourceList = mergeAllCompatibleSources(result.ncList!, mergeArgs) as LazySourceData[];
 		if (_.isEmpty(sourceList)) ++numMergeIncompatible;
 		//console.log(`$$ sources: ${Stringify2(sourceList)}`);
 		hash[key] = { sourceList };
@@ -928,8 +951,8 @@ let getCombosForUseNcLists = (sum: number, max: number, args: PreComputedData): 
 
 	    if (_.isUndefined(hash[key].isCompatible)) {
 		hash[key].isCompatible = isCompatibleWithUseSources(
-		    loadAndMergeSourceList(sourceList, args.orSourcesNcCsvMap),
-		    useSourcesList, args.orSourcesNcCsvMap);
+		    loadAndMergeSourceList(sourceList, pcd.orSourcesNcCsvMap),
+		    useSourcesList, pcd.orSourcesNcCsvMap);
 	    }
 	    if (hash[key].isCompatible) {
 		combos.push(result.nameList!.toString());
@@ -971,7 +994,8 @@ let getCombosForUseNcLists = (sum: number, max: number, args: PreComputedData): 
 let makeCombosForSum = (sum: number, max: number, args: any): string[] => {
     if (_.isUndefined(args.maxResults)) {
 	args.maxResults = 50000;
-        //TODO: whereever this is actually enforced: console.error(`Enforcing max results: ${args.maxResults}`);
+        // TODO: whereever this is actually enforced:
+        // console.error(`Enforcing max results: ${args.maxResults}`);
     }
     // TODO move this a layer or two out; use "validateArgs" 
     if (!_.isEmpty(args.require)) throw new Error('require not yet supported');
@@ -979,7 +1003,7 @@ let makeCombosForSum = (sum: number, max: number, args: any): string[] => {
     if (!PCD) {
 	PCD = preCompute(args);
     }
-    return getCombosForUseNcLists(sum, max, PCD);
+    return getCombosForUseNcLists(sum, max, PCD, args);
 };
 
 //
@@ -997,6 +1021,8 @@ let parallel_makeCombosForRange = (first: number, last: number, args: any): any 
 	    fast: args.fast,
 	    load_max: ClueManager.getNumPrimarySources(),
 	    parallel: true,
+            min_synonyms: args.min_synonyms,
+            max_synonyms: args.max_synonyms,
 	}));
 
     let cpus = OS.cpus().length;
@@ -1159,11 +1185,11 @@ function buildAllUseNcDataLists (useArgsList: string[]): NCDataList[] {
 //
 let getCompatibleUseSourcesFromNcData = (args: any): UseSource[] => {
     // XOR first
-    let sourceList = getUseSourcesList<XorSource>(args.allXorNcDataLists, Op.xor);
+    let sourceList = getUseSourcesList<XorSource>(args.allXorNcDataLists, Op.xor, args);
     //console.error(`xorSourceList(${sourceList.length})`); // : ${Stringify2(xorSourceList)}`);
 
     // OR next
-    let orSourceList = getUseSourcesList<OrSource>(args.allOrNcDataLists, Op.or);
+    let orSourceList = getUseSourcesList<OrSource>(args.allOrNcDataLists, Op.or, args);
     //console.error(`orSourceList(${orSourceList.length})`); // : ${Stringify2(orSourceList)}`);
 
     // final: merge OR with XOR

@@ -37,7 +37,7 @@ const REJECTS_DIR  = 'rejects';
 
 type CountList = number[];
 
-type SourceData = {
+export type SourceData = {
     clues: ClueList.Any;
     results?: any;
 };
@@ -340,10 +340,13 @@ let initCountedPropertiesInAllResults = function (nc: NameCount.Type, results: V
         // TODO: for name in Clue.CountedProperty.Names
         if (result.propertyCounts) console.error(`already initialized PropertyCounts`);
         else {
-            let propertyCounts = {}
+            let propertyCounts = {};
+            // TODO: make recursiveGet take a name or list of names.
+            // can we type a rest tuple as [...names: Clue.CountedProperty.Names] ?
             propertyCounts[Clue.CountedProperty.Enum.Synonym] =
                 recursiveGetCluePropertyCount(nc, result.resultMap.internal_map, Clue.CountedProperty.Enum.Synonym);
             result.propertyCounts = propertyCounts as Clue.CountedProperty.Map;
+
         }
     }
 }
@@ -371,7 +374,7 @@ let addCompoundClue = function (clue: Clue.Compound, count: number, validateAll 
 	});
         // this is where the magic happens
 	if (vsResult.success && validateAll) {
-            //initCountedPropertiesInAllResults({ name: clue.name, count }, vsResult.list!);
+            initCountedPropertiesInAllResults({ name: clue.name, count }, vsResult.list!);
             srcMap[srcKey].results = vsResult.list;
 	}
     } else if (validateAll) {
