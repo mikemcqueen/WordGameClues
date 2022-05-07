@@ -20,6 +20,7 @@ const PrettyMs	  = require('pretty-ms');
 const stringify	  = require('javascript-stringify').stringify;
 const Stringify2  = require('stringify-object');
 
+import * as Clue from '../types/clue';
 import * as ClueManager from './clue-manager';
 import * as NameCount from '../types/name-count';
 import { ValidateResult } from './validator';
@@ -375,9 +376,35 @@ let getSourceData = (nc: NameCount.Type, validateResult: ValidateResult, lazy: b
 	: populateSourceData({ primaryNameSrcList }, nc, validateResult, orSourcesNcCsvMap!);
 };
 
+let no_propcount = 0;
+let yes_propcount = 0;
+let oob = 0;
+
+//
+//
+let filterCountedPropertiesOutOfBounds = (result: ValidateResult, args: MergeArgs) => {
+    let propertyCounts: Clue.PropertyCounts.Map;
+    if (result.nameSrcList.length === 1) {
+        // primary clue: propertyCounts are attached to clue
+        const nameSrc = result.nameSrcList[0];
+        const clue = _.find(ClueManager.getClueList(1), { name: nameSrc.name, src: _.toString(nameSrc.count) }) as Clue.Primary;
+        propertyCounts = clue.propertyCounts!;
+    } else {
+        // compoundClue: propertyCounts are attached to each ValidateResult
+        propertyCounts = result.propertyCounts!;
+    }
+
+    if (propertyCounts[Clue.PropertyName.Synonym].total > args.max_synonyms) {
+        oob++;
+        return false;
+    }
+    return true;
+};
+
 //
 //
 let getSourceList = (nc: NameCount.Type, args: MergeArgs): AnySourceData[] => {
+/*
     const sourceList: AnySourceData[] = [];
     // NO: reduce
     ClueManager.getKnownSourceMapEntries(nc)
@@ -385,6 +412,22 @@ let getSourceList = (nc: NameCount.Type, args: MergeArgs): AnySourceData[] => {
 	    entry.results.forEach(result => {
 	        sourceList.push(getSourceData(nc, result, args.lazy));
 	    });
+        });
+*/
+    const sourceList: AnySourceData[] = [];
+    ClueManager.getKnownSourceMapEntries(nc)
+        .forEach(entry => {
+            entry.results.forEach(result => {
+                if (entry.results.length !== 1 && !result.propertyCounts) {
+                    console.log(`${result.ncList}`)
+                    ++no_propcount;
+                } else {
+                    ++yes_propcount;
+                }
+            });
+	    sourceList.push(...entry.results
+                .filter(result => filterCountedPropertiesOutOfBounds(result, args))
+	        .map(result => getSourceData(nc, result, args.lazy)));
         });
     if (AA) {
 	console.log(`getSourceList ${nc} (${sourceList.length}):`);
@@ -1097,7 +1140,7 @@ let makeCombos = (args: any): any => {
 	    const filterResult = ClueManager.filter(comboList, sum, comboMap);
 	}
 	let d = new Duration(begin, new Date()).milliseconds;
-	console.error(`--combos: ${PrettyMs(d)}`);
+	console.error(`--combos: ${PrettyMs(d)} no: ${no_propcount} yes: ${yes_propcount} oob: ${oob}`);
 	Debug(`total: ${total}, filtered(${_.size(comboMap)})`);
 	_.keys(comboMap).forEach((nameCsv: string) => console.log(nameCsv));
 	//console.log(`${Stringify(comboMap)}`);

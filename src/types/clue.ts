@@ -7,21 +7,26 @@
 import _ from 'lodash'; // TODO: need a smaller dummy import
 //let Stringify = require('stringify-object');
 
-export namespace CountedProperty {
+export namespace PropertyName {
     export enum Enum {
         Synonym = "synonym",
         Homonym = "homonym"
     };
 
-    export type Name = "synonym" | "homonym"; // TODO: Enum.Synonym |  Enum.Homonym;
+    export const Synonym = Enum.Synonym;
+    export const Homonym = Enum.Homonym;
 
-    export interface Counts {
+    export type Any = Enum.Synonym |  Enum.Homonym;
+}
+
+export namespace PropertyCounts {
+    export interface Type {
         total: number;
         primary: number;
     };
 
     export type Map = {
-        [key in Enum]: Counts;
+        [key in PropertyName.Enum]: Type;
     };
 }
 
@@ -34,9 +39,6 @@ interface Common {
     skip?: boolean;
     synonym?: boolean;
     homonym?: boolean;
-
-    // runtime only, not in schema
-    propertyCounts?: CountedProperty.Map;
 }
 
 // for primary sources only
@@ -54,6 +56,9 @@ interface PrimaryClue extends Common {
     _?: string;
 
     restrictToSameClueNumber?: boolean;
+
+    // runtime only, not in schema
+    propertyCounts?: PropertyCounts.Map;
 }
 
 interface CompoundClue extends Common {
@@ -118,17 +123,17 @@ export const PrimarySchema = {
     "additionalProperties": false
 };
 
-export namespace CountedProperty {
+export namespace PropertyCounts {
     export function initAll (clue: PrimaryClue): void {
         let propertyCounts = {};
-        Object.values(CountedProperty.Enum).forEach((propertyName: Name) => {
+        Object.values(PropertyName.Enum).forEach((propertyName: PropertyName.Any) => {
             //console.error(`propertyName: ${propertyName}`);
             propertyCounts[propertyName] = getCounts(clue, propertyName);
         });
         clue.propertyCounts = propertyCounts as Map;
     }
 
-    export function getCounts (clue: Any, propertyName: Name): Counts {
+    export function getCounts (clue: Any, propertyName: PropertyName.Any): Type {
         const hasProperty = !!clue[propertyName];
         return {
             total: hasProperty ? 1 : 0,
@@ -138,13 +143,13 @@ export namespace CountedProperty {
 
     export function addAll (toClue: PrimaryClue, fromClue: PrimaryClue): void {
         //console.error(`add: to ${toClue.name} from ${fromClue.name}`);
-        Object.values(Enum).forEach((propertyName: string) => {
+        Object.values(PropertyName.Enum).forEach((propertyName: PropertyName.Any) => {
             //console.error(`add: to[name](${toClue[propertyName]}) from[name](${fromClue[propertyName]})`);
             add(toClue.propertyCounts![propertyName], fromClue.propertyCounts![propertyName]);
         });
     }
 
-    export function add (to: Counts, from: Counts | undefined): void {
+    export function add (to: Type, from: Type | undefined): void {
         if (from) {
             to.total += from.total;
             to.primary += from.primary;
