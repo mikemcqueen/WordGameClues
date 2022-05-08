@@ -124,6 +124,13 @@ export const PrimarySchema = {
 };
 
 export namespace PropertyCounts {
+    export function empty() {
+        return {
+            total: 0,
+            primary: 0
+        }
+    }
+
     export function initAll (clue: PrimaryClue): void {
         let propertyCounts = {};
         Object.values(PropertyName.Enum).forEach((propertyName: PropertyName.Any) => {
@@ -143,10 +150,11 @@ export namespace PropertyCounts {
 
     export function addAll (toClue: PrimaryClue, fromClue: PrimaryClue): void {
         //console.error(`add: to ${toClue.name} from ${fromClue.name}`);
-        Object.values(PropertyName.Enum).forEach((propertyName: PropertyName.Any) => {
-            //console.error(`add: to[name](${toClue[propertyName]}) from[name](${fromClue[propertyName]})`);
-            add(toClue.propertyCounts![propertyName], fromClue.propertyCounts![propertyName]);
-        });
+        Object.values(PropertyName.Enum)
+            .forEach((propertyName: PropertyName.Any) => {
+                //console.error(`add: to[name](${toClue[propertyName]}) from[name](${fromClue[propertyName]})`);
+                add(toClue.propertyCounts![propertyName], fromClue.propertyCounts![propertyName]);
+            });
     }
 
     export function add (to: Type, from: Type | undefined): void {
@@ -160,7 +168,7 @@ export namespace PropertyCounts {
 //
 
 export function isPrimary (clue: Any): clue is PrimaryClue {
-    return 'propertyCounts' in clue; // (clue as PrimaryClue).num !== undefined;
+    return 'num' in clue; // (clue as PrimaryClue).num !== undefined;
 }
 
 export function isCompound (clue: Any): clue is CompoundClue {

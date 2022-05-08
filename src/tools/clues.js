@@ -363,7 +363,6 @@ async function main () {
     if (_.isNaN(options.min_synonyms)) options.min_synonyms = 0;
     options.max_synonyms = _.toNumber(options['syn-max']);
     if (_.isNaN(options.max_synonyms)) options.max_synonyms = 1;
-
     options.maxArg = maxArg;
     if (!maxArg) maxArg = 2; // TODO: default values in opt
     if (!options.count) {
@@ -486,10 +485,11 @@ async function main () {
             primary: options.primary,
 	    apple:   options.apple,
 	    final:   options.final,
-//	    and:     options.and,
 	    or:      options.or,
 	    xor:     options.xor,
-	    parallel: options.parallel
+	    parallel: options.parallel,
+            min_synonyms: options.min_synonyms,
+            max_synonyms: options.max_synonyms
         });
     }
     return 0;

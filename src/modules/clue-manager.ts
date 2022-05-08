@@ -10,6 +10,7 @@ const Log            = require('../../modules/log')('clue-manager');
 const Peco           = require('../../modules/peco');
 const Clues          = require('../../modules/clue-types');
 
+const Assert = require('assert');
 const Validator      = require('./validator');
 const Debug          = require('debug')('clue-manager');
 const Duration       = require('duration');
@@ -191,7 +192,6 @@ const autoSource = (clueList: ClueList.Primary): [ClueList.Primary, number] => {
             // to all subsequent clues with the "same" src.
             if (clue.source) throw new Error(`${clue.name}.src="same" has source="${clue.source}"`);
             clue.source = firstClueWithSrc!.source;
-            //console.error(`${clue.name}.source = ${clue.source}`);
         }
 	if (clue.ignore) {
             if (clue.name) {
@@ -236,7 +236,6 @@ const autoSource = (clueList: ClueList.Primary): [ClueList.Primary, number] => {
 //
 
 export let loadAllClues = function (args: any): void {
-    //console.error(`fast: ${args.fast}`);
     State.dir = Clues.getDirectory(args.clues);
     if (args.ignoreErrors) {
         State.ignoreLoadErrors = true;
@@ -289,7 +288,6 @@ interface LoadClueListOptions {
 
 let loadClueList = function (count: number, options?: LoadClueListOptions) {
     const filename = getKnownFilename(count, options?.dir);
-    //console.error(`filename: ${filename}`);
     return ClueList.makeFrom({
         filename,
         primary: count === 1
@@ -337,8 +335,114 @@ let getRejectFilename = function (count: number): string {
 };
 
 //
+// key types:
+// A.  non-array vlue
+// B.  array value
 
-let getResultPropertyCount = function (nc: NameCount.Type, resultMap: any, propertyName: Clue.PropertyName.Any) {
+//{
+// A.
+//  'jack:3': {
+// A:
+//    'card:2': {
+// B:
+//	'bird:1,red:1': [
+//	  'bird:2,red:8'
+//	]
+//    },
+// A:                       
+//    'face:1': {
+// B:
+//	'face:1': [
+//	  'face:10'
+//	]
+//    }
+//  }
+//}
+//
+//{
+// B:
+//  'face:1': [
+//    'face:10'
+//  ]
+//}
+
+let getResultNodePrimaryNameSrcList = function (node: Object) : NameCount.List {
+    let primaryNameSrcList: NameCount.List = [];
+    if (_.isArray(node)) {
+        Assert(node.length === 1);
+        if (_.isString(node[0])) {
+            primaryNameSrcList = [...node[0].split(',').map(nameSrcStr => NameCount.makeNew(nameSrcStr))];
+        } else {
+            primaryNameSrcList = [node[0]];
+        }
+    } else {
+        Assert(_.isObject(node));
+        for (const key of Object.keys(node)) {
+            primaryNameSrcList.push(...getResultNodePrimaryNameSrcList(node[key]));
+        }
+    }
+    return primaryNameSrcList;
+}
+
+//
+
+let computePropertyCountsForPrimaryNameSrcList = function (primaryNameSrcList: NameCount.List,
+                                                           propertyName: Clue.PropertyName.Any): Clue.PropertyCounts.Type {
+    const clueList = getClueList(1);
+    const propertyCounts = Clue.PropertyCounts.empty();
+    for (const nc of primaryNameSrcList) {
+        const clue: Clue.Primary = _.find(clueList, { name: nc.name, src: _.toString(nc.count) }) as Clue.Primary;
+        Assert(clue, `bad clue: ${nc.name}:${nc.count}`);
+        Clue.PropertyCounts.add(propertyCounts, clue!.propertyCounts![propertyName]);
+    }
+    return propertyCounts;
+}
+
+//
+
+let getPropertyCountsForResult = function(nc: NameCount.Type, source: string, primaryNameSrcList: NameCount.List,
+                                          propertyName: Clue.PropertyName.Any): Clue.PropertyCounts.Type {
+    const srcData = getKnownSourceMap(nc.count)[source];
+    Assert(srcData, `no SourceData for ${NameCount.makeCanonicalName(nc.name, nc.count)} - ${source}`);
+    // TODO: assert: srcData.clues.find({ name: nc.name, src: source });
+    const nameSrcCsv = _.sortBy(primaryNameSrcList, NameCount.count).toString();
+    let propertyCounts;
+    for (const result of srcData.results) {
+        // TODO: nameSrcCsv is also an optional member here, I'm just not sure if it's initialized/used
+        // TODO TODO TODO: sort this somewhere else.
+        if (_.sortBy(result.nameSrcList, NameCount.count).toString() === nameSrcCsv) {
+            propertyCounts = result.propertyCounts![propertyName];
+            break;
+        }
+    }
+    Assert(propertyCounts, `no result for ${NameCount.makeCanonicalName(nc.name, nc.count)} - ${nameSrcCsv}`);
+
+    return propertyCounts;
+}
+
+//
+
+let getResultNodePropertyCounts = function (nc: NameCount.Type, node: Object, propertyName: Clue.PropertyName.Any): Clue.PropertyCounts.Type {
+    let primaryNameSrcList = getResultNodePrimaryNameSrcList(node);
+    let propertyCounts: Clue.PropertyCounts.Type;
+    const keys = Object.keys(node);
+    if (_.isArray(node) || keys.length === 1) {
+        propertyCounts = computePropertyCountsForPrimaryNameSrcList(primaryNameSrcList, propertyName);
+    } else {
+        const source = keys.map(key => NameCount.makeNew(key).name).sort().toString();
+        propertyCounts = getPropertyCountsForResult(nc, source, primaryNameSrcList, propertyName);
+    }
+    return propertyCounts;
+}
+
+//
+
+let computeResultPropertyCounts = function (nc: NameCount.Type, node: Object, propertyName: Clue.PropertyName.Any): Clue.PropertyCounts.Type {
+    let counts: Clue.PropertyCounts.Type = Clue.PropertyCounts.empty();
+    for (const key of Object.keys(node)) {
+        Clue.PropertyCounts.add(counts, getResultNodePropertyCounts(NameCount.makeNew(key), node[key], propertyName));
+    }
+    return counts;
 }
 
 //
@@ -346,24 +450,11 @@ let getResultPropertyCount = function (nc: NameCount.Type, resultMap: any, prope
 let initCountedPropertiesInAllResults = function (nc: NameCount.Type, results: ValidateResult[]): void {
     for (let result of results) {
         // TODO: for name in Clue.CountedProperty.Names
-        if (result.propertyCounts) console.error(`already initialized PropertyCounts`);
-        else {
-            let propertyCounts = {};
-            // TODO: make recursiveGet take a name or list of names.
-            // can we type a rest tuple as [...names: Clue.CountedProperty.Names] ?
-
-            //TODO:
-            // so I think if i count the (global) totals > 1 here, it will be zero. same in combo-maker (do it, both).
-            // totals at 1 will be possibly accurate.
-            // the problem is that, recursive() is not actually storing propertyCounts data on compound clues,
-            // like I thought it would. I'm not sure how to solve this but it is going to be a little trickier.
-            // we may need CountListArray for every compound clue. not sure.
-
-            propertyCounts[Clue.PropertyName.Synonym] =
-                //getResultPropertyCounts(nc, result.resultMap.internal_map, Clue.PropertyName.Synonym);
-                recursiveGetCluePropertyCount(nc, result.resultMap.internal_map, Clue.PropertyName.Synonym);
-            result.propertyCounts = propertyCounts as Clue.PropertyCounts.Map;
-        }
+        Assert(!result.propertyCounts, `already initialized PropertyCounts`);
+        let propertyCounts = {};
+        propertyCounts[Clue.PropertyName.Synonym] =
+            computeResultPropertyCounts(nc, result.resultMap.internal_map, Clue.PropertyName.Synonym);
+        result.propertyCounts = propertyCounts as Clue.PropertyCounts.Map;
     }
 }
 
@@ -1397,7 +1488,7 @@ interface ClueIndex extends NameCount.Type {
     source: string;  // csv of names, or primary source #
 }
 
-interface ResultMapNode extends ClueIndex {
+interface RecursiveNode extends ClueIndex {
     recurse: boolean;
 }
 
@@ -1461,7 +1552,7 @@ export let recursiveGetCluePropertyCount = function (
     if (top && loggy) console.log(`${Stringify(resultMap)}`);
 
     const keys: string[] = _.keys(resultMap);
-    let nodes: ResultMapNode[] = _.flatMap(keys, key => {
+    let nodes: RecursiveNode[] = _.flatMap(keys, key => {
         // TODO: BUG:: key may be a ncCsv
 	let val: any = resultMap[key];
 	if (!_.isObject(val)) throw new Error(`Mystery key: ${key}`);
@@ -1491,7 +1582,6 @@ export let recursiveGetCluePropertyCount = function (
             // first array element
             let csv = val[0].toString();
             let list = NameCount.makeListFromCsv(csv);
-            //console.error(`csv: ${csv}, list: ${stringify(list)}`);
             return list.map(sourceNc => {
                 return {
                     name: sourceNc.name,

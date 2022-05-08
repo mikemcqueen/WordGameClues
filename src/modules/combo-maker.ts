@@ -382,7 +382,7 @@ let oob = 0;
 
 //
 //
-let filterCountedPropertiesOutOfBounds = (result: ValidateResult, args: MergeArgs) => {
+let filterPropertyCountsOutOfBounds = (result: ValidateResult, args: MergeArgs): boolean => {
     let propertyCounts: Clue.PropertyCounts.Map;
     if (result.nameSrcList.length === 1) {
         // primary clue: propertyCounts are attached to clue
@@ -417,16 +417,19 @@ let getSourceList = (nc: NameCount.Type, args: MergeArgs): AnySourceData[] => {
     const sourceList: AnySourceData[] = [];
     ClueManager.getKnownSourceMapEntries(nc)
         .forEach(entry => {
+            //++ INSTRUMENTATION
             entry.results.forEach(result => {
                 if (entry.results.length !== 1 && !result.propertyCounts) {
-                    console.log(`${result.ncList}`)
+                    //console.error(`noPropCounts: ${result.ncList}`)
                     ++no_propcount;
                 } else {
                     ++yes_propcount;
                 }
             });
+            //-- INSTRUMENTATION
+            
 	    sourceList.push(...entry.results
-                .filter(result => filterCountedPropertiesOutOfBounds(result, args))
+                .filter(result => filterPropertyCountsOutOfBounds(result, args))
 	        .map(result => getSourceData(nc, result, args.lazy)));
         });
     if (AA) {
