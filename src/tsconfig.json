@@ -8,7 +8,7 @@
 	"esModuleInterop": true,
 
 	"noImplicitThis": false,
-        "noImplicitAny": false,
+        "noImplicitAny": true,
         "noImplicitReturns": true,
 	
         "outDir": "dist"

@@ -122,8 +122,8 @@ export function getNcResultMap (count: number): NcResultMap {
 
 //
 
-function Stringify (val): string {
-    return stringify(val, (value, indent, stringify) => {
+function Stringify (val: any): string {
+    return stringify(val, (value: any, indent: number, stringify: any) => {
 	if (typeof value == 'function') return "function";
 	return stringify(value);
     }, " ");
@@ -131,7 +131,7 @@ function Stringify (val): string {
 
 //
 
-function showStrList (strList): string {
+function showStrList (strList: string[]): string {
     let result = "";
     let first = true;
     for (let str of strList) {
@@ -159,8 +159,8 @@ interface SaveClueListOptions {
     dir : string;
 }
 
-let saveClueList = function (list, count: number, options?: SaveClueListOptions): void {
-    list.save(getKnownFilename(count, options?.dir));
+let saveClueList = function (list: ClueList.Compound, count: number, options?: SaveClueListOptions): void {
+    ClueList.save(list, getKnownFilename(count, options?.dir));
 };
 
 const initCluePropertyCounts = (clueList: ClueList.Primary, ignoreList: ClueList.Primary): void => {
@@ -366,7 +366,7 @@ let getRejectFilename = function (count: number): string {
 //  ]
 //}
 
-let getResultNodePrimaryNameSrcList = function (node: Object) : NameCount.List {
+let getResultNodePrimaryNameSrcList = function (node: any) : NameCount.List {
     let primaryNameSrcList: NameCount.List = [];
     if (_.isArray(node)) {
         Assert(node.length === 1);
@@ -437,7 +437,7 @@ let getResultNodePropertyCounts = function (nc: NameCount.Type, node: Object, pr
 
 //
 
-let computeResultPropertyCounts = function (nc: NameCount.Type, node: Object, propertyName: Clue.PropertyName.Any): Clue.PropertyCounts.Type {
+let computeResultPropertyCounts = function (nc: NameCount.Type, node: any, propertyName: Clue.PropertyName.Any): Clue.PropertyCounts.Type {
     let counts: Clue.PropertyCounts.Type = Clue.PropertyCounts.empty();
     for (const key of Object.keys(node)) {
         Clue.PropertyCounts.add(counts, getResultNodePropertyCounts(NameCount.makeNew(key), node[key], propertyName));
@@ -451,7 +451,7 @@ let initCountedPropertiesInAllResults = function (nc: NameCount.Type, results: V
     for (let result of results) {
         // TODO: for name in Clue.CountedProperty.Names
         Assert(!result.propertyCounts, `already initialized PropertyCounts`);
-        let propertyCounts = {};
+        let propertyCounts: any = {};
         propertyCounts[Clue.PropertyName.Synonym] =
             computeResultPropertyCounts(nc, result.resultMap.internal_map, Clue.PropertyName.Synonym);
         result.propertyCounts = propertyCounts as Clue.PropertyCounts.Map;
@@ -554,7 +554,7 @@ let addKnownClue = function (count: number, name: string, source: string, nothro
 
 //
 
-let removeKnownClue = function (count: number, name: string, source: string, nothrow): boolean {
+let removeKnownClue = function (count: number, name: string, source: string, nothrow: boolean): boolean {
     let clueMap = State.knownClueMapArray[count];
     if (!_.has(clueMap, name) || !clueMap[name].includes(source)) {
         if (nothrow) return false;
@@ -583,10 +583,10 @@ let saveClues = function (counts: number | number[]): void {
 
 //
 
-let addClue = function (count: number, clue, save = false, nothrow = false): boolean {
+let addClue = function (count: number, clue: Clue.Compound, save = false, nothrow = false): boolean {
     clue.src = clue.src.split(',').sort().toString();
     if (addKnownClue(count, clue.name, clue.src, nothrow)) {
-        State.clueListArray[count].push(clue);
+        (getClueList(count) as ClueList.Compound).push(clue);
         if (save) {
             saveClues(count);
         }
@@ -761,11 +761,11 @@ let primaryNcListToNameSrcLists = function (ncList: NameCount.List): NameCount.L
         listArray: indexLists,
         max:        999 // TODO technically, clue-types[variety].max_clues
     }).getCombinations()
-	.map(indexList => indexList.map((value, index) =>  // indexList -> primaryNameSrcList
+	.map((indexList: number[]) => indexList.map((value, index) =>  // indexList -> primaryNameSrcList
             NameCount.makeNew(ncList[index].name, _.toNumber(srcLists[index][value]))))
-        .filter(nameSrcList =>                             // filter out duplicate primary sources
+        .filter((nameSrcList: NameCount.List) =>                             // filter out duplicate primary sources
             _.uniqBy(nameSrcList, NameCount.count).length === nameSrcList.length)
-	.map(nameSrcList =>                                // sort by primary source (count).
+	.map((nameSrcList: NameCount.List) =>                                // sort by primary source (count).
             _.sortBy(nameSrcList, NameCount.count));       //   TODO: couldn't i just do forEach(list => _.sortBy(list, xx)) ? (is sortBy sort-in-place list list.sort()?)
 
     if (log) {
@@ -786,7 +786,7 @@ let primaryNcListToNameSrcSets = function (ncList: NameCount.List): Set<string>[
         listArray: indexLists,
         max:       2 // 999 // TODO? technically, clue-types[variety].max_clues
     }).getCombinations()
-	.reduce((result, indexList) => {
+	.reduce((result: Set<string>[], indexList: number[]) => {
 	    let set = new Set<string>();
 	    //indexList.forEach((value, index) => set.add(NameCount.makeNew(ncList[index].name, srcLists[index][value])));
 	    indexList.forEach((value, index) => set.add(NameCount.makeCanonicalName(ncList[index].name, _.toNumber(srcLists[index][value]))));
@@ -897,7 +897,7 @@ let filterAddends = function (addends: any, sizes: any): any[] {
 
 //
 
-export let filter = function (srcCsvList: string[], clueCount: number, map = {}): any {
+export let filter = function (srcCsvList: string[], clueCount: number, map: any = {}): any {
     let known = 0;
     let reject = 0;
     let duplicate = 0;
@@ -1009,20 +1009,21 @@ let getValidCounts = function (nameList: string[], countListArray: any): number[
     Peco.makeNew({
         listArray: countListArray,
         max:       State.maxClues
-    }).getCombinations().forEach(clueCountList => {
-        Debug(`nameList: ${nameList}, clueCountList: ${clueCountList}`);
-        let sum = clueCountList.reduce((a, b) => a + b);
-        // why was I passing validateAll: true here, shouldn't a single
-        // validation suffice?
-        if (Validator.validateSources({
-            sum:         sum,
-            nameList:    nameList,
-            count:       nameList.length,
-            validateAll: false
-        }).success) {
-            addCountSet.add(sum);
-        }
-    });
+    }).getCombinations()
+        .forEach((clueCountList: number[]) => {
+            Debug(`nameList: ${nameList}, clueCountList: ${clueCountList}`);
+            let sum = clueCountList.reduce((a, b) => a + b);
+            // why was I passing validateAll: true here, shouldn't a single
+            // validation suffice?
+            if (Validator.validateSources({
+                sum:         sum,
+                nameList:    nameList,
+                count:       nameList.length,
+                validateAll: false
+            }).success) {
+                addCountSet.add(sum);
+            }
+        });
     return Array.from(addCountSet);
 };
 
@@ -1047,7 +1048,7 @@ export let getPrimaryClue = function (nameSrc: NameCount.Type): Clue.Primary {
 
 let getPrimarySources = function (): string[] {
     let primarySources: string[] = [];
-    let hash = {};
+    let hash: any = {};
     for (const clue of getClueList(1)) {
         if (_.has(hash, clue.src)) continue;
         primarySources.push(clue.src);
@@ -1307,7 +1308,7 @@ let getListOfPrimaryNameSrcLists = function (ncList: NameCount.List): NameCount.
 		else if (_.isEmpty(entry.results)) console.log('entry.results empty');
 		process.exit(-1);
 	    }
-	    return entry.results.map(result => result.nameSrcList);
+	    return entry.results.map((result: ValidateResult) => result.nameSrcList);
 	}));
 	//primaryNameSrcLists.forEach(nameSrcList => console.log(`    nameSrcList: ${nameSrcList}`));
 	listOfPrimaryNameSrcLists.push(primaryNameSrcLists);
@@ -1332,25 +1333,24 @@ let buildListsOfPrimaryNameSrcLists = function (ncLists: NameCount.List[]): any[
 function getCompatiblePrimaryNameSrcList (listOfListOfPrimaryNameSrcLists: any[]) {
     //console.log(`${Stringify(listOfListOfPrimaryNameSrcLists)}`);
     const listArray = listOfListOfPrimaryNameSrcLists.map(listOfNameSrcLists => [...Array(listOfNameSrcLists.length).keys()]); // 0..nameSrcList.length
-    let comboLists = Peco.makeNew({
+    return Peco.makeNew({
         listArray,
         max: listOfListOfPrimaryNameSrcLists.reduce((sum, listOfNameSrcLists) => sum + listOfNameSrcLists.length, 0)
-    }).getCombinations();
-
-    return comboLists.some(comboList => {
-	const nameSrcList = comboList.reduce((nameSrcList, element, index) => {
-	    let nsList = listOfListOfPrimaryNameSrcLists[index][element];
-	    //console.log(`nameSrcList: ${nameSrcList}, element ${element}, index ${index}, nsList: ${nsList}`);
-	    if (nsList) {
-		nameSrcList.push(...nsList);
-	    } else {
-		console.log(`no nsList for index: ${index}, element: ${element}`);
-	    }
-	    return nameSrcList;
-	}, []);
-	const numUniq = _.uniqBy(nameSrcList, NameCount.count).length;
-	return (numUniq === nameSrcList.length) ? nameSrcList : undefined;
-    });
+    }).getCombinations()
+        .some((comboList: number[]) => {
+	    const nameSrcList = comboList.reduce((nameSrcList, element, index) => {
+	        let nsList = listOfListOfPrimaryNameSrcLists[index][element];
+	        //console.log(`nameSrcList: ${nameSrcList}, element ${element}, index ${index}, nsList: ${nsList}`);
+	        if (nsList) {
+		    nameSrcList.push(...nsList);
+	        } else {
+		    console.log(`no nsList for index: ${index}, element: ${element}`);
+	        }
+	        return nameSrcList;
+	    }, [] as NameCount.List);
+	    const numUniq = _.uniqBy(nameSrcList, NameCount.count).length;
+	    return (numUniq === nameSrcList.length) ? nameSrcList : undefined;
+        });
 };
 
 //
@@ -1395,7 +1395,7 @@ export let fast_getCountListArrays = function (nameCsv: string, options: any): a
 // Document what this does.
 //
 
-let invalidHash = {}; // hax
+let invalidHash: any = {}; // hax
 
 export let getCountListArrays = function (nameCsv: string, options: any): any {
     const validateAll = options.any ? false : true;
@@ -1475,9 +1475,7 @@ export let getCountListArrays = function (nameCsv: string, options: any): any {
             } else {
                 valid.push(clueCountList);
             }
-            if (options.add || options.remove) {
-                addRemoveSet.add(sum);
-            }
+            addRemoveSet && addRemoveSet.add(sum);
         }
     }
     return { valid, known, rejects, invalid, clues, addRemoveSet };
@@ -1555,7 +1553,7 @@ export let recursiveGetCluePropertyCount = function (
     let nodes: RecursiveNode[] = _.flatMap(keys, key => {
         // TODO: BUG:: key may be a ncCsv
 	let val: any = resultMap[key];
-	if (!_.isObject(val)) throw new Error(`Mystery key: ${key}`);
+	Assert(_.isObject(val), `Mystery key: ${key}`);
 	// A,B,C: non-array object value type
 	if (!_.isArray(val)) {
             let nc = NameCount.makeNew(key);
@@ -1572,7 +1570,9 @@ export let recursiveGetCluePropertyCount = function (
                 } else {
                     // C. primary key
                     // first array element
-                    source = `${val[key][0].count}`;
+                    // ugly. TS requirign it. typify resultmap to fix.
+                    let ncList= (val as Record<string, NameCount.List>)[key];
+                    source = `${ncList[0].count}`;
                     recurse = false;
                 }
             }

@@ -125,7 +125,7 @@ export function listToString (ncList: List): string {
 //
 
 function listToJSON (ncList: List) {
-    let s;
+    let s: string;
 
     if (!ncList.length) { return '[]'; }
 
@@ -191,7 +191,7 @@ let toJSON = function (nc: NameCount): NameCount {
 //
 
 NameCount_t.prototype.logList = function (list: List) {
-    let str;
+    let str: string = '';
 
     list.forEach(nc => {
         if (str.length > 0) {

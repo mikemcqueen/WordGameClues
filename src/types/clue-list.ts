@@ -77,13 +77,13 @@ function persist (filename: string) {
     Fs.writeFileSync(filename, this.toJSON());
 }
 
-//
+// wrong name.
 
-function toJSON (): string {
+function toJSON (list: Compound): string {
     let result = '[\n';
     let first = true;
 
-    this.forEach(clue => {
+    list.forEach((clue: Clue.Any) => {
         if (!first) {
             result += ',\n';
         }
@@ -102,8 +102,8 @@ function toJSON (): string {
 
 //
 
-function save (filename: string) {
-    Fs.writeFileSync(filename, this.toJSON(), { encoding: 'utf8' });
+export function save (list: Compound, filename: string) {
+    Fs.writeFileSync(filename, toJSON(list), { encoding: 'utf8' });
 }
 
 //
@@ -118,21 +118,26 @@ function init () {
 //
 //
 
+/*
 export function makeKey (): string {
-    return this.map(clue => clue.name).sort().toString();
+    return map(clue => clue.name).sort().toString();
 }
+*/
 
 //
 
+/*
 function sortSources () {
     for (let clue of this) {
         clue.src = clue.src.split(',').sort().toString();
     }
     return this;
 }
+*/
 
 //
 
+/*
 function getSameSrcList (startIndex: number, options: any = {}) {
     let list = makeNew();
     let mismatch = -1;
@@ -148,11 +153,13 @@ function getSameSrcList (startIndex: number, options: any = {}) {
     }
     return [list, mismatch];
 }
+*/
 
 //
 
+/*
 function sortedBySrc () {
-    let srcHash = {};
+    let srcHash: any = {};
     let sorted = makeNew();
     this.sortSources();
     for (let index = 0; index < this.length; index += 1) {
@@ -165,9 +172,11 @@ function sortedBySrc () {
     }
     return sorted;
 }
+*/
 
 //
 
+/*
 function clueSetActual (clue, actualClue) {
     Expect(actualClue.src).is.a.String();
     clue.actual = actualClue.src;
@@ -276,21 +285,22 @@ function mergeFrom (fromList, options = {}) {
     Expect(fromIndex).is.equal(-1); // pigs fly
     return [merged, warnings];
 }
+*/
 
 //
 //
 
 function assignMethods (list: any): any {
 //    list.display          = display;
-    list.getSameSrcList   = getSameSrcList;
+//    list.getSameSrcList   = getSameSrcList;
 //    list.init             = init;
-    list.makeKey          = makeKey;
-    list.mergeFrom        = mergeFrom;
+//    list.makeKey          = makeKey;
+//    list.mergeFrom        = mergeFrom;
     list.toJSON           = toJSON;
     list.save             = save;
-    list.sameSrcMergeFrom = sameSrcMergeFrom;
-    list.sortedBySrc      = sortedBySrc;
-    list.sortSources      = sortSources;
+//    list.sameSrcMergeFrom = sameSrcMergeFrom;
+//    list.sortedBySrc      = sortedBySrc;
+//    list.sortSources      = sortSources;
 
     return list;
 }
