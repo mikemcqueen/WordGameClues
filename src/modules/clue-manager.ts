@@ -1089,7 +1089,8 @@ let addClueForCounts = function (countSet: Set<number>, name: string, src: strin
 	        }
             } else {
                 const list = getClueList(count);
-                let foundClue: Clue.Compound | undefined = _.find(list, clue);
+                // any because arbirtray property indexing
+                let foundClue: any = _.find(list, clue);
                 if (foundClue) {
                     foundClue[propertyName] = true;
                     console.log(`${count}: added '${propertyName}' property to ${name}:${src}`);
@@ -1116,7 +1117,8 @@ let removeClueForCounts = function (countSet: Set<number>, name: string, src: st
             }
         } else {
             const list = getClueList(count);
-            let foundClue: Clue.Compound | undefined = _.find(list, { name, src });
+            // any because arbirtray property indexing
+            let foundClue: any = _.find(list, { name, src });
             if (foundClue) {
                 delete foundClue[propertyName];
                 console.log(`${count}: removed '${propertyName}' property from ${name}:${src}`);

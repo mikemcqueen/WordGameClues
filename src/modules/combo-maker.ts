@@ -1144,12 +1144,12 @@ function nameOrNcStrListToKnownNcLists (nameOrNcStrList: string[]): NameCount.Li
 	.map(nc => nc.count ? [nc] : getKnownNcListForName(nc.name));
 }
 
-function combinationNcList (combo: any, ncLists: NameCount.List[]): NameCount.List {
+function combinationNcList (combo: number[], ncLists: NameCount.List[]): NameCount.List {
     return combo.map((ncIndex: number, listIndex: number) => ncLists[listIndex][ncIndex]);
 }
 
-function combinationNcDataList (combo: any, ncLists: NameCount.List[]): NCDataList {
-    return combo.map((ncIndex: number, listIndex: number) => Object({ ncList: ncLists[listIndex][ncIndex]}));
+function combinationNcDataList (ncListIndexes: number[], ncLists: NameCount.List[]): NCDataList {
+    return ncListIndexes.map((ncListIndex: number, listIndex: number) => Object({ ncList: ncLists[listIndex][ncListIndex]}));
 }
 
 function ncListsToCombinations (ncLists: NameCount.List[]): any {
@@ -1173,7 +1173,7 @@ function combinationsToNcLists (combinationNcLists: NameCount.List[]): NameCount
 	listArray: combinationNcLists.map(ncList => [...Array(ncList.length).keys()]),
 	max: combinationNcLists.reduce((sum, ncList) => sum + ncList.length, 0)	      // sum of lengths of nclists
     }).getCombinations()
-	.map((combo: any) => combinationNcList(combo, combinationNcLists));
+	.map((countList: number[]) => combinationNcList(countList, combinationNcLists));
 }
 
 // TODO: get rid of this and combinationsToNcLists, and add extra map step in buildAllUseNCData
@@ -1183,7 +1183,7 @@ function combinationsToNcDataLists (combinationNcLists: NameCount.List[]): NCDat
 	listArray: combinationNcLists.map(ncList => [...Array(ncList.length).keys()]),
 	max: combinationNcLists.reduce((sum, ncList) => sum + ncList.length, 0)	      // sum of lengths of nclists
     }).getCombinations()
-	.map((combo: any) => combinationNcDataList(combo, combinationNcLists));
+	.map((ncListIndexes: number[]) => combinationNcDataList(ncListIndexes, combinationNcLists));
 }
 
 //
@@ -1203,16 +1203,13 @@ function buildAllUseNcDataLists (useArgsList: string[]): NCDataList[] {
 let getCompatibleUseSourcesFromNcData = (args: any): UseSource[] => {
     // XOR first
     let sourceList = getUseSourcesList<XorSource>(args.allXorNcDataLists, Op.xor, args);
-    //console.error(`xorSourceList(${sourceList.length})`); // : ${Stringify2(xorSourceList)}`);
 
     // OR next
     let orSourceList = getUseSourcesList<OrSource>(args.allOrNcDataLists, Op.or, args);
-    //console.error(`orSourceList(${orSourceList.length})`); // : ${Stringify2(orSourceList)}`);
 
     // final: merge OR with XOR
     if (!_.isEmpty(orSourceList)) {
 	sourceList = mergeOrSourceList(sourceList, orSourceList);
-	//console.log(`orSourceList(${orSourceList.length}), mergedSources(${sourceList.length}): ${Stringify2(sourceList)}`);
     }
     console.error(`useSourceList(${sourceList.length})`);
     if (0) {

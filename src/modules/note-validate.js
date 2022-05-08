@@ -4,8 +4,9 @@
 
 'use strict';
 
+const ClueManager  = require('../dist/modules/clue-manager');
+
 const _            = require('lodash');
-const ClueManager  = require('./clue-manager');
 const Clues        = require('./clue-types');
 const Dir          = require('node-dir');
 const Duration     = require('duration');

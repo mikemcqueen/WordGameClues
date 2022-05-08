@@ -132,7 +132,7 @@ export namespace PropertyCounts {
     }
 
     export function initAll (clue: PrimaryClue): void {
-        let propertyCounts = {};
+        let propertyCounts: any = {};
         Object.values(PropertyName.Enum).forEach((propertyName: PropertyName.Any) => {
             //console.error(`propertyName: ${propertyName}`);
             propertyCounts[propertyName] = getCounts(clue, propertyName);

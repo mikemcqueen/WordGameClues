@@ -6,8 +6,9 @@
 
 //
 
+const ClueManager    = require('../dist/modules/clue-manager');
+
 const _              = require('lodash');
-const ClueManager    = require('../modules/clue-manager');
 const Clues          = require('../modules/clue-types');
 const Debug          = require('debug')('note');
 const Duration       = require('duration');
