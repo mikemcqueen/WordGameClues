@@ -12,6 +12,7 @@ const ClueManager = require('../dist/modules/clue-manager');
 const NameCount   = require('../dist/types/name-count');
 const Validator   = require('../dist/modules/validator');
 
+const Assert      = require('assert');
 const Debug       = require('debug')('show-components');
 const Expect      = require('should/as-function');
 const Path        = require('path');
@@ -52,6 +53,7 @@ function getClueSources (name, count, nameList) {
     let sources = '';
     const srcMap = ClueManager.getKnownSourceMap(count);
     if (count === 1) {
+        Assert(nameList.length === 1, "nameList.length > 1");
         const source = nameList[0];
         const clue = _.find(ClueManager.getClueList(count), { name, src: source });
         //console.error(clue);
@@ -72,7 +74,7 @@ function getClueSources (name, count, nameList) {
             */
             const countsList = results.map(result =>
                 ClueManager.recursiveGetCluePropertyCount({ name, count }, result.resultMap.internal_map,
-                                                          Clue.CountedProperty.Enum.Synonym));
+                                                          Clue.PropertyName.Synonym));
             // TODO: duplicated in getSourceClues
             const totals = countsList.map(tp => tp.total);
             const primarys = countsList.map(tp => tp.primary);
