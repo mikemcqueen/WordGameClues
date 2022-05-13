@@ -135,7 +135,6 @@ function Stringify(val: any) {
 let logging = 0;
 let loggy = false;
 let ZZ = 0;
-let AA = false;
 
 // TODO: as const;
 const Op = {
@@ -354,11 +353,11 @@ let populateSourceData = (lazySource: SourceBase, nc: NameCount.Type, validateRe
 	source.sourceNcCsvList = ncCsvList.filter(ncCsv => orSourcesNcCsvMap ? orSourcesNcCsvMap.has(ncCsv) : true);
     } else {
 	if (validateResult.ncList.length !== 1 || validateResult.ncList[0].count !== 1) throw new Error("wrong assumption");
-	let ncListCsv = validateResult.ncList.toString();
+	let ncListCsv = NameCount.listToString(validateResult.ncList);
 	source.sourceNcCsvList = [ncListCsv].filter(ncCsv => orSourcesNcCsvMap ? orSourcesNcCsvMap.has(ncCsv) : true);
     }
     if (nc.count > 1) {
-	let ncStr = nc.toString();
+	let ncStr = NameCount.toString(nc);
 	source.sourceNcCsvList.push(...[ncStr].filter(ncCsv => orSourcesNcCsvMap ? orSourcesNcCsvMap.has(ncCsv) : true));
     }
     source.ncList = [nc]; // TODO i could try getting rid of "LazySource.nc" and just make this part of LazySouceData
@@ -402,6 +401,8 @@ let filterPropertyCountsOutOfBounds = (result: ValidateResult, args: MergeArgs):
     return true;
 };
 
+let AA = false;
+
 //
 //
 let getSourceList = (nc: NameCount.Type, args: MergeArgs): AnySourceData[] => {
@@ -413,8 +414,8 @@ let getSourceList = (nc: NameCount.Type, args: MergeArgs): AnySourceData[] => {
 	        .map((result: ValidateResult) => getSourceData(nc, result, args.lazy)));
         });
     if (AA) {
-	console.log(`getSourceList ${nc} (${sourceList.length}):`);
-	for (let source of sourceList) console.log(` ncList: ${source.ncList}`);
+	console.log(`getSourceList ${NameCount.toString(nc)} (${sourceList.length}):`);
+	for (let source of sourceList) console.log(` ncList: ${NameCount.listToString(source.ncList)}`);
     }
     return sourceList;
 };
@@ -444,7 +445,7 @@ let mergeSources = (source1: AnySourceData, source2: AnySourceData, lazy: boolea
 	sourceNcCsvList: [...source1.sourceNcCsvList, ...source2.sourceNcCsvList]
     };
     // TODO: still used?
-    mergedSource.ncCsv = mergedSource.ncList.sort().toString();
+    mergedSource.ncCsv = NameCount.listToSortedString(mergedSource.ncList);
     return mergedSource;
 };
 
@@ -501,7 +502,7 @@ let buildSourceListsForUseNcData = (useNcDataLists: NCDataList[], args: MergeArg
 	    if (!hashList[sourceListIndex]) hashList.push({});
 	    let sourceList = mergeAllCompatibleSources(useNcData.ncList, args);
 	    for (let source of sourceList) {
-		let key = _.sortBy(source.primaryNameSrcList, NameCount.count).toString();
+		let key = NameCount.listToString(_.sortBy(source.primaryNameSrcList, NameCount.count));
 		if (!hashList[sourceListIndex][key]) {
 		    sourceLists[sourceListIndex].push(source as SourceData);
 		    hashList[sourceListIndex][key] = true;
@@ -560,17 +561,22 @@ let getCompatibleOrSourcesLists = (primaryNameSrcList: NameCount.List, orSourceL
 
 // Here we have 'orSourceLists', created from getUseSourcesList(Op.or).
 //
-// Generate a sorted ncCsv from the combined NCs of each ncList across all sources
-// in each sourceList. Return a map of ncCsvs : sourceList index.
+// Generate a sorted ncCsv using the combined NCs of each sources's ncList,
+// in each sourceList. Return a map of ncCsvs : [sourceList index(es)].
+//
+// Exmample sourceList's ncList's, stringified: [ [ b:1, a:2 ], [ c:3, d:4 ] ]
+// Flattened ncList, stringified: [ b:1, a:2, c:3, d:4 ]
+// sorted ncCsv: 'a:2,b:1,c:3,d:4'
 //
 // It'd be preferable to embed this ncCsv within each sourceList itself. I'd need to
 // wrap it in an object like { sourceList, ncCsv }.
 //
 let buildOrSourceNcCsvMap = (orSourceLists: SourceList[]): SourceNcCsvMap => {
     return orSourceLists.reduce((map: SourceNcCsvMap, sourceList: SourceList, index: number) => {
+        // DONE: this is done now, can remove all these comments if it works
         // TODO: just _.flatMap? instead of flatMap(map) and sort is suspicious here
 	//const key = _.flatMap(sourceList, sources => sources.ncList).sort().toString();
-	const key = _.flatMap(sourceList.map(sources => sources.ncList)).sort().toString();
+	const key = NameCount.listToSortedString(_.flatMap(sourceList, source => source.ncList));
 	if (!map[key]) map[key] = [];
 	map[key].push(index);
 	return map;
@@ -581,9 +587,8 @@ let buildOrSourceNcCsvMap = (orSourceLists: SourceList[]): SourceNcCsvMap => {
 //
 let buildUseSourceNcCsvMap = (useSourceList: UseSource[]): SourceNcCsvMap => {
     return useSourceList.reduce((map: SourceNcCsvMap, source: UseSource, index: number) => {
-	console.log(Stringify2(source));
-        // TODO: suspicious sort
-	const key = source.ncList.sort().toString();
+	if (AA) console.log(Stringify2(source));
+	const key = NameCount.listToSortedString(source.ncList);
 	if (!map[key]) map[key] = [];
 	map[key].push(index);
 	return map;
@@ -627,10 +632,11 @@ let mergeCompatibleUseSources = <SourceType extends UseSourceBase>(sourceLists: 
 	    if (op === Op.or) {
 		if (sourceIndex === 0) {
 		    if (ZZ) console.log(`adding to orSourceLists @ index(${listIndex}) length(${orSourceList.length}) count(${sourceLists[listIndex].length})`);
-		    if (ZZ) console.log(`  sourceLists[listIndex][0].ncList: ${sourceLists[listIndex][0].ncList}`);
+		    if (ZZ) console.log(`  sourceLists[listIndex][0].ncList: ${Stringify(sourceLists[listIndex][0].ncList)}`);
 		    orSourceLists.push(sourceLists[listIndex]);
-		    // TODO: probably can remove this (and all references to sources.ncCsv) at some point
-		    sourceLists[listIndex].forEach(source => { source.ncCsv = source.ncList.sort().toString(); });
+		    sourceLists[listIndex].forEach(source => {
+                        source.ncCsv = NameCount.listToSortedString(source.ncList);
+                    });
 		    continue;
 		}
 		--sourceIndex;
@@ -661,7 +667,7 @@ let mergeCompatibleUseSources = <SourceType extends UseSourceBase>(sourceLists: 
 	}
 	if (success) {
 	    if (ZZ) console.log(`pnsl, final: ${primaryNameSrcList}`);
-	    Assert(!_.isEmpty(primaryNameSrcList), 'empty primaryNameSrcList');
+	    //Assert(!_.isEmpty(primaryNameSrcList), 'empty primaryNameSrcList');
 	    let result: UseSourceBase = {
 		primaryNameSrcList,
 		primarySrcArray: getCountArray(primaryNameSrcList),
@@ -789,7 +795,7 @@ let next = (countList: number[], sourceIndexes: number[]): FirstNextResult => {
 	nameList.sort();
         // TODO: NameCount.sort(ncList), in sortBy func: convert NC to string
         // (NameCount.toString(nc: Type), use the standard string compare fn.
-        ncList.sort();
+        NameCount.sortList(ncList);
 	return { done: false, ncList, nameList };
     }
 };
@@ -805,25 +811,41 @@ let first = (countList: number[], sourceIndexes: number[]): FirstNextResult => {
     return next(countList, sourceIndexes);
 };
 
+// because the NcCsvMap size is typically low, this function doesn't consume much
 //
-//
-let isCompatibleWithAnyOrSource = (source: SourceData, useSource: UseSource,
-				   orSourcesNcCsvMap: Map<string, number>): boolean => {
+let isSourceCompatibleWithAnyOrSource = (source: SourceData, useSource: UseSource,
+				         orSourcesNcCsvMap: Map<string, number>): boolean => {
     let orSource = useSource.orSource!;
-    if (0 && AA) {
+    if (1 && AA) {
 	console.log(`orSource: ${Stringify2(orSource)}`);
     }
     return source.sourceNcCsvList.some(ncCsv => {
+        // TODO: comment this
 	if (!orSource.sourceNcCsvMap[ncCsv]) {
 	    if (AA) console.log( `  no ${ncCsv} in orSourceMap`);
 	    return false; // some.continue
 	}
 	if (AA) console.log(` found ${ncCsv} in orSourceMap`);
 	return orSource.sourceNcCsvMap[ncCsv].some(index => {
+            // TODO: comment this
+            // TODO: so at first glance this is looking woefully inadequate in multiple dimensions.
+            // 1. We're considering the "primary sources full intersection" case here but we aren't
+            //    considering the "primary sources empty intersection" case apparently, which is also
+            //    a valid OR case.
+            //    Although it's possible the "empty intersection" case is covered by the NcCsvMap[]
+            //    check in the outer loop.  But I'm not convinced, I think it might be doing the same
+            //    thing as here - only looking for a match (of primary NCs), not an empty intersection.
+            
+            // check if all primary source counts of orSource are included in source
             let primarySrcArrayAndSize = orSource.primarySrcArrayAndSizeList[index];
 	    let numCountsInArray = getNumCountsInArray(source.primaryNameSrcList, primarySrcArrayAndSize.array);
 	    if (AA) console.log(` matching counts (${numCountsInArray}) out of (${primarySrcArrayAndSize.size})`);
 	    if (numCountsInArray === primarySrcArrayAndSize.size) {
+                // take the remaining primary source counts from source that are not part of orSource,
+                // and ensure none of them are present in useSource.
+                // TODO: I'm actually not sure why I need to do this check, because it seems this is
+                // the first compatibility check in isSourceCompatibleWithUseSoruce. But I'm not going
+                // to second guess myself without more investigation.
 		const uniqPrimarySrcList = getCountListNotInArray(source.primaryNameSrcList, primarySrcArrayAndSize.array);
 		const allUniqueSrc = !anyNumberInArray(uniqPrimarySrcList, useSource.primarySrcArray);
 		if (AA) console.log(` allUnique: ${allUniqueSrc}`);
@@ -836,22 +858,66 @@ let isCompatibleWithAnyOrSource = (source: SourceData, useSource: UseSource,
 
 //
 //
+let isSourceCompatibleWithUseSource = (source: SourceData, useSource: UseSource,
+                                       orSourcesNcCsvMap: Map<string, number>): boolean => {
+    let compatible: boolean =
+        !anyCountInArray(source.primaryNameSrcList, useSource.primarySrcArray);
+    if (AA) console.log(` -xorCompatible: ${compatible}, sourceLists(${useSource.orSource?.sourceLists.length})`);
+    // Base case: --xor arguments only. Wether we're compatible or not is known at this point.
+    // --or case: if orSource.sourceLists is non-empty, we must check them for --or compatibility.
+    if (compatible && useSource.orSource?.sourceLists.length) {
+	compatible = isSourceCompatibleWithAnyOrSource(source, useSource, orSourcesNcCsvMap);
+	if (AA) console.log(` -orCompatible: ${compatible}`);
+    }
+    return compatible;
+}
+
+let isCWUS_calls = 0;
+let isCWUS_comps = 0;
+type CwusHashEntry = {
+    count: number;
+//    useSource: SourceData;
+};
+
+let CwusHash: Record<string, CwusHashEntry> = {};
+
+// The inner loop of this function can be executed a billion+ times with
+// a reasonably sized --xor list. About 45k outer loops and 25k inner.
+//
 let isCompatibleWithUseSources = (sourceList: SourceList, useSourceList: UseSource[],
 				  orSourcesNcCsvMap: Map<string, number>): boolean => {
     if (_.isEmpty(useSourceList)) return true;
+    isCWUS_calls += 1;
+
+    /*
+    // run through previously compatible useSources in hot-hash first
+    for (const entry of Object.entries(CwusHash)) {
+        let [sourceIndex, useSourceIndex] = entry[0].split(',').map(str => _.toNumber(str));
+        if (sourceIndex === 3 && useSourceIndex === 3) {
+            console.log(Object.keys(sourceList[sourceIndex]));
+        }
+
+        if (isSourceCompatibleWithUseSource(sourceList[sourceIndex], useSourceList[useSourceIndex], orSourcesNcCsvMap)) {
+            CwusHash[entry[0]].count += 1;
+            return true;
+        }
+    }
+    */
+
     // TODO: some
-    for (let source of sourceList) {
-	if (AA) console.log(`source nc: ${source.ncList}`);
-	for (let useSource of useSourceList) {
-	    let compatible = !anyCountInArray(source.primaryNameSrcList, useSource.primarySrcArray);
-	    if (AA) console.log(` -xorCompatible: ${compatible}, sourceLists: ${useSource.orSource?.sourceLists.length}`);
-	    // Base case: --xor arguments only. Wether we're compatible or not is known at this point.
-	    // --or case: if orSource.sourceLists is non-empty, we must check them for --or compatibility.
-	    if (compatible && useSource.orSource?.sourceLists.length) {
-		compatible = isCompatibleWithAnyOrSource(source, useSource, orSourcesNcCsvMap);
-		if (AA) console.log(` -orCompatible: ${compatible}`);
-	    }
-	    if (compatible) return true;
+    for (let sourceIndex = 0, sourceListLength = sourceList.length; sourceIndex < sourceListLength; ++sourceIndex) {
+        let source = sourceList[sourceIndex];
+	if (AA) console.log(`source nc: ${NameCount.listToString(source.ncList)}`);
+	for (let useSourceIndex = 0, useSourceListLength = useSourceList.length; useSourceIndex < useSourceListLength; ++useSourceIndex) {
+            let useSource = useSourceList[useSourceIndex];
+            isCWUS_comps += 1;
+            if (isSourceCompatibleWithUseSource(source, useSource, orSourcesNcCsvMap)) {
+                if (!CwusHash[useSourceIndex]) {
+                    CwusHash[useSourceIndex] = { count: 0 }; // , useSource };
+                }
+                CwusHash[useSourceIndex].count += 1;
+                return true;
+            }
 	}
     }
     return false;
@@ -911,7 +977,7 @@ let getCombosForUseNcLists = (sum: number, max: number, pcd: PreComputedData, ar
 
     // for each countList
     countListArray.forEach((countList: number[]) => {
-	AA = false;
+        AA = false;
 	comboCount += 1;
 
 	//console.log(`sum(${sum}) max(${max}) countList: ${Stringify(countList)}`);
@@ -948,8 +1014,7 @@ let getCombosForUseNcLists = (sum: number, max: number, pcd: PreComputedData, ar
 	    }
 
 	    //const key = NameCount.listToString(result.ncList);
-            // TODO: ncList.sort is bad mojo. NameCount.sort(ncList) is better
-	    const key: string = result.ncList!.sort().toString();
+	    const key: string = NameCount.listToSortedString(result.ncList!);
 	    let cacheHit = false;
 	    let sourceList: LazySourceData[];
 	    if (!hash[key]) {
@@ -1116,7 +1181,19 @@ let makeCombos = (args: any): any => {
 	    const filterResult = ClueManager.filter(comboList, sum, comboMap);
 	}
 	let d = new Duration(begin, new Date()).milliseconds;
-	console.error(`--combos: ${PrettyMs(d)}, oob: ${oob}`);
+	console.error(`--combos: ${PrettyMs(d)}, oob: ${oob}, ` +
+            `isCWUS calls: ${isCWUS_calls} avg comps: ${_.toInteger(isCWUS_comps / isCWUS_calls)} `);
+
+        
+        // ++ INSTRUMENTATION
+        let cwusEntries = [...Object.entries(CwusHash)].sort((a, b) => b[1].count - a[1].count);
+        for (let x = 0; x < 100; ++x) {
+            if (cwusEntries[x]) console.error(cwusEntries[x]);
+        }
+        console.error(`total: ${cwusEntries.length}`);
+        // -- INSTRUMENTATION
+
+
 	Debug(`total: ${total}, filtered(${_.size(comboMap)})`);
 	_.keys(comboMap).forEach((nameCsv: string) => console.log(nameCsv));
     }
@@ -1226,9 +1303,8 @@ let getCompatibleUseSourcesFromNcData = (args: any): UseSource[] => {
 let getOrSourcesNcCsvCountMap = (useSourcesList: UseSource[]): Map<string, number> => {
     let map = new Map<string, number>();
     for (let useSource of useSourcesList) {
-	let orSource = useSource.orSource!;
-	if (!orSource) continue;
-	for (let ncCsv of _.keys(orSource.sourceNcCsvMap)) {
+	if (!useSource.orSource) continue;
+	for (let ncCsv of _.keys(useSource.orSource.sourceNcCsvMap)) {
 	    let value = map.get(ncCsv) || 0;
 	    map.set(ncCsv, value + 1);
 	}

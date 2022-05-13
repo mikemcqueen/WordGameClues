@@ -105,7 +105,6 @@ export function listToCountList (ncList: NameCount[]): number[] {
 
 //
 
-
 export function makeCanonicalName (name: string, count: number, index?: number): string {
     let s = name;
     if (count) {
@@ -117,10 +116,28 @@ export function makeCanonicalName (name: string, count: number, index?: number):
     return s;
 }
 
+// list of NCs -> list of string representation of those NCs
+export function listToStringList (ncList: List): string[] {
+    return ncList.map(nc => toString(nc));
+}
+
+// AKA "listToCsv"
 export function listToString (ncList: List): string {
     if (!ncList) return _.toString(ncList);
-    return ncList.map(nc => nc.toString()).toString();
+    return listToStringList(ncList).toString();
 }
+
+// AKA "listToSortedCsv"
+export function listToSortedString (ncList: List): string {
+    if (!ncList) return _.toString(ncList);
+    return listToStringList(ncList).sort().toString();
+}
+
+export function sortList (ncList: List): List {
+    ncList.sort((a: NameCount, b: NameCount) => toString(a).localeCompare(toString(b)));
+    return ncList;
+}
+
 
 //
 
@@ -163,6 +180,10 @@ export function listContainsAll (ncListContains: List, ncList: List) {
 
 //////////////////////////////////////////////////////////////////////////////
 
+export function toString (nc: NameCount): string {
+    return makeCanonicalName(nc.name, nc.count, nc.index);
+}
+
 NameCount_t.prototype.toString = function(): string {
     return makeCanonicalName(this.name, this.count, this.index);
 //    this.cachedCanonicalName = this.cashedCanonicalName || 
@@ -179,7 +200,7 @@ NameCount_t.prototype.setIndex = function(index: number) {
 //
 
 NameCount_t.prototype.equals = function(nc: NameCount) {
-    return (nc.count === this.count) && (nc.name == this.name);
+    return (nc.count === this.count) && (nc.name === this.name);
 }
 
 //
@@ -201,21 +222,3 @@ NameCount_t.prototype.logList = function (list: List) {
     });
     console.log(str);
 };
-
-//
-
-/*
-module.exports = {
-    makeCopy,
-    makeNameList,
-    makeCountList,
-    makeListFromNameList,
-    makeListFromCsv,
-    makeNameMap,
-    makeCountMap,
-    listToString,
-    listToJSON,
-    listContains,
-    listContainsAll
-};
-*/

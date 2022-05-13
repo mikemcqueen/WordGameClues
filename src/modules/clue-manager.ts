@@ -1322,7 +1322,7 @@ export let origbuildListsOfPrimaryNameSrcLists = function (ncLists: NameCount.Li
     return ncLists.map(ncList => getListOfPrimaryNameSrcLists(ncList));
 };
 
-let buildListsOfPrimaryNameSrcLists = function (ncLists: NameCount.List[]): any[] {
+export let buildListsOfPrimaryNameSrcLists = function (ncLists: NameCount.List[]): any[] {
     return ncLists.map(ncList => {
 	let result = getListOfPrimaryNameSrcLists(ncList);
 	if (!result[0][0]) {
