@@ -207,6 +207,19 @@ let allCountUnique = (nameSrcList1: NameCount.List, nameSrcList2: NameCount.List
     return true;
 };
 
+                
+//
+//
+let countArrayToNumberList = (countArray: CountArray): number[] => {
+    let result: number[] = [];
+    for (let index = 1; index < countArray.length; ++index) {
+	if (countArray[index] === index) {
+	    result.push(index);
+	}
+    }
+    return result;
+}
+
 // 
 //
 let anyCountInArray = (ncList: NameCount.List, countArray: CountArray): boolean => {
@@ -738,11 +751,18 @@ let mergeCompatibleUseSources = <SourceType extends UseSourceBase>(sourceLists: 
                         console.log(`after: result.sourceLists(${orResult.sourceLists.length}): ${Stringify2(orResult.sourceLists)}`);
                         ZZ = false;
                     }
-                }
+		}
             }
             if (compatible) {
-                sourceList.push(result as SourceType);
-            }
+		if (ZZ) {
+		    console.log(` compatible: true, adding` +
+			` pnsl[${NameCount.listToString(result.primaryNameSrcList)}]` +
+			` sourceLists(${(result as OrSource).sourceLists?.length})`);
+		}
+		sourceList.push(result as SourceType);
+            } else {
+		if (ZZ) console.log(` compatible: false`);
+	    }
         }
         ++iter;
     }
@@ -791,7 +811,8 @@ let mergeOrSourceList = (sourceList: XorSource[], orSourceList: OrSource[]): Use
                     orSource
                 });
             } else if (numUnique === orSource.primaryNameSrcList.length) {
-                console.error('an --or value is implicitly compatible with an --xor value, making this --or value unnecessary');
+                console.error('an --or value is implicitly compatible with an --xor value' +
+		    ', making this --or value unnecessary');
             } else if (0) {
                 console.error(`not unique, source: ${NameCount.listToString(source.primaryNameSrcList)}, ` +
                               `orSource: ${NameCount.listToString(orSource.primaryNameSrcList)}`);
@@ -871,18 +892,60 @@ let first = (countList: number[], sourceIndexes: number[]): FirstNextResult => {
 //
 //                
 const isSourceANDCompatibleWithOrSource = (source: SourceData, orSourceData: OrSource,
-                                           orSourceIndex: number): boolean => {
+                                           index: number): boolean => {
     // check if all primary source counts of orSource are included in source
-    const primarySrcArrayAndSize = orSourceData.primarySrcArrayAndSizeList[orSourceIndex];
+    const primarySrcArrayAndSize = orSourceData.primarySrcArrayAndSizeList[index];
+    if (primarySrcArrayAndSize.size === 0) return true;
     const numCountsInArray = getNumCountsInArray(source.primaryNameSrcList, primarySrcArrayAndSize.array);
     const result = numCountsInArray === primarySrcArrayAndSize.size;
-    if (AA) console.log(` AND compatible: ${result}, matching counts (${numCountsInArray}) out of (${primarySrcArrayAndSize.size})`);
+    if (AA) {
+	console.log(` AND compatible @${index}: ${result}, matching counts` +
+	    ` (${numCountsInArray}) out of (${primarySrcArrayAndSize.size})`);
+    }
     return result;
 }
 
 //
 //                
-const isSourceXORCompatibleWithOrSource = (source: SourceData, orSourceData: OrSource): boolean => {
+const isSourceXORCompatibleWithOrSource = (source: SourceData, orSourceData: OrSource,
+                                           index: number): boolean => {
+
+    const orSourceList = orSourceData.sourceLists[index];
+    // comment
+    if (orSourceList!.length === 0) return true;
+    // comment
+    const countList = NameCount.listToCountList(source.primaryNameSrcList);
+    if (AA) {
+	console.log(` start: (${source.primaryNameSrcList.length})` +
+	    `, ${NameCount.listToStringList(source.primaryNameSrcList)}`);
+    }
+    // TODO: listToCountSet
+    let countSet = new Set(countList);
+    let size = countSet.size;
+    for (const orSource of orSourceList) {
+        if (AA) {
+            console.log(` before add: actual(${countSet.size}), expected(${size}),` +
+		` adding(${orSource.primaryNameSrcList.length})` +
+                `, ncList: ${NameCount.listToStringList(orSource.primaryNameSrcList)}`);
+        }
+        orSource.primaryNameSrcList.forEach(nameSrc => countSet.add(nameSrc.count));
+        size += orSource.primaryNameSrcList.length;
+        if (AA) console.log(` after add: actual(${countSet.size}), expected(${size})`);
+    }
+    const result = countSet.size === size;
+    if (AA) {
+	console.log(` XOR compatible @${index}: ${result}` +
+	    `, sourceLists(${orSourceData.sourceLists.length})`);
+    }
+    return result;
+};
+
+//
+//                
+/*
+const old_isSourceXORCompatibleWithOrSource = (source: SourceData, orSourceData: OrSource): boolean => {
+    // comment
+    if (_.isEmpty(orSourceData.sourceLists)) return true;
     // comment
     const countList = NameCount.listToCountList(source.primaryNameSrcList);
     if (AA) console.log(` start: (${source.primaryNameSrcList.length}), ${NameCount.listToStringList(source.primaryNameSrcList)}`);
@@ -903,6 +966,7 @@ const isSourceXORCompatibleWithOrSource = (source: SourceData, orSourceData: OrS
     if (AA) console.log(` XOR compatible: ${result}, sourceLists(${orSourceData.sourceLists.length})`);
     return result;
 };
+*/
 
 //
 //
@@ -910,9 +974,23 @@ let isSourceCompatibleWithAnyOrSource = (source: SourceData, useSource: UseSourc
                                          orSourcesNcCsvMap: Map<string, number>): boolean => {
     const orSource = useSource.orSource!;
     if (AA) {
-        console.log(` source.sourceNcCsvList(${source.sourceNcCsvList.length})`);
-        if (1) console.log(` orSource: ${Stringify2(orSource)}`);
+        console.log(` source.sourceNcCsvList(${source.sourceNcCsvList.length}), orSourceLists(${orSource.sourceLists.length})`);
+        if (0) console.log(` orSource: ${Stringify2(orSource)}`);
     }
+
+    // OR == AND || XOR
+    // however, the way i've structured the sourceList data I believe an && is still
+    // the appropriate operator here. I think with the knowledge of AND || XOR there
+    // is the possibility of structuring the data differently as an optimization.
+    for (let index = 0, length = orSource.sourceLists.length; index < length; ++index) {
+	if (ZZ) console.log(`index(${index})`);
+	if (isSourceANDCompatibleWithOrSource(source, orSource, index) &&
+            isSourceXORCompatibleWithOrSource(source, orSource, index)) {
+
+	    return true;
+        }
+    }
+    return false;
 
     // source.sourceNcCsvList is a list of ncCsvs that represent all of the component sources
     // of a particular source, like a flattened ResultMap, as well the source itself.
@@ -935,10 +1013,17 @@ let isSourceCompatibleWithAnyOrSource = (source: SourceData, useSource: UseSourc
     // Two: Worth revisiting.
     // Three: Worth revisiting
     // 
+    // So ultimately this sourceNcCsvList/sourceNcCsvMap stuff was an optimization that doesn't
+    // work, because it only addresses those orSources that have a sourceList, which is for the
+    // XOR compatibility check. There's no way (I can think of) to use this for AND compatibility
+    // checking. There is still some potential here to short-circuit some XOR compatibility checks
+    // using the ncCsv data; for example, if the current index is not in the Map[] index list, we
+    // can fail the XOR check without performing it.
+    /*
     return source.sourceNcCsvList.some(ncCsv => {
         // TODO: comment this
         if (!orSource.sourceNcCsvMap[ncCsv]) {
-            if (AA) console.log( `  no ${ncCsv} in orSourceMap`);
+            if (AA) console.log( ` no ${ncCsv} in orSourceMap`);
             return false; // some.continue
         }
         if (AA) console.log(` found ${ncCsv} in map: [${_.toString(orSource.sourceNcCsvMap[ncCsv])}]`);
@@ -947,7 +1032,8 @@ let isSourceCompatibleWithAnyOrSource = (source: SourceData, useSource: UseSourc
                 isSourceXORCompatibleWithOrSource(source, orSource);
         });
     });
-                
+    */
+
     /* this was the old "xor compatible" check.  I think it's wrong.  leaving it for until
        I'm more I know what I'm doing.
         // take the remaining primary source counts from source that are not part of orSource,
@@ -969,7 +1055,11 @@ let isSourceCompatibleWithUseSource = (source: SourceData, useSource: UseSource,
                                        orSourcesNcCsvMap: Map<string, number>): boolean => {
     let compatible: boolean =
         !anyCountInArray(source.primaryNameSrcList, useSource.primarySrcArray);
-    if (AA) console.log(` -xorCompatible: ${compatible}, orSourceLists(${useSource.orSource?.sourceLists.length})`);
+    if (AA) {
+	console.log(` -xorCompatible: ${compatible}, orSourceLists(${useSource.orSource?.sourceLists.length})` +
+	    ` source.pnslCounts[${NameCount.listToCountList(source.primaryNameSrcList)}]` +
+	    ` useSource.primarySrcArray[${countArrayToNumberList(useSource.primarySrcArray)}]`);
+    }
 
     // Base case: --xor arguments only. Wether we're compatible or not is known at this point.
     // --or case: if orSource.sourceLists is non-empty, we must check them for --or compatibility.
@@ -986,9 +1076,6 @@ let isSourceCompatibleWithUseSource = (source: SourceData, useSource: UseSource,
             if (AA) console.log(` -orCompatible: ${compatible}, ${ncStr}`);
         }
     }
-
-    WW = false;
-
     return compatible;
 }
 
@@ -1002,7 +1089,7 @@ type CwusHashEntry = {
 let CwusHash: Record<string, CwusHashEntry> = {};
 
 // TODO: isAnySourceCompatibleWithAnyUseSource
-
+//
 // The inner loop of this function can be executed a billion+ times with
 // a reasonably sized --xor list. About 45k outer loops and 25k inner.
 //
@@ -1131,7 +1218,8 @@ let getCombosForUseNcLists = (sum: number, max: number, pcd: PreComputedData, ar
             }
 
             
-            if (result.nameList!.includes('wallet')) {
+            //if (result.nameList!.includes('wallet')) {
+	    if (result.nameList!.toString() == 'note,wallet') {
                 console.log(`hit: ${result.nameList}`);
                 ZZ = true;
                 AA = true

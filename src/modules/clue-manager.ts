@@ -1471,9 +1471,12 @@ export let getCountListArrays = function (nameCsv: string, options: any): any {
                 clues.push({ countList: clueCountList, nameList: srcList });
             }
         } else {
-            let any = State.knownSourceMapArray[sum][nameList.toString()];
+            let any: SourceData = getKnownSourceMap(sum)[nameList.toString()];
             if (any) {
-                known.push({ countList: clueCountList, nameList: any.clues.map(clue => clue.name) });
+                known.push({
+		    countList: clueCountList,
+		    nameList: (any.clues as ClueList.Compound).map(clue => clue.name)
+		});
             } else {
                 valid.push(clueCountList);
             }
