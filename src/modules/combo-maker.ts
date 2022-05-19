@@ -119,8 +119,10 @@ interface UseSource extends UseSourceBase {
 }
 
 interface PreComputedData {
+    //useSourcesList: UseSource[];
+    xorSourceList: XorSource[];
+    orSourceList: OrSource[];
     orSourcesNcCsvMap: Map<string, number>;
-    useSourcesList: UseSource[];
 }
 
 let PCD: PreComputedData | undefined = undefined;
@@ -361,8 +363,6 @@ function buildSrcNcList (resultMap: Object): string[] {
     return recursiveAddSrcNcLists([], resultMap);
 }
 
-let PP = false;
-
 //
 //
 let populateSourceData = (lazySource: SourceBase, nc: NameCount.Type, validateResult: ValidateResult,
@@ -377,13 +377,9 @@ let populateSourceData = (lazySource: SourceBase, nc: NameCount.Type, validateRe
     if (nc.count > 1) {
         source.sourceNcCsvList.push(NameCount.toString(nc));
     }
-    if (PP) console.log(`before: ${Stringify2(source.sourceNcCsvList)}`);
     if (orSourcesNcCsvMap) {
         source.sourceNcCsvList = source.sourceNcCsvList.filter(ncCsv => orSourcesNcCsvMap.has(ncCsv));
-        //.filter(ncCsv => orSourcesNcCsvMap ? orSourcesNcCsvMap.has(ncCsv) : true);
     }
-    if (PP) console.log(`after: ${Stringify2(source.sourceNcCsvList)}`);
-
     source.ncList = [nc]; // TODO i could try getting rid of "LazySource.nc" and just make this part of LazySouceData
     if (loggy || logging > 3) {
         console.log(`getSourceList() ncList: ${source.ncList}, sourceNcCsvList: ${source.sourceNcCsvList}`);
@@ -402,6 +398,7 @@ let getSourceData = (nc: NameCount.Type, validateResult: ValidateResult, lazy: b
         : populateSourceData({ primaryNameSrcList }, nc, validateResult, orSourcesNcCsvMap);
 };
 
+// out of bounds
 let oob = 0;
 
 //
@@ -417,7 +414,6 @@ let filterPropertyCountsOutOfBounds = (result: ValidateResult, args: MergeArgs):
         // compoundClue: propertyCounts are attached to each ValidateResult
         propertyCounts = result.propertyCounts!;
     }
-
     if (propertyCounts[Clue.PropertyName.Synonym].total > args.max_synonyms) {
         oob++;
         return false;
@@ -639,7 +635,7 @@ let mergeCompatibleUseSources = <SourceType extends UseSourceBase>(sourceLists: 
     // low clue count range (e.g. -c2,4). should that even be allowed?
     let pad = (op === Op.or) ? 1 : 0;
     let listArray = sourceLists.map(sourceList => [...Array(sourceList.length + pad).keys()]);
-    ZZ = (op === Op.or);
+    //ZZ = (op === Op.or);
     if (ZZ) console.log(`listArray(${listArray.length}): ${Stringify2(listArray)}`);
     //console.log(`sourceLists(${sourceLists.length}): ${Stringify2(sourceLists)}`);
 
@@ -733,9 +729,9 @@ let mergeCompatibleUseSources = <SourceType extends UseSourceBase>(sourceLists: 
                 }
                 // --DEBUG
                 
-                // This can return an empty list and that should seem odd to you at first glance,
-                // because all of these OrSources were already determined to be compatible with
-                // each other.
+                // This can return an empty list and that seems odd at first glance, because all
+                // all of these OrSources were already determined to be compatible with each other.
+                // (Wait, what? Where? Is that some old "merge Xor with Or" code I removed?)
                 //
                 // When you throw primaryNameSrcList into the equation, it is possible that the
                 // the primary sources it uses results in no valid combination of the remaining
@@ -783,9 +779,17 @@ let getUseSourcesList = <SourceType extends UseSourceBase>(ncDataLists: NCDataLi
 };
 
 //
+// There is probably some potential for optimization here. Merging in this way is
+// wrong, however. This is specifically merging only those sources that have XOR
+// compatible primaryNameSrcLists, which, if not completely wrong, is at least in
+// part wrong.
+//
+// Also, if nothing else, the "implicitly compatible" check is probably worthwhile.
+//
 // nested loops over XorSources, OrSources primaryNameSrcLists,
 // looking for compatible lists
 //
+/*
 let mergeOrSourceList = (sourceList: XorSource[], orSourceList: OrSource[]): UseSource[] => {
     // NOTE: optimization, can be implemented with separate loop, 
     // (can start with LAST item in list as that should be the one with all
@@ -821,6 +825,7 @@ let mergeOrSourceList = (sourceList: XorSource[], orSourceList: OrSource[]): Use
     }
     return mergedSourceList;
 };
+*/
 
 //
 //
@@ -894,12 +899,19 @@ let first = (countList: number[], sourceIndexes: number[]): FirstNextResult => {
 const isSourceANDCompatibleWithOrSource = (source: SourceData, orSourceData: OrSource,
                                            index: number): boolean => {
     // check if all primary source counts of orSource are included in source
-    const primarySrcArrayAndSize = orSourceData.primarySrcArrayAndSizeList[index];
-    if (primarySrcArrayAndSize.size === 0) return true;
-    const numCountsInArray = getNumCountsInArray(source.primaryNameSrcList, primarySrcArrayAndSize.array);
-    const result = numCountsInArray === primarySrcArrayAndSize.size;
+    if (AA) console.log(` AND: (${index}) primarySrcArray(${countArrayToNumberList(orSourceData.primarySrcArray)})`);
+    const primarySrcArrayAndSize = { // orSourceData.primarySrcArrayAndSizeList[index];
+        array: orSourceData.primarySrcArray,
+        size: countArrayToNumberList(orSourceData.primarySrcArray).length
+    };
+    let result = true;
+    let numCountsInArray = 0;
+    if (primarySrcArrayAndSize.size > 0) { // size 0 list == success
+        numCountsInArray = getNumCountsInArray(source.primaryNameSrcList, primarySrcArrayAndSize.array);
+        result = numCountsInArray === primarySrcArrayAndSize.size;
+    }
     if (AA) {
-	console.log(` AND compatible @${index}: ${result}, matching counts` +
+	console.log(` AND compatible(${index}): ${result}, matching counts` +
 	    ` (${numCountsInArray}) out of (${primarySrcArrayAndSize.size})`);
     }
     return result;
@@ -912,7 +924,11 @@ const isSourceXORCompatibleWithOrSource = (source: SourceData, orSourceData: OrS
 
     const orSourceList = orSourceData.sourceLists[index];
     // comment
-    if (orSourceList!.length === 0) return true;
+    if (orSourceList.length === 0) {
+	if (AA) console.log(` XOR compatible(${index}): true` +
+	    `, sourceLists(${orSourceData.sourceLists.length}) - empty sourceList`);
+        return true;
+    }
     // comment
     const countList = NameCount.listToCountList(source.primaryNameSrcList);
     if (AA) {
@@ -942,10 +958,13 @@ const isSourceXORCompatibleWithOrSource = (source: SourceData, orSourceData: OrS
 
 //
 //                
-/*
 const old_isSourceXORCompatibleWithOrSource = (source: SourceData, orSourceData: OrSource): boolean => {
     // comment
-    if (_.isEmpty(orSourceData.sourceLists)) return true;
+    if (orSourceData.sourceLists.length === 0) {
+	console.log(` XOR compatible: true` +
+	    `, sourceLists(${orSourceData.sourceLists.length}) - empty sourceList`);
+        return true;
+    }
     // comment
     const countList = NameCount.listToCountList(source.primaryNameSrcList);
     if (AA) console.log(` start: (${source.primaryNameSrcList.length}), ${NameCount.listToStringList(source.primaryNameSrcList)}`);
@@ -966,32 +985,52 @@ const old_isSourceXORCompatibleWithOrSource = (source: SourceData, orSourceData:
     if (AA) console.log(` XOR compatible: ${result}, sourceLists(${orSourceData.sourceLists.length})`);
     return result;
 };
-*/
 
 //
 //
-let isSourceCompatibleWithAnyOrSource = (source: SourceData, useSource: UseSource,
+let isSourceCompatibleWithAnyOrSource = (source: SourceData, orSourceList: OrSource[],
                                          orSourcesNcCsvMap: Map<string, number>): boolean => {
-    const orSource = useSource.orSource!;
+//    const orSource = useSource.orSource!;
     if (AA) {
-        console.log(` source.sourceNcCsvList(${source.sourceNcCsvList.length}), orSourceLists(${orSource.sourceLists.length})`);
-        if (0) console.log(` orSource: ${Stringify2(orSource)}`);
+        //console.log(` source.sourceNcCsvList(${source.sourceNcCsvList.length}), orSourceLists(${orSource.sourceLists.length})`);
+        //if (0) console.log(` orSource: ${Stringify2(orSource)}`);
     }
 
+    // OR == AND || XOR
+    // However, the way i've structured the sourceList data I believe an && is still
+    // the correct operator here. However I think with the knowledge of AND || XOR
+    // there is the possibility of structuring the data differently as an optimization.
+
+    // NOTE these index names are foul
+    for (let listIndex = 0, listLength = orSourceList.length; listIndex < listLength; ++listIndex) {
+        const orSourceData = orSourceList[listIndex];
+	if (ZZ) console.log(`index(${listIndex}), sourceLists(${orSourceData.sourceLists.length})`);
+//        for (let sourceIndex = 0, numSources = orSourceData.sourceLists.length; sourceIndex < numSources; ++sourceIndex) {
+	    if (isSourceANDCompatibleWithOrSource(source, orSourceData, listIndex) &&
+                old_isSourceXORCompatibleWithOrSource(source, orSourceData)) // , listIndex))
+            {
+	        return true;
+            }
+//        }
+    }
+    return false;
+
+    /*
     // OR == AND || XOR
     // however, the way i've structured the sourceList data I believe an && is still
     // the appropriate operator here. I think with the knowledge of AND || XOR there
     // is the possibility of structuring the data differently as an optimization.
-    for (let index = 0, length = orSource.sourceLists.length; index < length; ++index) {
+    for (let index = 0, length = orSourceList.length; index < length; ++index) {
+        const orSourceData = orSourceList[index];
 	if (ZZ) console.log(`index(${index})`);
-	if (isSourceANDCompatibleWithOrSource(source, orSource, index) &&
-            isSourceXORCompatibleWithOrSource(source, orSource, index)) {
-
+	if (isSourceANDCompatibleWithOrSource(source, orSourceData, index) &&
+            isSourceXORCompatibleWithOrSource(source, orSourceData, index))
+        {
 	    return true;
         }
     }
     return false;
-
+    */
     // source.sourceNcCsvList is a list of ncCsvs that represent all of the component sources
     // of a particular source, like a flattened ResultMap, as well the source itself.
     //
@@ -1049,6 +1088,7 @@ let isSourceCompatibleWithAnyOrSource = (source: SourceData, useSource: UseSourc
     */
 };
 
+/*
 //
 //
 let isSourceCompatibleWithUseSource = (source: SourceData, useSource: UseSource,
@@ -1078,6 +1118,30 @@ let isSourceCompatibleWithUseSource = (source: SourceData, useSource: UseSource,
     }
     return compatible;
 }
+*/
+
+//
+//
+let isSourceCompatibleWithXorSourceAndAnyOrSource = (source: SourceData, xorSource: XorSource, orSourceList: OrSource[],
+                                                     orSourcesNcCsvMap: Map<string, number>): boolean => {
+    let compatible: boolean =
+        !anyCountInArray(source.primaryNameSrcList, xorSource.primarySrcArray);
+    if (AA) {
+	console.log(` -xorCompatible: ${compatible}, sources(${orSourceList.length})` +
+	    ` source.pnslCounts[${NameCount.listToCountList(source.primaryNameSrcList)}]` +
+	    ` xorSource.primarySrcArray[${countArrayToNumberList(xorSource.primarySrcArray)}]`);
+    }
+
+    // Base case: --xor arguments only. Wether we're compatible or not is known at this point.
+    // --or case: if orSource.sourceLists is non-empty, we must check them for --or compatibility.
+    if (compatible) {
+        if (orSourceList.length > 0) { // ?.sourceLists.length) {
+            compatible = isSourceCompatibleWithAnyOrSource(source, orSourceList, orSourcesNcCsvMap);
+            if (AA) console.log(` -orCompatible: ${compatible}, ${NameCount.listToString(source.ncList)}`);
+        }
+    }
+    return compatible;
+}
 
 let isCWUS_calls = 0;
 let isCWUS_comps = 0;
@@ -1093,11 +1157,12 @@ let CwusHash: Record<string, CwusHashEntry> = {};
 // The inner loop of this function can be executed a billion+ times with
 // a reasonably sized --xor list. About 45k outer loops and 25k inner.
 //
-let isCompatibleWithUseSources = (sourceList: SourceList, useSourceList: UseSource[],
-                                  orSourcesNcCsvMap: Map<string, number>): boolean => {
-    if (_.isEmpty(useSourceList)) return true;
+let isCompatibleWithUseSources = (sourceList: SourceList, pcd: PreComputedData): boolean => {
+    //
+    // NOTE: this is why --xor is required. OK for now. Fix later.
+    //
+    if (_.isEmpty(pcd.xorSourceList)) return true;
     isCWUS_calls += 1;
-
     /*
     // run through previously compatible useSources in hot-hash first
     for (const entry of Object.entries(CwusHash)) {
@@ -1112,19 +1177,20 @@ let isCompatibleWithUseSources = (sourceList: SourceList, useSourceList: UseSour
         }
     }
     */
-
-    // TODO: some
     for (let sourceIndex = 0, sourceListLength = sourceList.length; sourceIndex < sourceListLength; ++sourceIndex) {
         let source = sourceList[sourceIndex];
         if (AA) console.log(`source nc: ${NameCount.listToString(source.ncList)}`);
-        for (let useSourceIndex = 0, useSourceListLength = useSourceList.length; useSourceIndex < useSourceListLength; ++useSourceIndex) {
-            let useSource = useSourceList[useSourceIndex];
+        for (let xorSourceIndex = 0, xorSourceListLength = pcd.xorSourceList.length;
+             xorSourceIndex < xorSourceListLength;
+             ++xorSourceIndex)
+        {
+            let xorSource = pcd.xorSourceList[xorSourceIndex];
             isCWUS_comps += 1;
-            if (isSourceCompatibleWithUseSource(source, useSource, orSourcesNcCsvMap)) {
-                if (!CwusHash[useSourceIndex]) {
-                    CwusHash[useSourceIndex] = { count: 0 }; // , useSource };
+            if (isSourceCompatibleWithXorSourceAndAnyOrSource(source, xorSource, pcd.orSourceList, pcd.orSourcesNcCsvMap)) {
+                if (!CwusHash[xorSourceIndex]) {
+                    CwusHash[xorSourceIndex] = { count: 0 };
                 }
-                CwusHash[useSourceIndex].count += 1;
+                CwusHash[xorSourceIndex].count += 1;
                 return true;
             }
         }
@@ -1132,10 +1198,10 @@ let isCompatibleWithUseSources = (sourceList: SourceList, useSourceList: UseSour
     return false;
 };
 
-// Here lazySourceList is a list of lazy (i.e., not yet) merged sources.
+// Here lazySourceList is a list of lazy, i.e., not yet fully initialized sources.
 //
-// Construct and fully populate exactly 2 new component sources for each lazy-merged
-// source, then perform a full merge on those sources.
+// Construct and fully populate exactly 2 new component sources for each lazy source,
+// then perform a full merge on those sources.
 //
 // Return a list of fully merged sources.
 //
@@ -1145,12 +1211,14 @@ let loadAndMergeSourceList = (lazySourceList: LazySourceData[], orSourcesNcCsvMa
         Assert(lazySource.ncList.length === 2, `lazySource.ncList.length(${lazySource.ncList.length})`);
         Assert(lazySource.validateResultList.length === 2, `lazySource.validateResultList.length(${lazySource.validateResultList.length})`);
         let sourcesToMerge: AnySourceData[] = []; // TODO: not ideal, would prefer SourceData here
-        //PP = true;
         for (let index = 0; index < 2; ++index) {
-            sourcesToMerge.push(getSourceData(lazySource.ncList[index], lazySource.validateResultList[index], false, orSourcesNcCsvMap));
+            const sourceData = getSourceData(lazySource.ncList[index], lazySource.validateResultList[index], false, orSourcesNcCsvMap);
+            if (0 && ZZ) console.log(`lamSourceData[${index}]: ${Stringify2(sourceData)}`);
+            sourcesToMerge.push(sourceData);
         }
-        PP = false;
-        sourceList.push(mergeSources(sourcesToMerge[0], sourcesToMerge[1], false) as SourceData);
+        const mergedSources = mergeSources(sourcesToMerge[0], sourcesToMerge[1], false) as SourceData;
+        if (0 && ZZ) console.log(`lamMerged[${NameCount.listToString(lazySource.ncList)}]: ${Stringify2(mergedSources)}`);
+        sourceList.push(mergedSources);
     }
     return sourceList;
 };
@@ -1170,11 +1238,11 @@ let getCombosForUseNcLists = (sum: number, max: number, pcd: PreComputedData, ar
     let numMergeIncompatible = 0;
     let numUseIncompatible = 0;
     
-    let MILLY = 1000000n;
-    let start = process.hrtime.bigint();
+    const MILLY = 1000000n;
+    const start = process.hrtime.bigint();
 
-    let useSourcesList: UseSource[] = pcd.useSourcesList;
-    if (0) console.log(`useSourcesList: ${Stringify2(useSourcesList)}`);
+//    const useSourcesList: UseSource[] = pcd.useSourcesList;
+//    if (1) console.log(`xorSourceList: ${Stringify2(xorSourceList)}`);
 
     const mergeArgs = {
         min_synonyms: args.min_synonyms,
@@ -1219,7 +1287,7 @@ let getCombosForUseNcLists = (sum: number, max: number, pcd: PreComputedData, ar
 
             
             //if (result.nameList!.includes('wallet')) {
-	    if (result.nameList!.toString() == 'note,wallet') {
+	    if (0 && result.nameList!.toString() == 'note,wallet') {
                 console.log(`hit: ${result.nameList}`);
                 ZZ = true;
                 AA = true
@@ -1230,33 +1298,32 @@ let getCombosForUseNcLists = (sum: number, max: number, pcd: PreComputedData, ar
                 WW = false;
             }
 
-            //console.log(`result.nameList: ${result.nameList}`);
-            //console.log(`result.ncList: ${result.ncList}`);
-
-            //const key = NameCount.listToString(result.ncList);
             const key: string = NameCount.listToSortedString(result.ncList!);
             let cacheHit = false;
-            let sourceList: LazySourceData[];
+            let lazySourceList: LazySourceData[];
             if (!hash[key]) {
-                sourceList = mergeAllCompatibleSources(result.ncList!, mergeArgs) as LazySourceData[];
-                if (_.isEmpty(sourceList)) ++numMergeIncompatible;
+                lazySourceList = mergeAllCompatibleSources(result.ncList!, mergeArgs) as LazySourceData[];
+                if (_.isEmpty(lazySourceList)) ++numMergeIncompatible;
                 //console.log(`$$ sources: ${Stringify2(sourceList)}`);
-                hash[key] = { sourceList };
+                hash[key] = { lazySourceList };
             } else {
-                sourceList = hash[key].sourceList;
+                // TODO: NOT lazy, potentially
+                lazySourceList = hash[key].sourceList;
                 cacheHit = true;
                 numCacheHits += 1;
             }
 
-            if (logging) console.log(`  found compatible sources: ${!_.isEmpty(sourceList)}`);
+            if (logging) console.log(`  found compatible sources: ${!_.isEmpty(lazySourceList)}`);
 
             // failed to find any compatible combos
-            if (_.isEmpty(sourceList)) continue;
+            if (_.isEmpty(lazySourceList)) continue;
 
             if (_.isUndefined(hash[key].isCompatible)) {
+                //*****************************************
+                // HEY WAIT A SECOND WHY DONT I CACHE THE POPULATED SOURCE HERE
+                //*****************************************
                 hash[key].isCompatible = isCompatibleWithUseSources(
-                    loadAndMergeSourceList(sourceList, pcd.orSourcesNcCsvMap),
-                    useSourcesList, pcd.orSourcesNcCsvMap);
+                    loadAndMergeSourceList(lazySourceList, pcd.orSourcesNcCsvMap), pcd)
             }
             if (hash[key].isCompatible) {
                 combos.push(result.nameList!.toString());
@@ -1497,6 +1564,7 @@ function buildAllUseNcDataLists (useArgsList: string[]): NCDataList[] {
 
 //
 //
+/*
 let getCompatibleUseSourcesFromNcData = (args: any): UseSource[] => {
     // XOR first
     let sourceList = getUseSourcesList<XorSource>(args.allXorNcDataLists, Op.xor, args);
@@ -1505,9 +1573,15 @@ let getCompatibleUseSourcesFromNcData = (args: any): UseSource[] => {
     let orSourceList = getUseSourcesList<OrSource>(args.allOrNcDataLists, Op.or, args);
 
     // final: merge OR with XOR
-    if (!_.isEmpty(orSourceList)) {
-        sourceList = mergeOrSourceList(sourceList, orSourceList);
-    }
+    // There is probably some potential for optimization here. Merging in this way is
+    // wrong, however. This is specifically merging only those sources that have XOR
+    // compatible primaryNameSrcLists, which, if not completely wrong, is at least in
+    // part wrong.
+
+    //if (!_.isEmpty(orSourceList)) {
+    // sourceList = mergeOrSourceList(sourceList, orSourceList);
+    //}
+
     console.error(`useSourceList(${sourceList.length})`);
     if (0) {
         sourceList.forEach((source, index) => {
@@ -1517,6 +1591,7 @@ let getCompatibleUseSourcesFromNcData = (args: any): UseSource[] => {
     console.error(` orSourceList(${orSourceList.length})`);
     return sourceList;
 };
+*/
 
 //
 //
@@ -1540,12 +1615,14 @@ let preCompute = (args: any): PreComputedData => {
     //console.error(`allXorNcDataLists(${args.allXorNcDataLists.length})`);
     args.allOrNcDataLists = args.or ? buildAllUseNcDataLists(args.or) : [ [] ];
     
-    let useSourcesList = getCompatibleUseSourcesFromNcData(args);
-    // TODO: there is a faster way to generate this map, in mergeOrSources or something.
-    let orSourcesNcCsvMap = getOrSourcesNcCsvCountMap(useSourcesList);
+    //let useSourcesList = getCompatibleUseSourcesFromNcData(args);
+    let xorSourceList = getUseSourcesList<XorSource>(args.allXorNcDataLists, Op.xor, args);
+    let orSourceList = getUseSourcesList<OrSource>(args.allOrNcDataLists, Op.or, args);
 
+    // TODO: there is a faster way to generate this map, in mergeOrSources or something.
+    let orSourcesNcCsvMap = new Map<string, number>(); // getOrSourcesNcCsvCountMap(useSourcesList);
     // ++INSTRUMENTATION
-    if (1) {
+    if (0) {
         let list: [string, number][] = [...orSourcesNcCsvMap.entries()]; //.sort((a, b) => b[1] - a[1]);
         console.error(`orSourcesNcCsvCount(${list.length})`);
     }
@@ -1554,14 +1631,13 @@ let preCompute = (args: any): PreComputedData => {
     let d = new Duration(begin, new Date()).milliseconds;
     console.error(`Precompute(${PrettyMs(d)})`);
 
-    if (_.isEmpty(useSourcesList)) {
-        if (args.xor || args.or) {
-            console.error('incompatible --xor/--or params');
-            process.exit(-1);
-        }
+    if ((_.isEmpty(xorSourceList) && args.xor) ||
+        (_.isEmpty(orSourceList) && args.or))
+    {
+        console.error('incompatible --xor/--or params');
+        process.exit(-1);
     }
-    if (0) process.exit(0);
-    return { useSourcesList, orSourcesNcCsvMap };
+    return { xorSourceList, orSourceList, orSourcesNcCsvMap };
 };
 
 //
