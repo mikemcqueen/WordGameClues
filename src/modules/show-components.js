@@ -40,7 +40,7 @@ function getSourceClues (source, countList, nameList) {
     //console.error(`results ${Stringify(results)} len(${results.length})`);
     // TODO: duplicated in getSourceClues
     const countsList = results.map(result =>
-        ClueManager.recursiveGetCluePropertyCount(null, result.resultMap.internal_map, Clue.CountedProperty.Enum.Synonym));
+        ClueManager.recursiveGetCluePropertyCount(null, result.resultMap.internal_map, Clue.PropertyName.Synonym));
     const totals = countsList.map(tp => tp.total);
     const primarys = countsList.map(tp => tp.primary);
     return `${nameList.join(' - ')}  : syn totals(${totals}) primarys(${primarys})`;
