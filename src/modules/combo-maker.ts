@@ -150,6 +150,7 @@ function Stringify(val: any) {
     }, " ");
 }
 
+let PCLog = false;//true;
 let logging = 0;
 let loggy = false;
 let ZZ = false;
@@ -267,6 +268,18 @@ let listToCountArray = (ncList: NameCount.List): CountArray => {
         array[nc.count] = nc.count;
         return array;
     }, new Int32Array(ClueManager.getNumPrimarySources()));
+};
+
+//
+//
+let listToCountArrayAndSize = (ncList: NameCount.List): CountArrayAndSize => {
+    let array = new Int32Array(ClueManager.getNumPrimarySources());
+    let size = 0;
+    for (let nc of ncList) {
+        array[nc.count] = nc.count;
+        size++;
+    }
+    return { array, size };
 };
 
 //
@@ -967,6 +980,23 @@ const getCombinationOrSourceListsForIndexList = (indexList: number[], sourceList
     // so they are differentiated.
     // 
 
+    // when operation == 0, add to both and and xor
+    // if both and and xor lists are empty, don't add; return undefined?
+    // define ListOfSourceLists, and and xor are ListOfSourceLists[] ?
+    // when filtering compatibleOrSources, Xor compatibility is not required,
+    // but those incompatible sourcelists can be removed from ListOfSourceLists
+    // still need to add the OrSource tho, always, regardless of Xor incompatibility
+    // if .xor listOfSourceLists is empty, that is a guaranteed XOR **IN**compatibility,
+    // so make sure I default to false in is XORCompatibleWithSourceList,
+    // or from whereever I call it, if ListOfListOfSourceLists is empty.
+    // probably need to add one additional function in the middle of
+    // isSourceXXXCompatibleWith that takes a SourceList[]
+    // in summary, I need:
+    // a list, the length of which is the # of specified --or params.
+    // which contains a list of sourceLists (SourceList[]), for all of the valid
+    // primary source combinations of each --or param.
+
+    //ZZ = true;
     let combinationSourceLists: CombinationOrSourceLists = { xor: [], and: [] };
     for (let [sourceListIndex, operationIndex] of indexList.entries()) {
         if (ZZ) console.log(`sourceListIndex(${sourceListIndex}) operationIndex(${operationIndex})`); // , orSourceList(${orSourceList.length})`);
@@ -991,6 +1021,8 @@ const getCombinationOrSourceListsForIndexList = (indexList: number[], sourceList
             combinationSourceLists.xor.push(sourceList);
         }
     }
+    ZZ = false;
+
     /*
     let result: OrSource = {
         combinationSourceLists,
@@ -1047,10 +1079,18 @@ let getUseSourceLists = (ncDataLists: NCDataList[], args: any): SourceList[] => 
 //
 //
 let isXorSourceXORCompatibleWithSourceList = (xorSource: XorSource, sourceList: SourceList): boolean => {
+    if (listIsEmpty(sourceList)) console.log(`isXorSourceXORCompatibleWithSourceList: empty sourceList`);
     let compatible = true;
     for (let source of sourceList) {
         compatible = !anyCountInArray(source.primaryNameSrcList, xorSource.primarySrcArray);
-        if (!compatible) break;
+        if (!compatible) {
+            if (0 && PCLog) {
+                console.log(` isXorSourceXORCompatibileWithSourceList: ${compatible}` +
+                    `, source.primaryNameSrcArray: [${NameCount.listToCountList(source.primaryNameSrcList)}]` +
+                    `, xorSource.primarySrcArray: [${countArrayToNumberList(xorSource.primarySrcArray)}]`);
+            }
+            break;
+        }
     }
     return compatible;
 }
@@ -1058,8 +1098,10 @@ let isXorSourceXORCompatibleWithSourceList = (xorSource: XorSource, sourceList: 
 //
 //
 let filterXORCompatibleSourceLists = (xorSource: XorSource, sourceLists: SourceList[]): SourceList[] => {
+    //if (listIsEmpty(sourceLists)) return sourceLists; // could, but not strictly necessary
     let compatibleSourceLists: SourceList[] = [];
     for (let sourceList of sourceLists) {
+        if (PCLog) console.log(`  filterXORCompatibleSourceLists, sourceList(${sourceList.length})`);
         if (isXorSourceXORCompatibleWithSourceList(xorSource, sourceList)) {
             compatibleSourceLists.push(sourceList);
         }
@@ -1075,15 +1117,26 @@ let filterXORCompatibleSourceLists = (xorSource: XorSource, sourceLists: SourceL
 //
 let filterCompatibleOrSources = (xorSourceList: XorSource[], orSourceList: OrSource[]): OrSource[] => {
     let filteredOrSourceList: OrSource[] = [];
+    // TODO: problem here if no XorSources supplied
+    let FCOS; // = true;
     for (let xorSource of xorSourceList) {
         for (let orSource of orSourceList) {
-            let compatibleXorSourceLists = filterXORCompatibleSourceLists(xorSource, orSource.combinationSourceLists.xor);
-            if (!listIsEmpty(compatibleXorSourceLists)) {
-                orSource.combinationSourceLists.xor = compatibleXorSourceLists;
+            if (FCOS) {
+                console.log(` fCOS: xor(${orSource.combinationSourceLists.xor.length})` +
+                    `, and(${orSource.combinationSourceLists.and.length})`);
+            }
+            const originalSourceLists = orSource.combinationSourceLists.xor;
+            let compatibleSourceLists = filterXORCompatibleSourceLists(xorSource, originalSourceLists);
+            if (PCLog) {
+                console.log(` xor: compatible(${compatibleSourceLists.length})`);
+            }
+            if (listIsEmpty(originalSourceLists) || !listIsEmpty(compatibleSourceLists)) {
+                orSource.combinationSourceLists.xor = compatibleSourceLists;
                 filteredOrSourceList.push(orSource);
             }
             // TODO: something with AND compatibility here too
         }
+        FCOS = false;
     }
     return filteredOrSourceList;
 };
@@ -1164,13 +1217,14 @@ let isSourceArrayXORCompatibleWithSourceList = (primarySrcArray: CountArray, sou
             `, primarySrcArray[${primarySrcArray)}]`);
     }
     */
+    Assert(!listIsEmpty(sourceList));
     let compatible = true;
     for (let source of sourceList) {
         compatible = !anyCountInArray(source.primaryNameSrcList, primarySrcArray);
         if (!compatible) break;
     }
     if (AA) {
-	console.log(` XOR compatible: ${compatible}`);
+        console.log(` isSourceArrayXORCompatibileWithSourceList: ${compatible}`);
     }
     return true;
 }
@@ -1178,28 +1232,33 @@ let isSourceArrayXORCompatibleWithSourceList = (primarySrcArray: CountArray, sou
 //
 //                
 const isSourceXORCompatibleWithOrSource = (source: SourceData, orSource: OrSource): boolean => {
-    let compatible = false;
+    let compatible = true; // because empty combinationSourceLists.xor == compatible
     // TODO: precompute this somewhere.
     const primarySrcArray = listToCountArray(source.primaryNameSrcList)
     for (let sourceList of orSource.combinationSourceLists.xor) {
         compatible = isSourceArrayXORCompatibleWithSourceList(primarySrcArray, sourceList);
-        if (compatible) break;
+        if (compatible) break; // first compatible list is success
+    }
+    if (AA) {
+        console.log(` isSourceXORCompatibileWithOrSource: ${compatible}`);
     }
     return compatible;
 }
     
 //
 //
-let isSourceArrayANDCompatibleWithSourceList = (primarySrcArray: CountArray, sourceList: SourceList): boolean => {
+let isSourceArrayANDCompatibleWithSourceList = (primarySrcArrayAndSize: CountArrayAndSize, sourceList: SourceList): boolean => {
     //
     //
     // TODO: I think I should eliminate .and sourceLists if any one of them is compatible
     // with a supplied XorSource, in filterXOR... (or add a filterAND.. method as well).
     //
     //
+    Assert(!listIsEmpty(sourceList));
     let compatible = true;
     for (const source of sourceList) {
-        compatible = everyCountInArray(source.primaryNameSrcList, primarySrcArray);
+        const numCountsInArray = getNumCountsInArray(source.primaryNameSrcList, primarySrcArrayAndSize.array);
+        compatible = numCountsInArray === primarySrcArrayAndSize.size;
         if (!compatible) break;
         /*
         if (0 && AA) {
@@ -1210,7 +1269,7 @@ let isSourceArrayANDCompatibleWithSourceList = (primarySrcArray: CountArray, sou
         */
     }
     if (AA) {
-        console.log(` AND compatibile: ${compatible}`);
+        console.log(` isSourceArrayANDCompatibileWithSourceList: ${compatible}`);
     }
     return compatible;
 }
@@ -1219,13 +1278,18 @@ let isSourceArrayANDCompatibleWithSourceList = (primarySrcArray: CountArray, sou
 //                
 const isSourceANDCompatibleWithOrSource = (source: SourceData, orSource: OrSource): boolean => {
     ACWOS_calls++;
-    let compatible = false;
+    let compatible = true; // empty orSource.combinationSourceLists.and == compatible
     // TODO: precompute this somewhere.
-    const primarySrcArray = listToCountArray(source.primaryNameSrcList);
+    const primarySrcArrayAndSize = listToCountArrayAndSize(source.primaryNameSrcList);
     for (let sourceList of orSource.combinationSourceLists.and) {
         ACWOS_comps++;
-        compatible = isSourceArrayANDCompatibleWithSourceList(primarySrcArray, sourceList);
-        if (compatible) break;
+        compatible = isSourceArrayANDCompatibleWithSourceList(primarySrcArrayAndSize, sourceList);
+        if (compatible) break; // any
+    }
+    if (AA) {
+        console.log(` isSourceANDCompatibleWithOrSource: ${compatible}` +
+            `, sourceLists(${orSource.combinationSourceLists.and.length})` +
+            `, ${NameCount.listToString(source.ncList)}`);
     }
     return compatible;
 };
@@ -1259,8 +1323,8 @@ let isSourceCompatibleWithAnyOrSource = (source: SourceData, orSourceList: OrSou
 //
 //
 let isSourceXORCompatibleWithXorSource = (source: SourceData, xorSource: XorSource): boolean => {
-    let compatible: boolean = !anyCountInArray(source.primaryNameSrcList, xorSource.primarySrcArray);
-    if (AA) {
+    let compatible = !anyCountInArray(source.primaryNameSrcList, xorSource.primarySrcArray);
+    if (0 && AA) {
 	console.log(` -xorCompatible: ${compatible}` + // , sources(${orSourceList.length})` +
 	    ` source.pnslCounts[${NameCount.listToCountList(source.primaryNameSrcList)}]` +
 	    ` xorSource.primarySrcArray[${countArrayToNumberList(xorSource.primarySrcArray)}]`);
@@ -1447,8 +1511,8 @@ let getCombosForUseNcLists = (sum: number, max: number, pcd: PreComputedData, ar
             }
 
             
-            //if (result.nameList!.includes('wallet')) {
-	    if (1 && result.nameList!.toString() === 'dark,note') {
+            if (1 && result.nameList!.includes('buffalo spring')) {
+            //if (0 && result.nameList!.toString() === 'dark,note') {
                 console.log(`hit: ${result.nameList}`);
                 ZZ = true;
                 AA = true
@@ -1738,10 +1802,18 @@ let buildUseSourceListsFromNcData = (args: any): UseSourceLists => {
     let orSourceList = buildOrSourceListCombinations(getUseSourceLists(args.allOrNcDataLists, args) /*, mergeArgs*/);
     console.error(`orSourceList(${orSourceList.length})`);
 
+    //console.log(`orSourceList: ${Stringify2(orSourceList)}`);
+
     // final: filter out OR sources incompatible with XOR sources
-    if (!listIsEmpty(xorSourceList)) {
+    if (!listIsEmpty(xorSourceList) && !listIsEmpty(orSourceList)) {
         orSourceList = filterCompatibleOrSources(xorSourceList, orSourceList);
         console.error(`filtered orSourceList(${orSourceList.length})`);
+        if (listIsEmpty(orSourceList)) {
+            // In theory this might be possible, assuming i implement AND-compatibility checking
+            // of supplied OrSources vs. supplied XorSources - which I haven't done yet.
+            console.error(`empty filtered list - exiting until understood better`);
+            process.exit(-1);
+        }
     }
     /*
     if (1) {
