@@ -44,7 +44,8 @@ const CmdLineOptions = Opt.create(_.concat(Clues.Options, [
     ['x', 'max=COUNT',                         '  maximum # of sources to combine'],
 //  ['',  'and=NAME[:COUNT][,NAME[:COUNT]]+',  '  combos must have source NAME[:COUNT]'],
     ['',  'xor=NAME[:COUNT][,NAME[:COUNT]]+',  '  combos must not have, and must be compatible with, source NAME[:COUNT]s'],
-    ['',  'or=NAME[:COUNT][,NAME[:COUNT]]+',   '  combos may either have, or be compatible with, source NAME[:COUNT]s'],
+    ['',  'xormm=NAME[:COUNT][,NAME[:COUNT]]+[,MIN,MAX]',  '  form of --xor with min/max allowed synonym counts specified'],
+    ['',  'or=NAME[:COUNT][,NAME[:COUNT]]+',   '  combos must either have, or be compatible with, source NAME[:COUNT]s'],
     ['',  'primary',                           '  show combos as primary source clues' ],
     ['l', 'parallel',                          '  use paralelljs' ],
     ['',  'slow',                              '  use (old) slow method of loading clues' ],
@@ -487,6 +488,7 @@ async function main () {
 	    final:   options.final,
 	    or:      options.or,
 	    xor:     options.xor,
+	    xormm:   options.xormm,
 	    parallel: options.parallel,
             min_synonyms: options.min_synonyms,
             max_synonyms: options.max_synonyms
