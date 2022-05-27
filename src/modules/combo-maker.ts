@@ -65,6 +65,7 @@ type NCDataList = NCData[];
 //
 // TODO: find case where we use this without ncList and comment why ncList isn't here
 //       even though all derived interfaces have an ncList.
+// also synonyms.
 //
 interface SourceBase {
     primaryNameSrcList: NameCount.List;
@@ -74,6 +75,7 @@ interface SourceBase {
 //
 interface LazySourceData extends SourceBase {
     ncList: NameCount.List;
+    synonym: Clue.PropertyCounts.Type;
     validateResultList: ValidateResult[];
 }
 
@@ -81,6 +83,7 @@ interface LazySourceData extends SourceBase {
 //
 interface SourceData extends SourceBase {
     ncList: NameCount.List;
+    synonym: Clue.PropertyCounts.Type;
     sourceNcCsvList: string[];
     ncCsv?: string;
 }
@@ -140,12 +143,10 @@ namespace CompatibleOrSource {
     }
 }
 
+// One OrSource contains all of the data for a single --or argument.
+//
 interface OrSource {
     sourceListContainer: CompatibleOrSource.ListContainer;
-    // TODO: doubt I need this either
-    //    sourceNcCsvMap: SourceNcCsvMap;
-    // TODO: I'm not sure this is still needed, but i should use a Set()
-    //    primarySrcArrayAndSizeList: CountArrayAndSize[];
 }
 
 interface UseSourceLists {
@@ -155,8 +156,6 @@ interface UseSourceLists {
 
 interface PreComputedData {
     useSourceLists: UseSourceLists;
-    // TODO nuke
-    orSourcesNcCsvMap: Map<string, number>;
 }
 
 let PCD: PreComputedData | undefined = undefined;
@@ -274,11 +273,13 @@ let everyCountInArray = (ncList: NameCount.List, countArray: CountArray): boolea
     return ncList.every(nc => countArray[nc.count] === nc.count);
 };
 
+/*
 //
 //
 let anyNumberInArray = (numberList: number[], countArray: CountArray): boolean => {
     return numberList.some(num => countArray[num] === num);
 };
+*/
 
 //
 //
@@ -289,6 +290,7 @@ let listToCountArray = (ncList: NameCount.List): CountArray => {
     }, new Int32Array(ClueManager.getNumPrimarySources()));
 };
 
+/*
 //
 //
 let listToCountArrayAndSize = (ncList: NameCount.List): CountArrayAndSize => {
@@ -300,7 +302,9 @@ let listToCountArrayAndSize = (ncList: NameCount.List): CountArrayAndSize => {
     }
     return { array, size };
 };
+*/
 
+/*
 //
 //
 let getCountArrayAndSize = (sourceList: SourceList): CountArrayAndSize => {
@@ -315,13 +319,17 @@ let getCountArrayAndSize = (sourceList: SourceList): CountArrayAndSize => {
     }
     return { array, size };
 };
+*/
 
+/*
 //
 //
 let getCountListNotInArray = (ncList: NameCount.List, countArray: CountArray): number[] => {
     return ncList.map(nc => nc.count).filter(count => countArray[count] !== count);
 };
+*/
 
+/*
 //
 //
 let getNumCountsInArray = (ncList: NameCount.List, countArray: CountArray): number => {
@@ -332,6 +340,7 @@ let getNumCountsInArray = (ncList: NameCount.List, countArray: CountArray): numb
     }
     return count;
 };
+*/
 
 // key types:
 //{
@@ -407,6 +416,22 @@ function buildSrcNcList (resultMap: Object): string[] {
 
 //
 //
+let getPropertyCounts = (result: ValidateResult): Clue.PropertyCounts.Map => {
+    let propertyCounts: Clue.PropertyCounts.Map;
+    if (result.nameSrcList.length === 1) {
+        // primary clue: propertyCounts are attached to clue
+        const nameSrc = result.nameSrcList[0];
+        const clue = _.find(ClueManager.getClueList(1), { name: nameSrc.name, src: _.toString(nameSrc.count) }) as Clue.Primary;
+        propertyCounts = clue.propertyCounts!;
+    } else {
+        // compoundClue: propertyCounts are attached to each ValidateResult
+        propertyCounts = result.propertyCounts!;
+    }
+    return propertyCounts;
+}
+
+//
+//
 let populateSourceData = (lazySource: SourceBase, nc: NameCount.Type, validateResult: ValidateResult,
                           orSourcesNcCsvMap?: Map<string, number>): SourceData => {
     let source: SourceData = lazySource /*as SourceBase*/ as SourceData;
@@ -422,7 +447,9 @@ let populateSourceData = (lazySource: SourceBase, nc: NameCount.Type, validateRe
     if (orSourcesNcCsvMap) {
         source.sourceNcCsvList = source.sourceNcCsvList.filter(ncCsv => orSourcesNcCsvMap.has(ncCsv));
     }
+
     source.ncList = [nc]; // TODO i could try getting rid of "LazySource.nc" and just make this part of LazySouceData
+    source.synonym = getPropertyCounts(validateResult)[Clue.PropertyName.Synonym];
     if (loggy || logging > 3) {
         console.log(`getSourceList() ncList: ${source.ncList}, sourceNcCsvList: ${source.sourceNcCsvList}`);
         if (_.isEmpty(source.sourceNcCsvList)) console.log(`empty sourceNcCsvList: ${Stringify(validateResult.resultMap.map())}`);
@@ -435,9 +462,12 @@ let populateSourceData = (lazySource: SourceBase, nc: NameCount.Type, validateRe
 let getSourceData = (nc: NameCount.Type, validateResult: ValidateResult, lazy: boolean | undefined,
                      orSourcesNcCsvMap?: Map<string, number>): AnySourceData => {
     const primaryNameSrcList: NameCount.List = validateResult.nameSrcList;
-    return lazy
-        ? { primaryNameSrcList, ncList: [nc], validateResultList: [validateResult] }
-        : populateSourceData({ primaryNameSrcList }, nc, validateResult, orSourcesNcCsvMap);
+    return lazy ? {
+        primaryNameSrcList,
+        ncList: [nc],
+        synonym: getPropertyCounts(validateResult)[Clue.PropertyName.Synonym],
+        validateResultList: [validateResult]
+    } : populateSourceData({ primaryNameSrcList }, nc, validateResult, orSourcesNcCsvMap);
 };
 
 // out of bounds
@@ -445,18 +475,16 @@ let oob = 0;
 
 //
 //
+let propertyCountIsInBounds = (propertyCount: Clue.PropertyCounts.Type, min: number, max: number): boolean => {
+    const total = propertyCount.total;
+    return min <= total && total <= max;
+};
+
+//
+//
 let filterPropertyCountsOutOfBounds = (result: ValidateResult, args: MergeArgs): boolean => {
-    let propertyCounts: Clue.PropertyCounts.Map;
-    if (result.nameSrcList.length === 1) {
-        // primary clue: propertyCounts are attached to clue
-        const nameSrc = result.nameSrcList[0];
-        const clue = _.find(ClueManager.getClueList(1), { name: nameSrc.name, src: _.toString(nameSrc.count) }) as Clue.Primary;
-        propertyCounts = clue.propertyCounts!;
-    } else {
-        // compoundClue: propertyCounts are attached to each ValidateResult
-        propertyCounts = result.propertyCounts!;
-    }
-    const inBounds = propertyCounts[Clue.PropertyName.Synonym].total <= args.max_synonyms;
+    const propertyCounts = getPropertyCounts(result);
+    const inBounds = propertyCountIsInBounds(propertyCounts[Clue.PropertyName.Synonym], args.min_synonyms, args.max_synonyms);
     if (!inBounds) oob++;
     return inBounds;
 };
@@ -481,13 +509,19 @@ let getSourceList = (nc: NameCount.Type, args: MergeArgs): AnySourceData[] => {
 //
 //
 let mergeSources = (source1: AnySourceData, source2: AnySourceData, lazy: boolean | undefined): AnySourceData => {
-    let primaryNameSrcList = [...source1.primaryNameSrcList, ...source2.primaryNameSrcList];
-    let ncList = [...source1.ncList, ...source2.ncList];
+    const primaryNameSrcList = [...source1.primaryNameSrcList, ...source2.primaryNameSrcList];
+    const ncList = [...source1.ncList, ...source2.ncList];
     if (lazy) {
         Assert(ncList.length === 2, `ncList.length(${ncList.length})`);
-        let result: LazySourceData = {
+        source1 = source1 as LazySourceData;
+        source2 = source2 as LazySourceData;
+        const synonym = Clue.PropertyCounts.merge(
+            getPropertyCounts(source1.validateResultList[0])[Clue.PropertyName.Synonym],
+            getPropertyCounts(source2.validateResultList[0])[Clue.PropertyName.Synonym]);
+        const result: LazySourceData = {
             primaryNameSrcList,
             ncList,
+            synonym,
             validateResultList: [
                 (source1 as LazySourceData).validateResultList[0],
                 (source2 as LazySourceData).validateResultList[0]
@@ -497,8 +531,9 @@ let mergeSources = (source1: AnySourceData, source2: AnySourceData, lazy: boolea
     }
     source1 = source1 as SourceData;
     source2 = source2 as SourceData;
-    let mergedSource: SourceData = {
+    const mergedSource: SourceData = {
         primaryNameSrcList,
+        synonym: Clue.PropertyCounts.merge(source1.synonym, source2.synonym),
         ncList,
         sourceNcCsvList: [...source1.sourceNcCsvList, ...source2.sourceNcCsvList]
     };
@@ -511,7 +546,7 @@ let mergeSources = (source1: AnySourceData, source2: AnySourceData, lazy: boolea
 //
 let mergeCompatibleSources = (source1: AnySourceData, source2: AnySourceData, args: MergeArgs): AnySourceData[] => {
     // TODO: this logic could be part of mergeSources
-    // also, uh, isn't there are primarySrcArray I can be using here?
+    // also, uh, isn't there a primarySrcArray I can be using here?
     return allCountUnique(source1.primaryNameSrcList, source2.primaryNameSrcList)
         ? [mergeSources(source1, source2, args.lazy)]
         : [];
@@ -523,7 +558,7 @@ let mergeCompatibleSourceLists = (sourceList1: AnySourceData[], sourceList2: Any
     let mergedSourcesList: AnySourceData[] = [];
     for (const source1 of sourceList1) {
         for (const source2 of sourceList2) {
-            mergedSourcesList.push(...mergeCompatibleSources(source1, source2, args));
+            mergedSourcesList.push(...mergeCompatibleSources(source1, source2, args))
         }
     }
     return mergedSourcesList;
@@ -555,8 +590,13 @@ let buildSourceListsForUseNcData = (useNcDataLists: NCDataList[], args: MergeArg
         for (let [sourceListIndex, useNcData] of useNcDataList.entries()) {
             if (!sourceLists[sourceListIndex]) sourceLists.push([]);
             if (!hashList[sourceListIndex]) hashList.push({});
-            let sourceList = mergeAllCompatibleSources(useNcData.ncList, args);
+            let sourceList = mergeAllCompatibleSources(useNcData.ncList, args) as SourceList;
             for (let source of sourceList) {
+                if (!propertyCountIsInBounds(source.synonym, args.min_synonyms, args.max_synonyms)) {
+                    // never did get this to fire, but appears to be working, shut it off when i see it
+                    console.error(`oob: [${NameCount.listToNameList(source.ncList)}], syn-total(${source.synonym.total})`);
+                    continue;
+                }
                 let key = NameCount.listToString(_.sortBy(source.primaryNameSrcList, NameCount.count));
                 if (!hashList[sourceListIndex][key]) {
                     sourceLists[sourceListIndex].push(source as SourceData);
@@ -820,6 +860,7 @@ let isAnyCompatibleOrSourceXORCompatibleWithSourceArray = (compatibleSourceList:
     return compatible;
 }
 
+/*
 //
 //
 let isSourceArrayANDCompatibleWithSourceList = (primarySrcArrayAndSize: CountArrayAndSize, sourceList: SourceList): boolean => {
@@ -835,19 +876,18 @@ let isSourceArrayANDCompatibleWithSourceList = (primarySrcArrayAndSize: CountArr
         const numCountsInArray = getNumCountsInArray(source.primaryNameSrcList, primarySrcArrayAndSize.array);
         compatible = numCountsInArray === primarySrcArrayAndSize.size;
         if (!compatible) break;
-        /*
           if (0 && AA) {
           console.log(` AND: (${index}), match(${numCountsInArray})` +
           `, psnl[${NameCount.listToCountList(source.primaryNameSrcList)})]` +
           `, primarySrcArray[${countArrayToNumberList(primarySrcArrayAndSize.array)}]`);
           }
-        */
     }
     if (AA) {
         console.log(` isSourceArrayANDCompatibileWithSourceList: ${compatible}`);
     }
     return compatible;
 }
+*/
 
 // OR == XOR || AND
 //
@@ -949,20 +989,22 @@ let isAnySourceCompatibleWithUseSources = (sourceList: SourceList, pcd: PreCompu
 //
 // Return a list of fully merged sources.
 //
-let loadAndMergeSourceList = (lazySourceList: LazySourceData[], orSourcesNcCsvMap: Map<string, number>): SourceList => {
+let loadAndMergeSourceList = (lazySourceList: LazySourceData[], args: MergeArgs): SourceList => {
     let sourceList: SourceList = [];
     for (let lazySource of lazySourceList) {
         Assert(lazySource.ncList.length === 2);
         Assert(lazySource.validateResultList.length === 2);
         let sourcesToMerge: AnySourceData[] = []; // TODO: not ideal, would prefer SourceData here
         for (let index = 0; index < 2; ++index) {
-            const sourceData = getSourceData(lazySource.ncList[index], lazySource.validateResultList[index], false, orSourcesNcCsvMap);
+            const sourceData = getSourceData(lazySource.ncList[index], lazySource.validateResultList[index], false);
             if (0 && ZZ) console.log(`lamSourceData[${index}]: ${Stringify2(sourceData)}`);
             sourcesToMerge.push(sourceData);
         }
-        const mergedSources = mergeSources(sourcesToMerge[0], sourcesToMerge[1], false) as SourceData;
-        if (0 && ZZ) console.log(`lamMerged[${NameCount.listToString(lazySource.ncList)}]: ${Stringify2(mergedSources)}`);
-        sourceList.push(mergedSources);
+        const mergedSource = mergeSources(sourcesToMerge[0], sourcesToMerge[1], false) as SourceData;
+        if (propertyCountIsInBounds(mergedSource.synonym, args.min_synonyms, args.max_synonyms)) {
+            if (0 && ZZ) console.log(`lamMerged[${NameCount.listToString(lazySource.ncList)}]: ${Stringify2(mergedSource)}`);
+            sourceList.push(mergedSource);
+        }
     }
     return sourceList;
 };
@@ -1013,8 +1055,8 @@ let getCombosForUseNcLists = (sum: number, max: number, pcd: PreComputedData, ar
         let firstIter = true;
         while (!result.done) {
             if (!firstIter) {
-                // TODO problem 1:
-                // problem1: why is this (apparently) considering the first two entries of the same
+                // TODO:
+                // why is this (apparently) considering the first two entries of the same
                 // clue count (e.g. red, red). It doesn't matter when the clue counts are different,
                 // but when they're the same, we're wasting time. Is there some way to determine if
                 // the two lists are equal at time of get'ing (getClueSourceListArray) such that
@@ -1066,7 +1108,7 @@ let getCombosForUseNcLists = (sum: number, max: number, pcd: PreComputedData, ar
                 // TODO: HEY WAIT A SECOND WHY DONT I CACHE THE POPULATED SOURCE HERE
                 //*****************************************
                 hash[key].isCompatible = isAnySourceCompatibleWithUseSources(
-                    loadAndMergeSourceList(lazySourceList, pcd.orSourcesNcCsvMap), pcd)
+                    loadAndMergeSourceList(lazySourceList, args as MergeArgs), pcd)
             }
             if (hash[key].isCompatible) {
                 combos.push(result.nameList!.toString());
@@ -1417,6 +1459,7 @@ let preCompute = (args: any): PreComputedData => {
     
     let useSourceLists = buildUseSourceListsFromNcData(args);
 
+    /*
     // TODO: there is a faster way to generate this map, in mergeOrSources or something.
     let orSourcesNcCsvMap = new Map<string, number>(); // getOrSourcesNcCsvCountMap(useSourcesList);
     // ++DEBUG
@@ -1425,7 +1468,8 @@ let preCompute = (args: any): PreComputedData => {
         console.error(`orSourcesNcCsvCount(${list.length})`);
     }
     // ++DEBUG
-    
+    */
+
     let d = new Duration(begin, new Date()).milliseconds;
     console.error(`Precompute(${PrettyMs(d)})`);
 
@@ -1438,7 +1482,7 @@ let preCompute = (args: any): PreComputedData => {
         console.error('incompatible --xor/--or params');
         process.exit(-1);
     }
-    return { useSourceLists, orSourcesNcCsvMap };
+    return { useSourceLists }; // , orSourcesNcCsvMap };
 };
 
 //

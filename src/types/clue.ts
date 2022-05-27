@@ -163,6 +163,13 @@ export namespace PropertyCounts {
             to.primary += from.primary;
         }
     }
+
+    export function merge (a: Type, b: Type): Type {
+        let result: Type = empty();
+        add(result, a);
+        add(result, b);
+        return result;
+    }
 }
 
 //

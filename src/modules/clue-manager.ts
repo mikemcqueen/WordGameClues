@@ -286,7 +286,7 @@ interface LoadClueListOptions {
     dir : string;
 }
 
-let loadClueList = function (count: number, options?: LoadClueListOptions) {
+export let loadClueList = function (count: number, options?: LoadClueListOptions): ClueList.Any {
     const filename = getKnownFilename(count, options?.dir);
     return ClueList.makeFrom({
         filename,
