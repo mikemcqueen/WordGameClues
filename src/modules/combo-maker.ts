@@ -49,16 +49,15 @@ interface StringAnyMap {
 }
 
 type MergeArgs = {
-    min_synonyms: number;
-    max_synonyms: number;
-    lazy: boolean | undefined;
+    synonymMinMax: MinMax.Type;
+    lazy?: boolean;
 };
 
 //
 //
 interface NCData {
     ncList: NameCount.List;
-    synonym?: MinMax.Type;
+    synonymMinMax?: MinMax.Type;
 }
 type NCDataList = NCData[];
 
@@ -77,7 +76,7 @@ interface SourceBase {
 //
 interface LazySourceData extends SourceBase {
     ncList: NameCount.List;
-    synonym: Clue.PropertyCounts.Type;
+    synonymCounts: Clue.PropertyCounts.Type;
     validateResultList: ValidateResult[];
 }
 
@@ -85,7 +84,7 @@ interface LazySourceData extends SourceBase {
 //
 interface SourceData extends SourceBase {
     ncList: NameCount.List;
-    synonym: Clue.PropertyCounts.Type;
+    synonymCounts: Clue.PropertyCounts.Type;
     sourceNcCsvList: string[];
     ncCsv?: string;
 }
@@ -228,6 +227,15 @@ function showNcLists (ncLists: NameCount.List[]): string {
         first = false;
     }
     return _.isEmpty(str) ? "[]" : str;
+}
+
+//
+//
+let sourceListToNcList = (sourceList: AnySourceData[]): NameCount.List => {
+    return sourceList.reduce((ncList: NameCount.List, source) => {
+        ncList.push(...source.ncList);
+        return ncList;
+    }, []);
 }
 
 //
@@ -451,7 +459,7 @@ let populateSourceData = (lazySource: SourceBase, nc: NameCount.Type, validateRe
     }
 
     source.ncList = [nc]; // TODO i could try getting rid of "LazySource.nc" and just make this part of LazySouceData
-    source.synonym = getPropertyCounts(validateResult)[Clue.PropertyName.Synonym];
+    source.synonymCounts = getPropertyCounts(validateResult)[Clue.PropertyName.Synonym];
     if (loggy || logging > 3) {
         console.log(`getSourceList() ncList: ${source.ncList}, sourceNcCsvList: ${source.sourceNcCsvList}`);
         if (_.isEmpty(source.sourceNcCsvList)) console.log(`empty sourceNcCsvList: ${Stringify(validateResult.resultMap.map())}`);
@@ -467,7 +475,7 @@ let getSourceData = (nc: NameCount.Type, validateResult: ValidateResult, lazy: b
     return lazy ? {
         primaryNameSrcList,
         ncList: [nc],
-        synonym: getPropertyCounts(validateResult)[Clue.PropertyName.Synonym],
+        synonymCounts: getPropertyCounts(validateResult)[Clue.PropertyName.Synonym],
         validateResultList: [validateResult]
     } : populateSourceData({ primaryNameSrcList }, nc, validateResult, orSourcesNcCsvMap);
 };
@@ -477,16 +485,16 @@ let oob = 0;
 
 //
 //
-let propertyCountIsInBounds = (propertyCount: Clue.PropertyCounts.Type, min: number, max: number): boolean => {
+let propertyCountIsInBounds = (propertyCount: Clue.PropertyCounts.Type, minMax: MinMax.Type): boolean => {
     const total = propertyCount.total;
-    return min <= total && total <= max;
+    return minMax.min <= total && total <= minMax.max;
 };
 
 //
 //
 let filterPropertyCountsOutOfBounds = (result: ValidateResult, args: MergeArgs): boolean => {
-    const propertyCounts = getPropertyCounts(result);
-    const inBounds = propertyCountIsInBounds(propertyCounts[Clue.PropertyName.Synonym], args.min_synonyms, args.max_synonyms);
+    const synonymCounts = getPropertyCounts(result)[Clue.PropertyName.Synonym];
+    const inBounds = propertyCountIsInBounds(synonymCounts, args.synonymMinMax);
     if (!inBounds) oob++;
     return inBounds;
 };
@@ -517,13 +525,13 @@ let mergeSources = (source1: AnySourceData, source2: AnySourceData, lazy: boolea
         Assert(ncList.length === 2, `ncList.length(${ncList.length})`);
         source1 = source1 as LazySourceData;
         source2 = source2 as LazySourceData;
-        const synonym = Clue.PropertyCounts.merge(
+        const synonymCounts = Clue.PropertyCounts.merge(
             getPropertyCounts(source1.validateResultList[0])[Clue.PropertyName.Synonym],
             getPropertyCounts(source2.validateResultList[0])[Clue.PropertyName.Synonym]);
         const result: LazySourceData = {
             primaryNameSrcList,
             ncList,
-            synonym,
+            synonymCounts,
             validateResultList: [
                 (source1 as LazySourceData).validateResultList[0],
                 (source2 as LazySourceData).validateResultList[0]
@@ -535,7 +543,7 @@ let mergeSources = (source1: AnySourceData, source2: AnySourceData, lazy: boolea
     source2 = source2 as SourceData;
     const mergedSource: SourceData = {
         primaryNameSrcList,
-        synonym: Clue.PropertyCounts.merge(source1.synonym, source2.synonym),
+        synonymCounts: Clue.PropertyCounts.merge(source1.synonymCounts, source2.synonymCounts),
         ncList,
         sourceNcCsvList: [...source1.sourceNcCsvList, ...source2.sourceNcCsvList]
     };
@@ -568,37 +576,54 @@ let mergeCompatibleSourceLists = (sourceList1: AnySourceData[], sourceList2: Any
 
 //
 //
+let sourceListHasPropertyCountInBounds = (sourceList: AnySourceData[], minMax: MinMax.Type): boolean => {
+    const synonymCounts = sourceList.reduce((counts, source) =>
+        Clue.PropertyCounts.add(counts, source.synonymCounts),
+        Clue.PropertyCounts.empty());
+                      
+    const inBounds = propertyCountIsInBounds(synonymCounts, minMax);
+    if (!inBounds) {
+        console.error(`oob: [${NameCount.listToNameList(sourceListToNcList(sourceList))}]` +
+            `, syn-total(${synonymCounts.total})`);
+        // never did get this to fire, but appears to be working, shut it off when i see it
+        //Assert(false);
+    }
+    return inBounds;
+}
+
+//
+//
 let mergeAllCompatibleSources = (ncList: NameCount.List, args: MergeArgs): AnySourceData[] => {
     // because **maybe** broken for > 2 below
     Assert(ncList.length <= 2, `${ncList} length > 2 (${ncList.length})`);
     // TODO: reduce (or some) here
     let sourceList = getSourceList(ncList[0], args);
-    for (let ncIndex = 1; ncIndex < ncList.length; ncIndex += 1) {
+    for (let ncIndex = 1; ncIndex < ncList.length; ++ncIndex) {
         const nextSourceList = getSourceList(ncList[ncIndex], args);
         sourceList = mergeCompatibleSourceLists(sourceList, nextSourceList, args);
+        if (!sourceListHasPropertyCountInBounds(sourceList, args.synonymMinMax)) sourceList = [];
         // TODO BUG this is broken for > 2; should be something like: if (sourceList.length !== ncIndex + 1) 
         if (listIsEmpty(sourceList)) break;
     }
     return sourceList;
 };
 
-// TODO: revisit this hash and it's purpose
+//
 //
 let buildSourceListsForUseNcData = (useNcDataLists: NCDataList[], args: MergeArgs): SourceList[] => {
     let sourceLists: SourceList[] = [];
+    // TODO: This is to prevent duplicate sourceLists. I suppose I could use a Set or Map, above?
     let hashList: StringBoolMap[] = [];
     // TODO: forEach
-    for (let [dataListIndex, useNcDataList] of useNcDataLists.entries()) {
-        for (let [sourceListIndex, useNcData] of useNcDataList.entries()) {
+    for (let ncDataList of useNcDataLists) {
+        for (let [sourceListIndex, useNcData] of ncDataList.entries()) {
             if (!sourceLists[sourceListIndex]) sourceLists.push([]);
             if (!hashList[sourceListIndex]) hashList.push({});
-            let sourceList = mergeAllCompatibleSources(useNcData.ncList, args) as SourceList;
+            // give priority to any min/max args specific to an NcData, for example, through --xormm,
+            // but fallback to the values we were called with
+            const mergeArgs = useNcData.synonymMinMax ? { synonymMinMax: useNcData.synonymMinMax } : args;
+            const sourceList = mergeAllCompatibleSources(useNcData.ncList, mergeArgs) as SourceList;
             for (let source of sourceList) {
-                if (!propertyCountIsInBounds(source.synonym, args.min_synonyms, args.max_synonyms)) {
-                    // never did get this to fire, but appears to be working, shut it off when i see it
-                    console.error(`oob: [${NameCount.listToNameList(source.ncList)}], syn-total(${source.synonym.total})`);
-                    continue;
-                }
                 let key = NameCount.listToString(_.sortBy(source.primaryNameSrcList, NameCount.count));
                 if (!hashList[sourceListIndex][key]) {
                     sourceLists[sourceListIndex].push(source as SourceData);
@@ -659,12 +684,8 @@ let buildOrSourceNcCsvMap = (orSourceLists: SourceList[]): SourceNcCsvMap => {
 // TODO: function name
 //
 const mergeCompatibleXorSources = (indexList: number[], sourceLists: SourceList[]): XorSource[] => {
-    //
-    // TODO: list of sourceLists outside of this loop. 
-    // assign result.sourceLists inside indexList.entries() loop. 
-    //
     let primaryNameSrcList: NameCount.List = [];
-    let ncList: NameCount.List = []; // TODO: xor only
+    let ncList: NameCount.List = [];
     let compatible = true;
     // TODO: indexList.some()
     for (let [sourceListIndex, sourceIndex] of indexList.entries()) {
@@ -693,6 +714,7 @@ const mergeCompatibleXorSources = (indexList: number[], sourceLists: SourceList[
         if (0 || ZZ) console.log(` XOR pnsl, final: ${primaryNameSrcList}, indexList(${indexList.length}): [${indexList}]`);
         if (ZZ && listIsEmpty(primaryNameSrcList)) console.log(`empty pnsl`);
         
+        // I feel like this is still valid and worth removing or commenting
         //Assert(!_.isEmpty(primaryNameSrcList), 'empty primaryNameSrcList');
         let result: XorSource = {
             primaryNameSrcList,
@@ -734,13 +756,8 @@ let mergeCompatibleXorSourceCombinations = (sourceLists: SourceList[]/*, args: M
 //
 //
 let getUseSourceLists = (ncDataLists: NCDataList[], args: any): SourceList[] => {
-    if (listIsEmpty(ncDataLists[0])) return [];
-    const mergeArgs: MergeArgs = {
-        min_synonyms: args.min_synonyms,
-        max_synonyms: args.max_synonyms,
-        lazy: false
-    };
-    const sourceLists = buildSourceListsForUseNcData(ncDataLists, mergeArgs);
+    if (listIsEmpty(ncDataLists) || listIsEmpty(ncDataLists[0])) return [];
+    const sourceLists = buildSourceListsForUseNcData(ncDataLists, { synonymMinMax: args.synonymMinMax });
     return sourceLists;
 };
 
@@ -1003,7 +1020,7 @@ let loadAndMergeSourceList = (lazySourceList: LazySourceData[], args: MergeArgs)
             sourcesToMerge.push(sourceData);
         }
         const mergedSource = mergeSources(sourcesToMerge[0], sourcesToMerge[1], false) as SourceData;
-        if (propertyCountIsInBounds(mergedSource.synonym, args.min_synonyms, args.max_synonyms)) {
+        if (propertyCountIsInBounds(mergedSource.synonymCounts, args.synonymMinMax)) {
             if (0 && ZZ) console.log(`lamMerged[${NameCount.listToString(lazySource.ncList)}]: ${Stringify2(mergedSource)}`);
             sourceList.push(mergedSource);
         }
@@ -1032,9 +1049,8 @@ let getCombosForUseNcLists = (sum: number, max: number, pcd: PreComputedData, ar
     //    const useSourceList: UseSource[] = pcd.useSourceList;
     //    if (1) console.log(`xorSourceList: ${Stringify2(pcd.xorSourceList)}`);
 
-    const mergeArgs = {
-        min_synonyms: args.min_synonyms,
-        max_synonyms: args.max_synonyms,
+    const lazyMergeArgs = {
+        synonymMinMax: args.synonymMinMax,
         lazy: true
     };
 
@@ -1089,7 +1105,7 @@ let getCombosForUseNcLists = (sum: number, max: number, pcd: PreComputedData, ar
             let cacheHit = false;
             let lazySourceList: LazySourceData[];
             if (!hash[key]) {
-                lazySourceList = mergeAllCompatibleSources(result.ncList!, mergeArgs) as LazySourceData[];
+                lazySourceList = mergeAllCompatibleSources(result.ncList!, lazyMergeArgs) as LazySourceData[];
                 if (_.isEmpty(lazySourceList)) ++numMergeIncompatible;
                 //console.log(`$$ sources: ${Stringify2(sourceList)}`);
                 hash[key] = { lazySourceList };
@@ -1110,7 +1126,7 @@ let getCombosForUseNcLists = (sum: number, max: number, pcd: PreComputedData, ar
                 // TODO: HEY WAIT A SECOND WHY DONT I CACHE THE POPULATED SOURCE HERE
                 //*****************************************
                 hash[key].isCompatible = isAnySourceCompatibleWithUseSources(
-                    loadAndMergeSourceList(lazySourceList, args as MergeArgs), pcd)
+                    loadAndMergeSourceList(lazySourceList, { synonymMinMax: args.synonymMinMax }), pcd)
             }
             if (hash[key].isCompatible) {
                 combos.push(result.nameList!.toString());
@@ -1304,11 +1320,12 @@ function combinationNcList (indexList: number[], ncLists: NameCount.List[]): Nam
     return indexList.map((ncIndex: number, listIndex: number) => ncLists[listIndex][ncIndex]);
 }
 
-// TODO: ncDataCombinationFromNCLists
+// TODO: combinationNcDataListFromNcLists
 function combinationNcDataList (indexList: number[], ncLists: NameCount.List[]): NCDataList {
     return indexList.map((ncIndex: number, listIndex: number) => Object({ ncList: ncLists[listIndex][ncIndex]}));
 }
 
+// TODO: combinationNcDataListFromNcDataLists
 // same as combinationNcDataList but takes NCDataList[] instead of NameCount.List[]
 function ncDataCombinationsToNcDataList (indexList: number[], ncDataLists: NCDataList[]): NCDataList {
     return indexList.map((ncDataIndex: number, listIndex: number) => ncDataLists[listIndex][ncDataIndex]);
@@ -1334,11 +1351,10 @@ function minMaxNcListsTupleToNcDataCombinations (minMaxNcListsTuple: any[]): NCD
             let ncData: NCData = {
                 ncList: combinationNcList(indexList, ncLists)
             };
-            if (minMax) ncData.synonym = minMax;
+            if (minMax) ncData.synonymMinMax = minMax;
             return ncData;
         });
 }
-
 
 function getCombinationNcLists (useArgsList: string[]): any {
     Debug(`useArgsList: ${Stringify(useArgsList)}`);
@@ -1371,6 +1387,7 @@ let useArgToMinMaxNameListTuple = (useArg: string, hasMinMax: boolean): [MinMax.
 
 function getCombinationNcDataLists (useArgsList: string[], minMax: boolean = false): any {
     Debug(`useArgsList: ${Stringify(useArgsList)}`);
+    if (!useArgsList) return [];
     return useArgsList.map(useArg => useArgToMinMaxNameListTuple(useArg, minMax))
         .map(minMaxNameListTuple => { return [minMaxNameListTuple[0], nameOrNcStrListToKnownNcLists(minMaxNameListTuple[1])]; }) // nameOrNcStrList 
         .map(minMaxNcListsTuple => minMaxNcListsTupleToNcDataCombinations(minMaxNcListsTuple)); // knownNcLists
@@ -1401,9 +1418,11 @@ function combinationsToNcDataLists (combinationNcLists: NameCount.List[]): NCDat
         .map((ncListIndexes: number[]) => combinationNcDataList(ncListIndexes, combinationNcLists));
 }
 
+// TODO: ncDataListsToNcDataCombinations
 // a version of combinationsToNcDataLists that takes NCDataList[] instead of NameCount.List[]
 function ncDataCombinationListsToNcDataLists (ncDataCombinationLists: NCDataList[]): NCDataList[] {
     Debug(`ncDataCombinationsToNcDataLists() ncDataCombinationLists: ${Stringify(ncDataCombinationLists)}`);
+    if (listIsEmpty(ncDataCombinationLists)) return [ [] ];
     return Peco.makeNew({
         listArray: ncDataCombinationLists.map(ncDataList => [...Array(ncDataList.length).keys()]), // keys of array are 0..ncDataList.length-1
         max: ncDataCombinationLists.reduce((sum, ncDataList) => sum + ncDataList.length, 0)        // sum of lengths of ncDataLists
@@ -1437,6 +1456,7 @@ function buildCombinedUseNcDataLists (useArgsList: string[], minMaxUseArgsList: 
     //console.log(`standardNcDataLists: ${Stringify2(standardNcDataLists)}`);
     //console.log(`minMaxNcDataLists: ${Stringify2(minMaxNcDataLists)}`);
     const combinedNcDataLists = [...standardNcDataLists, ...minMaxNcDataLists];
+    // TODO: if (listIsEmpty(combinedNcDataLists)) combinedNcDataLists.push([]);
     //console.log(`combinedNcDataLists: ${Stringify2(combinedNcDataLists)}`);
     const ncDataLists = ncDataCombinationListsToNcDataLists(combinedNcDataLists);
     //console.log(`ncDataLists: ${Stringify2(ncDataLists)}`);
@@ -1502,14 +1522,23 @@ let markAllXORCompatibleOrSources = (xorSourceList: XorSource[], orSourceList: O
 //
 let buildUseSourceListsFromNcData = (args: any): UseSourceLists => {
     // XOR first
-    let xorSourceList = mergeCompatibleXorSourceCombinations(getUseSourceLists(args.allXorNcDataLists, args)/*, mergeArgs*/);
+    let xorSourceList = mergeCompatibleXorSourceCombinations(getUseSourceLists(args.allXorNcDataLists, args));
     console.error(`xorSourceList(${xorSourceList.length})`);
 
     // OR next
-    let orSourceList = buildOrSourceList(getUseSourceLists(args.allOrNcDataLists, args) /*, mergeArgs*/);
+    let orSourceList = buildOrSourceList(getUseSourceLists(args.allOrNcDataLists, args));
     console.error(`orSourceList(${orSourceList.length})`);
-
     //console.log(`orSourceList: ${Stringify2(orSourceList)}`);
+
+    // Thoughts on AND compatibility of OrSources:
+    // Just because (one sourceList of) an OrSource is AND compatible with an
+    // XorSource doesn't mean the OrSource is redundant and can be ignored
+    // (i.e., the container cannot be marked as "compatible.") We still need
+    // to check the possibility that any of the other XOR-but-not-AND-compatible
+    // sourceLists could be AND-compatible with the generated-combo sourceList.
+    // So, a container should only be marked compatible if and only if there are
+    // no remaining XOR-compatible sourceLists.
+    //TODO: markAllANDCompatibleOrSources(xorSourceList, orSourceList);
     markAllXORCompatibleOrSources(xorSourceList, orSourceList);
 
     /*

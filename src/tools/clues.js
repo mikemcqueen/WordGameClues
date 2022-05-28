@@ -9,6 +9,7 @@ const _           = require('lodash');
 const ClueList    = require('../dist/types/clue-list');
 const ClueManager = require('../dist/modules/clue-manager');
 const ComboMaker  = require('../dist/modules/combo-maker');
+const MinMax      = require("../dist/types/min-max");
 const NameCount   = require('../dist/types/name-count');
 const Validator   = require('../dist/modules/validator');
 
@@ -28,6 +29,7 @@ const Show        = require('../modules/show');
 const Stringify   = require('stringify-object');
 const ResultMap   = require('../types/result-map');
 const Timing      = require('debug')('timing');
+
 
 // initialize command line options.  do this before logger.
 //
@@ -360,10 +362,7 @@ async function main () {
     options.merge_style = Boolean(options['merge-style']);
     let showKnownArg = options['show-known'];
     options.copy_from = options['copy-from'];
-    options.min_synonyms = _.toNumber(options['syn-min']);
-    if (_.isNaN(options.min_synonyms)) options.min_synonyms = 0;
-    options.max_synonyms = _.toNumber(options['syn-max']);
-    if (_.isNaN(options.max_synonyms)) options.max_synonyms = 1;
+    options.synonymMinMax = MinMax.init(options['syn-min'], options['syn-max'], 0, 1);
     options.maxArg = maxArg;
     if (!maxArg) maxArg = 2; // TODO: default values in opt
     if (!options.count) {
@@ -490,8 +489,7 @@ async function main () {
 	    xor:     options.xor,
 	    xormm:   options.xormm,
 	    parallel: options.parallel,
-            min_synonyms: options.min_synonyms,
-            max_synonyms: options.max_synonyms
+            synonymMinMax: options.synonymMinMax
         });
     }
     return 0;

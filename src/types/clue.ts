@@ -124,7 +124,7 @@ export const PrimarySchema = {
 };
 
 export namespace PropertyCounts {
-    export function empty() {
+    export function empty(): Type {
         return {
             total: 0,
             primary: 0
@@ -157,11 +157,12 @@ export namespace PropertyCounts {
             });
     }
 
-    export function add (to: Type, from: Type | undefined): void {
+    export function add (to: Type, from: Type | undefined): Type {
         if (from) {
             to.total += from.total;
             to.primary += from.primary;
         }
+        return to;
     }
 
     export function merge (a: Type, b: Type): Type {
