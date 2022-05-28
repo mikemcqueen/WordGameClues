@@ -583,10 +583,10 @@ let sourceListHasPropertyCountInBounds = (sourceList: AnySourceData[], minMax: M
                       
     const inBounds = propertyCountIsInBounds(synonymCounts, minMax);
     if (!inBounds) {
-        console.error(`oob: [${NameCount.listToNameList(sourceListToNcList(sourceList))}]` +
-            `, syn-total(${synonymCounts.total})`);
-        // never did get this to fire, but appears to be working, shut it off when i see it
-        //Assert(false);
+        if (0) {
+            console.error(`oob: [${NameCount.listToNameList(sourceListToNcList(sourceList))}]` +
+                `, syn-total(${synonymCounts.total})`);
+        }
     }
     return inBounds;
 }
@@ -1030,8 +1030,7 @@ let loadAndMergeSourceList = (lazySourceList: LazySourceData[], args: MergeArgs)
 
 //
 // args:
-//   min_synonyms
-//   max_synonyms
+//   synonymMinMax
 //
 let getCombosForUseNcLists = (sum: number, max: number, pcd: PreComputedData, args: any): string[] => {
     let hash: StringAnyMap = {};
@@ -1195,8 +1194,7 @@ let parallel_makeCombosForRange = (first: number, last: number, args: any): any 
             fast: args.fast,
             load_max: ClueManager.getNumPrimarySources(),
             parallel: true,
-            min_synonyms: args.min_synonyms,
-            max_synonyms: args.max_synonyms,
+            synonymMinMax: args.synonymMinMax
         }));
 
     let cpus = OS.cpus().length;
