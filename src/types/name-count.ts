@@ -4,8 +4,6 @@
 
 'use strict';
 
-//
-
 import _ from 'lodash';
 
 //
@@ -123,8 +121,7 @@ export function listToStringList (ncList: List): string[] {
 
 // AKA "listToCsv"
 export function listToString (ncList: List): string {
-    if (!ncList) return _.toString(ncList);
-    return listToStringList(ncList).toString();
+    return ncList ? listToStringList(ncList).toString() : _.toString(ncList);
 }
 
 // AKA "listToSortedCsv"

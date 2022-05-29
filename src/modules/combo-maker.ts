@@ -1190,6 +1190,7 @@ let parallel_makeCombosForRange = (first: number, last: number, args: any): any 
             sum,
             max: (args.max > sum) ? sum : args.max,
             xor: args.xor,
+            xormm: args.xormm,
             or: args.or,
             fast: args.fast,
             load_max: ClueManager.getNumPrimarySources(),

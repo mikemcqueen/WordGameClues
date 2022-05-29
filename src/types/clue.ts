@@ -5,7 +5,7 @@
 'use strict';
 
 import _ from 'lodash'; // TODO: need a smaller dummy import
-//let Stringify = require('stringify-object');
+let Stringify = require('stringify-object');
 
 export namespace PropertyName {
     export enum Enum {
@@ -152,7 +152,11 @@ export namespace PropertyCounts {
         //console.error(`add: to ${toClue.name} from ${fromClue.name}`);
         Object.values(PropertyName.Enum)
             .forEach((propertyName: PropertyName.Any) => {
-                //console.error(`add: to[name](${toClue[propertyName]}) from[name](${fromClue[propertyName]})`);
+                if (0) {
+                    console.error(`add ${propertyName}` +
+                        ` to ${toClue.name}: ${Stringify(toClue.propertyCounts![propertyName])}` +
+                        ` from ${fromClue.name}: ${Stringify(fromClue.propertyCounts![propertyName])}`);
+                }
                 add(toClue.propertyCounts![propertyName], fromClue.propertyCounts![propertyName]);
             });
     }

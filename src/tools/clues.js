@@ -77,6 +77,7 @@ const CmdLineOptions = Opt.create(_.concat(Clues.Options, [
     ['',  'allow-used',                        '  allow used clues in clue combo generation' ],
     ['',  'any',                               '  any match (uh, probably should not use this)'],
     ['',  'production',                        'use production note store'],
+    ['',  'sort-all-clues',                    'sort all clue data files by src'],
     ['z', 'flags=OPTION+',                     'flags: 2=ignoreLoadErrors' ],
     ['v', 'verbose',                           'more output'],
     ['h', 'help',                              'this screen']
@@ -344,6 +345,26 @@ function log (text) {
 //
 //
 
+function sortAllClues (clueSource, max) {
+    const dir = clueSource.baseDir;
+    //max = 3;
+    for (let count = 2; count < max; ++count) {
+	let list;
+	try {
+	    list = ClueManager.loadClueList(count, { dir });
+            if (!_.isEmpty(list)) {
+                list.sort((a, b) => a.src.localeCompare(b.src));
+                ClueManager.saveClueList(list, count, { dir });
+            }
+	} catch (err) {
+	    if (!_.includes(err.message, 'ENOENT')) throw err;
+	    console.error(err);
+            continue;
+	}
+    }
+
+}
+
 async function main () {
     let needCount;
     let ignoreLoadErrors;
@@ -374,8 +395,9 @@ async function main () {
             showKnownArg ||
             useClueList ||
             options.test ||
-	    options.copy_from
-	   ) {
+	    options.copy_from ||
+            options['sort-all-clues'])
+        {
             needCount = false;
         }
         if (needCount) {
@@ -399,8 +421,13 @@ async function main () {
     }
 
     let clueSource = Clues.getByOptions(options);
-
     let load_max = clueSource.clueCount;
+
+    if (options['sort-all-clues']) {
+        sortAllClues(clueSource, load_max);
+        process.exit(0);
+    }
+
     if (options.count && !showKnownArg && !altSourcesArg && !allAltSourcesFlag) {
         let countRange = options.count.split(',').map(_.toNumber);
 	options.count_lo = countRange[0];

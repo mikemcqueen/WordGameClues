@@ -159,7 +159,7 @@ interface SaveClueListOptions {
     dir : string;
 }
 
-let saveClueList = function (list: ClueList.Compound, count: number, options?: SaveClueListOptions): void {
+export let saveClueList = function (list: ClueList.Compound, count: number, options?: SaveClueListOptions): void {
     ClueList.save(list, getKnownFilename(count, options?.dir));
 };
 
@@ -447,7 +447,7 @@ let computeResultPropertyCounts = function (nc: NameCount.Type, node: any, prope
 
 //
 
-let initCountedPropertiesInAllResults = function (nc: NameCount.Type, results: ValidateResult[]): void {
+let initCountedPropertiesInAllResults = (nc: NameCount.Type, results: ValidateResult[]): void => {
     for (let result of results) {
         // TODO: for name in Clue.CountedProperty.Names
         Assert(!result.propertyCounts, `already initialized PropertyCounts`);
@@ -456,7 +456,7 @@ let initCountedPropertiesInAllResults = function (nc: NameCount.Type, results: V
             computeResultPropertyCounts(nc, result.resultMap.internal_map, Clue.PropertyName.Synonym);
         result.propertyCounts = propertyCounts as Clue.PropertyCounts.Map;
     }
-}
+};
 
 //
 // Should rename this, as it doesn't actually add a clue.
@@ -1575,7 +1575,7 @@ export let recursiveGetCluePropertyCount = function (
                 } else {
                     // C. primary key
                     // first array element
-                    // ugly. TS requirign it. typify resultmap to fix.
+                    // ugly. TS requiring it. typify resultmap to fix.
                     let ncList= (val as Record<string, NameCount.List>)[key];
                     source = `${ncList[0].count}`;
                     recurse = false;
@@ -1601,7 +1601,7 @@ export let recursiveGetCluePropertyCount = function (
     // but not night:N itself. that's represented by 'nc' here. nc.count *should never* be 1,
     // as it's unnecessary to call this function if it is.
     if (nc) {
-        if (nc.count === 1) throw new Error(`nc.count === 1`);
+        Assert(nc.count !== 1);
         nodes.push({
             name: nc.name,
             count: nc.count,
@@ -1613,15 +1613,14 @@ export let recursiveGetCluePropertyCount = function (
     for (let node of nodes) {
         if (loggy) console.log(Stringify(node));
         const clue = getClue(node);
-        // primary clues only: add pre-compunted propertyCount data to total, if it exists
+        // primary clues only: add pre-computed propertyCount data to total, if it exists
         if (Clue.isPrimary(clue)) {
             clue.propertyCounts && Clue.PropertyCounts.add(counts, clue.propertyCounts[propertyName]);
         } else {
-            // sanity:
-            if (node.count <= 1) throw new Error('wat');
-            // compound clue: there is no propertyCount data, so just add the  count (1 or 0)
+            Assert(node.count > 1);
+            // compound clue: there is no propertyCount data, so just add the count (1 or 0)
             // of the properties on the clue itself
-            /*node.count > 1 && */ Clue.PropertyCounts.add(counts, Clue.PropertyCounts.getCounts(clue, propertyName));
+            Clue.PropertyCounts.add(counts, Clue.PropertyCounts.getCounts(clue, propertyName));
         }
         if (loggy) {
             if (clue[propertyName]) {
