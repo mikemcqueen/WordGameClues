@@ -50,41 +50,49 @@ function getSourceClues (source, countList, nameList) {
 
 let GCS = 0;
 function getClueSources (name, count, nameList) {
-    let sources = '';
     const srcMap = ClueManager.getKnownSourceMap(count);
+/*
     if (count === 1) {
-        Assert(nameList.length === 1, "nameList.length > 1");
+        Assert(nameList.length === 1, `${nameList}, expected nameList.length === 1`);
         const source = nameList[0];
         const clue = _.find(ClueManager.getClueList(count), { name, src: source });
         //console.error(clue);
         const counts = clue.propertyCounts.synonym;
         sources += `${source} : syn total(${counts.total}) primary(${counts.primary})`;
     } else {
-        sources += nameList.map(source => {
+  */
+    return nameList.map(source => {
+        /*
+          if (GCS) {
+          if (results.length > 1) {
+          for (const result of results) {
+          console.log(Stringify(result.resultMap.internal_map));
+          }
+          }
+          GCS = 0;
+          }
+        */
+        if (count === 1) {
+            const clue = _.find(ClueManager.getClueList(count), { name, src: source });
+            //console.error(clue);
+            const counts = clue.propertyCounts.synonym;
+            source += ` : syn total(${counts.total}) primary(${counts.primary})`;
+        } else {
             const results = srcMap[source].results;
-            /*
-            if (GCS) {
-                if (results.length > 1) {
-                    for (const result of results) {
-                        console.log(Stringify(result.resultMap.internal_map));
-                    }
-                }
-                GCS = 0;
-            }
-            */
             const countsList = results.map(result =>
                 ClueManager.recursiveGetCluePropertyCount({ name, count }, result.resultMap.internal_map,
                                                           Clue.PropertyName.Synonym));
             // TODO: duplicated in getSourceClues
             const totals = countsList.map(tp => tp.total);
             const primarys = countsList.map(tp => tp.primary);
-            source += ` : syn totals(${totals}) primarys(${primarys})`;
-            return source;
-        }).join(' - ');
-    }
-    return sources;
+            source += ` : syn total(${totals}) primary(${primarys})`;
+        }
+        return source;
+    }).join(' - ');
+//    return sources;
 }
 
+// this is really challenging to understand without types.
 //
 function showCountListArray (name, countListArray, text, hasNameList = false) {
     for (const elem of countListArray) {
