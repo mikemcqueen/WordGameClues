@@ -570,10 +570,11 @@ let removeKnownClue = function (count: number, name: string, source: string, not
 
 //
 
-let saveClues = function (counts: number | number[]): void {
+let saveClues = function (counts: number|number[]): void {
     if (_.isNumber(counts)) {
-        counts = [counts];
+        counts = [counts] as number[];
     }
+    counts = counts as number[];
     Debug(`saving clueLists ${counts}`);
     for (const count of counts) {
         saveClueList(State.clueListArray[count], count);
@@ -653,10 +654,11 @@ let addRejectCombos = function (clueList: ClueList.Compound, clueCount: number):
 
 //
 
-let saveRejects = function (counts: number | number[]): void {
+let saveRejects = function (counts: number|number[]): void {
     if (_.isNumber(counts)) {
-        counts = [counts];
+        counts = [counts] as number[];
     }
+    counts = counts as number[];
     counts.forEach(count => {
         State.rejectListArray[count].save(getRejectFilename(count));
     });
@@ -664,10 +666,11 @@ let saveRejects = function (counts: number | number[]): void {
 
 //
 
-let addReject = function (srcNameList: string | string[], save = false): boolean {
+let addReject = function (srcNameList: string|string[], save = false): boolean {
     if (_.isString(srcNameList)) {
-        srcNameList = srcNameList.split(',');
+        srcNameList = (srcNameList as string).split(',');
     }
+    srcNameList = srcNameList as string[];
     let count = _.size(srcNameList);
     //Expect(count).is.above(1); // at.least(2);
     if (addRejectSource(srcNameList)) {
@@ -684,10 +687,11 @@ let addReject = function (srcNameList: string | string[], save = false): boolean
 
 //
 
-let addRejectSource = function (srcNameList: string | string[]): boolean {
+let addRejectSource = function (srcNameList: string|string[]): boolean {
     if (_.isString(srcNameList)) {
-        srcNameList = srcNameList.split(',');
+        srcNameList = (srcNameList as string).split(',');
     }
+    srcNameList = srcNameList as string[];
     //Expect(srcNameList).is.an.Array().and.not.empty();
     srcNameList.sort();
     log('addRejectSource: ' + srcNameList);
@@ -812,7 +816,7 @@ let primaryNcListToNameSrcSets = function (ncList: NameCount.List): Set<string>[
 let primaryNcToSrcList = function (nc: NameCount.Type): string[] {
     if (nc.count !== 1) throw new Error(`nc.count must be 1 (${nc})`);
     const source = State.knownClueMapArray[1][nc.name];
-    return _.isArray(source) ? source : [source];
+    return (_.isArray(source) ? source : [source]) as string[];
 };
 
 //
@@ -955,10 +959,11 @@ export let getKnownSourceMapEntries = function (nc: NameCount.Type, andSources =
 
 //
 
-let getKnownClues = function (nameList: string | string[]): Record<string, Clue.Any[]> {
+let getKnownClues = function (nameList: string|string[]): Record<string, Clue.Any[]> {
     if (_.isString(nameList)) {
-        nameList = nameList.split(',');
+        nameList = (nameList as string).split(',');
     }
+    nameList = nameList as string[];
     const sourceCsv = nameList.sort().toString();
     let nameClueMap: Record<string, Clue.Any[]> = {};
     State.knownSourceMapArray.forEach(srcMap => {
@@ -1029,10 +1034,10 @@ let getValidCounts = function (nameList: string[], countListArray: any): number[
 
 //
 
-let getCountList = function (nameOrList: string | string[]): CountList {
+let getCountList = function (nameOrList: string|string[]): CountList {
     return _.isString(nameOrList)
-        ? getCountListForName(nameOrList)
-        : getValidCounts(nameOrList, getClueCountListArray(nameOrList));
+        ? getCountListForName(nameOrList as string)
+        : getValidCounts(nameOrList as string[], getClueCountListArray(nameOrList as string[]));
 };
 
 //
@@ -1200,7 +1205,8 @@ export let addRemoveOrReject = function (args: any, nameList: string[],
     return count;
 };
 
-let isAnySubListEmpty = (listOfLists: any[]): boolean => {
+// TODO: List.isAnySublistEmpty
+let isAnySubListEmpty = (listOfLists: any[][]): boolean => {
     let loggy = false;
     if (loggy) {
         console.log('listOfLists:');

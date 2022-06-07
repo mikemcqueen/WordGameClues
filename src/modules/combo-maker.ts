@@ -259,6 +259,14 @@ let listIsEmpty = (list: any[]): boolean => {
     return list.length === 0;
 }
 
+let listGetNumEmptySublists = (listOfLists: any[][]) => {
+    let numEmpty = 0;
+    for (let list of listOfLists) {
+        if (listIsEmpty(list)) ++numEmpty;
+    }
+    return numEmpty;
+}
+
 //
 //
 let countArrayToNumberList = (countArray: CountArray): number[] => {
@@ -735,8 +743,13 @@ const mergeCompatibleXorSources = (indexList: number[], sourceLists: SourceList[
 //
 // TODO function name,
 let mergeCompatibleXorSourceCombinations = (sourceLists: SourceList[]/*, args: MergeArgs*/): XorSource[] => {
-    // TODO: sometimes a sourceList is empty, like if doing $(cat required) with a
-    // low clue count range (e.g. -c2,4). should that even be allowed?
+    if (listIsEmpty(sourceLists)) return [];
+    const numEmptyLists = listGetNumEmptySublists(sourceLists);
+    if (numEmptyLists > 0) {
+        // TODO: sometimes a sourceList is empty, like if doing $(cat required) with a
+        // low clue count range (e.g. -c2,4). should that even be allowed?
+        Assert(false, `numEmpty(${numEmptyLists}), numLists(${sourceLists.length})`);
+    }
     let listArray = sourceLists.map(sourceList => [...Array(sourceList.length).keys()]);
     if (ZZ) console.log(`listArray(${listArray.length}): ${Stringify2(listArray)}`);
     //console.log(`sourceLists(${sourceLists.length}): ${Stringify2(sourceLists)}`);
@@ -828,15 +841,14 @@ let first = (countList: number[], sourceIndexes: number[]): FirstNextResult => {
     return next(countList, sourceIndexes);
 };
 
+/*
 //
 //
 let isSourceArrayXORCompatibleWithSourceList = (primarySrcArray: CountArray, sourceList: SourceList): boolean => {
-    /*
       if (0 && AA) {
       console.log(` XOR: pnsl[${NameCount.listToCountList(source.primaryNameSrcList)}]` +
       `, primarySrcArray[${primarySrcArray)}]`);
       }
-    */
     Assert(!listIsEmpty(sourceList));
     let compatible = true;
     for (let source of sourceList) {
@@ -846,8 +858,9 @@ let isSourceArrayXORCompatibleWithSourceList = (primarySrcArray: CountArray, sou
     if (AA) {
         console.log(` isSourceArrayXORCompatibileWithSourceList: ${compatible}`);
     }
-    return true;
+    return compatible;
 }
+*/
 
 //
 //
@@ -857,6 +870,8 @@ let isAnyCompatibleOrSourceANDCompatibleWithSourceArray = (compatibleSourceList:
     for (let compatibleSource of compatibleSourceList) {
         // this should never happen because AND compatibility should have propagated up to the
         // container level, and we never should have been called if container is compatible.
+        // (not so sure about this anymore, see note somewhere else on AND compatibility at
+        // container level)
         Assert(!compatibleSource.andCompatible);
         compatible = everyCountInArray(compatibleSource.source.primaryNameSrcList, primarySrcArray);
         if (compatible) break;
@@ -871,7 +886,7 @@ let isAnyCompatibleOrSourceXORCompatibleWithSourceArray = (compatibleSourceList:
     let compatible = false;
     for (let compatibleSource of compatibleSourceList) {
         // skip any sources that were already determined to be XOR incompatible or AND compatible
-        // with supplied --xor sources.
+        // with command-line supplied --xor sources.
         if (!compatibleSource.xorCompatible || compatibleSource.andCompatible) continue;
         compatible = !anyCountInArray(compatibleSource.source.primaryNameSrcList, primarySrcArray);
         if (compatible) break;
@@ -916,13 +931,7 @@ let isSourceArrayCompatibleWithEveryOrSource = (primarySrcArray: CountArray, orS
     for (let orSource of orSourceList) {
         CWOS_comps++;
         
-        //
-        //
-        //
-        // TODO
-        //
-        //
-        // skip calls to here if container.compatible = true  which may have been
+        // TODO: skip calls to here if container.compatible = true  which may have been
         // determined in Precompute phase @ markAllANDCompatibleOrSources()
         // and skip the XOR check as well in this case.
 
@@ -973,15 +982,9 @@ let ACWOS_comps = 0;
 //
 //
 let isAnySourceCompatibleWithUseSources = (sourceList: SourceList, pcd: PreComputedData): boolean => {
-    //
-    // NOTE: this is why --xor is required. OK for now. Fix later.
-    //
     isCWUS_calls += 1;
-    if (1) {
-        if (listIsEmpty(pcd.useSourceLists.xor)) return true;
-    } else {
-        //if (listIsEmpty(pcd.useSourceList!)) return true;
-    }
+    // TODO: this is why --xor is required with --or. OK for now. Fix later.
+    if (listIsEmpty(pcd.useSourceLists.xor)) return true;
 
     let compatible = false;
     for (let sourceIndex = 0, sourceListLength = sourceList.length; sourceIndex < sourceListLength; ++sourceIndex) {
@@ -1045,16 +1048,13 @@ let getCombosForUseNcLists = (sum: number, max: number, pcd: PreComputedData, ar
     const MILLY = 1000000n;
     const start = process.hrtime.bigint();
 
-    //    const useSourceList: UseSource[] = pcd.useSourceList;
-    //    if (1) console.log(`xorSourceList: ${Stringify2(pcd.xorSourceList)}`);
-
     const lazyMergeArgs = {
         synonymMinMax: args.synonymMinMax,
         lazy: true
     };
 
-    // Given a sum, such as 3, generate an array of addend arrays ("count lists") that
-    // that add up to that sum, such as [ [1, 2], [2, 1] ]
+    // Given a sum, such as 4, generate an array of addend arrays ("count lists") that
+    // that add up to that sum, such as [ [1, 3], [2, 2] ]
     let countListArray: number[][] = Peco.makeNew({ sum, max }).getCombinations(); 
 
     // for each countList
@@ -1072,13 +1072,6 @@ let getCombosForUseNcLists = (sum: number, max: number, pcd: PreComputedData, ar
         let firstIter = true;
         while (!result.done) {
             if (!firstIter) {
-                // TODO:
-                // why is this (apparently) considering the first two entries of the same
-                // clue count (e.g. red, red). It doesn't matter when the clue counts are different,
-                // but when they're the same, we're wasting time. Is there some way to determine if
-                // the two lists are equal at time of get'ing (getClueSourceListArray) such that
-                // we could optimize this.next for this condition?
-                // timed; 58s in 2
                 result = next(countList, sourceIndexes);
                 if (result.done) break;
                 numVariations += 1;
@@ -1087,8 +1080,7 @@ let getCombosForUseNcLists = (sum: number, max: number, pcd: PreComputedData, ar
             }
 
             
-            if (0 && result.nameList!.includes('buffalo spring')) {
-                //if (0 && result.nameList!.toString() === 'dark,note') {
+            if (0 && result.nameList!.includes('name,list')) {
                 console.log(`hit: ${result.nameList}`);
                 ZZ = true;
                 AA = true
@@ -1215,6 +1207,7 @@ let parallel_makeCombosForRange = (first: number, last: number, args: any): any 
     //const filterResult = ClueManager.filter(data[i], args.sum, comboMap);
 };
 
+/*
 //
 //
 let getAllPrimarySrcCombos = (orSource: SourceBase, size: number): string[] => {
@@ -1231,6 +1224,7 @@ let getAllPrimarySrcCombos = (orSource: SourceBase, size: number): string[] => {
     });
     return combos;
 }
+*/
 
 //
 //
@@ -1411,7 +1405,9 @@ function combinationsToNcLists (combinationNcLists: NameCount.List[]): NameCount
 function combinationsToNcDataLists (combinationNcLists: NameCount.List[]): NCDataList[] {
     Debug(`combToNcDataLists() combinationNcLists: ${Stringify(combinationNcLists)}`);
     return Peco.makeNew({
+        // TODO: List.toIndexList()
         listArray: combinationNcLists.map(ncList => [...Array(ncList.length).keys()]), // keys of array are 0..ncList.length-1
+        // TODO: List.sumOfSublistLengths()
         max: combinationNcLists.reduce((sum, ncList) => sum + ncList.length, 0)        // sum of lengths of nclists
     }).getCombinations()
         .map((ncListIndexes: number[]) => combinationNcDataList(ncListIndexes, combinationNcLists));
@@ -1423,7 +1419,9 @@ function ncDataCombinationListsToNcDataLists (ncDataCombinationLists: NCDataList
     Debug(`ncDataCombinationsToNcDataLists() ncDataCombinationLists: ${Stringify(ncDataCombinationLists)}`);
     if (listIsEmpty(ncDataCombinationLists)) return [ [] ];
     return Peco.makeNew({
+        // TODO: List.toIndexList()
         listArray: ncDataCombinationLists.map(ncDataList => [...Array(ncDataList.length).keys()]), // keys of array are 0..ncDataList.length-1
+        // TODO: List.sumOfSublistLengths()
         max: ncDataCombinationLists.reduce((sum, ncDataList) => sum + ncDataList.length, 0)        // sum of lengths of ncDataLists
     }).getCombinations()
         .map((indexList: number[]) => ncDataCombinationsToNcDataList(indexList, ncDataCombinationLists));
@@ -1535,7 +1533,7 @@ let buildUseSourceListsFromNcData = (args: any): UseSourceLists => {
     // (i.e., the container cannot be marked as "compatible.") We still need
     // to check the possibility that any of the other XOR-but-not-AND-compatible
     // sourceLists could be AND-compatible with the generated-combo sourceList.
-    // So, a container should only be marked compatible if and only if there are
+    // So, a container can be marked compatible if and only if there are no
     // no remaining XOR-compatible sourceLists.
     //TODO: markAllANDCompatibleOrSources(xorSourceList, orSourceList);
     markAllXORCompatibleOrSources(xorSourceList, orSourceList);

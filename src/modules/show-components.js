@@ -32,11 +32,20 @@ function Stringify (val) {
 //
 // TODO: not actually using nameList here except for output? i guess that's ok?
 function getSourceClues (source, countList, nameList) {
-    source = source.split(',').sort().toString();
     const count = countList.reduce((sum, count) => sum + count, 0);
-    // for each name in namelist, get propertyCount(s) of knownSrcMap[count][param]
     const srcMap = ClueManager.getKnownSourceMap(count);
-    const results = srcMap[source].results;
+    const results = srcMap[source] ? srcMap[source].results : undefined; // TODO: ?.results
+    if (!results) {
+        let sourceList = source.split(',');
+        let s = '';
+        sourceList.forEach((source, index) => {
+            s += getClueSources(source, countList[index], [source]);
+            console.error(s);
+        });
+        console.error('---');
+        return s;
+        // for each name in namelist, get propertyCount(s) of knownSrcMap[count][source]
+    }
     //console.error(`results ${Stringify(results)} len(${results.length})`);
     // TODO: duplicated in getSourceClues
     const countsList = results.map(result =>
@@ -47,34 +56,13 @@ function getSourceClues (source, countList, nameList) {
 }
 
 //
-
-let GCS = 0;
+//
 function getClueSources (name, count, nameList) {
+    console.log(`getClueSources(${name}:${count})`);
     const srcMap = ClueManager.getKnownSourceMap(count);
-/*
-    if (count === 1) {
-        Assert(nameList.length === 1, `${nameList}, expected nameList.length === 1`);
-        const source = nameList[0];
-        const clue = _.find(ClueManager.getClueList(count), { name, src: source });
-        //console.error(clue);
-        const counts = clue.propertyCounts.synonym;
-        sources += `${source} : syn total(${counts.total}) primary(${counts.primary})`;
-    } else {
-  */
     return nameList.map(source => {
-        /*
-          if (GCS) {
-          if (results.length > 1) {
-          for (const result of results) {
-          console.log(Stringify(result.resultMap.internal_map));
-          }
-          }
-          GCS = 0;
-          }
-        */
         if (count === 1) {
             const clue = _.find(ClueManager.getClueList(count), { name, src: source });
-            //console.error(clue);
             const counts = clue.propertyCounts.synonym;
             source += ` : syn total(${counts.total}) primary(${counts.primary})`;
         } else {
@@ -89,7 +77,6 @@ function getClueSources (name, count, nameList) {
         }
         return source;
     }).join(' - ');
-//    return sources;
 }
 
 // this is really challenging to understand without types.
@@ -135,7 +122,8 @@ function show (options) {
     if (nameList.length > 1 && options.fast) {
 	return fast_combo_wrapper(nameList, options);
     }
-    const result = ClueManager.getCountListArrays(options.test, options);
+    const nameCsv = nameList.toString();
+    const result = ClueManager.getCountListArrays(nameCsv, options);
     if (!result) {
         console.log('No matches');
         return null;
@@ -143,9 +131,10 @@ function show (options) {
 
     showCountListArray(null, result.rejects, 'REJECTED');
     showCountListArray(null, result.invalid, 'INVALID');
-    showCountListArray(options.test, result.known, 'PRESENT as', true);
-    showCountListArray(options.test, result.clues, 'PRESENT as clue with source:', true);
-    showCountListArray(null, result.valid, 'VALID');
+    showCountListArray(nameCsv, result.known, 'PRESENT as', true);
+    showCountListArray(nameCsv, result.clues, 'PRESENT as clue with source:', true);
+//    showCountListArray(null, result.valid, 'VALID');
+    showCountListArray(nameCsv, result.valid, 'VALID');
 
     // TODO: extract this to helper function, maybe in clue-manager
     // NOTE: explicit undefined check here is necessary
