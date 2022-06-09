@@ -10,13 +10,16 @@ const BootstrapComboMaker = require('../../modules/bootstrap-combo-maker');
 const ResultMap   = require('../../types/result-map');
 const Peco        = require('../../modules/peco');
 const Log         = require('../../modules/log')('combo-maker');
+const My          = require('../../modules/util');
 
 const Assert      = require('assert');
 const Debug       = require('debug')('combo-maker');
 const Duration    = require('duration');
 const Expect      = require('should/as-function');
+const Fs          = require('fs-extra');
 const OS          = require('os');
 const Parallel    = require('paralleljs');
+const Path        = require('path');
 const PrettyMs    = require('pretty-ms');
 const stringify   = require('javascript-stringify').stringify;
 const Stringify2  = require('stringify-object');
@@ -25,7 +28,12 @@ import * as Clue from '../types/clue';
 import * as ClueManager from './clue-manager';
 import * as MinMax from '../types/min-max';
 import * as NameCount from '../types/name-count';
+import * as Synonym from './synonym';
+
 import { ValidateResult } from './validator';
+
+// TODO: import from somewhere. also defined in clue-manager
+const DATA_DIR =  Path.normalize(`${Path.dirname(module.filename)}/../../../data/`);
 
 /* TODO:
    interface LazySourceHashEntry { 
@@ -584,11 +592,16 @@ let mergeCompatibleSourceLists = (sourceList1: AnySourceData[], sourceList2: Any
 
 //
 //
-let sourceListHasPropertyCountInBounds = (sourceList: AnySourceData[], minMax: MinMax.Type): boolean => {
-    const synonymCounts = sourceList.reduce((counts, source) =>
+let getSynonymCounts = (sourceList: AnySourceData[]): Clue.PropertyCounts.Type => {
+    return sourceList.reduce((counts, source) =>
         Clue.PropertyCounts.add(counts, source.synonymCounts),
         Clue.PropertyCounts.empty());
+};
                       
+//
+//
+let sourceListHasPropertyCountInBounds = (sourceList: AnySourceData[], minMax: MinMax.Type): boolean => {
+    const synonymCounts = getSynonymCounts(sourceList);
     const inBounds = propertyCountIsInBounds(synonymCounts, minMax);
     if (!inBounds) {
         if (0) {
@@ -622,7 +635,6 @@ let buildSourceListsForUseNcData = (useNcDataLists: NCDataList[], args: MergeArg
     let sourceLists: SourceList[] = [];
     // TODO: This is to prevent duplicate sourceLists. I suppose I could use a Set or Map, above?
     let hashList: StringBoolMap[] = [];
-    // TODO: forEach
     for (let ncDataList of useNcDataLists) {
         for (let [sourceListIndex, useNcData] of ncDataList.entries()) {
             if (!sourceLists[sourceListIndex]) sourceLists.push([]);
@@ -1004,10 +1016,10 @@ let isAnySourceCompatibleWithUseSources = (sourceList: SourceList, pcd: PreCompu
     return compatible;
 };
 
-// Here lazySourceList is a list of lazy, i.e., not yet fully initialized sources.
+// Here lazySourceList is a list of lazy, i.e., not yet fully initialized source data for
+// generated word-pairs (i.e. a "combo").
 //
-// Construct and fully populate exactly 2 new component sources for each lazy source,
-// then perform a full merge on those sources.
+// Fully load the source data for each word, then perform a full merge on those sources.
 //
 // Return a list of fully merged sources.
 //
@@ -1029,6 +1041,72 @@ let loadAndMergeSourceList = (lazySourceList: LazySourceData[], args: MergeArgs)
         }
     }
     return sourceList;
+};
+
+//
+//
+let makeSynonymFilePath = (name: string): string => {
+    return Path.format({
+        dir: `${DATA_DIR}syns`,
+        base: `${name}.json`
+    });
+};
+
+//
+//
+let synonymGetNameList = (name: string): string[] => {
+    const path = makeSynonymFilePath(name);
+    if (KK) console.error(` path: ${path}`);
+    let json;
+    let synListData: Synonym.ListData ;
+    try {
+        json = Fs.readFileSync(path, 'utf8');
+        synListData = JSON.parse(json);
+    } catch (err: any) {
+        if (err.code !== 'ENOENT') throw err;
+        return [];
+    }
+    if (synListData.ignore) return [];
+    return synListData.list
+        .filter(synData => !synData.ignore)
+        .map(synData => synData.name);
+};
+
+// This is designed for purpose at the moment in that it assumes syn-max is at most 1.
+// Therefore if synonymCounts.total is already one for the supplied sourceList, allow 
+// no synonyms. If synonymCounts.total is zero, allow one.
+//
+// There are reasons for doing it this way. For one, it's more complicated and requires
+// more recordkeeping to consider which of the two combo-word sources that were merged
+// together into sourceList, were the source of a synonym total > 1. It could have been
+// 1 from each, or 2 from one.
+//
+// If I'm ever *serious* about playing with syn-max > 1 though, I'll have to fix this.
+//
+const KK = false;
+let getSynonymCombos = (nameList: string[], sourceList: SourceList, args: any): string[] => {
+    // NOTE: assumes -x2
+    Assert(nameList.length === 2);
+    // TODO: also check for --synmin/max here. if max = 0, exit.
+    if (KK) console.error(`gSC, ${nameList}, use: ${args.use_syns}`);
+    if (!args.use_syns) return [];
+    const synonymCounts = getSynonymCounts(sourceList);
+    if (KK) console.error(` total(${synonymCounts.total})`);
+    // NOTE: assumes --syn-max = 1
+    if (synonymCounts.total > 0) return [];
+
+    let combos: string[] = [];
+    const minMax = args.synonymMinMax;
+    for (let index = 0; index < 2; ++index) {
+        const synList = synonymGetNameList(nameList[index]);
+        if (0 && synList.length) console.error(` ${nameList[index]}: ${synList}`);
+        combos.push(...synList
+            .map(synonym => [synonym, nameList[1 - index]])   // map to nameList
+            .sort()                                           
+            .map(nameList => nameList.toString()));           // map to nameCsv
+    }
+    if (KK) console.error(`syn combos for ${nameList}: ${combos}`);
+    return combos;
 };
 
 //
@@ -1094,33 +1172,32 @@ let getCombosForUseNcLists = (sum: number, max: number, pcd: PreComputedData, ar
 
             const key: string = NameCount.listToSortedString(result.ncList!);
             let cacheHit = false;
-            let lazySourceList: LazySourceData[];
+            let sourceList: AnySourceData[];
             if (!hash[key]) {
-                lazySourceList = mergeAllCompatibleSources(result.ncList!, lazyMergeArgs) as LazySourceData[];
-                if (_.isEmpty(lazySourceList)) ++numMergeIncompatible;
+                sourceList = mergeAllCompatibleSources(result.ncList!, lazyMergeArgs); // as LazySourceData[];
+                if (_.isEmpty(sourceList)) ++numMergeIncompatible;
                 //console.log(`$$ sources: ${Stringify2(sourceList)}`);
-                hash[key] = { lazySourceList };
+                hash[key] = { sourceList };
             } else {
-                // TODO: NOT lazy, potentially
-                lazySourceList = hash[key].lazySourceList;
+                sourceList = hash[key].sourceList;
                 cacheHit = true;
                 numCacheHits += 1;
             }
 
-            if (logging) console.log(`  found compatible sources: ${!_.isEmpty(lazySourceList)}`);
+            if (logging) console.log(`  found compatible sources: ${!listIsEmpty(sourceList)}`);
 
             // failed to find any compatible combos
-            if (listIsEmpty(lazySourceList)) continue;
+            if (listIsEmpty(sourceList)) continue;
 
             if (_.isUndefined(hash[key].isCompatible)) {
-                //*****************************************
-                // TODO: HEY WAIT A SECOND WHY DONT I CACHE THE POPULATED SOURCE HERE
-                //*****************************************
-                hash[key].isCompatible = isAnySourceCompatibleWithUseSources(
-                    loadAndMergeSourceList(lazySourceList, { synonymMinMax: args.synonymMinMax }), pcd)
+                sourceList = loadAndMergeSourceList(sourceList as LazySourceData[], { synonymMinMax: args.synonymMinMax });
+                hash[key].isCompatible = isAnySourceCompatibleWithUseSources(sourceList as SourceList, pcd)
+                // we could update hash with fully loaded & merged version, if there were a reason
+                // hash[key].sourceList = sourceList;
             }
             if (hash[key].isCompatible) {
                 combos.push(result.nameList!.toString());
+                combos.push(...getSynonymCombos(result.nameList!, sourceList as SourceList, args));
             } else if (!cacheHit) {
                 numUseIncompatible += 1;
             }
@@ -1187,6 +1264,7 @@ let parallel_makeCombosForRange = (first: number, last: number, args: any): any 
             fast: args.fast,
             load_max: ClueManager.getNumPrimarySources(),
             parallel: true,
+            use_syns: args.use_syns,
             synonymMinMax: args.synonymMinMax
         }));
 
@@ -1233,8 +1311,9 @@ let makeCombos = (args: any): any => {
     let sumRange: number[] = args.sum.split(',').map(_.toNumber);
     Assert(sumRange.length <= 2, `funny sum (${sumRange.length})`);
 
-    Debug(`++combos, sum: ${sumRange} max: ${args.max} use: ${args.use}`);
-    
+    Debug(`++combos, sum: ${sumRange} max: ${args.max} use-syns: ${args.use_syns}`);
+    if (KK) console.error(`++combos, sum: ${sumRange} max: ${args.max} use-syns: ${args.use_syns}`);
+
     let total = 0;
     let begin = new Date();
     let first = sumRange[0];
@@ -1570,7 +1649,6 @@ let getOrSourcesNcCsvCountMap = (useSourcesList: UseSource[]): Map<string, numbe
 //
 let preCompute = (args: any): PreComputedData => {
    let begin = new Date();
-    //args.allXorNcDataLists = args.xor ? buildAllUseNcDataLists(args.xor) : [ [] ];
     args.allXorNcDataLists = buildCombinedUseNcDataLists(args.xor, args.xormm);
     //console.error(`allXorNcDataLists(${args.allXorNcDataLists.length})`);
     args.allOrNcDataLists = args.or ? buildAllUseNcDataLists(args.or) : [ [] ];

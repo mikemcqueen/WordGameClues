@@ -51,6 +51,7 @@ const CmdLineOptions = Opt.create(_.concat(Clues.Options, [
     ['',  'primary',                           '  show combos as primary source clues' ],
     ['l', 'parallel',                          '  use paralelljs' ],
     ['',  'slow',                              '  use (old) slow method of loading clues' ],
+    ['',  'use-syns=NAME+',                    '  specifies one or more clue names with which synonyms will be used' ],
     ['',  'syn-min=COUNT',                     '  specifies the minimum number of synonyms allowed in any combo (default: 0)' ],
     ['',  'syn-max=COUNT',                     '  specifies the maximum number of synonyms allowed in any combo (default: 1)' ],
     ['',  'copy-from=SOURCE',                  'copy clues from source cluetype; e.g. p1.1'],
@@ -383,6 +384,7 @@ async function main () {
     options.merge_style = Boolean(options['merge-style']);
     let showKnownArg = options['show-known'];
     options.copy_from = options['copy-from'];
+    options.use_syns = options['use-syns'];
     options.synonymMinMax = MinMax.init(options['syn-min'], options['syn-max'], 0, 1);
     options.maxArg = maxArg;
     if (!maxArg) maxArg = 2; // TODO: default values in opt
@@ -516,6 +518,7 @@ async function main () {
 	    xor:     options.xor,
 	    xormm:   options.xormm,
 	    parallel: options.parallel,
+            use_syns: options.use_syns,
             synonymMinMax: options.synonymMinMax
         });
     }

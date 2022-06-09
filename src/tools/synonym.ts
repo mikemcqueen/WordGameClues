@@ -1,15 +1,19 @@
 //
-//
+// synonym.ts
 //
 
 'use strict';
 
 import _ from 'lodash';
-import fetch from 'node-fetch';
-import * as cheerio from 'cheerio';
+import * as Cheerio from 'cheerio';
+import Fetch from 'node-fetch';
+import * as Synonym from '../dist/modules/synonym';
 
-const Assert    = require('assert');
-const Opt       = require('node-getopt');
+const Assert       = require('assert');
+const My           = require('../../modules/util');
+const Opt          = require('node-getopt');
+const Stringify    = require('stringify-object');
+const Stringify2   = require('javascript-stringify').stringify;
 
 const CmdLineOptions = Opt.create([
     ['h', 'help',                              'this screen']
@@ -35,17 +39,33 @@ let main = async (): Promise<void> => {
         process.exit(-1);
     }
     const word = opt.argv[0];
-    const response = await fetch(powerThesaurusUrl(word), options);
-    Assert(response.ok, `HTTP: ${response.status}`);
+    let response;
+    let n = 0;
+    while (true) {
+        response = await Fetch(powerThesaurusUrl(word), options);
+        if (response.ok) break;
+        console.error(`HTTP: ${response.status}`);
+        await My.waitFor(61000);
+    }
     const body = await response.text();
     //console.log(body);
-    const $ = cheerio.load(body);
+    const $ = Cheerio.load(body);
     const at = $('a[title~=synonym]', '#content-list');
-    //console.log(`at.length(${at.length}), at[0]:  ${at[0]}`);
-    //console.log(`atitles (${atitles.length}) type: ${typeof atitles}`);
-    at.each((i, elem) => {
-        console.log(`${i}: ${$(elem).html()}`);
-    });
+    if (at.length === 0) {
+        console.log('no results');
+        process.exit(-1);
+    } else {
+        const retryDelay = 31000;
+        let synList: Synonym.ListData = { list: [] };
+        at.each((i, elem) => {
+            const name: string = $(elem).html() || '';
+            Assert(!_.isEmpty(name));
+            let synData: Synonym.Data = { name, ignore: true };
+            synList.list.push(synData);
+            //console.log(`${i}: ${$(elem).html()}`);
+        });
+        console.log(Stringify(synList));
+    }
 }
 
 main().catch(e => { throw e; });

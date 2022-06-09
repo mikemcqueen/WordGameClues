@@ -318,7 +318,7 @@ let addKnownPrimaryClues = function (clueList: ClueList.Primary): void {
 
 //
 
-let getKnownFilename = function (count: number, dir: string | undefined = undefined): string {
+let getKnownFilename = function (count: number, dir?: string): string {
     return Path.format({
         dir: !dir ? State.dir : `${DATA_DIR}${dir}`,
         base: `clues${count}.json`
