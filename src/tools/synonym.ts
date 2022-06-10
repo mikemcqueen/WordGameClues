@@ -64,7 +64,7 @@ let main = async (): Promise<void> => {
             synList.list.push(synData);
             //console.log(`${i}: ${$(elem).html()}`);
         });
-        console.log(Stringify(synList));
+        console.log(JSON.stringify(synList, null, 4));
     }
 }
 
