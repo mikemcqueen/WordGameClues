@@ -5,6 +5,7 @@
 'use strict';
 
 import _ from 'lodash'; // TODO: need a smaller dummy import
+let Assert = require('assert');
 let Stringify = require('stringify-object');
 
 export namespace PropertyName {
@@ -131,19 +132,34 @@ export namespace PropertyCounts {
         }
     }
 
-    export function initAll (clue: PrimaryClue): void {
+    export function createMapFromClue (clue: Any): PropertyCounts.Map {
+        let propertyCounts: PropertyCounts.Map = {} as PropertyCounts.Map;
+        Object.values(PropertyName.Enum)
+            .forEach((propertyName: PropertyName.Any) => {
+                propertyCounts[propertyName] = getCounts(clue, propertyName);
+            });
+        return propertyCounts;
+    }
+
+    // TODO: rename
+    //export function initAll (clue: PrimaryClue): void {
+    //clue.propertyCounts = createMapFromClue(clue);
+        /*
         let propertyCounts: any = {};
         Object.values(PropertyName.Enum).forEach((propertyName: PropertyName.Any) => {
             //console.error(`propertyName: ${propertyName}`);
             propertyCounts[propertyName] = getCounts(clue, propertyName);
         });
         clue.propertyCounts = propertyCounts as Map;
-    }
+        */
+    //}
 
     export function getCounts (clue: Any, propertyName: PropertyName.Any): Type {
         const hasProperty = !!clue[propertyName];
         return {
             total: hasProperty ? 1 : 0,
+            // TODO: something weird here I should look at.  the && !clue.source I sort
+            // of understand the motivation for that but I think it might be incorrect.
             primary: hasProperty && isPrimary(clue) && !clue.source ? 1 : 0
         }
     }
@@ -161,16 +177,29 @@ export namespace PropertyCounts {
             });
     }
 
-    export function add (to: Type, from: Type | undefined): Type {
-        if (from) {
+    export function add (to: Type, from: Type): Type {
+        Assert(to && from, `add ${to} ${from}`);
+        //if (from) {
             to.total += from.total;
             to.primary += from.primary;
-        }
+        //}
         return to;
     }
 
-    export function merge (a: Type, b: Type): Type {
-        let result: Type = empty();
+    export function mergeMaps (a: PropertyCounts.Map, b: PropertyCounts.Map): PropertyCounts.Map {
+        Assert(a && b, `mergeMaps ${a} ${b}`);
+        let result: PropertyCounts.Map = {} as PropertyCounts.Map;
+        // TODO PropertyName.forEach( name =>) 
+        Object.values(PropertyName.Enum)
+            .forEach((propertyName: PropertyName.Any) => {
+                result[propertyName] = merge(a[propertyName], b[propertyName]);
+            });
+        return result;
+    }
+
+    export function merge (a: PropertyCounts.Type, b: PropertyCounts.Type): PropertyCounts.Type {
+        Assert(a && b, `merge ${a} ${b}`);
+        let result: PropertyCounts.Type = empty();
         add(result, a);
         add(result, b);
         return result;

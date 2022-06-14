@@ -218,9 +218,10 @@ let stringifySourceList = (sourceList: SourceList): string => {
         if (!first) result += ',\n';
         else first = false;
         result += '  {\n';
-        result += `    ncList: ${source.ncList}\n`;
         result += `    primaryNameSrcList: ${source.primaryNameSrcList}\n`;
-        result += `    sourcNcCsvList: ${Stringify2(source.sourceNcCsvList)}\n`;
+        result += `    ncList: ${source.ncList}\n`;
+        result += `    synonymCounts: ${Stringify2(source.synonymCounts)}\n`;
+        //result += `    sourcNcCsvList: ${Stringify2(source.sourceNcCsvList)}\n`;
         result += '  }';
     }
     return result + "\n]";
@@ -441,20 +442,81 @@ function buildSrcNcList (resultMap: Object): string[] {
 }
 
 //
-//
-let getPropertyCounts = (result: ValidateResult): Clue.PropertyCounts.Map => {
-    let propertyCounts: Clue.PropertyCounts.Map;
-    if (result.nameSrcList.length === 1) {
-        // primary clue: propertyCounts are attached to clue
-        const nameSrc = result.nameSrcList[0];
-        const clue = _.find(ClueManager.getClueList(1), { name: nameSrc.name, src: _.toString(nameSrc.count) }) as Clue.Primary;
-        propertyCounts = clue.propertyCounts!;
-    } else {
-        // compoundClue: propertyCounts are attached to each ValidateResult
-        propertyCounts = result.propertyCounts!;
-    }
-    return propertyCounts;
+// TODO: ForPrimaryClue
+let getPropertyCountsMapForPrimaryNameSrc = (nameSrc: NameCount.Type): Clue.PropertyCounts.Map => {
+    return _.find(ClueManager.getClueList(1), {
+        name: nameSrc.name,
+        src: _.toString(nameSrc.count)
+    }).propertyCounts!;
 }
+
+//
+//
+let getPropertyCountsMapForCompoundClue = (clue: Clue.Compound, count: number): Clue.PropertyCounts.Map => {
+    return Clue.PropertyCounts.createMapFromClue(_.find(ClueManager.getClueList(count), clue));
+}
+
+//
+//
+let getPropertyCountsMapForValidateResult = (validateResult: ValidateResult): Clue.PropertyCounts.Map => {
+    const count = validateResult.nameSrcList.length;
+    if (count === 1) {
+        // primary clue: propertyCounts map is attached to clue itself
+        // TODO: Clue.fromPrimaryNameSrc (): Clue.Primary
+        return getPropertyCountsMapForPrimaryNameSrc(validateResult.nameSrcList[0]); // because length is 1
+    } else {
+        // compound clue: propertyCounts of sources are attached to each ValidateResult
+        return validateResult.propertyCounts!;
+    }
+};
+
+// Return keys of form ['name1:M', 'name2:N'] as array of form ['name1', 'name2'].
+// 
+let getResultMapTopLevelClueNameList = (resultMap: any): string[] => {
+    return Object.keys(resultMap.internal_map)
+        .map(nameSrcStr => nameSrcStr.split(':')[0])
+};
+
+//
+//
+let getPropertyCountsMapForNcAndValidateResult = (nc: NameCount.Type,
+                                                  validateResult: ValidateResult): Clue.PropertyCounts.Map => {
+    Assert(nc.count === validateResult.nameSrcList.length); // a hypothesis
+    const count = validateResult.nameSrcList.length;
+    const propertyCounts = getPropertyCountsMapForValidateResult(validateResult);
+
+    // For primary clue, there's only one source variation - the source is the source.
+    // PropertyCounts are attached to the clue itself, which we get via the validateResult.
+    if (count === 1) return propertyCounts;
+
+    // Compound clues may have many source combination variations, and as a result the
+    // the propertyCounts "totals" (for the clue itself plus all its sources) are not
+    // stored in the clue itself. Instead, we must merge (add) the propertyCounts of a
+    // *particular* source (ValidateResult) with those of the clue itself.
+    // TODO: Clue.fromNameAndNameSrcList (): Clue.Compound
+    // TODO: 
+    const clue = {
+        name: nc.name,
+        src: getResultMapTopLevelClueNameList(validateResult.resultMap).sort().toString()
+    };
+    //console.error(`clue: ${Clue.toJSON(clue)}, propertyCounts: ${propertyCounts}`);
+    return Clue.PropertyCounts.mergeMaps(propertyCounts,
+                                         getPropertyCountsMapForCompoundClue(clue, nc.count));
+}
+
+//
+//
+let getSynonymCountsForValidateResult = (validateResult: ValidateResult): Clue.PropertyCounts.Type => {
+    return getPropertyCountsMapForValidateResult(validateResult)[Clue.PropertyName.Synonym];
+};
+
+// For primary clues, this is just the synonymCounts attached to the clue.
+// For compound clues, this is a combination of the synonymCounts attached to the
+// clue, and the synonymCounts attached to the sources represented by validateResult.
+let getSynonymCountsForNcAndValidateResult = (nc: NameCount.Type,
+                                              validateResult: ValidateResult): Clue.PropertyCounts.Type => {
+    return getPropertyCountsMapForNcAndValidateResult(nc, validateResult)[Clue.PropertyName.Synonym];
+};
 
 //
 //
@@ -475,7 +537,14 @@ let populateSourceData = (lazySource: SourceBase, nc: NameCount.Type, validateRe
     }
 
     source.ncList = [nc]; // TODO i could try getting rid of "LazySource.nc" and just make this part of LazySouceData
-    source.synonymCounts = getPropertyCounts(validateResult)[Clue.PropertyName.Synonym];
+    source.synonymCounts = getSynonymCountsForNcAndValidateResult(nc, validateResult);
+
+    //////////////////////////////////////////////
+    if (NameCount.toString(nc) === 'city:2') {
+        console.error(`${nc} props: ${Stringify2(source.synonymCounts)}`);
+        //console.error(`result: ${Stringify(validateResult)}`);
+    }
+    /////////////////////////////////////////////
     if (loggy || logging > 3) {
         console.log(`getSourceList() ncList: ${source.ncList}, sourceNcCsvList: ${source.sourceNcCsvList}`);
         if (_.isEmpty(source.sourceNcCsvList)) console.log(`empty sourceNcCsvList: ${Stringify(validateResult.resultMap.map())}`);
@@ -491,7 +560,7 @@ let getSourceData = (nc: NameCount.Type, validateResult: ValidateResult, lazy: b
     return lazy ? {
         primaryNameSrcList,
         ncList: [nc],
-        synonymCounts: getPropertyCounts(validateResult)[Clue.PropertyName.Synonym],
+        synonymCounts: getSynonymCountsForNcAndValidateResult(nc, validateResult),
         validateResultList: [validateResult]
     } : populateSourceData({ primaryNameSrcList }, nc, validateResult, orSourcesNcCsvMap);
 };
@@ -508,8 +577,8 @@ let propertyCountIsInBounds = (propertyCount: Clue.PropertyCounts.Type, minMax: 
 
 //
 //
-let filterPropertyCountsOutOfBounds = (result: ValidateResult, args: MergeArgs): boolean => {
-    const synonymCounts = getPropertyCounts(result)[Clue.PropertyName.Synonym];
+let filterPropertyCountsOutOfBounds = (nc: NameCount.Type, result: ValidateResult, args: MergeArgs): boolean => {
+    const synonymCounts = getSynonymCountsForNcAndValidateResult(nc, result);
     const inBounds = propertyCountIsInBounds(synonymCounts, args.synonymMinMax);
     if (!inBounds) oob++;
     return inBounds;
@@ -520,9 +589,9 @@ let filterPropertyCountsOutOfBounds = (result: ValidateResult, args: MergeArgs):
 let getSourceList = (nc: NameCount.Type, args: MergeArgs): AnySourceData[] => {
     const sourceList: AnySourceData[] = [];
     ClueManager.getKnownSourceMapEntries(nc)
-        .forEach(entry => {
-            sourceList.push(...entry.results
-                .filter((result: ValidateResult) => filterPropertyCountsOutOfBounds(result, args))
+        .forEach((sourceData: ClueManager.SourceData) => {
+            sourceList.push(...sourceData.results
+                .filter((result: ValidateResult) => filterPropertyCountsOutOfBounds(nc, result, args))
                 .map((result: ValidateResult) => getSourceData(nc, result, args.lazy)));
         });
     if (AA) {
@@ -541,13 +610,12 @@ let mergeSources = (source1: AnySourceData, source2: AnySourceData, lazy: boolea
         Assert(ncList.length === 2, `ncList.length(${ncList.length})`);
         source1 = source1 as LazySourceData;
         source2 = source2 as LazySourceData;
-        const synonymCounts = Clue.PropertyCounts.merge(
-            getPropertyCounts(source1.validateResultList[0])[Clue.PropertyName.Synonym],
-            getPropertyCounts(source2.validateResultList[0])[Clue.PropertyName.Synonym]);
         const result: LazySourceData = {
             primaryNameSrcList,
             ncList,
-            synonymCounts,
+            synonymCounts: Clue.PropertyCounts.merge(
+                getSynonymCountsForValidateResult(source1.validateResultList[0]),
+                getSynonymCountsForValidateResult(source2.validateResultList[0])),
             validateResultList: [
                 (source1 as LazySourceData).validateResultList[0],
                 (source2 as LazySourceData).validateResultList[0]
@@ -559,8 +627,8 @@ let mergeSources = (source1: AnySourceData, source2: AnySourceData, lazy: boolea
     source2 = source2 as SourceData;
     const mergedSource: SourceData = {
         primaryNameSrcList,
-        synonymCounts: Clue.PropertyCounts.merge(source1.synonymCounts, source2.synonymCounts),
         ncList,
+        synonymCounts: Clue.PropertyCounts.merge(source1.synonymCounts, source2.synonymCounts),
         sourceNcCsvList: [...source1.sourceNcCsvList, ...source2.sourceNcCsvList]
     };
     // TODO: still used?
@@ -593,8 +661,8 @@ let mergeCompatibleSourceLists = (sourceList1: AnySourceData[], sourceList2: Any
 //
 //
 let getSynonymCounts = (sourceList: AnySourceData[]): Clue.PropertyCounts.Type => {
-    return sourceList.reduce((counts, source) =>
-        Clue.PropertyCounts.add(counts, source.synonymCounts),
+    return sourceList.reduce(
+        (counts, source) => Clue.PropertyCounts.add(counts, source.synonymCounts),
         Clue.PropertyCounts.empty());
 };
                       
@@ -1063,13 +1131,16 @@ let synonymGetNameList = (name: string): string[] => {
         json = Fs.readFileSync(path, 'utf8');
         synListData = JSON.parse(json);
     } catch (err: any) {
-        if (err.code !== 'ENOENT') throw err;
+        if (err.code !== 'ENOENT') {
+            console.error(path);
+            throw err;
+        }
         return [];
     }
-    if (synListData.ignore) return [];
-    return synListData.list
-        .filter(synData => !synData.ignore)
-        .map(synData => synData.name);
+    return synListData.ignore ? []
+        : synListData.list
+            .filter(synData => !synData.ignore)
+            .map(synData => synData.name);
 };
 
 // This is designed for purpose at the moment in that it assumes syn-max is at most 1.
@@ -1083,14 +1154,17 @@ let synonymGetNameList = (name: string): string[] => {
 //
 // If I'm ever *serious* about playing with syn-max > 1 though, I'll have to fix this.
 //
-const KK = false;
+let KK = false;
 let getSynonymCombos = (nameList: string[], sourceList: SourceList, args: any): string[] => {
     // NOTE: assumes -x2
     Assert(nameList.length === 2);
+    KK = nameList.includes('city');
+
     // TODO: also check for --synmin/max here. if max = 0, exit.
-    if (KK) console.error(`gSC, ${nameList}, use: ${args.use_syns}`);
+    if (KK) console.error(`gSC, ${nameList}`);
     if (!args.use_syns) return [];
     const synonymCounts = getSynonymCounts(sourceList);
+    if (KK) console.error(stringifySourceList(sourceList));
     if (KK) console.error(` total(${synonymCounts.total})`);
     // NOTE: assumes --syn-max = 1
     if (synonymCounts.total > 0) return [];
@@ -1099,7 +1173,7 @@ let getSynonymCombos = (nameList: string[], sourceList: SourceList, args: any): 
     const minMax = args.synonymMinMax;
     for (let index = 0; index < 2; ++index) {
         const synList = synonymGetNameList(nameList[index]);
-        if (0 && synList.length) console.error(` ${nameList[index]}: ${synList}`);
+        if (KK && synList.length) console.error(` ${nameList[index]}: ${synList}`);
         combos.push(...synList
             .map(synonym => [synonym, nameList[1 - index]])   // map to nameList
             .sort()                                           

@@ -58,7 +58,7 @@ function getSourceClues (source, countList, nameList) {
 //
 //
 function getClueSources (name, count, nameList) {
-    console.log(`getClueSources(${name}:${count})`);
+    //console.log(`getClueSources(${name}:${count})`);
     const srcMap = ClueManager.getKnownSourceMap(count);
     return nameList.map(source => {
         if (count === 1) {

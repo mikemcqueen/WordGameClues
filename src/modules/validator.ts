@@ -60,8 +60,8 @@ interface CandidateResult {
 export interface ValidateResult extends CandidateResult {
     nameSrcList: NameCount.List;
     nameSrcCsv?: string;
-//    primarySrcArray?: CountArray;
     propertyCounts?: Clue.PropertyCounts.Map;
+    //primarySrcArray?: CountArray;
 }
 
 export interface ValidateSourcesResult {
@@ -91,7 +91,7 @@ let dumpResultMap = (seq: any, level: number = 0): void => {
     if (typeof seq === 'object') {
         console.log(indent() + spaces(2 * level) + (_.isArray(seq) ? '[' : '{'));
         ++level;
-
+        
         if (_.isArray(seq)) {
             seq.forEach((elem: any) => {
                 if (typeof elem === 'object') {
@@ -1046,68 +1046,68 @@ let mergeNcListResults = (ncListToMerge: NameCount.List, args: any): ValidateSou
     if (NN) console.log(`merging: ${ncStr}`);
     let resultList: ValidateResult[] = [];
     if (0 && ncStr === 'word:1,word:2') {
-	console.log(`merging: ${ncStr}\n-----------------------------------`);
-	NN = true;
+	    console.log(`merging: ${ncStr}\n-----------------------------------`);
+	    NN = true;
     }
     let arrayList: NumberArray[] = ncListToMerge.map(nc => {
-	let ncResultMap = ClueManager.getNcResultMap(nc.count);
-	if (nc.count === 1) {
-	    return getPrimaryClueSources(nc.name);
-	} else {
-	    return [...Array(ncResultMap[nc.toString()].list.length).keys()].map(_.toNumber);
-	}
+	    let ncResultMap = ClueManager.getNcResultMap(nc.count);
+	    if (nc.count === 1) {
+	        return getPrimaryClueSources(nc.name);
+	    } else {
+	        return [...Array(ncResultMap[nc.toString()].list.length).keys()].map(_.toNumber);
+	    }
     });
     if (NN) console.log(`${ncListToMerge}:`)
     if (NN) console.log(Stringify(arrayList));
     Peco.makeNew({
-	listArray: arrayList,
-	max: 99999
+	    listArray: arrayList,
+	    max: 99999
     }).getCombinations().forEach((indexList: number[]) => {
-	let ncList: NameCount.List = [];
-	let nameSrcList: NameCount.List = [];
+	    let ncList: NameCount.List = [];
+	    let nameSrcList: NameCount.List = [];
         let resultMap = ResultMap.makeNew();
-	let restrictToClueNumber = 0;
-	if (NN) console.log ('****************************************************************');
-	indexList.forEach((resultIndex, ncIndex) => { // TODO: resultIndex kinda bad name, can also be clue source for primary clues
-	    let nc = ncListToMerge[ncIndex];
-	    if (nc.count > 1) {
-		let result = ClueManager.getNcResultMap(nc.count)[nc.toString()].list[resultIndex];
-		if (NN) console.log(`merging ${nc} as ${result.ncList}: ${Stringify(result)}`);
-		ncList.push(...result.ncList);
-		nameSrcList.push(...result.nameSrcList);
-		resultMap.addNcMapSource(nc, result.resultMap);
-	    } else {
-		if (NN) console.log(`merging nc: ${nc}`);
-		ncList.push(nc);
-		let nameSrc = NameCount.makeNew(nc.name, resultIndex);
-		nameSrcList.push(nameSrc);
-		resultMap.addPrimarySource(nameSrc);
-		let clueNumber = getRestrictedPrimaryClueNumber(nameSrc);
-		if (clueNumber) {
-		    if (NN) console.log(`restricting ${ncListToMerge} to clueNumber(${clueNumber}) due to ${nameSrc}`);
-		    restrictToClueNumber = clueNumber;
-		}
+	    let restrictToClueNumber = 0;
+	    if (NN) console.log ('****************************************************************');
+	    indexList.forEach((resultIndex, ncIndex) => { // TODO: resultIndex kinda bad name, can also be clue source for primary clues
+	        let nc = ncListToMerge[ncIndex];
+	        if (nc.count > 1) {
+		        let result = ClueManager.getNcResultMap(nc.count)[nc.toString()].list[resultIndex];
+		        if (NN) console.log(`merging ${nc} as ${result.ncList}: ${Stringify(result)}`);
+		        ncList.push(...result.ncList);
+		        nameSrcList.push(...result.nameSrcList);
+		        resultMap.addNcMapSource(nc, result.resultMap);
+	        } else {
+		        if (NN) console.log(`merging nc: ${nc}`);
+		        ncList.push(nc);
+		        let nameSrc = NameCount.makeNew(nc.name, resultIndex);
+		        nameSrcList.push(nameSrc);
+		        resultMap.addPrimarySource(nameSrc);
+		        let clueNumber = getRestrictedPrimaryClueNumber(nameSrc);
+		        if (clueNumber) {
+		            if (NN) console.log(`restricting ${ncListToMerge} to clueNumber(${clueNumber}) due to ${nameSrc}`);
+		            restrictToClueNumber = clueNumber;
+		        }
+	        }
+	    });
+	    if (restrictToClueNumber) {
+	        if (!allHaveSameClueNumber(nameSrcList, restrictToClueNumber)) {
+		        if (NN) console.log(`  restriction failed`);
+		        return; // forEach.continue;
+	        }
+	        if (NN) console.log(`  restriction passed`);
 	    }
-	});
-	if (restrictToClueNumber) {
-	    if (!allHaveSameClueNumber(nameSrcList, restrictToClueNumber)) {
-		if (NN) console.log(`  restriction failed`);
-		return; // forEach.continue;
-	    }
-	    if (NN) console.log(`  restriction passed`);
-	}
-	// TODO: uniqBy da debil
-	if (_.uniqBy(nameSrcList, NameCount.count).length === nameSrcList.length) {
-	    let nameSrcCsv = _.sortBy(nameSrcList, NameCount.count).toString();
-	    let result: ValidateResult = {
-		ncList,
-		nameSrcList,
-		nameSrcCsv,
-		resultMap
-	    };
-	    resultList.push(result);
-	    if (NN) console.log(`result: ${Stringify(result)}`);
-	} else if (NN) console.log ('skipped - above not unique');
+	    // TODO: uniqBy da debil
+	    if (_.uniqBy(nameSrcList, NameCount.count).length === nameSrcList.length) {
+	        let nameSrcCsv = _.sortBy(nameSrcList, NameCount.count).toString();
+	        let result: ValidateResult = {
+		        ncList,
+		        nameSrcList,
+		        nameSrcCsv,
+		        resultMap
+	        };
+	        resultList.push(result);
+	        if (NN) console.log(`result: ${Stringify(result)}`);
+	    } else if (NN) console.log ('skipped - above not unique');
     });
     NN = false;
     return { list: resultList, success: !_.isEmpty(resultList) };
@@ -1118,12 +1118,12 @@ let mergeNcListResults = (ncListToMerge: NameCount.List, args: any): ValidateSou
 let test = (ncList: NameCount.List, args: any): ValidateSourcesResult => {
     // can remove this.
     if (!ncList.every(nc => {
-	let ncResultMap = ClueManager.getNcResultMap(nc.count);
-	let ncStr = nc.toString();
-	if (nc.count === 1 || (ncResultMap[ncStr] && ncResultMap[ncStr].list)) {
-	    return true;
-	}
-	return false;
+	    let ncResultMap = ClueManager.getNcResultMap(nc.count);
+	    let ncStr = nc.toString();
+	    if (nc.count === 1 || (ncResultMap[ncStr] && ncResultMap[ncStr].list)) {
+	        return true;
+	    }
+	    return false;
     })) throw new Error('no result list');
     return mergeNcListResults(ncList, args);
 };
@@ -1174,23 +1174,23 @@ let rvsWorker = (args: any): ValidateSourcesResult => {
     // If only one name & count remain, we're done.
     // (name & count lists are equal length, just test one)
     if (args.nameList.length === 1) {
-	let result: ValidateSourcesResult;
-	if (args.fast && args.validateAll) { // NOTE getting rid of this validateAll check might fix --copy-from, --add, etc.
-	    if (NN) console.log('fast');
-	    result = mergeNcListResults(newNameCountList, args);
-	} else {
+	    let result: ValidateSourcesResult;
+	    if (args.fast && args.validateAll) { // NOTE getting rid of this validateAll check might fix --copy-from, --add, etc.
+	        if (NN) console.log('fast');
+	        result = mergeNcListResults(newNameCountList, args);
+	    } else {
             result = checkUniqueSources(newNameCountList, args);
             Debug(`checkUniqueSources --- ${result.success ? 'success!' : 'failure'}`);
-	}
+	    }
         if (result.success) {
             args.ncList.push(NameCount.makeNew(args.name, args.count));
             Debug(`add1, ${args.name}:${args.count}` +
-                  `, newNc(${newNameCountList.length})` +
-                  `, ${newNameCountList}`);
+                `, newNc(${newNameCountList.length})` +
+                `, ${newNameCountList}`);
         }
         return result;
     }
-
+    
     // nameList.length > 1, remove current name & count,
     // and validate remaining
     Debug(`calling rvs recursively, ncList: ${newNameCountList}`);
@@ -1198,7 +1198,7 @@ let rvsWorker = (args: any): ValidateSourcesResult => {
         clueNameList:  chop(args.nameList, args.name),
         clueCountList: chop(args.countList, args.count),
         nameCountList: newNameCountList,
-	fast: args.fast,
+	    fast: args.fast,
         validateAll:   args.validateAll
     });
     if (!rvsResult.success) {
