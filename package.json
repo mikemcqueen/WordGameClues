@@ -40,7 +40,7 @@
     "stringify-object": "^3.3.0",
     "tmp": "0.0.31",
     "wikijs": "^1.1.1",
-    "xmldom": "^0.1.31"
+    "xmldom": "^0.6.0"
   },
   "devDependencies": {
     "@types/node": "^16.11.7",
