@@ -12,7 +12,7 @@
     "bluebird": "^3.7.2",
     "chai": "^3.5.0",
     "cheerio": "^1.0.0-rc.11",
-    "csv-parse": "^1.3.3",
+    "csv-parse": "^4.4.6",
     "debug": "^2.6.8",
     "duration": "^0.2.2",
     "encodeurl": "^1.0.2",
