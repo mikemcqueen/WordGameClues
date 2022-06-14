@@ -538,13 +538,6 @@ let populateSourceData = (lazySource: SourceBase, nc: NameCount.Type, validateRe
 
     source.ncList = [nc]; // TODO i could try getting rid of "LazySource.nc" and just make this part of LazySouceData
     source.synonymCounts = getSynonymCountsForNcAndValidateResult(nc, validateResult);
-
-    //////////////////////////////////////////////
-    if (NameCount.toString(nc) === 'city:2') {
-        console.error(`${nc} props: ${Stringify2(source.synonymCounts)}`);
-        //console.error(`result: ${Stringify(validateResult)}`);
-    }
-    /////////////////////////////////////////////
     if (loggy || logging > 3) {
         console.log(`getSourceList() ncList: ${source.ncList}, sourceNcCsvList: ${source.sourceNcCsvList}`);
         if (_.isEmpty(source.sourceNcCsvList)) console.log(`empty sourceNcCsvList: ${Stringify(validateResult.resultMap.map())}`);
@@ -1158,7 +1151,7 @@ let KK = false;
 let getSynonymCombos = (nameList: string[], sourceList: SourceList, args: any): string[] => {
     // NOTE: assumes -x2
     Assert(nameList.length === 2);
-    KK = nameList.includes('city');
+    //KK = nameList.includes('city');
 
     // TODO: also check for --synmin/max here. if max = 0, exit.
     if (KK) console.error(`gSC, ${nameList}`);
