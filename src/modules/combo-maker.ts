@@ -178,7 +178,6 @@ function Stringify(val: any) {
     }, " ");
 }
 
-let PCLog = false;//true;
 let logging = 0;
 let loggy = false;
 let ZZ = false;
@@ -563,7 +562,7 @@ let oob = 0;
 
 //
 //
-let propertyCountIsInBounds = (propertyCount: Clue.PropertyCounts.Type, minMax: MinMax.Type): boolean => {
+let propertyCountsIsInBounds = (propertyCount: Clue.PropertyCounts.Type, minMax: MinMax.Type): boolean => {
     const total = propertyCount.total;
     return minMax.min <= total && total <= minMax.max;
 };
@@ -572,7 +571,7 @@ let propertyCountIsInBounds = (propertyCount: Clue.PropertyCounts.Type, minMax: 
 //
 let filterPropertyCountsOutOfBounds = (nc: NameCount.Type, result: ValidateResult, args: MergeArgs): boolean => {
     const synonymCounts = getSynonymCountsForNcAndValidateResult(nc, result);
-    const inBounds = propertyCountIsInBounds(synonymCounts, args.synonymMinMax);
+    const inBounds = propertyCountsIsInBounds(synonymCounts, args.synonymMinMax);
     if (!inBounds) oob++;
     return inBounds;
 };
@@ -663,7 +662,7 @@ let getSynonymCounts = (sourceList: AnySourceData[]): Clue.PropertyCounts.Type =
 //
 let sourceListHasPropertyCountInBounds = (sourceList: AnySourceData[], minMax: MinMax.Type): boolean => {
     const synonymCounts = getSynonymCounts(sourceList);
-    const inBounds = propertyCountIsInBounds(synonymCounts, minMax);
+    const inBounds = propertyCountsIsInBounds(synonymCounts, minMax);
     if (!inBounds) {
         if (0) {
             console.error(`oob: [${NameCount.listToNameList(sourceListToNcList(sourceList))}]` +
@@ -999,11 +998,8 @@ let isSourceArrayANDCompatibleWithSourceList = (primarySrcArrayAndSize: CountArr
 // OR == XOR || AND
 //
 let isSourceArrayCompatibleWithEveryOrSource = (primarySrcArray: CountArray, orSourceList: OrSource[]) : boolean => {
-    CWOS_calls++;
     let compatible = true; // if no --or sources specified, compatible == true
     for (let orSource of orSourceList) {
-        CWOS_comps++;
-        
         // TODO: skip calls to here if container.compatible = true  which may have been
         // determined in Precompute phase @ markAllANDCompatibleOrSources()
         // and skip the XOR check as well in this case.
@@ -1045,17 +1041,9 @@ let filterXorSourcesXORCompatibleWithSource = (xorSourceList: XorSource[], sourc
     return filteredXorSources;
 };
 
-let isCWUS_calls = 0;
-let isCWUS_comps = 0;
-let CWOS_calls = 0;
-let CWOS_comps = 0;
-let ACWOS_calls = 0;
-let ACWOS_comps = 0;
-
 //
 //
 let isAnySourceCompatibleWithUseSources = (sourceList: SourceList, pcd: PreComputedData): boolean => {
-    isCWUS_calls += 1;
     // TODO: this is why --xor is required with --or. OK for now. Fix later.
     if (listIsEmpty(pcd.useSourceLists.xor)) return true;
 
@@ -1096,7 +1084,7 @@ let loadAndMergeSourceList = (lazySourceList: LazySourceData[], args: MergeArgs)
             sourcesToMerge.push(sourceData);
         }
         const mergedSource = mergeSources(sourcesToMerge[0], sourcesToMerge[1], false) as SourceData;
-        if (propertyCountIsInBounds(mergedSource.synonymCounts, args.synonymMinMax)) {
+        if (propertyCountsIsInBounds(mergedSource.synonymCounts, args.synonymMinMax)) {
             if (0 && ZZ) console.log(`lamMerged[${NameCount.listToString(lazySource.ncList)}]: ${Stringify2(mergedSource)}`);
             sourceList.push(mergedSource);
         }
@@ -1131,8 +1119,7 @@ let synonymGetNameList = (name: string): string[] => {
         return [];
     }
     return synListData.ignore ? []
-        : synListData.list
-            .filter(synData => !synData.ignore)
+        : synListData.list.filter(synData => !synData.ignore)
             .map(synData => synData.name);
 };
 
@@ -1410,10 +1397,7 @@ let makeCombos = (args: any): any => {
             const filterResult = ClueManager.filter(comboList, sum, comboMap);
         }
         let d = new Duration(begin, new Date()).milliseconds;
-        console.error(`--combos: ${PrettyMs(d)}, oob: ${oob}` +
-            `, isCWUS calls(${isCWUS_calls}), comps(${isCWUS_comps}), avg comps(${_.toInteger(isCWUS_comps / isCWUS_calls)})` +
-            `, CWOS calls(${CWOS_calls}), comps(${CWOS_comps}), avg comps(${_.toInteger(CWOS_comps / CWOS_calls)})`);
-
+        console.error(`--combos: ${PrettyMs(d)}, oob: ${oob}`);
         
         // ++ INSTRUMENTATION
         /*
@@ -1426,7 +1410,6 @@ let makeCombos = (args: any): any => {
         }
         */
         // -- INSTRUMENTATION
-
 
         Debug(`total: ${total}, filtered(${_.size(comboMap)})`);
         _.keys(comboMap).forEach((nameCsv: string) => console.log(nameCsv));

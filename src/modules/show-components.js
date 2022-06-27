@@ -32,6 +32,8 @@ function Stringify (val) {
 //
 // TODO: not actually using nameList here except for output? i guess that's ok?
 function getSourceClues (source, countList, nameList) {
+    console.log(`getSourceClues source: ${source}, countList: [${countList}], nameList: [${nameList}]`);
+
     const count = countList.reduce((sum, count) => sum + count, 0);
     const srcMap = ClueManager.getKnownSourceMap(count);
     const results = srcMap[source] ? srcMap[source].results : undefined; // TODO: ?.results
@@ -39,6 +41,10 @@ function getSourceClues (source, countList, nameList) {
         let sourceList = source.split(',');
         let s = '';
         sourceList.forEach((source, index) => {
+            //
+            // 1. this code is so hard to understand i think it was written by an stoned autistic retard
+            // 2. [source] is wrong at least for primary clue case, need actual list of sources.
+            //
             s += getClueSources(source, countList[index], [source]);
             console.error(s);
         });
@@ -55,12 +61,14 @@ function getSourceClues (source, countList, nameList) {
     return `${nameList.join(' - ')}  : syn totals(${totals}) primarys(${primarys})`;
 }
 
+let GG=false;
 //
 //
 function getClueSources (name, count, nameList) {
-    //console.log(`getClueSources(${name}:${count})`);
+    if (GG) console.log(`getClueSources ${name}:${count}, nameList: [${nameList}]`);
     const srcMap = ClueManager.getKnownSourceMap(count);
     return nameList.map(source => {
+        if (GG) console.log(` source: ${source}`);
         if (count === 1) {
             const clue = _.find(ClueManager.getClueList(count), { name, src: source });
             const counts = clue.propertyCounts.synonym;
@@ -82,15 +90,16 @@ function getClueSources (name, count, nameList) {
 // this is really challenging to understand without types.
 //
 function showCountListArray (name, countListArray, text, hasNameList = false) {
+    if (GG) console.log(`sCLA name: ${name}, text: ${text}, cla: ${Stringify2(countListArray)}`);
     for (const elem of countListArray) {
         const countList = hasNameList ? elem.countList : elem;
+        if (GG) console.log(` countList(${countList.length}): [${countList}], nameList [${elem.nameList}]`);
         let sources = '';
         if (name) {
             if (countList.length > 1) {
                 // -t name1,name2[,name3,...] (multiple names; name == nameCsv here)
                 sources += getSourceClues(name, countList, elem.nameList); // 
-            }
-            else {
+            } else {
                 // -t name (one name only)
                 sources += getClueSources(name, countList[0], elem.nameList);
             }
@@ -133,8 +142,8 @@ function show (options) {
     showCountListArray(null, result.invalid, 'INVALID');
     showCountListArray(nameCsv, result.known, 'PRESENT as', true);
     showCountListArray(nameCsv, result.clues, 'PRESENT as clue with source:', true);
-//    showCountListArray(null, result.valid, 'VALID');
-    showCountListArray(nameCsv, result.valid, 'VALID');
+    showCountListArray(null, result.valid, 'VALID');
+//    showCountListArray(nameCsv, result.valid, 'VALID');
 
     // TODO: extract this to helper function, maybe in clue-manager
     // NOTE: explicit undefined check here is necessary

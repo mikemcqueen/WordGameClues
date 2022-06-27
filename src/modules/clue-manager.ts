@@ -1461,7 +1461,7 @@ export let getCountListArrays = function (nameCsv: string, options: any): any {
     for (const clueCountList of resultList) {
         const sum = clueCountList.reduce((a, b) => a + b);
         const start = new Date();
-        let uniqueCounts = _.uniqBy(clueCountList, _.toNumber);
+        let uniqueCounts = _.uniqBy(clueCountList, _.toNumber); // or just _.uniq ?
         if (0) {
             console.log(`${nameList}`);
             console.log(` sum: ${sum}, countList: ${clueCountList}, uniqueCounts: ${uniqueCounts}`);
@@ -1514,7 +1514,7 @@ export let getCountListArrays = function (nameCsv: string, options: any): any {
             } else {
                 valid.push(clueCountList);
             }
-            addRemoveSet && addRemoveSet.add(sum);
+            if (addRemoveSet) addRemoveSet.add(sum);
         }
     }
     return { valid, known, rejects, invalid, clues, addRemoveSet };
