@@ -1010,7 +1010,7 @@ let getKnownClues = function (nameList: string|string[]): Record<string, Clue.An
 
 //
 
-let getKnownClueNames = function (nameList: string | string[]): string[] {
+export let getKnownClueNames = function (nameList: string | string[]): string[] {
     return _.keys(getKnownClues(nameList));
 };
 

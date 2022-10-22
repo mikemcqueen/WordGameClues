@@ -7,7 +7,8 @@
 //
 
 const _                = require('lodash');
-const ClueManager      = require('../modules/clue-manager');
+const ClueManager      = require('../dist/modules/clue-manager');
+
 const Clues            = require('../modules/clue-types');
 const Debug            = require('debug')('note-merge');
 const Note             = require('../modules/note');
@@ -48,7 +49,11 @@ async function main () {
     const filename = opt.argv[0];
     Debug(`filename: ${filename}`);
 
-    ClueManager.loadAllClues({ clues: Clues.getByOptions(options) });
+    ClueManager.loadAllClues({
+        clues: Clues.getByOptions(options),
+        validateAll: true,
+        fast: true
+    });
 
     if (options['no-filter-urls'])    options.noFilterUrls    = true;
     if (options['no-filter-sources']) options.noFilterSources = true;

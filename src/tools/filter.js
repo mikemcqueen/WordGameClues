@@ -9,7 +9,7 @@
 
 const _            = require('lodash');
 const ChildProcess = require('child_process');
-const ClueManager  = require('../modules/clue-manager');
+const ClueManager  = require('../dist/modules/clue-manager');
 const Clues        = require('../modules/clue-types');
 const Debug        = require('debug')('filter');
 const Dir          = require('node-dir');
@@ -239,7 +239,7 @@ function filterSearchResultDir (dir, fileMatch, options) {
             Debug(`filename: ${filepath}`);
             let wordList = SearchResult.makeWordlist(filepath);
             // filter out rejected word combos
-            if (ClueManager.isRejectSource(wordList)) return next();
+            //if (ClueManager.isRejectSource(wordList)) return next();
             if (!_.isUndefined(options.nameMap) && !isInNameMap(options.nameMap, wordList)) return next();
             // temp
 
@@ -357,7 +357,7 @@ function getPathList (dir, fileMatch, nameMap) {
                 let filename = Path.basename(path);
                 let wordList = SearchResult.makeWordlist(filename);
                 // filter out rejected word combos
-                if (ClueManager.isRejectSource(wordList)) return false;
+                //if (ClueManager.isRejectSource(wordList)) return false;
                 if (!_.isUndefined(nameMap) && !isInNameMap(nameMap, wordList)) return false;
                 return match.test(filename);
             });
@@ -372,7 +372,7 @@ function getPathList (dir, fileMatch, nameMap) {
 function writeFilterResults (resultList, stream, options) {
     Expect(resultList).is.an.Array();
     for (const result of resultList) {
-        if (ClueManager.isRejectSource(result.src)) continue;
+        //if (ClueManager.isRejectSource(result.src)) continue;
         const knownList = ClueManager.getKnownClueNames(result.src);
         if (_.isEmpty(knownList) && _.isEmpty(result.urlList)) continue;
 
@@ -459,7 +459,11 @@ async function main () {
     if (options['known-urls']) options.filter_known_urls = true;
     if (options['add-known']) options.add_known_clues = true;
 
-    ClueManager.loadAllClues({ clues: Clues.getByOptions(options) });
+    ClueManager.loadAllClues({
+        clues: Clues.getByOptions(options),
+        validateAll: true,
+        fast: true
+    });
 
     // default to title filter if no filter specified
     if (!options.article && !options.title) {

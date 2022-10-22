@@ -108,9 +108,9 @@ function loadClues (clues, ignoreErrors, max, fast) {
     ClueManager.loadAllClues({
         clues,
         ignoreErrors,
-	max,
+        max,
         validateAll: true,
-	fast
+        fast
     });
     log('done.');
     return true;
@@ -178,7 +178,7 @@ function doCombos(args) {
         args.sources = _.chain(args.sources).split(',').map(_.toNumber).value();
     }
     if (!_.isUndefined(args.require)) {
-	// is _chain even necessary here?
+    // is _chain even necessary here?
         args.require = _.chain(args.require).split(',').map(_.toNumber).value();
     }
     ComboMaker.makeCombos(args);
@@ -259,34 +259,34 @@ function copyClues (fromType, options = {}) {
     let copied = 0;
     let max = options.max ? options.max : 20;
     for (let count = 2; count < max; ++count) {
-	let list;
-	try {
-	    list = ClueManager.loadClueList(count, { dir });
-	} catch (err) {
-	    if (!_.includes(err.message, 'ENOENT')) throw err;
-	    console.error(err);
+        let list;
+        try {
+            list = ClueManager.loadClueList(count, { dir });
+        } catch (err) {
+            if (!_.includes(err.message, 'ENOENT')) throw err;
+            console.error(err);
             continue;
-	}
-	total += _.size(list);
+        }
+        total += _.size(list);
         //Debug(`count ${count}: size(${_.size(list)})`);
         console.log(`count(${count}):\n${Stringify(list)}`);
-	for (let clue of list) {
-	    const nameList = clue.src.split(',').sort();
+        for (let clue of list) {
+            const nameList = clue.src.split(',').sort();
             let countSet;
             let compound = false;
             if (0) { // fast, but no respeto restrictToSameClueNumberOnly flag
                 const ncLists = ClueManager.fast_getCountListArrays(clue.src, { add: true, fast: true });
-	        if (_.isEmpty(ncLists)) {
-		    Debug(`No matches for: ${clue.src}`);
-		    continue;
-	        }
-	        countSet = ncLists.reduce((countSet, ncList) => {
-		    let sum = ncList.reduce((sum, nc) => { return sum + nc.count; }, 0);
-		    if (sum <= max) countSet.add(sum);
-		    return countSet;
-	        }, new Set());
+                if (_.isEmpty(ncLists)) {
+                    Debug(`No matches for: ${clue.src}`);
+                    continue;
+                }
+                countSet = ncLists.reduce((countSet, ncList) => {
+                    let sum = ncList.reduce((sum, nc) => { return sum + nc.count; }, 0);
+                    if (sum <= max) countSet.add(sum);
+                    return countSet;
+                }, new Set());
             } else { // slower, with respect
-	        const result = ClueManager.getCountListArrays(clue.src, { add: true, fast: true });
+                const result = ClueManager.getCountListArrays(clue.src, { add: true, fast: true });
                 if (!result) {
                     Debug(`No matches for: ${clue.src}`);
                     continue;
@@ -295,30 +295,30 @@ function copyClues (fromType, options = {}) {
                 console.log(` valid(${_.size(result.valid)}) known(${_.size(result.known)}) invalid(${_.size(result.invalid)}) clues(${_.size(result.clues)})`);
                 if (_.isEmpty(result.known) && _.isEmpty(result.valid)) continue;
                 countSet = new Set();
-	        countSet = result.valid.reduce((countSet, countList) => {
-		    let sum = countList.reduce((sum, count) => sum + count, 0);
-		    if (sum <= max) countSet.add(sum);
+                countSet = result.valid.reduce((countSet, countList) => {
+                    let sum = countList.reduce((sum, count) => sum + count, 0);
+                    if (sum <= max) countSet.add(sum);
                     // only add for the current count
-		    //if (sum === count) countSet.add(sum);
-		    return countSet;
-	        }, countSet);
-	        countSet = result.known.reduce((countSet, obj) => {
-		    let sum = obj.countList.reduce((sum, count) => sum + count, 0);
-		    if (sum <= max) countSet.add(sum);
+                    //if (sum === count) countSet.add(sum);
+                    return countSet;
+                }, countSet);
+                countSet = result.known.reduce((countSet, obj) => {
+                    let sum = obj.countList.reduce((sum, count) => sum + count, 0);
+                    if (sum <= max) countSet.add(sum);
                     // only add for the current count
-		    //if (sum === count) countSet.add(sum);
-		    return countSet;
-	        }, countSet);
+                    //if (sum === count) countSet.add(sum);
+                    return countSet;
+                }, countSet);
                 compound = true;
             }
-
-	    Debug(`Adding ${clue.name}:${clue.src}, counts: ${Array.from(countSet)}`);
-	    const added = ClueManager.addRemoveOrReject({
-		add: clue.name,
-		isReject: false,
-	    }, nameList, countSet, { save: options.save, compound });
-	    copied += added;
-	}
+            
+            Debug(`Adding ${clue.name}:${clue.src}, counts: ${Array.from(countSet)}`);
+            const added = ClueManager.addRemoveOrReject({
+                add: clue.name,
+                isReject: false,
+            }, nameList, countSet, { save: options.save, compound });
+            copied += added;
+        }
     }
     console.log(`total: ${total}, copied: ${copied}`);
 }
@@ -350,20 +350,19 @@ function sortAllClues (clueSource, max) {
     const dir = clueSource.baseDir;
     //max = 3;
     for (let count = 2; count < max; ++count) {
-	let list;
-	try {
-	    list = ClueManager.loadClueList(count, { dir });
+        let list;
+        try {
+            list = ClueManager.loadClueList(count, { dir });
             if (!_.isEmpty(list)) {
                 list.sort((a, b) => a.src.localeCompare(b.src));
                 ClueManager.saveClueList(list, count, { dir });
             }
-	} catch (err) {
-	    if (!_.includes(err.message, 'ENOENT')) throw err;
-	    console.error(err);
+        } catch (err) {
+            if (!_.includes(err.message, 'ENOENT')) throw err;
+            console.error(err);
             continue;
-	}
+        }
     }
-
 }
 
 async function main () {
@@ -397,7 +396,7 @@ async function main () {
             showKnownArg ||
             useClueList ||
             options.test ||
-	    options.copy_from ||
+        options.copy_from ||
             options['sort-all-clues'])
         {
             needCount = false;
@@ -432,9 +431,9 @@ async function main () {
 
     if (options.count && !showKnownArg && !altSourcesArg && !allAltSourcesFlag) {
         let countRange = options.count.split(',').map(_.toNumber);
-	options.count_lo = countRange[0];
-	options.count_hi = countRange.length > 1 ? countRange[1] : countRange[0];
-	load_max = options.count_hi;
+        options.count_lo = countRange[0];
+        options.count_hi = countRange.length > 1 ? countRange[1] : countRange[0];
+        load_max = options.count_hi;
     }
 
     setLogging(_.includes(options.verbose, VERBOSE_FLAG_LOAD));
@@ -473,15 +472,15 @@ async function main () {
             }
         });
     } else if (options.test) {
-	let start = new Date();
+    let start = new Date();
         if (options.validate) {
             Components.validate(options.test, options);
         } else {
             Components.show(options);
         }
-	Timing(`count: ${Validator.count}, dupe: ${Validator.dupe}`);
-	const d = new Duration(start, new Date()).milliseconds;
-	Timing(`${PrettyMs(d)}`);
+    Timing(`count: ${Validator.count}, dupe: ${Validator.dupe}`);
+    const d = new Duration(start, new Date()).milliseconds;
+    Timing(`${PrettyMs(d)}`);
 
     } else if (showSourcesClueName) {
         showSources(showSourcesClueName);
@@ -496,9 +495,9 @@ async function main () {
             output : options.output
         });
     } else if (options.copy_from) {
-	const from = Clues.getByVariety(options.copy_from);
-	Debug(`from: ${from.baseDir}`);
-	copyClues(from, options);
+        const from = Clues.getByVariety(options.copy_from);
+        Debug(`from: ${from.baseDir}`);
+        copyClues(from, options);
     } else if (options.count) {
         let sources = options['primary-sources'];
         if (options.inverse) {
@@ -512,12 +511,12 @@ async function main () {
             sources,
             use:     useClueList,
             primary: options.primary,
-	    apple:   options.apple,
-	    final:   options.final,
-	    or:      options.or,
-	    xor:     options.xor,
-	    xormm:   options.xormm,
-	    parallel: options.parallel,
+            apple:   options.apple,
+            final:   options.final,
+            or:      options.or,
+            xor:     options.xor,
+            xormm:   options.xormm,
+            parallel: options.parallel,
             use_syns: options.use_syns,
             synonymMinMax: options.synonymMinMax
         });
