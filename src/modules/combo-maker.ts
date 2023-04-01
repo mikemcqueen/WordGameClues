@@ -11,6 +11,7 @@ const ResultMap   = require('../../types/result-map');
 const Peco        = require('../../modules/peco');
 const Log         = require('../../modules/log')('combo-maker');
 const My          = require('../../modules/util');
+const NativeComboMaker = require('../../native-modules/experiment/build/Release/experiment.node');
 
 const Assert      = require('assert');
 const Debug       = require('debug')('combo-maker');
@@ -69,8 +70,17 @@ interface NCData {
 }
 type NCDataList = NCData[];
 
-// TODO: renaming this "Source" stuff would be welcome. isn't it close to ValidateResult?
+//
+//
 
+type CountArray = Int32Array;
+
+interface CountArrayAndSize {
+    array: CountArray;
+    size: number;
+}
+
+// TODO: renaming this "Source" stuff would be welcome. isn't it close to ValidateResult?
 //
 // TODO: find case where we use this without ncList and comment why ncList isn't here
 //       even though all derived interfaces have an ncList.
@@ -98,16 +108,6 @@ interface SourceData extends SourceBase {
 }
 type SourceList = SourceData[];
 type AnySourceData = LazySourceData | SourceData;
-
-//
-//
-
-type CountArray = Int32Array;
-
-interface CountArrayAndSize {
-    array: CountArray;
-    size: number;
-}
 
 // TODO: or just XorSource here/
 interface UseSourceBase extends SourceBase {
@@ -248,8 +248,19 @@ let sourceListToNcList = (sourceList: AnySourceData[]): NameCount.List => {
 
 //
 //
-let allCountUnique = (nameSrcList1: NameCount.List, nameSrcList2: NameCount.List): boolean => {
-    let set: Set<number> = new Set<number>();
+let allCountUnique = (ncList: NameCount.List): boolean => {
+    let set = new Set<number>();
+    for (let nc of ncList) {
+        if (set.has(nc.count)) return false;
+	set.add(nc.count);
+    }
+    return true;
+}
+
+//
+//
+let allCountUnique2 = (nameSrcList1: NameCount.List, nameSrcList2: NameCount.List): boolean => {
+    let set = new Set<number>();
     for (let nameSrc of nameSrcList1) {
         set.add(nameSrc.count);
     }
@@ -259,7 +270,6 @@ let allCountUnique = (nameSrcList1: NameCount.List, nameSrcList2: NameCount.List
     }
     return true;
 };
-
 
 //
 //
@@ -580,12 +590,25 @@ let filterPropertyCountsOutOfBounds = (nc: NameCount.Type, result: ValidateResul
 //
 let getSourceList = (nc: NameCount.Type, args: MergeArgs): AnySourceData[] => {
     const sourceList: AnySourceData[] = [];
+
     ClueManager.getKnownSourceMapEntries(nc)
         .forEach((sourceData: ClueManager.SourceData) => {
             sourceList.push(...sourceData.results
-                .filter((result: ValidateResult) => filterPropertyCountsOutOfBounds(nc, result, args))
+                //.filter((result: ValidateResult) => filterPropertyCountsOutOfBounds(nc, result, args))
                 .map((result: ValidateResult) => getSourceData(nc, result, args.lazy)));
         });
+/*
+    let ncStr = NameCount.toString(nc);
+    let entries = ClueManager.getKnownSourceMapEntries(nc);
+    if (listIsEmpty(entries)) console.error(`${ncStr}: entries empty`);
+    entries.forEach((sourceData: ClueManager.SourceData) => {
+	if (listIsEmpty(sourceData.results)) console.error(`${ncStr}: sourceData.results empty`);
+	let filtered = sourceData.results;
+//            .filter((result: ValidateResult) => filterPropertyCountsOutOfBounds(nc, result, args));
+//	if (listIsEmpty(filtered)) console.error(`${ncStr}: filtered empty`);
+        sourceList.push(...filtered.map((result: ValidateResult) => getSourceData(nc, result, args.lazy)));
+    });
+*/
     if (AA) {
         console.log(`getSourceList ${NameCount.toString(nc)} (${sourceList.length}):`);
         for (let source of sourceList) console.log(` ncList: ${NameCount.listToString(source.ncList)}`);
@@ -633,7 +656,7 @@ let mergeSources = (source1: AnySourceData, source2: AnySourceData, lazy: boolea
 let mergeCompatibleSources = (source1: AnySourceData, source2: AnySourceData, args: MergeArgs): AnySourceData[] => {
     // TODO: this logic could be part of mergeSources
     // also, uh, isn't there a primarySrcArray I can be using here?
-    return allCountUnique(source1.primaryNameSrcList, source2.primaryNameSrcList)
+    return allCountUnique2(source1.primaryNameSrcList, source2.primaryNameSrcList)
         ? [mergeSources(source1, source2, args.lazy)]
         : [];
 };
@@ -674,13 +697,18 @@ let sourceListHasPropertyCountInBounds = (sourceList: AnySourceData[], minMax: M
 
 //
 //
-let mergeAllCompatibleSources = (ncList: NameCount.List, args: MergeArgs): AnySourceData[] => {
+let mergeAllCompatibleSources = (ncList: NameCount.List, sourceListMap: Map<string, AnySourceData[]> | undefined,
+				 args: MergeArgs): AnySourceData[] => {
     // because **maybe** broken for > 2 below
     Assert(ncList.length <= 2, `${ncList} length > 2 (${ncList.length})`);
     // TODO: reduce (or some) here
-    let sourceList = getSourceList(ncList[0], args);
+    let sourceList = sourceListMap
+	? sourceListMap.get(NameCount.toString(ncList[0])) as AnySourceData[] 
+	: getSourceList(ncList[0], args);
     for (let ncIndex = 1; ncIndex < ncList.length; ++ncIndex) {
-        const nextSourceList = getSourceList(ncList[ncIndex], args);
+        const nextSourceList: AnySourceData[] = sourceListMap
+	    ? sourceListMap.get(NameCount.toString(ncList[ncIndex])) as AnySourceData[]
+	    : getSourceList(ncList[ncIndex], args);
         sourceList = mergeCompatibleSourceLists(sourceList, nextSourceList, args);
         if (!sourceListHasPropertyCountInBounds(sourceList, args.synonymMinMax)) sourceList = [];
         // TODO BUG this is broken for > 2; should be something like: if (sourceList.length !== ncIndex + 1) 
@@ -691,7 +719,8 @@ let mergeAllCompatibleSources = (ncList: NameCount.List, args: MergeArgs): AnySo
 
 //
 //
-let buildSourceListsForUseNcData = (useNcDataLists: NCDataList[], args: MergeArgs): SourceList[] => {
+let buildSourceListsForUseNcData = (useNcDataLists: NCDataList[], sourceListMap: Map<string, AnySourceData[]>,
+				    args: MergeArgs): SourceList[] => {
     let sourceLists: SourceList[] = [];
     // TODO: This is to prevent duplicate sourceLists. I suppose I could use a Set or Map, above?
     let hashList: StringBoolMap[] = [];
@@ -702,7 +731,7 @@ let buildSourceListsForUseNcData = (useNcDataLists: NCDataList[], args: MergeArg
             // give priority to any min/max args specific to an NcData, for example, through --xormm,
             // but fallback to the values we were called with
             const mergeArgs = useNcData.synonymMinMax ? { synonymMinMax: useNcData.synonymMinMax } : args;
-            const sourceList = mergeAllCompatibleSources(useNcData.ncList, mergeArgs) as SourceList;
+            const sourceList = mergeAllCompatibleSources(useNcData.ncList, sourceListMap, mergeArgs) as SourceList;
             for (let source of sourceList) {
                 let key = NameCount.listToString(_.sortBy(source.primaryNameSrcList, NameCount.count));
                 if (!hashList[sourceListIndex][key]) {
@@ -712,6 +741,68 @@ let buildSourceListsForUseNcData = (useNcDataLists: NCDataList[], args: MergeArg
             }
         }
     }
+    return sourceLists;
+};
+
+//
+//
+let empty = 0;
+let getSourceListMap = (useNcDataLists: NCDataList[], args: MergeArgs): Map<string, AnySourceData[]> => {
+    let map = new Map<string, AnySourceData[]>();
+    let numNc = 0;
+    let begin = new Date();
+    for (let ncDataList of useNcDataLists) {
+        for (let [sourceListIndex, useNcData] of ncDataList.entries()) {
+            for (let nc of useNcData.ncList) {
+		//sourceLists.push(getSourceList(nc, args) as SourceList);
+		numNc += 1;
+		const key = NameCount.toString(nc)
+		if (!map.has(key)) {
+		    const sourceList = getSourceList(nc, args);
+		    if (listIsEmpty(sourceList)) {
+			console.error(`${NameCount.toString(nc)}`);
+			empty += 1;
+		    }
+		    map.set(key, sourceList);
+		}
+	    }
+	}
+    }
+    let end = new Duration(begin, new Date()).milliseconds;
+    console.error(` getSourceListMap(${PrettyMs(end)}) nc(${numNc}) unique(${map.size})`);
+    return map;
+}
+
+//
+//
+let getUseSourceLists = (ncDataLists: NCDataList[], args: any): SourceList[] => {
+    if (listIsEmpty(ncDataLists) || listIsEmpty(ncDataLists[0])) return [];
+
+    const mergeArgs = { synonymMinMax: args.synonymMinMax };
+    const sourceListMap = getSourceListMap(ncDataLists, mergeArgs);
+
+    /*
+    let x = 0;
+    for (let entry of sourceListMap.entries()) {
+	console.log(`-------------------`);
+	console.log(`${Stringify(entry)}`);
+	if (x++ === 2) break;
+    }
+    */
+
+    /*
+    let native = new Date();
+    NativeComboMaker.buildSourceListsForUseNcData(ncDataLists, Array.from(sourceListMap.entries()), mergeArgs);
+    let nend = new Duration(native, new Date()).milliseconds;
+    console.error(` Native.buildSLforUseNCD(${PrettyMs(nend)})`);
+    */
+
+    let begin = new Date();
+    // console.log(`ncdatalists(${ncDataLists.length}) [0] = ${Stringify(ncDataLists[0])}`);
+    const sourceLists = buildSourceListsForUseNcData(ncDataLists, sourceListMap, mergeArgs);
+    // console.log(`sourceLists(${sourceLists.length}) [0] (${sourceLists[0].length}) = ${Stringify(sourceLists[0])}`);
+    let end = new Duration(begin, new Date()).milliseconds;
+    console.error(` buildSLforUseNCD(${PrettyMs(end)})`);
     return sourceLists;
 };
 
@@ -728,6 +819,7 @@ let buildSourceListsForUseNcData = (useNcDataLists: NCDataList[], args: MergeArg
 // wrap it in an object like { sourceList, ncCsv }.
 //
 // NOTE: not used, but may use something similar at some point. maybe.
+//
 let buildOrSourceNcCsvMap = (orSourceLists: SourceList[]): SourceNcCsvMap => {
     return orSourceLists.reduce((map: SourceNcCsvMap, sourceList: SourceList, index: number) => {
         // ++INSTRUMENTATION
@@ -764,36 +856,29 @@ let buildOrSourceNcCsvMap = (orSourceLists: SourceList[]): SourceNcCsvMap => {
 // TODO: function name
 //
 const mergeCompatibleXorSources = (indexList: number[], sourceLists: SourceList[]): XorSource[] => {
-    let primaryNameSrcList: NameCount.List = [];
-    let ncList: NameCount.List = [];
     let compatible = true;
+
+    let sources: SourceList = [];
+    let srcSet = new Set<number>();
+    
     // TODO: indexList.some()
     for (let [sourceListIndex, sourceIndex] of indexList.entries()) {
         if (ZZ) console.log(`XOR sourceListIndex(${sourceListIndex}) sourceIndex(${sourceIndex})`);
         const source = sourceLists[sourceListIndex][sourceIndex];
-        if (listIsEmpty(primaryNameSrcList)) {
-            primaryNameSrcList.push(...source.primaryNameSrcList);
-            ncList.push(...source.ncList);
-            if (ZZ) console.log(` XOR pnsl, initial: ${primaryNameSrcList}`);
-        } else {
-            // TODO: hash of primary sources would be faster here. inside inner loop.
-            let combinedNameSrcList = primaryNameSrcList.concat(source.primaryNameSrcList);
-            // TODO: uniqBy da debil
-            if (_.uniqBy(combinedNameSrcList, NameCount.count).length === combinedNameSrcList.length) {
-                primaryNameSrcList = combinedNameSrcList;
-                ncList.push(...source.ncList);
-                if (ZZ) console.log(` XOR pnsl, combined: ${primaryNameSrcList}`);
-            } else {
-                if (ZZ) console.log(` XOR pnsl, emptied: ${primaryNameSrcList}`);
-                compatible = false;
-                break;
-            }
-        }
+	if (!NameCount.listAddCountsToSet(source.primaryNameSrcList, srcSet)) {
+	    compatible = false;
+	    break;
+	}
+	sources.push(source);
     }
     if (compatible) {
-        if (0 || ZZ) console.log(` XOR pnsl, final: ${primaryNameSrcList}, indexList(${indexList.length}): [${indexList}]`);
-        if (ZZ && listIsEmpty(primaryNameSrcList)) console.log(`empty pnsl`);
-        
+	let primaryNameSrcList: NameCount.List = [];
+	let ncList: NameCount.List = [];
+	for (let source of sources) {
+	    primaryNameSrcList.push(...source.primaryNameSrcList);
+	    ncList.push(...source.ncList);
+	}
+
         // I feel like this is still valid and worth removing or commenting
         //Assert(!_.isEmpty(primaryNameSrcList), 'empty primaryNameSrcList');
         let result: XorSource = {
@@ -816,6 +901,7 @@ const mergeCompatibleXorSources = (indexList: number[], sourceLists: SourceList[
 // TODO function name,
 let mergeCompatibleXorSourceCombinations = (sourceLists: SourceList[]/*, args: MergeArgs*/): XorSource[] => {
     if (listIsEmpty(sourceLists)) return [];
+    let begin = new Date();
     const numEmptyLists = listGetNumEmptySublists(sourceLists);
     if (numEmptyLists > 0) {
         // TODO: sometimes a sourceList is empty, like if doing $(cat required) with a
@@ -829,21 +915,18 @@ let mergeCompatibleXorSourceCombinations = (sourceLists: SourceList[]/*, args: M
         listArray,
         max: 99999
     });
+    let combos = 0;
     let sourceList: XorSource[] = [];
-    for (let indexList = peco.firstCombination(); indexList; indexList = peco.nextCombination()) {
+    for (let indexList = peco.firstCombination(); indexList; ) {
         //if (ZZ) console.log(`iter (${iter}), indexList: ${stringify(indexList)}`);
         const mergedSources: XorSource[] = mergeCompatibleXorSources(indexList, sourceLists);
         sourceList.push(...mergedSources);
+	indexList = peco.nextCombination();
+	combos += 1;
     }
+    let end = new Duration(begin, new Date()).milliseconds;
+    console.error(` merge(${PrettyMs(end)}), combos(${combos})`);
     return sourceList;
-};
-
-//
-//
-let getUseSourceLists = (ncDataLists: NCDataList[], args: any): SourceList[] => {
-    if (listIsEmpty(ncDataLists) || listIsEmpty(ncDataLists[0])) return [];
-    const sourceLists = buildSourceListsForUseNcData(ncDataLists, { synonymMinMax: args.synonymMinMax });
-    return sourceLists;
 };
 
 //
@@ -1228,7 +1311,7 @@ let getCombosForUseNcLists = (sum: number, max: number, pcd: PreComputedData, ar
             let cacheHit = false;
             let sourceList: AnySourceData[];
             if (!hash[key]) {
-                sourceList = mergeAllCompatibleSources(result.ncList!, lazyMergeArgs); // as LazySourceData[];
+                sourceList = mergeAllCompatibleSources(result.ncList!, undefined, lazyMergeArgs); // as LazySourceData[];
                 if (_.isEmpty(sourceList)) ++numMergeIncompatible;
                 //console.log(`$$ sources: ${Stringify2(sourceList)}`);
                 hash[key] = { sourceList };
@@ -1648,12 +1731,37 @@ let markAllXORCompatibleOrSources = (xorSourceList: XorSource[], orSourceList: O
 //
 let buildUseSourceListsFromNcData = (args: any): UseSourceLists => {
     // XOR first
-    let xorSourceList = mergeCompatibleXorSourceCombinations(getUseSourceLists(args.allXorNcDataLists, args));
-    console.error(`xorSourceList(${xorSourceList.length})`);
+
+    /*
+    console.log(`args.allXorNcDataLists(${args.allXorNcDataLists.length})`);
+    let y = 0;
+    for (let ncDataList of args.allXorNcDataLists) {
+	console.log(`${Stringify(ncDataList)},`);
+	//if (y++ === 2) break;
+    }
+    */
+
+    //
+    const mergeArgs = { synonymMinMax: args.synonymMinMax };
+    const sourceListMap = getSourceListMap(args.allXorNcDataLists, mergeArgs);
+    let native = new Date();
+    NativeComboMaker.mergeCompatibleXorSourceCombinations(args.allXorNcDataLists, Array.from(sourceListMap.entries()));
+    let nend = new Duration(native, new Date()).milliseconds;
+    console.error(` Native.mergeCompatibleXorSourceCombinations(${PrettyMs(nend)})`);
+    //
+
+    let merge = new Date();
+    let sourceLists = getUseSourceLists(args.allXorNcDataLists, args);
+    console.error(`  sourceLists(${sourceLists.length}), sourceLists[0].length(${sourceLists[0].length})`);
+    let xorSourceList = mergeCompatibleXorSourceCombinations(sourceLists);
+    let dmerge = new Duration(merge, new Date()).milliseconds;
+    console.error(`xorSourceList(${xorSourceList.length}), total(${PrettyMs(dmerge)})`);
 
     // OR next
+    let build = new Date();
     let orSourceList = buildOrSourceList(getUseSourceLists(args.allOrNcDataLists, args));
-    console.error(`orSourceList(${orSourceList.length})`);
+    let dbuild = new Duration(build, new Date()).milliseconds;
+    console.error(`orSourceList(${orSourceList.length}), build(${PrettyMs(dbuild)})`);
     //console.log(`orSourceList: ${Stringify2(orSourceList)}`);
 
     // Thoughts on AND compatibility of OrSources:
@@ -1665,7 +1773,10 @@ let buildUseSourceListsFromNcData = (args: any): UseSourceLists => {
     // So, a container can be marked compatible if and only if there are no
     // no remaining XOR-compatible sourceLists.
     //TODO: markAllANDCompatibleOrSources(xorSourceList, orSourceList);
+    let mark = new Date();
     markAllXORCompatibleOrSources(xorSourceList, orSourceList);
+    let dmark = new Duration(mark, new Date()).milliseconds;
+    console.error(`mark(${PrettyMs(dmark)})`);
 
     /*
     if (1) {
@@ -1698,12 +1809,22 @@ let getOrSourcesNcCsvCountMap = (useSourcesList: UseSource[]): Map<string, numbe
 //
 //
 let preCompute = (args: any): PreComputedData => {
-   let begin = new Date();
+    let begin = new Date();
+    let build1 = new Date();
     args.allXorNcDataLists = buildCombinedUseNcDataLists(args.xor, args.xormm);
+    let d1 = new Duration(build1, new Date()).milliseconds;
+    console.error(` build1(${PrettyMs(d1)})`);
     //console.error(`allXorNcDataLists(${args.allXorNcDataLists.length})`);
+
+    let build2 = new Date();
     args.allOrNcDataLists = args.or ? buildAllUseNcDataLists(args.or) : [ [] ];
+    let d2 = new Duration(build2, new Date()).milliseconds;
+    console.error(` build2(${PrettyMs(d2)})`);
     
+    let build3 = new Date();
     let useSourceLists = buildUseSourceListsFromNcData(args);
+    let d3 = new Duration(build3, new Date()).milliseconds;
+    console.error(` build3(${PrettyMs(d3)})`);
 
     /*
     // TODO: there is a faster way to generate this map, in mergeOrSources or something.

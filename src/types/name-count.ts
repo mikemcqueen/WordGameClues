@@ -103,6 +103,16 @@ export function listToCountList (ncList: NameCount[]): number[] {
 
 //
 
+export function listAddCountsToSet (ncList: NameCount[], set: Set<number>): boolean {
+    for (let nc of ncList) {
+	if (set.has(nc.count)) return false;
+	set.add(nc.count);
+    }
+    return true;
+}
+
+//
+
 export function makeCanonicalName (name: string, count: number, index?: number): string {
     let s = name;
     if (count) {
