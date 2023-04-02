@@ -1,3 +1,4 @@
+#include <chrono>
 #include <functional>
 #include <vector>
 #include <memory>
@@ -349,29 +350,47 @@ auto getNumEmptySublists(const std::vector<SourceList>& sourceLists) {
   return count;
 }
 
+void call(int x) {
+  if (x > 1'000'000'000) cerr << "big" << endl;
+}
+
 XorSourceList mergeCompatibleXorSourceCombinations(const std::vector<SourceList>& sourceLists) {
   if (sourceLists.empty()) return {};
   assert((getNumEmptySublists(sourceLists) == 0) && "mergeCompatibleXorSourceCombinations: empty sublist");
-  std::vector<int> lengths{};
+  std::vector<uint32_t> lengths{};
   for (const auto& sl : sourceLists) {
     lengths.push_back(sl.size());
   }
-  auto combos = 0;
+  int combos = 0;
   XorSourceList sourceList{};
-  auto peco = std::make_unique<Peco>(lengths);
-  for (auto indexList = peco->first_combination(); !indexList->empty();
-       indexList = peco->next_combination())
+  Peco<4> peco(lengths);
+  for (auto indexList = peco.first_combination(); indexList;
+       indexList = peco.next_combination())
   {
     //cout << "indexList(" << indexList.size() << "): " << vec_to_string(indexList) << endl;
+    /*
     XorSourceList mergedSources{};// = mergeCompatibleXorSources(indexList, sourceLists);
     if (!mergedSources.empty()) {
       sourceList.emplace_back(std::move(mergedSources.back()));
     }
+    */
     ++combos;
   }
   cerr << " Native combos(" << combos << "), XorSources(" << sourceList.size() << ")" << endl;
 
-  for (auto i = 0; i < 73939320; ++i ) ;
+  using namespace std::chrono;
+  auto t0 = high_resolution_clock::now();
+  for (auto i = 0; i < 73939320; ++i ) {
+    auto x = i * 3;
+    if (x % 2) {
+      x++;
+    }
+    call(x);
+  }
+  auto t1 = high_resolution_clock::now();
+  //  cout << "duration: " << duration_cast<duration>(t1-t0).count() << endl;
+  auto d = duration_cast<milliseconds>(t1-t0).count();
+  cerr << " Native loop: " << d << "ms" << endl;
 
   return sourceList;
 }
