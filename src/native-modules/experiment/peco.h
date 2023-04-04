@@ -6,54 +6,45 @@
 #include <vector>
 //#include <span>
 
-template<int MaxLength>
 class Peco {
 public:
   // todo: std::span
-  Peco(std::vector<uint32_t>& lengths) :
-    size_((int)lengths.size())
-  {
-    for (auto i = 0u; i < lengths.size(); ++i) {
-      lengths_[i] = lengths[i];
+  Peco(std::vector<int>& lengths) : lengths_(std::move(lengths)) {
+    max_ = 1;
+    for (const auto len : lengths_) {
+      max_ *= len;
     }
-    reset_state();
+    indices_.resize(lengths_.size());
   }
 
-  using take_type = std::uint32_t*;
-
   //const?
+  using take_type = std::vector<int>*;
+
   take_type first_combination() {
+    index_ = 0;
     reset_indices();
     return take();
   }
 
-  //const?
   take_type next_combination() {
-    if (indices_[0] < lengths_[0]) {
-      for (int i = size_ - 1; i >= 0; --i) {
-	indices_[i]++;
-	if (i > 0 && indices_[i] == lengths_[i]) {
-	  indices_[i] = 0;
-	  continue;
-	}
-	break;
-      }
-    }
+    if (index_ < max_) ++index_;
     return take();
   }
 
 private:
-  //const?
   take_type take() {
-    if (indices_[0] < lengths_[0]) {
-      return indices_.data();
+    if (index_ == max_) return nullptr;
+    int remain = index_;
+    for (int i = (int)lengths_.size() - 1; i >= 0; --i) {
+      auto val = remain % lengths_[i];
+      indices_[i] = val;
+      if (val > 0) break;
+      remain /= lengths_[i];
     }
-    return nullptr;
+    return &indices_;
   }
 
   void reset_state() {
-    //indices_.resize(size_);
-    reset_indices();
     //    state_.resize(lengths_.size());
     //result_.resize(lengths_.size());
     /*
@@ -64,8 +55,8 @@ private:
   }
 
   void reset_indices() {
-    //std::fill(indices_.begin(), indices_.begin() + size_, 0);
-    indices_.fill(0);
+    std::fill(indices_.begin(), indices_.begin() + lengths_.size(), 0);
+    //indices_.fill(0);
   }
 
   /*
@@ -76,9 +67,10 @@ private:
   }
   */
 
-  std::array<std::uint32_t, MaxLength> lengths_;
-  std::array<std::uint32_t, MaxLength> indices_;
-  int size_;
+  std::vector<int> lengths_;
+  std::vector<int> indices_;
+  int max_;
+  int index_;
   //std::vector<std::vector<int>> state_;
   //std::vector<int> result_;
 };

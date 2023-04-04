@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <chrono>
 #include <functional>
 #include <vector>
@@ -51,10 +52,15 @@ let mergeSources = (source1: AnySourceData, source2: AnySourceData, lazy: boolea
 };
 #endif
 
+int merges = 0;
+int list_merges = 0;
 SourceData mergeSources(const SourceData& source1, const SourceData& source2) {
+  merges++;
   NameCountList primaryNameSrcList(source1.primaryNameSrcList);
   primaryNameSrcList.insert(primaryNameSrcList.end(), source2.primaryNameSrcList.begin(),
 			    source2.primaryNameSrcList.end());
+
+  SourceBits primarySrcBits = source1.primarySrcBits | source2.primarySrcBits;
 
   NameCountList ncList(source1.ncList);
   ncList.insert(ncList.end(), source2.ncList.begin(), source2.ncList.end());
@@ -65,7 +71,7 @@ SourceData mergeSources(const SourceData& source1, const SourceData& source2) {
   
   //synonymCounts: Clue.PropertyCounts.merge(source1.synonymCounts, source2.synonymCounts),
   //mergedSource.ncCsv = NameCount.listToSortedString(ncList);
-  return { primaryNameSrcList, ncList, sourceNcCsvList };
+  return { primaryNameSrcList, primarySrcBits, ncList, sourceNcCsvList };
 }
 
 #if 0
@@ -94,29 +100,19 @@ let mergeCompatibleSourceLists = (sourceList1: AnySourceData[], sourceList2: Any
 };
 #endif
 
-bool allCountsUnique(const NameCountList& ncList1, const NameCountList& ncList2) {
-  std::unordered_set<int> hash{};
-  for (const auto& nc : ncList1) {
-    hash.insert(nc.count);
-  }
-  for (const auto& nc : ncList2) {
-    if (hash.find(nc.count) != hash.end()) return false;
-  }
-  return true;
-}
-
 auto mergeCompatibleSourceLists(const SourceList& sourceList1, const SourceList& sourceList2) {
+  list_merges++;
   SourceList result;
   for (const auto& s1 : sourceList1) {
     for (const auto& s2 : sourceList2) {
-      if (allCountsUnique(s1.primaryNameSrcList, s2.primaryNameSrcList)) {
+      if ((s1.primarySrcBits & s2.primarySrcBits).none()) {
+	cout << "!";
 	result.emplace_back(std::move(mergeSources(s1, s2)));
       }
     }
   }
   return result;
 }
-
 
 #if 0
 //
@@ -142,196 +138,116 @@ let mergeAllCompatibleSources = (ncList: NameCount.List, sourceListMap: Map<stri
 };
 #endif
 
+// for ncList.size() > 1, not used atm
 SourceList mergeAllCompatibleSources(const NameCountList& ncList, const SourceListMap& sourceListMap) {
-  //const auto& firstSourceList 
-  // TODO: unnecessary copy except in special case where ncList.size() == 1, rare
+  // TODO: unnecessary copy, ncList.size() == 1, is common case.
+  // TODO: possible small improvement: first walk through all NCs and make sure they
+  // are compatible before doing any merging.
+  // TODO: next improvement: use primarySrcBits and, what, map<bits, SouurceList> ?
+  // or do we need two maps, one for aliased srcBits?, map<bits, map<string, SourceList>>?
+  // because **maybe** broken for > 2 below
+  assert(ncList.size() <= 2 && "ncList.length > 2");
   SourceList sourceList = sourceListMap.at(ncList[0].toString());
   for (auto i = 1u; i < ncList.size(); ++i) {
-    const auto& prevSourceList = /*(i == 1u) ? firstSourceList : */ sourceList;
     const auto& nextSourceList = sourceListMap.at(ncList[i].toString());
-    sourceList = std::move(mergeCompatibleSourceLists(prevSourceList, nextSourceList));
+    sourceList = std::move(mergeCompatibleSourceLists(sourceList, nextSourceList));
+    // TODO BUG this is broken for > 2; should be something like: if (sourceList.length !== ncIndex + 1) 
     if (sourceList.empty()) break;
   }
   return sourceList;
 }
 
-#if 0
-//
-//
-let buildSourceListsForUseNcData = (useNcDataLists: NCDataList[], sourceListMap: Map<string, AnySourceData[]>,
-				    args: MergeArgs): SourceList[] => {
-    let sourceLists: SourceList[] = [];
-    // TODO: This is to prevent duplicate sourceLists. I suppose I could use a Set or Map, above?
-    let hashList: StringBoolMap[] = [];
-    for (let ncDataList of useNcDataLists) {
-        for (let [sourceListIndex, useNcData] of ncDataList.entries()) {
-            if (!sourceLists[sourceListIndex]) sourceLists.push([]);
-            if (!hashList[sourceListIndex]) hashList.push({});
-            // give priority to any min/max args specific to an NcData, for example, through --xormm,
-            // but fallback to the values we were called with
-            const mergeArgs = useNcData.synonymMinMax ? { synonymMinMax: useNcData.synonymMinMax } : args;
-            const sourceList = mergeAllCompatibleSources(useNcData.ncList, sourceListMap, mergeArgs) as SourceList;
-            for (let source of sourceList) {
-                let key = NameCount.listToString(_.sortBy(source.primaryNameSrcList, NameCount.count));
-                if (!hashList[sourceListIndex][key]) {
-                    sourceLists[sourceListIndex].push(source as SourceData);
-                    hashList[sourceListIndex][key] = true;
-                }
-            }
-        }
-    }
-    return sourceLists;
-};
-#endif
+const SourceList& getSourceList(const NameCountList& ncList, const SourceListMap& sourceListMap) {
+  assert((ncList.size() == 1) && "not implemented, but could be easily");
+  return sourceListMap.at(ncList[0].toString());
+}
 
-std::vector<SourceList> buildSourceListsForUseNcData(
+std::vector<SourceRefList> buildSourceListsForUseNcData(
   const vector<NCDataList>& useNcDataLists, const SourceListMap& sourceListMap)
 {
   using StringSet = std::unordered_set<std::string>;
+  using BitsToStringSetMap = std::unordered_map<SourceBits, StringSet>;
+
+  srand(-1);
+  int total = 0;
+  int hash_hits = 0;
+  int synonyms = 0;
   auto size = useNcDataLists[0].size();
-  std::vector<StringSet> hashList(size);
-  std::vector<SourceList> sourceLists(size);
-  //cout << "useNcDataLists.size(" << useNcDataLists.size() << ")" << endl;
+  std::vector<BitsToStringSetMap> hashList(size);
+  std::vector<SourceRefList> sourceLists(size);
   for (const auto& ncDataList : useNcDataLists) {
-    //cout << "  ncDataList.size(" << ncDataList.size() << ")" << endl;
     for (auto i = 0u; i < ncDataList.size(); ++i) {
-      auto sourceList = mergeAllCompatibleSources(ncDataList[i].ncList, sourceListMap);
-      //cout << "    sourceList.size(" << sourceList.size() << ")" << endl;
-      for (auto& source : sourceList) {
-	std::sort(source.primaryNameSrcList.begin(), source.primaryNameSrcList.end(),
-		  [](const auto& a, const auto& b){ return a.count < b.count; });
-	const auto key = NameCount::listToString(source.primaryNameSrcList);
-	//cout << "key: " << key << endl;
-	if (hashList[i].find(key) == hashList[i].end()) {
-	  //cout << "  ADDING!: " << key << endl;
-	  sourceLists[i].emplace_back(std::move(source));
-	  hashList[i].insert(key);
+      // for size == 2: return by value; could return reference to static local in a pinch
+      //auto sourceList = mergeAllCompatibleSources(ncDataList[i].ncList, sourceListMap);
+      const auto& sourceList = getSourceList(ncDataList[i].ncList, sourceListMap);
+      total += sourceList.size();
+      for (const auto& source : sourceList) {
+	// TODO: NOT GOOD ENOUUGH. still need a set of strings in value type.
+	// HOWEVER, instead of listToSring'ing 75 million lists, how about we
+	// mark "duplicate count, different name", i.e. "aliased" sources in 
+	// clue-manager, and only listToString and add those to a separate
+	// map<bitset, set<String>> for ncLists with "shared" primarySrcBits.
+	// probably don't need a separate map. just don't bother populating
+	// and looking in the set unless its an aliased source.
+	auto it = hashList[i].find(source.primarySrcBits);
+	if (it != hashList[i].end()) {
+	  hash_hits++;
+#if 0
+	  if (it->second.find(key) != it->second.end()) continue;
+	  synonyms++;
+	  cout << "synonyms:" << endl << " " << key << endl
+	       << " " << *it->second.begin() << endl << endl;
+#endif
+	  continue;
 	}
+	hashList[i][source.primarySrcBits] = StringSet{};
+	//it = hashList[i].find(source.primarySrcBits);
+	//it->second.insert(key);
+	//sourceLists[i].emplace_back(std::move(source));
+	sourceLists[i].emplace_back(SourceRef(source));
       }
     }
   }
+  cerr << " hash_hits: " << hash_hits << ", synonyms: " << synonyms
+       << ", total: " << total << ", list_merges: " << list_merges 
+       << ", source_merges: " << merges << ", sourceLists: " << sourceLists.size() 
+       << ", " << std::accumulate(sourceLists.begin(), sourceLists.end(), 0u,
+	  [](size_t total, const SourceRefList& list){ return total + list.size(); }) << endl;
   return sourceLists;
 }
 
-#if 0
-const mergeCompatibleXorSources = (indexList: number[], sourceLists: SourceList[]): XorSource[] => {
-    let compatible = true;
-
-    let sources: SourceList = [];
-    let srcSet = new Set<number>();
-
-    // TODO: indexList.some()
-    for (let [sourceListIndex, sourceIndex] of indexList.entries()) {
-        if (ZZ) console.log(`XOR sourceListIndex(${sourceListIndex}) sourceIndex(${sourceIndex})`);
-        const source = sourceLists[sourceListIndex][sourceIndex];
-        if (!NameCount.listAddCountsToSet(source.primaryNameSrcList, srcSet)) {
-            compatible = false;
-            break;
-        }
-        sources.push(source);
-    }
-    if (compatible) {
-        let primaryNameSrcList: NameCount.List = [];
-        let ncList: NameCount.List = [];
-        for (let source of sources) {
-            primaryNameSrcList.push(...source.primaryNameSrcList);
-            ncList.push(...source.ncList);
-        }
-
-        // I feel like this is still valid and worth removing or commenting
-        //Assert(!_.isEmpty(primaryNameSrcList), 'empty primaryNameSrcList');
-        let result: XorSource = {
-            primaryNameSrcList,
-            primarySrcArray: listToCountArray(primaryNameSrcList),
-            ncList
-        };
-        if (ZZ) {
-            console.log(` XOR compatible: true, adding` +
-                ` pnsl[${NameCount.listToString(result.primaryNameSrcList)}]`);
-        }
-        return [result];
-    } else {
-        if (ZZ) console.log(` XOR compatible: false`);
-    }
-    return [];
-}
-#endif
-
-bool addCountsToSet(const NameCountList& ncList, std::unordered_set<int>& countSet) {
-  for (const auto& nc : ncList) {
-    if (countSet.find(nc.count) != countSet.end()) return false;
-    countSet.insert(nc.count);
-  }
-  return true;
-}
-
 XorSourceList mergeCompatibleXorSources(const std::vector<int>& indexList,
-					const std::vector<SourceList>& sourceLists)
+  const std::vector<SourceRefList>& sourceLists)
 {
-  bool compatible = true;
-  std::vector<std::reference_wrapper<const SourceData>> sources{};
-  /*
-  std::unordered_set<int> srcSet{};
+  // this part is inner-loop (100s of millions potentially) and should be fast
+  // probably should make it a separate function
+  SourceRefList sources{};
+  SourceBits bits{};
   for (auto i = 0u; i < indexList.size(); ++i) {
-    const auto& source = sourceLists[i][indexList[i]];
-    if (!addCountsToSet(source.primaryNameSrcList, srcSet)) {
-      compatible = false;
-      break;
-    }
-    sources.push_back(std::reference_wrapper(source));
+    const auto sourceRef = sourceLists[i][indexList[i]]; // reference, uh, optional here?
+    if ((bits & sourceRef.get().primarySrcBits).any()) return {};
+    bits |= sourceRef.get().primarySrcBits;
+    sources.push_back(sourceRef);
   }
-  */compatible = false;
+  // below here is called much less often, less speed critical
+
+  NameCountList primaryNameSrcList{};
+  NameCountList ncList{};
+  for (const auto sourceRef : sources) {
+    const auto& pnsl = sourceRef.get().primaryNameSrcList;
+    primaryNameSrcList.insert(primaryNameSrcList.end(), pnsl.begin(), pnsl.end()); // copy (by design?)
+    const auto& ncl = sourceRef.get().ncList;
+    ncList.insert(ncList.end(), ncl.begin(), ncl.end());                           // copy (by design?)
+  }
+  // I feel like this is still valid and worth removing or commenting
+  assert(!primaryNameSrcList.empty() && "empty primaryNameSrcList");
+
   XorSourceList result{};
-  if (compatible) {
-    NameCountList primaryNameSrcList{};
-    NameCountList ncList{};
-    for (const auto sourceRef : sources) {
-      // copy (by design?)
-      const auto& pnsl = sourceRef.get().primaryNameSrcList;
-      primaryNameSrcList.insert(primaryNameSrcList.end(), pnsl.begin(), pnsl.end());
-      const auto& ncl = sourceRef.get().ncList;
-      ncList.insert(ncList.end(), ncl.begin(), ncl.end());
-    }
-    // I feel like this is still valid and worth removing or commenting
-    //Assert(!_.isEmpty(primaryNameSrcList), 'empty primaryNameSrcList');
-    // TODO: can optimize with move constructor, only called ~1500 times tho (currently)
-    XorSource mergedSource{ primaryNameSrcList, ncList,
-      NameCount::listToCountSet(primaryNameSrcList) };
-    result.emplace_back(std::move(mergedSource));
-  }
+  XorSource mergedSource{ primaryNameSrcList, ncList,
+    NameCount::listToCountSet(primaryNameSrcList) }; // TODO: bitset?
+  result.emplace_back(std::move(mergedSource));
   return result;
 }
-
-#if 0
-// TODO function name,
-let mergeCompatibleXorSourceCombinations = (sourceLists: SourceList[]/*, args: MergeArgs*/): XorSource[] => {
-    if (listIsEmpty(sourceLists)) return [];
-    let begin = new Date();
-    const numEmptyLists = listGetNumEmptySublists(sourceLists);
-    if (numEmptyLists > 0) {
-        // TODO: sometimes a sourceList is empty, like if doing $(cat required) with a
-        // low clue count range (e.g. -c2,4). should that even be allowed?
-        Assert(false, `numEmpty(${numEmptyLists}), numLists(${sourceLists.length})`);
-    }
-    let listArray = sourceLists.map(sourceList => [...Array(sourceList.length).keys()]);
-    if (ZZ) console.log(`listArray(${listArray.length}): ${Stringify2(listArray)}`);
-    //console.log(`sourceLists(${sourceLists.length}): ${Stringify2(sourceLists)}`);
-    const peco = Peco.makeNew({
-        listArray,
-        max: 99999
-    });
-    let sourceList: XorSource[] = [];
-    for (let indexList = peco.firstCombination(); indexList; ) {
-        //if (ZZ) console.log(`iter (${iter}), indexList: ${stringify(indexList)}`);
-        const mergedSources: XorSource[] = mergeCompatibleXorSources(indexList, sourceLists);
-        sourceList.push(...mergedSources);
-        indexList = peco.nextCombination();
-    }
-    let end = new Duration(begin, new Date()).milliseconds;
-    console.error(` merge(${PrettyMs(end)})`);
-    return sourceList;
-};
-#endif
 
 std::string vec_to_string(const vector<int>& v) {
   std::string result{};
@@ -342,56 +258,43 @@ std::string vec_to_string(const vector<int>& v) {
   return result;
 }
 
-auto getNumEmptySublists(const std::vector<SourceList>& sourceLists) {
-  int count = 0;
+auto getNumEmptySublists(const std::vector<SourceRefList>& sourceLists) {
+  auto count = 0;
   for (const auto& sl : sourceLists) {
     if (sl.empty()) count++;
   }
   return count;
 }
 
-void call(int x) {
-  if (x > 1'000'000'000) cerr << "big" << endl;
-}
+XorSourceList mergeCompatibleXorSourceCombinations(
+  const std::vector<SourceRefList>& sourceLists)
+{
+  using namespace std::chrono;
 
-XorSourceList mergeCompatibleXorSourceCombinations(const std::vector<SourceList>& sourceLists) {
   if (sourceLists.empty()) return {};
   assert((getNumEmptySublists(sourceLists) == 0) && "mergeCompatibleXorSourceCombinations: empty sublist");
-  std::vector<uint32_t> lengths{};
+  std::vector<int> lengths{};
   for (const auto& sl : sourceLists) {
     lengths.push_back(sl.size());
   }
   int combos = 0;
   XorSourceList sourceList{};
-  Peco<4> peco(lengths);
+  Peco peco(lengths);
+  auto peco0 = high_resolution_clock::now();
   for (auto indexList = peco.first_combination(); indexList;
        indexList = peco.next_combination())
   {
-    //cout << "indexList(" << indexList.size() << "): " << vec_to_string(indexList) << endl;
-    /*
-    XorSourceList mergedSources{};// = mergeCompatibleXorSources(indexList, sourceLists);
+    XorSourceList mergedSources = mergeCompatibleXorSources(*indexList, sourceLists);
     if (!mergedSources.empty()) {
       sourceList.emplace_back(std::move(mergedSources.back()));
     }
-    */
     ++combos;
   }
-  cerr << " Native combos(" << combos << "), XorSources(" << sourceList.size() << ")" << endl;
-
-  using namespace std::chrono;
-  auto t0 = high_resolution_clock::now();
-  for (auto i = 0; i < 73939320; ++i ) {
-    auto x = i * 3;
-    if (x % 2) {
-      x++;
-    }
-    call(x);
-  }
-  auto t1 = high_resolution_clock::now();
-  //  cout << "duration: " << duration_cast<duration>(t1-t0).count() << endl;
-  auto d = duration_cast<milliseconds>(t1-t0).count();
-  cerr << " Native loop: " << d << "ms" << endl;
-
+  auto peco1 = high_resolution_clock::now();
+  auto d_peco = duration_cast<milliseconds>(peco1 - peco0).count();
+  cerr << " Native peco loop: " << d_peco << "ms" << ", combos: " << combos
+       << ", XorSources: " << sourceList.size() << endl;
+  
   return sourceList;
 }
 

@@ -1,6 +1,7 @@
 #ifndef include_combo_maker_h
 #define include_combo_maker_h
 
+#include <bitset>
 #include <vector>
 #include <string>
 #include <unordered_map>
@@ -8,6 +9,9 @@
 #include <napi.h>
 
 namespace cm {
+
+constexpr auto kMaxPrimarySources = 111;
+using SourceBits = std::bitset<kMaxPrimarySources>;
 
 struct NameCount {
   std::string name;
@@ -30,12 +34,31 @@ struct NameCount {
     return buf;
   }
 
+  static std::string listToString(const std::vector<const NameCount*>& list) {
+    char buf[1280] = { 0 };
+    for (auto it = list.cbegin(); it != list.cend(); ++it) {
+      strcat(buf, (*it)->toString().c_str());
+      if ((it + 1) != list.cend()) {
+	strcat(buf, ",");
+      }
+    }
+    return buf;
+  }
+
   static auto listToCountSet(const std::vector<NameCount>& list) {
     std::unordered_set<int> count_set;
     for (const auto& nc : list) {
       count_set.insert(nc.count);
     }
     return count_set;
+  }
+
+  static auto listToSourceBits(const std::vector<NameCount>& list) {
+    SourceBits bits{};
+    for (const auto& nc : list) {
+      bits.set(nc.count);
+    }
+    return bits;
   }
 
 };
@@ -50,6 +73,7 @@ using NCDataList = std::vector<NCData>;
 
 struct SourceData {
   std::vector<NameCount> primaryNameSrcList;
+  SourceBits primarySrcBits;
   std::vector<NameCount> ncList;
   std::vector<std::string> sourceNcCsvList;
   // synonymCounts
@@ -57,6 +81,8 @@ struct SourceData {
 
 using SourceList = std::vector<SourceData>;
 using SourceListMap = std::unordered_map<std::string, SourceList>;
+using SourceRef = std::reference_wrapper<const SourceData>;
+using SourceRefList = std::vector<SourceRef>;
 
 struct XorSource {
   std::vector<NameCount> primaryNameSrcList;
@@ -70,11 +96,12 @@ using StringList = std::vector<std::string>;
 
 //
  
-std::vector<SourceList> buildSourceListsForUseNcData(
-  const std::vector<NCDataList>& useNcDataLists, const SourceListMap& sourceListMap);
+std::vector<SourceRefList> buildSourceListsForUseNcData(
+  const std::vector<NCDataList>& useNcDataLists,
+  const SourceListMap& sourceListMap);
 
-XorSourceList mergeCompatibleXorSourceCombinations(const std::vector<SourceList>& sourceLists);
-
+XorSourceList mergeCompatibleXorSourceCombinations(
+  const std::vector<SourceRefList>& sourceLists);
 
 #if 0
 template <typename T>

@@ -1,0 +1,3 @@
+* combo-maker is calling buildSrcNcCsv list a lot in "maker" phase. I thought we did this
+  in PreCompute phase? Is it really necessary in maker phase?
+  

@@ -264,7 +264,7 @@ export let loadAllClues = function (args: any): void {
     for (let count = 2; count <= State.numPrimarySources; ++count) {
         let compoundClueList: ClueList.Compound = loadClueList(count);
     State.clueListArray[count] = compoundClueList;
-        addKnownCompoundClues(compoundClueList, count, args.validateAll, args.fast);
+        addKnownCompoundClues(compoundClueList, count, args);
     }
 
     /*
@@ -468,11 +468,63 @@ let initPropertyCountsInAllResults = (nc: NameCount.Type, results: ValidateResul
         propertyCounts[Clue.PropertyName.Homonym] =
             computeResultPropertyCounts(nc, result.resultMap.internal_map, Clue.PropertyName.Homonym);
         result.propertyCounts = propertyCounts as Clue.PropertyCounts.Map;
-        /*
-        if (NameCount.toString(nc) === 'town:2') {
-            console.error(`${NameCount.toString(nc)} init props: ${Stringify2(result.propertyCounts[Clue.PropertyName.Synonym])}`);
-        }
-        */
+    }
+};
+
+//
+//
+let funnyBusiness = (set: Set<string>, nameSrcList: NameCount.List) : boolean => {
+    for (let ncCsv of set.values()) {
+	const ncList = NameCount.makeListFromCsv(ncCsv);
+	Assert(ncList.length === nameSrcList.length);
+	let conflicts: string[][] = [];
+	for (let i = 0; i < ncList.length; ++i) {
+	    if (ncList[i].name != nameSrcList[i].name) {
+		conflicts.push([ncList[i].name, nameSrcList[i].name]);
+	    }
+	}
+	// 1 is always bad. **probably** same with 3 but not proven.
+	// 2 and 4 are recoverable. only works for 2 for now (lazy).
+	// ex: [ 'low' (13), 'owl' (70) ], [ 'owl' (13), 'low' (70) ]
+	if ((conflicts.length != 2) ||
+	    (conflicts[0][0] != conflicts[1][1]) ||
+	    (conflicts[0][1] != conflicts[1][0]))
+	{
+	    return true;
+	}
+    }
+    return false;
+};
+
+//
+//
+let appendUniqueResults = (ncStr: string, dstList: ValidateResult[], srcList: ValidateResult[], args: any) : void => {
+    let map = new Map<string, Set<string>>();
+    for (let source of dstList) {
+	const key = NameCount.listToCountList(source.nameSrcList).toString();
+	if (!map.has(key)) map.set(key, new Set<string>());
+	map.get(key)!.add(NameCount.listToString(source.nameSrcList));
+    }
+    for (let source of srcList) {
+	source.nameSrcList = _.sortBy(source.nameSrcList, NameCount.count);
+	const key = NameCount.listToCountList(source.nameSrcList).toString();
+	const value = NameCount.listToString(source.nameSrcList);
+	if (map.has(key)) {
+	    const set = map.get(key);
+	    if (set!.has(value)) continue; // strict duplicate
+	    if (funnyBusiness(set!, source.nameSrcList)) {
+		console.log(`${ncStr} =>`);
+		console.log(`set: ${Stringify(map.get(key))}\nvalue: ${value}`);
+		if (!args.ignoreErrors) {
+		    throw new Error(`${ncStr} has conflicting sources, probably a data bug.`);
+		}
+	    }
+	} else {
+	    let set = new Set<string>();
+	    set.add(value);
+	    map.set(key, set);
+	}
+	dstList.push(source);
     }
 };
 
@@ -481,7 +533,7 @@ let initPropertyCountsInAllResults = (nc: NameCount.Type, results: ValidateResul
 // validateCompoundClueAndUpdateState()
 // 
 
-let addCompoundClue = function (clue: Clue.Compound, count: number, validateAll = true, fast = false): ValidateSourcesResult {
+let addCompoundClue = function (clue: Clue.Compound, count: number, args: any): ValidateSourcesResult {
     let nameList = clue.src.split(',').sort();
     let srcMap = State.knownSourceMapArray[count];
     let srcKey = nameList.toString();
@@ -493,11 +545,11 @@ let addCompoundClue = function (clue: Clue.Compound, count: number, validateAll 
             sum: count,
             nameList,
             count: nameList.length,
-            fast,
-            validateAll
+            fast: args.fast,
+            validateAll: args.validateAll
         });
         // this is where the magic happens
-        if (vsResult.success && validateAll) {
+        if (vsResult.success && args.validateAll) {
             initPropertyCountsInAllResults({ name: clue.name, count }, vsResult.list!);
             srcMap[srcKey] = {
                 clues: [],
@@ -505,11 +557,11 @@ let addCompoundClue = function (clue: Clue.Compound, count: number, validateAll 
                 //,cluePropertyCountsMap: {}
             };
         }
-    } else if (validateAll) {
+    } else if (args.validateAll) {
         vsResult.list = srcMap[srcKey].results;
     }
     
-    if (vsResult.success && validateAll) {
+    if (vsResult.success && args.validateAll) {
         let ncResultMap = State.ncResultMapList[count];
         if (!ncResultMap) {
             ncResultMap = State.ncResultMapList[count] = {};
@@ -522,7 +574,7 @@ let addCompoundClue = function (clue: Clue.Compound, count: number, validateAll 
                 list: [] // vsResult.list
             };
         }
-        ncResultMap[ncStr].list.push(...vsResult.list!);
+        appendUniqueResults(ncStr, ncResultMap[ncStr].list, vsResult.list!, args);
         //srcMap[srcKey].clueNamePropertyCountsMapMap[clue.name] = 
         //  Clue.PropertyCounts.createMapFromClue(clue);
         (srcMap[srcKey].clues as ClueList.Compound).push(clue);
@@ -538,7 +590,7 @@ let addCompoundClue = function (clue: Clue.Compound, count: number, validateAll 
 
 //
 
-let addKnownCompoundClues = function (clueList: ClueList.Compound, clueCount: number, validateAll: boolean, fast: boolean): void {
+let addKnownCompoundClues = function (clueList: ClueList.Compound, clueCount: number, args: any): void {
     Assert(clueCount > 1);
     // this is currently only callable once per clueCount.
     Assert(!getKnownClueMap(clueCount));
@@ -552,7 +604,7 @@ let addKnownCompoundClues = function (clueList: ClueList.Compound, clueCount: nu
             return; // continue
         }
         clue.src = clue.src.split(',').sort().toString();
-        let result = addCompoundClue(clue, clueCount, validateAll, fast);
+        let result = addCompoundClue(clue, clueCount, args);
         if (!State.ignoreLoadErrors) {
             if (!result.success) {
                 console.error(`VALIDATE FAILED KNOWN COMPOUND CLUE: '${clue.src}':${clueCount}`);
@@ -956,12 +1008,12 @@ export let filter = function (srcCsvList: string[], clueCount: number, map: any 
 // TODO: return type.  from Validator?
 function singleEntry (nc: NameCount.Type, source: string): any {
     return {
-    results: [
-        {
-        ncList: [nc],
-        nameSrcList: [NameCount.makeNew(nc.name, _.toNumber(source))]
-        }
-    ]
+	results: [
+            {
+		ncList: [nc],
+		nameSrcList: [NameCount.makeNew(nc.name, _.toNumber(source))]
+            }
+	]
     };
 };
 
@@ -1112,7 +1164,7 @@ let addClueForCounts = function (countSet: Set<number>, name: string, src: strin
         .reduce((added: number, count: number) => {
             if (!propertyName) {
                 if (options.compound) {
-                    let result = addCompoundClue(clue, count, true, true);
+                    let result = addCompoundClue(clue, count, { validateAll: true, fast: true });
                     if (!result.success) throw new Error(`addCompoundclue failed, ${clue}:${count}`);
                 }
                 if (addClue(count, clue, options.save, true)) { // save, nothrow
@@ -1320,7 +1372,7 @@ let getListOfPrimaryNameSrcLists = function (ncList: NameCount.List): NameCount.
             //console.log(`adding nc: ${nc}, sources ${sources}`); // entries: ${Stringify(entries)}`);
             
             const clue = { name: nc.name, src: sources };
-            addCompoundClue(clue, nc.count, true);
+            addCompoundClue(clue, nc.count, { validateAll: true });
             //
             // TODO
             //
@@ -1462,10 +1514,6 @@ export let getCountListArrays = function (nameCsv: string, options: any): any {
         const sum = clueCountList.reduce((a, b) => a + b);
         const start = new Date();
         let uniqueCounts = _.uniqBy(clueCountList, _.toNumber); // or just _.uniq ?
-        if (0) {
-            console.log(`${nameList}`);
-            console.log(` sum: ${sum}, countList: ${clueCountList}, uniqueCounts: ${uniqueCounts}`);
-        }
         let ncListStr = clueCountList.map((count, index) => NameCount.makeNew(nameList[index], count)).toString();
         let result: ValidateSourcesResult = invalidHash[ncListStr];
         if (!result) {

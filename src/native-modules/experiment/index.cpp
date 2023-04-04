@@ -61,9 +61,10 @@ cm::SourceData makeSourceData(Env& env, const Napi::Object& jsSourceData) {
     return {};
   }
   auto primaryNameSrcList = makeNameCountList(env, jsPrimaryNameSrcList.As<Array>());
+  auto primarySrcBits = cm::NameCount::listToSourceBits(primaryNameSrcList);
   auto sourceNcCsvList = makeStringList(env, jsSourceNcCsvList.As<Array>());
   auto ncList = makeNameCountList(env, jsNcList.As<Array>());
-  return { primaryNameSrcList, ncList, sourceNcCsvList };
+  return { primaryNameSrcList, primarySrcBits, ncList, sourceNcCsvList };
 }
 
 cm::SourceList makeSourceList(Napi::Env& env, const Napi::Array& jsList) {
@@ -151,22 +152,40 @@ Value buildSourceListsForUseNcData(const CallbackInfo& info) {
 }
 
 Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
+  using namespace std::chrono;
+
   Env env = info.Env();
   if (!info[0].IsArray() || !info[1].IsArray()) {
       Napi::TypeError::New(env, "mergeCompatibleXorSourceCombinations: non-array parameter")
 	.ThrowAsJavaScriptException();
       return env.Null();
   }
-  cout << "++unwrap" << endl;
-  cout << "  unwrapping ncDataLists" << endl;
+
+  auto unwrap0 = high_resolution_clock::now();
+
   auto ncDataLists = makeNcDataLists(env, info[0].As<Array>());
-  cout << "  unwrapping sourceListMap" << endl;
   auto sourceListMap = makeSourceListMap(env, info[1].As<Array>());
-  cout << "--unwrap" << endl;
+
+  auto unwrap1 = high_resolution_clock::now();
+  auto d_unwrap = duration_cast<milliseconds>(unwrap1 - unwrap0).count();
+  cerr << " native unwrap: " << d_unwrap << "ms" << endl;
+
+  auto build0 = high_resolution_clock::now();
 
   auto sourceLists = cm::buildSourceListsForUseNcData(ncDataLists, sourceListMap);
-  //dump(sourceLists);
+
+  auto build1 = high_resolution_clock::now();
+  auto d_build = duration_cast<milliseconds>(build1 - build0).count();
+  cerr << " native build: " << d_build << "ms" << endl;
+
+  auto merge0 = high_resolution_clock::now();
+
   cm::mergeCompatibleXorSourceCombinations(sourceLists);
+
+  auto merge1 = high_resolution_clock::now();
+  auto d_merge = duration_cast<milliseconds>(merge1 - merge0).count();
+  cerr << " native merge: " << d_merge << "ms" << endl;
+
   return env.Null();
 }
 

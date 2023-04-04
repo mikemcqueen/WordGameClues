@@ -180,9 +180,7 @@ function Stringify(val: any) {
 
 let logging = 0;
 let loggy = false;
-let ZZ = false;
 let WW = false;
-let AA = false;
 
 // TODO: as const;
 const Op = {
@@ -309,14 +307,6 @@ let everyCountInArray = (ncList: NameCount.List, countArray: CountArray): boolea
     return ncList.every(nc => countArray[nc.count] === nc.count);
 };
 
-/*
-//
-//
-let anyNumberInArray = (numberList: number[], countArray: CountArray): boolean => {
-    return numberList.some(num => countArray[num] === num);
-};
-*/
-
 //
 //
 let listToCountArray = (ncList: NameCount.List): CountArray => {
@@ -325,58 +315,6 @@ let listToCountArray = (ncList: NameCount.List): CountArray => {
         return array;
     }, new Int32Array(ClueManager.getNumPrimarySources()));
 };
-
-/*
-//
-//
-let listToCountArrayAndSize = (ncList: NameCount.List): CountArrayAndSize => {
-    let array = new Int32Array(ClueManager.getNumPrimarySources());
-    let size = 0;
-    for (let nc of ncList) {
-        array[nc.count] = nc.count;
-        size++;
-    }
-    return { array, size };
-};
-*/
-
-/*
-//
-//
-let getCountArrayAndSize = (sourceList: SourceList): CountArrayAndSize => {
-    // NO: reduce
-    let array = new Int32Array(ClueManager.getNumPrimarySources());
-    let size = 0;
-    for (let source of sourceList) {
-        for (let nc of source.primaryNameSrcList) {
-            array[nc.count] = nc.count;
-        }
-        size += source.primaryNameSrcList.length;
-    }
-    return { array, size };
-};
-*/
-
-/*
-//
-//
-let getCountListNotInArray = (ncList: NameCount.List, countArray: CountArray): number[] => {
-    return ncList.map(nc => nc.count).filter(count => countArray[count] !== count);
-};
-*/
-
-/*
-//
-//
-let getNumCountsInArray = (ncList: NameCount.List, countArray: CountArray): number => {
-    // TODO: reduce
-    let count = 0;
-    for (let nc of ncList) {
-        if (countArray[nc.count] === nc.count) ++count;
-    }
-    return count;
-};
-*/
 
 // key types:
 //{
@@ -415,26 +353,21 @@ let recursiveAddSrcNcLists = (list: string[], resultMap: any, top = true): strin
             if (splitKeys.length > 1) return splitKeys;
             // D: single top-level key with array value type: allow; TODO assert primary?
             if (top) {
-                if (loggy) console.log(`D: ${key}`);
                 return key;
             }
             // C: single nested key with array value type: ignore; TODO assert primary?
         }
-        if (loggy) console.log(`F: ${key}`);
         return [];
     });
-    if (loggy) console.log(keys);
     if (!_.isEmpty(keys)) {
         // push combined sorted keys for multi-key case
         if (keys.length > 1) {
             let sortedKeys = keys.sort().toString();
             list.push(sortedKeys);
-            //obj.map[sortedKeys] = true;
         }
         keys.forEach(key => {
             // push individual keys
             list.push(key);
-            //obj.map[key] = true;
             let val = resultMap[key];
             if (val && !_.isArray(val)) {
                 recursiveAddSrcNcLists(list, val, false);
@@ -572,9 +505,9 @@ let oob = 0;
 
 //
 //
-let propertyCountsIsInBounds = (propertyCount: Clue.PropertyCounts.Type, minMax: MinMax.Type): boolean => {
+let propertyCountsIsInBounds = (propertyCount: Clue.PropertyCounts.Type, minMax: MinMax.Type|undefined): boolean => {
     const total = propertyCount.total;
-    return minMax.min <= total && total <= minMax.max;
+    return minMax ? (minMax.min <= total) && (total <= minMax.max) : true;
 };
 
 //
@@ -595,30 +528,27 @@ let getSourceList = (nc: NameCount.Type, args: MergeArgs): AnySourceData[] => {
         .forEach((sourceData: ClueManager.SourceData) => {
             sourceList.push(...sourceData.results
                 //.filter((result: ValidateResult) => filterPropertyCountsOutOfBounds(nc, result, args))
-                .map((result: ValidateResult) => getSourceData(nc, result, args.lazy)));
+                .map((result: ValidateResult) =>  getSourceData(nc, result, args.lazy)));
+		    /*
+		    {
+			result.nameSrcList.forEach(ns => {
+			    if (nc.name === 'old' && ns.name === 'ton')
+				console.error(` **TON: ${nc}, primaryNameSrc: ${ns} **`);
+			});
+			return getSourceData(nc, result, args.lazy);
+		    }));
+		    */
         });
-/*
-    let ncStr = NameCount.toString(nc);
-    let entries = ClueManager.getKnownSourceMapEntries(nc);
-    if (listIsEmpty(entries)) console.error(`${ncStr}: entries empty`);
-    entries.forEach((sourceData: ClueManager.SourceData) => {
-	if (listIsEmpty(sourceData.results)) console.error(`${ncStr}: sourceData.results empty`);
-	let filtered = sourceData.results;
-//            .filter((result: ValidateResult) => filterPropertyCountsOutOfBounds(nc, result, args));
-//	if (listIsEmpty(filtered)) console.error(`${ncStr}: filtered empty`);
-        sourceList.push(...filtered.map((result: ValidateResult) => getSourceData(nc, result, args.lazy)));
-    });
-*/
-    if (AA) {
-        console.log(`getSourceList ${NameCount.toString(nc)} (${sourceList.length}):`);
-        for (let source of sourceList) console.log(` ncList: ${NameCount.listToString(source.ncList)}`);
-    }
     return sourceList;
 };
+
+let merges = 0;
+let list_merges = 0;
 
 //
 //
 let mergeSources = (source1: AnySourceData, source2: AnySourceData, lazy: boolean | undefined): AnySourceData => {
+    merges += 1;
     const primaryNameSrcList = [...source1.primaryNameSrcList, ...source2.primaryNameSrcList];
     const ncList = [...source1.ncList, ...source2.ncList];
     if (lazy) {
@@ -664,6 +594,7 @@ let mergeCompatibleSources = (source1: AnySourceData, source2: AnySourceData, ar
 //
 //
 let mergeCompatibleSourceLists = (sourceList1: AnySourceData[], sourceList2: AnySourceData[], args: MergeArgs): AnySourceData[] => {
+    list_merges += 1;
     let mergedSourcesList: AnySourceData[] = [];
     for (const source1 of sourceList1) {
         for (const source2 of sourceList2) {
@@ -683,7 +614,7 @@ let getSynonymCounts = (sourceList: AnySourceData[]): Clue.PropertyCounts.Type =
                       
 //
 //
-let sourceListHasPropertyCountInBounds = (sourceList: AnySourceData[], minMax: MinMax.Type): boolean => {
+let sourceListHasPropertyCountInBounds = (sourceList: AnySourceData[], minMax: MinMax.Type|undefined): boolean => {
     const synonymCounts = getSynonymCounts(sourceList);
     const inBounds = propertyCountsIsInBounds(synonymCounts, minMax);
     if (!inBounds) {
@@ -746,10 +677,10 @@ let buildSourceListsForUseNcData = (useNcDataLists: NCDataList[], sourceListMap:
 
 //
 //
-let empty = 0;
 let getSourceListMap = (useNcDataLists: NCDataList[], args: MergeArgs): Map<string, AnySourceData[]> => {
     let map = new Map<string, AnySourceData[]>();
     let numNc = 0;
+    let empty = 0;
     let begin = new Date();
     for (let ncDataList of useNcDataLists) {
         for (let [sourceListIndex, useNcData] of ncDataList.entries()) {
@@ -760,7 +691,7 @@ let getSourceListMap = (useNcDataLists: NCDataList[], args: MergeArgs): Map<stri
 		if (!map.has(key)) {
 		    const sourceList = getSourceList(nc, args);
 		    if (listIsEmpty(sourceList)) {
-			console.error(`${NameCount.toString(nc)}`);
+			console.error(`ERROR! empty sourceList: ${NameCount.toString(nc)}`);
 			empty += 1;
 		    }
 		    map.set(key, sourceList);
@@ -769,7 +700,7 @@ let getSourceListMap = (useNcDataLists: NCDataList[], args: MergeArgs): Map<stri
 	}
     }
     let end = new Duration(begin, new Date()).milliseconds;
-    console.error(` getSourceListMap(${PrettyMs(end)}) nc(${numNc}) unique(${map.size})`);
+    console.error(` getSourceListMap(${PrettyMs(end)}), nc(${numNc}), unique(${map.size}), empty(${empty})`);
     return map;
 }
 
@@ -781,28 +712,13 @@ let getUseSourceLists = (ncDataLists: NCDataList[], args: any): SourceList[] => 
     const mergeArgs = { synonymMinMax: args.synonymMinMax };
     const sourceListMap = getSourceListMap(ncDataLists, mergeArgs);
 
-    /*
-    let x = 0;
-    for (let entry of sourceListMap.entries()) {
-	console.log(`-------------------`);
-	console.log(`${Stringify(entry)}`);
-	if (x++ === 2) break;
-    }
-    */
-
-    /*
-    let native = new Date();
-    NativeComboMaker.buildSourceListsForUseNcData(ncDataLists, Array.from(sourceListMap.entries()), mergeArgs);
-    let nend = new Duration(native, new Date()).milliseconds;
-    console.error(` Native.buildSLforUseNCD(${PrettyMs(nend)})`);
-    */
-
     let begin = new Date();
-    // console.log(`ncdatalists(${ncDataLists.length}) [0] = ${Stringify(ncDataLists[0])}`);
     const sourceLists = buildSourceListsForUseNcData(ncDataLists, sourceListMap, mergeArgs);
-    // console.log(`sourceLists(${sourceLists.length}) [0] (${sourceLists[0].length}) = ${Stringify(sourceLists[0])}`);
     let end = new Duration(begin, new Date()).milliseconds;
-    console.error(` buildSLforUseNCD(${PrettyMs(end)})`);
+
+    let sum = sourceLists.reduce((total, sl) => { return total + sl.length; }, 0);
+    console.error(` buildSLforUseNCD(${PrettyMs(end)}), sourceLists(${sum}), ` +
+	`list_merges(${list_merges}), merges(${merges})`);
     return sourceLists;
 };
 
@@ -822,36 +738,12 @@ let getUseSourceLists = (ncDataLists: NCDataList[], args: any): SourceList[] => 
 //
 let buildOrSourceNcCsvMap = (orSourceLists: SourceList[]): SourceNcCsvMap => {
     return orSourceLists.reduce((map: SourceNcCsvMap, sourceList: SourceList, index: number) => {
-        // ++INSTRUMENTATION
-        if (0) {
-            let text = `orSourceList(${index}):`;
-            for (const source of sourceList) {
-                text += ` [${NameCount.listToSortedString(source.ncList)}]`;
-            }
-            console.log(text);
-        }
-        // --INSTRUMENTATION
-
         const key = NameCount.listToSortedString(_.flatMap(sourceList, source => source.ncList));
         if (!map[key]) map[key] = [];
         map[key].push(index);
         return map;
     }, {});
 };
-
-//
-//
-/*
-  let buildUseSourceNcCsvMap = (useSourceList: UseSourceLists): SourceNcCsvMap => {
-  return useSourceList.reduce((map: SourceNcCsvMap, source: UseSource, index: number) => {
-  if (AA) console.log(Stringify2(source));
-  const key = NameCount.listToSortedString(source.ncList);
-  if (!map[key]) map[key] = [];
-  map[key].push(index);
-  return map;
-  }, {});
-  };
-*/
 
 // TODO: function name
 //
@@ -863,7 +755,6 @@ const mergeCompatibleXorSources = (indexList: number[], sourceLists: SourceList[
     
     // TODO: indexList.some()
     for (let [sourceListIndex, sourceIndex] of indexList.entries()) {
-        if (ZZ) console.log(`XOR sourceListIndex(${sourceListIndex}) sourceIndex(${sourceIndex})`);
         const source = sourceLists[sourceListIndex][sourceIndex];
 	if (!NameCount.listAddCountsToSet(source.primaryNameSrcList, srcSet)) {
 	    compatible = false;
@@ -886,13 +777,7 @@ const mergeCompatibleXorSources = (indexList: number[], sourceLists: SourceList[
             primarySrcArray: listToCountArray(primaryNameSrcList),
             ncList
         };
-	if (ZZ) {
-	    console.log(` XOR compatible: true, adding` +
-		` pnsl[${NameCount.listToString(result.primaryNameSrcList)}]`);
-	}
         return [result];
-    } else {
-	if (ZZ) console.log(` XOR compatible: false`);
     }
     return [];
 };
@@ -909,8 +794,6 @@ let mergeCompatibleXorSourceCombinations = (sourceLists: SourceList[]/*, args: M
         Assert(false, `numEmpty(${numEmptyLists}), numLists(${sourceLists.length})`);
     }
     let listArray = sourceLists.map(sourceList => [...Array(sourceList.length).keys()]);
-    if (ZZ) console.log(`listArray(${listArray.length}): ${Stringify2(listArray)}`);
-    //console.log(`sourceLists(${sourceLists.length}): ${Stringify2(sourceLists)}`);
     const peco = Peco.makeNew({
         listArray,
         max: 99999
@@ -918,7 +801,6 @@ let mergeCompatibleXorSourceCombinations = (sourceLists: SourceList[]/*, args: M
     let combos = 0;
     let sourceList: XorSource[] = [];
     for (let indexList = peco.firstCombination(); indexList; ) {
-        //if (ZZ) console.log(`iter (${iter}), indexList: ${stringify(indexList)}`);
         const mergedSources: XorSource[] = mergeCompatibleXorSources(indexList, sourceLists);
         sourceList.push(...mergedSources);
 	indexList = peco.nextCombination();
@@ -996,27 +878,6 @@ let first = (countList: number[], sourceIndexes: number[]): FirstNextResult => {
     return next(countList, sourceIndexes);
 };
 
-/*
-//
-//
-let isSourceArrayXORCompatibleWithSourceList = (primarySrcArray: CountArray, sourceList: SourceList): boolean => {
-      if (0 && AA) {
-      console.log(` XOR: pnsl[${NameCount.listToCountList(source.primaryNameSrcList)}]` +
-      `, primarySrcArray[${primarySrcArray)}]`);
-      }
-    Assert(!listIsEmpty(sourceList));
-    let compatible = true;
-    for (let source of sourceList) {
-        compatible = !anyCountInArray(source.primaryNameSrcList, primarySrcArray);
-        if (!compatible) break;
-    }
-    if (AA) {
-        console.log(` isSourceArrayXORCompatibileWithSourceList: ${compatible}`);
-    }
-    return compatible;
-}
-*/
-
 //
 //
 let isAnyCompatibleOrSourceANDCompatibleWithSourceArray = (compatibleSourceList: CompatibleOrSource.Type[],
@@ -1065,14 +926,6 @@ let isSourceArrayANDCompatibleWithSourceList = (primarySrcArrayAndSize: CountArr
         const numCountsInArray = getNumCountsInArray(source.primaryNameSrcList, primarySrcArrayAndSize.array);
         compatible = numCountsInArray === primarySrcArrayAndSize.size;
         if (!compatible) break;
-          if (0 && AA) {
-          console.log(` AND: (${index}), match(${numCountsInArray})` +
-          `, psnl[${NameCount.listToCountList(source.primaryNameSrcList)})]` +
-          `, primarySrcArray[${countArrayToNumberList(primarySrcArrayAndSize.array)}]`);
-          }
-    }
-    if (AA) {
-        console.log(` isSourceArrayANDCompatibileWithSourceList: ${compatible}`);
     }
     return compatible;
 }
@@ -1097,9 +950,6 @@ let isSourceArrayCompatibleWithEveryOrSource = (primarySrcArray: CountArray, orS
         compatible = isAnyCompatibleOrSourceANDCompatibleWithSourceArray(
             orSource.sourceListContainer.compatibleSourceList, primarySrcArray);
         if (!compatible) break;
-    }
-    if (AA) {
-        console.log(` -orCompatible: ${compatible}, primarySrcArray:[${primarySrcArray}]`);
     }
     return compatible;
 };
@@ -1133,7 +983,6 @@ let isAnySourceCompatibleWithUseSources = (sourceList: SourceList, pcd: PreCompu
     let compatible = false;
     for (let sourceIndex = 0, sourceListLength = sourceList.length; sourceIndex < sourceListLength; ++sourceIndex) {
         let source = sourceList[sourceIndex];
-        if (AA) console.log(`source nc: ${NameCount.listToString(source.ncList)}`);
 
         const xorSourceList = filterXorSourcesXORCompatibleWithSource(pcd.useSourceLists.xor, source);
         // if there were --xor sources specified, and none are compatible with the
@@ -1163,12 +1012,10 @@ let loadAndMergeSourceList = (lazySourceList: LazySourceData[], args: MergeArgs)
         let sourcesToMerge: AnySourceData[] = []; // TODO: not ideal, would prefer SourceData here
         for (let index = 0; index < 2; ++index) {
             const sourceData = getSourceData(lazySource.ncList[index], lazySource.validateResultList[index], false);
-            if (0 && ZZ) console.log(`lamSourceData[${index}]: ${Stringify2(sourceData)}`);
             sourcesToMerge.push(sourceData);
         }
         const mergedSource = mergeSources(sourcesToMerge[0], sourcesToMerge[1], false) as SourceData;
         if (propertyCountsIsInBounds(mergedSource.synonymCounts, args.synonymMinMax)) {
-            if (0 && ZZ) console.log(`lamMerged[${NameCount.listToString(lazySource.ncList)}]: ${Stringify2(mergedSource)}`);
             sourceList.push(mergedSource);
         }
     }
@@ -1268,8 +1115,9 @@ let getCombosForUseNcLists = (sum: number, max: number, pcd: PreComputedData, ar
         lazy: true
     };
 
-    // Given a sum, such as 4, generate an array of addend arrays ("count lists") that
-    // that add up to that sum, such as [ [1, 3], [2, 2] ]
+    // Given a sum, such as 4, and a max # of numbers to combine, such as 3, generate
+    // an array of addend arrays ("count lists"), for each 2 <= N <= max, that add up
+    // to that sum, such as [ [1, 3], [2, 2], [1, 1, 1] ]
     let countListArray: number[][] = Peco.makeNew({ sum, max }).getCombinations(); 
 
     // for each countList
@@ -1297,12 +1145,8 @@ let getCombosForUseNcLists = (sum: number, max: number, pcd: PreComputedData, ar
             
             if (0 && result.nameList!.includes('name,list')) {
                 console.log(`hit: ${result.nameList}`);
-                ZZ = true;
-                AA = true
                 WW = true
             } else {
-                ZZ = false;
-                AA = false;
                 WW = false;
             }
 
@@ -1313,7 +1157,6 @@ let getCombosForUseNcLists = (sum: number, max: number, pcd: PreComputedData, ar
             if (!hash[key]) {
                 sourceList = mergeAllCompatibleSources(result.ncList!, undefined, lazyMergeArgs); // as LazySourceData[];
                 if (_.isEmpty(sourceList)) ++numMergeIncompatible;
-                //console.log(`$$ sources: ${Stringify2(sourceList)}`);
                 hash[key] = { sourceList };
             } else {
                 sourceList = hash[key].sourceList;
@@ -1422,25 +1265,6 @@ let parallel_makeCombosForRange = (first: number, last: number, args: any): any 
     //const filterResult = ClueManager.filter(data[i], args.sum, comboMap);
 };
 
-/*
-//
-//
-let getAllPrimarySrcCombos = (orSource: SourceBase, size: number): string[] => {
-    let combos: string[] = [];
-    let list = [...Array(orSource.primaryNameSrcList.length).keys()];
-    Peco.makeNew({
-        listArray: [list, list], // TODO: fix for arbitrary "size"
-        max: 99999,
-        noDuplicates: true
-    }).getCombinations().forEach((indexList: number[]) => {
-        if (indexList[0] === indexList[1]) return; // TODO: fix for arbitrary "size"
-        let combo = indexList.map(index => orSource.primaryNameSrcList[index].count).sort().toString();
-        combos.push(combo);
-    });
-    return combos;
-}
-*/
-
 //
 //
 let makeCombos = (args: any): any => {
@@ -1481,19 +1305,6 @@ let makeCombos = (args: any): any => {
         }
         let d = new Duration(begin, new Date()).milliseconds;
         console.error(`--combos: ${PrettyMs(d)}, oob: ${oob}`);
-        
-        // ++ INSTRUMENTATION
-        /*
-        if (0)  {
-            let cwusEntries = [...Object.entries(CwusHash)].sort((a, b) => b[1].count - a[1].count);
-            for (let x = 0; x < 100; ++x) {
-                if (cwusEntries[x]) console.error(cwusEntries[x]);
-            }
-            console.error(`total: ${cwusEntries.length}`);
-        }
-        */
-        // -- INSTRUMENTATION
-
         Debug(`total: ${total}, filtered(${_.size(comboMap)})`);
         _.keys(comboMap).forEach((nameCsv: string) => console.log(nameCsv));
     }
@@ -1576,8 +1387,7 @@ let splitArgListAndMinMax = (argList: string[]): [MinMax.Type, string[]] => {
     Assert(argList.length > 2);
     const minArg = argList[argList.length - 2];
     const maxArg = argList[argList.length - 1];
-    Assert(isSingleNumericDigit(minArg));
-    Assert(isSingleNumericDigit(maxArg));
+    Assert(isSingleNumericDigit(minArg) && isSingleNumericDigit(maxArg));
     return [MinMax.init(minArg, maxArg), argList.slice(0, argList.length - 2)];
 };
 
@@ -1704,13 +1514,6 @@ let isSourceXORCompatibleWithAnyXorSource = (source: SourceData, xorSourceList: 
         if (compatible) break;
     }
     return compatible;
-    /*
-    if (0 && AA) {
-	console.log(` -xorCompatible: ${compatible}` + 
-	    ` source.pnslCounts[${NameCount.listToCountList(source.primaryNameSrcList)}]` +
-	    ` xorSource.primarySrcArray[${countArrayToNumberList(xorSource.primarySrcArray)}]`);
-    }
-    */
 };
 
 
@@ -1752,7 +1555,8 @@ let buildUseSourceListsFromNcData = (args: any): UseSourceLists => {
 
     let merge = new Date();
     let sourceLists = getUseSourceLists(args.allXorNcDataLists, args);
-    console.error(`  sourceLists(${sourceLists.length}), sourceLists[0].length(${sourceLists[0].length})`);
+    let sum = sourceLists.reduce((total, sl) => { return total + sl.length; }, 0);
+    console.error(` sourceLists(${sourceLists.length}), sourceLists(${sum})`);
     let xorSourceList = mergeCompatibleXorSourceCombinations(sourceLists);
     let dmerge = new Duration(merge, new Date()).milliseconds;
     console.error(`xorSourceList(${xorSourceList.length}), total(${PrettyMs(dmerge)})`);
