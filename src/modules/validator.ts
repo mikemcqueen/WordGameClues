@@ -59,6 +59,7 @@ interface CandidateResult {
 
 export interface ValidateResult extends CandidateResult {
     nameSrcList: NameCount.List;
+    srcBits?: any;
     nameSrcCsv?: string;
     propertyCounts?: Clue.PropertyCounts.Map;
     //primarySrcArray?: CountArray;

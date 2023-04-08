@@ -1,133 +1,92 @@
-#if 0
-//
-//
-let mergeSources = (source1: AnySourceData, source2: AnySourceData, lazy: boolean | undefined): AnySourceData => {
-    const primaryNameSrcList = [...source1.primaryNameSrcList, ...source2.primaryNameSrcList];
-    const ncList = [...source1.ncList, ...source2.ncList];
-    if (lazy) {
-        Assert(ncList.length === 2, `ncList.length(${ncList.length})`);
-        source1 = source1 as LazySourceData;
-        source2 = source2 as LazySourceData;
-        const result: LazySourceData = {
-            primaryNameSrcList,
-            ncList,
-            synonymCounts: Clue.PropertyCounts.merge(
-                getSynonymCountsForValidateResult(source1.validateResultList[0]),
-                getSynonymCountsForValidateResult(source2.validateResultList[0])),
-            validateResultList: [
-                (source1 as LazySourceData).validateResultList[0],
-                (source2 as LazySourceData).validateResultList[0]
-            ]
-        };
-        return result;
-    }
-    source1 = source1 as SourceData;
-    source2 = source2 as SourceData;
-    const mergedSource: SourceData = {
-        primaryNameSrcList,
-        ncList,
-        synonymCounts: Clue.PropertyCounts.merge(source1.synonymCounts, source2.synonymCounts),
-        sourceNcCsvList: [...source1.sourceNcCsvList, ...source2.sourceNcCsvList]
-    };
-    // TODO: still used?
-    mergedSource.ncCsv = NameCount.listToSortedString(mergedSource.ncList);
-    return mergedSource;
-};
-#endif
+#include <iostream>
+#include "combo-maker.h"
 
-#if 0
-//
-//
-let mergeCompatibleSources = (source1: AnySourceData, source2: AnySourceData, args: MergeArgs): AnySourceData[] => {
-    // TODO: this logic could be part of mergeSources
-    // also, uh, isn't there a primarySrcArray I can be using here?
-    return allCountUnique(source1.primaryNameSrcList, source2.primaryNameSrcList)
-        ? [mergeSources(source1, source2, args.lazy)]
-        : [];
-};
-#endif
+namespace cm {
 
-#if 0
-//
-//
-let mergeCompatibleSourceLists = (sourceList1: AnySourceData[], sourceList2: AnySourceData[], args: MergeArgs): AnySourceData[] => {
-    let mergedSourcesList: AnySourceData[] = [];
-    for (const source1 of sourceList1) {
-        for (const source2 of sourceList2) {
-            mergedSourcesList.push(...mergeCompatibleSources(source1, source2, args))
-        }
-    }
-    return mergedSourcesList;
-};
-#endif
+PreComputedData PCD;
 
-#if 0
-//
-//
-let getSynonymCounts = (sourceList: AnySourceData[]): Clue.PropertyCounts.Type => {
-    return sourceList.reduce(
-        (counts, source) => Clue.PropertyCounts.add(counts, source.synonymCounts),
-        Clue.PropertyCounts.empty());
-};
-                      
-//
-//
-let sourceListHasPropertyCountInBounds = (sourceList: AnySourceData[], minMax: MinMax.Type): boolean => {
-    const synonymCounts = getSynonymCounts(sourceList);
-    const inBounds = propertyCountsIsInBounds(synonymCounts, minMax);
-    if (!inBounds) {
-        if (0) {
-            console.error(`oob: [${NameCount.listToNameList(sourceListToNcList(sourceList))}]` +
-                `, syn-total(${synonymCounts.total})`);
-        }
-    }
-    return inBounds;
+auto isSourceCompatibleWithEveryOrSource(const SourceData& source,
+  const OrSourceList& orSourceList)
+{
+  return true;
 }
-#endif
 
 #if 0
 //
 //
-let mergeAllCompatibleSources = (ncList: NameCount.List, args: MergeArgs): AnySourceData[] => {
-    // because **maybe** broken for > 2 below
-    Assert(ncList.length <= 2, `${ncList} length > 2 (${ncList.length})`);
-    // TODO: reduce (or some) here
-    let sourceList = getSourceList(ncList[0], args);
-    for (let ncIndex = 1; ncIndex < ncList.length; ++ncIndex) {
-        const nextSourceList = getSourceList(ncList[ncIndex], args);
-        sourceList = mergeCompatibleSourceLists(sourceList, nextSourceList, args);
-        if (!sourceListHasPropertyCountInBounds(sourceList, args.synonymMinMax)) sourceList = [];
-        // TODO BUG this is broken for > 2; should be something like: if (sourceList.length !== ncIndex + 1) 
-        if (listIsEmpty(sourceList)) break;
+let isSourceXORCompatibleWithAnyXorSource = (source: SourceData, xorSourceList: XorSource[]): boolean => {
+    let compatible = listIsEmpty(xorSourceList); // empty list == compatible
+    for (let xorSource of xorSourceList) {
+        compatible = !CountBits.intersects(source.primarySrcBits, xorSource.primarySrcBits);
+        if (compatible) break;
     }
-    return sourceList;
+    return compatible;
 };
 #endif
+
+auto isSourceXORCompatibleWithAnyXorSource(const SourceData& source,
+  const XorSourceList& xorSourceList)
+{
+#if 0
+  using namespace std;
+  auto it = std::find_if(source.ncList.begin(), source.ncList.end(),
+    [](const NameCount& nc){ return nc.name == "volleyball"; });
+  auto vb = (it != source.ncList.end());
+#endif
+
+  bool compatible = xorSourceList.empty(); // empty list == compatible
+  for (const auto& xorSource : xorSourceList) {
+    compatible = (source.primarySrcBits & xorSource.primarySrcBits).none();
+#if 0
+    if (compatible) {
+      if (vb) {
+	cout << source.primarySrcBits.to_string() << endl
+	     << xorSource.primarySrcBits.to_string() << endl
+	     << "---" << endl;
+      }
+    }
+#endif
+    if (compatible) break;
+  }
+  return compatible;
+};
 
 #if 0
 //
 //
-let buildSourceListsForUseNcData = (useNcDataLists: NCDataList[], args: MergeArgs): SourceList[] => {
-    let sourceLists: SourceList[] = [];
-    // TODO: This is to prevent duplicate sourceLists. I suppose I could use a Set or Map, above?
-    let hashList: StringBoolMap[] = [];
-    for (let ncDataList of useNcDataLists) {
-        for (let [sourceListIndex, useNcData] of ncDataList.entries()) {
-            if (!sourceLists[sourceListIndex]) sourceLists.push([]);
-            if (!hashList[sourceListIndex]) hashList.push({});
-            // give priority to any min/max args specific to an NcData, for example, through --xormm,
-            // but fallback to the values we were called with
-            const mergeArgs = useNcData.synonymMinMax ? { synonymMinMax: useNcData.synonymMinMax } : args;
-            const sourceList = mergeAllCompatibleSources(useNcData.ncList, mergeArgs) as SourceList;
-            for (let source of sourceList) {
-                let key = NameCount.listToString(_.sortBy(source.primaryNameSrcList, NameCount.count));
-                if (!hashList[sourceListIndex][key]) {
-                    sourceLists[sourceListIndex].push(source as SourceData);
-                    hashList[sourceListIndex][key] = true;
-                }
-            }
-        }
+let isAnySourceCompatibleWithUseSources = (sourceList: SourceList, pcd: PreComputedData): boolean => {
+    // TODO: this is why --xor is required with --or. OK for now. Fix later.
+    if (listIsEmpty(pcd.useSourceLists.xor)) return true;
+
+    let compatible = false;
+    for (let source of sourceList) {
+        compatible = isSourceXORCompatibleWithAnyXorSource(source, pcd.useSourceLists.xor);
+        // if there were --xor sources specified, and none are compatible with the
+        // current source, no further compatibility checking is necessary; continue
+        // to next source.
+        if (!compatible) continue;
+
+        compatible = isSourceCompatibleWithEveryOrSource(source, pcd.useSourceLists.or);
+        if (compatible) break;
     }
-    return sourceLists;
+    return compatible;
 };
 #endif
+
+bool isAnySourceCompatibleWithUseSources(const SourceList& sourceList) {
+  if (sourceList.empty()) return true;
+  auto compatible = false;
+  for (const auto& source : sourceList) {
+    compatible = isSourceXORCompatibleWithAnyXorSource(source, PCD.xorSourceList);
+    // if there were --xor sources specified, and none are compatible with the
+    // current source, no further compatibility checking is necessary; continue
+    // to next source.
+    if (!compatible) continue;
+
+    compatible = isSourceCompatibleWithEveryOrSource(source, PCD.orSourceList);
+    if (compatible) break;
+  }
+  return compatible;
+};
+
+} // namespace cm

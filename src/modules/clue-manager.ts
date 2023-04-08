@@ -471,6 +471,17 @@ let initPropertyCountsInAllResults = (nc: NameCount.Type, results: ValidateResul
     }
 };
 
+let initSrcBitsInAllResults = (results: ValidateResult[]): void => {
+    for (let result of results) {
+	result.srcBits = NameCount.listToCountBits(result.nameSrcList);
+    }
+}
+
+let massageValidateResults = (nc: NameCount.Type, results: ValidateResult[]): void => {
+    initPropertyCountsInAllResults(nc, results);
+    initSrcBitsInAllResults(results);
+}
+
 //
 //
 let funnyBusiness = (set: Set<string>, nameSrcList: NameCount.List) : boolean => {
@@ -535,7 +546,7 @@ let appendUniqueResults = (ncStr: string, dstList: ValidateResult[], srcList: Va
 
 let addCompoundClue = function (clue: Clue.Compound, count: number, args: any): ValidateSourcesResult {
     let nameList = clue.src.split(',').sort();
-    let srcMap = State.knownSourceMapArray[count];
+    let srcMap = getKnownSourceMap(count);
     let srcKey = nameList.toString();
     // new sources need to be validated
     let vsResult : ValidateSourcesResult = { success: true };
@@ -550,7 +561,7 @@ let addCompoundClue = function (clue: Clue.Compound, count: number, args: any): 
         });
         // this is where the magic happens
         if (vsResult.success && args.validateAll) {
-            initPropertyCountsInAllResults({ name: clue.name, count }, vsResult.list!);
+            massageValidateResults({ name: clue.name, count }, vsResult.list!);
             srcMap[srcKey] = {
                 clues: [],
                 results: vsResult.list!
@@ -1007,11 +1018,13 @@ export let filter = function (srcCsvList: string[], clueCount: number, map: any 
 
 // TODO: return type.  from Validator?
 function singleEntry (nc: NameCount.Type, source: string): any {
+    let nameSrcList: NameCount.List = [NameCount.makeNew(nc.name, _.toNumber(source))];
     return {
 	results: [
             {
+		nameSrcList,
+		srcBits: NameCount.listToCountBits(nameSrcList),
 		ncList: [nc],
-		nameSrcList: [NameCount.makeNew(nc.name, _.toNumber(source))]
             }
 	]
     };
@@ -1372,7 +1385,7 @@ let getListOfPrimaryNameSrcLists = function (ncList: NameCount.List): NameCount.
             //console.log(`adding nc: ${nc}, sources ${sources}`); // entries: ${Stringify(entries)}`);
             
             const clue = { name: nc.name, src: sources };
-            addCompoundClue(clue, nc.count, { validateAll: true });
+//            addCompoundClue(clue, nc.count, { validateAll: true });
             //
             // TODO
             //

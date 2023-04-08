@@ -7,6 +7,7 @@
 #include "greeting.h"
 #include "combo-maker.h"
 #include "dump.h"
+#include "wrap.h"
 
 using namespace Napi;
 
@@ -151,6 +152,29 @@ Value buildSourceListsForUseNcData(const CallbackInfo& info) {
   return env.Null();
 }
 
+namespace cm {
+  extern PreComputedData PCD;
+}
+
+
+//
+// mergeAllCompatibleSources
+//
+Value mergeAllCompatibleSources(const CallbackInfo& info) {
+  Env env = info.Env();
+  if (!info[0].IsArray()) {
+      Napi::TypeError::New(env, "mergeAllCompatibleSources: non-array parameter")
+	.ThrowAsJavaScriptException();
+      return env.Null();
+  }
+  auto ncList = makeNameCountList(env, info[0].As<Array>());
+  auto mergedSourcesList = cm::mergeAllCompatibleSources(ncList, cm::PCD.sourceListMap);
+  return cm::wrap(env, mergedSourcesList);
+}
+
+//
+// mergeCompatibleXorSourceCombinations
+//
 Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   using namespace std::chrono;
 
@@ -164,7 +188,7 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   auto unwrap0 = high_resolution_clock::now();
 
   auto ncDataLists = makeNcDataLists(env, info[0].As<Array>());
-  auto sourceListMap = makeSourceListMap(env, info[1].As<Array>());
+  cm::PCD.sourceListMap = makeSourceListMap(env, info[1].As<Array>());
 
   auto unwrap1 = high_resolution_clock::now();
   auto d_unwrap = duration_cast<milliseconds>(unwrap1 - unwrap0).count();
@@ -172,7 +196,7 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
 
   auto build0 = high_resolution_clock::now();
 
-  auto sourceLists = cm::buildSourceListsForUseNcData(ncDataLists, sourceListMap);
+  auto sourceLists = cm::buildSourceListsForUseNcData(ncDataLists, cm::PCD.sourceListMap);
 
   auto build1 = high_resolution_clock::now();
   auto d_build = duration_cast<milliseconds>(build1 - build0).count();
@@ -180,24 +204,40 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
 
   auto merge0 = high_resolution_clock::now();
 
-  cm::mergeCompatibleXorSourceCombinations(sourceLists);
+  cm::PCD.xorSourceList = cm::mergeCompatibleXorSourceCombinations(sourceLists);
+  cm::PCD.orSourceList = cm::OrSourceList{};
 
   auto merge1 = high_resolution_clock::now();
   auto d_merge = duration_cast<milliseconds>(merge1 - merge0).count();
   cerr << " native merge: " << d_merge << "ms" << endl;
 
-  return env.Null();
+  return cm::wrap(env, cm::PCD.xorSourceList);
 }
 
-Napi::Object Init(Napi::Env env, Napi::Object exports) {
-  exports.Set(Napi::String::New(env, "greetHello"),
-	      Napi::Function::New(env, greetHello));
+//
+// isAnySourceCompatibleWithUseSources
+//
+Value isAnySourceCompatibleWithUseSources(const CallbackInfo& info) {
+  using namespace std::chrono;
 
-  exports.Set(Napi::String::New(env, "buildSourceListsForUseNcData"),
-	      Napi::Function::New(env, buildSourceListsForUseNcData));
+  Env env = info.Env();
+  if (!info[0].IsArray()) {
+    TypeError::New(env, "isAnySourceCompatibleWithUseSources: non-array parameter")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+  auto sourceList = makeSourceList(env, info[0].As<Array>());
+  bool compatible = cm::isAnySourceCompatibleWithUseSources(sourceList);
+  return Boolean::New(env, compatible);
+}
 
-  exports.Set(Napi::String::New(env, "mergeCompatibleXorSourceCombinations"),
-	      Napi::Function::New(env, mergeCompatibleXorSourceCombinations));
+Object Init(Env env, Object exports) {
+  exports["greetHello"] = Function::New(env, greetHello);
+
+  exports["buildSourceListsForUseNcData"] = Function::New(env, buildSourceListsForUseNcData);
+  exports["mergeAllCompatibleSources"] = Function::New(env, mergeAllCompatibleSources);
+  exports["mergeCompatibleXorSourceCombinations"] = Function::New(env, mergeCompatibleXorSourceCombinations);
+  exports["isAnySourceCompatibleWithUseSources"] = Function::New(env, isAnySourceCompatibleWithUseSources);
 
   return exports;
 }

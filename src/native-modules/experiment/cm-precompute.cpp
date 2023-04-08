@@ -54,107 +54,75 @@ let mergeSources = (source1: AnySourceData, source2: AnySourceData, lazy: boolea
 
 int merges = 0;
 int list_merges = 0;
-SourceData mergeSources(const SourceData& source1, const SourceData& source2) {
+//SourceData
+void mergeSources(SourceData& source1, const SourceData& source2) {
   merges++;
-  NameCountList primaryNameSrcList(source1.primaryNameSrcList);
-  primaryNameSrcList.insert(primaryNameSrcList.end(), source2.primaryNameSrcList.begin(),
-			    source2.primaryNameSrcList.end());
+  //NameCountList primaryNameSrcList = source1.primaryNameSrcList;
+  //primaryNameSrcList.insert(primaryNameSrcList.end(),
+  source1.primaryNameSrcList.insert(source1.primaryNameSrcList.end(),
+    source2.primaryNameSrcList.begin(), source2.primaryNameSrcList.end());
 
-  SourceBits primarySrcBits = source1.primarySrcBits | source2.primarySrcBits;
+  //SourceBits primarySrcBits = source1.primarySrcBits | source2.primarySrcBits;
+  source1.primarySrcBits |= source2.primarySrcBits;
 
-  NameCountList ncList(source1.ncList);
-  ncList.insert(ncList.end(), source2.ncList.begin(), source2.ncList.end());
+  //NameCountList ncList = source1.ncList;
+  //ncList.insert(ncList.end(), source2.ncList.begin(), source2.ncList.end());
+  source1.ncList.insert(source1.ncList.end(), source2.ncList.begin(), source2.ncList.end());
 
-  StringList sourceNcCsvList(source1.sourceNcCsvList);
-  sourceNcCsvList.insert(sourceNcCsvList.end(), source2.sourceNcCsvList.begin(),
-			 source2.sourceNcCsvList.end());
+  //StringList sourceNcCsvList = source1.sourceNcCsvList;
+  //sourceNcCsvList.insert(sourceNcCsvList.end(),
+  source1.sourceNcCsvList.insert(source1.sourceNcCsvList.end(),
+    source2.sourceNcCsvList.begin(), source2.sourceNcCsvList.end());
   
   //synonymCounts: Clue.PropertyCounts.merge(source1.synonymCounts, source2.synonymCounts),
   //mergedSource.ncCsv = NameCount.listToSortedString(ncList);
-  return { primaryNameSrcList, primarySrcBits, ncList, sourceNcCsvList };
+  //return { primaryNameSrcList, primarySrcBits, ncList, sourceNcCsvList };
 }
 
-#if 0
-//
-//
-let mergeCompatibleSources = (source1: AnySourceData, source2: AnySourceData, args: MergeArgs): AnySourceData[] => {
-    // TODO: this logic could be part of mergeSources
-    // also, uh, isn't there a primarySrcArray I can be using here?
-    return allCountUnique2(source1.primaryNameSrcList, source2.primaryNameSrcList)
-        ? [mergeSources(source1, source2, args.lazy)]
-        : [];
-};
-#endif
-
-#if 0
-//
-//
-let mergeCompatibleSourceLists = (sourceList1: AnySourceData[], sourceList2: AnySourceData[], args: MergeArgs): AnySourceData[] => {
-    let mergedSourcesList: AnySourceData[] = [];
-    for (const source1 of sourceList1) {
-        for (const source2 of sourceList2) {
-            mergedSourcesList.push(...mergeCompatibleSources(source1, source2, args))
-        }
-    }
-    return mergedSourcesList;
-};
-#endif
-
-auto mergeCompatibleSourceLists(const SourceList& sourceList1, const SourceList& sourceList2) {
+auto mergeCompatibleSourceLists(const MergedSourcesList& mergedSourcesList, const SourceList& sourceList2) {
   list_merges++;
-  SourceList result;
-  for (const auto& s1 : sourceList1) {
+  MergedSourcesList result{};
+  for (const auto& mergedSources : mergedSourcesList) {
     for (const auto& s2 : sourceList2) {
-      if ((s1.primarySrcBits & s2.primarySrcBits).none()) {
-	cout << "!";
-	result.emplace_back(std::move(mergeSources(s1, s2)));
+      if ((mergedSources.primarySrcBits & s2.primarySrcBits).none()) {
+	MergedSources ms{
+	  mergedSources.primarySrcBits | s2.primarySrcBits,
+	  mergedSources.sourceCRefList
+	};
+	ms.sourceCRefList.push_back(SourceCRef{s2});
+	result.emplace_back(std::move(ms));
       }
     }
   }
   return result;
 }
 
-#if 0
-//
-//
-let mergeAllCompatibleSources = (ncList: NameCount.List, sourceListMap: Map<string, AnySourceData[]> | undefined,
-				 args: MergeArgs): AnySourceData[] => {
-    // because **maybe** broken for > 2 below
-    Assert(ncList.length <= 2, `${ncList} length > 2 (${ncList.length})`);
-    // TODO: reduce (or some) here
-    let sourceList = sourceListMap
-	? sourceListMap.get(NameCount.toString(ncList[0])) as AnySourceData[] 
-	: getSourceList(ncList[0], args);
-    for (let ncIndex = 1; ncIndex < ncList.length; ++ncIndex) {
-        const nextSourceList: AnySourceData[] = sourceListMap
-	    ? sourceListMap.get(NameCount.toString(ncList[ncIndex])) as AnySourceData[]
-	    : getSourceList(ncList[ncIndex], args);
-        sourceList = mergeCompatibleSourceLists(sourceList, nextSourceList, args);
-        if (!sourceListHasPropertyCountInBounds(sourceList, args.synonymMinMax)) sourceList = [];
-        // TODO BUG this is broken for > 2; should be something like: if (sourceList.length !== ncIndex + 1) 
-        if (listIsEmpty(sourceList)) break;
-    }
-    return sourceList;
-};
-#endif
+auto makeMergedSourcesList(const SourceList& sourceList) {
+  //cout << sourceList.size() << endl;
+  MergedSourcesList mergedSourcesList;
+  for (const auto& source : sourceList) {
+    MergedSources ms;
+    ms.primarySrcBits = source.primarySrcBits;
+    ms.sourceCRefList = SourceCRefList{SourceCRef{source}};
+    mergedSourcesList.emplace_back(std::move(ms));
+  }
+  return mergedSourcesList;
+}
 
-// for ncList.size() > 1, not used atm
-SourceList mergeAllCompatibleSources(const NameCountList& ncList, const SourceListMap& sourceListMap) {
-  // TODO: unnecessary copy, ncList.size() == 1, is common case.
-  // TODO: possible small improvement: first walk through all NCs and make sure they
-  // are compatible before doing any merging.
-  // TODO: next improvement: use primarySrcBits and, what, map<bits, SouurceList> ?
-  // or do we need two maps, one for aliased srcBits?, map<bits, map<string, SourceList>>?
+// NOTE: for ncList.size() >= 2
+//
+MergedSourcesList mergeAllCompatibleSources(const NameCountList& ncList, const SourceListMap& sourceListMap) {
   // because **maybe** broken for > 2 below
   assert(ncList.size() <= 2 && "ncList.length > 2");
-  SourceList sourceList = sourceListMap.at(ncList[0].toString());
+  // TODO: find smallest sourcelist to copy first, then skip merge in loop?
+  MergedSourcesList mergedSourcesList = std::move(makeMergedSourcesList(sourceListMap.at(ncList[0].toString())));
   for (auto i = 1u; i < ncList.size(); ++i) {
     const auto& nextSourceList = sourceListMap.at(ncList[i].toString());
-    sourceList = std::move(mergeCompatibleSourceLists(sourceList, nextSourceList));
+    mergedSourcesList = std::move(mergeCompatibleSourceLists(mergedSourcesList, nextSourceList));
     // TODO BUG this is broken for > 2; should be something like: if (sourceList.length !== ncIndex + 1) 
-    if (sourceList.empty()) break;
+    if (mergedSourcesList.empty()) break;
   }
-  return sourceList;
+  return mergedSourcesList;
 }
 
 const SourceList& getSourceList(const NameCountList& ncList, const SourceListMap& sourceListMap) {
@@ -162,7 +130,7 @@ const SourceList& getSourceList(const NameCountList& ncList, const SourceListMap
   return sourceListMap.at(ncList[0].toString());
 }
 
-std::vector<SourceRefList> buildSourceListsForUseNcData(
+std::vector<SourceCRefList> buildSourceListsForUseNcData(
   const vector<NCDataList>& useNcDataLists, const SourceListMap& sourceListMap)
 {
   using StringSet = std::unordered_set<std::string>;
@@ -174,7 +142,7 @@ std::vector<SourceRefList> buildSourceListsForUseNcData(
   int synonyms = 0;
   auto size = useNcDataLists[0].size();
   std::vector<BitsToStringSetMap> hashList(size);
-  std::vector<SourceRefList> sourceLists(size);
+  std::vector<SourceCRefList> sourceCRefLists(size);
   for (const auto& ncDataList : useNcDataLists) {
     for (auto i = 0u; i < ncDataList.size(); ++i) {
       // for size == 2: return by value; could return reference to static local in a pinch
@@ -204,24 +172,24 @@ std::vector<SourceRefList> buildSourceListsForUseNcData(
 	//it = hashList[i].find(source.primarySrcBits);
 	//it->second.insert(key);
 	//sourceLists[i].emplace_back(std::move(source));
-	sourceLists[i].emplace_back(SourceRef(source));
+	sourceCRefLists[i].emplace_back(SourceCRef{source});
       }
     }
   }
   cerr << " hash_hits: " << hash_hits << ", synonyms: " << synonyms
        << ", total: " << total << ", list_merges: " << list_merges 
-       << ", source_merges: " << merges << ", sourceLists: " << sourceLists.size() 
-       << ", " << std::accumulate(sourceLists.begin(), sourceLists.end(), 0u,
-	  [](size_t total, const SourceRefList& list){ return total + list.size(); }) << endl;
-  return sourceLists;
+       << ", source_merges: " << merges << ", sourceLists: " << sourceCRefLists.size() 
+       << ", " << std::accumulate(sourceCRefLists.begin(), sourceCRefLists.end(), 0u,
+	  [](size_t total, const SourceCRefList& list){ return total + list.size(); }) << endl;
+  return sourceCRefLists;
 }
 
 XorSourceList mergeCompatibleXorSources(const std::vector<int>& indexList,
-  const std::vector<SourceRefList>& sourceLists)
+  const std::vector<SourceCRefList>& sourceLists)
 {
   // this part is inner-loop (100s of millions potentially) and should be fast
   // probably should make it a separate function
-  SourceRefList sources{};
+  SourceCRefList sources{};
   SourceBits bits{};
   for (auto i = 0u; i < indexList.size(); ++i) {
     const auto sourceRef = sourceLists[i][indexList[i]]; // reference, uh, optional here?
@@ -243,8 +211,11 @@ XorSourceList mergeCompatibleXorSources(const std::vector<int>& indexList,
   assert(!primaryNameSrcList.empty() && "empty primaryNameSrcList");
 
   XorSourceList result{};
-  XorSource mergedSource{ primaryNameSrcList, ncList,
-    NameCount::listToCountSet(primaryNameSrcList) }; // TODO: bitset?
+  XorSource mergedSource{
+    primaryNameSrcList,
+    NameCount::listToSourceBits(primaryNameSrcList),
+    ncList
+  };
   result.emplace_back(std::move(mergedSource));
   return result;
 }
@@ -258,7 +229,7 @@ std::string vec_to_string(const vector<int>& v) {
   return result;
 }
 
-auto getNumEmptySublists(const std::vector<SourceRefList>& sourceLists) {
+auto getNumEmptySublists(const std::vector<SourceCRefList>& sourceLists) {
   auto count = 0;
   for (const auto& sl : sourceLists) {
     if (sl.empty()) count++;
@@ -267,7 +238,7 @@ auto getNumEmptySublists(const std::vector<SourceRefList>& sourceLists) {
 }
 
 XorSourceList mergeCompatibleXorSourceCombinations(
-  const std::vector<SourceRefList>& sourceLists)
+  const std::vector<SourceCRefList>& sourceLists)
 {
   using namespace std::chrono;
 

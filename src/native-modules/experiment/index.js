@@ -1,3 +1,4 @@
+const Stringify = require('stringify-object');
 const xp = require('./build/Release/experiment.node');
 
 let greet = () => {
@@ -307,7 +308,10 @@ let buildSourceListsForUseNcData = () => {
 };
 
 let mergeCompatibleXorSourceCombinations = () => {
-    xp.mergeCompatibleXorSourceCombinations(ncDataLists, mapEntries);
+    let result = xp.mergeCompatibleXorSourceCombinations(ncDataLists, mapEntries);
+    for (let source of result) {
+	console.log(Stringify(source));
+    }
 };
 
 greet();

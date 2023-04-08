@@ -5,6 +5,7 @@
 'use strict';
 
 import _ from 'lodash';
+import * as CountBits from '../types/count-bits';
 
 //
 //
@@ -75,10 +76,10 @@ export function nameListFromCsv (csv: string): string[] {
 
 //
 
-export function listFromStrList (strList: string[]): NameCount[] {
+export function listFromStrList (strList: string[]): List {
     return strList.map(ncStr => new NameCount_t(ncStr));
 /*
-    let ncList: NameCount[] = nameList.map(nameOrNcStr => {
+    let ncList: List = nameList.map(nameOrNcStr => {
         ncList.push(new NameCount_t(name));
     });
     return ncList;
@@ -91,19 +92,31 @@ export function nameListFromStrList (strList: string[]): string[] {
 
 //
 
-export function listToNameList (ncList: NameCount[]): string[] {
+export function listToNameList (ncList: List): string[] {
     return ncList.map(nc => nc.name);
 }
 
 //
 
-export function listToCountList (ncList: NameCount[]): number[] {
-    return ncList.map(nc => nc.count);
+export function listToCountList (ncList: List): number[] {
+    return ncList.map((nc: Type) => nc.count);
+}
+
+export let listCountSum = (ncList: List): number => {
+    return ncList.reduce((sum: number, nc: Type) => { return sum + nc.count; }, 0);
 }
 
 //
+//
+export let listToCountBits = (ncList: List): CountBits.Type => {
+    let cb = CountBits.makeNew();
+    CountBits.setMany(cb, listToCountList(ncList));
+    return cb;
+};
 
-export function listAddCountsToSet (ncList: NameCount[], set: Set<number>): boolean {
+//
+
+export function listAddCountsToSet (ncList: List, set: Set<number>): boolean {
     for (let nc of ncList) {
 	if (set.has(nc.count)) return false;
 	set.add(nc.count);

@@ -36,6 +36,7 @@
     "paralleljs": "^1.1.0",
     "pretty-ms": "^2.1.0",
     "retry": "^0.10.1",
+    "roaring": "^1.5.2",
     "should": "^11.2.1",
     "simple-git": "^1.132.0",
     "sliced": "^1.0.1",

@@ -9,6 +9,7 @@ const _           = require('lodash');
 
 const Clue        = require('../dist/types/clue');
 const ClueManager = require('../dist/modules/clue-manager');
+const ComboMaker  = require('../dist/modules/combo-maker');
 const NameCount   = require('../dist/types/name-count');
 const Validator   = require('../dist/modules/validator');
 
@@ -129,7 +130,12 @@ function show (options) {
 
     const nameList = options.test.split(',').sort();
     if (nameList.length > 1 && options.fast) {
-	return fast_combo_wrapper(nameList, options);
+	//return fast_combo_wrapper(nameList, options);
+	let args = { xor: nameList, max: 2 };
+	let pcd = ComboMaker.preCompute(2, ClueManager.getNumPrimarySources(), args);
+	console.log("OK");
+	console.log(Stringify(pcd.useSourceLists.xor));
+	process.exit(0);
     }
     const nameCsv = nameList.toString();
     const result = ClueManager.getCountListArrays(nameCsv, options);
@@ -213,47 +219,51 @@ function buildSubListFromIndexList (nameList, indexList) {
     return subList;
 }
 
+// I don't know what the hell is going on here. I tried to get --or work with -t or something?
+// And it made me jump through some extra hoops here? The code doesn't appear to be working.
+function flunky (nameList, /*allOrNcDataList,*/ options) {
+    const validResults = {};
+    let clueNameList = [...get_clue_names(options), ...options.or];
+    const min = 2;
+    let max = clueNameList.length;
+    const indexList = [...Array(max).keys()]; // 0..max (-1?)
+    console.log(`maxArg: ${options.maxArg}`);
+    let maxIter = options.maxArg ? options.maxArg : max;
+    for (let count = maxIter; count >= min; --count) {
+	Timing(`wrapper count(${count})`);
+	const listArray = [...Array(count).keys()].map(_ => indexList);
+	let peco = Peco.makeNew({
+	    listArray,
+	    max: count * max
+	});
+	let comboCount = 0;
+	let comboList;
+	for (/*let */comboList = peco.firstCombination(); !_.isNull(comboList); comboList = peco.nextCombination()) {
+	    comboCount++;
+	    //console.log(`comboList: ${comboList}`); //***logging
+	    //if (1) continue;
+	    //if (_.uniq(comboList).length !== comboList.length) continue;
+	    //console.log(comboList);
+	    let subList = buildSubListFromIndexList(clueNameList, comboList);
+	    let comboNameList = [...nameList, ...subList];
+	    //console.log(`comboNameList: ${comboNameList}`);
+	    let validResultList = fast_combos_list(comboNameList, Object.assign(
+                _.clone(options), { quiet: true, skip_invalid: true }));
+	    addValidResults(validResults, validResultList, { slice_index: nameList.length });
+	}
+	Timing(`comboCount: ${comboCount}`);
+	
+	// Bigger idea: optional arg(s) to -t[COUNTLO[,COUNTHI]]
+	// build list of input clues from all clues of those counts
+    }
+    display_valid_results(validResults);
+}
+
 function fast_combo_wrapper (nameList, /*allOrNcDataList,*/ options) {
     console.log('fast_combo_wrapper');
     console.log(`--or: ${Stringify(options.or)}`);
-    // I don't know what the hell is going on here. I tried to get --or work with -t or something?
-    // And it made me jump through some extra hoops here? The code doesn't appear to be working.
     if (options.or) {
-	const validResults = {};
-	let clueNameList = [...get_clue_names(options), ...options.or];
-	const min = 2;
-	let max = clueNameList.length;
-	const indexList = [...Array(max).keys()]; // 0..max (-1?)
-	console.log(`maxArg: ${options.maxArg}`);
-	let maxIter = options.maxArg ? options.maxArg : max;
-	for (let count = maxIter; count >= min; --count) {
-	    Timing(`wrapper count(${count})`);
-	    const listArray = [...Array(count).keys()].map(_ => indexList);
-	    let peco = Peco.makeNew({
-		listArray,
-		max: count * max
-	    });
-	    let comboCount = 0;
-	    let comboList;
-	    for (/*let */comboList = peco.firstCombination(); !_.isNull(comboList); comboList = peco.nextCombination()) {
-		comboCount++;
-		//console.log(`comboList: ${comboList}`); //***logging
-		//if (1) continue;
-		//if (_.uniq(comboList).length !== comboList.length) continue;
-		//console.log(comboList);
-		let subList = buildSubListFromIndexList(clueNameList, comboList);
-		let comboNameList = [...nameList, ...subList];
-		//console.log(`comboNameList: ${comboNameList}`);
-		let validResultList = fast_combos_list(comboNameList, Object.assign(
-                    _.clone(options), { quiet: true, skip_invalid: true }));
-		addValidResults(validResults, validResultList, { slice_index: nameList.length });
-	    }
-	    Timing(`comboCount: ${comboCount}`);
-
-	    // Bigger idea: optional arg(s) to -t[COUNTLO[,COUNTHI]]
-	    // build list of input clues from all clues of those counts
-	}
-	display_valid_results(validResults);
+	flunky(nameList, options);
     } else {
 	let counts = fast_combos(nameList, options);
         addOrRemove ({

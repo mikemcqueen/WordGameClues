@@ -71,69 +71,58 @@ struct NCData {
 
 using NCDataList = std::vector<NCData>;
 
-struct SourceData {
+struct SourceBase {
   std::vector<NameCount> primaryNameSrcList;
   SourceBits primarySrcBits;
   std::vector<NameCount> ncList;
+};
+
+struct SourceData : SourceBase {
   std::vector<std::string> sourceNcCsvList;
   // synonymCounts
 };
 
 using SourceList = std::vector<SourceData>;
 using SourceListMap = std::unordered_map<std::string, SourceList>;
-using SourceRef = std::reference_wrapper<const SourceData>;
-using SourceRefList = std::vector<SourceRef>;
+  //using SourceRef = std::reference_wrapper<SourceData>;
+  //using SourceRefList = std::vector<SourceRef>;
+using SourceCRef = std::reference_wrapper<const SourceData>;
+using SourceCRefList = std::vector<SourceCRef>;
 
-struct XorSource {
-  std::vector<NameCount> primaryNameSrcList;
-  std::vector<NameCount> ncList;
-  std::unordered_set<int> primarySrcSet;
-};
+using XorSource = SourceBase;
+using OrSource = SourceBase; // TODO: for now
 
 using XorSourceList = std::vector<XorSource>;
+using OrSourceList = std::vector<OrSource>; // TODO: for now
+
+struct PreComputedData {
+  XorSourceList xorSourceList;
+  OrSourceList orSourceList;
+  SourceListMap sourceListMap;
+};
+
+struct MergedSources {
+  SourceBits primarySrcBits;
+  SourceCRefList sourceCRefList;
+};
+
+using MergedSourcesList = std::vector<MergedSources>;
 
 using StringList = std::vector<std::string>;
 
-//
+// functions
  
-std::vector<SourceRefList> buildSourceListsForUseNcData(
+std::vector<SourceCRefList> buildSourceListsForUseNcData(
   const std::vector<NCDataList>& useNcDataLists,
   const SourceListMap& sourceListMap);
 
+MergedSourcesList mergeAllCompatibleSources(const NameCountList& ncList,
+  const SourceListMap& sourceListMap);
+
 XorSourceList mergeCompatibleXorSourceCombinations(
-  const std::vector<SourceRefList>& sourceLists);
+  const std::vector<SourceCRefList>& sourceLists);
 
-#if 0
-template <typename T>
-typename std::vector<T>::iterator append(std::vector<T>& dst, const std::vector<T>& src)
-{
-    typename std::vector<T>::iterator result;
-    if (dst.empty()) {
-        dst = src;
-        result = std::begin(dst);
-    } else {
-        result = dst.insert(std::end(dst), std::cbegin(src), std::cend(src));
-    }
-    return result;
-}
-
-template <typename T>
-typename std::vector<T>::const_iterator append(std::vector<T>& dst, std::vector<T>&& src)
-{
-    typename std::vector<T>::const_iterator result;
-    if (dst.empty()) {
-        dst = std::move(src);
-        result = std::cbegin(dst);
-    } else {
-        result = dst.insert(std::end(dst),
-                             std::make_move_iterator(std::begin(src)),
-                             std::make_move_iterator(std::end(src)));
-    }
-    src.clear();
-    src.shrink_to_fit();
-    return result;
-}
-#endif
+bool isAnySourceCompatibleWithUseSources(const SourceList& sourceList);
 
 } // namespace cm
 
