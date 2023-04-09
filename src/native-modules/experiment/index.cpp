@@ -136,6 +136,40 @@ cm::SourceListMap makeSourceListMap(Napi::Env& env, const Napi::Array& jsList) {
   return map;
 }
 
+// FromSourceList
+cm::SourceBits makeSourceBits(Napi::Env& env, const Napi::Array& jsList) {
+  cm::SourceBits sourceBits{};
+  for (auto i = 0u; i < jsList.Length(); ++i) {
+    if (!jsList[i].IsObject()) {
+      Napi::TypeError::New(env, "makeSourceBits: non-object element").ThrowAsJavaScriptException();
+      return {};
+    }
+    const auto jsPnsl = jsList[i].As<Object>().Get("primaryNameSrcList").As<Array>();
+    for (auto j = 0u; j < jsPnsl.Length(); ++j) {
+      const auto jsNc = jsPnsl[j].As<Object>();
+      sourceBits.set(jsNc.Get("count").As<Number>().Int32Value());
+    }
+  }
+  return sourceBits;
+}
+
+// FromMergedSourcesList
+cm::SourceBitsList makeSourceBitsList(Napi::Env& env, const Napi::Array& jsList) {
+  cm::SourceBitsList sourceBitsList{};
+  for (auto i = 0u; i < jsList.Length(); ++i) {
+    if (!jsList[i].IsObject()) {
+      Napi::TypeError::New(env, "makeSourceBitsList: non-object element").ThrowAsJavaScriptException();
+      return {};
+    }
+    sourceBitsList.emplace_back(std::move(makeSourceBits(env,
+        jsList[i].As<Object>().Get("sourceList").As<Array>())));
+  }
+  return sourceBitsList;
+}
+
+//
+//
+//
 Value buildSourceListsForUseNcData(const CallbackInfo& info) {
   Env env = info.Env();
   if (!info[0].IsArray() || !info[1].IsArray()) {
@@ -226,8 +260,9 @@ Value isAnySourceCompatibleWithUseSources(const CallbackInfo& info) {
       .ThrowAsJavaScriptException();
     return env.Null();
   }
-  auto sourceList = makeSourceList(env, info[0].As<Array>());
-  bool compatible = cm::isAnySourceCompatibleWithUseSources(sourceList);
+  auto sourceBitsList = makeSourceBitsList(env, info[0].As<Array>());
+  auto flag = info[1].As<Boolean>();
+  bool compatible = cm::isAnySourceCompatibleWithUseSources(sourceBitsList, flag);
   return Boolean::New(env, compatible);
 }
 

@@ -12,6 +12,7 @@ namespace cm {
 
 constexpr auto kMaxPrimarySources = 111;
 using SourceBits = std::bitset<kMaxPrimarySources>;
+using SourceBitsList = std::vector<SourceBits>;
 
 struct NameCount {
   std::string name;
@@ -122,7 +123,7 @@ MergedSourcesList mergeAllCompatibleSources(const NameCountList& ncList,
 XorSourceList mergeCompatibleXorSourceCombinations(
   const std::vector<SourceCRefList>& sourceLists);
 
-bool isAnySourceCompatibleWithUseSources(const SourceList& sourceList);
+bool isAnySourceCompatibleWithUseSources(const SourceBitsList& sourceBitsList, bool flag);
 
 } // namespace cm
 

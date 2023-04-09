@@ -5,7 +5,6 @@
 'use strict';
 
 import _ from 'lodash';
-import * as CountBits from '../types/count-bits';
 
 //
 //
@@ -105,14 +104,6 @@ export function listToCountList (ncList: List): number[] {
 export let listCountSum = (ncList: List): number => {
     return ncList.reduce((sum: number, nc: Type) => { return sum + nc.count; }, 0);
 }
-
-//
-//
-export let listToCountBits = (ncList: List): CountBits.Type => {
-    let cb = CountBits.makeNew();
-    CountBits.setMany(cb, listToCountList(ncList));
-    return cb;
-};
 
 //
 

@@ -18,6 +18,7 @@
     "encodeurl": "^1.0.2",
     "event-stream": "^3.3.5",
     "evernote": "^2.0.5",
+    "fastbitset": "^0.4.0",
     "fs-extra": "^4.0.3",
     "google-it": "^1.6.2",
     "he": "^1.2.0",

@@ -25,6 +25,7 @@ const stringify = require('javascript-stringify').stringify;
 import * as NameCount from '../types/name-count';
 import * as Clue from '../types/clue';
 import * as ClueList from '../types/clue-list';
+import * as CountBits from '../types/count-bits-fastbitset';
 import type { ValidateResult, ValidateSourcesResult } from './validator';
 
 //
@@ -473,7 +474,7 @@ let initPropertyCountsInAllResults = (nc: NameCount.Type, results: ValidateResul
 
 let initSrcBitsInAllResults = (results: ValidateResult[]): void => {
     for (let result of results) {
-	result.srcBits = NameCount.listToCountBits(result.nameSrcList);
+	result.srcBits = CountBits.makeFrom(NameCount.listToCountList(result.nameSrcList));
     }
 }
 
@@ -1023,7 +1024,7 @@ function singleEntry (nc: NameCount.Type, source: string): any {
 	results: [
             {
 		nameSrcList,
-		srcBits: NameCount.listToCountBits(nameSrcList),
+		srcBits: CountBits.makeFrom(NameCount.listToCountList(nameSrcList)),
 		ncList: [nc],
             }
 	]
@@ -1046,7 +1047,6 @@ export let getKnownSourceMapEntries = function (nc: NameCount.Type, andSources =
             const entry = (nc.count === 1)
                 ? singleEntry(nc, sourcesList[index])
                 : getKnownSourceMap(nc.count)[sources];
-            //console.log(` sources: ${sources}`); // entry: ${Stringify(entry)}, entry2: ${Stringify(entry2)}`);
             return andSources ? { entry, sources } : entry;
         }); 
 };
