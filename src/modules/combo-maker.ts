@@ -121,48 +121,39 @@ interface MergedSources {
 type MergedSourcesList = MergedSources[];
 
 
-namespace CompatibleOrSource {
-    //
-    //
-    export interface Type {
-        source: SourceData;
-        xorCompatible: boolean;
-        andCompatible: boolean;
-    }
+interface OrSourceData {
+    source: SourceData;
+    xorCompatible: boolean;
+    andCompatible: boolean;
+}
+type OrSourceList = OrSourceData[];
 
-    export function init (source: SourceData): Type {
-        return {
-            source,
-            xorCompatible: false,
-            andCompatible: false
-        };
-    }
-
-    //
-    //
-    export interface ListContainer {
-        compatibleSourceList: Type[];
-        compatible: boolean;
-    }
-
-    export function listContainerInit (): ListContainer {
-        return {
-            compatibleSourceList: [],
-            compatible: false
-        };
-    }
+let initOrSource = (source: SourceData): OrSourceData => {
+    return {
+        source,
+        xorCompatible: false,
+        andCompatible: false
+    };
 }
 
-// One OrSource contains all of the data for a single --or argument.
+// One OrArgData contains all of the data for a single --or argument.
 //
-interface OrSource {
-    sourceListContainer: CompatibleOrSource.ListContainer;
+interface OrArgData {
+    orSourceList: OrSourceList;
+    compatible: boolean;
 }
-type OrSourceList = OrSource[];
+type OrArgDataList = OrArgData[];
+
+let initOrArgData = (): OrArgData => {
+    return {
+        orSourceList: [],
+        compatible: false
+    };
+}
 
 interface UseSourceLists {
     xor: XorSourceList;
-    or: OrSourceList;
+    orArgDataList: OrArgDataList;
 }
 
 interface PreComputedData {
@@ -837,6 +828,7 @@ let fillKnownNcSourceListMapForSum = (map: Map<string, AnySourceData[]>,
 let getKnownNcSourceListMap = (first: number, last: number,
     args: any): Map<string, AnySourceData[]> =>
 {
+    // NOTE: correct, but hacky
     last = ClueManager.getNumPrimarySources();
     let map = new Map<string, AnySourceData[]>();
     const mergeArgs = { synonymMinMax: args.synonymMinMax };
@@ -1034,6 +1026,7 @@ let first = (countList: number[], clueIndexes: number[]): FirstNextResult => {
     return next(countList, clueIndexes);
 };
 
+/*
 //
 //
 let isAnyCompatibleOrSourceANDCompatibleWithSource = (
@@ -1071,27 +1064,6 @@ let isAnyCompatibleOrSourceXORCompatibleWithSource = (
     return compatible;
 };
 
-/*
-//
-//
-let isSourceArrayANDCompatibleWithSourceList = (primarySrcArrayAndSize: CountArrayAndSize, sourceList: SourceList): boolean => {
-    //
-    //
-    // TODO: I think I should eliminate .and sourceLists if any one of them is compatible
-    // with a supplied XorSource, in filterXOR... (or add a filterAND.. method as well).
-    //
-    //
-    Assert(!listIsEmpty(sourceList));
-    let compatible = true;
-    for (const source of sourceList) {
-        const numCountsInArray = getNumCountsInArray(source.primaryNameSrcList, primarySrcArrayAndSize.array);
-        compatible = numCountsInArray === primarySrcArrayAndSize.size;
-        if (!compatible) break;
-    }
-    return compatible;
-}
-*/
-
 // OR == XOR || AND
 //
 let isSourceCompatibleWithEveryOrSource = (source: SourceData, orSourceList: OrSource[]) : boolean => {
@@ -1114,6 +1086,7 @@ let isSourceCompatibleWithEveryOrSource = (source: SourceData, orSourceList: OrS
     }
     return compatible;
 };
+*/
 
 /*
 //
@@ -1177,7 +1150,8 @@ let isAnySourceCompatibleWithUseSources = (sourceList: SourceList, pcd: PreCompu
         // to next source.
         if (!compatible) continue;
 
-        compatible = isSourceCompatibleWithEveryOrSource(source, pcd.useSourceLists.or);
+	// TODO:
+	//compatible = isSourceCompatibleWithEveryOrSource(source, pcd.useSourceLists.orArgDataList);
         if (compatible) break;
     }
     return compatible;
@@ -1759,35 +1733,33 @@ let buildCombinedUseNcDataLists = (useArgsList: string[],
 
 //
 //
-let buildCompatibleOrSourceListContainer = (sourceList: SourceList): CompatibleOrSource.ListContainer => {
-    const listContainer = CompatibleOrSource.listContainerInit();
+let buildOrArgData = (sourceList: SourceList): OrArgData => {
+    const orArgData = initOrArgData();
     for (let source of sourceList) {
-        const compatibleSource = CompatibleOrSource.init(source);
-        listContainer.compatibleSourceList.push(compatibleSource);
+        const orSource = initOrSource(source);
+        orArgData.orSourceList.push(orSource);
     }
-    return listContainer;
+    return orArgData;
 };
 
 //
-let buildOrSourceList = (sourceLists: SourceList[]): OrSource[] => {
-    let orSourceList: OrSource[] = [];
+let buildOrArgDataList = (sourceLists: SourceList[]): OrArgDataList => {
+    let orArgDataList: OrArgDataList = [];
     for (let sourceList of sourceLists) {
-        const orSource: OrSource = {
-            sourceListContainer: buildCompatibleOrSourceListContainer(sourceList)
-        };
-        orSourceList.push(orSource);
+        const orArgData: OrArgData = buildOrArgData(sourceList);
+        orArgDataList.push(orArgData);
     }
-    return orSourceList;
+    return orArgDataList;
 };
 
 // Given a list of XorSources, and a list of OrSources, TODO
 //
-let markAllXORCompatibleOrSources = (xorSourceList: XorSource[], orSourceList: OrSource[]): void => {
-    for (let orSource of orSourceList) {
-        let compatibleSourceList = orSource.sourceListContainer.compatibleSourceList;
-        for (let compatibleSource of compatibleSourceList) {
-            if (isSourceXORCompatibleWithAnyXorSource(compatibleSource.source, xorSourceList)) {
-                compatibleSource.xorCompatible = true;
+let markAllXORCompatibleOrSources = (xorSourceList: XorSource[], orArgDataList: OrArgDataList): void => {
+    for (let orArgData of orArgDataList) {
+        const orSourceList = orArgData.orSourceList;
+        for (let orSource of orSourceList) {
+            if (isSourceXORCompatibleWithAnyXorSource(orSource.source, xorSourceList)) {
+                orSource.xorCompatible = true;
             }
         }
     }
@@ -1797,42 +1769,20 @@ let markAllXORCompatibleOrSources = (xorSourceList: XorSource[], orSourceList: O
 //
 let buildUseSourceListsFromNcData = (sourceListMap: Map<string, AnySourceData[]>, args: any): UseSourceLists => {
     // XOR first
-
-    //const mergeArgs = { synonymMinMax: args.synonymMinMax };
-    //const sourceListMap = getUseNcSourceListMap(args.allXorNcDataLists, mergeArgs);
-
-    let native = new Date();
-    let xorSourceList: XorSource[] = NativeComboMaker.mergeCompatibleXorSourceCombinations(
+    let xor0 = new Date();
+    let xorSourceList: XorSourceList = NativeComboMaker.mergeCompatibleXorSourceCombinations(
 	args.allXorNcDataLists, Array.from(sourceListMap.entries()));
     setPrimarySrcBits(xorSourceList);
-    let nend = new Duration(native, new Date()).milliseconds;
-    console.error(` Native.mergeCompatibleXorSourceCombinations(${PrettyMs(nend)})`);
-    //
+    let xdur = new Duration(xor0, new Date()).milliseconds;
+    console.error(` Native.mergeCompatibleXorSourceCombinations(${PrettyMs(xdur)})`);
 
-    /*
-    let merge = new Date();
-    let sourceLists = getUseSourceLists(args.allXorNcDataLists, args);
-    let sum = sourceLists.reduce((total, sl) => { return total + sl.length; }, 0);
-    console.error(` sourceLists(${sourceLists.length}), sourceLists(${sum})`);
-    let xorSourceList = mergeCompatibleXorSourceCombinations(sourceLists);
-    let dmerge = new Duration(merge, new Date()).milliseconds;
-    console.error(`xorSourceList(${xorSourceList.length}), total(${PrettyMs(dmerge)})`);
-    */
-
-    /* TODOTODOTODOTODOTODO
-    * TODOTODOTODOTODOTODO
-    * TODOTODOTODOTODOTODO
-    * TODOTODOTODOTODOTODO
-    * TODOTODOTODOTODOTODO
-    * TODOTODOTODOTODOTODO
     // OR next
-    let build = new Date();
-    let orSourceList = buildOrSourceList(getUseSourceLists(args.allOrNcDataLists, args));
-    let dbuild = new Duration(build, new Date()).milliseconds;
-    console.error(`orSourceList(${orSourceList.length}), build(${PrettyMs(dbuild)})`);
-    */
-    let orSourceList = [];
-    //console.log(`orSourceList: ${Stringify2(orSourceList)}`);
+    let or0 = new Date();
+    const mergeArgs = { synonymMinMax: args.synonymMinMax };
+    let orArgDataList = buildOrArgDataList(buildSourceListsForUseNcData(
+	args.allOrNcDataLists, sourceListMap, mergeArgs));
+    let odur = new Duration(or0, new Date()).milliseconds;
+    console.error(`orArgDataList(${orArgDataList.length}), build(${PrettyMs(odur)})`);
 
     // Thoughts on AND compatibility of OrSources:
     // Just because (one sourceList of) an OrSource is AND compatible with an
@@ -1843,10 +1793,12 @@ let buildUseSourceListsFromNcData = (sourceListMap: Map<string, AnySourceData[]>
     // So, a container can be marked compatible if and only if there are no
     // no remaining XOR-compatible sourceLists.
     //TODO: markAllANDCompatibleOrSources(xorSourceList, orSourceList);
-    let mark = new Date();
-    markAllXORCompatibleOrSources(xorSourceList, orSourceList);
-    let dmark = new Duration(mark, new Date()).milliseconds;
-    console.error(`mark(${PrettyMs(dmark)})`);
+    let mark0 = new Date();
+    markAllXORCompatibleOrSources(xorSourceList, orArgDataList);
+    let mdur = new Duration(mark0, new Date()).milliseconds;
+    console.error(`mark(${PrettyMs(mdur)})`);
+
+    NativeComboMaker.setOrArgDataList(orArgDataList);
 
     /*
     if (1) {
@@ -1857,7 +1809,7 @@ let buildUseSourceListsFromNcData = (sourceListMap: Map<string, AnySourceData[]>
         });
     }
     */
-    return { xor: xorSourceList, or: orSourceList };
+    return { xor: xorSourceList, orArgDataList: orArgDataList };
 };
 
 /*

@@ -167,8 +167,47 @@ cm::SourceBitsList makeSourceBitsList(Napi::Env& env, const Napi::Array& jsList)
   return sourceBitsList;
 }
 
+cm::OrSourceData makeOrSource(Napi::Env& env, const Napi::Object& jsObject) {
+  cm::OrSourceData orSource;
+  orSource.source = std::move(makeSourceData(env, jsObject["source"].As<Object>()));
+  orSource.xorCompatible = jsObject["xorCompatible"].As<Boolean>();
+  orSource.andCompatible = jsObject["andCompatible"].As<Boolean>();
+  return orSource;
+}
+
+cm::OrSourceList makeOrSourceList(Napi::Env& env, const Napi::Array& jsList) {
+  cm::OrSourceList orSourceList{};
+  for (auto i = 0u; i < jsList.Length(); ++i) {
+    if (!jsList[i].IsObject()) {
+      Napi::TypeError::New(env, "makeOrSourceList: non-object element").ThrowAsJavaScriptException();
+      return {};
+    }
+    orSourceList.emplace_back(std::move(makeOrSource(env, jsList[i].As<Object>())));
+  }
+  return orSourceList;
+}
+
+cm::OrArgData makeOrArgData(Napi::Env& env, const Napi::Object& jsObject) {
+  cm::OrArgData orArgData{};
+  orArgData.orSourceList = std::move(makeOrSourceList(env, jsObject["orSourceList"].As<Array>()));
+  orArgData.compatible = jsObject["compatible"].As<Boolean>();
+  return orArgData;
+}
+
+cm::OrArgDataList makeOrArgDataList(Napi::Env& env, const Napi::Array& jsList) {
+  cm::OrArgDataList orArgDataList{};
+  for (auto i = 0u; i < jsList.Length(); ++i) {
+    if (!jsList[i].IsObject()) {
+      Napi::TypeError::New(env, "makeOrArgDataList: non-object element").ThrowAsJavaScriptException();
+      return {};
+    }
+    orArgDataList.emplace_back(std::move(makeOrArgData(env, jsList[i].As<Object>())));
+  }
+  return orArgDataList;
+}
+
 //
-//
+// unused? i think
 //
 Value buildSourceListsForUseNcData(const CallbackInfo& info) {
   Env env = info.Env();
@@ -189,7 +228,6 @@ Value buildSourceListsForUseNcData(const CallbackInfo& info) {
 namespace cm {
   extern PreComputedData PCD;
 }
-
 
 //
 // mergeAllCompatibleSources
@@ -228,6 +266,8 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   auto d_unwrap = duration_cast<milliseconds>(unwrap1 - unwrap0).count();
   cerr << " native unwrap: " << d_unwrap << "ms" << endl;
 
+  //--
+    
   auto build0 = high_resolution_clock::now();
 
   auto sourceLists = cm::buildSourceListsForUseNcData(ncDataLists, cm::PCD.sourceListMap);
@@ -236,14 +276,17 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   auto d_build = duration_cast<milliseconds>(build1 - build0).count();
   cerr << " native build: " << d_build << "ms" << endl;
 
+  //--
+
   auto merge0 = high_resolution_clock::now();
 
   cm::PCD.xorSourceList = cm::mergeCompatibleXorSourceCombinations(sourceLists);
-  cm::PCD.orSourceList = cm::OrSourceList{};
 
   auto merge1 = high_resolution_clock::now();
   auto d_merge = duration_cast<milliseconds>(merge1 - merge0).count();
   cerr << " native merge: " << d_merge << "ms" << endl;
+
+  //--
 
   return cm::wrap(env, cm::PCD.xorSourceList);
 }
@@ -266,13 +309,30 @@ Value isAnySourceCompatibleWithUseSources(const CallbackInfo& info) {
   return Boolean::New(env, compatible);
 }
 
+//
+// setOrArgDataList
+//
+Value setOrArgDataList(const CallbackInfo& info) {
+  using namespace std::chrono;
+
+  Env env = info.Env();
+  if (!info[0].IsArray()) {
+      Napi::TypeError::New(env, "mergeCompatibleXorSourceCombinations: non-array parameter")
+	.ThrowAsJavaScriptException();
+      return env.Null();
+  }
+  cm::PCD.orArgDataList = makeOrArgDataList(env, info[0].As<Array>());
+  return env.Null();
+}
+
 Object Init(Env env, Object exports) {
   exports["greetHello"] = Function::New(env, greetHello);
 
-  exports["buildSourceListsForUseNcData"] = Function::New(env, buildSourceListsForUseNcData);
+  //  exports["buildSourceListsForUseNcData"] = Function::New(env, buildSourceListsForUseNcData);
   exports["mergeAllCompatibleSources"] = Function::New(env, mergeAllCompatibleSources);
   exports["mergeCompatibleXorSourceCombinations"] = Function::New(env, mergeCompatibleXorSourceCombinations);
   exports["isAnySourceCompatibleWithUseSources"] = Function::New(env, isAnySourceCompatibleWithUseSources);
+  exports["setOrArgDataList"] = Function::New(env, setOrArgDataList);
 
   return exports;
 }

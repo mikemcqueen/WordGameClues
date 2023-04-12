@@ -5,10 +5,54 @@ namespace cm {
 
 PreComputedData PCD;
 
-auto isSourceCompatibleWithEveryOrSource(const SourceBits& sourceBits,
+#if 0
+struct OrSource : SourceData {
+  bool xorCompatible = false;
+  bool andCompatible = false;
+};
+
+// One OrArgData contains all of the data for a single --or argument.
+//
+struct OrArgData {
+  std::vector<OrSource> orSourceList;
+  bool compatible = false;
+};
+using OrArgDataList = std::vector<OrArgData>;
+#endif
+
+//
+//
+auto isSourceORCompatibleWithAnyOrSource(const SourceBits& sourceBits,
   const OrSourceList& orSourceList)
 {
-  return true;
+    auto compatible = false;
+    for (const auto& orSource : orSourceList) {
+      // skip any sources that were already determined to be XOR incompatible or AND compatible
+      // with command-line supplied --xor sources.
+      if (!orSource.xorCompatible || orSource.andCompatible) continue;
+      auto andBits = (sourceBits & orSource.source.primarySrcBits);
+      // OR == XOR || AND
+      compatible = andBits.none() || (andBits == orSource.source.primarySrcBits);
+      if (compatible) break;
+    }
+    return compatible;
+};
+
+//
+//
+auto isSourceCompatibleWithEveryOrArg(const SourceBits& sourceBits,
+  const OrArgDataList& orArgDataList)
+{
+  auto compatible = true; // if no --or sources specified, compatible == true
+  for (const auto& orArgData : orArgDataList) {
+    // TODO: skip calls to here if container.compatible = true  which may have
+    // been determined in Precompute phase @ markAllANDCompatibleOrSources()
+    // and skip the XOR check as well in this case.
+    compatible = isSourceORCompatibleWithAnyOrSource(sourceBits,
+      orArgData.orSourceList);
+    if (!compatible) break;
+  }
+  return compatible;
 }
 
 auto isSourceXORCompatibleWithAnyXorSource(const SourceBits& sourceBits,
@@ -18,11 +62,6 @@ auto isSourceXORCompatibleWithAnyXorSource(const SourceBits& sourceBits,
   bool compatible = xorSourceList.empty(); // empty list == compatible
   for (const auto& xorSource : xorSourceList) {
     compatible = (sourceBits & xorSource.primarySrcBits).none();
-    if (flag) {
-      cout << sourceBits.to_string() << endl
-	   << xorSource.primarySrcBits.to_string() << endl
-	   << "+++++ " << std::boolalpha << compatible << endl;
-    }
     if (compatible) break;
   }
   return compatible;
@@ -38,7 +77,7 @@ bool isAnySourceCompatibleWithUseSources(const SourceBitsList& sourceBitsList, b
     // to next source.
     if (!compatible) continue;
 
-    compatible = isSourceCompatibleWithEveryOrSource(sourceBits, PCD.orSourceList);
+    compatible = isSourceCompatibleWithEveryOrArg(sourceBits, PCD.orArgDataList);
     if (compatible) break;
   }
   return compatible;

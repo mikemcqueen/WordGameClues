@@ -248,10 +248,12 @@ XorSourceList mergeCompatibleXorSourceCombinations(
   for (const auto& sl : sourceLists) {
     lengths.push_back(sl.size());
   }
+
+  auto peco0 = high_resolution_clock::now();
+
   int combos = 0;
   XorSourceList sourceList{};
   Peco peco(lengths);
-  auto peco0 = high_resolution_clock::now();
   for (auto indexList = peco.first_combination(); indexList;
        indexList = peco.next_combination())
   {
@@ -261,6 +263,7 @@ XorSourceList mergeCompatibleXorSourceCombinations(
     }
     ++combos;
   }
+
   auto peco1 = high_resolution_clock::now();
   auto d_peco = duration_cast<milliseconds>(peco1 - peco0).count();
   cerr << " Native peco loop: " << d_peco << "ms" << ", combos: " << combos

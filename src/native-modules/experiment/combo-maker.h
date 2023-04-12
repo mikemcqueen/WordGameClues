@@ -85,20 +85,30 @@ struct SourceData : SourceBase {
 
 using SourceList = std::vector<SourceData>;
 using SourceListMap = std::unordered_map<std::string, SourceList>;
-  //using SourceRef = std::reference_wrapper<SourceData>;
-  //using SourceRefList = std::vector<SourceRef>;
 using SourceCRef = std::reference_wrapper<const SourceData>;
 using SourceCRefList = std::vector<SourceCRef>;
 
 using XorSource = SourceBase;
-using OrSource = SourceBase; // TODO: for now
-
 using XorSourceList = std::vector<XorSource>;
-using OrSourceList = std::vector<OrSource>; // TODO: for now
+
+struct OrSourceData {
+  SourceData source;
+  bool xorCompatible = false;
+  bool andCompatible = false;
+};
+using OrSourceList = std::vector<OrSourceData>;
+
+// One OrArgData contains all of the data for a single --or argument.
+//
+struct OrArgData {
+  OrSourceList orSourceList;
+  bool compatible = false;
+};
+using OrArgDataList = std::vector<OrArgData>;
 
 struct PreComputedData {
   XorSourceList xorSourceList;
-  OrSourceList orSourceList;
+  OrArgDataList orArgDataList;
   SourceListMap sourceListMap;
 };
 
