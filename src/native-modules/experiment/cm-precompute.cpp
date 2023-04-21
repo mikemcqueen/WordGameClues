@@ -184,24 +184,29 @@ std::vector<SourceCRefList> buildSourceListsForUseNcData(
   return sourceCRefLists;
 }
 
-XorSourceList mergeCompatibleXorSources(const std::vector<int>& indexList,
+// this part is inner-loop (100s of millions potentially) and should be fast
+SourceCRefList getCompatibleXorSources(const std::vector<int>& indexList,
   const std::vector<SourceCRefList>& sourceLists)
 {
-  // this part is inner-loop (100s of millions potentially) and should be fast
-  // probably should make it a separate function
-  SourceCRefList sources{};
+  const auto firstSourceRef = sourceLists[0][indexList[0]]; // reference type, uh, optional here?
+  SourceCRefList sourceList{};
+  sourceList.emplace_back(std::move(firstSourceRef));
   SourceBits bits{};
-  for (auto i = 0u; i < indexList.size(); ++i) {
-    const auto sourceRef = sourceLists[i][indexList[i]]; // reference, uh, optional here?
+  bits |= firstSourceRef.get().primarySrcBits;
+  for (auto i = 1u; i < indexList.size(); ++i) {
+    const auto sourceRef = sourceLists[i][indexList[i]]; // reference type, uh, optional here?
     if ((bits & sourceRef.get().primarySrcBits).any()) return {};
     bits |= sourceRef.get().primarySrcBits;
-    sources.push_back(sourceRef);
+    sourceList.emplace_back(std::move(sourceRef));
   }
-  // below here is called much less often, less speed critical
+  return sourceList;
+}
 
+// here is called much less often, less speed critical
+XorSourceList mergeCompatibleXorSources(const SourceCRefList& sourceList) {
   NameCountList primaryNameSrcList{};
   NameCountList ncList{};
-  for (const auto sourceRef : sources) {
+  for (const auto sourceRef : sourceList) {
     const auto& pnsl = sourceRef.get().primaryNameSrcList;
     primaryNameSrcList.insert(primaryNameSrcList.end(), pnsl.begin(), pnsl.end()); // copy (by design?)
     const auto& ncl = sourceRef.get().ncList;
@@ -209,14 +214,69 @@ XorSourceList mergeCompatibleXorSources(const std::vector<int>& indexList,
   }
   // I feel like this is still valid and worth removing or commenting
   assert(!primaryNameSrcList.empty() && "empty primaryNameSrcList");
-
+  XorSource mergedSource(std::move(primaryNameSrcList),
+			 std::move(NameCount::listToSourceBits(primaryNameSrcList)),
+			 std::move(ncList));
   XorSourceList result{};
-  XorSource mergedSource{
-    primaryNameSrcList,
-    NameCount::listToSourceBits(primaryNameSrcList),
-    ncList
-  };
   result.emplace_back(std::move(mergedSource));
+  return result;
+}
+
+bool anyCompatibleXorSources(const SourceCRef sourceRef, const Peco::IndexList& indexList,
+  const SourceCRefList& sourceList)
+{
+  SourceBits sourceBits = sourceRef.get().primarySrcBits;
+  for (auto it_index = indexList.cbegin(); it_index != indexList.cend(); ++it_index) {
+    if ((sourceBits & sourceList[*it_index].get().primarySrcBits).none())
+      return true;
+  }
+  return false;
+}
+
+bool filterXorIncompatibleIndices(Peco::IndexListVector& indexLists, int first, int second,
+  const std::vector<SourceCRefList>& sourceLists)
+{
+  Peco::IndexList& firstList = indexLists[first];
+  for (auto it_first = firstList.before_begin(); std::next(it_first) != firstList.end(); /* nothing */) {
+    bool any_compat = anyCompatibleXorSources(sourceLists[first][*std::next(it_first)],
+      indexLists[second], sourceLists[second]);
+    if (!any_compat) {
+      firstList.erase_after(it_first);
+    } else {
+      ++it_first;
+    }
+  }
+  return !firstList.empty();
+}
+
+bool filterAllXorIncompatibleIndices(Peco::IndexListVector& indexLists,
+  const std::vector<SourceCRefList>& sourceLists)
+{
+  if (indexLists.size() < 2u) return true;
+  for (auto first = 0u; first < indexLists.size(); ++first) {
+    for (auto second = 0u; second < indexLists.size(); ++second) {
+      if (first == second) continue;
+      //cerr << "  comparing " << first << " to " << second << endl;
+      if (!filterXorIncompatibleIndices(indexLists, first, second, sourceLists)) {
+	return false;
+      }
+    }
+  }
+  return true;
+}
+
+auto list_size(const Peco::IndexList& indexList) {
+  int size = 0;
+  std::for_each(indexList.cbegin(), indexList.cend(),
+		[&size](int i){ ++size; });
+  return size;
+}
+
+int vec_product(const vector<int>& v) {
+  int result{1};
+  for (auto i : v) {
+    result *= i;
+  }
   return result;
 }
 
@@ -248,28 +308,47 @@ XorSourceList mergeCompatibleXorSourceCombinations(
   for (const auto& sl : sourceLists) {
     lengths.push_back(sl.size());
   }
+  cerr << "  initial lengths: " << vec_to_string(lengths)
+       << ", product: " << vec_product(lengths) << endl;
+  auto indexLists = Peco::initial_indices(lengths);
+  bool valid = filterAllXorIncompatibleIndices(indexLists, sourceLists);
+  
+#if 1
+  lengths.clear();
+  for (const auto& il : indexLists) {
+    lengths.push_back(list_size(il));
+  }
+  cerr << "  filtered lengths: " << vec_to_string(lengths)
+       << ", product: " << vec_product(lengths)
+       << ", valid: " << boolalpha << valid << endl;
+#endif
 
   auto peco0 = high_resolution_clock::now();
 
   int combos = 0;
-  XorSourceList sourceList{};
-  Peco peco(lengths);
+  int compatible = 0;
+  int merged = 0;
+  XorSourceList xorSourceList{};
+  Peco peco(std::move(indexLists));
   for (auto indexList = peco.first_combination(); indexList;
        indexList = peco.next_combination())
   {
-    XorSourceList mergedSources = mergeCompatibleXorSources(*indexList, sourceLists);
-    if (!mergedSources.empty()) {
-      sourceList.emplace_back(std::move(mergedSources.back()));
-    }
     ++combos;
+    SourceCRefList sourceList = getCompatibleXorSources(*indexList, sourceLists);
+    if (sourceList.empty()) continue;
+    ++compatible;
+    XorSourceList mergedSources = mergeCompatibleXorSources(sourceList);
+    if (mergedSources.empty()) continue;
+    ++merged;
+    xorSourceList.emplace_back(std::move(mergedSources.back()));
   }
-
   auto peco1 = high_resolution_clock::now();
   auto d_peco = duration_cast<milliseconds>(peco1 - peco0).count();
   cerr << " Native peco loop: " << d_peco << "ms" << ", combos: " << combos
-       << ", XorSources: " << sourceList.size() << endl;
+       << ", compatible: " << compatible << ", merged: " << merged
+       << ", XorSources: " << xorSourceList.size() << endl;
   
-  return sourceList;
+  return xorSourceList;
 }
 
 } // namespace cm

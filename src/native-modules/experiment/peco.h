@@ -4,75 +4,78 @@
 #include <algorithm>
 #include <numeric>
 #include <vector>
-//#include <span>
+#include <forward_list>
+#include <cassert>
 
 class Peco {
 public:
-  // todo: std::span
-  Peco(std::vector<int>& lengths) : lengths_(std::move(lengths)) {
-    max_ = 1;
-    for (const auto len : lengths_) {
-      max_ *= len;
-    }
-    indices_.resize(lengths_.size());
-  }
-
+  using IndexList = std::forward_list<int>;
+  using IndexListVector = std::vector<IndexList>;
   //const?
   using take_type = std::vector<int>*;
 
+  Peco() = delete;
+  Peco(IndexListVector&& indexLists) : index_lists_(std::move(indexLists)) {
+    assert(index_lists_.size() >= 2);
+    result_.resize(index_lists_.size());
+  }
+
   take_type first_combination() {
-    index_ = 0;
-    reset_indices();
+    reset_iterators(index_lists_.size());
+    done_ = false;
     return take();
   }
 
   take_type next_combination() {
-    if (index_ < max_) ++index_;
+    int i{};
+    for (i = iterators_.size() - 1; i >= 0; --i) {
+      auto& il = index_lists_[i];
+      assert(std::next(iterators_[i]) != il.end());
+      ++iterators_[i];
+      if (std::next(iterators_[i]) != il.end()) break;
+      iterators_[i] = il.before_begin();
+    }
+    if (i < 0) done_ = true;
     return take();
+  }
+
+  static IndexListVector initial_indices(const std::vector<int>& lengths) {
+    IndexListVector indexLists;
+    indexLists.resize(lengths.size());
+    for (auto i = 0u; i < indexLists.size(); ++i) {
+      initialize_list(indexLists[i], lengths[i]);
+    }
+    return indexLists;
   }
 
 private:
   take_type take() {
-    if (index_ == max_) return nullptr;
-    int remain = index_;
-    for (int i = (int)lengths_.size() - 1; i >= 0; --i) {
-      auto val = remain % lengths_[i];
-      indices_[i] = val;
-      if (val > 0) break;
-      remain /= lengths_[i];
+    if (done_) return nullptr;
+    for (auto i = 0u; i < iterators_.size(); ++i) {
+      result_[i] = *std::next(iterators_[i]);
     }
-    return &indices_;
+    return &result_;
   }
 
-  void reset_state() {
-    //    state_.resize(lengths_.size());
-    //result_.resize(lengths_.size());
-    /*
-    for (auto i = 0u; i < lengths_.size(); ++i) {
-      reset(i);
+  void reset_iterators(int size) {
+    iterators_.resize(size);
+    for (int i = 0; i < size; ++i) {
+      assert(!index_lists_[i].empty());
+      iterators_[i] = index_lists_[i].before_begin();
     }
-    */
   }
 
-  void reset_indices() {
-    std::fill(indices_.begin(), indices_.begin() + lengths_.size(), 0);
-    //indices_.fill(0);
+  static void initialize_list(IndexList& indexList, int size) {
+    indexList.clear();
+    for (int i = size - 1; i >= 0; --i) {
+      indexList.emplace_front(i);
+    }
   }
 
-  /*
-  void reset(int i) {
-    vector<int>& v = state_[i];
-    v.resize(lengths_[i]);
-    std::iota(v.begin(), v.end(), 0);
-  }
-  */
-
-  std::vector<int> lengths_;
-  std::vector<int> indices_;
-  int max_;
-  int index_;
-  //std::vector<std::vector<int>> state_;
-  //std::vector<int> result_;
+  IndexListVector index_lists_;
+  std::vector<IndexList::const_iterator> iterators_;
+  std::vector<int> result_;
+  bool done_;
 };
 
 #endif //  include_peco_h

@@ -18,6 +18,13 @@ struct NameCount {
   std::string name;
   int count;
 
+  NameCount(std::string&& name, int count) : name(std::move(name)), count(count) {}
+  NameCount() = default;
+  NameCount(const NameCount&) = default;
+  NameCount& operator=(const NameCount&) = default;
+  NameCount(NameCount&&) = default;
+  NameCount& operator=(NameCount&&) = default;
+
   std::string toString() const {
     char buf[128] = { 0 };
     sprintf(buf, "%s:%d", name.c_str(), count);
@@ -73,14 +80,39 @@ struct NCData {
 using NCDataList = std::vector<NCData>;
 
 struct SourceBase {
-  std::vector<NameCount> primaryNameSrcList;
+  NameCountList primaryNameSrcList;
   SourceBits primarySrcBits;
-  std::vector<NameCount> ncList;
+  NameCountList ncList;
+
+  SourceBase() = default;
+  SourceBase(NameCountList&& primaryNameSrcList, SourceBits&& primarySrcBits,
+	     NameCountList&& ncList) :
+    primaryNameSrcList(std::move(primaryNameSrcList)),
+    primarySrcBits(std::move(primarySrcBits)),
+    ncList(std::move(ncList))
+  {}
+
+  SourceBase(const SourceBase&) = delete;
+  SourceBase& operator=(const SourceBase&) = delete;
+  SourceBase(SourceBase&&) = default;
+  SourceBase& operator=(SourceBase&&) = default;
 };
 
 struct SourceData : SourceBase {
-  std::vector<std::string> sourceNcCsvList;
+  std::vector<std::string> sourceNcCsvList; // TODO: I don't think this is even used anymore
   // synonymCounts
+
+  SourceData() = default;
+  SourceData(NameCountList&& primaryNameSrcList, SourceBits&& primarySrcBits,
+	     NameCountList&& ncList, std::vector<std::string>&& sourceNcCsvList) :
+    SourceBase(std::move(primaryNameSrcList), std::move(primarySrcBits), std::move(ncList)),
+    sourceNcCsvList(std::move(sourceNcCsvList))
+  {}
+
+  SourceData(const SourceData&) = delete;
+  SourceData& operator=(const SourceData&) = delete;
+  SourceData(SourceData&&) = default;
+  SourceData& operator=(SourceData&&) = default;
 };
 
 using SourceList = std::vector<SourceData>;

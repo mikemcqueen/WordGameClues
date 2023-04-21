@@ -5,21 +5,6 @@ namespace cm {
 
 PreComputedData PCD;
 
-#if 0
-struct OrSource : SourceData {
-  bool xorCompatible = false;
-  bool andCompatible = false;
-};
-
-// One OrArgData contains all of the data for a single --or argument.
-//
-struct OrArgData {
-  std::vector<OrSource> orSourceList;
-  bool compatible = false;
-};
-using OrArgDataList = std::vector<OrArgData>;
-#endif
-
 //
 //
 auto isSourceORCompatibleWithAnyOrSource(const SourceBits& sourceBits,

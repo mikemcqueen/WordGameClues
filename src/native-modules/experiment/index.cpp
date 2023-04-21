@@ -36,9 +36,9 @@ cm::NameCount makeNameCount(Env& env, const Napi::Object& jsObject) {
     Napi::TypeError::New(env, "makeNameCount: invalid arguments").ThrowAsJavaScriptException();
     return {};
   }
-  const auto name = jsName.As<String>().Utf8Value();
+  auto name = jsName.As<String>().Utf8Value();
   const int count = (int)jsCount.As<Number>().Int32Value();
-  return { name, count };
+  return cm::NameCount(std::move(name), count);
 }
 
 cm::NameCountList makeNameCountList(Env& env, const Napi::Array& jsList) {
@@ -65,7 +65,8 @@ cm::SourceData makeSourceData(Env& env, const Napi::Object& jsSourceData) {
   auto primarySrcBits = cm::NameCount::listToSourceBits(primaryNameSrcList);
   auto sourceNcCsvList = makeStringList(env, jsSourceNcCsvList.As<Array>());
   auto ncList = makeNameCountList(env, jsNcList.As<Array>());
-  return { primaryNameSrcList, primarySrcBits, ncList, sourceNcCsvList };
+  return cm::SourceData(std::move(primaryNameSrcList), std::move(primarySrcBits),
+			std::move(ncList), std::move(sourceNcCsvList));
 }
 
 cm::SourceList makeSourceList(Napi::Env& env, const Napi::Array& jsList) {
@@ -131,7 +132,7 @@ cm::SourceListMap makeSourceListMap(Napi::Env& env, const Napi::Array& jsList) {
     }
     const auto key = tuple[0u].As<String>().Utf8Value();
     auto sourceList = makeSourceList(env, tuple[1u].As<Array>());
-    map.emplace(std::make_pair(key, sourceList));
+    map.emplace(std::move(key), std::move(sourceList));
   }
   return map;
 }
