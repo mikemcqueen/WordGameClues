@@ -44,11 +44,6 @@ interface Common {
 
 // for primary sources only
 interface PrimaryClue extends Common {
-/*
-    name: string;
-    src: string;
-*/
-    
     num: number;
     source?: string;
     target?: string;
@@ -62,12 +57,7 @@ interface PrimaryClue extends Common {
     propertyCounts?: PropertyCounts.Map;
 }
 
-interface CompoundClue extends Common {
-/*    
-    name: string;
-    src: string;
-*/
-}
+type CompoundClue = Common;
 
 export type Primary = PrimaryClue;
 export type Compound = CompoundClue;
@@ -206,8 +196,6 @@ export namespace PropertyCounts {
     }
 }
 
-//
-
 export function isPrimary (clue: Any): clue is PrimaryClue {
     return 'num' in clue; // (clue as PrimaryClue).num !== undefined;
 }
@@ -216,18 +204,14 @@ export function isCompound (clue: Any): clue is CompoundClue {
     return !isPrimary(clue);
 }
 
-//
-//
-
 function format2 (text: string, span: number) {
     let result = "";
     for (let len = text.toString().length; len < span; ++len) { result += " "; }
     return result;
 }
 
-//
 // uh. this is named wrong. toString() ?
-
+//
 export function toJSON (clue: /*PrimaryClue*/ Common, options: any = {}): string {
     let s = '{';
     if (clue.name) {

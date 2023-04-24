@@ -518,7 +518,8 @@ async function main () {
             xormm:   options.xormm,
             parallel: options.parallel,
             use_syns: options.use_syns,
-            synonymMinMax: options.synonymMinMax
+            synonymMinMax: options.synonymMinMax,
+	    verbose: options.verbose
         });
     }
     return 0;

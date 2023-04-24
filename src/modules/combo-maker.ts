@@ -573,9 +573,6 @@ let mergeSources = (source1: AnySourceData, source2: AnySourceData, lazy: boolea
 //
 //
 let mergeCompatibleSources = (source1: AnySourceData, source2: AnySourceData, args: MergeArgs): AnySourceData[] => {
-    // TODO: this logic could be part of mergeSources
-    // also, uh, isn't there a primarySrcArray I can be using here?
-//  return allCountUnique2(source1.primaryNameSrcList, source2.primaryNameSrcList)
     return !CountBits.intersects(source1.primarySrcBits, source2.primarySrcBits)
         ? [mergeSources(source1, source2, args.lazy)]
         : [];
@@ -1343,7 +1340,6 @@ let getCombosForUseNcLists = (sum: number, max: number, pcd: PreComputedData, ar
     countListArray.forEach((countList: number[]) => {
         comboCount += 1;
 
-        //console.log(`sum(${sum}) max(${max}) countList: ${Stringify(countList)}`);
         let clueIndexes: number[] = [];
         let result = first(countList, clueIndexes);
         if (result.done) return; // continue; 
@@ -1372,17 +1368,9 @@ let getCombosForUseNcLists = (sum: number, max: number, pcd: PreComputedData, ar
 
             const key: string = NameCount.listToString(result.ncList!);
             let cacheHit = false;
-            //let sourceList: AnySourceData[];
 	    let mergedSourcesList: MergedSourcesList = [];
             if (!hash[key]) {
-		// TODO: use native here
-                if (1) { // No. JS is faster
-		    mergedSourcesList = mergeAllCompatibleSources2(result.ncList!, pcd.sourceListMap);
-		    //validatePrimarySrcBits(mergedSourcesList);
-		} else {
-		    //mergedSourcesList = NativeComboMaker.mergeAllCompatibleSources(result.ncList!);
-		    //setPrimarySrcBits(mergedSourcesList); // TODO
-		}
+		mergedSourcesList = mergeAllCompatibleSources2(result.ncList!, pcd.sourceListMap);
                 if (listIsEmpty(mergedSourcesList)) {
 		    ++numMergeIncompatible;
 		}
@@ -1402,22 +1390,8 @@ let getCombosForUseNcLists = (sum: number, max: number, pcd: PreComputedData, ar
                 //sourceList = loadAndMergeSourceList(sourceList as LazySourceData[], { synonymMinMax: args.synonymMinMax });
 		// can't i precompute this state also?
 		isany += 1;
-		if (0) {
-                    //hash[key].isCompatible = isAnySourceCompatibleWithUseSources(mergedSourcesList as SourceList, pcd)
-		} else {
-		    let flag = false;
-		    if (WW) {
-			let bits = CountBits.makeFrom([35,36,37,38,73,79,80]);
-			if (anyMergedSourcesHasBits(mergedSourcesList, bits)) {
-			    flag = true;
-			}
-		    }
-                    hash[key].isCompatible = NativeComboMaker.isAnySourceCompatibleWithUseSources(mergedSourcesList, flag);
-		    if (WW) {
-			console.error(`compat: ${hash[key].isCompatible}`);
-			showMergedSourcesBits(mergedSourcesList, pcd.useSourceLists.xor);
-		    }
-		}
+		let flag = false;
+                hash[key].isCompatible = NativeComboMaker.isAnySourceCompatibleWithUseSources(mergedSourcesList, flag);
             }
             if (hash[key].isCompatible) {
                 combos.push(result.nameList!.toString());
@@ -1434,7 +1408,7 @@ let getCombosForUseNcLists = (sum: number, max: number, pcd: PreComputedData, ar
         `merge-incompatible(${numMergeIncompatible}) use-incompatible(${numUseIncompatible}) ` +
         `actual(${totalVariations - numCacheHits - numUseIncompatible}) ${duration}ms`);
 
-    if (1) {
+    if (args.verbose) {
         console.error(`sum(${sum}) combos(${comboCount}) ` +
 	    `variations(${totalVariations}) cacheHits(${numCacheHits}) ` +
             `merge-incompat(${numMergeIncompatible}) ` +
@@ -1549,6 +1523,7 @@ export let makeCombos = (args: any): any => {
             const filterResult = ClueManager.filter(comboList, sum, comboMap);
         }
         let d = new Duration(begin, new Date()).milliseconds;
+	if (!args.verbose) console.error('');
         console.error(`--combos: ${PrettyMs(d)}, oob: ${oob}`);
         Debug(`total: ${total}, filtered(${_.size(comboMap)})`);
         _.keys(comboMap).forEach((nameCsv: string) => console.log(nameCsv));
@@ -1710,9 +1685,7 @@ let sumOfNcDataListCounts = (ncDataList: NCDataList): number => {
 //
 function buildAllUseNcDataLists (useArgsList: string[]): NCDataList[] {
     const combinationNcLists = getCombinationNcLists(useArgsList);
-    //console.log(`combinationNcLists: ${Stringify2(combinationNcLists)}`);
     const ncDataLists = combinationsToNcDataLists(combinationNcLists)
-    //console.log(`ncDataList: ${Stringify2(ncDataList)}`);
     return ncDataLists;
     //.filter((ncDataList: NCDataList) => sumOfNcDataListCounts(ncDataList) <= maxSum);
 }
