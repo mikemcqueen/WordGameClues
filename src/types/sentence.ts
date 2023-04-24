@@ -19,7 +19,7 @@ interface SentenceBase {
     combinations: string[];
 }
 
-interface Variations {
+export interface Variations {
     components: Record<string, string[]>;
     synonyms: Record<string, string[]>;
     homophones: Record<string, string[]>;
@@ -30,16 +30,16 @@ type NameCountMap = {
 };
 
 // run-time only, not part of schema
-interface Candidate {
+export interface Candidate {
     names: NameCountMap;
     clues: ClueList.Primary;
 }
 
-interface Candidates {
-    candidates: Candidates[];
+interface CandidatesContainer {
+    candidates: Candidate[];
 }
 
-export type Type = SentenceBase & Variations & Candidates;
+export type Type = SentenceBase & Variations & CandidatesContainer;
 export type List = Type[];
 
 export let load = (dir: string, num: number): Type => {
@@ -102,9 +102,6 @@ const validateVariations = (sentence: Type): boolean => {
     return true;
 }
 
-// todo: might want a type that includes variations, synonyms, and homonyms
-// and this is "addAllThatType".  Might still be called variations, but then
-// we need a new name for "letter order variations". Anagrams?
 export const addVariations = (sentence: Type, variations: Variations): void => {
     for (let key of Object.keys(sentence.components)) {
 	if (_.has(variations.components, key)) {
@@ -172,7 +169,8 @@ const buildClueList = (num: number, nameList: string[], src: number,
     return clues;
 };
 
-// TODO: alien technology. revisit. pretty sure this has some profound wrongness about it.
+// TODO: alien technology. revisit or ignore at your peril.
+// pretty sure this has some profound wrongness about it.
 //
 const buildCandidateNameLists = (components: string[], variations: Variations, startIndex = 0,
     results = new Map<string, string[]>()): Map<string, string[]> => 
