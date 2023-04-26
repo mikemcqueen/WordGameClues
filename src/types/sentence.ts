@@ -25,21 +25,26 @@ export interface Variations {
     homophones: Record<string, string[]>;
 }
 
-type NameCountMap = {
-    [key: string]: number;
+type StringToNumbersMap = {
+    [key: string]: Set<number>;
 };
+
+export type NameSourcesMap = StringToNumbersMap;
 
 // run-time only, not part of schema
 export interface Candidate {
-    names: NameCountMap;
     clues: ClueList.Primary;
+    nameSourcesMap: NameSourcesMap;
 }
 
-interface CandidatesContainer {
+export type NameIndicesMap = StringToNumbersMap;
+
+export interface CandidatesContainer {
     candidates: Candidate[];
+    nameIndicesMap: NameIndicesMap;
 }
 
-export type Type = SentenceBase & Variations & CandidatesContainer;
+export type Type = SentenceBase & Variations; // & CandidatesContainer;
 export type List = Type[];
 
 export let load = (dir: string, num: number): Type => {
@@ -51,8 +56,55 @@ export const emptyVariations = (): Variations => {
 	components: {},
 	synonyms: {},
 	homophones: {}
+    };
+};
+
+// maybe not needed
+/*
+const emptyCandidatesContainer = (): CandidatesContainer => {
+    return {
+	candidates: {},
+	nameCandidatesMap: {}
     }
-}
+};
+*/
+
+const buildNameIndicesMap = (candidates: Candidate[]): NameIndicesMap => {
+    let map = {};
+    for (let i = 0; i < candidates.length; ++i) {
+	const candidate = candidates[i];
+	for (let name of Object.keys(candidate.nameSourcesMap)) {
+	    if (!_.has(map, name)) {
+		map[name] = new Set<number>();
+	    }
+	    map[name].add(i);
+	}
+    }
+    return map;
+};
+
+const copyStringToNumbersMap = (fromMap: StringToNumbersMap): StringToNumbersMap => {
+    let toMap = {};
+    for (let key of Object.keys(fromMap)) {
+	toMap[key] = new Set(fromMap[key]);
+    }
+    return toMap;
+};
+
+const copyCandidates = (srcCandidates: Candidate[]): Candidate[] => {
+    let candidates = [...srcCandidates];
+    for (let candidate of candidates) {
+	candidate.nameSourcesMap = copyStringToNumbersMap(candidate.nameSourcesMap);
+    }
+    return candidates;
+};
+
+export const copyCandidatesContainer = (container: CandidatesContainer): CandidatesContainer => {
+    return {
+	candidates: copyCandidates(container.candidates),
+	nameIndicesMap: copyStringToNumbersMap(container.nameIndicesMap)
+    };
+};
 
 const makeFrom = (filename: string): Type => {
     let sentence: Type;
@@ -76,7 +128,7 @@ const getFilename = (dir: string, count: number): string => {
 
 const validate = (sentence: Type): boolean => {
     return validateCombinations(sentence) && validateVariations(sentence);
-}
+};
 
 const validateCombinations = (sentence: Type): boolean => {
     const sortedText = stripAndSort(sentence.text);
@@ -87,7 +139,7 @@ const validateCombinations = (sentence: Type): boolean => {
 	}
     }
     return true;
-}
+};
 
 const validateVariations = (sentence: Type): boolean => {
     for (let key of Object.keys(sentence.components)) {
@@ -100,7 +152,7 @@ const validateVariations = (sentence: Type): boolean => {
 	}
     }
     return true;
-}
+};
 
 export const addVariations = (sentence: Type, variations: Variations): void => {
     for (let key of Object.keys(sentence.components)) {
@@ -120,7 +172,9 @@ export const addVariations = (sentence: Type, variations: Variations): void => {
     }
 };
 
-export const buildAllCandidates = (sentence: Type, variations: Variations): Candidate[] => {
+export const buildAllCandidates = (sentence: Type, variations: Variations):
+     CandidatesContainer =>
+{
     let candidates: Candidate[] = [];
     let src = 1000000 * sentence.num; // up to 10000 variations of up to 100 names
     const sortedText = stripAndSort(sentence.text);
@@ -132,24 +186,27 @@ export const buildAllCandidates = (sentence: Type, variations: Variations): Cand
 	    if (sortedText != joinAndSort(nameList)) {
 		throw new Error(`sentence '${sentence.text}' != nameList '${nameList}'`);
 	    }
+	    const clues = buildClueList(sentence.num, nameList, src, variations);
 	    candidates.push({
-		names: buildNameCountMap(nameList),
-		clues: buildClueList(sentence.num, nameList, src, variations)
+		clues,
+		nameSourcesMap: buildNameSourcesMap(clues)
 	    });
 	    src += 100;
 	}
     }
-    return candidates;
+    return {
+	candidates,
+	nameIndicesMap: buildNameIndicesMap(candidates)
+    };
 };
 
-const buildNameCountMap = (nameList: string[]): NameCountMap => {
-    let map: NameCountMap = {};
-    for (let name of nameList) {
-	if (!_.has(map, name)) {
-	    map[name] = 1;
-	} else {
-	    map[name] += 1;
+const buildNameSourcesMap = (clues: ClueList.Primary): NameSourcesMap => {
+    let map: NameSourcesMap = {};
+    for (let clue of clues) {
+	if (!_.has(map, clue.name)) {
+	    map[clue.name] = new Set<number>();
 	}
+	map[clue.name].add(Number(clue.src));
     }
     return map;
 };
@@ -227,4 +284,4 @@ const stripAndSort = (text: string): string => {
 // join strings, sort resulting letters
 const joinAndSort = (arr: string[]): string => {
     return arr.join('').split('').sort().join('');
-}
+};

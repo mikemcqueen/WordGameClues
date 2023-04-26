@@ -78,6 +78,7 @@ const CmdLineOptions = Opt.create(_.concat(Clues.Options, [
     ['',  'allow-used',                        '  allow used clues in clue combo generation' ],
     ['',  'any',                               '  any match (uh, probably should not use this)'],
     ['',  'production',                        'use production note store'],
+    ['',  'sentence',                          'load clues from sentence files (that have source="sentence" property)' ],
     ['',  'sort-all-clues',                    'sort all clue data files by src'],
     ['z', 'flags=OPTION+',                     'flags: 2=ignoreLoadErrors' ],
     ['v', 'verbose',                           'more output'],
@@ -410,11 +411,13 @@ async function main () {
         QUIET = true;
     }
 
-    Validator.setAllowDupeFlags({
+    /****
+    OldValidator.setAllowDupeFlags({
         allowDupeNameSrc: false,
         allowDupeSrc:     options.allow_dupe_source,
         allowDupeName:    true
     });
+    ****/
 
     if (_.includes(options.flags, '2')) {
         ignoreLoadErrors = true;

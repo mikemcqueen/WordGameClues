@@ -54,23 +54,29 @@ type NcResultData = {
     list: ValidateResult[];
 };
 
+/*
 type CandidatesMap = {
     [key: number]: Sentence.Candidate[];
 };
+*/
 
 type ClueMap = Record<string, string[]>;
 type SourceMap = Record<string, SourceData>;
 type NcResultMap = Record<string, NcResultData>;
 type SentenceMap = Map<number, Sentence.Candidate[]>;
 
-type InternalState = {
+export type AllCandidates = Sentence.CandidatesContainer[];
+export interface AllCandidatesContainer {
+    allCandidates: AllCandidates;     // one per sentence (if parsed as a "sentence")
+}
+
+type InternalStateBase = {
     clueListArray: ClueList.Any[];    // the JSON "known" clue files in an array
     knownClueMapArray: ClueMap[];     // map clue name to clue src
     knownSourceMapArray: SourceMap[]; // map sourceCsv to SourceData
-    ncResultMaps: NcResultMap[];   // map known NCs to result list
+    ncResultMaps: NcResultMap[];      // map known NCs to result list
 
-    variations: Sentence.Variations;
-    candidatesMap: CandidatesMap;
+    variations: Sentence.Variations;  // "global" variations aggregated from all sentences
 
     maybeListArray: any[];            // the JSON maybe files in an array
     rejectListArray: any[];           // the JSON reject files in an array
@@ -87,6 +93,8 @@ type InternalState = {
     numPrimarySources: number;
 }
 
+type InternalState = InternalStateBase & AllCandidatesContainer;
+
 //
 //
 
@@ -97,8 +105,8 @@ let initialState = (): InternalState => {
         knownSourceMapArray: [],
         ncResultMaps: [],
 
+	allCandidates: [],
 	variations: Sentence.emptyVariations(),
-	candidatesMap: {},
 
 	// TODO: remove? maybe, at least
         maybeListArray: [],
@@ -138,6 +146,20 @@ export function getKnownSourceMap (count: number): SourceMap {
 
 export function getNcResultMap (count: number): NcResultMap {
     return State.ncResultMaps[count];
+}
+
+const getCandidatesContainer = (sentence: number): Sentence.CandidatesContainer => {
+    return State.allCandidates[sentence];
+}
+
+export const copyAllCandidates = (allCandidates: AllCandidates = State.allCandidates):
+    AllCandidates =>
+{
+    let result: AllCandidates = [];
+    for (let [index, container] of allCandidates.entries()) {
+	result[index] = Sentence.copyCandidatesContainer(container);
+    }
+    return result;
 }
 
 //
@@ -195,8 +217,8 @@ const loadSentence = (num: number, args: any): number => {
     let maxClues = 0;// TODO
     let sentence = Sentence.load(Clues.getDirectory(Clues.getByOptions(args)), num);
     Sentence.addVariations(sentence, State.variations);
-    const candidates = Sentence.buildAllCandidates(sentence, State.variations);
-    State.candidatesMap[num] = candidates;
+    const container = Sentence.buildAllCandidates(sentence, State.variations);
+    State.allCandidates[num] = container;
     return maxClues;
 }
 
@@ -516,7 +538,8 @@ let funnyBusiness = (set: Set<string>, nameSrcList: NameCount.List) : boolean =>
     return false;
 };
 
-//
+// TODO: return dstList, spread push @ caller
+// well, that might be tricky because I initialize map from dstList.
 //
 let appendUniqueResults = (ncStr: string, dstList: ValidateResult[],
     srcList: ValidateResult[], args: any) : void => 
@@ -532,9 +555,9 @@ let appendUniqueResults = (ncStr: string, dstList: ValidateResult[],
         const key = NameCount.listToCountList(source.nameSrcList).toString();
         const value = NameCount.listToString(source.nameSrcList);
         if (map.has(key)) {
-            const set = map.get(key);
-            if (set!.has(value)) continue; // strict duplicate
-            if (funnyBusiness(set!, source.nameSrcList)) {
+            const set = map.get(key)!;
+            if (set.has(value)) continue; // strict duplicate
+            if (funnyBusiness(set, source.nameSrcList)) {
                 console.log(`${ncStr} =>`);
                 console.log(`set: ${Stringify(map.get(key))}\nvalue: ${value}`);
                 if (!args.ignoreErrors) {
