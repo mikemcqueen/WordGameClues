@@ -13,7 +13,7 @@
     "chai": "^3.5.0",
     "cheerio": "^1.0.0-rc.11",
     "csv-parse": "^1.3.3",
-    "debug": "^2.6.8",
+    "debug": "^4.3.4",
     "duration": "^0.2.2",
     "encodeurl": "^1.0.2",
     "event-stream": "^3.3.5",

@@ -68,9 +68,11 @@ function Peco(args) {
     this.noDuplicates = args.noDuplicates;
 
     if (this.listArray) {
+	/*
         if (!this.max) {
             throw new Error('Peco: must specify max with listArray');
         }
+	*/
 	if (_.isEmpty(this.listArray)) {
             throw new Error('Peco: empty listArray');
 	}
@@ -101,7 +103,7 @@ function Peco(args) {
 //
 
 function setLogging(flag) {
-    if (!flag || (flag && !FORCE_QUIET)) {
+    if (!flag || !FORCE_QUIET) {
         LOGGING = flag;
     }
 }
@@ -294,8 +296,8 @@ Peco.prototype.listFirst = function (listArray, flags) {
         this.log (`srcCount: ${srcCount} indexList: ${Stringify(this.indexList)}`);
     }
 
-    const sum = this.getIndexSum();
-    if (sum <= this.max) {
+    const sum = this.max ? this.getIndexSum() : undefined;
+    if (!this.max || (sum <= this.max)) {
 	this.log(`pecoList, getIndexSum ${sum}`);
         list = this.getPecoList();
     } else {
@@ -345,7 +347,7 @@ Peco.prototype.listNext = function (flags) {
 	    }
 	}
 
-        if (this.getIndexSum() > this.max) {
+        if (this.max && (this.getIndexSum() > this.max)) {
             continue;
         }
         /*

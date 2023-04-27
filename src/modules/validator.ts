@@ -22,6 +22,7 @@ import * as ClueList from '../types/clue-list';
 import * as ClueManager from './clue-manager';
 import * as NameCount from '../types/name-count';
 import * as OldValidator from './old-validator';
+import * as Sentence from '../types/sentence';
 
 function Stringify(val: any) {
     return stringify(val, (value: any, indent: any, stringify: any) => {
@@ -52,8 +53,6 @@ export interface ValidateSourcesResult {
     success: boolean;
     list?: ValidateResult[];
 }
-
-export type NumberArray = number[]; // TODO: Int32Array
 
 //
 //
@@ -125,17 +124,17 @@ type VSFlags = {
     fast: boolean|undefined;
 }
 
-//
+// part of restrictToSameClueNumber logic
 //
 let getRestrictedPrimaryClueNumber = (nameSrc: NameCount.Type): number => {
     let clue = ClueManager.getPrimaryClue(nameSrc);
-    return clue.restrictToSameClueNumber ? clue.num : 0;
+    return clue?.restrictToSameClueNumber ? clue.num : 0;
 };
 
-//
+// part of restrictToSameClueNumber logic
 //
 let allHaveSameClueNumber = (nameSrcList: NameCount.List, clueNumber: number): boolean => {
-    return nameSrcList.every(nameSrc => ClueManager.getPrimaryClue(nameSrc).num === clueNumber);
+    return nameSrcList.every(nameSrc => ClueManager.getPrimaryClue(nameSrc)?.num === clueNumber);
 };
 
 //
@@ -143,42 +142,69 @@ let allHaveSameClueNumber = (nameSrcList: NameCount.List, clueNumber: number): b
 let getAllSourcesForPrimaryClueName = (name: string, allCandidates: ClueManager.AllCandidates):
     number[] =>
 {
-//    let clueList: { name: string, src: string }[] = ClueManager.getClueList(1);
+    //let clueList: { name: string, src: string }[] = ClueManager.getClueList(1);
     let clueList = ClueManager.getClueList(1) as ClueList.Primary;
     let sources: number[] = clueList.filter(clue => clue.name === name)
 	.map(clue => _.toNumber(clue.src));
-    // Add "sentence" candidates to sources list.
+
     // TODOTODOTODOTODOTODOTODOTODOTODOTODOTODOTODOTODOTODOTODOTODOTODO
     //
     // TODO: We should probably be removing both the used & incompatible
     // candidates from all lists at this point as well.
     //
-    // THIS is probably slow. make it faster with pure for loops.
-    //
     // TODOTODOTODOTODOTODOTODOTODOTODOTODOTODOTODOTODOTODOTODOTODOTODO
     
+    let log = false; //name === 'town';
+
+    // Add "sentence" candidates to sources list.
     allCandidates
-	.filter(container => _.has(container.nameIndicesMap, name))
+	.filter(container => {
+	    let has = _.has(container.nameIndicesMap, name);
+	    if (log) console.error(`filter ${container}, ${name}: ${has}`);
+	    return has;
+	})
 	.forEach(container => {
-	    // add all sources from name to sources list
+	    // add all sources for name to sources list
+	    let numValidIndices = 0;
 	    const compatibleIndices = container.nameIndicesMap[name];
 	    for (let index of compatibleIndices) {
-		if (container.candidates[index]) { // might have been deleted
-		    Assert(_.has(container.candidates[index].nameSourcesMap, name));
-		    Assert(!_.isEmpty(container.candidates[index].nameSourcesMap[name]));
-		    sources.push(...container.candidates[index].nameSourcesMap[name]);
-		}
+		if (!container.candidates[index]) continue; // might have been deleted already
+		numValidIndices += 1;
+		Assert(_.has(container.candidates[index].nameSourcesMap, name));
+		Assert(!_.isEmpty(container.candidates[index].nameSourcesMap[name]));
+		sources.push(...container.candidates[index].nameSourcesMap[name]);
 	    }
+	    // NOT HERE.  after we succeed.  or something.
+	    /*
 	    // remove all incompatible candidates from candidate list
 	    for (let index = 0; index < container.candidates.length; ++index) {
+		if (!container.candidates[index]) continue; // might have been deleted already
 		if (!_.has(container.candidates[index].nameSourcesMap, name)) {
 		    delete container.candidates[index];
 		}
 	    }
+	    */
+	    if (log) console.error(` ${numValidIndices} indices valid of ${[...compatibleIndices].length}`);
 	});
 
     if (_.isEmpty(sources)) throw new Error(`can't find: ${name}`);
     return sources;
+}
+
+const isCompatibleCandidateSource = (src: number, candidates: number[]): boolean => {
+    if (!Sentence.isCandidateSource(src)) {
+	return true;
+    }
+    const sentence = Sentence.getSourceSentence(src);
+    const variation = Sentence.getSourceVariation(src);
+    if (candidates[sentence]) {
+	if (candidates[sentence] !== variation) {
+	    return false;
+	}
+    } else {
+	candidates[sentence] = variation;
+    }
+    return true;
 }
 
 type MergeNcListResultsArgs = ClueManager.AllCandidatesContainer & VSFlags;
@@ -187,42 +213,63 @@ let mergeNcListResults = (ncListToMerge: NameCount.List,
     args: MergeNcListResultsArgs): ValidateSourcesResult =>
 {
     let ncCsv = ncListToMerge.toString();
-    let arrayList: NumberArray[] = ncListToMerge.map(nc => {
+    let listArray: number[][] = ncListToMerge.map(nc => {
         if (nc.count === 1) {
             return getAllSourcesForPrimaryClueName(nc.name, args.allCandidates);
         } else {
             const ncResultMap = ClueManager.getNcResultMap(nc.count);
+	    //console.error(`nc: ${nc.toString()}, next: ${ncResultMap[nc.toString()]}`); //.list.length).keys()].map(_.toNumber);
             return [...Array(ncResultMap[nc.toString()].list.length).keys()].map(_.toNumber);
         }
     });
+    //console.error(Stringify(listArray));
     let resultList: ValidateResult[] = [];
-    Peco.makeNew({
-        listArray: arrayList,
-        max: 99999
-    }).getCombinations().forEach((indexList: number[]) => {
+    //Peco.setLogging(true);
+    const combos = Peco.makeNew({
+	listArray
+    }).getCombinations();
+    //Peco.setLogging(false);
+
+    /*
+    let str: string = '';
+    for (let list of combos) {
+	str = str.concat(` ${list.length}`);
+    }
+    */
+    //console.error(`combos.length(${combos.length})`);
+    //console.error(Stringify(combos));
+
+    combos.forEach((indexList: number[]) => {
+	let candidates: number[] = [];
         let ncList: NameCount.List = [];
         let nameSrcList: NameCount.List = [];
         let resultMap = ResultMap.makeNew();
         let restrictToClueNumber = 0;
-	// TODO: resultIndex kinda bad name, can also be clue source for primary clues
-        indexList.forEach((resultIndex, ncIndex) => {
-            let nc = ncListToMerge[ncIndex];
-            if (nc.count > 1) {
-                let result = ClueManager.getNcResultMap(nc.count)[nc.toString()].list[resultIndex];
+	// indexList values are either indexes into a resultMap.list (compound clue)
+	// or primary sources (primary clue)
+        for (let i = 0; i < indexList.length; ++i) {
+            const nc = ncListToMerge[i];
+            if (nc.count > 1) { // compound clue
+		const index = indexList[i];
+                const result = ClueManager.getNcResultMap(nc.count)[nc.toString()].list[index];
                 ncList.push(...result.ncList);
                 nameSrcList.push(...result.nameSrcList);
                 resultMap.addNcMapSource(nc, result.resultMap);
-            } else {
+            } else { // primary clue
+		const primarySrc = indexList[i];
+		if (!isCompatibleCandidateSource(primarySrc, candidates)) {
+		    return; // forEach.continue;
+		}
                 ncList.push(nc);
-                let nameSrc = NameCount.makeNew(nc.name, resultIndex);
+                const nameSrc = NameCount.makeNew(nc.name, primarySrc);
                 nameSrcList.push(nameSrc);
                 resultMap.addPrimarySource(nameSrc);
-                let clueNumber = getRestrictedPrimaryClueNumber(nameSrc);
+                const clueNumber = getRestrictedPrimaryClueNumber(nameSrc);
                 if (clueNumber) {
                     restrictToClueNumber = clueNumber;
                 }
             }
-        });
+        }
         if (restrictToClueNumber) {
             if (!allHaveSameClueNumber(nameSrcList, restrictToClueNumber)) {
                 return; // forEach.continue;
@@ -236,7 +283,7 @@ let mergeNcListResults = (ncListToMerge: NameCount.List,
                 resultMap,
                 nameSrcList,
                 nameSrcCsv,
-		allCandidates: args.allCandidates
+		allCandidates: [] // args.allCandidates // TODO avoiding OOM
             };
             resultList.push(result);
 	}
@@ -265,7 +312,7 @@ type VSForNameCountArgs = NameListContainer & CountListContainer
 let validateSourcesForNameCount = (name: string, count: number, args: VSForNameCountArgs):
     ValidateSourcesResult =>
 {
-    Debug(`++rvsWorker, ${name}:${count}` +
+    Debug(`++validateSourcesForNameCount, ${name}:${count}` +
         `, validateAll: ${args.validateAll} ${indentNewline()}` +
 	`  ncList: ${args.ncList}, nameList: ${args.nameList}`);
 
@@ -277,10 +324,10 @@ let validateSourcesForNameCount = (name: string, count: number, args: VSForNameC
         // in the clueList[count]. (at least as many entries as there are
         // copies of name in ncList)
         // SEE ALSO: copyAddNcList()
-        Debug(`++rvsWorker, duplicate name:count, ${name}:{count}`);
+        Debug(`  duplicate nc, ${name}:{count}`);
         return { success: false }; // fail
     }
-    Debug(`added NC ${name}:${count}, ncList.length: ${ncList.length}`);
+    Debug(`  added nc ${name}:${count}, ncList.length: ${ncList.length}`);
     // If only one name & count remain, we're done.
     // (name & count lists are equal length, just test one)
     if (args.nameList.length === 1) {
@@ -293,23 +340,23 @@ let validateSourcesForNameCount = (name: string, count: number, args: VSForNameC
         }
         if (result.success) {
             args.ncList.push(NameCount.makeNew(name, count));
-            Debug(`add1, ${name}:${count}, ncList(${ncList.length}): ${ncList}`);
+            Debug(`  add1, ${name}:${count}, ncList(${ncList.length}): ${ncList}`);
         }
         return result;
     }
     
     // nameList.length > 1, remove current name & count,
     // and validate remaining
-    Debug(`calling rvs recursively, ncList: ${ncList}`);
-    let rvsResult = validateSourcesForNameCountLists(chop(args.nameList, name),
-        chop(args.countList, count), {
-	    allCandidates: ClueManager.copyAllCandidates(args.allCandidates),
+    Debug(`..calling validateSorucesForNameCountLists recursively, ncList: ${ncList}`);
+    let rvsResult = validateSourcesForNameCountLists(
+	chop(args.nameList, name), chop(args.countList, count), {
+	    allCandidates: args.allCandidates, //ClueManager.copyAllCandidates(args.allCandidates),
 	    ncList,
 	    fast: args.fast,
 	    validateAll: args.validateAll
 	});
     if (!rvsResult.success) {
-        Debug('--rvsWorker, recursiveValidateSources failed');
+        Debug('--validateSourcesForNameCount: validateSourcesForNameCountLists failed');
         return rvsResult;
     }
     // does this achieve anything? modifies args.ncList.
@@ -317,7 +364,7 @@ let validateSourcesForNameCount = (name: string, count: number, args: VSForNameC
     // TODO2: use _clone() until then
     args.ncList.length = 0;
     ncList.forEach(nc => args.ncList.push(nc));
-    Debug(`--rvsWorker, add ${name}:${count}` +
+    Debug(`--validateSourcesForNameCount, add ${name}:${count}` +
           `, ncList(${ncList.length}): ${ncList}`);
     return rvsResult;
 };
@@ -328,7 +375,7 @@ let validateSourcesForNameCountLists = (nameList: string[], countList: number[],
     args: VSForNameCountListsArgs): ValidateSourcesResult =>
 {
     logLevel++;
-    Debug(`++recursiveValidateSources, looking for [${nameList}] in [${countList}]`);
+    Debug(`++validateSourcesForNameCountLists, looking for [${nameList}] in [${countList}]`);
     //if (xp) Expect(nameList.length).is.equal(countList.length);
 
     // optimization: could have a map of count:boolean entries here
@@ -338,8 +385,8 @@ let validateSourcesForNameCountLists = (nameList: string[], countList: number[],
     let resultList: ValidateResult[] = [];
     const clueName = nameList[0];
     let success = countList
-	.filter(count => _.has(ClueManager.getKnownClueMap(count), clueName))
-        .some(count => // .every !!??
+	.filter(count => ClueManager.clueExists(clueName, count))
+        .some(count => // .every ??!!
     {
         let rvsResult = validateSourcesForNameCount(clueName, count, {
             nameList,
@@ -350,7 +397,7 @@ let validateSourcesForNameCountLists = (nameList: string[], countList: number[],
             validateAll: args.validateAll
         });
         if (!rvsResult.success) return false; // some.continue;
-        Debug(`  rvsWorker output for: ${clueName}, ncList(${args.ncList.length}) ${args.ncList}`);
+        Debug(`  validateSourcesForNameCount output for: ${clueName}, ncList(${args.ncList.length}): ${args.ncList}`);
         // sanity check
         if (!args.validateAll && (args.ncList.length < 2)) {
             // TODO: add "allowSingleEntry" ?
@@ -359,8 +406,6 @@ let validateSourcesForNameCountLists = (nameList: string[], countList: number[],
         }
         resultList = rvsResult.list!;
         return true; // success: some.exit
-	// TODO::: WAIT WHAT?? EARLY EXIT ON SUCCESS? WITHOUT CHECKING ALL VARIATIONS?
-	// I AM NOT SURE IF THAT'S TRUE BUT I SHOULD UNDERSTAND THIS
     });
     --logLevel;
 
@@ -388,7 +433,7 @@ export const validateSources = (args: any): ValidateSourcesResult => {
         quiet:   args.quiet
     }).getCombinations().some((countList: number[]) => {
         let rvsResult = validateSourcesForNameCountLists(args.nameList, countList, {
-	    allCandidates: ClueManager.copyAllCandidates(),
+	    allCandidates: ClueManager.getAllCandidates(), //ClueManager.copyAllCandidates(),
 	    ncList: [],
             fast: args.fast,
             validateAll: args.validateAll
@@ -398,13 +443,14 @@ export const validateSources = (args: any): ValidateSourcesResult => {
             if (rvsResult.list) {
 		resultList.push(...rvsResult.list);// TODO: return empty array, get rid of .success
 	    }
+	    //console.error(`resultList(${resultList.length})`);
             found = true;
             if (!args.validateAll) return true; // found a match; some.exit
             // validatingg all, continue searching
             Debug('validateSources: validateAll set, continuing...');
         }
         return false; // some.continue
-    }, this);
+    });
     Debug('--validateSources');
 
     return {

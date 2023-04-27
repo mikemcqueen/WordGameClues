@@ -93,14 +93,14 @@ interface SourceBase {
 //
 //
 interface LazySourceData extends SourceBase {
-    synonymCounts: Clue.PropertyCounts.Type;
+    synonymCounts?: Clue.PropertyCounts.Type;
     validateResultList: ValidateResult[];
 }
 
 //
 //
 interface SourceData extends SourceBase {
-    synonymCounts: Clue.PropertyCounts.Type;
+    synonymCounts?: Clue.PropertyCounts.Type;
     sourceNcCsvList: string[];
 //    ncCsv?: string;
 }
@@ -475,7 +475,7 @@ let makeSourceData = (nc: NameCount.Type, validateResult: ValidateResult,
 	primaryNameSrcList: validateResult.nameSrcList,
 	primarySrcBits: validateResult.srcBits,
 	ncList: [nc], // TODO i could try getting rid of "LazySource.nc" and just make this part of LazySouceData
-	synonymCounts: getSynonymCountsForNcAndValidateResult(nc, validateResult),
+//	synonymCounts: getSynonymCountsForNcAndValidateResult(nc, validateResult),
 	sourceNcCsvList
     };
 };
@@ -490,7 +490,7 @@ let getSourceData = (nc: NameCount.Type, validateResult: ValidateResult, lazy: b
 	primaryNameSrcList: validateResult.nameSrcList,
 	primarySrcBits: validateResult.srcBits,
         ncList: [nc],
-        synonymCounts: getSynonymCountsForNcAndValidateResult(nc, validateResult),
+//        synonymCounts: getSynonymCountsForNcAndValidateResult(nc, validateResult),
         validateResultList: [validateResult]
     } : makeSourceData(nc, validateResult, orSourcesNcCsvMap);
 };
@@ -546,9 +546,11 @@ let mergeSources = (source1: AnySourceData, source2: AnySourceData, lazy: boolea
             primaryNameSrcList,
 	    primarySrcBits,
             ncList,
+/*
             synonymCounts: Clue.PropertyCounts.merge(
                 getSynonymCountsForValidateResult(source1.validateResultList[0]),
                 getSynonymCountsForValidateResult(source2.validateResultList[0])),
+*/
             validateResultList: [
                 (source1 as LazySourceData).validateResultList[0],
                 (source2 as LazySourceData).validateResultList[0]
@@ -562,7 +564,7 @@ let mergeSources = (source1: AnySourceData, source2: AnySourceData, lazy: boolea
         primaryNameSrcList,
 	primarySrcBits,
         ncList,
-        synonymCounts: Clue.PropertyCounts.merge(source1.synonymCounts, source2.synonymCounts),
+//        synonymCounts: Clue.PropertyCounts.merge(source1.synonymCounts, source2.synonymCounts),
         sourceNcCsvList: [...source1.sourceNcCsvList, ...source2.sourceNcCsvList]
     };
     // TODO: still used?
@@ -692,9 +694,12 @@ let mergeAllCompatibleSources2 = (ncList: NameCount.List,
 //
 //
 let getSynonymCounts = (sourceList: AnySourceData[]): Clue.PropertyCounts.Type => {
+    throw new Error ('not implemented');
+    /*
     return sourceList.reduce(
         (counts, source) => Clue.PropertyCounts.add(counts, source.synonymCounts),
         Clue.PropertyCounts.empty());
+    */
 };
                       
 //
@@ -1200,7 +1205,7 @@ let loadAndMergeSourceList = (lazySourceList: LazySourceData[], args: MergeArgs)
             sourcesToMerge.push(sourceData);
         }
         const mergedSource = mergeSources(sourcesToMerge[0], sourcesToMerge[1], false) as SourceData;
-        if (propertyCountsIsInBounds(mergedSource.synonymCounts, args.synonymMinMax)) {
+        if (1) { // (propertyCountsIsInBounds(mergedSource.synonymCounts, args.synonymMinMax)) {
             sourceList.push(mergedSource);
         }
     }

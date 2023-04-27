@@ -148,6 +148,10 @@ export function getNcResultMap (count: number): NcResultMap {
     return State.ncResultMaps[count];
 }
 
+export function getAllCandidates (): AllCandidates {
+    return State.allCandidates;
+}
+
 const getCandidatesContainer = (sentence: number): Sentence.CandidatesContainer => {
     return State.allCandidates[sentence];
 }
@@ -157,7 +161,9 @@ export const copyAllCandidates = (allCandidates: AllCandidates = State.allCandid
 {
     let result: AllCandidates = [];
     for (let [index, container] of allCandidates.entries()) {
-	result[index] = Sentence.copyCandidatesContainer(container);
+	if (container) {
+	    result[index] = Sentence.copyCandidatesContainer(container);
+	}
     }
     return result;
 }
@@ -207,6 +213,8 @@ const initCluePropertyCounts = (clueList: ClueList.Primary, ignoreList: ClueList
         sources.forEach(source => {
             Debug(`iCPC: source: ${source}`);
             // the (intentional) source/source here is from hack in autoSource
+	    // bug here with --sentence is that a source may be in a sentence,
+	    // in which case this _find will fail, I think.
             Clue.PropertyCounts.addAll(clue, _.find(ignoreList, { name: source, src: source })!);
         });
     }
@@ -215,8 +223,8 @@ const initCluePropertyCounts = (clueList: ClueList.Primary, ignoreList: ClueList
 const loadSentence = (num: number, args: any): number => {
     console.error(`loading sentence ${num}`);
     let maxClues = 0;// TODO
-    let sentence = Sentence.load(Clues.getDirectory(Clues.getByOptions(args)), num);
-    Sentence.addVariations(sentence, State.variations);
+    let sentence = Sentence.load(State.dir, num);
+    Sentence.addAllVariations(sentence, State.variations);
     const container = Sentence.buildAllCandidates(sentence, State.variations);
     State.allCandidates[num] = container;
     return maxClues;
@@ -235,7 +243,7 @@ const autoSource = (clueList: ClueList.Primary, args: any): [ClueList.Primary, n
         // clue.num check must happen before clue.ignore check
         if (clue.num) {
 	    clueNumber = Number(clue.num);
-	    const sentence = args.sentence && (clue.source === "sentence");
+	    const sentence = args.useSentences && (clue.source === "sentence");
 	    if (sentence) {
 		maxSentenceClues += loadSentence(clueNumber, args);
 	    }
@@ -268,7 +276,8 @@ const autoSource = (clueList: ClueList.Primary, args: any): [ClueList.Primary, n
         clue.num = clueNumber;
         actualClues.push(clue);
     }
-    let loggy = false;
+    /*
+    let loggy = true;
     initCluePropertyCounts(ignoredClues, ignoredClues);
     if (loggy) {
         console.log('Ignored:');
@@ -279,9 +288,12 @@ const autoSource = (clueList: ClueList.Primary, args: any): [ClueList.Primary, n
         console.log('Actual:');
         ClueList.display(actualClues, { synonym: true });
     }
+    */
     
+    // TODO: doesn't include sentences.  and sources are about to change
+    // to bigger numbers, making this output untenable
     Debug(`autoSource: ${source} primary clues, ` +
-        `${actualClues.reduce((srcList: string[], clue: Clue.Primary) => { srcList.push(clue.src||"undefined"); return srcList; }, [])}`);
+        `${actualClues.reduce((srcList: string[], clue: Clue.Primary) => { srcList.push(clue.src || "undefined"); return srcList; }, [])}`);
     return [actualClues, source];
 };
 
@@ -509,8 +521,8 @@ let initSrcBitsInAllResults = (results: ValidateResult[]): void => {
 }
 
 let massageValidateResults = (nc: NameCount.Type, results: ValidateResult[]): void => {
-    initPropertyCountsInAllResults(nc, results);
-    initSrcBitsInAllResults(results);
+    //initPropertyCountsInAllResults(nc, results);
+    //initSrcBitsInAllResults(results);
 }
 
 //
@@ -645,12 +657,11 @@ let addKnownCompoundClues = function (clueList: ClueList.Compound, clueCount: nu
     clueList.filter(clue => !clue.ignore).forEach(clue => {
         clue.src = clue.src.split(',').sort().toString();
         let result = addCompoundClue(clue, clueCount, args);
-        if (!State.ignoreLoadErrors) {
-            if (!result.success) {
-                console.error(`VALIDATE FAILED KNOWN COMPOUND CLUE: '${clue.src}':${clueCount}`);
-            }
+	if (result.success) {
+            addKnownClue(clueCount, clue.name, clue.src);
+	} else if (!State.ignoreLoadErrors) {
+            console.error(`VALIDATE FAILED KNOWN COMPOUND CLUE: '${clue.src}':${clueCount}`);
         }
-        addKnownClue(clueCount, clue.name, clue.src);
     });
 };
 
@@ -1016,13 +1027,13 @@ let getCountList = function (nameOrList: string|string[]): CountList {
         : getValidCounts(nameOrList as string[], getClueCountListArray(nameOrList as string[]));
 };
 
+// used by Validator.getRestrictedPrimaryClueNumber
 //
-//
-export let getPrimaryClue = function (nameSrc: NameCount.Type): Clue.Primary {
+export let getPrimaryClue = function (nameSrc: NameCount.Type): Clue.Primary|undefined {
     const match = getClueList(1).find(clue => 
         clue.name === nameSrc.name && _.toNumber(clue.src) === nameSrc.count);
-    if (!match) throw new Error(`can't find clue: ${nameSrc}`);
-    return match as Clue.Primary;
+    //if (!match) throw new Error(`can't find clue: ${nameSrc}`);
+    return match ? match as Clue.Primary : undefined;
 };
 
 //
@@ -1618,3 +1629,31 @@ export let recursiveGetCluePropertyCount = function (
     }
     return counts;
 };
+
+export const clueExists = (name: string, count: number): boolean => {
+    // for old-school primary, and all compound clues
+    if (_.has(getKnownClueMap(count), name)) {
+	return true;
+    }
+    // special case for primary clues in sentences
+    if (count === 1) {
+	return anyCandidateHasClueName(name);
+    }
+    return false;
+}
+
+const anyCandidateHasClueName = (name: string,
+    allCandidates: AllCandidates = State.allCandidates): boolean =>
+{
+    for (let container of allCandidates) {
+	if (!container) continue;
+	const indices = container.nameIndicesMap[name] || [];
+	for (let index of indices) {
+	    if (container.candidates[index]) {
+		return true;
+	    }
+	}
+    }
+    return false;
+}
+
