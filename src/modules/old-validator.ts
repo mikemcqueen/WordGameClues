@@ -176,6 +176,7 @@ let buildValidateResult = (nameSrcList: NameCount.List, args: CompatibleResultAr
         }).ensureUniquePrimaryLists(),
         nameSrcList,
 	allCandidates: []
+	//,usedSources: []
     };
 };
 
@@ -778,7 +779,7 @@ export const checkUniqueSources = (nameCountList: NameCount.List, args: any): Va
                 }];
             } else {
                 // call validateSources recursively with compound clues
-                let vsResult = Validator.validateSources({
+                let vsResult = Validator.validateSources(undefined, {
                     sum:            buildResult.count,
                     nameList:       buildResult.compoundSrcNameList,
                     count:          buildResult.compoundSrcNameList.length,

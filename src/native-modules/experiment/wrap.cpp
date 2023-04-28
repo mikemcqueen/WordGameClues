@@ -42,17 +42,17 @@ Array wrap(Env& env, const XorSourceList& xorSourceList) {
   return jsList;
 }
 
-Object wrap(Env& env, const SourceData& source) {
 #if 0
+Object wrap(Env& env, const SourceData& source) {
   Object jsObj = Object::New(env);
   jsObj.Set("primaryNameSrcList", wrap(env, xorSource.primaryNameSrcList));
   jsObj.Set("ncList", wrap(env, xorSource.ncList));
   return jsObj;
-#endif
   auto jsObj = wrap(env, (const SourceBase&)source);
   jsObj.Set("sourceNcCsvList", wrap(env, source.sourceNcCsvList));
   return jsObj;
 }
+#endif
 
 Array wrap(Env& env, const SourceList& sourceList) {
   Array jsList = Array::New(env, sourceList.size());
@@ -75,9 +75,11 @@ Object wrapMergedSource(Env& env, const SourceCRefList& sourceCRefList) {
     for (const auto& nc : source.ncList) {
       jsNcl.Set(jsNcl.Length(), wrap(env, nc));
     }
+    /*
     for (const auto& str : source.sourceNcCsvList) {
       jsSncl.Set(jsSncl.Length(), String::New(env, str));
     }
+    */
   }
   jsObj.Set("primaryNameSrcList", jsPnsl);
   jsObj.Set("ncList", jsNcl);

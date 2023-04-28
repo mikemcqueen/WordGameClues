@@ -42,6 +42,7 @@ interface ValidateResultData {
     resultMap: any;
     nameSrcList: NameCount.List;
     srcBits?: any;
+    usedSources?: number[];
     nameSrcCsv?: string;
     propertyCounts?: Clue.PropertyCounts.Map;
     //primarySrcArray?: CountArray;
@@ -191,18 +192,22 @@ let getAllSourcesForPrimaryClueName = (name: string, allCandidates: ClueManager.
     return sources;
 }
 
-const isCompatibleCandidateSource = (src: number, candidates: number[]): boolean => {
+let theName: string = ""
+
+const addCompatibleCandidateSource = (src: number, candidates: number[]): boolean => {
     if (!Sentence.isCandidateSource(src)) {
 	return true;
     }
-    const sentence = Sentence.getSourceSentence(src);
-    const variation = Sentence.getSourceVariation(src);
-    if (candidates[sentence]) {
-	if (candidates[sentence] !== variation) {
+    const [sentenceIndex, variationIndex] = Sentence.getSourceIndices(src);
+    if (candidates[sentenceIndex]) {
+	if (candidates[sentenceIndex] !== variationIndex) {
 	    return false;
 	}
     } else {
-	candidates[sentence] = variation;
+	if (theName === 'old' && sentenceIndex === 3) {
+	    console.error(`${theName}: adding ${src} to [${candidates}]`);
+	}
+	candidates[sentenceIndex] = variationIndex;
     }
     return true;
 }
@@ -218,17 +223,13 @@ let mergeNcListResults = (ncListToMerge: NameCount.List,
             return getAllSourcesForPrimaryClueName(nc.name, args.allCandidates);
         } else {
             const ncResultMap = ClueManager.getNcResultMap(nc.count);
-	    //console.error(`nc: ${nc.toString()}, next: ${ncResultMap[nc.toString()]}`); //.list.length).keys()].map(_.toNumber);
             return [...Array(ncResultMap[nc.toString()].list.length).keys()].map(_.toNumber);
         }
     });
-    //console.error(Stringify(listArray));
     let resultList: ValidateResult[] = [];
-    //Peco.setLogging(true);
     const combos = Peco.makeNew({
 	listArray
     }).getCombinations();
-    //Peco.setLogging(false);
 
     /*
     let str: string = '';
@@ -245,19 +246,24 @@ let mergeNcListResults = (ncListToMerge: NameCount.List,
         let nameSrcList: NameCount.List = [];
         let resultMap = ResultMap.makeNew();
         let restrictToClueNumber = 0;
-	// indexList values are either indexes into a resultMap.list (compound clue)
-	// or primary sources (primary clue)
+	// indexList value is either an index into a resultMap.list (compound clue)
+	// or a primary source (primary clue)
         for (let i = 0; i < indexList.length; ++i) {
             const nc = ncListToMerge[i];
             if (nc.count > 1) { // compound clue
-		const index = indexList[i];
-                const result = ClueManager.getNcResultMap(nc.count)[nc.toString()].list[index];
+		const resultListIndex = indexList[i];
+                const result = ClueManager.getNcResultMap(nc.count)[nc.toString()].list[resultListIndex];
+		for (let nameSrc of result.nameSrcList) {
+		    if (!addCompatibleCandidateSource(nameSrc.count, candidates)) {
+			return; // forEach.continue;
+		    }
+		}
                 ncList.push(...result.ncList);
                 nameSrcList.push(...result.nameSrcList);
                 resultMap.addNcMapSource(nc, result.resultMap);
             } else { // primary clue
 		const primarySrc = indexList[i];
-		if (!isCompatibleCandidateSource(primarySrc, candidates)) {
+		if (!addCompatibleCandidateSource(primarySrc, candidates)) {
 		    return; // forEach.continue;
 		}
                 ncList.push(nc);
@@ -309,14 +315,14 @@ let test = (ncList: NameCount.List, args: any): ValidateSourcesResult => {
 type VSForNameCountArgs = NameListContainer & CountListContainer
     & ClueManager.AllCandidatesContainer & NcListContainer & VSFlags;
 
-let validateSourcesForNameCount = (name: string, count: number, args: VSForNameCountArgs):
-    ValidateSourcesResult =>
+let validateSourcesForNameCount = (clueName: string|undefined, srcName: string,
+    srcCount: number, args: VSForNameCountArgs): ValidateSourcesResult =>
 {
-    Debug(`++validateSourcesForNameCount, ${name}:${count}` +
+    Debug(`++validateSourcesForNameCount(${clueName}), ${srcName}:${srcCount}` +
         `, validateAll: ${args.validateAll} ${indentNewline()}` +
 	`  ncList: ${args.ncList}, nameList: ${args.nameList}`);
 
-    let ncList = copyAddNcList(args.ncList, name, count);
+    let ncList = copyAddNcList(args.ncList, srcName, srcCount);
     if (_.isEmpty(ncList)) {
         // TODO:
         // duplicate name:count entry. technically this is allowable for
@@ -324,23 +330,24 @@ let validateSourcesForNameCount = (name: string, count: number, args: VSForNameC
         // in the clueList[count]. (at least as many entries as there are
         // copies of name in ncList)
         // SEE ALSO: copyAddNcList()
-        Debug(`  duplicate nc, ${name}:{count}`);
+        Debug(`  duplicate nc, ${srcName}:{srcCount}`);
         return { success: false }; // fail
     }
-    Debug(`  added nc ${name}:${count}, ncList.length: ${ncList.length}`);
+    Debug(`  added nc ${srcName}:${srcCount}, ncList.length: ${ncList.length}`);
     // If only one name & count remain, we're done.
     // (name & count lists are equal length, just test one)
     if (args.nameList.length === 1) {
         let result: ValidateSourcesResult;
         if (args.fast && args.validateAll) { // NOTE getting rid of this validateAll check might fix --copy-from, --add, etc.
+	    theName = clueName!;
             result = mergeNcListResults(ncList, args);
         } else {
             result = OldValidator.checkUniqueSources(ncList, args);
             Debug(`checkUniqueSources --- ${result.success ? 'success!' : 'failure'}`);
         }
         if (result.success) {
-            args.ncList.push(NameCount.makeNew(name, count));
-            Debug(`  add1, ${name}:${count}, ncList(${ncList.length}): ${ncList}`);
+            args.ncList.push(NameCount.makeNew(srcName, srcCount));
+            Debug(`  added ${srcName}:${srcCount}, ncList(${ncList.length}): ${ncList}`);
         }
         return result;
     }
@@ -348,8 +355,8 @@ let validateSourcesForNameCount = (name: string, count: number, args: VSForNameC
     // nameList.length > 1, remove current name & count,
     // and validate remaining
     Debug(`..calling validateSorucesForNameCountLists recursively, ncList: ${ncList}`);
-    let rvsResult = validateSourcesForNameCountLists(
-	chop(args.nameList, name), chop(args.countList, count), {
+    let rvsResult = validateSourcesForNameCountLists(clueName,
+	chop(args.nameList, srcName), chop(args.countList, srcCount), {
 	    allCandidates: args.allCandidates, //ClueManager.copyAllCandidates(args.allCandidates),
 	    ncList,
 	    fast: args.fast,
@@ -364,14 +371,14 @@ let validateSourcesForNameCount = (name: string, count: number, args: VSForNameC
     // TODO2: use _clone() until then
     args.ncList.length = 0;
     ncList.forEach(nc => args.ncList.push(nc));
-    Debug(`--validateSourcesForNameCount, add ${name}:${count}` +
+    Debug(`--validateSourcesForNameCount, add ${srcName}:${srcCount}` +
           `, ncList(${ncList.length}): ${ncList}`);
     return rvsResult;
 };
 
 type VSForNameCountListsArgs = ClueManager.AllCandidatesContainer & NcListContainer & VSFlags;
 
-let validateSourcesForNameCountLists = (nameList: string[], countList: number[],
+let validateSourcesForNameCountLists = (clueName: string|undefined, nameList: string[], countList: number[],
     args: VSForNameCountListsArgs): ValidateSourcesResult =>
 {
     logLevel++;
@@ -383,12 +390,13 @@ let validateSourcesForNameCountLists = (nameList: string[], countList: number[],
     // count is checked for a name, no need to check it again
 
     let resultList: ValidateResult[] = [];
-    const clueName = nameList[0];
+    const srcName = nameList[0];
     let success = countList
-	.filter(count => ClueManager.clueExists(clueName, count))
+	.filter(count => ClueManager.clueExists(srcName, count))
+        // TODO filter on name != clueName
         .some(count => // .every ??!!
     {
-        let rvsResult = validateSourcesForNameCount(clueName, count, {
+        let rvsResult = validateSourcesForNameCount(clueName, srcName, count, {
             nameList,
             countList,
 	    allCandidates: args.allCandidates,
@@ -397,7 +405,7 @@ let validateSourcesForNameCountLists = (nameList: string[], countList: number[],
             validateAll: args.validateAll
         });
         if (!rvsResult.success) return false; // some.continue;
-        Debug(`  validateSourcesForNameCount output for: ${clueName}, ncList(${args.ncList.length}): ${args.ncList}`);
+        Debug(`  validateSourcesForNameCount output for: ${srcName}, ncList(${args.ncList.length}): ${args.ncList}`);
         // sanity check
         if (!args.validateAll && (args.ncList.length < 2)) {
             // TODO: add "allowSingleEntry" ?
@@ -417,8 +425,10 @@ let validateSourcesForNameCountLists = (nameList: string[], countList: number[],
 
 //
 //
-export const validateSources = (args: any): ValidateSourcesResult => {
-    Debug('++validateSources' +
+export const validateSources = (clueName: string|undefined, args: any):
+    ValidateSourcesResult =>
+{
+    Debug('++validateSources(${clueName}' +
           `${indentNewline()}  nameList(${args.nameList.length}): ${args.nameList}` +
           `, sum(${args.sum})` +
           `, count(${args.count})` +
@@ -432,7 +442,7 @@ export const validateSources = (args: any): ValidateSourcesResult => {
         max:     args.max,
         quiet:   args.quiet
     }).getCombinations().some((countList: number[]) => {
-        let rvsResult = validateSourcesForNameCountLists(args.nameList, countList, {
+        let rvsResult = validateSourcesForNameCountLists(clueName, args.nameList, countList, {
 	    allCandidates: ClueManager.getAllCandidates(), //ClueManager.copyAllCandidates(),
 	    ncList: [],
             fast: args.fast,

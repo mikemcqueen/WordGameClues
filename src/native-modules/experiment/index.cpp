@@ -55,18 +55,24 @@ cm::NameCountList makeNameCountList(Env& env, const Napi::Array& jsList) {
 
 cm::SourceData makeSourceData(Env& env, const Napi::Object& jsSourceData) {
   auto jsPrimaryNameSrcList = jsSourceData.Get("primaryNameSrcList");
-  auto jsSourceNcCsvList = jsSourceData.Get("sourceNcCsvList");
-  auto jsNcList = jsSourceData.Get("ncList");
-  if (!jsPrimaryNameSrcList.IsArray() || !jsSourceNcCsvList.IsArray() || !jsNcList.IsArray()) {
-    Napi::TypeError::New(env, "makeSourceData: invalid arguments").ThrowAsJavaScriptException();
+  if (!jsPrimaryNameSrcList.IsArray()) {
+    Napi::TypeError::New(env, "makeSourceData: primaryNameSrcList is not an array")
+      .ThrowAsJavaScriptException();
     return {};
   }
+  auto jsNcList = jsSourceData.Get("ncList");
+  if (!jsNcList.IsArray()) {
+    Napi::TypeError::New(env, "makeSourceData: ncList is not an array")
+      .ThrowAsJavaScriptException();
+    return {};
+  }
+  //auto jsSourceNcCsvList = jsSourceData.Get("sourceNcCsvList");
   auto primaryNameSrcList = makeNameCountList(env, jsPrimaryNameSrcList.As<Array>());
   auto primarySrcBits = cm::NameCount::listToSourceBits(primaryNameSrcList);
-  auto sourceNcCsvList = makeStringList(env, jsSourceNcCsvList.As<Array>());
+  //auto sourceNcCsvList = makeStringList(env, jsSourceNcCsvList.As<Array>());
   auto ncList = makeNameCountList(env, jsNcList.As<Array>());
   return cm::SourceData(std::move(primaryNameSrcList), std::move(primarySrcBits),
-			std::move(ncList), std::move(sourceNcCsvList));
+			std::move(ncList)); // , std::move(sourceNcCsvList));
 }
 
 cm::SourceList makeSourceList(Napi::Env& env, const Napi::Array& jsList) {
@@ -147,8 +153,10 @@ cm::SourceBits makeSourceBits(Napi::Env& env, const Napi::Array& jsList) {
     }
     const auto jsPnsl = jsList[i].As<Object>().Get("primaryNameSrcList").As<Array>();
     for (auto j = 0u; j < jsPnsl.Length(); ++j) {
-      const auto jsNc = jsPnsl[j].As<Object>();
-      sourceBits.set(jsNc.Get("count").As<Number>().Int32Value());
+      const auto count = jsPnsl[j].As<Object>().Get("count").As<Number>().Int32Value();
+      if (count < 1'000'000) {
+	sourceBits.set(count);
+      }
     }
   }
   return sourceBits;

@@ -31,25 +31,13 @@ import * as ClueManager from './clue-manager';
 import * as CountBits from '../types/count-bits-fastbitset';
 import * as MinMax from '../types/min-max';
 import * as NameCount from '../types/name-count';
+import * as Sentence from '../types/sentence';
 import * as Synonym from './synonym';
 
 import { ValidateResult } from './validator';
 
 // TODO: import from somewhere. also defined in clue-manager
 const DATA_DIR =  Path.normalize(`${Path.dirname(module.filename)}/../../../data/`);
-
-/* TODO:
-   interface LazySourceHashEntry { 
-   sourceList: LazySourceData[];
-   isCompatible: boolean;
-   }
-
-   interface LazySourceHashMap {
-   [key: string]: LazySourceHashEntry;
-   }
-
-   replaces: StringAnyMap
-*/
 
 interface StringBoolMap {
     [key: string]: boolean; // for now; eventually maybe array of string (sorted primary nameSrcCsv)
@@ -86,40 +74,42 @@ interface CountArrayAndSize {
 //
 interface SourceBase {
     primaryNameSrcList: NameCount.List;
-    primarySrcBits: CountBits.Type;
     ncList: NameCount.List;
+    //synonymCounts?: Clue.PropertyCounts.Type;
 }
 
-//
-//
-interface LazySourceData extends SourceBase {
-    synonymCounts?: Clue.PropertyCounts.Type;
-    validateResultList: ValidateResult[];
+interface SourceCompatibilityData {
+    primarySrcBits: CountBits.Type;
+    usedSources: number[];
 }
 
-//
-//
+/*
 interface SourceData extends SourceBase {
-    synonymCounts?: Clue.PropertyCounts.Type;
-    sourceNcCsvList: string[];
-//    ncCsv?: string;
+    //sourceNcCsvList: string[];
+    //ncCsv?: string;
 }
+*/
+type SourceData = SourceBase & SourceCompatibilityData;
 type SourceList = SourceData[];
+
+interface ValidateResultsContainer {
+    validateResults: ValidateResult[];
+}
+
+type LazySourceData = SourceBase & SourceCompatibilityData & ValidateResultsContainer;
+
 type AnySourceData = LazySourceData | SourceData;
 
-type XorSource = SourceBase;
-type XorSourceList = SourceBase[];
+type XorSource = SourceData;
+type XorSourceList = XorSource[];
 
-type SourceNcCsvMap = Record<string, number[]>;
+//type SourceNcCsvMap = Record<string, number[]>;
 
-//
-//
-interface MergedSources {
-    primarySrcBits: CountBits.Type;
+interface SourceListContainer {
     sourceList: SourceList;
 }
+type MergedSources = SourceListContainer & SourceCompatibilityData;
 type MergedSourcesList = MergedSources[];
-
 
 interface OrSourceData {
     source: SourceData;
@@ -172,10 +162,6 @@ function Stringify(val: any) {
     }, " ");
 }
 
-let logging = 0;
-let loggy = false;
-let WW = false;
-
 // TODO: as const;
 const Op = {
     and: 1,
@@ -211,7 +197,7 @@ let stringifySourceList = (sourceList: SourceList): string => {
         result += '  {\n';
         result += `    primaryNameSrcList: ${source.primaryNameSrcList}\n`;
         result += `    ncList: ${source.ncList}\n`;
-        result += `    synonymCounts: ${Stringify2(source.synonymCounts)}\n`;
+        //result += `    synonymCounts: ${Stringify2(source.synonymCounts)}\n`;
         //result += `    sourcNcCsvList: ${Stringify2(source.sourceNcCsvList)}\n`;
         result += '  }';
     }
@@ -474,9 +460,11 @@ let makeSourceData = (nc: NameCount.Type, validateResult: ValidateResult,
     return {
 	primaryNameSrcList: validateResult.nameSrcList,
 	primarySrcBits: validateResult.srcBits,
+	//usedSources: validateResult.usedSources, // TODO?
+	usedSources: Sentence.getUsedSources(validateResult.nameSrcList),
 	ncList: [nc], // TODO i could try getting rid of "LazySource.nc" and just make this part of LazySouceData
-//	synonymCounts: getSynonymCountsForNcAndValidateResult(nc, validateResult),
-	sourceNcCsvList
+	//synonymCounts: getSynonymCountsForNcAndValidateResult(nc, validateResult),
+	//sourceNcCsvList
     };
 };
 
@@ -485,13 +473,15 @@ let makeSourceData = (nc: NameCount.Type, validateResult: ValidateResult,
 let getSourceData = (nc: NameCount.Type, validateResult: ValidateResult, lazy: boolean | undefined,
     orSourcesNcCsvMap?: Map<string, number>): AnySourceData =>
 {
-    Assert(validateResult.srcBits, `${nc}`);
+    Assert(validateResult.srcBits && validateResult.usedSources, `getSourceData(): ${nc}`);
     return lazy ? {
 	primaryNameSrcList: validateResult.nameSrcList,
 	primarySrcBits: validateResult.srcBits,
+	//usedSources: validateResult.usedSources, //TODO?
+	usedSources: Sentence.getUsedSources(validateResult.nameSrcList),
         ncList: [nc],
 //        synonymCounts: getSynonymCountsForNcAndValidateResult(nc, validateResult),
-        validateResultList: [validateResult]
+        validateResults: [validateResult]
     } : makeSourceData(nc, validateResult, orSourcesNcCsvMap);
 };
 
@@ -528,15 +518,37 @@ let getSourceList = (nc: NameCount.Type, args: MergeArgs): AnySourceData[] => {
     return sourceList;
 };
 
-let merges = 0;
-let list_merges = 0;
+const mergeUsedSources = (first: number[], second: number[]): number[] => {
+    let result: number[] = first.slice();
+    for (let i = 0; i < 9 /* cough */; ++i) {
+	result[i] ||= second[i];
+    }
+    return result;
+}
+
+const isSourceDataCompatible = (first: SourceCompatibilityData,
+    second: SourceCompatibilityData): boolean =>
+{
+    if (CountBits.intersects(first.primarySrcBits, second.primarySrcBits)) {
+	return false;
+    }
+    for (let i = 0; i < 9 /* cough */; ++i) {
+	if ((first.usedSources[i] && second.usedSources[i])
+	    && (first.usedSources[i] !== second.usedSources[i]))
+	{
+	    return false;
+	}
+    }
+    return true;
+}
 
 //
 //
 let mergeSources = (source1: AnySourceData, source2: AnySourceData, lazy: boolean | undefined): AnySourceData => {
-    merges += 1;
+    if (lazy) { console.error('lazy'); process.exit(-1); }
     const primaryNameSrcList = [...source1.primaryNameSrcList, ...source2.primaryNameSrcList];
     const primarySrcBits = CountBits.or(source1.primarySrcBits, source2.primarySrcBits);
+    const usedSources = mergeUsedSources(source1.usedSources, source2.usedSources);
     const ncList = [...source1.ncList, ...source2.ncList];
     if (lazy) {
         Assert(ncList.length === 2, `ncList.length(${ncList.length})`);
@@ -545,15 +557,16 @@ let mergeSources = (source1: AnySourceData, source2: AnySourceData, lazy: boolea
         const result: LazySourceData = {
             primaryNameSrcList,
 	    primarySrcBits,
+	    usedSources,
             ncList,
 /*
             synonymCounts: Clue.PropertyCounts.merge(
-                getSynonymCountsForValidateResult(source1.validateResultList[0]),
-                getSynonymCountsForValidateResult(source2.validateResultList[0])),
+                getSynonymCountsForValidateResult(source1.validateResults[0]),
+                getSynonymCountsForValidateResult(source2.validateResults[0])),
 */
-            validateResultList: [
-                (source1 as LazySourceData).validateResultList[0],
-                (source2 as LazySourceData).validateResultList[0]
+            validateResults: [
+                (source1 as LazySourceData).validateResults[0],
+                (source2 as LazySourceData).validateResults[0]
             ]
         };
         return result;
@@ -563,9 +576,10 @@ let mergeSources = (source1: AnySourceData, source2: AnySourceData, lazy: boolea
     const mergedSource: SourceData = {
         primaryNameSrcList,
 	primarySrcBits,
-        ncList,
+	usedSources,
+        ncList
 //        synonymCounts: Clue.PropertyCounts.merge(source1.synonymCounts, source2.synonymCounts),
-        sourceNcCsvList: [...source1.sourceNcCsvList, ...source2.sourceNcCsvList]
+//        sourceNcCsvList: [...source1.sourceNcCsvList, ...source2.sourceNcCsvList]
     };
     // TODO: still used?
     //mergedSource.ncCsv = NameCount.listToSortedString(mergedSource.ncList);
@@ -575,7 +589,7 @@ let mergeSources = (source1: AnySourceData, source2: AnySourceData, lazy: boolea
 //
 //
 let mergeCompatibleSources = (source1: AnySourceData, source2: AnySourceData, args: MergeArgs): AnySourceData[] => {
-    return !CountBits.intersects(source1.primarySrcBits, source2.primarySrcBits)
+    return isSourceDataCompatible(source1, source2)
         ? [mergeSources(source1, source2, args.lazy)]
         : [];
 };
@@ -583,7 +597,6 @@ let mergeCompatibleSources = (source1: AnySourceData, source2: AnySourceData, ar
 //
 //
 let mergeCompatibleSourceLists = (sourceList1: AnySourceData[], sourceList2: AnySourceData[], args: MergeArgs): AnySourceData[] => {
-    list_merges += 1;
     let mergedSourcesList: AnySourceData[] = [];
     for (const source1 of sourceList1) {
         for (const source2 of sourceList2) {
@@ -595,7 +608,7 @@ let mergeCompatibleSourceLists = (sourceList1: AnySourceData[], sourceList2: Any
 
 let validateSourceBits = (source: SourceData): CountBits.Type => {
     let sourceBits = CountBits.makeNew();
-    CountBits.setMany(sourceBits, NameCount.listToCountList(source.primaryNameSrcList));
+    CountBits.setMany(sourceBits, Sentence.legacySrcList(source.primaryNameSrcList));
     if (!sourceBits.equals(source.primarySrcBits)) {
 	throw new Error("**source bits mismatch**");
     }
@@ -630,30 +643,18 @@ let validatePrimarySrcBits = (mergedSourcesList: MergedSourcesList) : void => {
     }
 };
 
-//
-//
 let mergeCompatibleSourceLists2 = (mergedSourcesList: MergedSourcesList,
     sourceList: SourceList): MergedSourcesList =>
 {
-    list_merges += 1;
     let result: MergedSourcesList = [];
     for (const mergedSources of mergedSourcesList) {
-	//validateMergedSourcesBits(mergedSources);
         for (const source of sourceList) {
-	    //validateSourceBits(source);
-	    if (!CountBits.intersects(mergedSources.primarySrcBits, source.primarySrcBits)) {
-		if (0) {
-		    console.log(`merging nc(${NameCount.listToString(source.ncList)}), ` +
-			`primary(${NameCount.listToString(source.primaryNameSrcList)}), ` +
-			`bits(${source.primarySrcBits.toString()})`);
-		}
-		let ms: MergedSources = {
+	    if (isSourceDataCompatible(source, mergedSources)) {
+		result.push({
 		    primarySrcBits: CountBits.or(mergedSources.primarySrcBits, source.primarySrcBits),
-		    sourceList: [...mergedSources.sourceList]
-		};
-		ms.sourceList.push(source);
-		//validateMergedSourcesBits(ms, source);
-		result.push(ms);
+		    usedSources: mergeUsedSources(mergedSources.usedSources, source.usedSources),
+		    sourceList: [...mergedSources.sourceList, source]
+		});
 	    }
         }
     }
@@ -665,6 +666,7 @@ let makeMergedSourcesList = (sourceList: SourceList) : MergedSourcesList => {
     for (const source of sourceList) {
 	mergedSourcesList.push({
 	    primarySrcBits: CountBits.makeFrom(source.primarySrcBits),
+	    usedSources: source.usedSources.slice(),
 	    sourceList: [source]
 	});
     }
@@ -862,11 +864,11 @@ let getUseSourceLists = (ncDataLists: NCDataList[], args: any): SourceList[] => 
     let end = new Duration(begin, new Date()).milliseconds;
 
     let sum = sourceLists.reduce((total, sl) => { return total + sl.length; }, 0);
-    console.error(` buildSLforUseNCD(${PrettyMs(end)}), sourceLists(${sum}), ` +
-	`list_merges(${list_merges}), merges(${merges})`);
+    console.error(` buildSLforUseNCD(${PrettyMs(end)}), sourceLists(${sum})`);
     return sourceLists;
 };
 
+/*
 // Here we have 'orSourceLists', created from getUseSourcesList(Op.or).
 //
 // Generate a sorted ncCsv using the combined NCs of each sources's ncList,
@@ -889,6 +891,7 @@ let buildOrSourceNcCsvMap = (orSourceLists: SourceList[]): SourceNcCsvMap => {
         return map;
     }, {});
 };
+*/
 
 // TODO: function name
 //
@@ -911,10 +914,13 @@ const mergeCompatibleXorSources = (indexList: number[], sourceLists: SourceList[
 	let primaryNameSrcList: NameCount.List = [];
 	let ncList: NameCount.List = [];
 	let primarySrcBits = CountBits.makeNew();
+	let usedSources: number[] = [];
 	for (let source of sources) {
 	    primaryNameSrcList.push(...source.primaryNameSrcList);
 	    primarySrcBits.orInPlace(source.primarySrcBits);
 	    ncList.push(...source.ncList);
+	     // TODO: could do this in place, mergeUsedSourcesInPlace
+	    usedSources = mergeUsedSources(usedSources, source.usedSources);
 	}
 
         // I feel like this is still valid and worth removing or commenting
@@ -922,6 +928,7 @@ const mergeCompatibleXorSources = (indexList: number[], sourceLists: SourceList[
         let result: XorSource = {
             primaryNameSrcList,
             primarySrcBits,
+	    usedSources,
             ncList,
         };
         return [result];
@@ -1131,7 +1138,7 @@ let isSourceXORCompatibleWithAnyOrSource = (source: SourceData, xorSourceList: X
 let isSourceXORCompatibleWithAnyXorSource = (source: SourceData, xorSourceList: XorSource[]): boolean => {
     let compatible = listIsEmpty(xorSourceList); // empty list == compatible
     for (let xorSource of xorSourceList) {
-        compatible = !CountBits.intersects(source.primarySrcBits, xorSource.primarySrcBits);
+        compatible = isSourceDataCompatible(source, xorSource);
         if (compatible) break;
     }
     return compatible;
@@ -1198,10 +1205,10 @@ let loadAndMergeSourceList = (lazySourceList: LazySourceData[], args: MergeArgs)
     let sourceList: SourceList = [];
     for (let lazySource of lazySourceList) {
         Assert(lazySource.ncList.length === 2);
-        Assert(lazySource.validateResultList.length === 2);
+        Assert(lazySource.validateResults.length === 2);
         let sourcesToMerge: AnySourceData[] = []; // TODO: not ideal, would prefer SourceData here
         for (let index = 0; index < 2; ++index) {
-            const sourceData = getSourceData(lazySource.ncList[index], lazySource.validateResultList[index], false);
+            const sourceData = getSourceData(lazySource.ncList[index], lazySource.validateResults[index], false);
             sourcesToMerge.push(sourceData);
         }
         const mergedSource = mergeSources(sourcesToMerge[0], sourcesToMerge[1], false) as SourceData;
@@ -1299,25 +1306,20 @@ let getSynonymCombosForMergedSourcesList = (nameList: string[],
     return combos;
 };
 
-let setPrimarySrcBits = (sourceList: SourceBase[]): void => {
+let setPrimarySrcBits = (sourceList: SourceData[]): void => {
     for (let source of sourceList) {
-	source.primarySrcBits = CountBits.makeFrom(NameCount.listToCountList(source.primaryNameSrcList));
+	source.primarySrcBits = CountBits.makeFrom(
+	    Sentence.legacySrcList(source.primaryNameSrcList));
     }
-};
-
-let anyMergedSourcesHasBits = (mergedSourcesList: MergedSourcesList, bits: CountBits.Type) : boolean => {
-    for (const mergedSources of mergedSourcesList) {
-	//if (CountBits.and(bits, mergedSources.primarySrcBits).equals(bits)) return true;
-	if (mergedSources.primarySrcBits.equals(bits)) return true;
-    }
-    return false;
 };
 
 //
 // args:
 //   synonymMinMax
 //
-let getCombosForUseNcLists = (sum: number, max: number, pcd: PreComputedData, args: any): string[] => {
+let getCombosForUseNcLists = (sum: number, max: number, pcd: PreComputedData,
+    args: any): string[] =>
+{
     let hash: StringAnyMap = {};
     let combos: string[] = [];
 
@@ -1361,17 +1363,8 @@ let getCombosForUseNcLists = (sum: number, max: number, pcd: PreComputedData, ar
             } else {
                 firstIter = false;
             }
-
-
-            if (0 && (result.nameList!.toString() == "nineteenth century,polar")) {
-                console.error(`hit: ${result.nameList}`);
-                WW = true
-            } else {
-                WW = false;
-            }
-
-
             const key: string = NameCount.listToString(result.ncList!);
+
             let cacheHit = false;
 	    let mergedSourcesList: MergedSourcesList = [];
             if (!hash[key]) {
@@ -1386,14 +1379,12 @@ let getCombosForUseNcLists = (sum: number, max: number, pcd: PreComputedData, ar
                 numCacheHits += 1;
             }
 
-            if (logging) console.log(`  found compatible sources: ${!listIsEmpty(mergedSourcesList)}`);
+            //console.log(`  found compatible sources: ${!listIsEmpty(mergedSourcesList)}`);
 
             // failed to find any compatible combos
             if (listIsEmpty(mergedSourcesList)) continue;
 
             if (hash[key].isCompatible === undefined) {
-                //sourceList = loadAndMergeSourceList(sourceList as LazySourceData[], { synonymMinMax: args.synonymMinMax });
-		// can't i precompute this state also?
 		isany += 1;
 		let flag = false;
                 hash[key].isCompatible = NativeComboMaker.isAnySourceCompatibleWithUseSources(mergedSourcesList, flag);
@@ -1749,7 +1740,7 @@ let buildUseSourceListsFromNcData = (sourceListMap: Map<string, AnySourceData[]>
     // XOR first
     let xor0 = new Date();
     let xorSourceList: XorSourceList = NativeComboMaker.mergeCompatibleXorSourceCombinations(
-	args.allXorNcDataLists, Array.from(sourceListMap.entries()));
+	args.allXorNcDataLists, Array.from(sourceListMap.entries())); // [...sourceListMap.entries()]
     setPrimarySrcBits(xorSourceList);
     let xdur = new Duration(xor0, new Date()).milliseconds;
     console.error(` Native.mergeCompatibleXorSourceCombinations(${PrettyMs(xdur)})`);

@@ -15,69 +15,8 @@
 
 namespace cm {
 
-#if 0
-//
-//
-let mergeSources = (source1: AnySourceData, source2: AnySourceData, lazy: boolean | undefined): AnySourceData => {
-    const primaryNameSrcList = [...source1.primaryNameSrcList, ...source2.primaryNameSrcList];
-    const ncList = [...source1.ncList, ...source2.ncList];
-    if (lazy) {
-        Assert(ncList.length === 2, `ncList.length(${ncList.length})`);
-        source1 = source1 as LazySourceData;
-        source2 = source2 as LazySourceData;
-        const result: LazySourceData = {
-            primaryNameSrcList,
-            ncList,
-            synonymCounts: Clue.PropertyCounts.merge(
-                getSynonymCountsForValidateResult(source1.validateResultList[0]),
-                getSynonymCountsForValidateResult(source2.validateResultList[0])),
-            validateResultList: [
-                (source1 as LazySourceData).validateResultList[0],
-                (source2 as LazySourceData).validateResultList[0]
-            ]
-        };
-        return result;
-    }
-    source1 = source1 as SourceData;
-    source2 = source2 as SourceData;
-    const mergedSource: SourceData = {
-        primaryNameSrcList,
-        ncList,
-        synonymCounts: Clue.PropertyCounts.merge(source1.synonymCounts, source2.synonymCounts),
-        sourceNcCsvList: [...source1.sourceNcCsvList, ...source2.sourceNcCsvList]
-    };
-    // TODO: still used?
-    mergedSource.ncCsv = NameCount.listToSortedString(mergedSource.ncList);
-    return mergedSource;
-};
-#endif
-
 int merges = 0;
 int list_merges = 0;
-//SourceData
-void mergeSources(SourceData& source1, const SourceData& source2) {
-  merges++;
-  //NameCountList primaryNameSrcList = source1.primaryNameSrcList;
-  //primaryNameSrcList.insert(primaryNameSrcList.end(),
-  source1.primaryNameSrcList.insert(source1.primaryNameSrcList.end(),
-    source2.primaryNameSrcList.begin(), source2.primaryNameSrcList.end());
-
-  //SourceBits primarySrcBits = source1.primarySrcBits | source2.primarySrcBits;
-  source1.primarySrcBits |= source2.primarySrcBits;
-
-  //NameCountList ncList = source1.ncList;
-  //ncList.insert(ncList.end(), source2.ncList.begin(), source2.ncList.end());
-  source1.ncList.insert(source1.ncList.end(), source2.ncList.begin(), source2.ncList.end());
-
-  //StringList sourceNcCsvList = source1.sourceNcCsvList;
-  //sourceNcCsvList.insert(sourceNcCsvList.end(),
-  source1.sourceNcCsvList.insert(source1.sourceNcCsvList.end(),
-    source2.sourceNcCsvList.begin(), source2.sourceNcCsvList.end());
-  
-  //synonymCounts: Clue.PropertyCounts.merge(source1.synonymCounts, source2.synonymCounts),
-  //mergedSource.ncCsv = NameCount.listToSortedString(ncList);
-  //return { primaryNameSrcList, primarySrcBits, ncList, sourceNcCsvList };
-}
 
 auto mergeCompatibleSourceLists(const MergedSourcesList& mergedSourcesList, const SourceList& sourceList2) {
   list_merges++;

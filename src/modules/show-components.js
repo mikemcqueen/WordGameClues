@@ -55,21 +55,21 @@ function getSourceClues (source, countList, nameList) {
     }
     //console.error(`results ${Stringify(results)} len(${results.length})`);
     // TODO: duplicated in getSourceClues
+    /*
     const countsList = results.map(result =>
         ClueManager.recursiveGetCluePropertyCount(null, result.resultMap.internal_map, Clue.PropertyName.Synonym));
     const totals = countsList.map(tp => tp.total);
     const primarys = countsList.map(tp => tp.primary);
-    return `${nameList.join(' - ')}  : syn totals(${totals}) primarys(${primarys})`;
+    */
+    return `${nameList.join(' - ')}`; //  : syn totals(${totals}) primarys(${primarys})`;
 }
 
-let GG=false;
 //
 //
 function getClueSources (name, count, nameList) {
-    if (GG) console.log(`getClueSources ${name}:${count}, nameList: [${nameList}]`);
     const srcMap = ClueManager.getKnownSourceMap(count);
     return nameList.map(source => {
-        if (GG) console.log(` source: ${source}`);
+	/*
         if (count === 1) {
             const clue = _.find(ClueManager.getClueList(count), { name, src: source });
             const counts = clue.propertyCounts.synonym;
@@ -81,9 +81,10 @@ function getClueSources (name, count, nameList) {
                                                           Clue.PropertyName.Synonym));
             // TODO: duplicated in getSourceClues
             const totals = countsList.map(tp => tp.total);
-            const primarys = countsList.map(tp => tp.primary);
+	    const primarys = countsList.map(tp => tp.primary);
             source += ` : syn total(${totals}) primary(${primarys})`;
         }
+	*/
         return source;
     }).join(' - ');
 }
@@ -91,10 +92,8 @@ function getClueSources (name, count, nameList) {
 // this is really challenging to understand without types.
 //
 function showCountListArray (name, countListArray, text, hasNameList = false) {
-    if (GG) console.log(`sCLA name: ${name}, text: ${text}, cla: ${Stringify2(countListArray)}`);
     for (const elem of countListArray) {
         const countList = hasNameList ? elem.countList : elem;
-        if (GG) console.log(` countList(${countList.length}): [${countList}], nameList [${elem.nameList}]`);
         let sources = '';
         if (name) {
             if (countList.length > 1) {
@@ -134,7 +133,11 @@ function show (options) {
 	let args = { xor: nameList, max: 2 };
 	let pcd = ComboMaker.preCompute(2, ClueManager.getNumPrimarySources(), args);
 	console.log("OK");
-	console.log(Stringify(pcd.useSourceLists.xor));
+	//console.log(Stringify(pcd.useSourceLists.xor));
+	for (let xorResult of pcd.useSourceLists.xor) {
+	    console.log(`${NameCount.listToString(xorResult.ncList)}:` +
+		` ${NameCount.listToString(xorResult.primaryNameSrcList)}`);
+	}
 	process.exit(0);
     }
     const nameCsv = nameList.toString();
@@ -149,7 +152,7 @@ function show (options) {
     showCountListArray(nameCsv, result.known, 'PRESENT as', true);
     showCountListArray(nameCsv, result.clues, 'PRESENT as clue with source:', true);
     showCountListArray(null, result.valid, 'VALID');
-//    showCountListArray(nameCsv, result.valid, 'VALID');
+    //showCountListArray(nameCsv, result.valid, 'VALID');
 
     // TODO: extract this to helper function, maybe in clue-manager
     // NOTE: explicit undefined check here is necessary
@@ -178,8 +181,6 @@ function addOrRemove (args, nameList, countSet, options) {
     }, nameList, countSet, { save });
     console.log(`${options.add ? "added" : "removed"} ${count} clues`);
 }
-
-//
 
 function getCompatiblePrimaryNameSrcList (listOfListOfPrimaryNameSrcLists) {
     //console.log(`${Stringify(listOfListOfPrimaryNameSrcLists)}`);
@@ -219,8 +220,10 @@ function buildSubListFromIndexList (nameList, indexList) {
     return subList;
 }
 
-// I don't know what the hell is going on here. I tried to get --or work with -t or something?
-// And it made me jump through some extra hoops here? The code doesn't appear to be working.
+// I don't know what the hell is going on here.
+// I tried to get --or work with -t or something?
+// And it made me jump through some extra hoops here?
+// The code doesn't appear to be working.
 function flunky (nameList, /*allOrNcDataList,*/ options) {
     const validResults = {};
     let clueNameList = [...get_clue_names(options), ...options.or];
@@ -260,8 +263,8 @@ function flunky (nameList, /*allOrNcDataList,*/ options) {
 }
 
 function fast_combo_wrapper (nameList, /*allOrNcDataList,*/ options) {
-    console.log('fast_combo_wrapper');
-    console.log(`--or: ${Stringify(options.or)}`);
+    console.error('fast_combo_wrapper');
+    console.error(`--or: ${Stringify(options.or)}`);
     if (options.or) {
 	flunky(nameList, options);
     } else {
@@ -345,9 +348,8 @@ function addValidResults (validResults, validResultList, options) {
 }
 
 function display_valid_results (validResults) {
-    console.log('++display');
+    console.error('++display');
     Object.keys(validResults).forEach(key => console.log(key));
-    console.log('--display');
 }
 
 function showNcLists (ncLists) {

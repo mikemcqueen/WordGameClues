@@ -102,68 +102,18 @@ function usage (msg) {
     process.exit(-1);
 }
 
-//
-
 function loadClues (clues, ignoreErrors, max, options) {
     log('loading all clues...');
     ClueManager.loadAllClues({
         clues,
         ignoreErrors,
         max,
-	useSentences: options.sentence,
+        useSentences: true,
         fast: !options.slow,
         validateAll: true
     });
     log('done.');
     return true;
-}
-
-// unused
-function convertUseToPrimarySources (args) {
-    // build ncList of supplied name:counts
-    const ncList = args.use.map(ncStr => NameCount.makeNew(ncStr));
-    for (const nc of ncList) {
-        if (!nc.count || _.isNaN(nc.count)) {
-            console.log('All -u names require a count (for now)');
-            return { success: false };
-        }
-    }
-
-    // TODO: some more clear way to extract just ".count"s into an array, then sum them
-    const sum = ncList.reduce((a, b) => Object({ count: (a.count + b.count) })).count;
-    const remain = ClueManager.getMaxClues() - sum;
-    if (remain < 1) {
-        console.log(`The sum of the specified clue counts (${sum})` +
-                    ` equals or exceeds the maximum clue count (${ClueManager.getMaxClues()})`);
-        return { success: false };
-    }
-    
-    Debug('convertNcStrToPrimarySources ' + args.use + 
-                ', sum: ' + sum + ', remain: ' + remain);
-
-    // first, make sure the supplied nameList:sum by itself is a valid clue
-    // combination, and find out how many primary-clue variations there
-    // are in which the clue names in args.nameList exist.
-    let vsResult = Validator.validateSources({
-        sum:         sum,
-        nameList:    ncList.map(nc => nc.name),
-        count:       args.use.length,
-        validateAll: true
-    });
-    if (!vsResult.success) {
-        console.log(`The ncStr [${args.use}] is not a valid clue combination`);
-        return { success: false };
-    }
-
-    console.log(`results: ${vsResult.list.length}`);
-
-    // TODO: for each primary-clue variation from validateResults
-    const nameSrcList = vsResult.list[0].nameSrcList;
-    return {
-        success: true,
-        sources: nameSrcList.map(nc => _.toString(nc.count)),
-        clues:   nameSrcList.map(nc => _.toString(nc.name))
-    };
 }
 
 //
@@ -174,7 +124,6 @@ function convertUseToPrimarySources (args) {
 //  sources: primarySourcesArg,
 //  use:     useClueList
 //
-
 function doCombos(args) {
     if (!_.isUndefined(args.sources)) {
         args.sources = _.chain(args.sources).split(',').map(_.toNumber).value();
@@ -185,8 +134,6 @@ function doCombos(args) {
     }
     ComboMaker.makeCombos(args);
 }
-
-//
 
 async function getNamedNoteNames(options) {
     if (options.production) Log.info('---PRODUCTION---');
@@ -207,8 +154,6 @@ async function getNamedNoteNames(options) {
         });
 }
 
-//
-
 function combo_maker(args) {
     return Promise.resolve(args.remaining ? getNamedNoteNames(args) : false)
         .then(noteNames => {
@@ -219,8 +164,6 @@ function combo_maker(args) {
             return doCombos(args);
         });
 }
-
-//
 
 function showSources(clueName) {
     let result;
@@ -252,8 +195,6 @@ function showSources(clueName) {
         });
     });
 }
-
-//
 
 function copyClues (fromType, options = {}) {
     const dir = fromType.baseDir;
@@ -325,8 +266,6 @@ function copyClues (fromType, options = {}) {
     console.log(`total: ${total}, copied: ${copied}`);
 }
 
-//
-
 function setLogging (flag) {
     ClueManager.setLogging(flag);
     ComboMaker.logging  = flag;
@@ -337,16 +276,11 @@ function setLogging (flag) {
     LOGGING = flag;
 }
 
-//
-
 function log (text) {
     if (LOGGING) {
         console.log(text);
     }
 }
-
-//
-//
 
 function sortAllClues (clueSource, max) {
     const dir = clueSource.baseDir;
@@ -460,39 +394,32 @@ async function main () {
             console.log('one or more -u NAME:COUNT required with that option');
             return 1;
         }
-        /*
-        if (!metaFlag) {
-            console.log('--meta required with that option');
-            return 1;
-        }
-        */
         Show.compatibleKnownClues({
             nameList: useClueList,
-            max:      options.count ? _.toNumber(options.count) : ClueManager.getMaxClues(),
-            root:     '../data/results/',
-            format:   {
-                csv:   options.csv,
+            max: options.count ? Number(options.count) : ClueManager.getMaxClues(),
+            root: '../data/results/',
+            format: {
+                csv: options.csv,
                 files: options.files
             }
         });
     } else if (options.test) {
-    let start = new Date();
+        let start = new Date();
         if (options.validate) {
             Components.validate(options.test, options);
         } else {
             Components.show(options);
         }
-    Timing(`count: ${Validator.count}, dupe: ${Validator.dupe}`);
-    const d = new Duration(start, new Date()).milliseconds;
-    Timing(`${PrettyMs(d)}`);
-
+        Timing(`count: ${Validator.count}, dupe: ${Validator.dupe}`);
+        const d = new Duration(start, new Date()).milliseconds;
+        Timing(`${PrettyMs(d)}`);
     } else if (showSourcesClueName) {
         showSources(showSourcesClueName);
     } else if (altSourcesArg || allAltSourcesFlag) {
         AltSources.show(allAltSourcesFlag ? {
             all    : true,
             output : options.output,
-            count  : _.toNumber(options.count)
+            count  : Number(options.count)
         } : {
             all    : false,
             name   : altSourcesArg,
@@ -523,7 +450,7 @@ async function main () {
             parallel: options.parallel,
             use_syns: options.use_syns,
             synonymMinMax: options.synonymMinMax,
-	    verbose: options.verbose
+            verbose: options.verbose
         });
     }
     return 0;
@@ -536,5 +463,5 @@ main().catch(err => {
     console.error(err, err.stack);
 });
 if (LOGGING && !QUIET) {
-    console.log('runtime: ' + (new Duration(appBegin, new Date())).seconds + ' seconds');
+    console.error('runtime: ' + (new Duration(appBegin, new Date())).seconds + ' seconds');
 }

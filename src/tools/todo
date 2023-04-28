@@ -1,3 +1,14 @@
+* validateSources(name) -- enforce everywhere
+* -t newton fails (-t probably doesn't honor candidate clues)
+
+validatesources is apparently happy with old:3=not:1,not:1,old:1
+which is wrong because:
+1) two nots from two different variations of sentence three. i though i checked
+   for and prevented this with the "candidates" thing somewhere
+2) this is like that weird case with "bird" being the "name" of a clue that had
+   "bird" as a source, and that should be disallowed.
+clues3.json:  { "name": "old",             "src": "new,not" },
+
 merge needs:
   --append
   --filter-reject-urls

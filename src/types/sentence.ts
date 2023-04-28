@@ -8,9 +8,11 @@ import _ from 'lodash';
 const Assert = require('assert');
 const Fs = require('fs-extra');
 const Path = require('path');
+const Stringify = require('stringify-object');
 
-import * as ClueList from './clue-list';
 import * as Clue from './clue';
+import * as ClueList from './clue-list';
+import * as NameCount from './name-count';
 
 //
 //
@@ -355,18 +357,36 @@ const getAlternateNames = (name: string, variations: Variations): string[] => {
     return result;
 };
 
+export const getUsedSources = (nameSrcList: NameCount.List): number[] => {
+    let result: number[] = [];
+    nameSrcList.filter(nameSrc => isCandidateSource(nameSrc.count))
+	.forEach(nameSrc => {
+	    const [sentenceIndex, variationIndex] = getSourceIndices(nameSrc.count);
+	    // this should never fire. just being defensive.
+	    if (result[sentenceIndex]) {
+		if (result[sentenceIndex] !== variationIndex) {
+		    console.error(Stringify(nameSrcList));
+		    throw new Error(`oopsie ${nameSrc}`);
+		}
+	    } else {
+		result[sentenceIndex] = variationIndex;
+	    }
+	});
+    return result;
+}
+
 export const isCandidateSource = (src: number): boolean => {
     return src >= 1_000_000;
 }
 
-export const getSourceSentence = (src: number): number => {
+export const getSourceIndices = (src: number): [number, number] => {
     Assert(isCandidateSource(src));
-    return Math.floor(src / 1_000_000);
+    return [Math.floor(src / 1_000_000), Math.floor((src % 1_000_000) / 100)];
+
 }
 
-export const getSourceVariation = (src: number): number => {
-    Assert(isCandidateSource(src));
-    return Math.floor((src % 1_000_000) / 100);
+export const legacySrcList = (nameSrcList: NameCount.List): number[] => {
+    return nameSrcList.map(nc => nc.count).filter(src => (src < 1_000_000));
 }
 
 // "strip" spaces from string, sort resulting letters

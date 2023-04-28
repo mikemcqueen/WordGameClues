@@ -64,7 +64,9 @@ struct NameCount {
   static auto listToSourceBits(const std::vector<NameCount>& list) {
     SourceBits bits{};
     for (const auto& nc : list) {
-      bits.set(nc.count);
+      if (nc.count < 1'000'000) {
+	bits.set(nc.count);
+      }
     }
     return bits;
   }
@@ -99,14 +101,14 @@ struct SourceBase {
 };
 
 struct SourceData : SourceBase {
-  std::vector<std::string> sourceNcCsvList; // TODO: I don't think this is even used anymore
+  //std::vector<std::string> sourceNcCsvList; // TODO: I don't think this is even used anymore
   // synonymCounts
 
   SourceData() = default;
   SourceData(NameCountList&& primaryNameSrcList, SourceBits&& primarySrcBits,
-	     NameCountList&& ncList, std::vector<std::string>&& sourceNcCsvList) :
-    SourceBase(std::move(primaryNameSrcList), std::move(primarySrcBits), std::move(ncList)),
-    sourceNcCsvList(std::move(sourceNcCsvList))
+	     NameCountList&& ncList): //, std::vector<std::string>&& sourceNcCsvList) :
+    SourceBase(std::move(primaryNameSrcList), std::move(primarySrcBits), std::move(ncList))
+      //,sourceNcCsvList(std::move(sourceNcCsvList))
   {}
 
   SourceData(const SourceData&) = delete;
