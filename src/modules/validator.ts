@@ -20,6 +20,7 @@ const Timing      = require('debug')('timing');
 import * as Clue from '../types/clue';
 import * as ClueList from '../types/clue-list';
 import * as ClueManager from './clue-manager';
+import * as CountBits from '../types/count-bits-fastbitset';
 import * as NameCount from '../types/name-count';
 import * as OldValidator from './old-validator';
 import * as Sentence from '../types/sentence';
@@ -41,13 +42,14 @@ interface ValidateResultData {
     ncList: NameCount.List;
     resultMap: any;
     nameSrcList: NameCount.List;
-    srcBits?: any;
+    sourceBits?: CountBits.Type;
     usedSources?: number[];
-    nameSrcCsv?: string;
-    propertyCounts?: Clue.PropertyCounts.Map;
+    nameSrcCsv?: string; // TODO: remove; old-validator uses it, stop using old-validator
+    //propertyCounts?: Clue.PropertyCounts.Map;
     //primarySrcArray?: CountArray;
 }
 
+// TODO: & Source.CompatibilityData (when no longer optional)
 export type ValidateResult = ValidateResultData & ClueManager.AllCandidatesContainer;
 
 export interface ValidateSourcesResult {
@@ -288,7 +290,7 @@ let mergeNcListResults = (ncListToMerge: NameCount.List,
                 ncList,
                 resultMap,
                 nameSrcList,
-                nameSrcCsv,
+                //nameSrcCsv,
 		allCandidates: [] // args.allCandidates // TODO avoiding OOM
             };
             resultList.push(result);

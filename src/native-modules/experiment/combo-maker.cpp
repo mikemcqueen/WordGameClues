@@ -15,9 +15,9 @@ auto isSourceORCompatibleWithAnyOrSource(const SourceBits& sourceBits,
       // skip any sources that were already determined to be XOR incompatible or AND compatible
       // with command-line supplied --xor sources.
       if (!orSource.xorCompatible || orSource.andCompatible) continue;
-      auto andBits = (sourceBits & orSource.source.primarySrcBits);
+      auto andBits = (sourceBits & orSource.source.sourceBits);
       // OR == XOR || AND
-      compatible = andBits.none() || (andBits == orSource.source.primarySrcBits);
+      compatible = andBits.none() || (andBits == orSource.source.sourceBits);
       if (compatible) break;
     }
     return compatible;
@@ -39,30 +39,30 @@ auto isSourceCompatibleWithEveryOrArg(const SourceBits& sourceBits,
   }
   return compatible;
 }
-
-auto isSourceXORCompatibleWithAnyXorSource(const SourceBits& sourceBits,
-  const XorSourceList& xorSourceList, bool flag)
+ 
+auto isSourceXORCompatibleWithAnyXorSource(const SourceCompatibilityData& compatData,
+  const XorSourceList& xorSourceList)
 {
-  using namespace std;
   bool compatible = xorSourceList.empty(); // empty list == compatible
   for (const auto& xorSource : xorSourceList) {
-    compatible = (sourceBits & xorSource.primarySrcBits).none();
+    compatible = compatData.isCompatibleWith(xorSource);
     if (compatible) break;
   }
   return compatible;
 };
 
-bool isAnySourceCompatibleWithUseSources(const SourceBitsList& sourceBitsList, bool flag) {
-  if (sourceBitsList.empty()) return true;
+bool isAnySourceCompatibleWithUseSources(const SourceCompatibilityList& sourceCompatList) {
+  if (sourceCompatList.empty()) return true;
   auto compatible = false;
-  for (const auto& sourceBits : sourceBitsList) {
-    compatible = isSourceXORCompatibleWithAnyXorSource(sourceBits, PCD.xorSourceList, flag);
+  for (const auto& compatData : sourceCompatList) {
+    compatible = isSourceXORCompatibleWithAnyXorSource(compatData, PCD.xorSourceList);
     // if there were --xor sources specified, and none are compatible with the
     // current source, no further compatibility checking is necessary; continue
     // to next source.
     if (!compatible) continue;
 
-    compatible = isSourceCompatibleWithEveryOrArg(sourceBits, PCD.orArgDataList);
+    // TODO
+    compatible = isSourceCompatibleWithEveryOrArg(compatData.sourceBits, PCD.orArgDataList);
     if (compatible) break;
   }
   return compatible;

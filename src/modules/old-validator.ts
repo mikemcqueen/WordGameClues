@@ -99,7 +99,9 @@ let hasNameSrcList = (resultList: Validator.ValidateResult[], nameSrcList: NameC
 // as far as I can tell this is _.xorBy(list1, list2, nameSrcCsv!) ?
 //
 // also , return list, push(...result) at call site
-let addAllCompatible = (compatList: Validator.ValidateResult[], resultList: Validator.ValidateResult[]): void => {
+let addAllCompatible = (compatList: Validator.ValidateResult[],
+    resultList: Validator.ValidateResult[]): void =>
+{
     for (let compatResult of compatList) {
 	compatResult.nameSrcCsv = compatResult.nameSrcList!.toString(); // sorted?
         if (resultList.every(result => compatResult.nameSrcCsv! !== result.nameSrcCsv!)) {

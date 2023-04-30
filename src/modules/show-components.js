@@ -11,6 +11,7 @@ const Clue        = require('../dist/types/clue');
 const ClueManager = require('../dist/modules/clue-manager');
 const ComboMaker  = require('../dist/modules/combo-maker');
 const NameCount   = require('../dist/types/name-count');
+const Precompute  = require('../dist/modules/cm-precompute');
 const Validator   = require('../dist/modules/validator');
 
 const Assert      = require('assert');
@@ -108,6 +109,30 @@ function showCountListArray (name, countListArray, text, hasNameList = false) {
     }
 }
 
+const showXorResults = (xorResults, options) => {
+    let hash = {};
+    for (let xorResult of xorResults) {
+	if (options.verbose) {
+	    console.log(`${NameCount.listToString(xorResult.ncList)}:` +
+		` ${NameCount.listToString(xorResult.primaryNameSrcList)}`);
+	    continue;
+	}
+	const nameList = NameCount.listToNameList(xorResult.ncList).toString();
+	const countList = NameCount.listToCountList(xorResult.ncList).toString();
+	if (!_.has(hash, countList)) {
+	    hash[countList] = new Set();
+	}
+	let set = hash[countList];
+	if (!set.has(nameList)) {
+	    set.add(nameList);
+	}
+    }
+    if (options.verbose) return;
+    for (let key of _.keys(hash)) {
+   	console.log(`${key} PRESENT as ${[...hash[key].entries()].join(' - ')}`);
+    }
+}
+
 //
 //
 
@@ -131,13 +156,8 @@ function show (options) {
     if (nameList.length > 1 && options.fast) {
 	//return fast_combo_wrapper(nameList, options);
 	let args = { xor: nameList, max: 2 };
-	let pcd = ComboMaker.preCompute(2, ClueManager.getNumPrimarySources(), args);
-	console.log("OK");
-	//console.log(Stringify(pcd.useSourceLists.xor));
-	for (let xorResult of pcd.useSourceLists.xor) {
-	    console.log(`${NameCount.listToString(xorResult.ncList)}:` +
-		` ${NameCount.listToString(xorResult.primaryNameSrcList)}`);
-	}
+	let pcd = Precompute.preCompute(2, ClueManager.getNumPrimarySources(), args);
+	showXorResults(pcd.useSourceLists.xor, options);
 	process.exit(0);
     }
     const nameCsv = nameList.toString();

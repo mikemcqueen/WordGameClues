@@ -379,6 +379,7 @@ const getRejectFilename = function (count: number): string {
     });
 };
 
+/*
 //
 // key types:
 // A.  non-array vlue
@@ -513,16 +514,12 @@ let initPropertyCountsInAllResults = (nc: NameCount.Type, results: ValidateResul
         result.propertyCounts = propertyCounts as Clue.PropertyCounts.Map;
     }
 };
+*/
 
 let initSrcBitsInAllResults = (results: ValidateResult[]): void => {
     for (let result of results) {
-        result.srcBits = CountBits.makeFrom(Sentence.legacySrcList(result.nameSrcList));
-	try {
-	    result.usedSources = Sentence.getUsedSources(result.nameSrcList);
-	} catch (e) {
-	    console.error(`ncList: ${result.ncList}`);
-	    throw e;
-	}
+        result.sourceBits = CountBits.makeFrom(Sentence.legacySrcList(result.nameSrcList));
+	result.usedSources = Sentence.getUsedSources(result.nameSrcList);
     }
 }
 
@@ -921,7 +918,7 @@ export let filter = function (srcCsvList: string[], clueCount: number, map: any 
 };
 
 // TODO: return type.  from Validator?
-const singleEntry = (nc: NameCount.Type, source: string): any => {
+const singleEntry = (nc: NameCount.Type, source: string): SourceData => {
     let nameSrcList: NameCount.List = [NameCount.makeNew(nc.name, _.toNumber(source))];
     return {
 	clues: [],
@@ -929,8 +926,11 @@ const singleEntry = (nc: NameCount.Type, source: string): any => {
 	    {
                 ncList: [nc],
                 nameSrcList,
-                srcBits: CountBits.makeFrom(Sentence.legacySrcList(nameSrcList)),
-		usedSources: Sentence.getUsedSources(nameSrcList)
+                sourceBits: CountBits.makeFrom(Sentence.legacySrcList(nameSrcList)),
+		usedSources: Sentence.getUsedSources(nameSrcList),
+		// NOTE that these two shouldn't be here.
+		resultMap: undefined,
+		allCandidates: []
             }
         ]
     };

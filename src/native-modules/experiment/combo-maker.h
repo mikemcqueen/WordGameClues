@@ -81,34 +81,62 @@ struct NCData {
 
 using NCDataList = std::vector<NCData>;
 
-struct SourceBase {
-  NameCountList primaryNameSrcList;
-  SourceBits primarySrcBits;
-  NameCountList ncList;
+using UsedSources = std::array<std::int32_t, 10>;
+using UsedSourcesList = std::vector<UsedSources>;
 
-  SourceBase() = default;
-  SourceBase(NameCountList&& primaryNameSrcList, SourceBits&& primarySrcBits,
-	     NameCountList&& ncList) :
-    primaryNameSrcList(std::move(primaryNameSrcList)),
-    primarySrcBits(std::move(primarySrcBits)),
-    ncList(std::move(ncList))
+struct SourceCompatibilityData {
+  SourceBits sourceBits;
+  UsedSources usedSources;
+
+  SourceCompatibilityData() = default;
+  SourceCompatibilityData(const SourceCompatibilityData&) = delete;
+  SourceCompatibilityData& operator=(const SourceCompatibilityData&) = delete;
+  SourceCompatibilityData(SourceCompatibilityData&&) = default;
+  SourceCompatibilityData& operator=(SourceCompatibilityData&&) = default;
+
+  // copy components
+  SourceCompatibilityData(const SourceBits& sourceBits,
+      const UsedSources& usedSources):
+    sourceBits(sourceBits),
+    usedSources(usedSources)
   {}
 
-  SourceBase(const SourceBase&) = delete;
-  SourceBase& operator=(const SourceBase&) = delete;
-  SourceBase(SourceBase&&) = default;
-  SourceBase& operator=(SourceBase&&) = default;
+  // move components
+  SourceCompatibilityData(SourceBits&& sourceBits,
+      UsedSources&& usedSources):
+    sourceBits(std::move(sourceBits)),
+    usedSources(std::move(usedSources))
+  {}
+
+  auto isCompatibleWith(const SourceCompatibilityData& other) const {
+    if ((sourceBits & other.sourceBits).any()) {
+      return false;
+    }
+    for (auto i = 1u; i < usedSources.size(); ++i) {
+      if (usedSources[i] && other.usedSources[i] && 
+	  (usedSources[i] != other.usedSources[i])) {
+	return false;
+      }
+    }
+    return true;
+  }
+
+  void mergeWith() {
+  }
 };
 
-struct SourceData : SourceBase {
-  //std::vector<std::string> sourceNcCsvList; // TODO: I don't think this is even used anymore
-  // synonymCounts
+using SourceCompatibilityList = std::vector<SourceCompatibilityData>;
+
+struct SourceData : SourceCompatibilityData {
+  NameCountList primaryNameSrcList;
+  NameCountList ncList;
 
   SourceData() = default;
-  SourceData(NameCountList&& primaryNameSrcList, SourceBits&& primarySrcBits,
-	     NameCountList&& ncList): //, std::vector<std::string>&& sourceNcCsvList) :
-    SourceBase(std::move(primaryNameSrcList), std::move(primarySrcBits), std::move(ncList))
-      //,sourceNcCsvList(std::move(sourceNcCsvList))
+  SourceData(NameCountList&& primaryNameSrcList, SourceBits&& sourceBits,
+      UsedSources&& usedSources, NameCountList&& ncList) :
+    SourceCompatibilityData(std::move(sourceBits), std::move(usedSources)),
+    primaryNameSrcList(std::move(primaryNameSrcList)),
+    ncList(std::move(ncList))
   {}
 
   SourceData(const SourceData&) = delete;
@@ -117,12 +145,32 @@ struct SourceData : SourceBase {
   SourceData& operator=(SourceData&&) = default;
 };
 
+/*
+struct SourceData : SourceBase {
+  //std::vector<std::string> sourceNcCsvList; // TODO: I don't think this is even used anymore
+  // synonymCounts
+
+  SourceData() = default;
+  SourceData(NameCountList&& primaryNameSrcList, SourceBits&& primarySrcBits,
+      UsedSources&& usedSources, NameCountList&& ncList): //, std::vector<std::string>&& sourceNcCsvList) :
+    SourceBase(std::move(primaryNameSrcList), std::move(primarySrcBits),
+      std::move(usedSources), std::move(ncList))
+      //,sourceNcCsvList(std::move(sourceNcCsvList))
+  {}
+
+  SourceData(const SourceData&) = delete;
+  SourceData& operator=(const SourceData&) = delete;
+  SourceData(SourceData&&) = default;
+  SourceData& operator=(SourceData&&) = default;
+};
+*/
+
 using SourceList = std::vector<SourceData>;
 using SourceListMap = std::unordered_map<std::string, SourceList>;
 using SourceCRef = std::reference_wrapper<const SourceData>;
 using SourceCRefList = std::vector<SourceCRef>;
 
-using XorSource = SourceBase;
+using XorSource = SourceData;
 using XorSourceList = std::vector<XorSource>;
 
 struct OrSourceData {
@@ -146,9 +194,20 @@ struct PreComputedData {
   SourceListMap sourceListMap;
 };
 
-struct MergedSources {
-  SourceBits primarySrcBits;
+struct MergedSources : SourceCompatibilityData {
   SourceCRefList sourceCRefList;
+
+  MergedSources() = default;
+  MergedSources(const MergedSources&) = default; // allow, dangerous?
+  MergedSources& operator=(const MergedSources&) = delete;
+  MergedSources(MergedSources&&) = default;
+  MergedSources& operator=(MergedSources&&) = default;
+
+  // copy from SourceData
+  MergedSources(const SourceData& source) :
+      SourceCompatibilityData(source.sourceBits, source.usedSources),
+      sourceCRefList(SourceCRefList{SourceCRef{source}})
+  {}
 };
 
 using MergedSourcesList = std::vector<MergedSources>;
@@ -167,7 +226,9 @@ MergedSourcesList mergeAllCompatibleSources(const NameCountList& ncList,
 XorSourceList mergeCompatibleXorSourceCombinations(
   const std::vector<SourceCRefList>& sourceLists);
 
-bool isAnySourceCompatibleWithUseSources(const SourceBitsList& sourceBitsList, bool flag);
+bool isAnySourceCompatibleWithUseSources(const SourceCompatibilityList& sourceCompatList);
+
+void mergeUsedSourcesInPlace(UsedSources& to, const UsedSources& from);
 
 } // namespace cm
 

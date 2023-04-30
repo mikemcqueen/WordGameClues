@@ -21,7 +21,8 @@ std::vector<std::string> makeStringList(Env& env, const Napi::Array& jsList) {
   std::vector<std::string> list{};
   for (auto i = 0u; i < jsList.Length(); ++i) {
     if (!jsList[i].IsString()) {
-      Napi::TypeError::New(env, "makeStringList: non-string element").ThrowAsJavaScriptException();
+      Napi::TypeError::New(env, "makeStringList: non-string element")
+	.ThrowAsJavaScriptException();
       return {};
     }
     list.emplace_back(std::move(jsList[i].As<String>().Utf8Value()));
@@ -29,11 +30,32 @@ std::vector<std::string> makeStringList(Env& env, const Napi::Array& jsList) {
   return list;
 }
 
+
+cm::UsedSources makeUsedSources(Env& env, const Napi::Array& jsList) {
+  cm::UsedSources usedSources;
+  for (auto i = 0u; i < usedSources.size(); ++i) {
+    std::int32_t value = 0;
+    if (i < jsList.Length()) {
+      if (!jsList[i].IsNumber() && !jsList[i].IsUndefined()) {
+	Napi::TypeError::New(env, "makeUsedSources: non-(number or undefined) element")
+	  .ThrowAsJavaScriptException();
+	return {};
+      }
+      if (jsList[i].IsNumber()) {
+	value = jsList[i].As<Number>().Int32Value();
+      }
+    }
+    usedSources[i] = value;
+  }
+  return usedSources;
+}
+
 cm::NameCount makeNameCount(Env& env, const Napi::Object& jsObject) {
   auto jsName = jsObject.Get("name");
   auto jsCount = jsObject.Get("count");
   if (!jsName.IsString() || !jsCount.IsNumber()) {
-    Napi::TypeError::New(env, "makeNameCount: invalid arguments").ThrowAsJavaScriptException();
+    Napi::TypeError::New(env, "makeNameCount: invalid arguments")
+      .ThrowAsJavaScriptException();
     return {};
   }
   auto name = jsName.As<String>().Utf8Value();
@@ -45,7 +67,8 @@ cm::NameCountList makeNameCountList(Env& env, const Napi::Array& jsList) {
   cm::NameCountList ncList{};
   for (auto i = 0u; i < jsList.Length(); ++i) {
     if (!jsList[i].IsObject()) {
-      Napi::TypeError::New(env, "makeNameCountList: non-object element").ThrowAsJavaScriptException();
+      Napi::TypeError::New(env, "makeNameCountList: non-object element")
+	.ThrowAsJavaScriptException();
       return {};
     }
     ncList.emplace_back(std::move(makeNameCount(env, jsList[i].As<Object>())));
@@ -66,20 +89,28 @@ cm::SourceData makeSourceData(Env& env, const Napi::Object& jsSourceData) {
       .ThrowAsJavaScriptException();
     return {};
   }
+  auto jsUsedSources = jsSourceData.Get("usedSources");
+  if (!jsUsedSources.IsArray()) {
+    Napi::TypeError::New(env, "makeSourceData: usedSources is not an array")
+      .ThrowAsJavaScriptException();
+    return {};
+  }
   //auto jsSourceNcCsvList = jsSourceData.Get("sourceNcCsvList");
   auto primaryNameSrcList = makeNameCountList(env, jsPrimaryNameSrcList.As<Array>());
   auto primarySrcBits = cm::NameCount::listToSourceBits(primaryNameSrcList);
+  auto usedSources = makeUsedSources(env, jsUsedSources.As<Array>());
   //auto sourceNcCsvList = makeStringList(env, jsSourceNcCsvList.As<Array>());
   auto ncList = makeNameCountList(env, jsNcList.As<Array>());
   return cm::SourceData(std::move(primaryNameSrcList), std::move(primarySrcBits),
-			std::move(ncList)); // , std::move(sourceNcCsvList));
+    std::move(usedSources), std::move(ncList)); // , std::move(sourceNcCsvList));
 }
 
 cm::SourceList makeSourceList(Napi::Env& env, const Napi::Array& jsList) {
   cm::SourceList sourceList{};
   for (auto i = 0u; i < jsList.Length(); ++i) {
     if (!jsList[i].IsObject()) {
-      Napi::TypeError::New(env, "makeSourceList: non-object element").ThrowAsJavaScriptException();
+      Napi::TypeError::New(env, "makeSourceList: non-object element")
+	.ThrowAsJavaScriptException();
       return {};
     }
     sourceList.emplace_back(std::move(makeSourceData(env, jsList[i].As<Object>())));
@@ -90,7 +121,8 @@ cm::SourceList makeSourceList(Napi::Env& env, const Napi::Array& jsList) {
 cm::NCData makeNcData(Napi::Env& env, const Napi::Object& jsObject) {
   auto jsNcList = jsObject.Get("ncList");
   if (!jsNcList.IsArray()) {
-    Napi::TypeError::New(env, "makeNcData: ncList is non-array type").ThrowAsJavaScriptException();
+    Napi::TypeError::New(env, "makeNcData: ncList is non-array type")
+      .ThrowAsJavaScriptException();
     return {};
   }
   return { makeNameCountList(env, jsNcList.As<Array>()) };
@@ -143,12 +175,48 @@ cm::SourceListMap makeSourceListMap(Napi::Env& env, const Napi::Array& jsList) {
   return map;
 }
 
+/*
+cm::UsedSources makeUsedSourcesFromSourceList(Napi::Env& env,
+  const Napi::Array& jsList)
+{
+  cm::UsedSources usedSources{};
+  for (auto i = 0u; i < jsList.Length(); ++i) {
+    if (!jsList[i].IsObject()) {
+      Napi::TypeError::New(env, "makeUsedSources: non-object element")
+	.ThrowAsJavaScriptException();
+      return {};
+    }
+    const auto jsUsedSources = jsList[i].As<Object>().Get("usedSources").As<Array>();
+    cm::mergeUsedSourcesInPlace(usedSources, makeUsedSources(env, jsUsedSources));
+  }
+  return usedSources;
+}
+
+// FromMergedSourcesList
+cm::UsedSourcesList makeUsedSourcesList(Napi::Env& env,
+  const Napi::Array& jsList)
+{
+  cm::UsedSourcesList usedSourcesList{};
+  for (auto i = 0u; i < jsList.Length(); ++i) {
+    if (!jsList[i].IsObject()) {
+      Napi::TypeError::New(env, "makeUsedSourcesList: non-object element")
+	.ThrowAsJavaScriptException();
+      return {};
+    }
+    const auto jsSourceList = jsList[i].As<Object>().Get("sourceList").As<Array>();
+    usedSourcesList.emplace_back(std::move(makeUsedSources(env, jsSourceList)));
+  }
+  return usedSourcesList;
+}
+*/
+
 // FromSourceList
 cm::SourceBits makeSourceBits(Napi::Env& env, const Napi::Array& jsList) {
   cm::SourceBits sourceBits{};
   for (auto i = 0u; i < jsList.Length(); ++i) {
     if (!jsList[i].IsObject()) {
-      Napi::TypeError::New(env, "makeSourceBits: non-object element").ThrowAsJavaScriptException();
+      Napi::TypeError::New(env, "makeSourceBits: non-object element")
+	.ThrowAsJavaScriptException();
       return {};
     }
     const auto jsPnsl = jsList[i].As<Object>().Get("primaryNameSrcList").As<Array>();
@@ -176,6 +244,44 @@ cm::SourceBitsList makeSourceBitsList(Napi::Env& env, const Napi::Array& jsList)
   return sourceBitsList;
 }
 
+/*
+// FromSourceList
+cm::SourceCompatibilityData makeSourceCompatibiltyData(Napi::Env& env, const Napi::Array& jsList) {
+  cm::SourceCompatibilityData compatData{};
+  for (auto i = 0u; i < jsList.Length(); ++i) {
+    if (!jsList[i].IsObject()) {
+      Napi::TypeError::New(env, "makeSourceCompatibiltyData: non-object element")
+	.ThrowAsJavaScriptException();
+      return {};
+    }
+    const auto jsPnsl = jsList[i].As<Object>().Get("primaryNameSrcList").As<Array>();
+    for (auto j = 0u; j < jsPnsl.Length(); ++j) {
+      const auto count = jsPnsl[j].As<Object>().Get("count").As<Number>().Int32Value();
+      if (count < 1'000'000) {
+	compatData.sourceBits.set(count);
+      }
+    }
+  }
+  return compatData;
+}
+*/
+
+cm::SourceCompatibilityList makeSourceCompatibilityList(Napi::Env& env, const Napi::Array& jsList) {
+  cm::SourceCompatibilityList sourceCompatList{};
+  for (auto i = 0u; i < jsList.Length(); ++i) {
+    if (!jsList[i].IsObject()) {
+      Napi::TypeError::New(env, "makeSourceCompatibiltyList: non-object element").ThrowAsJavaScriptException();
+      return {};
+    }
+    auto jsSourceList = jsList[i].As<Object>().Get("sourceList").As<Array>();
+    auto jsUsedSources = jsList[i].As<Object>().Get("usedSources").As<Array>();
+    cm::SourceCompatibilityData compatData(std::move(makeSourceBits(env, jsSourceList)),
+      std::move(makeUsedSources(env, jsUsedSources)));
+    sourceCompatList.emplace_back(std::move(compatData));
+  }
+  return sourceCompatList;
+}
+
 cm::OrSourceData makeOrSource(Napi::Env& env, const Napi::Object& jsObject) {
   cm::OrSourceData orSource;
   orSource.source = std::move(makeSourceData(env, jsObject["source"].As<Object>()));
@@ -188,7 +294,8 @@ cm::OrSourceList makeOrSourceList(Napi::Env& env, const Napi::Array& jsList) {
   cm::OrSourceList orSourceList{};
   for (auto i = 0u; i < jsList.Length(); ++i) {
     if (!jsList[i].IsObject()) {
-      Napi::TypeError::New(env, "makeOrSourceList: non-object element").ThrowAsJavaScriptException();
+      Napi::TypeError::New(env, "makeOrSourceList: non-object element")
+	.ThrowAsJavaScriptException();
       return {};
     }
     orSourceList.emplace_back(std::move(makeOrSource(env, jsList[i].As<Object>())));
@@ -207,7 +314,8 @@ cm::OrArgDataList makeOrArgDataList(Napi::Env& env, const Napi::Array& jsList) {
   cm::OrArgDataList orArgDataList{};
   for (auto i = 0u; i < jsList.Length(); ++i) {
     if (!jsList[i].IsObject()) {
-      Napi::TypeError::New(env, "makeOrArgDataList: non-object element").ThrowAsJavaScriptException();
+      Napi::TypeError::New(env, "makeOrArgDataList: non-object element")
+	.ThrowAsJavaScriptException();
       return {};
     }
     orArgDataList.emplace_back(std::move(makeOrArgData(env, jsList[i].As<Object>())));
@@ -238,6 +346,7 @@ namespace cm {
   extern PreComputedData PCD;
 }
 
+#if 0 // unused
 //
 // mergeAllCompatibleSources
 //
@@ -252,6 +361,7 @@ Value mergeAllCompatibleSources(const CallbackInfo& info) {
   auto mergedSourcesList = cm::mergeAllCompatibleSources(ncList, cm::PCD.sourceListMap);
   return cm::wrap(env, mergedSourcesList);
 }
+#endif
 
 //
 // mergeCompatibleXorSourceCombinations
@@ -269,7 +379,7 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   auto unwrap0 = high_resolution_clock::now();
 
   auto ncDataLists = makeNcDataLists(env, info[0].As<Array>());
-  cm::PCD.sourceListMap = makeSourceListMap(env, info[1].As<Array>());
+  cm::PCD.sourceListMap = std::move(makeSourceListMap(env, info[1].As<Array>()));
 
   auto unwrap1 = high_resolution_clock::now();
   auto d_unwrap = duration_cast<milliseconds>(unwrap1 - unwrap0).count();
@@ -312,9 +422,8 @@ Value isAnySourceCompatibleWithUseSources(const CallbackInfo& info) {
       .ThrowAsJavaScriptException();
     return env.Null();
   }
-  auto sourceBitsList = makeSourceBitsList(env, info[0].As<Array>());
-  auto flag = info[1].As<Boolean>();
-  bool compatible = cm::isAnySourceCompatibleWithUseSources(sourceBitsList, flag);
+  auto compatList = makeSourceCompatibilityList(env, info[0].As<Array>());
+  bool compatible = cm::isAnySourceCompatibleWithUseSources(compatList);
   return Boolean::New(env, compatible);
 }
 
@@ -338,7 +447,7 @@ Object Init(Env env, Object exports) {
   exports["greetHello"] = Function::New(env, greetHello);
 
   //  exports["buildSourceListsForUseNcData"] = Function::New(env, buildSourceListsForUseNcData);
-  exports["mergeAllCompatibleSources"] = Function::New(env, mergeAllCompatibleSources);
+  //  exports["mergeAllCompatibleSources"] = Function::New(env, mergeAllCompatibleSources);
   exports["mergeCompatibleXorSourceCombinations"] = Function::New(env, mergeCompatibleXorSourceCombinations);
   exports["isAnySourceCompatibleWithUseSources"] = Function::New(env, isAnySourceCompatibleWithUseSources);
   exports["setOrArgDataList"] = Function::New(env, setOrArgDataList);

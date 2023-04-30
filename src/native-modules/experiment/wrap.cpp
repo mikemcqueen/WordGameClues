@@ -4,6 +4,16 @@ using namespace Napi;
 
 namespace cm {
 
+Array wrap(Env& env, const UsedSources& usedSources) {
+  Array jsList = Array::New(env, usedSources.size());
+  for (auto i = 1u; i < usedSources.size(); ++i) {
+    if (usedSources[i]) {
+      jsList.Set(i, Number::New(env, usedSources[i]));
+    }
+  }
+  return jsList;
+}
+
 Object wrap(Env& env, const NameCount& nc) {
   Object jsObj = Object::New(env);
   jsObj.Set("name", String::New(env, nc.name));
@@ -29,6 +39,7 @@ Array wrap(Env& env, const std::vector<std::string>& strList) {
 
 Object wrap(Env& env, const XorSource& xorSource) {
   Object jsObj = Object::New(env);
+  jsObj.Set("usedSources", wrap(env, xorSource.usedSources));
   jsObj.Set("primaryNameSrcList", wrap(env, xorSource.primaryNameSrcList));
   jsObj.Set("ncList", wrap(env, xorSource.ncList));
   return jsObj;
@@ -52,7 +63,6 @@ Object wrap(Env& env, const SourceData& source) {
   jsObj.Set("sourceNcCsvList", wrap(env, source.sourceNcCsvList));
   return jsObj;
 }
-#endif
 
 Array wrap(Env& env, const SourceList& sourceList) {
   Array jsList = Array::New(env, sourceList.size());
@@ -66,7 +76,7 @@ Object wrapMergedSource(Env& env, const SourceCRefList& sourceCRefList) {
   Object jsObj = Object::New(env);
   Array jsPnsl = Array::New(env);
   Array jsNcl = Array::New(env);
-  Array jsSncl = Array::New(env);
+  //Array jsSncl = Array::New(env);
   for (const auto sourceCRef : sourceCRefList) {
     const auto& source = sourceCRef.get();
     for (const auto& nc : source.primaryNameSrcList) {
@@ -83,7 +93,7 @@ Object wrapMergedSource(Env& env, const SourceCRefList& sourceCRefList) {
   }
   jsObj.Set("primaryNameSrcList", jsPnsl);
   jsObj.Set("ncList", jsNcl);
-  jsObj.Set("sourceNcCsvList", jsSncl);
+  //jsObj.Set("sourceNcCsvList", jsSncl);
   return jsObj;
 }
 
@@ -94,5 +104,6 @@ Array wrap(Env& env, const MergedSourcesList& mergedSourcesList) {
   }
   return jsList;
 }
+#endif
 
 } // namespace cm
