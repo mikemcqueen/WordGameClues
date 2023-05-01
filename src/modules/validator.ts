@@ -1062,7 +1062,7 @@ let mergeNcListResults = (ncListToMerge: NameCount.List, args: any): ValidateSou
     if (NN) console.log(Stringify(arrayList));
     Peco.makeNew({
 	    listArray: arrayList,
-	    max: 99999
+	    max: 999_999_999
     }).getCombinations().forEach((indexList: number[]) => {
 	    let ncList: NameCount.List = [];
 	    let nameSrcList: NameCount.List = [];

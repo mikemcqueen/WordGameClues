@@ -410,11 +410,13 @@ async function main () {
         QUIET = true;
     }
 
+    /*
     Validator.setAllowDupeFlags({
         allowDupeNameSrc: false,
         allowDupeSrc:     options.allow_dupe_source,
         allowDupeName:    true
     });
+    */
 
     if (_.includes(options.flags, '2')) {
         ignoreLoadErrors = true;
