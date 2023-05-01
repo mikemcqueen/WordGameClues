@@ -1,7 +1,51 @@
+* so, ClueManager.getClueList(1) is the culprit. In every case, I need
+  to review what I am doing with the list when I call it with 1.
+  In the specific case of -t, I'm calling it and using it's length
+  to fill up a Peco-style index array, and (probably) then dereferncing
+  the array using those indices. Both bad.  I'm not sure what I can do
+  for this case.  I can of course find all unique names in all candidates,
+  and build/store a "virtual" cluelist length, but then the deferencing
+  using an index in that length range may be tricky. Think about it.
+
+* -t newton fails (-t probably doesn't honor candidate clues)
+  * make -t <one-word> work
+
+* --xor newton fails as well (probably doesn't honor candidate clues)
+
+* -t (no --verbose) output sources is funny
+* make -t --fast default
+
+* I wonder if I am still respecting max in peco, for the cases where that
+  makes sense.  did I comment it out, or just allow undefined?
+
+* Precompute is a tiny bit slower now. Maybe because I'm doing too much
+  copying in mergeAllCompatibleSources/XorSources? Any way to put a
+  stop to that? Like the optimization idea I might have in a comment there,
+  using something like a new CombinedSourceRefs data type 
+
+* All of the "getNumPrimarySources()" stuff is a bit weird now isn't it
+  I should look into all uses and confirm what it means. And consider
+  the "MaxPossiblePrimarySources" case as a possible solution (largest
+  sourcelist variation from each sentence).
+
+* so with 13 bits I can store 8191 (plus 1 "empty") variations
+  with 9 * 13 = 117 bits i can store 9 variation values for the 9 sentences
+  in a 128-bit bitset.
+  rather than unwrapping UsedSources into a similar array of ints in c++,
+  unwrap into a 128-bit bitset, with the value shifted left 13 bits for
+  each sentence.
+  initialize/default each set of sentence-bits to 0x1fff (13 bits on)
+
+* the first/next/nextIndex stuff in combo-maker looks sus
+
+* The below might go away in c++ though if I use bitset.
+* take a closer look at UsedSources declarations/comparisons in C++. I think
+  I have all declarations covered with = { -1 }, but probably makes sense
+  for the default constructor to do that. If there were a default constructor,
+  which there isn't (that i'm in control of).
+  Similarly, the >= 0 or > -1 comparisons should ideally all be in one spot.
 
 * validateSources(name) -- enforce everywhere
-* -t newton fails (-t probably doesn't honor candidate clues)
-* -t (no --verbose) output sources is funny
 
 validatesources is apparently happy with old:3=not:1,not:1,old:1
 which is wrong because:

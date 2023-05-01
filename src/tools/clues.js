@@ -9,6 +9,7 @@ const _           = require('lodash');
 const ClueList    = require('../dist/types/clue-list');
 const ClueManager = require('../dist/modules/clue-manager');
 const ComboMaker  = require('../dist/modules/combo-maker');
+const Components  = require('../dist/modules/show-components');
 const MinMax      = require("../dist/types/min-max");
 const NameCount   = require('../dist/types/name-count');
 const Validator   = require('../dist/modules/validator');
@@ -16,7 +17,7 @@ const Validator   = require('../dist/modules/validator');
 const AltSources  = require('../modules/alt-sources');
 const Clues       = require('../modules/clue-types');
 const ComboSearch = require('../modules/combo-search');
-const Components  = require('../modules/show-components');
+
 const Debug       = require('debug')('clues');
 const Duration    = require('duration');
 const Expect      = require('should/as-function');
@@ -381,7 +382,7 @@ async function main () {
     }
     let loadMillis = new Duration(loadBegin, new Date()).milliseconds;
     console.error(`loadClues(${PrettyMs(loadMillis)})`);
-    setLogging(options.verbose);
+    setLogging(false); //options.verbose);
 
     options.notebook = options.notebook || Note.getWorksheetName(clueSource);
 

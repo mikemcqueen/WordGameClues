@@ -4,25 +4,27 @@
 
 'use strict';
 
-//import _ from 'lodash';
-const _           = require('lodash');
+import _ from 'lodash'; // import statement to signal that we are a "module"
 
-const Clue        = require('../dist/types/clue');
-const ClueManager = require('../dist/modules/clue-manager');
-const ComboMaker  = require('../dist/modules/combo-maker');
-const NameCount   = require('../dist/types/name-count');
-const Precompute  = require('../dist/modules/cm-precompute');
-const Validator   = require('../dist/modules/validator');
+//const Validator   = require('../dist/modules/validator');
 
 const Assert      = require('assert');
 const Debug       = require('debug')('show-components');
 const Expect      = require('should/as-function');
 const Path        = require('path');
-const Peco        = require('./peco');
 const Readlines   = require('n-readlines');
 const stringify   = require('javascript-stringify').stringify;
 const Stringify2  = require('stringify-object');
 const Timing      = require('debug')('timing');
+
+const Peco        = require('../../modules/peco');
+
+import * as Clue from '../types/clue';
+import * as ClueManager from './clue-manager';
+import * as NameCount from '../types/name-count';
+import * as PreCompute from './cm-precompute';
+
+///////////
 
 function Stringify (val) {
     return stringify(val, (value, indent, stringify) => {
@@ -136,7 +138,7 @@ const showXorResults = (xorResults, options) => {
 //
 //
 
-function show (options) {
+function show (options: any) {
     Expect(options).is.an.Object();
     Expect(options.test).is.a.String();
     if (options.reject) {
@@ -153,10 +155,10 @@ function show (options) {
     }
 
     const nameList = options.test.split(',').sort();
-    if (nameList.length > 1 && options.fast) {
+    if ((nameList.length > 1) && options.fast) {
 	//return fast_combo_wrapper(nameList, options);
 	let args = { xor: nameList, max: 2 };
-	let pcd = Precompute.preCompute(2, ClueManager.getNumPrimarySources(), args);
+	let pcd = PreCompute.preCompute(2, ClueManager.getNumPrimarySources(), args);
 	showXorResults(pcd.useSourceLists.xor, options);
 	process.exit(0);
     }
@@ -234,8 +236,10 @@ function getCompatiblePrimaryNameSrcList (listOfListOfPrimaryNameSrcLists) {
     return null;
 }
 
-function buildSubListFromIndexList (nameList, indexList) {
-    const subList = [];
+function buildSubListFromIndexList (nameList: string[], indexList: number[]):
+    string[]
+{
+    const subList: string[] = [];
     indexList.forEach(index => subList.push(nameList[index]));
     return subList;
 }
@@ -297,8 +301,8 @@ function fast_combo_wrapper (nameList, /*allOrNcDataList,*/ options) {
     }
 }
 
-function get_clue_names (options) {
-    let result = [];
+function get_clue_names (options: any) {
+    let result: string[] = [];
     if (options.count_lo) {
 	//console.log(`get_clue_names: lo(${options.count_lo}) hi(${options.count_hi})`);
 	for (let count = options.count_lo; count <= options.count_hi; count += 1) {
@@ -338,7 +342,7 @@ function fast_combos_list (nameList, options) {
     const lists = ClueManager.buildListsOfPrimaryNameSrcLists(ncLists);
     return lists.reduce((resultList, listOfListOfPrimaryNameSrcLists, index) => {
 	let add = false;
-	let result = {};
+	let result: any = {};
 	result.compatibleNameSrcList = getCompatiblePrimaryNameSrcList(listOfListOfPrimaryNameSrcLists);
 	result.valid = Boolean(result.compatibleNameSrcList);
 	result.ncList = ncLists[index];
@@ -380,7 +384,7 @@ function showNcLists (ncLists) {
 
 //
 
-function validate (filename, options = {}) {
+function validate (filename, options: any = {}) {
     const lines = readlines(filename);
     if (options.combos) {
 	validate_combos(lines, options);
@@ -389,8 +393,8 @@ function validate (filename, options = {}) {
     }
 }
 
-function validate_combos(lines, options) {
-    const combos = [];
+function validate_combos(lines, options): void {
+    const combos: string[] = [];
     let input = lines;
     for (;;) {
 	Timing(``);
@@ -398,8 +402,7 @@ function validate_combos(lines, options) {
 	Timing(`all_combos (${raw_combo_list.length})`);
 	if (_.isEmpty(raw_combo_list)) break;
 	Debug(`raw: ${typeof(raw_combo_list)}, len: ${raw_combo_list.length}: ${raw_combo_list}`);
-	let valid_combo_list = [];
-	valid_combo_list = valid_combos(raw_combo_list);
+	let valid_combo_list = valid_combos(raw_combo_list);
 	if (_.isEmpty(valid_combo_list)) break; 
 	Timing(`valid combos (${valid_combo_list.length})`);
 	combos.push(...valid_combo_list);
@@ -410,8 +413,8 @@ function validate_combos(lines, options) {
     });
 }
 
-function valid_combos(combo_list, options = {}) {
-    const combos = [];
+function valid_combos(combo_list: string[], options: any = {}): string[] {
+    const combos: string[] = [];
     options.any = true;
 
     combo_list.forEach(combo_str => {
@@ -434,8 +437,8 @@ function valid_combos(combo_list, options = {}) {
     return combos;
 }
 
-function all_combos(input_list, word_list) {
-    const combos = [];
+function all_combos(input_list: string[], word_list: string[]): string[] {
+    const combos: string[] = [];
     for (const csvInput of input_list) {
 	const input = csvInput.split(',');
 	for (const word of word_list) {
@@ -461,10 +464,10 @@ function validate_sources(lines, options) {
     }
 }
 
-function readlines(filename) {
+function readlines(filename): string[] {
     const path = Path.normalize(`${Path.dirname(module.filename)}/tools/${filename}`);
     const readLines = new Readlines(filename);
-    let lines = [];
+    let lines: string[] = [];
     let line;
     while ((line = readLines.next()) !== false) {
         lines.push(line.toString().trim());

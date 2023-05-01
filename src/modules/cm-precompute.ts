@@ -6,20 +6,14 @@
 
 import _ from 'lodash'; // import statement to signal that we are a "module"
 
-//const ResultMap   = require('../../types/result-map');
 const Peco        = require('../../modules/peco');
-//const Log         = require('../../modules/log')('combo-maker');
-//const My          = require('../../modules/util');
 const NativeComboMaker = require('../../native-modules/experiment/build/Release/experiment.node');
 
 const Assert      = require('assert');
 const Debug       = require('debug')('cm-precompute');
 const Duration    = require('duration');
-//const Fs          = require('fs-extra');
-//const Path        = require('path');
 const PrettyMs    = require('pretty-ms');
-//const stringify   = require('javascript-stringify').stringify;
-const Stringify  = require('stringify-object');
+const Stringify   = require('stringify-object');
 
 import * as Clue from '../types/clue';
 import * as ClueManager from './clue-manager';
@@ -74,13 +68,13 @@ type NCDataList = NCData[];
 
 //////////
 
-let listIsEmpty = (list: any[]): boolean => {
+const listIsEmpty = (list: any[]): boolean => {
     return list.length === 0;
 };
 
 const isSingleNumericDigit = (arg: string): boolean => {
     return (arg.length === 1) && (arg[0] >= '0') && (arg[0] <= '9');
-}
+};
 
 const splitArgListAndMinMax = (argList: string[]): [MinMax.Type, string[]] => {
     Assert(argList.length > 2);
@@ -90,7 +84,7 @@ const splitArgListAndMinMax = (argList: string[]): [MinMax.Type, string[]] => {
     return [MinMax.init(minArg, maxArg), argList.slice(0, argList.length - 2)];
 };
 
-const useArgToMinMaxNameListTuple = (useArg: string, hasMinMax: boolean):
+const useArgToMinMaxNameListTuple = (useArg: string, hasMinMax?: boolean):
     [MinMax.Type|undefined, string[]] =>
 {
     let argList = useArg.split(',');
@@ -101,11 +95,11 @@ const useArgToMinMaxNameListTuple = (useArg: string, hasMinMax: boolean):
     return [minMax, argList];
 };
 
-function getKnownNcListForName (name: string): NameCount.List {
-    const countList: number[] = ClueManager.getCountListForName(name);
+const getKnownNcListForName = (name: string): NameCount.List => {
+    const countList = ClueManager.getCountListForName(name);
     Assert(!_.isEmpty(countList), `not a valid clue name: '${name}'`);
-    return countList.map(count => Object({ name, count }));
-}
+    return countList.map(count => ({ name, count }));
+};
 
 //
 // Given a list of names and/or ncStrs, convert ncStrs to an array of (1) NC
@@ -116,17 +110,24 @@ function getKnownNcListForName (name: string): NameCount.List {
 //  convert: [ 'billy', 'bob:1' ]
 //  to: [ [ billy:1, billy:2 ], [ bob:1 ] ]
 //
-function nameOrNcStrListToKnownNcLists (nameOrNcStrList: string[]): NameCount.List[] {
+const nameOrNcStrListToKnownNcLists = (nameOrNcStrList: string[]):
+    NameCount.List[] =>
+{
     return nameOrNcStrList.map(nameOrNcStr => NameCount.makeNew(nameOrNcStr))
         .map(nc => nc.count ? [nc] : getKnownNcListForName(nc.name));
-}
+};
 
-function combinationNcList (indexList: number[], ncLists: NameCount.List[]): NameCount.List {
-    return indexList.map((ncIndex: number, listIndex: number) => ncLists[listIndex][ncIndex]);
-}
+const combinationNcList =  (indexList: number[], ncLists: NameCount.List[]):
+    NameCount.List =>
+{
+    return indexList.map((ncIndex: number, listIndex: number) =>
+	ncLists[listIndex][ncIndex]);
+};
 
 // TODO: tuple type interface
-function minMaxNcListsTupleToNcDataCombinations (minMaxNcListsTuple: any[]): NCDataList[] {
+const minMaxNcListsTupleToNcDataCombinations = (minMaxNcListsTuple: any[]):
+    NCDataList[] =>
+{
     const minMax = minMaxNcListsTuple[0];
     const ncLists = minMaxNcListsTuple[1] as NameCount.List[];
     return Peco.makeNew({
@@ -139,9 +140,11 @@ function minMaxNcListsTupleToNcDataCombinations (minMaxNcListsTuple: any[]): NCD
         if (minMax) ncData.synonymMinMax = minMax;
         return ncData;
     });
-}
+};
 
-function getCombinationNcDataLists (useArgsList: string[], hasMinMax: boolean = false): any {
+const getCombinationNcDataLists = (useArgsList: string[], hasMinMax?: boolean):
+    any =>
+{
     Debug(`useArgsList: ${Stringify(useArgsList)}`);
     if (!useArgsList) return [];
     return useArgsList
@@ -150,22 +153,24 @@ function getCombinationNcDataLists (useArgsList: string[], hasMinMax: boolean = 
 	    return [minMaxNameListTuple[0], nameOrNcStrListToKnownNcLists(minMaxNameListTuple[1])];  // nameOrNcStrList 
 	})
         .map(minMaxNcListsTuple => minMaxNcListsTupleToNcDataCombinations(minMaxNcListsTuple)); // knownNcLists
-}
+};
 
 // TODO: combinationNcDataListFromNcDataLists
 // same as combinationNcDataList but takes NCDataList[]
 // instead of NameCount.List[]
-function ncDataCombinationsToNcDataList (indexList: number[],
-    ncDataLists: NCDataList[]): NCDataList
+const ncDataCombinationsToNcDataList = (indexList: number[],
+    ncDataLists: NCDataList[]): NCDataList => 
 {
     return indexList.map((ncDataIndex: number, listIndex: number) =>
 	ncDataLists[listIndex][ncDataIndex]);
-}
+};
 
 // TODO: ncDataListsToNcDataCombinations
 // same as combinationsToNcDataLists that takes NCDataList[]
 // instead of NameCount.List[]
-function ncDataCombinationsToNcDataLists (combinationNcDataLists: NCDataList[]): NCDataList[] {
+const ncDataCombinationsToNcDataLists = (combinationNcDataLists: NCDataList[]):
+    NCDataList[] =>
+{
     Debug(`ncDataCombinationsToNcDataLists() ` +
 	`ncDataCombinationLists: ${Stringify(combinationNcDataLists)}`);
     if (listIsEmpty(combinationNcDataLists)) return [ [] ];
@@ -178,7 +183,7 @@ function ncDataCombinationsToNcDataLists (combinationNcDataLists: NCDataList[]):
 	    sum + ncDataList.length, 0) // sum of lengths of ncDataLists
     }).getCombinations().map((indexList: number[]) =>
 	ncDataCombinationsToNcDataList(indexList, combinationNcDataLists));
-}
+};
 
 // for combining --xor with --xormm
 //
@@ -192,25 +197,25 @@ const buildCombinedUseNcDataLists = (useArgsList: string[],
     const ncDataLists = ncDataCombinationsToNcDataLists(combinedNcDataLists);
     return ncDataLists;
     //.filter((ncDataList: NCDataList) => sumOfNcDataListCounts(ncDataList) <= maxSum);
-}
+};
 
 //
 
-function ncListsToCombinations (ncLists: NameCount.List[]): NameCount.List[] {
+const ncListsToCombinations = (ncLists: NameCount.List[]): NameCount.List[] => {
     return Peco.makeNew({
         listArray: ncLists.map(ncList => [...Array(ncList.length).keys()]),       // keys of array are 0..ncList.length
         max: ncLists.reduce((sum, ncList) => sum + ncList.length, 0)              // sum of lengths of nclists
     }).getCombinations()
         .map((indexList: number[]) => combinationNcList(indexList, ncLists));
-}
+};
 
-function getCombinationNcLists (useArgsList: string[]): any {
+const getCombinationNcLists = (useArgsList: string[]): any => {
     Debug(`useArgsList: ${Stringify(useArgsList)}`);
     return useArgsList
 	.map(useArg => useArg.split(','))
         .map((nameOrNcStrList: string[]) => nameOrNcStrListToKnownNcLists(nameOrNcStrList))
         .map((knownNcLists: NameCount.List[]) => ncListsToCombinations(knownNcLists));
-}
+};
 
 // TODO: combinationNcDataListFromNcLists
 const combinationNcDataList = (indexList: number[], ncLists: NameCount.List[]):
@@ -218,29 +223,32 @@ const combinationNcDataList = (indexList: number[], ncLists: NameCount.List[]):
 {
     return indexList.map((ncIndex: number, listIndex: number) =>
 	Object({ ncList: ncLists[listIndex][ncIndex]}));
-}
+};
 
-function combinationsToNcDataLists (combinationNcLists: NameCount.List[]): NCDataList[] {
+const combinationsToNcDataLists = (combinationNcLists: NameCount.List[]):
+    NCDataList[] =>
+{
     Debug(`combToNcDataLists() combinationNcLists: ${Stringify(combinationNcLists)}`);
     return Peco.makeNew({
         // TODO: List.toIndexList()
-        listArray: combinationNcLists.map(ncList => [...Array(ncList.length).keys()]), // keys of array are 0..ncList.length-1
+        listArray: combinationNcLists.map(ncList =>
+            [...Array(ncList.length).keys()]), // keys of array are 0..ncList.length-1
         // TODO: List.sumOfSublistLengths()
         max: combinationNcLists.reduce((sum, ncList) => sum + ncList.length, 0)        // sum of lengths of nclists
-    }).getCombinations()
-        .map((ncListIndexes: number[]) => combinationNcDataList(ncListIndexes, combinationNcLists));
-}
+    }).getCombinations().map((ncListIndexes: number[]) =>
+	combinationNcDataList(ncListIndexes, combinationNcLists));
+};
 
-function buildAllUseNcDataLists (useArgsList: string[]): NCDataList[] {
+const buildAllUseNcDataLists = (useArgsList: string[]): NCDataList[] => {
     const combinationNcLists = getCombinationNcLists(useArgsList);
     const ncDataLists = combinationsToNcDataLists(combinationNcLists)
     return ncDataLists;
     //.filter((ncDataList: NCDataList) => sumOfNcDataListCounts(ncDataList) <= maxSum);
-}
+};
 
 //////////
 
-let getSourceList = (nc: NameCount.Type): Source.List => {
+const getSourceList = (nc: NameCount.Type): Source.List => {
     const sourceList: Source.List = [];
     ClueManager.getKnownSourceMapEntries(nc)
         .forEach((sourceData: ClueManager.SourceData) => {
@@ -259,6 +267,10 @@ const addNcListToSourceListMap = (ncList: NameCount.List,
 	    const sourceList = getSourceList(nc);
 	    if (listIsEmpty(sourceList)) {
 		throw new Error(`empty sourceList: ${key}`);
+	    }
+	    //console.error(`key: ${key}`);
+	    if (_.find(['gold', 'pure'], name => name === nc.name)) {
+		console.error(`adding ${key} to map with ${sourceList.length} sources`)
 	    }
 	    map.set(key, sourceList);
 	}
@@ -294,18 +306,14 @@ const fillKnownNcSourceListMapForSum = (map: Map<string, Source.AnyData[]>,
 const getKnownNcSourceListMap = (first: number, last: number,
     args: any): Map<string, Source.AnyData[]> =>
 {
-    // NOTE: correct, but hacky
+    // TODO: correct-ish, but hacky, and bound to fail soon
     last = ClueManager.getNumPrimarySources();
     let map = new Map<string, Source.AnyData[]>();
     let begin = new Date();
     for (let sum = first; sum <= last; ++sum) {
-        // TODO: Fix this abomination
-        args.sum = sum;
-	let max = args.max;
-        args.max = Math.min(args.max, args.sum);
-        // TODO: return # of combos filtered due to note name match
-        fillKnownNcSourceListMapForSum(map, sum, args.max);
-        args.max = max;
+        // TODO: move this to last calculation, above?
+	let max = Math.min(args.max, sum);
+        fillKnownNcSourceListMapForSum(map, sum, max);
     }
     let d = new Duration(begin, new Date()).milliseconds;
     console.error(` getKnownNcSourceListMap: ${PrettyMs(d)}, size: ${map.size}`);
@@ -455,7 +463,7 @@ const initOrArgData = (): OrArgData => {
         orSourceList: [],
         compatible: false
     };
-}
+};
 
 const buildOrArgData = (sourceList: Source.List): OrArgData => {
     const orArgData = initOrArgData();
@@ -487,7 +495,7 @@ const markAllXorCompatibleOrSources = (xorSourceList: XorSource[],
             }
         }
     }
-}
+};
 
 /*
 const debugXorResults = (xorResults: XorSourceList) => {
@@ -500,11 +508,24 @@ const debugXorResults = (xorResults: XorSourceList) => {
 }
 */
 
+const dumpNcDataLists = (ncDataLists: NCDataList[],
+    sourceListMap: Map<string, Source.AnyData[]>): void =>
+{
+    console.error(` ncDataLists:`);
+    for (let ncDataList of ncDataLists) {
+	for (let ncData of ncDataList) {
+	    let str = NameCount.listToString(ncData.ncList);
+	    console.error(`  ${str}: ${sourceListMap.has(str)}`);
+	}
+    }
+}
+
 let buildUseSourceListsFromNcData = (sourceListMap: Map<string, Source.AnyData[]>,
     args: any): UseSourceLists =>
 {
     // XOR first
     let xor0 = new Date();
+    dumpNcDataLists(args.allXorNcDataLists, sourceListMap);
     let xorSourceList: XorSourceList = NativeComboMaker.mergeCompatibleXorSourceCombinations(
 	args.allXorNcDataLists, Array.from(sourceListMap.entries())); // TODO? [...sourceListMap.entries()]
     setPrimarySrcBits(xorSourceList);

@@ -197,6 +197,33 @@ let log = function (text: string): void {
     }
 };
 
+const anyCandidateHasClueName = (name: string,
+    allCandidates: AllCandidates = State.allCandidates): boolean =>
+{
+    for (let container of allCandidates) {
+	if (!container) continue;
+	const indices = container.nameIndicesMap[name] || [];
+	for (let index of indices) {
+	    if (container.candidates[index]) {
+		return true;
+	    }
+	}
+    }
+    return false;
+}
+
+export const clueExists = (name: string, count: number): boolean => {
+    // for old-school primary, and all compound clues
+    if (_.has(getKnownClueMap(count), name)) {
+	return true;
+    }
+    // special case for primary clues in sentences
+    if (count === 1) {
+	return anyCandidateHasClueName(name);
+    }
+    return false;
+}
+
 interface SaveClueListOptions {
     dir : string;
 }
@@ -668,7 +695,7 @@ let addKnownCompoundClues = function (clueList: ClueList.Compound, clueCount: nu
 };
 
 let addKnownClue = function (count: number, name: string, source: string, nothrow: boolean = false): boolean {
-    let clueMap = State.knownClueMapArray[count];
+    let clueMap = getKnownClueMap(count);
     if (!_.has(clueMap, name)) {
         log(`clueMap[${name}] = [${source}]`);
         clueMap[name] = [source];
@@ -683,7 +710,7 @@ let addKnownClue = function (count: number, name: string, source: string, nothro
 };
 
 let removeKnownClue = function (count: number, name: string, source: string, nothrow: boolean): boolean {
-    let clueMap = State.knownClueMapArray[count];
+    let clueMap = getKnownClueMap(count);
     if (!_.has(clueMap, name) || !clueMap[name].includes(source)) {
         if (nothrow) return false;
         throw new Error(`removeKnownClue, missing clue: ${name}:${source} at count: ${count}`);
@@ -807,13 +834,13 @@ let isRejectSource = function (source: string | string[]): boolean {
 //
 
 export let getCountListForName = (name: string): CountList => {
-    // TODO: filter/map
-    let countList: CountList = [];
-    for (const [index, clueMap] of State.knownClueMapArray.entries()) {
-        if (_.has(clueMap, name)) {
-            countList.push(index);
-        }
-    };
+    let countList: CountList = [...Array(State.knownClueMapArray.length).keys()]
+        .filter(count => count && _.has(getKnownClueMap(count), name));
+    if (_.isEmpty(countList) || (countList[0] !== 1)) {
+	if (anyCandidateHasClueName(name)) {
+	    countList = [1, ...countList];
+	}
+    }
     return countList;
 };
 
@@ -1641,31 +1668,4 @@ export let recursiveGetCluePropertyCount = function (
     }
     return counts;
 };
-
-export const clueExists = (name: string, count: number): boolean => {
-    // for old-school primary, and all compound clues
-    if (_.has(getKnownClueMap(count), name)) {
-	return true;
-    }
-    // special case for primary clues in sentences
-    if (count === 1) {
-	return anyCandidateHasClueName(name);
-    }
-    return false;
-}
-
-const anyCandidateHasClueName = (name: string,
-    allCandidates: AllCandidates = State.allCandidates): boolean =>
-{
-    for (let container of allCandidates) {
-	if (!container) continue;
-	const indices = container.nameIndicesMap[name] || [];
-	for (let index of indices) {
-	    if (container.candidates[index]) {
-		return true;
-	    }
-	}
-    }
-    return false;
-}
 

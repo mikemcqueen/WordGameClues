@@ -1,3 +1,75 @@
+
+// key types:
+//{
+// A:
+//  'jack:3': {             // non-array object value type
+//    'card:2': {
+// B:
+//      'bird:1,red:1': [   // multiple primary NCs with array value type, split them
+//        'bird:2,red:8'
+//      ]
+//    },
+//    'face:1': {
+// C:
+//      'face:1': [         // single primary NC with array value type, ignore
+//        'face:10'
+//      ]
+//    }
+//  }
+//}
+//
+//{
+// D:
+//  'face:1': [              // single top-level primary NC with array value type, allow
+//    'face:10'
+//  ]
+//}
+let recursiveAddSrcNcLists = (list: string[], resultMap: any, top = true): string[] => {
+    let keys: string[] = _.flatMap(_.keys(resultMap), (key: string) => {
+        let val = resultMap[key];
+        if (_.isObject(val)) {
+            // A: non-array object value type: allow
+            if (!_.isArray(val)) return key;
+            // split multiple primary NCs into separate keys
+            let splitKeys = key.split(',');
+            // B: comma separated key with array value type: split; TODO assert primary?
+            if (splitKeys.length > 1) return splitKeys;
+            // D: single top-level key with array value type: allow; TODO assert primary?
+            if (top) {
+                return key;
+            }
+            // C: single nested key with array value type: ignore; TODO assert primary?
+        }
+        return [];
+    });
+    if (!_.isEmpty(keys)) {
+        // push combined sorted keys for multi-key case
+        if (keys.length > 1) {
+            let sortedKeys = keys.sort().toString();
+            list.push(sortedKeys);
+        }
+        keys.forEach(key => {
+            // push individual keys
+            list.push(key);
+            let val = resultMap[key];
+            if (val && !_.isArray(val)) {
+                recursiveAddSrcNcLists(list, val, false);
+            }
+        });
+    }
+    return list;
+};
+
+// NOTE: resultMap here is a not actually a ResultMap, it's a resultMap.map().
+//
+function buildSrcNcList (resultMap: Object): string[] {
+    return recursiveAddSrcNcLists([], resultMap);
+}
+
+// out of bounds
+let oob = 0;
+
+
 /*
 // this really could be reduced to "makeSourceNcCsvList"
 //

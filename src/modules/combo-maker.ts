@@ -45,16 +45,6 @@ interface StringAnyMap {
     [key: string]: any;
 }
 
-/*
-type MergeArgs = {
-    synonymMinMax: MinMax.Type;
-    lazy?: boolean;
-};
-*/
-
-//
-//
-
 type CountArray = Int32Array;
 
 interface CountArrayAndSize {
@@ -67,11 +57,11 @@ type MergedSourcesList = MergedSources[];
 
 let PCD: PreCompute.Data;
 
-//
-//
-function Stringify(val: any) {
+//////////
+
+const Stringify = (val: any) => {
     return stringify(val, (value: any, indent: any, stringify: any) => {
-        if (typeof value == 'function') return "function";
+        if (typeof value === 'function') return "function";
         return stringify(value);
     }, " ");
 }
@@ -84,93 +74,23 @@ const Op = {
 };
 Object.freeze(Op);
 
-function OpName (opValue: number): string | undefined {
+const OpName = (opValue: number): string | undefined => {
     return _.findKey(Op, (v: number) => opValue === v);
-}
+};
 
 //////////
 
-let listIsEmpty = (list: any[]): boolean => {
+const listIsEmpty = (list: any[]): boolean => {
     return list.length === 0;
 };
 
-let listGetNumEmptySublists = (listOfLists: any[][]) => {
+const listGetNumEmptySublists = (listOfLists: any[][]) => {
     let numEmpty = 0;
     for (let list of listOfLists) {
         if (listIsEmpty(list)) ++numEmpty;
     }
     return numEmpty;
 };
-
-// key types:
-//{
-// A:
-//  'jack:3': {             // non-array object value type
-//    'card:2': {
-// B:
-//      'bird:1,red:1': [   // multiple primary NCs with array value type, split them
-//        'bird:2,red:8'
-//      ]
-//    },
-//    'face:1': {
-// C:
-//      'face:1': [         // single primary NC with array value type, ignore
-//        'face:10'
-//      ]
-//    }
-//  }
-//}
-//
-//{
-// D:
-//  'face:1': [              // single top-level primary NC with array value type, allow
-//    'face:10'
-//  ]
-//}
-let recursiveAddSrcNcLists = (list: string[], resultMap: any, top = true): string[] => {
-    let keys: string[] = _.flatMap(_.keys(resultMap), (key: string) => {
-        let val = resultMap[key];
-        if (_.isObject(val)) {
-            // A: non-array object value type: allow
-            if (!_.isArray(val)) return key;
-            // split multiple primary NCs into separate keys
-            let splitKeys = key.split(',');
-            // B: comma separated key with array value type: split; TODO assert primary?
-            if (splitKeys.length > 1) return splitKeys;
-            // D: single top-level key with array value type: allow; TODO assert primary?
-            if (top) {
-                return key;
-            }
-            // C: single nested key with array value type: ignore; TODO assert primary?
-        }
-        return [];
-    });
-    if (!_.isEmpty(keys)) {
-        // push combined sorted keys for multi-key case
-        if (keys.length > 1) {
-            let sortedKeys = keys.sort().toString();
-            list.push(sortedKeys);
-        }
-        keys.forEach(key => {
-            // push individual keys
-            list.push(key);
-            let val = resultMap[key];
-            if (val && !_.isArray(val)) {
-                recursiveAddSrcNcLists(list, val, false);
-            }
-        });
-    }
-    return list;
-};
-
-// NOTE: resultMap here is a not actually a ResultMap, it's a resultMap.map().
-//
-function buildSrcNcList (resultMap: Object): string[] {
-    return recursiveAddSrcNcLists([], resultMap);
-}
-
-// out of bounds
-let oob = 0;
 
 export const mergeUsedSources = (first: number[], second: number[]): number[] => {
     let result: number[] = first.slice();
@@ -180,7 +100,7 @@ export const mergeUsedSources = (first: number[], second: number[]): number[] =>
     return result;
 }
 
-let mergeCompatibleSourceLists2 = (mergedSourcesList: MergedSourcesList,
+const mergeCompatibleSourceLists2 = (mergedSourcesList: MergedSourcesList,
     sourceList: Source.List): MergedSourcesList =>
 {
     let result: MergedSourcesList = [];
@@ -197,7 +117,7 @@ let mergeCompatibleSourceLists2 = (mergedSourcesList: MergedSourcesList,
     return result;
 };
 
-let makeMergedSourcesList = (sourceList: Source.List) : MergedSourcesList => {
+const makeMergedSourcesList = (sourceList: Source.List) : MergedSourcesList => {
     let mergedSourcesList: MergedSourcesList = [];
     for (const source of sourceList) {
 	mergedSourcesList.push({
@@ -209,35 +129,30 @@ let makeMergedSourcesList = (sourceList: Source.List) : MergedSourcesList => {
     return mergedSourcesList;
 };
 
-//
-//
-let mergeAllCompatibleSources2 = (ncList: NameCount.List,
+const mergeAllCompatibleSources2 = (ncList: NameCount.List,
     sourceListMap: Map<string, Source.AnyData[]>): MergedSourcesList =>
 {
     // because **maybe** broken for > 2 below
     Assert(ncList.length <= 2, `${ncList} length > 2 (${ncList.length})`);
     // TODO: reduce (or some) here
-    let mergedSourcesList: MergedSourcesList = makeMergedSourcesList(
-	sourceListMap.get(NameCount.toString(ncList[0])) as Source.List);
+    let mergedSourcesList = makeMergedSourcesList(sourceListMap.get(
+	NameCount.toString(ncList[0])) as Source.List);
     for (let ncIndex = 1; ncIndex < ncList.length; ++ncIndex) {
-        const nextSourceList: Source.List = sourceListMap.get(NameCount.toString(ncList[ncIndex])) as Source.List;
+        const nextSourceList = sourceListMap.get(NameCount.toString(ncList[ncIndex])) as Source.List;
         mergedSourcesList = mergeCompatibleSourceLists2(mergedSourcesList, nextSourceList);
-        //if (!sourceListHasPropertyCountInBounds(sourceList, args.synonymMinMax)) sourceList = [];
         // TODO BUG this is broken for > 2; should be something like: if (sourceList.length !== ncIndex + 1) 
         if (listIsEmpty(mergedSourcesList)) break;
     }
     return mergedSourcesList;
 };
 
-//
-//
-let nextIndex = function(countList: number[], clueIndexes: number[]): boolean {
+const nextIndex = (countList: number[], clueIndexes: number[]): boolean => {
     // increment last index
     let index = clueIndexes.length - 1;
     clueIndexes[index] += 1;
 
     // while last index is maxed: reset to zero, increment next-to-last index, etc.
-    while (clueIndexes[index] === ClueManager.getClueList(countList[index]).length) { // clueSourceList[index].list.length) {
+    while (clueIndexes[index] === ClueManager.getClueList(countList[index]).length) {
         clueIndexes[index] = 0;
         if (--index < 0) {
             return false;
@@ -253,8 +168,6 @@ export interface FirstNextResult {
     nameList?: string[];
 }
 
-//
-//
 export const next = (countList: number[], clueIndexes: number[]): FirstNextResult => {
     for (;;) {
         if (!nextIndex(countList, clueIndexes)) {
@@ -285,8 +198,6 @@ export const next = (countList: number[], clueIndexes: number[]): FirstNextResul
     }
 };
 
-//
-//
 export const first = (countList: number[], clueIndexes: number[]): FirstNextResult => {
     // TODO: _.fill?
     for (let index = 0; index < countList.length; ++index) {
@@ -303,7 +214,7 @@ export const first = (countList: number[], clueIndexes: number[]): FirstNextResu
 // args:
 //   synonymMinMax
 //
-let getCombosForUseNcLists = (sum: number, max: number, pcd: PreCompute.Data,
+const getCombosForUseNcLists = (sum: number, max: number, pcd: PreCompute.Data,
     args: any): string[] =>
 {
     let hash: StringAnyMap = {};
@@ -496,7 +407,7 @@ export const makeCombos = (args: any): any => {
         }
         let d = new Duration(begin, new Date()).milliseconds;
 	if (!args.verbose) console.error('');
-        console.error(`--combos: ${PrettyMs(d)}, oob: ${oob}`);
+        console.error(`--combos: ${PrettyMs(d)}`);
         Debug(`total: ${total}, filtered(${_.size(comboMap)})`);
         _.keys(comboMap).forEach((nameCsv: string) => console.log(nameCsv));
     }
