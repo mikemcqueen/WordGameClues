@@ -95,6 +95,8 @@ cm::SourceData makeSourceData(Env& env, const Napi::Object& jsSourceData) {
       .ThrowAsJavaScriptException();
     return {};
   }
+  // TODO: declare SourceData result; assign result.xxx = std::move(yyy);; return result
+  // (no move-all-params constructor required)
   //auto jsSourceNcCsvList = jsSourceData.Get("sourceNcCsvList");
   auto primaryNameSrcList = makeNameCountList(env, jsPrimaryNameSrcList.As<Array>());
   auto primarySrcBits = cm::NameCount::listToSourceBits(primaryNameSrcList);
@@ -170,6 +172,7 @@ cm::SourceListMap makeSourceListMap(Napi::Env& env, const Napi::Array& jsList) {
     }
     const auto key = tuple[0u].As<String>().Utf8Value();
     auto sourceList = makeSourceList(env, tuple[1u].As<Array>());
+    //cm::debugSourceList(sourceList, "makeSourceListMap");
     map.emplace(std::move(key), std::move(sourceList));
   }
   return map;
@@ -399,7 +402,7 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
 
   auto merge0 = high_resolution_clock::now();
 
-  cm::PCD.xorSourceList = cm::mergeCompatibleXorSourceCombinations(sourceLists);
+  cm::PCD.xorSourceList = std::move(cm::mergeCompatibleXorSourceCombinations(sourceLists));
 
   auto merge1 = high_resolution_clock::now();
   auto d_merge = duration_cast<milliseconds>(merge1 - merge0).count();
@@ -435,7 +438,7 @@ Value setOrArgDataList(const CallbackInfo& info) {
 
   Env env = info.Env();
   if (!info[0].IsArray()) {
-      Napi::TypeError::New(env, "mergeCompatibleXorSourceCombinations: non-array parameter")
+      Napi::TypeError::New(env, "setOrArgDataList: non-array parameter")
 	.ThrowAsJavaScriptException();
       return env.Null();
   }

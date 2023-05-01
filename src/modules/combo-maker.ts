@@ -319,11 +319,6 @@ let getCombosForUseNcLists = (sum: number, max: number, pcd: PreCompute.Data,
     const MILLY = 1000000n;
     const start = process.hrtime.bigint();
 
-    const lazyMergeArgs = {
-        synonymMinMax: args.synonymMinMax
-//	,lazy: true
-    };
-
     // Given a sum, such as 4, and a max # of numbers to combine, such as 2, generate
     // an array of addend arrays ("count lists"), for each 2 <= N <= max, that add up
     // to that sum, such as [ [1, 3], [2, 2] ]

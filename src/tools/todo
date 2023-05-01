@@ -1,33 +1,13 @@
+
 * validateSources(name) -- enforce everywhere
 * -t newton fails (-t probably doesn't honor candidate clues)
+* -t (no --verbose) output sources is funny
 
 validatesources is apparently happy with old:3=not:1,not:1,old:1
 which is wrong because:
-1) two nots from two different variations of sentence three. i though i checked
+1) FIXED: two nots from two different variations of sentence three. i though i checked
    for and prevented this with the "candidates" thing somewhere
-2) this is like that weird case with "bird" being the "name" of a clue that had
+2) TODO: this is like that weird case with "bird" being the "name" of a clue that had
    "bird" as a source, and that should be disallowed.
+   
 clues3.json:  { "name": "old",             "src": "new,not" },
-
-merge needs:
-  --append
-  --filter-reject-urls
-  --filter-reject-sources
-
-those will all be defaults most likely.
-
-may want:
-  --filter urls,sources,all,none [all] default0
-  --no-filter [could be same args as above + restore (restore rejected urls)] 
-    (longer term feature, when the need arises)
-
-
---
-
-the hasCommaSuffix/RejectSuffix problem, where to put this. filter? update? markdown?<<===
-
---
-
-merge:
-* filter rejects from noteParse - compare filter reject code, ideally 1 place that accesses _filtered files
-* why am I sorting

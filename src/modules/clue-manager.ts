@@ -516,21 +516,20 @@ let initPropertyCountsInAllResults = (nc: NameCount.Type, results: ValidateResul
 };
 */
 
-let initSrcBitsInAllResults = (results: ValidateResult[]): void => {
+const initSrcBitsInAllResults = (results: ValidateResult[]): void => {
     for (let result of results) {
+	Assert(NameCount.listHasCompatibleSources(result.nameSrcList));
         result.sourceBits = CountBits.makeFrom(Sentence.legacySrcList(result.nameSrcList));
 	result.usedSources = Sentence.getUsedSources(result.nameSrcList);
     }
-}
+};
 
-let massageValidateResults = (nc: NameCount.Type, results: ValidateResult[]): void => {
+const massageValidateResults = (nc: NameCount.Type, results: ValidateResult[]): void => {
     //initPropertyCountsInAllResults(nc, results);
     initSrcBitsInAllResults(results);
-}
+};
 
-//
-//
-let funnyBusiness = (set: Set<string>, nameSrcList: NameCount.List) : boolean => {
+const funnyBusiness = (set: Set<string>, nameSrcList: NameCount.List) : boolean => {
     for (let ncCsv of set.values()) {
         const ncList = NameCount.makeListFromCsv(ncCsv);
         Assert(ncList.length === nameSrcList.length);
@@ -917,7 +916,7 @@ export let filter = function (srcCsvList: string[], clueCount: number, map: any 
     return { map, known, reject, duplicate };
 };
 
-// TODO: return type.  from Validator?
+// TODO: return type.
 const singleEntry = (nc: NameCount.Type, source: string): SourceData => {
     let nameSrcList: NameCount.List = [NameCount.makeNew(nc.name, _.toNumber(source))];
     return {
@@ -1131,7 +1130,6 @@ const removeClueForCounts = (countSet: Set<number>, name: string, src: string,
 // each name appears
 const getKnownClueIndexLists = (nameList: string[]): CountList[] => {
     let countListArray: CountList[] = Array(_.size(nameList)).fill(0).map(_ => []);
-    //Debug(countListArray);
     // TODO: is maxClues correct here
     for (let count = 1; count <= State.maxClues; ++count) {
         const map = State.knownClueMapArray[count];

@@ -160,36 +160,24 @@ let getAllSourcesForPrimaryClueName = (name: string, allCandidates: ClueManager.
     let log = false; //name === 'town';
 
     // Add "sentence" candidates to sources list.
-    allCandidates
-	.filter(container => {
-	    let has = _.has(container.nameIndicesMap, name);
-	    if (log) console.error(`filter ${container}, ${name}: ${has}`);
-	    return has;
-	})
-	.forEach(container => {
-	    // add all sources for name to sources list
-	    let numValidIndices = 0;
-	    const compatibleIndices = container.nameIndicesMap[name];
-	    for (let index of compatibleIndices) {
-		if (!container.candidates[index]) continue; // might have been deleted already
-		numValidIndices += 1;
-		Assert(_.has(container.candidates[index].nameSourcesMap, name));
-		Assert(!_.isEmpty(container.candidates[index].nameSourcesMap[name]));
-		sources.push(...container.candidates[index].nameSourcesMap[name]);
-	    }
-	    // NOT HERE.  after we succeed.  or something.
-	    /*
-	    // remove all incompatible candidates from candidate list
-	    for (let index = 0; index < container.candidates.length; ++index) {
-		if (!container.candidates[index]) continue; // might have been deleted already
-		if (!_.has(container.candidates[index].nameSourcesMap, name)) {
-		    delete container.candidates[index];
-		}
-	    }
-	    */
-	    if (log) console.error(` ${numValidIndices} indices valid of ${[...compatibleIndices].length}`);
-	});
-
+    allCandidates.filter(container => {
+	let has = _.has(container.nameIndicesMap, name);
+	if (log) console.error(`filter ${container}, ${name}: ${has}`);
+	return has;
+    }).forEach(container => {
+	// add all sources for name to sources list
+	let numValidIndices = 0;
+	const compatibleIndices = container.nameIndicesMap[name];
+	for (let index of compatibleIndices) {
+	    if (!container.candidates[index]) continue; // might have been deleted already
+	    numValidIndices += 1;
+	    Assert(_.has(container.candidates[index].nameSourcesMap, name));
+	    Assert(!_.isEmpty(container.candidates[index].nameSourcesMap[name]));
+	    sources.push(...container.candidates[index].nameSourcesMap[name]);
+	}
+	if (log) console.error(` ${numValidIndices} indices valid of ${[...compatibleIndices].length}`);
+    });
+    
     if (_.isEmpty(sources)) throw new Error(`can't find: ${name}`);
     return sources;
 }
@@ -206,9 +194,6 @@ const addCompatibleCandidateSource = (src: number, candidates: number[]): boolea
 	    return false;
 	}
     } else {
-	if (theName === 'old' && sentenceIndex === 3) {
-	    console.error(`${theName}: adding ${src} to [${candidates}]`);
-	}
 	candidates[sentenceIndex] = variationIndex;
     }
     return true;
@@ -216,7 +201,7 @@ const addCompatibleCandidateSource = (src: number, candidates: number[]): boolea
 
 type MergeNcListResultsArgs = ClueManager.AllCandidatesContainer & VSFlags;
 
-let mergeNcListResults = (ncListToMerge: NameCount.List,
+const mergeNcListResults = (ncListToMerge: NameCount.List,
     args: MergeNcListResultsArgs): ValidateSourcesResult =>
 {
     let ncCsv = ncListToMerge.toString();
@@ -231,18 +216,7 @@ let mergeNcListResults = (ncListToMerge: NameCount.List,
     let resultList: ValidateResult[] = [];
     const combos = Peco.makeNew({
 	listArray
-    }).getCombinations();
-
-    /*
-    let str: string = '';
-    for (let list of combos) {
-	str = str.concat(` ${list.length}`);
-    }
-    */
-    //console.error(`combos.length(${combos.length})`);
-    //console.error(Stringify(combos));
-
-    combos.forEach((indexList: number[]) => {
+    }).getCombinations().forEach((indexList: number[]) => {
 	let candidates: number[] = [];
         let ncList: NameCount.List = [];
         let nameSrcList: NameCount.List = [];
@@ -283,14 +257,12 @@ let mergeNcListResults = (ncListToMerge: NameCount.List,
                 return; // forEach.continue;
             }
         }
-        // TODO: uniqBy da debil
-        if (_.uniqBy(nameSrcList, NameCount.count).length === nameSrcList.length) {
-            let nameSrcCsv = _.sortBy(nameSrcList, NameCount.count).toString();
+        if (NameCount.listHasCompatibleSources(nameSrcList)) {
+            //let nameSrcCsv = _.sortBy(nameSrcList, NameCount.count).toString();
             let result: ValidateResult = {
                 ncList,
                 resultMap,
                 nameSrcList,
-                //nameSrcCsv,
 		allCandidates: [] // args.allCandidates // TODO avoiding OOM
             };
             resultList.push(result);

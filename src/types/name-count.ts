@@ -6,6 +6,9 @@
 
 import _ from 'lodash';
 
+// dumb but whatever
+import * as Sentence from './sentence';
+
 //
 //
 
@@ -149,6 +152,22 @@ export function sortList (ncList: List): List {
     return ncList;
 }
 
+export const listHasCompatibleSources = (nameSrcList: List):
+    boolean =>
+{
+    // TODO: uniqBy da debil
+    if (_.uniqBy(nameSrcList, count).length !== nameSrcList.length) {
+	return false;
+    }
+    // TODO: sloww probably, also requiring sentence is dumb
+    try {
+	Sentence.getUsedSources(nameSrcList);
+    } catch(e) {
+	//console.error('***incompatible usedSources***');
+	return false;
+    }
+    return true;
+}
 
 //
 

@@ -51,7 +51,8 @@ export interface ListContainer {
 export const makeData = (nc: NameCount.Type, validateResult: ValidateResult):
     Data =>
 {
-    Assert(validateResult.sourceBits && validateResult.usedSources, `makeData(): ${nc}`);
+    Assert(validateResult.sourceBits && validateResult.usedSources, `makeData(): ${NameCount.toString(nc)}`);
+    Assert(NameCount.listHasCompatibleSources(validateResult.nameSrcList), `makeData(): ${NameCount.toString(nc)}`);
     return {
 	primaryNameSrcList: validateResult.nameSrcList,
 	sourceBits: validateResult.sourceBits,

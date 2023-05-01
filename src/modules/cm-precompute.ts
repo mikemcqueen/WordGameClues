@@ -176,8 +176,8 @@ function ncDataCombinationsToNcDataLists (combinationNcDataLists: NCDataList[]):
         // TODO: List.sumOfSublistLengths()
         max: combinationNcDataLists.reduce((sum, ncDataList) =>
 	    sum + ncDataList.length, 0) // sum of lengths of ncDataLists
-    }).getCombinations()
-        .map((indexList: number[]) => ncDataCombinationsToNcDataList(indexList, combinationNcDataLists));
+    }).getCombinations().map((indexList: number[]) =>
+	ncDataCombinationsToNcDataList(indexList, combinationNcDataLists));
 }
 
 // for combining --xor with --xormm
@@ -240,7 +240,7 @@ function buildAllUseNcDataLists (useArgsList: string[]): NCDataList[] {
 
 //////////
 
-let getSourceList = (nc: NameCount.Type/*, args: MergeArgs*/): Source.List => {
+let getSourceList = (nc: NameCount.Type): Source.List => {
     const sourceList: Source.List = [];
     ClueManager.getKnownSourceMapEntries(nc)
         .forEach((sourceData: ClueManager.SourceData) => {
@@ -251,14 +251,14 @@ let getSourceList = (nc: NameCount.Type/*, args: MergeArgs*/): Source.List => {
 };
 
 const addNcListToSourceListMap = (ncList: NameCount.List,
-    map: Map<string, Source.AnyData[]>/*, mergeArgs: MergeArgs*/) : void =>
+    map: Map<string, Source.AnyData[]>) : void =>
 {
     for (let nc of ncList) {
 	const key = NameCount.toString(nc)
 	if (!map.has(key)) {
-	    const sourceList = getSourceList(nc, /*mergeArgs*/);
+	    const sourceList = getSourceList(nc);
 	    if (listIsEmpty(sourceList)) {
-		throw new Error(`empty sourceList: ${NameCount.toString(nc)}`);
+		throw new Error(`empty sourceList: ${key}`);
 	    }
 	    map.set(key, sourceList);
 	}
@@ -266,7 +266,7 @@ const addNcListToSourceListMap = (ncList: NameCount.List,
 };
 
 const fillKnownNcSourceListMapForSum = (map: Map<string, Source.AnyData[]>,
-    sum: number, max: number/*, mergeArgs: MergeArgs*/) : void =>
+    sum: number, max: number) : void =>
 {
     // Given a sum, such as 4, and a max # of numbers to combine, such as 2, generate
     // an array of addend arrays ("count lists"), for each 2 <= N <= max, that add up
@@ -286,7 +286,7 @@ const fillKnownNcSourceListMapForSum = (map: Map<string, Source.AnyData[]>,
                 result = ComboMaker.next(countList, sourceIndexes);
                 if (result.done) break;
             }
-	    addNcListToSourceListMap(result.ncList!, map/*, mergeArgs*/);
+	    addNcListToSourceListMap(result.ncList!, map);
 	}
     });
 };
@@ -297,7 +297,6 @@ const getKnownNcSourceListMap = (first: number, last: number,
     // NOTE: correct, but hacky
     last = ClueManager.getNumPrimarySources();
     let map = new Map<string, Source.AnyData[]>();
-    //const mergeArgs = { synonymMinMax: args.synonymMinMax };
     let begin = new Date();
     for (let sum = first; sum <= last; ++sum) {
         // TODO: Fix this abomination
@@ -305,11 +304,11 @@ const getKnownNcSourceListMap = (first: number, last: number,
 	let max = args.max;
         args.max = Math.min(args.max, args.sum);
         // TODO: return # of combos filtered due to note name match
-        fillKnownNcSourceListMapForSum(map, sum, args.max/*, mergeArgs*/);
+        fillKnownNcSourceListMapForSum(map, sum, args.max);
         args.max = max;
     }
     let d = new Duration(begin, new Date()).milliseconds;
-    console.error(`getKnownNcSourceListMap: ${PrettyMs(d)}, size: ${map.size}`);
+    console.error(` getKnownNcSourceListMap: ${PrettyMs(d)}, size: ${map.size}`);
     return map;
 };
 
@@ -321,10 +320,31 @@ const setPrimarySrcBits = (sourceList: Source.List): void => {
     }
 };
 
+/*
+const hasCandidate = (nc: NameCount.Type): boolean => { return nc.count >= 1_000_000; }
+const listCandidateCount = (ncList: NameCount.List): number => {
+    let count = 0;
+    for (let nc of ncList) {
+	if (hasCandidate(nc)) ++count;
+    }
+    return count;
+}
+
+const debug = (s1: Source.Data, s2: Source.Data): void => {
+    let c1 = listCandidateCount(s1.primaryNameSrcList);
+    let c2 = listCandidateCount(s2.primaryNameSrcList);
+    if (((c1 > 0) && (c2 > 0)) || (c1 > 1) || (c2 > 1)) {
+	console.error(`merging: ${NameCount.listToCountList(s1.primaryNameSrcList)}` +
+	    ` with ${NameCount.listToCountList(s2.primaryNameSrcList)}`);
+    }
+}
+*/
+
 // TODO: move to Source?
 const mergeSources = (source1: Source.Data, source2: Source.Data):
     Source.Data =>
 {
+    //debug(source1, source2);
     const primaryNameSrcList = [...source1.primaryNameSrcList, ...source2.primaryNameSrcList];
     const sourceBits = CountBits.or(source1.sourceBits, source2.sourceBits);
     const usedSources = ComboMaker.mergeUsedSources(source1.usedSources, source2.usedSources);
@@ -409,7 +429,7 @@ const buildSourceListsForUseNcData = (useNcDataLists: NCDataList[],
             // give priority to any min/max args specific to an NcData, for example, through --xormm,
             // but fallback to the values we were called with
             //const mergeArgs = useNcData.synonymMinMax ? { synonymMinMax: useNcData.synonymMinMax } : args;
-            const sourceList = mergeAllCompatibleSources(useNcData.ncList, sourceListMap/*, mergeArgs*/) as Source.List;
+            const sourceList = mergeAllCompatibleSources(useNcData.ncList, sourceListMap) as Source.List;
             for (let source of sourceList) {
                 let key = NameCount.listToString(_.sortBy(source.primaryNameSrcList, NameCount.count));
                 if (!hashList[sourceListIndex][key]) {
@@ -457,12 +477,11 @@ const buildOrArgDataList = (sourceLists: Source.List[]): OrArgDataList => {
 
 // Given a list of XorSources, and a list of OrSources, TODO
 //
-const markAllXORCompatibleOrSources = (xorSourceList: XorSource[],
+const markAllXorCompatibleOrSources = (xorSourceList: XorSource[],
     orArgDataList: OrArgDataList): void =>
 {
     for (let orArgData of orArgDataList) {
-        const orSourceList = orArgData.orSourceList;
-        for (let orSource of orSourceList) {
+        for (let orSource of orArgData.orSourceList) {
             if (Source.isXorCompatibleWithAnySource(orSource.source, xorSourceList)) {
                 orSource.xorCompatible = true;
             }
@@ -470,7 +489,20 @@ const markAllXORCompatibleOrSources = (xorSourceList: XorSource[],
     }
 }
 
-let buildUseSourceListsFromNcData = (sourceListMap: Map<string, Source.AnyData[]>, args: any): UseSourceLists => {
+/*
+const debugXorResults = (xorResults: XorSourceList) => {
+    for (let xorResult of xorResults) {
+	if (listCandidateCount(xorResult.primaryNameSrcList) > 1) {
+	    console.log(`${NameCount.listToString(xorResult.ncList)}:` +
+		` ${NameCount.listToString(xorResult.primaryNameSrcList)}`);
+	}
+    }
+}
+*/
+
+let buildUseSourceListsFromNcData = (sourceListMap: Map<string, Source.AnyData[]>,
+    args: any): UseSourceLists =>
+{
     // XOR first
     let xor0 = new Date();
     let xorSourceList: XorSourceList = NativeComboMaker.mergeCompatibleXorSourceCombinations(
@@ -481,11 +513,10 @@ let buildUseSourceListsFromNcData = (sourceListMap: Map<string, Source.AnyData[]
 
     // OR next
     let or0 = new Date();
-    //const mergeArgs = { synonymMinMax: args.synonymMinMax };
     let orArgDataList = buildOrArgDataList(buildSourceListsForUseNcData(
-	args.allOrNcDataLists, sourceListMap/*, mergeArgs*/));
+	args.allOrNcDataLists, sourceListMap));
     let odur = new Duration(or0, new Date()).milliseconds;
-    console.error(`orArgDataList(${orArgDataList.length}), build(${PrettyMs(odur)})`);
+    console.error(` orArgDataList(${orArgDataList.length}), build(${PrettyMs(odur)})`);
 
     // Thoughts on AND compatibility of OrSources:
     // Just because (one sourceList of) an OrSource is AND compatible with an
@@ -496,32 +527,22 @@ let buildUseSourceListsFromNcData = (sourceListMap: Map<string, Source.AnyData[]
     // So, a container can be marked compatible if and only if there are no
     // no remaining XOR-compatible sourceLists.
     //TODO: markAllANDCompatibleOrSources(xorSourceList, orSourceList);
+
     let mark0 = new Date();
-    markAllXORCompatibleOrSources(xorSourceList, orArgDataList);
+    markAllXorCompatibleOrSources(xorSourceList, orArgDataList);
     let mdur = new Duration(mark0, new Date()).milliseconds;
-    console.error(`mark(${PrettyMs(mdur)})`);
+    console.error(` mark(${PrettyMs(mdur)})`);
 
     NativeComboMaker.setOrArgDataList(orArgDataList);
 
-    /*
-    if (1) {
-        useSourceList.forEach((source, index) => {
-            const orSource: OrSource = source.orSource!;
-            if (orSource && !orSource.sourceLists) console.log(`orSourceLists ${orSource.sourceLists}`);
-            if (orSource && orSource.sourceLists && listIsEmpty(orSource.sourceLists)) console.log(`EMPTY4`);
-        });
-    }
-    */
     return { xor: xorSourceList, orArgDataList: orArgDataList };
 };
 
 export const preCompute = (first: number, last: number, args: any): Data => {
     const begin = new Date();
-    const build1 = new Date();
     args.allXorNcDataLists = buildCombinedUseNcDataLists(args.xor, args.xormm);
-    const d1 = new Duration(build1, new Date()).milliseconds;
+    const d1 = new Duration(begin, new Date()).milliseconds;
     console.error(` buildAllXorNcDataLists(${PrettyMs(d1)})`);
-    //console.error(`allXorNcDataLists(${args.allXorNcDataLists.length})`);
 
     const build2 = new Date();
     args.allOrNcDataLists = args.or ? buildAllUseNcDataLists(args.or) : [ [] ];
@@ -529,7 +550,6 @@ export const preCompute = (first: number, last: number, args: any): Data => {
     console.error(` buildAllOrNcDataLists(${PrettyMs(d2)})`);
     
     const sourceListMap = getKnownNcSourceListMap(first, last, args);
-    //const sourceListMap = getUseNcSourceListMap(args.allXorNcDataLists, args);
 
     const build3 = new Date();
     const useSourceLists = buildUseSourceListsFromNcData(sourceListMap, args);
@@ -537,7 +557,7 @@ export const preCompute = (first: number, last: number, args: any): Data => {
     console.error(` buildUseSourceLists(${PrettyMs(d3)})`);
 
     const d = new Duration(begin, new Date()).milliseconds;
-    console.error(`Precompute(${PrettyMs(d)})`);
+    console.error(`--Precompute(${PrettyMs(d)})`);
 
     if (listIsEmpty(useSourceLists.xor) && args.xor)
         // || (listIsEmpty(orSourceList) && args.or))

@@ -71,6 +71,13 @@ struct NameCount {
     return bits;
   }
 
+  static auto listMerge(const std::vector<NameCount>& list1,
+    const std::vector<NameCount>& list2)
+  {
+    auto result = list1; // copy (ok)
+    result.insert(result.end(), list2.begin(), list2.end()); // copy (ok)
+    return result;
+  }
 };
 
 using NameCountList = std::vector<NameCount>;
@@ -89,8 +96,9 @@ struct SourceCompatibilityData {
   UsedSources usedSources;
 
   SourceCompatibilityData() = default;
-  SourceCompatibilityData(const SourceCompatibilityData&) = delete;
-  SourceCompatibilityData& operator=(const SourceCompatibilityData&) = delete;
+  // copy assign allowed for now for precompute.mergeAllCompatibleXorSources
+  SourceCompatibilityData(const SourceCompatibilityData&) = default;
+  SourceCompatibilityData& operator=(const SourceCompatibilityData&) = default;
   SourceCompatibilityData(SourceCompatibilityData&&) = default;
   SourceCompatibilityData& operator=(SourceCompatibilityData&&) = default;
 
@@ -139,8 +147,9 @@ struct SourceData : SourceCompatibilityData {
     ncList(std::move(ncList))
   {}
 
-  SourceData(const SourceData&) = delete;
-  SourceData& operator=(const SourceData&) = delete;
+  // copy assign allowed for now for precompute.mergeAllCompatibleXorSources
+  SourceData(const SourceData&) = default;
+  SourceData& operator=(const SourceData&) = default;
   SourceData(SourceData&&) = default;
   SourceData& operator=(SourceData&&) = default;
 };
@@ -216,15 +225,13 @@ using StringList = std::vector<std::string>;
 
 // functions
  
-std::vector<SourceCRefList> buildSourceListsForUseNcData(
-  const std::vector<NCDataList>& useNcDataLists,
-  const SourceListMap& sourceListMap);
+void debugSourceList(const SourceList& sourceList, std::string_view sv);
 
-MergedSourcesList mergeAllCompatibleSources(const NameCountList& ncList,
-  const SourceListMap& sourceListMap);
+auto buildSourceListsForUseNcData(const std::vector<NCDataList>& useNcDataLists,
+  const SourceListMap& sourceListMap) -> std::vector<SourceList>;
 
 XorSourceList mergeCompatibleXorSourceCombinations(
-  const std::vector<SourceCRefList>& sourceLists);
+  const std::vector<SourceList>& sourceLists);
 
 bool isAnySourceCompatibleWithUseSources(const SourceCompatibilityList& sourceCompatList);
 

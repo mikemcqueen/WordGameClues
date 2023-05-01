@@ -363,10 +363,10 @@ export const getUsedSources = (nameSrcList: NameCount.List): number[] => {
 	.forEach(nameSrc => {
 	    const [sentenceIndex, variationIndex] = getSourceIndices(nameSrc.count);
 	    // this should never fire. just being defensive.
-	    if (result[sentenceIndex]) {
+	    if (result[sentenceIndex] !== undefined) {
 		if (result[sentenceIndex] !== variationIndex) {
-		    console.error(Stringify(nameSrcList));
-		    throw new Error(`oopsie ${nameSrc}`);
+		    //console.error(NameCount.listToString(nameSrcList));
+		    throw new Error(`oopsie ${NameCount.toString(nameSrc)}`);
 		}
 	    } else {
 		result[sentenceIndex] = variationIndex;
@@ -382,7 +382,6 @@ export const isCandidateSource = (src: number): boolean => {
 export const getSourceIndices = (src: number): [number, number] => {
     Assert(isCandidateSource(src));
     return [Math.floor(src / 1_000_000), Math.floor((src % 1_000_000) / 100)];
-
 }
 
 export const legacySrcList = (nameSrcList: NameCount.List): number[] => {

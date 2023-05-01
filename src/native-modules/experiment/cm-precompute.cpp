@@ -19,6 +19,135 @@ namespace cm {
 int merges = 0;
 int list_merges = 0;
 
+
+auto getCandidateCount(const SourceData& source) {
+  auto count = 0;
+  for (const auto& nameSrc : source.primaryNameSrcList) {
+    if (nameSrc.count >= 1'000'000) {
+      ++count;
+    }
+  }
+  return count;
+}
+
+auto hasConflictingCandidates(const SourceData& source) {
+  if (getCandidateCount(source) < 2) return false;
+  UsedSources usedSources = { -1 };
+  std::cerr << "-----" << endl;
+  for (const auto& nameSrc : source.primaryNameSrcList) {
+    if (nameSrc.count < 1'000'000) continue;
+    auto sentence = nameSrc.count / 1'000'000;
+    auto variation = (nameSrc.count % 1'000'000) / 100;
+    std::cerr << sentence << "," << variation << ":" << nameSrc.count << std::endl;
+    if ((usedSources[sentence] >= 0) && (usedSources[sentence] != variation)) {
+      std::cerr << "true" << endl;
+      return true;
+    }
+    usedSources[sentence] = variation;
+  }
+  std::cerr << "false" << endl;
+  return false;
+}
+
+auto hasCandidate(const SourceData& source) {
+  return getCandidateCount(source) > 0;
+}
+
+auto getCandidateCount(const SourceList& sourceList) {
+  auto count = 0;
+  for (const auto& source : sourceList) {
+    count += getCandidateCount(source);
+  }
+  return count;
+}
+
+auto getCandidateCount(const SourceCRefList& sourceCRefList) {
+  auto count = 0;
+  for (const auto sourceRef : sourceCRefList) {
+    count += getCandidateCount(sourceRef.get());
+  }
+  return count;
+}
+
+auto hasCandidate(const SourceCRefList& sourceCRefList) {
+  return getCandidateCount(sourceCRefList) > 0;
+}
+
+void debugSource(const SourceData& source, std::string_view sv) {
+  if (getCandidateCount(source) < 2) return;
+  std::cerr << sv << ": " << NameCount::listToString(source.primaryNameSrcList) << std::endl;
+}
+
+void debugAddSourceToList(const SourceData& source,
+  const SourceList& sourceList)
+{
+  //  if (!hasCandidate(source) || !hasCandidate(sourceCRefList)) return;
+  if (getCandidateCount(source) + getCandidateCount(sourceList) < 2) return;
+  std::string sources{};
+  for (const auto& other : sourceList) {
+    if (getCandidateCount(other)) {
+      if (!sources.empty()) sources += " - ";
+      sources += NameCount::listToString(other.primaryNameSrcList);
+    }
+  }
+  std::cerr << "adding " << NameCount::listToString(source.primaryNameSrcList)
+	    <<" to " << sources << endl;
+}
+
+void debugAddSourceToList(const SourceData& source,
+  const SourceCRefList& sourceCRefList)
+{
+  //  if (!hasCandidate(source) || !hasCandidate(sourceCRefList)) return;
+  if (getCandidateCount(source) + getCandidateCount(sourceCRefList) < 2) return;
+  std::string sources{};
+  for (const auto sourceCRef : sourceCRefList) {
+    if (getCandidateCount(sourceCRef)) {
+      if (!sources.empty()) sources += " - ";
+      sources += NameCount::listToString(sourceCRef.get().primaryNameSrcList);
+    }
+  }
+  // try:
+  //std::cerr << "adding " << std::to_string(source.primaryNameSrcList) << 
+  std::cerr << "adding " << NameCount::listToString(source.primaryNameSrcList)
+	    <<" to " << sources << std::endl;
+}
+
+void debugSourceList(const SourceCRefList& sourceCRefList, std::string_view sv) {
+  auto first = true;
+  for (const auto sourceCRef : sourceCRefList) {
+    if (!hasConflictingCandidates(sourceCRef.get())) continue;
+    if (first) {
+      std::cerr << sv << ":" << std::endl;
+      first = false;
+    }
+    std::cerr << "  " << NameCount::listToString(sourceCRef.get().primaryNameSrcList) << std::endl;
+  }
+}
+
+void debugSourceList(const SourceList& sourceList, std::string_view sv) {
+  auto first = true;
+  for (const auto& source : sourceList) {
+    if (!hasConflictingCandidates(source)) continue;
+    if (first) {
+      std::cerr << sv << ":" << std::endl;
+      first = false;
+    }
+    std::cerr << "  " << NameCount::listToString(source.primaryNameSrcList) << std::endl;
+  }
+}
+
+void debugMergedSource(const SourceData& mergedSource, const SourceData& source1,
+  const SourceData& source2)
+{
+  auto candidates = getCandidateCount(mergedSource);
+  if (candidates > 1) {
+    std::cerr << "candidates(" << candidates << "),"
+	      << " merged " << NameCount::listToString(source1.primaryNameSrcList)
+	      << " with " << NameCount::listToString(source2.primaryNameSrcList)
+	      << std::endl;
+  }
+}
+
 auto sourceBitsAreCompatible(const SourceBits& bits1, const SourceBits& bits2) {
   return (bits1 & bits2).none();
 }
@@ -42,7 +171,7 @@ void mergeUsedSourcesInPlace(UsedSources& to, const UsedSources& from) {
     std::copy(std::begin(to), std::end(to), std::ostream_iterator<int>(std::cerr, " "));
     std::cerr << "] with [";
     std::copy(std::begin(from), std::end(from), std::ostream_iterator<int>(std::cerr, " "));
-    std::cerr << "]" << endl;
+    std::cerr << "]" << std::endl;
   }
 #endif
   for (auto i = 1u; i < from.size(); ++i) {
@@ -58,7 +187,7 @@ void mergeUsedSourcesInPlace(UsedSources& to, const UsedSources& from) {
   if (toCandidate) { // && fromCandidate) {
     std::cerr << "  to after: [";
     std::copy(std::begin(to), std::end(to), std::ostream_iterator<int>(std::cerr, " "));
-    std::cerr << "]" << endl;
+    std::cerr << "]" << std::endl;
   }
   //return to;
 #endif
@@ -85,57 +214,57 @@ auto sourcesAreCompatible(const MergedSources& mergedSources, const SourceData& 
   return usedSourcesAreCompatible(mergedSources.usedSources, source.usedSources);
 }
 
-auto mergeCompatibleSourceLists(const MergedSourcesList& mergedSourcesList, const SourceList& sourceList) {
-  list_merges++;
-  MergedSourcesList result{};
-  for (const auto& mergedSources : mergedSourcesList) {
-    for (const auto& source : sourceList) {
-      if (mergedSources.isCompatibleWith(source)) {
-	// TODO:
-	/*
-	MergedSources copyOfMergedSources{mergedSources};
-	copyOfMergedSources.mergeWith(source);
-	*/
-	MergedSources ms{};
-	ms.sourceBits = std::move(mergedSources.sourceBits | source.sourceBits);
-	ms.usedSources = std::move(mergeUsedSources(mergedSources.usedSources, source.usedSources));
-	ms.sourceCRefList = mergedSources.sourceCRefList; // no way around this copy
-	ms.sourceCRefList.emplace_back(SourceCRef{source}); // copy (ok)
-	result.emplace_back(std::move(ms));
+const SourceList& getSourceList(const NameCountList& ncList, const SourceListMap& sourceListMap) {
+  assert((ncList.size() == 1) && "not implemented, but could be easily");
+  return sourceListMap.at(ncList[0].toString());
+}
+
+
+auto mergeSources(const SourceData& source1, const SourceData& source2) {
+  SourceData result{};
+  result.primaryNameSrcList = std::move(NameCount::listMerge(source1.primaryNameSrcList,
+    source2.primaryNameSrcList));
+  //debugSource(result, "merged source");
+  result.ncList = std::move(NameCount::listMerge(source1.ncList, source2.ncList));
+  result.sourceBits = std::move(source1.sourceBits | source2.sourceBits);
+  result.usedSources = std::move(mergeUsedSources(source1.usedSources, source2.usedSources));
+  return result;
+}
+
+auto mergeCompatibleSourceLists(const SourceList& sourceList1,
+  const SourceList& sourceList2)
+{
+  SourceList result{};
+  for (const auto& source1 : sourceList1) {
+    for (const auto& source2 : sourceList2) {
+      if (source1.isCompatibleWith(source2)) {
+	auto mergedSource = mergeSources(source1, source2);
+	//debugMergedSource(mergedSource, source1, source2);
+	result.emplace_back(std::move(mergedSource));
       }
     }
   }
   return result;
 }
 
-auto makeMergedSourcesList(const SourceList& sourceList) {
-  //cout << sourceList.size() << endl;
-  MergedSourcesList mergedSourcesList;
-  for (const auto& source : sourceList) {
-    mergedSourcesList.emplace_back(std::move(MergedSources{source}));
-  }
-  return mergedSourcesList;
-}
-
 // NOTE: for ncList.size() >= 2
 //
-MergedSourcesList mergeAllCompatibleSources(const NameCountList& ncList, const SourceListMap& sourceListMap) {
+auto mergeAllCompatibleSources(const NameCountList& ncList,
+  const SourceListMap& sourceListMap) -> SourceList
+{
   // because **maybe** broken for > 2 below
   assert(ncList.size() <= 2 && "ncList.length > 2");
   // TODO: find smallest sourcelist to copy first, then skip merge in loop?
-  MergedSourcesList mergedSourcesList = std::move(makeMergedSourcesList(sourceListMap.at(ncList[0].toString())));
+  SourceList sourceList{sourceListMap.at(ncList[0].toString())}; // copy
+  //debugSourceList(sourceList, "initial copy");
   for (auto i = 1u; i < ncList.size(); ++i) {
     const auto& nextSourceList = sourceListMap.at(ncList[i].toString());
-    mergedSourcesList = std::move(mergeCompatibleSourceLists(mergedSourcesList, nextSourceList));
+    sourceList = std::move(mergeCompatibleSourceLists(sourceList, nextSourceList));
     // TODO BUG this is broken for > 2; should be something like: if (sourceList.length !== ncIndex + 1) 
-    if (mergedSourcesList.empty()) break;
+    if (sourceList.empty()) break;
   }
-  return mergedSourcesList;
-}
-
-const SourceList& getSourceList(const NameCountList& ncList, const SourceListMap& sourceListMap) {
-  assert((ncList.size() == 1) && "not implemented, but could be easily");
-  return sourceListMap.at(ncList[0].toString());
+  //debugSourceList(sourceList, "merged list");
+  return sourceList;
 }
 
 auto makeUsedSourcesString(const UsedSources& usedSources) {
@@ -151,9 +280,17 @@ auto makeBitString(const SourceData& source) {
     .append(makeUsedSourcesString(source.usedSources));
 };
 
-std::vector<SourceCRefList> buildSourceListsForUseNcData(
-  const vector<NCDataList>& useNcDataLists, const SourceListMap& sourceListMap)
+auto buildSourceListsForUseNcData(const vector<NCDataList>& useNcDataLists,
+  const SourceListMap& sourceListMap) -> std::vector<SourceList>
 {
+  // possible optimization:
+  // instead of constructing a new sourcelist in mergeAllCompatible,
+  // we could have a new data structure like a SourceData but that
+  // contains a list of NcCRefLists for both ncList and primaryNameSrcList,
+  // and only merge sourceBits and usedSources (for the purposes of
+  // determining compatibility). Then, at return/wrap time, we marshal
+  // the lists-of-NcCRefLists into a single NcList.
+
   using StringSet = std::unordered_set<std::string>;
   using BitStringToStringSetMap = std::unordered_map<string, StringSet>;
 
@@ -163,12 +300,12 @@ std::vector<SourceCRefList> buildSourceListsForUseNcData(
   int synonyms = 0;
   auto size = useNcDataLists[0].size();
   std::vector<BitStringToStringSetMap> hashList(size);
-  std::vector<SourceCRefList> sourceCRefLists(size);
+  std::vector<SourceList> sourceLists(size);
   for (const auto& ncDataList : useNcDataLists) {
     for (auto i = 0u; i < ncDataList.size(); ++i) {
       // for size == 2: return by value; could return reference to static local in a pinch
-      //auto sourceList = mergeAllCompatibleSources(ncDataList[i].ncList, sourceListMap);
-      const auto& sourceList = getSourceList(ncDataList[i].ncList, sourceListMap);
+      auto sourceList = mergeAllCompatibleSources(ncDataList[i].ncList, sourceListMap);
+      //const auto& sourceList = getSourceList(ncDataList[i].ncList, sourceListMap);
       total += sourceList.size();
       for (const auto& source : sourceList) {
 	// TODO: NOT GOOD ENOUUGH. still need a set of strings in value type.
@@ -183,85 +320,110 @@ std::vector<SourceCRefList> buildSourceListsForUseNcData(
 	// resolved it. Apparently sourceBits aren't good enough here.
 	// I should probably figure out what I was thinking, especially now
 	// that usedSources is being phased in (and is not used here).
-
-	// So it seems the point of this hashlist is to outputing *duplicate*
-	// sourcelists. No effort is made here to determine if the sourceLists
-	// themselves are actually compatible, among their constituent sources,
-	// which is what I think needs to happen. I'm not sure why it's
-	// happening at this point though.  Wasn't there a BuildNcDataLists
-	// process that happeend before this, was it completely unaware of
-	// compatibiltiy of any kind?
-
 	auto key = makeBitString(source);
-	//std::cerr << key << endl;
 	auto it = hashList[i].find(key);
 	if (it != hashList[i].end()) {
 	  hash_hits++;
-#if 0
-	  if (it->second.find(key) != it->second.end()) continue;
-	  synonyms++;
-	  cout << "synonyms:" << endl << " " << key << endl
-	       << " " << *it->second.begin() << endl << endl;
-#endif
 	  continue;
 	}
 	hashList[i][key] = StringSet{};
 	//it = hashList[i].find(source.sourceBits);
 	//it->second.insert(key);
-	//sourceLists[i].emplace_back(std::move(source));
-	sourceCRefLists[i].emplace_back(SourceCRef{source});
+	//debugSource(source, "source after mergeAll");
+	sourceLists[i].emplace_back(std::move(source));
       }
     }
   }
   cerr << " hash_hits: " << hash_hits << ", synonyms: " << synonyms
        << ", total: " << total << ", list_merges: " << list_merges 
-       << ", source_merges: " << merges << ", sourceLists: " << sourceCRefLists.size() 
-       << ", " << std::accumulate(sourceCRefLists.begin(), sourceCRefLists.end(), 0u,
-	  [](size_t total, const SourceCRefList& list){ return total + list.size(); }) << endl;
-  return sourceCRefLists;
+       << ", source_merges: " << merges << ", sourceLists: " << sourceLists.size() 
+       << ", " << std::accumulate(sourceLists.begin(), sourceLists.end(), 0u,
+         [](size_t total, const SourceList& list){ return total + list.size(); })
+       << std::endl;
+  return sourceLists;
 }
 
-auto hasCandidate(const SourceCRef sourceRef) {
-  for (const auto& nameSrc : sourceRef.get().primaryNameSrcList) {
-    if (nameSrc.count >= 1'000'000) return true;
+//////////
+
+auto getNumEmptySublists(const std::vector<SourceList>& sourceLists) {
+  auto count = 0;
+  for (const auto& sl : sourceLists) {
+    if (sl.empty()) count++;
+  }
+  return count;
+}
+
+auto anyCompatibleXorSources(const SourceData& source,
+  const Peco::IndexList& indexList, const SourceList& sourceList)
+{
+  for (auto it = indexList.cbegin(); it != indexList.cend(); ++it) {
+    if (source.isCompatibleWith(sourceList[*it])) {
+      return true;
+    }
   }
   return false;
 }
-  
-auto hasCandidate(const SourceCRefList& sourceList) {
-  for (const auto sourceRef : sourceList) {
-    if (hasCandidate(sourceRef)) return true;
+
+// TODO: comment this. code is tricky
+bool filterXorIncompatibleIndices(Peco::IndexListVector& indexLists, int first,
+  int second, const std::vector<SourceList>& sourceLists)
+{
+  Peco::IndexList& firstList = indexLists[first];
+  for (auto it_first = firstList.before_begin();
+       std::next(it_first) != firstList.end();
+       /* nothing */)
+  {
+    const auto& first_source = sourceLists[first][*std::next(it_first)];
+    bool any_compat = anyCompatibleXorSources(first_source, indexLists[second],
+      sourceLists[second]);
+    if (!any_compat) {
+      firstList.erase_after(it_first);
+    } else {
+      ++it_first;
+    }
   }
-  return false;
+  return !firstList.empty();
+}
+
+bool filterAllXorIncompatibleIndices(Peco::IndexListVector& indexLists,
+  const std::vector<SourceList>& sourceLists)
+{
+  if (indexLists.size() < 2u) return true;
+  for (auto first = 0u; first < indexLists.size(); ++first) {
+    for (auto second = 0u; second < indexLists.size(); ++second) {
+      if (first == second) continue;
+      if (!filterXorIncompatibleIndices(indexLists, first, second, sourceLists)) {
+	return false;
+      }
+    }
+  }
+  return true;
 }
 
 // this part is inner-loop and should be fast
 // NOTE: used to be 100s of millions potentially, now more like 10s of thousands.
 SourceCRefList getCompatibleXorSources(const std::vector<int>& indexList,
-  const std::vector<SourceCRefList>& sourceLists)
+  const std::vector<SourceList>& sourceLists)
 {
   // auto reference type, uh, optional here?
-  const auto firstSourceRef = sourceLists[0][indexList[0]];
-  SourceCRefList sourceList{};
-  sourceList.emplace_back(firstSourceRef);
-  SourceBits sourceBits{ firstSourceRef.get().sourceBits };
-  UsedSources usedSources{ firstSourceRef.get().usedSources };
+  SourceCRefList sourceCRefList{};
+  const auto& firstSource = sourceLists[0][indexList[0]];
+  sourceCRefList.emplace_back(SourceCRef{firstSource});
+  SourceBits sourceBits{ firstSource.sourceBits }; // copy (ok)
+  UsedSources usedSources{ firstSource.usedSources }; // copy (ok)
   for (auto i = 1u; i < indexList.size(); ++i) {
-    // auto reference type, uh, optional here?
-    const auto sourceRef = sourceLists[i][indexList[i]];
-    if (!sourceBitsAreCompatible(sourceBits, sourceRef.get().sourceBits) ||
-	!usedSourcesAreCompatible(usedSources, sourceRef.get().usedSources))
+    const auto& source = sourceLists[i][indexList[i]];
+    if (!sourceBitsAreCompatible(sourceBits, source.sourceBits) ||
+	!usedSourcesAreCompatible(usedSources, source.usedSources))
     {
       return {};
     }
-    sourceBits |= sourceRef.get().sourceBits;
-    mergeUsedSourcesInPlace(usedSources, sourceRef.get().usedSources);
-    if (hasCandidate(sourceList) && hasCandidate(sourceRef)) {
-      std::cerr << "hi" << endl;
-    }
-    sourceList.emplace_back(sourceRef);
+    sourceBits |= source.sourceBits;
+    mergeUsedSourcesInPlace(usedSources, source.usedSources);
+    //debugAddSourceToList(source, sourceCRefList);
+    sourceCRefList.emplace_back(SourceCRef{source});
   }
-  return sourceList;
+  return sourceCRefList;
 }
 
 // here is called much less often, less speed critical
@@ -293,55 +455,6 @@ XorSourceList mergeCompatibleXorSources(const SourceCRefList& sourceList) {
   return result;
 }
 
-bool anyCompatibleXorSources(const SourceCRef sourceRef, const Peco::IndexList& indexList,
-  const SourceCRefList& sourceList)
-{
-  for (auto it = indexList.cbegin(); it != indexList.cend(); ++it) {
-    //    if (sourcesAreCompatible(sourceRef.get(), sourceList[*it].get())) {
-    if (sourceRef.get().isCompatibleWith(sourceList[*it].get())) {
-      return true;
-    }
-  }
-  return false;
-}
-
-// TODO: comment this. code is tricky
-bool filterXorIncompatibleIndices(Peco::IndexListVector& indexLists, int first,
-  int second, const std::vector<SourceCRefList>& sourceLists)
-{
-  Peco::IndexList& firstList = indexLists[first];
-  for (auto it_first = firstList.before_begin();
-       std::next(it_first) != firstList.end();
-       /* nothing */)
-  {
-    const auto& first_source = sourceLists[first][*std::next(it_first)];
-    bool any_compat = anyCompatibleXorSources(first_source, indexLists[second],
-      sourceLists[second]);
-    if (!any_compat) {
-      firstList.erase_after(it_first);
-    } else {
-      ++it_first;
-    }
-  }
-  return !firstList.empty();
-}
-
-bool filterAllXorIncompatibleIndices(Peco::IndexListVector& indexLists,
-  const std::vector<SourceCRefList>& sourceLists)
-{
-  if (indexLists.size() < 2u) return true;
-  for (auto first = 0u; first < indexLists.size(); ++first) {
-    for (auto second = 0u; second < indexLists.size(); ++second) {
-      if (first == second) continue;
-      //cerr << "  comparing " << first << " to " << second << endl;
-      if (!filterXorIncompatibleIndices(indexLists, first, second, sourceLists)) {
-	return false;
-      }
-    }
-  }
-  return true;
-}
-
 auto list_size(const Peco::IndexList& indexList) {
   int size = 0;
   std::for_each(indexList.cbegin(), indexList.cend(),
@@ -366,16 +479,8 @@ std::string vec_to_string(const vector<int>& v) {
   return result;
 }
 
-auto getNumEmptySublists(const std::vector<SourceCRefList>& sourceLists) {
-  auto count = 0;
-  for (const auto& sl : sourceLists) {
-    if (sl.empty()) count++;
-  }
-  return count;
-}
-
 XorSourceList mergeCompatibleXorSourceCombinations(
-  const std::vector<SourceCRefList>& sourceLists)
+  const std::vector<SourceList>& sourceLists)
 {
   using namespace std::chrono;
 
@@ -386,7 +491,7 @@ XorSourceList mergeCompatibleXorSourceCombinations(
     lengths.push_back(sl.size());
   }
   cerr << "  initial lengths: " << vec_to_string(lengths)
-       << ", product: " << vec_product(lengths) << endl;
+       << ", product: " << vec_product(lengths) << std::endl;
   auto indexLists = Peco::initial_indices(lengths);
   bool valid = filterAllXorIncompatibleIndices(indexLists, sourceLists);
   
@@ -397,7 +502,7 @@ XorSourceList mergeCompatibleXorSourceCombinations(
   }
   cerr << "  filtered lengths: " << vec_to_string(lengths)
        << ", product: " << vec_product(lengths)
-       << ", valid: " << boolalpha << valid << endl;
+       << ", valid: " << boolalpha << valid << std::endl;
 #endif
 
   auto peco0 = high_resolution_clock::now();
@@ -411,10 +516,10 @@ XorSourceList mergeCompatibleXorSourceCombinations(
        indexList = peco.next_combination())
   {
     ++combos;
-    SourceCRefList sourceList = getCompatibleXorSources(*indexList, sourceLists);
-    if (sourceList.empty()) continue;
+    SourceCRefList sourceCRefList = getCompatibleXorSources(*indexList, sourceLists);
+    if (sourceCRefList.empty()) continue;
     ++compatible;
-    XorSourceList mergedSources = mergeCompatibleXorSources(sourceList);
+    XorSourceList mergedSources = mergeCompatibleXorSources(sourceCRefList);
     if (mergedSources.empty()) continue;
     ++merged;
     xorSourceList.emplace_back(std::move(mergedSources.back()));
@@ -423,7 +528,7 @@ XorSourceList mergeCompatibleXorSourceCombinations(
   auto d_peco = duration_cast<milliseconds>(peco1 - peco0).count();
   cerr << " Native peco loop: " << d_peco << "ms" << ", combos: " << combos
        << ", compatible: " << compatible << ", merged: " << merged
-       << ", XorSources: " << xorSourceList.size() << endl;
+       << ", XorSources: " << xorSourceList.size() << std::endl;
   
   return xorSourceList;
 }
