@@ -134,7 +134,11 @@ function show (options) {
 	let args = { xor: nameList, max: 2 };
 	let pcd = ComboMaker.preCompute(2, ClueManager.getNumPrimarySources(), args);
 	console.log("OK");
-	console.log(Stringify(pcd.useSourceLists.xor));
+	//console.log(Stringify(pcd.useSourceLists.xor));
+	for (let xorSource of pcd.useSourceLists.xor) {
+	    console.log(`${NameCount.listToCountList(xorSource.ncList)}:` +
+		` ${NameCount.listToString(xorSource.primaryNameSrcList)}`);
+	}
 	process.exit(0);
     }
     const nameCsv = nameList.toString();
