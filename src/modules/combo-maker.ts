@@ -1738,10 +1738,15 @@ let markAllXORCompatibleOrSources = (xorSourceList: XorSource[], orArgDataList: 
     }
 }
 
-const dumpNcDataLists = (ncDataLists: NCDataList[]): void => {
+const dumpNcDataLists = (ncDataLists: NCDataList[],
+    sourceListMap: Map<string, AnySourceData[]>): void =>
+{
+    console.error(` ncDataLists:`);
     for (let ncDataList of ncDataLists) {
-	let str = ncDataList.map(ncData => NameCount.listToString(ncData.ncList)).join(" - ");
-	console.error(str);
+        for (let ncData of ncDataList) {
+            let str = NameCount.listToString(ncData.ncList);
+            console.error(`  ${str}: ${sourceListMap.has(str)}`);
+        }
     }
 }
 
@@ -1750,7 +1755,7 @@ const dumpNcDataLists = (ncDataLists: NCDataList[]): void => {
 let buildUseSourceListsFromNcData = (sourceListMap: Map<string, AnySourceData[]>, args: any): UseSourceLists => {
     // XOR first
     let xor0 = new Date();
-    dumpNcDataLists(args.allXorNcDataLists);
+    dumpNcDataLists(args.allXorNcDataLists, sourceListMap);
     let xorSourceList: XorSourceList = NativeComboMaker.mergeCompatibleXorSourceCombinations(
 	args.allXorNcDataLists, Array.from(sourceListMap.entries()));
     setPrimarySrcBits(xorSourceList);
