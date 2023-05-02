@@ -121,7 +121,7 @@ struct SourceCompatibilityData {
       return false;
     }
     for (auto i = 1u; i < usedSources.size(); ++i) {
-      if (usedSources[i] && other.usedSources[i] && 
+      if ((usedSources[i] >= 0) && (other.usedSources[i] >= 0) && 
 	  (usedSources[i] != other.usedSources[i])) {
 	return false;
       }

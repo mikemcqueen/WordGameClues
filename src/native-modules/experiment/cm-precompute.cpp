@@ -247,7 +247,7 @@ auto mergeCompatibleSourceLists(const SourceList& sourceList1,
   return result;
 }
 
-// NOTE: for ncList.size() >= 2
+// NOTE: for ncList.size() <= 2
 //
 auto mergeAllCompatibleSources(const NameCountList& ncList,
   const SourceListMap& sourceListMap) -> SourceList
@@ -256,14 +256,12 @@ auto mergeAllCompatibleSources(const NameCountList& ncList,
   assert(ncList.size() <= 2 && "ncList.length > 2");
   // TODO: find smallest sourcelist to copy first, then skip merge in loop?
   SourceList sourceList{sourceListMap.at(ncList[0].toString())}; // copy
-  //debugSourceList(sourceList, "initial copy");
   for (auto i = 1u; i < ncList.size(); ++i) {
     const auto& nextSourceList = sourceListMap.at(ncList[i].toString());
     sourceList = std::move(mergeCompatibleSourceLists(sourceList, nextSourceList));
     // TODO BUG this is broken for > 2; should be something like: if (sourceList.length !== ncIndex + 1) 
     if (sourceList.empty()) break;
   }
-  //debugSourceList(sourceList, "merged list");
   return sourceList;
 }
 
@@ -436,7 +434,7 @@ XorSourceList mergeCompatibleXorSources(const SourceCRefList& sourceList) {
   // TODO: Also, why am I not just |='ing srcbits in the loop?
   NameCountList primaryNameSrcList{};
   NameCountList ncList{};
-  UsedSources usedSources{};
+  UsedSources usedSources = { -1 };
   for (const auto sourceRef : sourceList) {
     const auto& pnsl = sourceRef.get().primaryNameSrcList;
     primaryNameSrcList.insert(primaryNameSrcList.end(), pnsl.begin(), pnsl.end()); // copy (by design?)
@@ -504,6 +502,7 @@ XorSourceList mergeCompatibleXorSourceCombinations(
        << ", product: " << vec_product(lengths)
        << ", valid: " << boolalpha << valid << std::endl;
 #endif
+  if (!valid) return {};
 
   auto peco0 = high_resolution_clock::now();
 

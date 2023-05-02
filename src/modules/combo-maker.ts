@@ -152,7 +152,7 @@ const nextIndex = (countList: number[], clueIndexes: number[]): boolean => {
     clueIndexes[index] += 1;
 
     // while last index is maxed: reset to zero, increment next-to-last index, etc.
-    while (clueIndexes[index] === ClueManager.getClueList(countList[index]).length) {
+    while (clueIndexes[index] === ClueManager.getUniqueClueNameCount(countList[index])) {
         clueIndexes[index] = 0;
         if (--index < 0) {
             return false;
@@ -168,6 +168,12 @@ export interface FirstNextResult {
     nameList?: string[];
 }
 
+const skip = (clueCount: number, clueIndex: number): boolean => {
+    if (clueCount < 2) return false;
+    const clue = ClueManager.getClueList(clueCount)[clueIndex];
+    return Boolean(clue.ignore || clue.skip);
+}
+
 export const next = (countList: number[], clueIndexes: number[]): FirstNextResult => {
     for (;;) {
         if (!nextIndex(countList, clueIndexes)) {
@@ -175,24 +181,16 @@ export const next = (countList: number[], clueIndexes: number[]): FirstNextResul
         }
         let ncList: NameCount.List = [];    // e.g. [ { name: "pollock", count: 2 }, { name: "jackson", count: 4 } ]
         let nameList: string[] = [];        // e.g. [ "pollock", "jackson" ]
-        let srcCountStrList: string[] = []; // e.g. [ "white,fish:2", "moon,walker:4" ]
         if (!countList.every((count, index) => {
-            let clue = ClueManager.getClueList(count)[clueIndexes[index]];
-            if (clue.ignore || clue.skip) {
-                return false; // every.exit
-            }
-            nameList.push(clue.name);
-            // TODO: to remove NameCount.makeNew here, we must add and call
-            // NameCount.sort(list: NameCount.List) below
-            ncList.push(NameCount.makeNew(clue.name, count));
-            srcCountStrList.push(NameCount.makeCanonicalName(clue.src, count));
+	    if (skip(count, clueIndexes[index])) return false;
+            let name = ClueManager.getUniqueClueName(count, clueIndexes[index]);
+            nameList.push(name);
+            ncList.push(NameCount.makeNew(name, count));
             return true; // every.continue;
         })) {
             continue;
         }
         nameList.sort();
-        // TODO: NameCount.sort(ncList), in sortBy func: convert NC to string
-        // (NameCount.toString(nc: Type), use the standard string compare fn.
         NameCount.sortList(ncList);
         return { done: false, ncList, nameList };
     }
@@ -201,7 +199,7 @@ export const next = (countList: number[], clueIndexes: number[]): FirstNextResul
 export const first = (countList: number[], clueIndexes: number[]): FirstNextResult => {
     // TODO: _.fill?
     for (let index = 0; index < countList.length; ++index) {
-	if (listIsEmpty(ClueManager.getClueList(countList[index]))) {
+	if (ClueManager.getUniqueClueNameCount(countList[index]) === 0) {
 	    return { done: true };
 	}
         clueIndexes[index] = 0;

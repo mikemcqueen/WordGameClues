@@ -32,7 +32,7 @@ std::vector<std::string> makeStringList(Env& env, const Napi::Array& jsList) {
 
 
 cm::UsedSources makeUsedSources(Env& env, const Napi::Array& jsList) {
-  cm::UsedSources usedSources;
+  cm::UsedSources usedSources = { -1 };
   for (auto i = 0u; i < usedSources.size(); ++i) {
     std::int32_t value = 0;
     if (i < jsList.Length()) {
@@ -238,7 +238,8 @@ cm::SourceBitsList makeSourceBitsList(Napi::Env& env, const Napi::Array& jsList)
   cm::SourceBitsList sourceBitsList{};
   for (auto i = 0u; i < jsList.Length(); ++i) {
     if (!jsList[i].IsObject()) {
-      Napi::TypeError::New(env, "makeSourceBitsList: non-object element").ThrowAsJavaScriptException();
+      Napi::TypeError::New(env, "makeSourceBitsList: non-object element")
+	.ThrowAsJavaScriptException();
       return {};
     }
     sourceBitsList.emplace_back(std::move(makeSourceBits(env,
@@ -269,11 +270,14 @@ cm::SourceCompatibilityData makeSourceCompatibiltyData(Napi::Env& env, const Nap
 }
 */
 
-cm::SourceCompatibilityList makeSourceCompatibilityList(Napi::Env& env, const Napi::Array& jsList) {
+cm::SourceCompatibilityList makeSourceCompatibilityList(Napi::Env& env,
+  const Napi::Array& jsList)
+{
   cm::SourceCompatibilityList sourceCompatList{};
   for (auto i = 0u; i < jsList.Length(); ++i) {
     if (!jsList[i].IsObject()) {
-      Napi::TypeError::New(env, "makeSourceCompatibiltyList: non-object element").ThrowAsJavaScriptException();
+      Napi::TypeError::New(env, "makeSourceCompatibiltyList: non-object element")
+	.ThrowAsJavaScriptException();
       return {};
     }
     auto jsSourceList = jsList[i].As<Object>().Get("sourceList").As<Array>();
@@ -326,9 +330,7 @@ cm::OrArgDataList makeOrArgDataList(Napi::Env& env, const Napi::Array& jsList) {
   return orArgDataList;
 }
 
-//
-// unused? i think
-//
+#if 0 // unused
 Value buildSourceListsForUseNcData(const CallbackInfo& info) {
   Env env = info.Env();
   if (!info[0].IsArray() || !info[1].IsArray()) {
@@ -344,15 +346,13 @@ Value buildSourceListsForUseNcData(const CallbackInfo& info) {
   cm::buildSourceListsForUseNcData(ncDataLists, sourceListMap);
   return env.Null();
 }
+#endif
 
 namespace cm {
   extern PreComputedData PCD;
 }
 
 #if 0 // unused
-//
-// mergeAllCompatibleSources
-//
 Value mergeAllCompatibleSources(const CallbackInfo& info) {
   Env env = info.Env();
   if (!info[0].IsArray()) {
@@ -392,7 +392,8 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
     
   auto build0 = high_resolution_clock::now();
 
-  auto sourceLists = cm::buildSourceListsForUseNcData(ncDataLists, cm::PCD.sourceListMap);
+  std::vector<cm::SourceList> sourceLists{};
+  sourceLists = std::move(cm::buildSourceListsForUseNcData(ncDataLists, cm::PCD.sourceListMap));
 
   auto build1 = high_resolution_clock::now();
   auto d_build = duration_cast<milliseconds>(build1 - build0).count();

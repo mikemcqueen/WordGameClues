@@ -37,17 +37,9 @@ const REJECTS_DIR  = 'rejects';
 
 type CountList = number[];
 
-// Map a clue name to a PropertyCounts Map. This is necessary because all
-// clue names with the same count and source (such as synonyms) share the
-// same "source data" as an optimization. What differs between them is
-// whether the parent clue definition itself contains any counted properties,
-// and those are stored at the root of the source data in this map.
-//type ClueNamePropertyCountsMapMap = Record<string, Clue.PropertyCounts.Map>;
-
 export type SourceData = {
     clues: ClueList.Any;
     results: ValidateResult[];
-//    clueNamePropertyCountsMapMap: ClueNamePropertyCountsMapMap;
 };
 
 type NcResultData = {
@@ -63,7 +55,7 @@ type CandidatesMap = {
 type ClueMap = Record<string, string[]>;
 type SourceMap = Record<string, SourceData>;
 type NcResultMap = Record<string, NcResultData>;
-type SentenceMap = Map<number, Sentence.Candidate[]>;
+//type NameVariationMap = Record<string, string[]>;
 
 export type AllCandidates = Sentence.CandidatesContainer[];
 export interface AllCandidatesContainer {
@@ -77,6 +69,13 @@ type InternalStateBase = {
     ncResultMaps: NcResultMap[];      // map known NCs to result list
 
     variations: Sentence.Variations;  // "global" variations aggregated from all sentences
+    reverseVariations: Sentence.Variations; // reverse lookup of anagrams/homophones in above
+/*
+    variationMap: NameVariationMap;   // allows lookup from variation name -> actual clue name
+                                      // currently only used for clueCount:1
+*/
+
+    uniquePrimaryClueNames: string[];
 
     maybeListArray: any[];            // the JSON maybe files in an array
     rejectListArray: any[];           // the JSON reject files in an array
@@ -107,6 +106,9 @@ let initialState = (): InternalState => {
 
 	allCandidates: [],
 	variations: Sentence.emptyVariations(),
+	reverseVariations: Sentence.emptyVariations(),
+
+	uniquePrimaryClueNames: [],
 
 	// TODO: remove? maybe, at least
         maybeListArray: [],
@@ -161,11 +163,26 @@ export const copyAllCandidates = (allCandidates: AllCandidates = State.allCandid
 {
     let result: AllCandidates = [];
     for (let [index, container] of allCandidates.entries()) {
-	if (container) {
-	    result[index] = Sentence.copyCandidatesContainer(container);
-	}
+	if (!container) continue;
+	result[index] = Sentence.copyCandidatesContainer(container);
     }
     return result;
+}
+
+export const getUniqueClueNameCount = (clueCount: number) => {
+    if (clueCount === 1) {
+	return State.uniquePrimaryClueNames.length;
+    }
+    // for now. could do better
+    return getClueList(clueCount).length;
+}
+
+export const getUniqueClueName = (clueCount: number, nameIndex: number) => {
+    if (clueCount === 1) {
+	return State.uniquePrimaryClueNames[nameIndex];
+    }
+    // for now. could do better
+    return getClueList(clueCount)[nameIndex].name;
 }
 
 //
@@ -232,19 +249,22 @@ export let saveClueList = function (list: ClueList.Compound, count: number, opti
     ClueList.save(list, getKnownFilename(count, options?.dir));
 };
 
-const initCluePropertyCounts = (clueList: ClueList.Primary, ignoreList: ClueList.Primary): void => {
-    for (const clue of clueList) {
-        Debug(`iCPC: ${Stringify(clue)}`);
-        clue.propertyCounts = Clue.PropertyCounts.createMapFromClue(clue);
-        const sources = clue.source?.split(',') || [];
-        sources.forEach(source => {
-            Debug(`iCPC: source: ${source}`);
-            // the (intentional) source/source here is from hack in autoSource
-	    // bug here with --sentence is that a source may be in a sentence,
-	    // in which case this _find will fail, I think.
-            Clue.PropertyCounts.addAll(clue, _.find(ignoreList, { name: source, src: source })!);
-        });
-    }
+//////////
+
+const getKnownFilename = function (count: number, dir?: string): string {
+    return Path.format({
+        dir: !dir ? State.dir : `${DATA_DIR}${dir}`,
+        base: `clues${count}.json`
+    });
+};
+
+interface LoadClueListOptions {
+    dir : string;
+}
+
+export const loadClueList = function (count: number, options?: LoadClueListOptions): ClueList.Any {
+    const filename = getKnownFilename(count, options?.dir);
+    return ClueList.makeFrom({ filename, primary: count === 1 });
 };
 
 const loadSentence = (num: number, args: any): number => {
@@ -252,7 +272,13 @@ const loadSentence = (num: number, args: any): number => {
     let maxClues = 0;// TODO
     let sentence = Sentence.load(State.dir, num);
     Sentence.addAllVariations(sentence, State.variations);
-    const container = Sentence.buildAllCandidates(sentence, State.variations);
+    // TODO: possible chicken/egg problem here. Passing State.variations here
+    // is imperfect because we haven't loaded all variations from all sentences
+    // yet, so early sentences will (potentially) get a subset of all variations.
+    // probably we should store all sentences in an array somewhere, then build
+    // all candidates *after* all sentences have been loaded (and State.variations
+    // is fully populated).
+    const container = Sentence.buildAllCandidates(sentence); // , State.variations);
     State.allCandidates[num] = container;
     return maxClues;
 };
@@ -303,20 +329,6 @@ const autoSource = (clueList: ClueList.Primary, args: any): [ClueList.Primary, n
         clue.num = clueNumber;
         actualClues.push(clue);
     }
-    /*
-    let loggy = true;
-    initCluePropertyCounts(ignoredClues, ignoredClues);
-    if (loggy) {
-        console.log('Ignored:');
-        ClueList.display(ignoredClues, { synonym: true });
-    }
-    initCluePropertyCounts(actualClues, ignoredClues);
-    if (loggy) {
-        console.log('Actual:');
-        ClueList.display(actualClues, { synonym: true });
-    }
-    */
-    
     // TODO: doesn't include sentences.  and sources are about to change
     // to bigger numbers, making this output untenable
     Debug(`autoSource: ${source} primary clues, ` +
@@ -324,12 +336,113 @@ const autoSource = (clueList: ClueList.Primary, args: any): [ClueList.Primary, n
     return [actualClues, source];
 };
 
+const addPrimaryNameSrcToMap = (name: string, src: string): void => { // TODO: src: number?
+    const clueMap = getKnownClueMap(1);
+    if (!_.has(clueMap, name)) {
+        clueMap[name] = [];
+    }
+    clueMap[name].push(src);
+};
+
+const addPrimaryClueAndVariationsToMap = (clue: Clue.Primary,
+    variations = State.variations): void => 
+{
+    addPrimaryNameSrcToMap(clue.name, clue.src);
+    const nameVariations = Sentence.getNameVariations(clue.name, variations);
+    for (let name of nameVariations) {
+	addPrimaryNameSrcToMap(name, clue.src);
+    }
+}
+
+const addKnownPrimaryClues = (clueList: ClueList.Primary): void => {
+    let clueMap = State.knownClueMapArray[1] = {};
+    // legacy clues
+    clueList.filter(clue => !clue.ignore)
+	.forEach(clue => addPrimaryNameSrcToMap(clue.name, clue.src));
+
+    // candidates clues
+    for (let container of getAllCandidates()) {
+	if (!container) continue;
+	for (let candidate of container.candidates) {
+	    for (let clue of candidate.clues) {
+		addPrimaryClueAndVariationsToMap(clue);
+	    }
+	}
+    }
+};
+
+const addUniqueNameToList = (name: string, toList: string[],
+    hash: Set<string>): void =>
+{
+    if (!hash.has(name)) {
+	hash.add(name);
+	toList.push(name);
+    }
+}
+
+/*
+const addUniqueNamesToList = (fromList: string[] | undefined,
+    toList: string[], hash: Set<string>): void =>
+{
+    if (!fromList) return;
+    for (let name of fromList) {
+	addUniqueNameToList(name, toList, hash);
+    }
+}
+*/
+
+const initUniquePrimaryClueNames = (): string[] => {
+    let result: string[] = [];
+    let hash = new Set<string>();
+    // add from (legacy) cluelist
+    for (let clue of getClueList(1)) {
+	addUniqueNameToList(clue.name, result, hash);
+    }
+    // add from each sentence candidate set
+    for (let [index, container] of getAllCandidates().entries()) {
+	if (!container) continue;
+	for (let name of _.keys(container.nameIndicesMap)) {
+	    addUniqueNameToList(name, result, hash);
+	    // variation names are already in nameIndicesMap
+	    //addUniqueNamesToList(State.variations.anagrams[name], result, hash);
+	    //addUniqueNamesToList(State.variations.synonyms[name], result, hash);
+	    //addUniqueNamesToList(State.variations.homophones[name], result, hash);
+	}
+    }
+    return result;
+}
+
+const addReverseVariations = (toMap: Sentence.VariationMap,
+    fromMap: Sentence.VariationMap): void =>
+{
+    for (let key of _.keys(fromMap)) {
+	for (let name of fromMap[key]) {
+	    if (!_.has(toMap, name)) {
+		toMap[name] = [];
+	    }
+	    if (!toMap[name].find(elem => elem === name)) {
+		toMap[name].push(key);
+	    }
+	}
+    }
+}
+
+// reverse look for anagrams, homophones.
+// not sure about synonyms but thinking no.
+const initReverseVariations = (variations: Sentence.Variations = State.variations):
+    Sentence.Variations =>
+{
+    let result = Sentence.emptyVariations();
+    addReverseVariations(result.anagrams, variations.anagrams);
+    addReverseVariations(result.homophones, variations.homophones);
+    return result;
+}
+
 // args:
 //  baseDir:  base directory (meta, synth)
 //  ignoreErrors:
 //  validateAll:
 //
-
 export const loadAllClues = function (args: any): void {
     State.dir = Clues.getDirectory(args.clues);
     if (args.ignoreErrors) {
@@ -343,58 +456,20 @@ export const loadAllClues = function (args: any): void {
         [primaryClueList, numPrimarySources] = autoSource(primaryClueList, args);
         State.numPrimarySources = numPrimarySources;
         State.clueListArray[1] = primaryClueList;
+	// initUniquePrimaryCluueNames() after clueListArray[] assignment
+	State.uniquePrimaryClueNames = initUniquePrimaryClueNames();
         addKnownPrimaryClues(primaryClueList);
+	State.reverseVariations = initReverseVariations();
     } else {
         throw new Error('numPrimarySources not initialized without src="auto"');
     }
 
     for (let count = 2; count <= State.numPrimarySources; ++count) {
-        let compoundClueList: ClueList.Compound = loadClueList(count);
-        State.clueListArray[count] = compoundClueList;
-        addKnownCompoundClues(compoundClueList, count, args);
+        let clueList: ClueList.Compound = loadClueList(count);
+        State.clueListArray[count] = clueList;
+        addKnownCompoundClues(clueList, count, args);
     }
     State.loaded = true;
-};
-
-//
-
-interface LoadClueListOptions {
-    dir : string;
-}
-
-export const loadClueList = function (count: number, options?: LoadClueListOptions): ClueList.Any {
-    const filename = getKnownFilename(count, options?.dir);
-    return ClueList.makeFrom({ filename, primary: count === 1 });
-};
-
-//
-
-const addPrimaryClueToMap = function (clue: Clue.Primary): void {
-    const clueMap = getKnownClueMap(1);
-    if (!_.has(clueMap, clue.name)) {
-        clueMap[clue.name] = [];
-    }
-    clueMap[clue.name].push(clue.src);
-};
-
-//
-
-const addKnownPrimaryClues = function (clueList: ClueList.Primary): void {
-    let clueMap = State.knownClueMapArray[1] = {};
-    clueList.forEach(clue => {
-        if (!clue.ignore) {
-            addPrimaryClueToMap(clue);
-        }
-    });
-};
-
-//
-
-const getKnownFilename = function (count: number, dir?: string): string {
-    return Path.format({
-        dir: !dir ? State.dir : `${DATA_DIR}${dir}`,
-        base: `clues${count}.json`
-    });
 };
 
 //
@@ -405,143 +480,6 @@ const getRejectFilename = function (count: number): string {
         base: `rejects${count}.json`
     });
 };
-
-/*
-//
-// key types:
-// A.  non-array vlue
-// B.  array value
-
-//{
-// A.
-//  'jack:3': {
-// A:
-//    'card:2': {
-// B:
-//  'bird:1,red:1': [
-//    'bird:2,red:8'
-//  ]
-//    },
-// A:                       
-//    'face:1': {
-// B:
-//  'face:1': [
-//    'face:10'
-//  ]
-//    }
-//  }
-//}
-//
-//{
-// B:
-//  'face:1': [
-//    'face:10'
-//  ]
-//}
-
-let getResultNodePrimaryNameSrcList = function (node: any) : NameCount.List {
-    let primaryNameSrcList: NameCount.List = [];
-    if (_.isArray(node)) {
-        Assert(node.length === 1);
-        if (_.isString(node[0])) {
-            primaryNameSrcList = [...node[0].split(',').map(nameSrcStr => NameCount.makeNew(nameSrcStr))];
-        } else {
-            primaryNameSrcList = [node[0]];
-        }
-    } else {
-        Assert(_.isObject(node));
-        for (const key of Object.keys(node)) {
-            primaryNameSrcList.push(...getResultNodePrimaryNameSrcList(node[key]));
-        }
-    }
-    return primaryNameSrcList;
-}
-
-//
-
-let computePropertyCountsForPrimaryNameSrcList = (
-    primaryNameSrcList: NameCount.List,
-    propertyName: Clue.PropertyName.Any): Clue.PropertyCounts.Type =>
-{
-    const clueList = getClueList(1);
-    const propertyCounts = Clue.PropertyCounts.empty();
-    for (const nc of primaryNameSrcList) {
-        const clue: Clue.Primary = _.find(clueList, { name: nc.name, src: _.toString(nc.count) }) as Clue.Primary;
-        Assert(clue, `bad clue: ${NameCount.toString(nc)}`);
-        Clue.PropertyCounts.add(propertyCounts, clue!.propertyCounts![propertyName]);
-    }
-    return propertyCounts;
-}
-
-//
-
-let getPropertyCountsForResult = (nc: NameCount.Type, source: string,
-    primaryNameSrcList: NameCount.List,
-    propertyName: Clue.PropertyName.Any): Clue.PropertyCounts.Type =>
-{
-    const srcData = getKnownSourceMap(nc.count)[source];
-    Assert(srcData, `no SourceData for ${NameCount.makeCanonicalName(nc.name, nc.count)} - ${source}`);
-    // TODO: assert: srcData.clues.find({ name: nc.name, src: source });
-    const nameSrcCsv = _.sortBy(primaryNameSrcList, NameCount.count).toString();
-    let propertyCounts;
-    for (const result of srcData.results) {
-        // TODO: nameSrcCsv is also an optional member here, I'm just not sure if it's initialized/used
-        // TODO TODO TODO: sort this somewhere else.
-        if (_.sortBy(result.nameSrcList, NameCount.count).toString() === nameSrcCsv) {
-            propertyCounts = result.propertyCounts![propertyName];
-            break;
-        }
-    }
-    // TODO: toString(nc)
-    Assert(propertyCounts, `no result for ${NameCount.toString(nc)} - ${nameSrcCsv}`);
-    return propertyCounts;
-}
-
-//
-//
-let getResultNodePropertyCounts = (nc: NameCount.Type, node: Object,
-    propertyName: Clue.PropertyName.Any): Clue.PropertyCounts.Type => 
-{
-    let primaryNameSrcList = getResultNodePrimaryNameSrcList(node);
-    let propertyCounts: Clue.PropertyCounts.Type;
-    const keys = Object.keys(node);
-    if (_.isArray(node) || keys.length === 1) {
-        propertyCounts = computePropertyCountsForPrimaryNameSrcList(primaryNameSrcList, propertyName);
-    } else {
-        const source = keys.map(key => NameCount.makeNew(key).name).sort().toString();
-        propertyCounts = getPropertyCountsForResult(nc, source, primaryNameSrcList, propertyName);
-    }
-    return propertyCounts;
-}
-
-//
-//
-let computeResultPropertyCounts = (nc: NameCount.Type, node: any,
-    propertyName: Clue.PropertyName.Any): Clue.PropertyCounts.Type =>
-{
-    let counts: Clue.PropertyCounts.Type = Clue.PropertyCounts.empty();
-    for (const key of Object.keys(node)) {
-        Clue.PropertyCounts.add(counts, getResultNodePropertyCounts(NameCount.makeNew(key), node[key], propertyName));
-    }
-    return counts;
-}
-
-//
-// TODO: ForNcAndEachValidateResult
-let initPropertyCountsInAllResults = (nc: NameCount.Type, results: ValidateResult[]): void => {
-    for (let result of results) {
-        // TODO: for name in Clue.CountedProperty.Names
-        Assert(!result.propertyCounts, `already initialized PropertyCounts`);
-        let propertyCounts: any = {};
-        // TODO: loop over PropertyName.Enum (or PropertyName.forEach())
-        propertyCounts[Clue.PropertyName.Synonym] =
-            computeResultPropertyCounts(nc, result.resultMap.internal_map, Clue.PropertyName.Synonym);
-        propertyCounts[Clue.PropertyName.Homonym] =
-            computeResultPropertyCounts(nc, result.resultMap.internal_map, Clue.PropertyName.Homonym);
-        result.propertyCounts = propertyCounts as Clue.PropertyCounts.Map;
-    }
-};
-*/
 
 const initSrcBitsInAllResults = (results: ValidateResult[]): void => {
     for (let result of results) {
@@ -945,7 +883,7 @@ export let filter = function (srcCsvList: string[], clueCount: number, map: any 
 
 // TODO: return type.
 const singleEntry = (nc: NameCount.Type, source: string): SourceData => {
-    let nameSrcList: NameCount.List = [NameCount.makeNew(nc.name, _.toNumber(source))];
+    let nameSrcList: NameCount.List = [NameCount.makeNew(nc.name, Number(source))];
     return {
 	clues: [],
         results: [            
@@ -954,7 +892,7 @@ const singleEntry = (nc: NameCount.Type, source: string): SourceData => {
                 nameSrcList,
                 sourceBits: CountBits.makeFrom(Sentence.legacySrcList(nameSrcList)),
 		usedSources: Sentence.getUsedSources(nameSrcList),
-		// NOTE that these two shouldn't be here.
+		// TODO: these two shouldn't be here.
 		resultMap: undefined,
 		allCandidates: []
             }
@@ -962,7 +900,7 @@ const singleEntry = (nc: NameCount.Type, source: string): SourceData => {
     };
 };
 
-// returns:  array of SourceData or array of { entry: SourceData, sources: string }
+// returns: array of SourceData --or-- array of { entry: SourceData, sources: string }
 // 
 export const getKnownSourceMapEntries = (nc: NameCount.Type, andSources = false):
     any[] =>
