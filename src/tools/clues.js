@@ -47,14 +47,10 @@ const CmdLineOptions = Opt.create(_.concat(Clues.Options, [
     ['x', 'max=COUNT',                         '  maximum # of sources to combine'],
 //  ['',  'and=NAME[:COUNT][,NAME[:COUNT]]+',  '  combos must have source NAME[:COUNT]'],
     ['',  'xor=NAME[:COUNT][,NAME[:COUNT]]+',  '  combos must not have, and must be compatible with, source NAME[:COUNT]s'],
-    ['',  'xormm=NAME[:COUNT][,NAME[:COUNT]]+[,MIN,MAX]',  '  form of --xor with min/max allowed synonym counts specified'],
     ['',  'or=NAME[:COUNT][,NAME[:COUNT]]+',   '  combos must either have, or be compatible with, source NAME[:COUNT]s'],
     ['',  'primary',                           '  show combos as primary source clues' ],
     ['l', 'parallel',                          '  use paralelljs' ],
     ['',  'slow',                              '  use (old) slow method of loading clues' ],
-    ['',  'use-syns=NAME+',                    '  specifies one or more clue names with which synonyms will be used' ],
-    ['',  'syn-min=COUNT',                     '  specifies the minimum number of synonyms allowed in any combo (default: 0)' ],
-    ['',  'syn-max=COUNT',                     '  specifies the maximum number of synonyms allowed in any combo (default: 1)' ],
     ['',  'copy-from=SOURCE',                  'copy clues from source cluetype; e.g. p1.1'],
     ['',  'save',                              '  save clue files'],
     ['',  'allow-dupe-source',                 '  allow duplicate sources'],
@@ -320,8 +316,6 @@ async function main () {
     options.merge_style = Boolean(options['merge-style']);
     let showKnownArg = options['show-known'];
     options.copy_from = options['copy-from'];
-    options.use_syns = options['use-syns'];
-    options.synonymMinMax = MinMax.init(options['syn-min'], options['syn-max'], 0, 1);
     options.maxArg = maxArg;
     if (!maxArg) maxArg = 2; // TODO: default values in opt
     if (!options.count) {
@@ -447,10 +441,7 @@ async function main () {
             final:   options.final,
             or:      options.or,
             xor:     options.xor,
-            xormm:   options.xormm,
             parallel: options.parallel,
-            use_syns: options.use_syns,
-            synonymMinMax: options.synonymMinMax,
             verbose: options.verbose
         });
     }

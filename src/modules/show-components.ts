@@ -158,8 +158,12 @@ function show (options: any) {
     if ((nameList.length > 1) && options.fast) {
 	//return fast_combo_wrapper(nameList, options);
 	let args = { xor: nameList, max: 2 };
-	let pcd = PreCompute.preCompute(2, ClueManager.getNumPrimarySources(), args);
-	showXorResults(pcd.useSourceLists.xor, options);
+	let result = PreCompute.preCompute(2, ClueManager.getNumPrimarySources(), args);
+	if (result.success) {
+	    showXorResults(result.data!.useSourceLists.xor, options);
+	} else {
+            console.log('No matches');
+	}
 	process.exit(0);
     }
     const nameCsv = nameList.toString();

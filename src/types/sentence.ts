@@ -13,6 +13,7 @@ const Stringify = require('stringify-object');
 import * as Clue from './clue';
 import * as ClueList from './clue-list';
 import * as NameCount from './name-count';
+import * as Source from '../modules/source';
 
 //////////
 
@@ -374,36 +375,7 @@ export const buildAllCandidates = (sentence: Type/*, variations: Variations*/):
     };
 };
 
-///////////
-
-export const isCandidateSource = (src: number): boolean => {
-    return src >= 1_000_000;
-}
-
-export const getSourceIndices = (src: number): [number, number] => {
-    Assert(isCandidateSource(src));
-    return [Math.floor(src / 1_000_000), Math.floor((src % 1_000_000) / 100)];
-}
-
-export const getUsedSources = (nameSrcList: NameCount.List): number[] => {
-    let result: number[] = [];
-    nameSrcList.filter(nameSrc => isCandidateSource(nameSrc.count))
-	.forEach(nameSrc => {
-	    const [sentenceIndex, variationIndex] = getSourceIndices(nameSrc.count);
-	    // this should never fire. just being defensive.
-	    if (result[sentenceIndex] !== undefined) {
-		if (result[sentenceIndex] !== variationIndex) {
-		    //console.error(NameCount.listToString(nameSrcList));
-		    throw new Error(`oopsie ${NameCount.toString(nameSrc)}`);
-		}
-	    } else {
-		result[sentenceIndex] = variationIndex;
-	    }
-	});
-    return result;
-}
-
 export const legacySrcList = (nameSrcList: NameCount.List): number[] => {
-    return nameSrcList.map(nc => nc.count).filter(src => !isCandidateSource(src));
+    return nameSrcList.map(nc => nc.count).filter(src => !Source.isCandidate(src));
 }
 

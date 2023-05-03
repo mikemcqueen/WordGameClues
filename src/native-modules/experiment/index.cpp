@@ -31,8 +31,9 @@ std::vector<std::string> makeStringList(Env& env, const Napi::Array& jsList) {
 }
 
 
+/*
 cm::UsedSources makeUsedSources(Env& env, const Napi::Array& jsList) {
-  cm::UsedSources usedSources = { -1 };
+  cm::UsedSources usedSources{};
   for (auto i = 0u; i < usedSources.size(); ++i) {
     std::int32_t value = 0;
     if (i < jsList.Length()) {
@@ -49,6 +50,7 @@ cm::UsedSources makeUsedSources(Env& env, const Napi::Array& jsList) {
   }
   return usedSources;
 }
+*/
 
 cm::NameCount makeNameCount(Env& env, const Napi::Object& jsObject) {
   auto jsName = jsObject.Get("name");
@@ -100,7 +102,7 @@ cm::SourceData makeSourceData(Env& env, const Napi::Object& jsSourceData) {
   //auto jsSourceNcCsvList = jsSourceData.Get("sourceNcCsvList");
   auto primaryNameSrcList = makeNameCountList(env, jsPrimaryNameSrcList.As<Array>());
   auto primarySrcBits = cm::NameCount::listToSourceBits(primaryNameSrcList);
-  auto usedSources = makeUsedSources(env, jsUsedSources.As<Array>());
+  auto usedSources = cm::NameCount::listToUsedSources(primaryNameSrcList);
   //auto sourceNcCsvList = makeStringList(env, jsSourceNcCsvList.As<Array>());
   auto ncList = makeNameCountList(env, jsNcList.As<Array>());
   return cm::SourceData(std::move(primaryNameSrcList), std::move(primarySrcBits),
@@ -233,6 +235,7 @@ cm::SourceBits makeSourceBits(Napi::Env& env, const Napi::Array& jsList) {
   return sourceBits;
 }
 
+/*
 // FromMergedSourcesList
 cm::SourceBitsList makeSourceBitsList(Napi::Env& env, const Napi::Array& jsList) {
   cm::SourceBitsList sourceBitsList{};
@@ -248,7 +251,6 @@ cm::SourceBitsList makeSourceBitsList(Napi::Env& env, const Napi::Array& jsList)
   return sourceBitsList;
 }
 
-/*
 // FromSourceList
 cm::SourceCompatibilityData makeSourceCompatibiltyData(Napi::Env& env, const Napi::Array& jsList) {
   cm::SourceCompatibilityData compatData{};
@@ -270,6 +272,29 @@ cm::SourceCompatibilityData makeSourceCompatibiltyData(Napi::Env& env, const Nap
 }
 */
 
+cm::SourceCompatibilityData makeSourceCompatibilityData(Napi::Env& env,
+  const Napi::Array& jsList)
+{
+  cm::SourceCompatibilityData compatData{};
+  for (auto i = 0u; i < jsList.Length(); ++i) {
+    if (!jsList[i].IsObject()) {
+      Napi::TypeError::New(env, "makeSourceCompatibilityData: non-object element")
+	.ThrowAsJavaScriptException();
+      return {};
+    }
+    const auto jsPnsl = jsList[i].As<Object>().Get("primaryNameSrcList").As<Array>();
+    for (auto j = 0u; j < jsPnsl.Length(); ++j) {
+      const auto count = jsPnsl[j].As<Object>().Get("count").As<Number>().Int32Value();
+      if (count < 1'000'000) {
+	compatData.sourceBits.set(count);
+      } else {
+	compatData.addUsedSource(count);
+      }
+    }
+  }
+  return compatData;
+}
+
 cm::SourceCompatibilityList makeSourceCompatibilityList(Napi::Env& env,
   const Napi::Array& jsList)
 {
@@ -281,9 +306,10 @@ cm::SourceCompatibilityList makeSourceCompatibilityList(Napi::Env& env,
       return {};
     }
     auto jsSourceList = jsList[i].As<Object>().Get("sourceList").As<Array>();
-    auto jsUsedSources = jsList[i].As<Object>().Get("usedSources").As<Array>();
-    cm::SourceCompatibilityData compatData(std::move(makeSourceBits(env, jsSourceList)),
-      std::move(makeUsedSources(env, jsUsedSources)));
+    //auto jsUsedSources = jsList[i].As<Object>().Get("usedSources").As<Array>();
+    //cm::SourceCompatibilityData compatData(std::move(makeSourceBits(env, jsSourceList)),
+    // std::move(makeUsedSources(env, jsUsedSources)));
+    cm::SourceCompatibilityData compatData = makeSourceCompatibilityData(env, jsSourceList);
     sourceCompatList.emplace_back(std::move(compatData));
   }
   return sourceCompatList;

@@ -4,6 +4,7 @@ using namespace Napi;
 
 namespace cm {
 
+  /*
 Array wrap(Env& env, const UsedSources& usedSources) {
   Array jsList = Array::New(env, usedSources.size());
   for (auto i = 1u; i < usedSources.size(); ++i) {
@@ -13,6 +14,7 @@ Array wrap(Env& env, const UsedSources& usedSources) {
   }
   return jsList;
 }
+  */
 
 Object wrap(Env& env, const NameCount& nc) {
   Object jsObj = Object::New(env);
@@ -39,7 +41,7 @@ Array wrap(Env& env, const std::vector<std::string>& strList) {
 
 Object wrap(Env& env, const XorSource& xorSource) {
   Object jsObj = Object::New(env);
-  jsObj.Set("usedSources", wrap(env, xorSource.usedSources));
+  //jsObj.Set("usedSources", wrap(env, xorSource.usedSources));
   jsObj.Set("primaryNameSrcList", wrap(env, xorSource.primaryNameSrcList));
   jsObj.Set("ncList", wrap(env, xorSource.ncList));
   return jsObj;

@@ -92,14 +92,6 @@ const listGetNumEmptySublists = (listOfLists: any[][]) => {
     return numEmpty;
 };
 
-export const mergeUsedSources = (first: number[], second: number[]): number[] => {
-    let result: number[] = first.slice();
-    for (let i = 1; i < 10 /* cough */; ++i) {
-	result[i] ||= second[i];
-    }
-    return result;
-}
-
 const mergeCompatibleSourceLists2 = (mergedSourcesList: MergedSourcesList,
     sourceList: Source.List): MergedSourcesList =>
 {
@@ -109,7 +101,7 @@ const mergeCompatibleSourceLists2 = (mergedSourcesList: MergedSourcesList,
 	    if (!Source.isXorCompatible(source, mergedSources)) continue;
 	    result.push({
 		sourceBits: CountBits.or(mergedSources.sourceBits, source.sourceBits),
-		usedSources: mergeUsedSources(mergedSources.usedSources, source.usedSources),
+		usedSources: Source.mergeUsedSources(mergedSources.usedSources, source.usedSources),
 		sourceList: [...mergedSources.sourceList, source]
 	    });
         }
@@ -389,20 +381,22 @@ export const makeCombos = (args: any): any => {
                 }
             });
     } else {
-        PCD = PreCompute.preCompute(first, last, args);
-	//console.log(JSON.stringify(PCD.useSourceLists.xor));
+        const result = PreCompute.preCompute(first, last, args);
         let comboMap = {};
-        for (let sum = first; sum <= last; ++sum) {
-            // TODO: Fix this abomination
-            args.sum = sum;
-            let max = args.max;
-            args.max = Math.min(args.max, args.sum);
-            // TODO: return # of combos filtered due to note name match
-            const comboList = makeCombosForSum(sum, args.max, args);
-            args.max = max;
-            total += comboList.length;
-            const filterResult = ClueManager.filter(comboList, sum, comboMap);
-        }
+	if (result.success) {
+	    PCD = result.data!;
+            for (let sum = first; sum <= last; ++sum) {
+		// TODO: Fix this abomination
+		args.sum = sum;
+		let max = args.max;
+		args.max = Math.min(args.max, args.sum);
+		// TODO: return # of combos filtered due to note name match
+		const comboList = makeCombosForSum(sum, args.max, args);
+		args.max = max;
+		total += comboList.length;
+		const filterResult = ClueManager.filter(comboList, sum, comboMap);
+            }
+	}
         let d = new Duration(begin, new Date()).milliseconds;
 	if (!args.verbose) console.error('');
         console.error(`--combos: ${PrettyMs(d)}`);

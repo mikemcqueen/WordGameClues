@@ -1,11 +1,16 @@
+* bug: -t peru,pure --fast -v
+  * I think the problem lies in buildUseSourceListsFromNcData.
+    A "compatible sources" check may need to happen here somewhere.
+
+* need to initUsedSources after return from merge, now
+
+* NameCount.listHasCompatibleSources looks unnecessary, or weird, or both
+
+* quick exit from PreCompute if any --xor specified and merge returns an
+  empty list
+
 * so, ClueManager.getClueList(1) is the culprit. In every case, I need
   to review what I am doing with the list when I call it with 1.
-  In the specific case of -t, I'm calling it and using it's length
-  to fill up a Peco-style index array, and (probably) then dereferncing
-  the array using those indices. Both bad.  I'm not sure what I can do
-  for this case.  I can of course find all unique names in all candidates,
-  and build/store a "virtual" cluelist length, but then the deferencing
-  using an index in that length range may be tricky. Think about it.
 
 * -t newton fails (-t probably doesn't honor candidate clues)
   * make -t <one-word> work

@@ -27,6 +27,7 @@ import * as Clue from '../types/clue';
 import * as ClueList from '../types/clue-list';
 import * as CountBits from '../types/count-bits-fastbitset';
 import * as Sentence from '../types/sentence';
+import * as Source from './source';
 import type { ValidateResult, ValidateSourcesResult } from './validator';
 
 //
@@ -229,14 +230,14 @@ const anyCandidateHasClueName = (name: string,
     return false;
 }
 
-export const clueExists = (name: string, count: number): boolean => {
+export const isKnownNc = (nc: NameCount.Type): boolean => {
     // for old-school primary, and all compound clues
-    if (_.has(getKnownClueMap(count), name)) {
+    if (_.has(getKnownClueMap(nc.count), nc.name)) {
 	return true;
     }
     // special case for primary clues in sentences
-    if (count === 1) {
-	return anyCandidateHasClueName(name);
+    if (nc.count === 1) {
+	return anyCandidateHasClueName(nc.name);
     }
     return false;
 }
@@ -485,7 +486,7 @@ const initSrcBitsInAllResults = (results: ValidateResult[]): void => {
     for (let result of results) {
 	Assert(NameCount.listHasCompatibleSources(result.nameSrcList));
         result.sourceBits = CountBits.makeFrom(Sentence.legacySrcList(result.nameSrcList));
-	result.usedSources = Sentence.getUsedSources(result.nameSrcList);
+	result.usedSources = Source.getUsedSources(result.nameSrcList);
     }
 };
 
@@ -891,7 +892,7 @@ const singleEntry = (nc: NameCount.Type, source: string): SourceData => {
                 ncList: [nc],
                 nameSrcList,
                 sourceBits: CountBits.makeFrom(Sentence.legacySrcList(nameSrcList)),
-		usedSources: Sentence.getUsedSources(nameSrcList),
+		usedSources: Source.getUsedSources(nameSrcList),
 		// TODO: these two shouldn't be here.
 		resultMap: undefined,
 		allCandidates: []

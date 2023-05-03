@@ -7,7 +7,7 @@
 import _ from 'lodash';
 
 // dumb but whatever
-import * as Sentence from './sentence';
+import * as Source from '../modules/source';
 
 //
 //
@@ -161,7 +161,7 @@ export const listHasCompatibleSources = (nameSrcList: List):
     }
     // TODO: sloww probably, also requiring sentence is dumb
     try {
-	Sentence.getUsedSources(nameSrcList);
+	Source.getUsedSources(nameSrcList);
     } catch(e) {
 	//console.error('***incompatible usedSources***');
 	return false;
