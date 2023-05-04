@@ -20,6 +20,7 @@ const Timing      = require('debug')('timing');
 const Peco        = require('../../modules/peco');
 
 import * as Clue from '../types/clue';
+import * as ClueList from '../types/clue-list';
 import * as ClueManager from './clue-manager';
 import * as NameCount from '../types/name-count';
 import * as PreCompute from './cm-precompute';
@@ -36,7 +37,7 @@ function Stringify (val) {
 //
 // TODO: not actually using nameList here except for output? i guess that's ok?
 function getSourceClues (source, countList, nameList) {
-    console.log(`getSourceClues source: ${source}, countList: [${countList}], nameList: [${nameList}]`);
+//    console.log(`getSourceClues source: ${source}, countList: [${countList}], nameList: [${nameList}]`);
 
     const count = countList.reduce((sum, count) => sum + count, 0);
     const srcMap = ClueManager.getKnownSourceMap(count);
@@ -56,15 +57,7 @@ function getSourceClues (source, countList, nameList) {
         return s;
         // for each name in namelist, get propertyCount(s) of knownSrcMap[count][source]
     }
-    //console.error(`results ${Stringify(results)} len(${results.length})`);
-    // TODO: duplicated in getSourceClues
-    /*
-    const countsList = results.map(result =>
-        ClueManager.recursiveGetCluePropertyCount(null, result.resultMap.internal_map, Clue.PropertyName.Synonym));
-    const totals = countsList.map(tp => tp.total);
-    const primarys = countsList.map(tp => tp.primary);
-    */
-    return `${nameList.join(' - ')}`; //  : syn totals(${totals}) primarys(${primarys})`;
+    return `${nameList.join(' - ')}`;
 }
 
 //
@@ -111,34 +104,102 @@ function showCountListArray (name, countListArray, text, hasNameList = false) {
     }
 }
 
-const showXorResults = (xorResults, options) => {
+const showXorResults = (xorResults: PreCompute.XorSourceList, options: any): void => {
     let hash = {};
     for (let xorResult of xorResults) {
+        /*
         if (options.verbose) {
             console.log(`${NameCount.listToString(xorResult.ncList)}:` +
                 ` ${NameCount.listToString(xorResult.primaryNameSrcList)}`);
             continue;
         }
-        const nameList = NameCount.listToNameList(xorResult.ncList).toString();
-        const countList = NameCount.listToCountList(xorResult.ncList).toString();
-        if (!_.has(hash, countList)) {
-            hash[countList] = new Set();
+        */
+        const nameCsv = NameCount.listToNameList(xorResult.ncList).toString();
+        const countCsv = NameCount.listToCountList(xorResult.ncList).toString();
+        if (!_.has(hash, countCsv)) {
+            hash[countCsv] = new Set<string>();
         }
-        let set = hash[countList];
-        if (!set.has(nameList)) {
-            set.add(nameList);
+        let set = hash[countCsv];
+        if (!set.has(nameCsv)) {
+            console.error(`hash: adding ${nameCsv}`);
+            set.add(nameCsv);
         }
     }
-    if (options.verbose) return;
-    for (let key of _.keys(hash)) {
-        console.log(`${key} PRESENT as ${[...hash[key].entries()].join(' - ')}`);
+    //if (options.verbose) return;
+    for (let key of Object.keys(hash)) {
+        console.log(`${key} PRESENT as ${[...hash[key].values()].join(' - ')}`);
     }
 }
 
-//
-//
+const getCountListArrays = (nameList: string[], pcResult: PreCompute.Result,
+    options: any): any =>
+{
+    let addRemoveSet;
+    if (options.add || options.remove) {
+        addRemoveSet = new Set();
+    }
+    let valid: any[] = [];
+    let known: any[] = [];
+    let clues: any[] = [];
+    let invalid: any[] = [];
 
-function show (options: any) {
+    let hash = {};
+    for (const xorSource of pcResult.data!.useSourceLists.xor) {
+        const countList = NameCount.listToCountList(xorSource.ncList);
+        // for --verbose, we could allow this:
+        const hashKey = countList.toString();
+        if (hash[hashKey]) continue;
+        hash[hashKey] = true;
+        let ncListStr = countList.map((count, index) => NameCount.makeNew(nameList[index], count)).toString();
+        /*
+          // TODO: in order to support his, we'd need to pass a flag to PreCompute to
+          // tell it to preserve the filtered incompatible combinations, or manually
+          // walk through all ClueManager.knownSourceMaps looking for a sourceCsv combo,
+          // and displaying those that *aren'* in the xor list. the latter should be done
+          // in a separate loop probably, not in this loop.
+        if (!result.success) {
+            //console.log(`invalid: ${nameList}  CL ${clueCountList}  x ${x} sum ${sum}  validateAll=${validateAll}`);
+            invalid.push(clueCountList);
+        } else
+        */
+        const sum = countList.reduce((a, b) => a + b);
+        if (nameList.length === 1) {
+            const name = nameList[0];
+            let srcList: string[];
+            // this is a bit awkward. I didn't want to write the code to handle
+            // candidate clue lookup for ClueList(1) so I hacked it to look
+            // at primaryNameSrcList.
+            if (sum > 1) {
+                srcList = ClueManager.getClueList(sum)
+                    .filter(clue => clue.name === name)
+                    .map(clue => clue.src);
+            } else {
+                 srcList = xorSource.primaryNameSrcList
+                     .filter(nameSrc => nameSrc.name === name)
+                     .map(nameSrc => `${nameSrc.count}`);
+            }
+            if (srcList.length) {
+                clues.push({ countList, nameList: srcList });
+            } else {
+                console.log('well, nothing');
+            }
+        } else {
+            let sourceData = ClueManager.getKnownSourceMap(sum)[nameList.toString()];
+            if (sourceData) {
+                known.push({
+                    countList,
+                    nameList: (sourceData.clues as ClueList.Compound).map(clue => clue.name)
+                });
+            } else {
+                valid.push(countList);
+            }
+            if (addRemoveSet) addRemoveSet.add(sum);
+        }
+    }
+    return { valid, known, invalid, clues, addRemoveSet };
+};
+
+const show = (options: any): any => {
     Expect(options).is.an.Object();
     Expect(options.test).is.a.String();
     if (options.reject) {
@@ -154,30 +215,37 @@ function show (options: any) {
     }
 
     const nameList = options.test.split(',').sort();
-    if ((nameList.length > 1) && options.fast) {
-        //return fast_combo_wrapper(nameList, options);
-        let args = { xor: nameList, max: 2 };
-        let result = PreCompute.preCompute(2, ClueManager.getNumPrimarySources(), args);
-        if (result.success) {
-        showXorResults(result.data!.useSourceLists.xor, options);
-    } else {
-        console.log('No matches');
-    }
+    if (options.fast) {
+        // TODO: maybe all of this belongs in ClueManager. Because getCountListArrays()
+        //       is called from so many places.
+        const args = { xor: nameList, max: 2 };
+        const pcResult = PreCompute.preCompute(2, ClueManager.getNumPrimarySources(), args);
+        const result = getCountListArrays(nameList, pcResult, options);
+        showCountLists(nameList, result, options);
+        // TODO: return something for valid_combos()
+        // TODO: support addRemoveOrReject
         process.exit(0);
+    } else {
+        return slow_show(nameList, options);
     }
+};
+
+const slow_show = (nameList: string[], options: any) => {
     const nameCsv = nameList.toString();
     const result = ClueManager.getCountListArrays(nameCsv, options);
     if (!result) {
         console.log('No matches');
         return null;
     }
+    return showCountLists(nameList, result, options);
+};
 
-    showCountListArray(null, result.rejects, 'REJECTED');
+const showCountLists = (nameList: string[], result: any, options: any): any => {
+    //showCountListArray(null, result.rejects, 'REJECTED');
     showCountListArray(null, result.invalid, 'INVALID');
-    showCountListArray(nameCsv, result.known, 'PRESENT as', true);
-    showCountListArray(nameCsv, result.clues, 'PRESENT as clue with source:', true);
+    showCountListArray(nameList.toString(), result.known, 'PRESENT as', true);
+    showCountListArray(nameList.toString(), result.clues, 'PRESENT as clue with source:', true);
     showCountListArray(null, result.valid, 'VALID');
-    //showCountListArray(nameCsv, result.valid, 'VALID');
 
     // TODO: extract this to helper function, maybe in clue-manager
     // NOTE: explicit undefined check here is necessary
@@ -194,7 +262,7 @@ function show (options: any) {
         console.log(`${options.add ? "added" : "removed"} ${count} clues`);
     }
     return Object.assign(result, { added: count });
-}
+};
 
 function addOrRemove (args, nameList, countSet, options) {
     if (!options.add && !options.remove) return;

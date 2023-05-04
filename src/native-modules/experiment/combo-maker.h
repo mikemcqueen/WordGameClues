@@ -52,14 +52,14 @@ struct SourceCompatibilityData {
     for (auto i = 1u; i < usedSources.size(); ++i) {
       if (usedSources[i].empty() || other[i].empty()) continue;
       if (getVariation(*usedSources[i].cbegin()) != 
-	  getVariation(*other[i].cbegin()))
+          getVariation(*other[i].cbegin()))
       {
-	return false;
+        return false;
       }
       for (auto it = usedSources[i].cbegin(); it != usedSources[i].cend(); ++it) {
-	if (other[i].find(*it) != other[i].end()) {
-	  return false;
-	}
+        if (other[i].find(*it) != other[i].end()) {
+          return false;
+        }
       }
     }
     return true;
@@ -88,12 +88,12 @@ struct SourceCompatibilityData {
     // defensive incompatible variation index check
     if (!set.empty()) {
       if (getVariation(*set.begin()) != getVariation(source)) {
-	if (nothrow) return false;
-	throw "oopsie1"; // new Error(`oopsie ${anyElem}, ${source}`);
+        if (nothrow) return false;
+        throw "oopsie1"; // new Error(`oopsie ${anyElem}, ${source}`);
       }
       if (set.find(source) != set.end()) {
-	if (nothrow) return false;
-	throw "oopsie2"; // new Error(`poopsie ${source}, [${[...set]}]`);
+        if (nothrow) return false;
+        throw "oopsie2"; // new Error(`poopsie ${source}, [${[...set]}]`);
       }
     }
     set.insert(source);
@@ -216,7 +216,7 @@ struct NameCount {
     for (auto it = list.cbegin(); it != list.cend(); ++it) {
       strcat(buf, it->toString().c_str());
       if ((it + 1) != list.cend()) {
-	strcat(buf, ",");
+        strcat(buf, ",");
       }
     }
     return buf;
@@ -227,7 +227,7 @@ struct NameCount {
     for (auto it = list.cbegin(); it != list.cend(); ++it) {
       strcat(buf, (*it)->toString().c_str());
       if ((it + 1) != list.cend()) {
-	strcat(buf, ",");
+        strcat(buf, ",");
       }
     }
     return buf;
@@ -245,7 +245,7 @@ struct NameCount {
     SourceBits bits{};
     for (const auto& nc : list) {
       if (nc.count < 1'000'000) {
-	bits.set(nc.count);
+        bits.set(nc.count);
       }
     }
     return bits;
@@ -255,7 +255,7 @@ struct NameCount {
     UsedSources usedSources{};
     for (const auto& nc : list) {
       if (nc.count >= 1'000'000) {
-	SourceCompatibilityData::addUsedSource(usedSources, nc.count);
+        SourceCompatibilityData::addUsedSource(usedSources, nc.count);
       }
     }
     return usedSources;

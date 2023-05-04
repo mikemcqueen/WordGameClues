@@ -427,14 +427,18 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
 
   //--
 
-  auto merge0 = high_resolution_clock::now();
-
-  cm::PCD.xorSourceList = std::move(cm::mergeCompatibleXorSourceCombinations(sourceLists));
-
-  auto merge1 = high_resolution_clock::now();
-  auto d_merge = duration_cast<milliseconds>(merge1 - merge0).count();
-  cerr << " native merge: " << d_merge << "ms" << endl;
-
+  if (sourceLists.size() > 1) {
+    auto merge0 = high_resolution_clock::now();
+    
+    cm::PCD.xorSourceList = std::move(cm::mergeCompatibleXorSourceCombinations(sourceLists));
+    
+    auto merge1 = high_resolution_clock::now();
+    auto d_merge = duration_cast<milliseconds>(merge1 - merge0).count();
+    cerr << " native merge: " << d_merge << "ms" << endl;
+  } else {
+    cm::PCD.xorSourceList = std::move(sourceLists.back());
+  }
+    
   //--
 
   return cm::wrap(env, cm::PCD.xorSourceList);

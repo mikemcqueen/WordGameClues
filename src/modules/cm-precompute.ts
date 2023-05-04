@@ -33,7 +33,7 @@ interface StringBoolMap {
 }
 
 type XorSource = Source.Data;
-type XorSourceList = XorSource[];
+export type XorSourceList = XorSource[];
 
 interface OrSourceData {
     source: Source.Data;
@@ -457,7 +457,7 @@ const buildUseSourceListsFromNcData = (sourceListMap: Map<string, Source.AnyData
     let orArgDataList = buildOrArgDataList(buildSourceListsForUseNcData(
         args.allOrNcDataLists, sourceListMap));
     let odur = new Duration(or0, new Date()).milliseconds;
-    console.error(` orArgDataList(${orArgDataList.length}), build(${PrettyMs(odur)})`);
+    console.error(` orArgDataList(${orArgDataList.length}) - ${PrettyMs(odur)}`);
 
     // Thoughts on AND compatibility of OrSources:
     // Just because (one sourceList of) an OrSource is AND compatible with an
@@ -483,13 +483,15 @@ export const preCompute = (first: number, last: number, args: any): Result => {
     const begin = new Date();
     args.allXorNcDataLists = buildAllUseNcDataLists(args.xor);
     const d1 = new Duration(begin, new Date()).milliseconds;
-    console.error(` buildAllXorNcDataLists(${args.allXorNcDataLists.length}) - ${PrettyMs(d1)}`);
+    console.error(` buildAllXorNcDataLists(${args.allXorNcDataLists.length})` +
+        ` - ${PrettyMs(d1)}`);
     if (args.xor && listIsEmpty(args.allXorNcDataLists)) return { success: false };
 
     const build2 = new Date();
     args.allOrNcDataLists = args.or ? buildAllUseNcDataLists(args.or) : [ [] ];
     const d2 = new Duration(build2, new Date()).milliseconds;
-    console.error(` buildAllOrNcDataLists(${args.allOrNcDataLists.length}) - ${PrettyMs(d2)}`);
+    console.error(` buildAllOrNcDataLists(${args.allOrNcDataLists.length})` +
+        ` - ${PrettyMs(d2)}`);
     if (args.or && listIsEmpty(args.allOrNcDataLists)) return { success: false };
     
     const sourceListMap = buildKnownNcSourceListMap(first, last, args);
@@ -497,7 +499,8 @@ export const preCompute = (first: number, last: number, args: any): Result => {
     const build3 = new Date();
     const useSourceLists = buildUseSourceListsFromNcData(sourceListMap, args);
     const d3 = new Duration(build3, new Date()).milliseconds;
-    console.error(` buildUseSourceListsFromNcData(${PrettyMs(d3)})`);
+    console.error(` buildUseSourceListsFromNcData, xor(${useSourceLists.xor.length})` +
+        ` - ${PrettyMs(d3)}`);
     if (args.xor && listIsEmpty(useSourceLists.xor)) return { success: false };
 
     const d = new Duration(begin, new Date()).milliseconds;

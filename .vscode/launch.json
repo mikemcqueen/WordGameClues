@@ -12,7 +12,19 @@
                 "<node_internals>/**"
             ],
             "program": "${workspaceFolder}/src/tools/clues.js",
-            "args": [ "-pf.71", "-t", "newton,home", "-v", "--fast" ]
-        }
+            "args": [ "-pf.71", "-t", "newton", "-v", "--fast" ]
+        },
+        {
+            "type": "cppdbg",
+            "request": "launch",
+            "name": "Debug Program",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "program": "/usr/local/bin/node",
+            "cwd": "${workspaceFolder}/src/tools",
+            "args": [ "clues.js", "-pf.71", "-t", "newton", "-v" ]
+        },
+       
     ]
 }

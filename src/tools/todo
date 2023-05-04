@@ -1,3 +1,5 @@
+* debug build of addon is running too fast and giving bad results.
+
 * -t 20,s or 24,s are valid, shouldn't be. looks like restrictSameClueNumber
   is broke.
   * now it crashes. after putting in support for non-unique legacy clue names
@@ -13,15 +15,9 @@
 * so, ClueManager.getClueList(1) is the culprit. In every case, I need
   to review what I am doing with the list when I call it with 1.
 
-* -t newton fails (-t probably doesn't honor candidate clues)
-  * make -t <one-word> work
+* -t --verbose
 
-* --xor newton fails as well (probably doesn't honor candidate clues)
-
-* -t (no --verbose) output sources is funny
-* make -t --fast default
-
-* -t full support, including --add, will be necessary
+* -t full support, including --add, will be necessary (might be working now)
 
 * I wonder if I am still respecting max in peco, for the cases where that
   makes sense.  did I comment it out, or just allow undefined?
@@ -48,7 +44,7 @@
   values per sentence (up to 100, but i could limit it to 64 as well)
   but the variation # stays the same.
   so still 13 bits for variation#.
-  6 7 bits for index (64 or 100)
+  6 or 7 bits for index (64 or 100)
   128 = 13 + N * count (N = 6 or 7)
   N = 115 / count
   for N=6, count = 19
