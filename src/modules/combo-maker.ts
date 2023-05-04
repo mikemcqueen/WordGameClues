@@ -11,7 +11,7 @@ const ResultMap   = require('../../types/result-map');
 const Peco        = require('../../modules/peco');
 const Log         = require('../../modules/log')('combo-maker');
 const My          = require('../../modules/util');
-const NativeComboMaker = require('../../native-modules/experiment/build/Release/experiment.node');
+const NativeComboMaker = require('../../../build/Release/experiment.node');
 
 const Assert      = require('assert');
 const Debug       = require('debug')('combo-maker');
@@ -98,12 +98,12 @@ const mergeCompatibleSourceLists2 = (mergedSourcesList: MergedSourcesList,
     let result: MergedSourcesList = [];
     for (const mergedSources of mergedSourcesList) {
         for (const source of sourceList) {
-	    if (!Source.isXorCompatible(source, mergedSources)) continue;
-	    result.push({
-		sourceBits: CountBits.or(mergedSources.sourceBits, source.sourceBits),
-		usedSources: Source.mergeUsedSources(mergedSources.usedSources, source.usedSources),
-		sourceList: [...mergedSources.sourceList, source]
-	    });
+            if (!Source.isXorCompatible(source, mergedSources)) continue;
+            result.push({
+                sourceBits: CountBits.or(mergedSources.sourceBits, source.sourceBits),
+                usedSources: Source.mergeUsedSources(mergedSources.usedSources, source.usedSources),
+                sourceList: [...mergedSources.sourceList, source]
+            });
         }
     }
     return result;
@@ -112,11 +112,11 @@ const mergeCompatibleSourceLists2 = (mergedSourcesList: MergedSourcesList,
 const makeMergedSourcesList = (sourceList: Source.List) : MergedSourcesList => {
     let mergedSourcesList: MergedSourcesList = [];
     for (const source of sourceList) {
-	mergedSourcesList.push({
-	    sourceBits: CountBits.makeFrom(source.sourceBits),
-	    usedSources: source.usedSources.slice(),
-	    sourceList: [source]
-	});
+        mergedSourcesList.push({
+            sourceBits: CountBits.makeFrom(source.sourceBits),
+            usedSources: source.usedSources.slice(),
+            sourceList: [source]
+        });
     }
     return mergedSourcesList;
 };
@@ -128,7 +128,7 @@ const mergeAllCompatibleSources2 = (ncList: NameCount.List,
     Assert(ncList.length <= 2, `${ncList} length > 2 (${ncList.length})`);
     // TODO: reduce (or some) here
     let mergedSourcesList = makeMergedSourcesList(sourceListMap.get(
-	NameCount.toString(ncList[0])) as Source.List);
+        NameCount.toString(ncList[0])) as Source.List);
     for (let ncIndex = 1; ncIndex < ncList.length; ++ncIndex) {
         const nextSourceList = sourceListMap.get(NameCount.toString(ncList[ncIndex])) as Source.List;
         mergedSourcesList = mergeCompatibleSourceLists2(mergedSourcesList, nextSourceList);
@@ -149,7 +149,7 @@ const nextIndex = (countList: number[], clueIndexes: number[]): boolean => {
         if (--index < 0) {
             return false;
         }
-	clueIndexes[index] += 1;
+        clueIndexes[index] += 1;
     }
     return true;
 };
@@ -160,9 +160,18 @@ export interface FirstNextResult {
     nameList?: string[];
 }
 
+// "clueIndex" here is actually "uniqueNameIndex". except if it's a legacy
+// clue index, which are (non-uniquely) added to the uniqueNameList first.
+// This is done to support ignore/skip properties, which only exist on legacy
+// clues, but the same properties don't exist on every instance of the same
+// named legacy clue. We needed to differentiate between the various isntances
+// of:  ace, hero, north
 const skip = (clueCount: number, clueIndex: number): boolean => {
-    if (clueCount < 2) return false;
-    const clue = ClueManager.getClueList(clueCount)[clueIndex];
+    if (clueCount !== 1) return false;
+    const clueList = ClueManager.getClueList(clueCount)
+    // only legacy clue indices are currently skippable
+    if (clueIndex >= clueList.length) return false;
+    const clue = clueList[clueIndex];
     return Boolean(clue.ignore || clue.skip);
 }
 
@@ -174,7 +183,7 @@ export const next = (countList: number[], clueIndexes: number[]): FirstNextResul
         let ncList: NameCount.List = [];    // e.g. [ { name: "pollock", count: 2 }, { name: "jackson", count: 4 } ]
         let nameList: string[] = [];        // e.g. [ "pollock", "jackson" ]
         if (!countList.every((count, index) => {
-	    if (skip(count, clueIndexes[index])) return false;
+            if (skip(count, clueIndexes[index])) return false;
             let name = ClueManager.getUniqueClueName(count, clueIndexes[index]);
             nameList.push(name);
             ncList.push(NameCount.makeNew(name, count));
@@ -191,9 +200,9 @@ export const next = (countList: number[], clueIndexes: number[]): FirstNextResul
 export const first = (countList: number[], clueIndexes: number[]): FirstNextResult => {
     // TODO: _.fill?
     for (let index = 0; index < countList.length; ++index) {
-	if (ClueManager.getUniqueClueNameCount(countList[index]) === 0) {
-	    return { done: true };
-	}
+        if (ClueManager.getUniqueClueNameCount(countList[index]) === 0) {
+            return { done: true };
+        }
         clueIndexes[index] = 0;
     }
     clueIndexes[clueIndexes.length - 1] = -1;
@@ -248,12 +257,12 @@ const getCombosForUseNcLists = (sum: number, max: number, pcd: PreCompute.Data,
             const key: string = NameCount.listToString(result.ncList!);
 
             let cacheHit = false;
-	    let mergedSourcesList: MergedSourcesList = [];
+            let mergedSourcesList: MergedSourcesList = [];
             if (!hash[key]) {
-		mergedSourcesList = mergeAllCompatibleSources2(result.ncList!, pcd.sourceListMap);
+                mergedSourcesList = mergeAllCompatibleSources2(result.ncList!, pcd.sourceListMap);
                 if (listIsEmpty(mergedSourcesList)) {
-		    ++numMergeIncompatible;
-		}
+                    ++numMergeIncompatible;
+                }
                 hash[key] = { mergedSourcesList };
             } else {
                 mergedSourcesList = hash[key].mergedSourcesList;
@@ -267,8 +276,8 @@ const getCombosForUseNcLists = (sum: number, max: number, pcd: PreCompute.Data,
             if (listIsEmpty(mergedSourcesList)) continue;
 
             if (hash[key].isCompatible === undefined) {
-		isany += 1;
-		let flag = false;
+                isany += 1;
+                let flag = false;
                 hash[key].isCompatible = NativeComboMaker.isAnySourceCompatibleWithUseSources(mergedSourcesList, flag);
             }
             if (hash[key].isCompatible) {
@@ -288,11 +297,11 @@ const getCombosForUseNcLists = (sum: number, max: number, pcd: PreCompute.Data,
 
     if (args.verbose) {
         console.error(`sum(${sum}) combos(${comboCount}) ` +
-	    `variations(${totalVariations}) cacheHits(${numCacheHits}) ` +
+            `variations(${totalVariations}) cacheHits(${numCacheHits}) ` +
             `merge-incompat(${numMergeIncompatible}) ` +
-	    `use-incompat(${numUseIncompatible}) ` +
+            `use-incompat(${numUseIncompatible}) ` +
             `actual(${totalVariations - numCacheHits - numUseIncompatible}) ` +
-	    `isany(${isany}) ${duration}ms `);
+            `isany(${isany}) ${duration}ms `);
     } else {
         process.stderr.write('.');
     }
@@ -383,22 +392,22 @@ export const makeCombos = (args: any): any => {
     } else {
         const result = PreCompute.preCompute(first, last, args);
         let comboMap = {};
-	if (result.success) {
-	    PCD = result.data!;
+        if (result.success) {
+            PCD = result.data!;
             for (let sum = first; sum <= last; ++sum) {
-		// TODO: Fix this abomination
-		args.sum = sum;
-		let max = args.max;
-		args.max = Math.min(args.max, args.sum);
-		// TODO: return # of combos filtered due to note name match
-		const comboList = makeCombosForSum(sum, args.max, args);
-		args.max = max;
-		total += comboList.length;
-		const filterResult = ClueManager.filter(comboList, sum, comboMap);
+                // TODO: Fix this abomination
+                args.sum = sum;
+                let max = args.max;
+                args.max = Math.min(args.max, args.sum);
+                // TODO: return # of combos filtered due to note name match
+                const comboList = makeCombosForSum(sum, args.max, args);
+                args.max = max;
+                total += comboList.length;
+                const filterResult = ClueManager.filter(comboList, sum, comboMap);
             }
-	}
+        }
         let d = new Duration(begin, new Date()).milliseconds;
-	if (!args.verbose) console.error('');
+        if (!args.verbose) console.error('');
         console.error(`--combos: ${PrettyMs(d)}`);
         Debug(`total: ${total}, filtered(${_.size(comboMap)})`);
         _.keys(comboMap).forEach((nameCsv: string) => console.log(nameCsv));

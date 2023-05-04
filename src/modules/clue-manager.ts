@@ -105,13 +105,13 @@ let initialState = (): InternalState => {
         knownSourceMapArray: [],
         ncResultMaps: [],
 
-	allCandidates: [],
-	variations: Sentence.emptyVariations(),
-	reverseVariations: Sentence.emptyVariations(),
+        allCandidates: [],
+        variations: Sentence.emptyVariations(),
+        reverseVariations: Sentence.emptyVariations(),
 
-	uniquePrimaryClueNames: [],
+        uniquePrimaryClueNames: [],
 
-	// TODO: remove? maybe, at least
+        // TODO: remove? maybe, at least
         maybeListArray: [],
         rejectListArray: [],
         rejectSourceMap: {},
@@ -164,15 +164,15 @@ export const copyAllCandidates = (allCandidates: AllCandidates = State.allCandid
 {
     let result: AllCandidates = [];
     for (let [index, container] of allCandidates.entries()) {
-	if (!container) continue;
-	result[index] = Sentence.copyCandidatesContainer(container);
+        if (!container) continue;
+        result[index] = Sentence.copyCandidatesContainer(container);
     }
     return result;
 }
 
 export const getUniqueClueNameCount = (clueCount: number) => {
     if (clueCount === 1) {
-	return State.uniquePrimaryClueNames.length;
+        return State.uniquePrimaryClueNames.length;
     }
     // for now. could do better
     return getClueList(clueCount).length;
@@ -180,7 +180,7 @@ export const getUniqueClueNameCount = (clueCount: number) => {
 
 export const getUniqueClueName = (clueCount: number, nameIndex: number) => {
     if (clueCount === 1) {
-	return State.uniquePrimaryClueNames[nameIndex];
+        return State.uniquePrimaryClueNames[nameIndex];
     }
     // for now. could do better
     return getClueList(clueCount)[nameIndex].name;
@@ -219,25 +219,25 @@ const anyCandidateHasClueName = (name: string,
     allCandidates: AllCandidates = State.allCandidates): boolean =>
 {
     for (let container of allCandidates) {
-	if (!container) continue;
-	const indices = container.nameIndicesMap[name] || [];
-	for (let index of indices) {
-	    if (container.candidates[index]) {
-		return true;
-	    }
-	}
+        if (!container) continue;
+        const indices = container.nameIndicesMap[name] || [];
+        for (let index of indices) {
+            if (container.candidates[index]) {
+                return true;
+            }
+        }
     }
     return false;
 }
 
 export const isKnownNc = (nc: NameCount.Type): boolean => {
-    // for old-school primary, and all compound clues
+    // for legacy primary, and all compound clues
     if (_.has(getKnownClueMap(nc.count), nc.name)) {
-	return true;
+        return true;
     }
-    // special case for primary clues in sentences
+    // special case for candidate primary clues in sentences
     if (nc.count === 1) {
-	return anyCandidateHasClueName(nc.name);
+        return anyCandidateHasClueName(nc.name);
     }
     return false;
 }
@@ -296,14 +296,14 @@ const autoSource = (clueList: ClueList.Primary, args: any): [ClueList.Primary, n
     for (let clue of clueList) {
         // clue.num check must happen before clue.ignore check
         if (clue.num) {
-	    clueNumber = Number(clue.num);
-	    const sentence = args.useSentences && (clue.source === "sentence");
-	    if (sentence) {
-		maxSentenceClues += loadSentence(clueNumber, args);
-	    }
-	    skipThisClue = sentence;
-	}
-	if (skipThisClue) continue;
+            clueNumber = Number(clue.num);
+            const sentence = args.useSentences && (clue.source === "sentence");
+            if (sentence) {
+                maxSentenceClues += loadSentence(clueNumber, args);
+            }
+            skipThisClue = sentence;
+        }
+        if (skipThisClue) continue;
         const isSameSrc = clue.src === "same";
         if (isSameSrc) {
             // propagate the .source field from the first clue with a specific src
@@ -351,7 +351,7 @@ const addPrimaryClueAndVariationsToMap = (clue: Clue.Primary,
     addPrimaryNameSrcToMap(clue.name, clue.src);
     const nameVariations = Sentence.getNameVariations(clue.name, variations);
     for (let name of nameVariations) {
-	addPrimaryNameSrcToMap(name, clue.src);
+        addPrimaryNameSrcToMap(name, clue.src);
     }
 }
 
@@ -359,56 +359,51 @@ const addKnownPrimaryClues = (clueList: ClueList.Primary): void => {
     let clueMap = State.knownClueMapArray[1] = {};
     // legacy clues
     clueList.filter(clue => !clue.ignore)
-	.forEach(clue => addPrimaryNameSrcToMap(clue.name, clue.src));
+        .forEach(clue => addPrimaryNameSrcToMap(clue.name, clue.src));
 
     // candidates clues
     for (let container of getAllCandidates()) {
-	if (!container) continue;
-	for (let candidate of container.candidates) {
-	    for (let clue of candidate.clues) {
-		addPrimaryClueAndVariationsToMap(clue);
-	    }
-	}
+        if (!container) continue;
+        for (let candidate of container.candidates) {
+            for (let clue of candidate.clues) {
+                addPrimaryClueAndVariationsToMap(clue);
+            }
+        }
     }
 };
 
 const addUniqueNameToList = (name: string, toList: string[],
-    hash: Set<string>): void =>
+    hash: Set<string>, addAlways?: boolean): void =>
 {
-    if (!hash.has(name)) {
-	hash.add(name);
-	toList.push(name);
+    let isUnique = !hash.has(name);
+    // always add unique name to hash
+    if (isUnique) {
+        hash.add(name);
+    }
+    // add name to list if unique, or for legacy (addAlways) names
+    if (addAlways || isUnique) {
+        toList.push(name);
     }
 }
-
-/*
-const addUniqueNamesToList = (fromList: string[] | undefined,
-    toList: string[], hash: Set<string>): void =>
-{
-    if (!fromList) return;
-    for (let name of fromList) {
-	addUniqueNameToList(name, toList, hash);
-    }
-}
-*/
 
 const initUniquePrimaryClueNames = (): string[] => {
     let result: string[] = [];
     let hash = new Set<string>();
-    // add from (legacy) cluelist
+    // add from legacy cluelist
     for (let clue of getClueList(1)) {
-	addUniqueNameToList(clue.name, result, hash);
+        // true = always add name to list
+        addUniqueNameToList(clue.name, result, hash, true);
     }
     // add from each sentence candidate set
     for (let [index, container] of getAllCandidates().entries()) {
-	if (!container) continue;
-	for (let name of _.keys(container.nameIndicesMap)) {
-	    addUniqueNameToList(name, result, hash);
-	    // variation names are already in nameIndicesMap
-	    //addUniqueNamesToList(State.variations.anagrams[name], result, hash);
-	    //addUniqueNamesToList(State.variations.synonyms[name], result, hash);
-	    //addUniqueNamesToList(State.variations.homophones[name], result, hash);
-	}
+        if (!container) continue;
+        for (let name of _.keys(container.nameIndicesMap)) {
+            addUniqueNameToList(name, result, hash);
+            // variation names are already in nameIndicesMap
+            //addUniqueNamesToList(State.variations.anagrams[name], result, hash);
+            //addUniqueNamesToList(State.variations.synonyms[name], result, hash);
+            //addUniqueNamesToList(State.variations.homophones[name], result, hash);
+        }
     }
     return result;
 }
@@ -417,14 +412,14 @@ const addReverseVariations = (toMap: Sentence.VariationMap,
     fromMap: Sentence.VariationMap): void =>
 {
     for (let key of _.keys(fromMap)) {
-	for (let name of fromMap[key]) {
-	    if (!_.has(toMap, name)) {
-		toMap[name] = [];
-	    }
-	    if (!toMap[name].find(elem => elem === name)) {
-		toMap[name].push(key);
-	    }
-	}
+        for (let name of fromMap[key]) {
+            if (!_.has(toMap, name)) {
+                toMap[name] = [];
+            }
+            if (!toMap[name].find(elem => elem === name)) {
+                toMap[name].push(key);
+            }
+        }
     }
 }
 
@@ -457,10 +452,10 @@ export const loadAllClues = function (args: any): void {
         [primaryClueList, numPrimarySources] = autoSource(primaryClueList, args);
         State.numPrimarySources = numPrimarySources;
         State.clueListArray[1] = primaryClueList;
-	// initUniquePrimaryCluueNames() after clueListArray[] assignment
-	State.uniquePrimaryClueNames = initUniquePrimaryClueNames();
+        // initUniquePrimaryCluueNames() after clueListArray[] assignment
+        State.uniquePrimaryClueNames = initUniquePrimaryClueNames();
         addKnownPrimaryClues(primaryClueList);
-	State.reverseVariations = initReverseVariations();
+        State.reverseVariations = initReverseVariations();
     } else {
         throw new Error('numPrimarySources not initialized without src="auto"');
     }
@@ -484,14 +479,13 @@ const getRejectFilename = function (count: number): string {
 
 const initSrcBitsInAllResults = (results: ValidateResult[]): void => {
     for (let result of results) {
-	Assert(NameCount.listHasCompatibleSources(result.nameSrcList));
+        Assert(NameCount.listHasCompatibleSources(result.nameSrcList));
         result.sourceBits = CountBits.makeFrom(Sentence.legacySrcList(result.nameSrcList));
-	result.usedSources = Source.getUsedSources(result.nameSrcList);
+        result.usedSources = Source.getUsedSources(result.nameSrcList);
     }
 };
 
 const massageValidateResults = (nc: NameCount.Type, results: ValidateResult[]): void => {
-    //initPropertyCountsInAllResults(nc, results);
     initSrcBitsInAllResults(results);
 };
 
@@ -625,9 +619,9 @@ let addKnownCompoundClues = function (clueList: ClueList.Compound, clueCount: nu
     clueList.filter(clue => !clue.ignore).forEach(clue => {
         clue.src = clue.src.split(',').sort().toString();
         let result = addCompoundClue(clue, clueCount, args);
-	if (result.success) {
+        if (result.success) {
             addKnownClue(clueCount, clue.name, clue.src);
-	} else if (!State.ignoreLoadErrors) {
+        } else if (!State.ignoreLoadErrors) {
             console.error(`VALIDATE FAILED KNOWN COMPOUND CLUE: '${clue.src}':${clueCount}`);
         }
     });
@@ -776,9 +770,9 @@ export let getCountListForName = (name: string): CountList => {
     let countList: CountList = [...Array(State.knownClueMapArray.length).keys()]
         .filter(count => count && _.has(getKnownClueMap(count), name));
     if (_.isEmpty(countList) || (countList[0] !== 1)) {
-	if (anyCandidateHasClueName(name)) {
-	    countList = [1, ...countList];
-	}
+        if (anyCandidateHasClueName(name)) {
+            countList = [1, ...countList];
+        }
     }
     return countList;
 };
@@ -827,7 +821,7 @@ let primaryNcListToNameSrcSets = function (ncList: NameCount.List): Set<string>[
             let set = new Set<string>();
             //indexList.forEach((value, index) => set.add(NameCount.makeNew(ncList[index].name, srcLists[index][value])));
             indexList.forEach((value, index) =>
-		set.add(NameCount.makeCanonicalName(ncList[index].name,
+                set.add(NameCount.makeCanonicalName(ncList[index].name,
                   _.toNumber(srcLists[index][value]))));
             if (set.size === indexList.length) {
                 result.push(set); // no duplicates
@@ -886,16 +880,16 @@ export let filter = function (srcCsvList: string[], clueCount: number, map: any 
 const singleEntry = (nc: NameCount.Type, source: string): SourceData => {
     let nameSrcList: NameCount.List = [NameCount.makeNew(nc.name, Number(source))];
     return {
-	clues: [],
+        clues: [],
         results: [            
-	    {
+            {
                 ncList: [nc],
                 nameSrcList,
                 sourceBits: CountBits.makeFrom(Sentence.legacySrcList(nameSrcList)),
-		usedSources: Source.getUsedSources(nameSrcList),
-		// TODO: these two shouldn't be here.
-		resultMap: undefined,
-		allCandidates: []
+                usedSources: Source.getUsedSources(nameSrcList),
+                // TODO: these two shouldn't be here.
+                resultMap: undefined,
+                allCandidates: []
             }
         ]
     };

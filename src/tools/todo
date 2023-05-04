@@ -1,13 +1,14 @@
-* bug: -t peru,pure --fast -v
-  * I think the problem lies in buildUseSourceListsFromNcData.
-    A "compatible sources" check may need to happen here somewhere.
-
-* need to initUsedSources after return from merge, now
+* -t 20,s or 24,s are valid, shouldn't be. looks like restrictSameClueNumber
+  is broke.
+  * now it crashes. after putting in support for non-unique legacy clue names
+    into the uniquePrimaryClueNames list.
+  * so one idea is we could justa call Validator.validateSources(validateAll: false)
+    for any supplyed -t (or --xor, --or, etc) combo. If it doesn't pass
+    validator, then, duh, it's nto valid. The problem with this is if I want
+    to support name:count syntax: Validator doesn't (currently) support it.
+  * Maybe the crash on bad combos is something I can live with for now.
 
 * NameCount.listHasCompatibleSources looks unnecessary, or weird, or both
-
-* quick exit from PreCompute if any --xor specified and merge returns an
-  empty list
 
 * so, ClueManager.getClueList(1) is the culprit. In every case, I need
   to review what I am doing with the list when I call it with 1.
@@ -19,6 +20,8 @@
 
 * -t (no --verbose) output sources is funny
 * make -t --fast default
+
+* -t full support, including --add, will be necessary
 
 * I wonder if I am still respecting max in peco, for the cases where that
   makes sense.  did I comment it out, or just allow undefined?
@@ -40,6 +43,33 @@
   unwrap into a 128-bit bitset, with the value shifted left 13 bits for
   each sentence.
   initialize/default each set of sentence-bits to 0x1fff (13 bits on)
+
+* I think the match changed a bit from above.  now i've got multpile
+  values per sentence (up to 100, but i could limit it to 64 as well)
+  but the variation # stays the same.
+  so still 13 bits for variation#.
+  6 7 bits for index (64 or 100)
+  128 = 13 + N * count (N = 6 or 7)
+  N = 115 / count
+  for N=6, count = 19
+  for N=7, count = 16
+  that's how many primary sources from the same sentence can be stored
+  in 128 bits.
+  64 or 100 is the total number of ?? what ?? of "names", meaning, of
+  possible components in any single combined sentence?  That sounds
+  too high. I wonder how much if any the "anagrams are components"
+  part of the legacy design impacted this number. If we leave anagrams
+  to post-processing, I could see reducing that number to 32 (5 bits)
+  for N=5, count = 23
+  and the number of variations could come down as well, because variations
+  no longer (?necessarily? - actually it's unsolved atm just theorized)
+  include anagrams/synonyms/homophones.
+  I could imagine though, that it would not be too constraining to limit
+  the variation count to 1000 (10 bits), but that's really not going to
+  buy us much. 256 (8 bits) would get us 1 more word (24) stored in a
+  128bit set for N=5. We could go there if we need to but I don't see
+  the need at the moment introduce a constraint on variation count when
+  I don't really understand the math.
 
 * the first/next/nextIndex stuff in combo-maker looks sus
 

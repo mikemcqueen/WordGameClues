@@ -13,7 +13,7 @@ const ResultMap   = require('../../types/result-map');
 const Assert      = require('assert');
 const Debug       = require('debug')('validator');
 const Expect      = require('should/as-function');
-const stringify	  = require('javascript-stringify').stringify;
+const stringify   = require('javascript-stringify').stringify;
 const Stringify2  = require('stringify-object');
 const Timing      = require('debug')('timing');
 
@@ -28,8 +28,8 @@ import * as Source from './source';
 
 function Stringify(val: any) {
     return stringify(val, (value: any, indent: any, stringify: any) => {
-	if (typeof value === 'function') return "function";
-	return stringify(value);
+        if (typeof value === 'function') return "function";
+        return stringify(value);
     }, " ");
 }
 
@@ -149,7 +149,7 @@ let getAllSourcesForPrimaryClueName = (name: string, allCandidates: ClueManager.
     //let clueList: { name: string, src: string }[] = ClueManager.getClueList(1);
     let clueList = ClueManager.getClueList(1) as ClueList.Primary;
     let sources: number[] = clueList.filter(clue => clue.name === name)
-	.map(clue => _.toNumber(clue.src));
+        .map(clue => _.toNumber(clue.src));
 
     // TODOTODOTODOTODOTODOTODOTODOTODOTODOTODOTODOTODOTODOTODOTODOTODO
     //
@@ -162,21 +162,21 @@ let getAllSourcesForPrimaryClueName = (name: string, allCandidates: ClueManager.
 
     // Add "sentence" candidates to sources list.
     allCandidates.filter(container => {
-	let has = _.has(container.nameIndicesMap, name);
-	if (log) console.error(`filter ${container}, ${name}: ${has}`);
-	return has;
+        let has = _.has(container.nameIndicesMap, name);
+        if (log) console.error(`filter ${container}, ${name}: ${has}`);
+        return has;
     }).forEach(container => {
-	// add all sources for name to sources list
-	let numValidIndices = 0;
-	const compatibleIndices = container.nameIndicesMap[name];
-	for (let index of compatibleIndices) {
-	    if (!container.candidates[index]) continue; // might have been deleted already
-	    numValidIndices += 1;
-	    Assert(_.has(container.candidates[index].nameSourcesMap, name));
-	    Assert(!_.isEmpty(container.candidates[index].nameSourcesMap[name]));
-	    sources.push(...container.candidates[index].nameSourcesMap[name]);
-	}
-	if (log) console.error(` ${numValidIndices} indices valid of ${[...compatibleIndices].length}`);
+        // add all sources for name to sources list
+        let numValidIndices = 0;
+        const compatibleIndices = container.nameIndicesMap[name];
+        for (let index of compatibleIndices) {
+            if (!container.candidates[index]) continue; // might have been deleted already
+            numValidIndices += 1;
+            Assert(_.has(container.candidates[index].nameSourcesMap, name));
+            Assert(!_.isEmpty(container.candidates[index].nameSourcesMap[name]));
+            sources.push(...container.candidates[index].nameSourcesMap[name]);
+        }
+        if (log) console.error(` ${numValidIndices} indices valid of ${[...compatibleIndices].length}`);
     });
     
     if (_.isEmpty(sources)) throw new Error(`can't find: ${name}`);
@@ -201,34 +201,34 @@ const mergeNcListResults = (ncListToMerge: NameCount.List,
     });
     let resultList: ValidateResult[] = [];
     const combos = Peco.makeNew({
-	listArray
+        listArray
     }).getCombinations().forEach((indexList: number[]) => {
-	let usedSources: Source.UsedSources = [];
+        let usedSources: Source.UsedSources = [];
         let ncList: NameCount.List = [];
         let nameSrcList: NameCount.List = [];
         let resultMap = ResultMap.makeNew();
         let restrictToClueNumber = 0;
-	// indexList value is either an index into a resultMap.list (compound clue)
-	// or a primary source (primary clue)
+        // indexList value is either an index into a resultMap.list (compound clue)
+        // or a primary source (primary clue)
         for (let i = 0; i < indexList.length; ++i) {
             const nc = ncListToMerge[i];
             if (nc.count > 1) { // compound clue
-		const resultListIndex = indexList[i];
+                const resultListIndex = indexList[i];
                 const result = ClueManager.getNcResultMap(nc.count)[nc.toString()]
-		    .list[resultListIndex];
-		for (let nameSrc of result.nameSrcList) {
-		    if (!Source.addUsedSource(usedSources, nameSrc.count, true)) {
-			return; // forEach.continue;
-		    }
-		}
+                    .list[resultListIndex];
+                for (let nameSrc of result.nameSrcList) {
+                    if (!Source.addUsedSource(usedSources, nameSrc.count, true)) {
+                        return; // forEach.continue;
+                    }
+                }
                 ncList.push(...result.ncList);
                 nameSrcList.push(...result.nameSrcList);
                 resultMap.addNcMapSource(nc, result.resultMap);
             } else { // primary clue
-		const primarySrc = indexList[i];
-		if (!Source.addUsedSource(usedSources, primarySrc, true)) {
-		    return; // forEach.continue;
-		}
+                const primarySrc = indexList[i];
+                if (!Source.addUsedSource(usedSources, primarySrc, true)) {
+                    return; // forEach.continue;
+                }
                 ncList.push(nc);
                 const nameSrc = NameCount.makeNew(nc.name, primarySrc);
                 nameSrcList.push(nameSrc);
@@ -250,10 +250,10 @@ const mergeNcListResults = (ncListToMerge: NameCount.List,
                 ncList,
                 resultMap,
                 nameSrcList,
-		allCandidates: [] // args.allCandidates // TODO avoiding OOM
+                allCandidates: [] // args.allCandidates // TODO avoiding OOM
             };
             resultList.push(result);
-	}
+        }
     });
     return { list: resultList, success: !_.isEmpty(resultList) };
 };
@@ -281,7 +281,7 @@ let validateSourcesForNameCount = (clueName: string|undefined, srcName: string,
 {
     Debug(`++validateSourcesForNameCount(${clueName}), ${srcName}:${srcCount}` +
         `, validateAll: ${args.validateAll} ${indentNewline()}` +
-	`  ncList: ${args.ncList}, nameList: ${args.nameList}`);
+        `  ncList: ${args.ncList}, nameList: ${args.nameList}`);
 
     let ncList = copyAddNcList(args.ncList, srcName, srcCount);
     if (_.isEmpty(ncList)) {
@@ -300,7 +300,7 @@ let validateSourcesForNameCount = (clueName: string|undefined, srcName: string,
     if (args.nameList.length === 1) {
         let result: ValidateSourcesResult;
         if (args.fast && args.validateAll) { // NOTE getting rid of this validateAll check might fix --copy-from, --add, etc.
-	    theName = clueName!;
+            theName = clueName!;
             result = mergeNcListResults(ncList, args);
         } else {
             result = OldValidator.checkUniqueSources(ncList, args);
@@ -317,12 +317,12 @@ let validateSourcesForNameCount = (clueName: string|undefined, srcName: string,
     // and validate remaining
     Debug(`..calling validateSorucesForNameCountLists recursively, ncList: ${ncList}`);
     let rvsResult = validateSourcesForNameCountLists(clueName,
-	chop(args.nameList, srcName), chop(args.countList, srcCount), {
-	    allCandidates: args.allCandidates, //ClueManager.copyAllCandidates(args.allCandidates),
-	    ncList,
-	    fast: args.fast,
-	    validateAll: args.validateAll
-	});
+        chop(args.nameList, srcName), chop(args.countList, srcCount), {
+            allCandidates: args.allCandidates, //ClueManager.copyAllCandidates(args.allCandidates),
+            ncList,
+            fast: args.fast,
+            validateAll: args.validateAll
+        });
     if (!rvsResult.success) {
         Debug('--validateSourcesForNameCount: validateSourcesForNameCountLists failed');
         return rvsResult;
@@ -355,23 +355,23 @@ let validateSourcesForNameCountLists = (clueName: string|undefined, nameList: st
     const name = nameList[0];
     // could do this test earlier, like in calling function, check entire name list.
     if (name === clueName) {
-	return { success: false, list: undefined };
+        return { success: false, list: undefined };
     }
     let success = countList
-	.filter(count => ClueManager.isKnownNc({ name, count }))
+        .filter(count => ClueManager.isKnownNc({ name, count }))
         .some(count =>
     {
         let rvsResult = validateSourcesForNameCount(clueName, name, count, {
             nameList,
             countList,
-	    allCandidates: args.allCandidates,
+            allCandidates: args.allCandidates,
             ncList: args.ncList,
             fast: args.fast,
             validateAll: args.validateAll
         });
         if (!rvsResult.success) return false; // some.continue;
         Debug(`  validateSourcesForNameCount output for: ${name}`+
-	    `, ncList(${args.ncList.length}): ${args.ncList}`);
+            `, ncList(${args.ncList.length}): ${args.ncList}`);
         // sanity check
         if (!args.validateAll && (args.ncList.length < 2)) {
             // TODO: add "allowSingleEntry" ?
@@ -409,17 +409,17 @@ export const validateSources = (clueName: string|undefined, args: any):
         quiet:   args.quiet
     }).getCombinations().some((countList: number[]) => {
         let rvsResult = validateSourcesForNameCountLists(clueName, args.nameList, countList, {
-	    allCandidates: ClueManager.getAllCandidates(), //ClueManager.copyAllCandidates(),
-	    ncList: [],
+            allCandidates: ClueManager.getAllCandidates(), //ClueManager.copyAllCandidates(),
+            ncList: [],
             fast: args.fast,
             validateAll: args.validateAll
         });
         if (rvsResult.success) {
             Debug('validateSources: VALIDATE SUCCESS!');
             if (rvsResult.list) {
-		resultList.push(...rvsResult.list);// TODO: return empty array, get rid of .success
-	    }
-	    //console.error(`resultList(${resultList.length})`);
+                resultList.push(...rvsResult.list);// TODO: return empty array, get rid of .success
+            }
+            //console.error(`resultList(${resultList.length})`);
             found = true;
             if (!args.validateAll) return true; // found a match; some.exit
             // validatingg all, continue searching

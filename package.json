@@ -48,10 +48,12 @@
   },
   "devDependencies": {
     "@types/node": "^16.11.7",
-    "mocha": "^5.2.0"
+    "mocha": "^5.2.0",
+    "node-gyp": "^9.3.1"
   },
   "scripts": {
-    "test": "make test"
+    "test": "make test",
+    "build": "node-gyp build"
   },
   "author": "Mike McQueen",
   "license": "MIT"

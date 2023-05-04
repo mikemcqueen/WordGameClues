@@ -57,9 +57,9 @@ export interface CandidatesContainer {
 
 export const emptyVariations = (): Variations => {
     return {
-	anagrams: {},
-	synonyms: {},
-	homophones: {}
+        anagrams: {},
+        synonyms: {},
+        homophones: {}
     };
 };
 
@@ -67,8 +67,8 @@ export const emptyVariations = (): Variations => {
 /*
 const emptyCandidatesContainer = (): CandidatesContainer => {
     return {
-	candidates: {},
-	nameCandidatesMap: {}
+        candidates: {},
+        nameCandidatesMap: {}
     }
 };
 */
@@ -76,7 +76,7 @@ const emptyCandidatesContainer = (): CandidatesContainer => {
 const copyStringToNumbersMap = (fromMap: StringToNumbersMap): StringToNumbersMap => {
     let toMap = {};
     for (let key of Object.keys(fromMap)) {
-	toMap[key] = new Set(fromMap[key]);
+        toMap[key] = new Set(fromMap[key]);
     }
     return toMap;
 };
@@ -84,15 +84,15 @@ const copyStringToNumbersMap = (fromMap: StringToNumbersMap): StringToNumbersMap
 const copyCandidates = (srcCandidates: Candidate[]): Candidate[] => {
     let candidates = [...srcCandidates];
     for (let candidate of candidates) {
-	candidate.nameSourcesMap = copyStringToNumbersMap(candidate.nameSourcesMap);
+        candidate.nameSourcesMap = copyStringToNumbersMap(candidate.nameSourcesMap);
     }
     return candidates;
 };
 
 export const copyCandidatesContainer = (container: CandidatesContainer): CandidatesContainer => {
     return {
-	candidates: copyCandidates(container.candidates),
-	nameIndicesMap: copyStringToNumbersMap(container.nameIndicesMap)
+        candidates: copyCandidates(container.candidates),
+        nameIndicesMap: copyStringToNumbersMap(container.nameIndicesMap)
     };
 };
 
@@ -119,55 +119,55 @@ const sortString = (str: string): string => {
 const validateCombinations = (sentence: Type): boolean => {
     const sortedText = stripAndSort(sentence.text);
     for (let combo of sentence.combinations) {
-	if (sortedText != stripAndSort(combo)) {
-	    console.error(`sentences (${sentence.num}) combination:` +
-		` ${sentence.text} != ${combo}`);
-	    return false;
-	}
+        if (sortedText != stripAndSort(combo)) {
+            console.error(`sentences (${sentence.num}) combination:` +
+                ` ${sentence.text} != ${combo}`);
+            return false;
+        }
     }
     return true;
 };
 
 const validateVariations = (sentence: Type): boolean => {
     for (let key of Object.keys(sentence.components)) {
-	const sortedText = stripAndSort(key);
-	for (let component of sentence.components[key]) {
-	    if (sortedText != stripAndSort(component)) {
-		console.error(`sentence (${sentence.num}) component:` +
-		    ` ${key} != ${component}`);
-		return false;
-	    }
-	}
+        const sortedText = stripAndSort(key);
+        for (let component of sentence.components[key]) {
+            if (sortedText != stripAndSort(component)) {
+                console.error(`sentence (${sentence.num}) component:` +
+                    ` ${key} != ${component}`);
+                return false;
+            }
+        }
     }
     for (let key of Object.keys(sentence.anagrams)) {
-	const sortedText = sortString(key);
-	for (let anagram of sentence.anagrams[key]) {
-	    if (sortedText != sortString(anagram)) {
-		console.error(`sentence (${sentence.num}) anagram:` +
-		    ` ${key} != ${anagram}`);
-		return false;
-	    }
-	}
+        const sortedText = sortString(key);
+        for (let anagram of sentence.anagrams[key]) {
+            if (sortedText != sortString(anagram)) {
+                console.error(`sentence (${sentence.num}) anagram:` +
+                    ` ${key} != ${anagram}`);
+                return false;
+            }
+        }
     }
     if (!sentence.anagrams) {
-	// TODO: confirm they are actually anagrams
-	console.error(`sentence ${sentence.num} missing 'anagrams'`);
-	return false;
+        // TODO: confirm they are actually anagrams
+        console.error(`sentence ${sentence.num} missing 'anagrams'`);
+        return false;
     }
     if (!sentence.synonyms) {
-	console.error(`sentence ${sentence.num} missing 'synonyms'`);
-	return false;
+        console.error(`sentence ${sentence.num} missing 'synonyms'`);
+        return false;
     }
     if (!sentence.homophones) {
-	console.error(`sentence ${sentence.num} missing 'homophones'`);
-	return false;
+        console.error(`sentence ${sentence.num} missing 'homophones'`);
+        return false;
     }
     return true;
 };
 
 const validate = (sentence: Type): boolean => {
     return validateCombinations(sentence)
-	&& validateVariations(sentence);
+        && validateVariations(sentence);
 };
 
 const makeFrom = (filename: string): Type => {
@@ -181,7 +181,7 @@ const makeFrom = (filename: string): Type => {
         }
     }
     catch(e) {
-	throw new Error(`${filename}, ${e}`);
+        throw new Error(`${filename}, ${e}`);
     }
     return sentence;
 };
@@ -200,19 +200,19 @@ const addVariations = (fromVariations: VariationMap,
     toVariations: VariationMap): void =>
 {
     for (let key of Object.keys(fromVariations)) {
-	if (_.has(toVariations, key)) {
-	    // this could be more relaxed; i could compare values to ensure equality
-	    throw new Error(`duplicate variation: ${key}`)
-	}
-	const wordList = fromVariations[key];
-	toVariations[key] = wordList;
-	for (let word of wordList) {
-	    if (_.has(toVariations, word)) {
-		// this could be more relaxed; i could compare values to ensure equality
-		throw new Error(`duplicate variation ${key}: ${word}`)
-	    }
-	    toVariations[word] = wordList;
-	}
+        if (_.has(toVariations, key)) {
+            // this could be more relaxed; i could compare values to ensure equality
+            throw new Error(`duplicate variation: ${key}`)
+        }
+        const wordList = fromVariations[key];
+        toVariations[key] = wordList;
+        for (let word of wordList) {
+            if (_.has(toVariations, word)) {
+                // this could be more relaxed; i could compare values to ensure equality
+                throw new Error(`duplicate variation ${key}: ${word}`)
+            }
+            toVariations[word] = wordList;
+        }
     }
 };
 
@@ -232,45 +232,45 @@ const buildCandidateNameListMap = (componentList: string[],
 {
     const log = false;
     if (log) {
-	console.error(`  IN: ${componentList} @ ${componentList[startIndex]}` +
-	    ` (${startIndex} of ${componentList.length})`);
+        console.error(`  IN: ${componentList} @ ${componentList[startIndex]}` +
+            ` (${startIndex} of ${componentList.length})`);
     }
     for (let i = startIndex; i < componentList.length; ++i) {
-	const component = componentList[i];
-	const replace = _.has(components, component);
-	const alternates: string[] = replace ? components[component] : [component];
-	for (let alternate of alternates) {
-	    let copy = componentList.slice(0, i);
-	    let offset = 0;
-	    const split = alternate.split(' ');
-	    if (split.length > 1) {
-		copy.push(...split);
-	    } else {
-		copy.push(alternate);
-		offset = 1;
-	    }
-	    for (let j = i + 1; j < componentList.length; ++j) {
-		copy.push(componentList[j]);
-	    }
-	    const nextIndex = i + offset;
-	    if (/*(startIndex < componentList.length - 1) || */(nextIndex < copy.length)) {
-		buildCandidateNameListMap(copy, components, nextIndex, results);
-	    } else if ((startIndex == componentList.length - 1) && (nextIndex === copy.length)) {
-		const key = copy.slice().sort().join('');
-		if (!results.has(key)) {
-		    results.set(key, copy);
-		    if (log) {
-			console.error(`  OUT: ${copy} @ start(${componentList[startIndex]}), next(${copy[nextIndex]})` +
-			    `, startIndex ${startIndex} of ${componentList.length}, nextIndex ${nextIndex} of ${copy.length}`);
-		    }
-		}
-	    } else {
-		if (log) {
-		    console.error(`  skip: ${copy} @ start(${componentList[startIndex]}), next(${copy[nextIndex]})` +
-			`, startIndex ${startIndex} of ${componentList.length}, nextIndex ${nextIndex} of ${copy.length}`);
-		}
-	    }
-	}
+        const component = componentList[i];
+        const replace = _.has(components, component);
+        const alternates: string[] = replace ? components[component] : [component];
+        for (let alternate of alternates) {
+            let copy = componentList.slice(0, i);
+            let offset = 0;
+            const split = alternate.split(' ');
+            if (split.length > 1) {
+                copy.push(...split);
+            } else {
+                copy.push(alternate);
+                offset = 1;
+            }
+            for (let j = i + 1; j < componentList.length; ++j) {
+                copy.push(componentList[j]);
+            }
+            const nextIndex = i + offset;
+            if (/*(startIndex < componentList.length - 1) || */(nextIndex < copy.length)) {
+                buildCandidateNameListMap(copy, components, nextIndex, results);
+            } else if ((startIndex == componentList.length - 1) && (nextIndex === copy.length)) {
+                const key = copy.slice().sort().join('');
+                if (!results.has(key)) {
+                    results.set(key, copy);
+                    if (log) {
+                        console.error(`  OUT: ${copy} @ start(${componentList[startIndex]}), next(${copy[nextIndex]})` +
+                            `, startIndex ${startIndex} of ${componentList.length}, nextIndex ${nextIndex} of ${copy.length}`);
+                    }
+                }
+            } else {
+                if (log) {
+                    console.error(`  skip: ${copy} @ start(${componentList[startIndex]}), next(${copy[nextIndex]})` +
+                        `, startIndex ${startIndex} of ${componentList.length}, nextIndex ${nextIndex} of ${copy.length}`);
+                }
+            }
+        }
     }
     return results;
 };
@@ -280,8 +280,8 @@ const buildClueList = (num: number, nameList: string[], src: number):
 {
     let clues: ClueList.Primary = [];
     for (let name of nameList) {
-	clues.push({ num, name, src: `${src}` });
-	src += 1;
+        clues.push({ num, name, src: `${src}` });
+        src += 1;
     }
     return clues;
 };
@@ -299,20 +299,20 @@ const buildNameSourcesMap = (clueList: ClueList.Primary, variations: Variations)
 {
     let map: NameSourcesMap = {};
     for (let clue of clueList) {
-	if (!_.has(map, clue.name)) {
-	    map[clue.name] = new Set<number>();
-	}
-	let set = map[clue.name];
-	set.add(Number(clue.src));
-	const nameVariations = getNameVariations(clue.name, variations);
-	for (let name of nameVariations) {
-	    if (!_.has(map, name)) {
-		map[name] = set;
-	    } else {
-		// if this fires, we've got mismatched name/variation somewhere
-		Assert(map[name] === set);
-	    }
-	}
+        if (!_.has(map, clue.name)) {
+            map[clue.name] = new Set<number>();
+        }
+        let set = map[clue.name];
+        set.add(Number(clue.src));
+        const nameVariations = getNameVariations(clue.name, variations);
+        for (let name of nameVariations) {
+            if (!_.has(map, name)) {
+                map[name] = set;
+            } else {
+                // if this fires, we've got mismatched name/variation somewhere
+                Assert(map[name] === set);
+            }
+        }
     }
     return map;
 };
@@ -322,29 +322,29 @@ const buildNameIndicesMap = (candidates: Candidate[], variations: Variations):
 {
     let map: NameIndicesMap = {};
     for (let i = 0; i < candidates.length; ++i) {
-	const candidate = candidates[i];
-	const names = Object.keys(candidate.nameSourcesMap);
-	for (let name of names) {
-	    if (!_.has(map, name)) {
-		map[name] = new Set<number>();
-	    }
-	    let set = map[name];
-	    set.add(i);
-	    // TODO: something tells me this may not be necessary. try with and
-	    // without, and see if there's a difference. easier than actually
-	    // understanding wtf I am doing. HA HA HA.
-	    ///*
-	    const nameVariations = getNameVariations(name, variations);
-	    for (let altName of nameVariations) {
-		if (!_.has(map, altName)) {
-		    map[altName] = set;
-		} else {
-		    // if this fires, we've got mismatched name/variation somewhere
-		    Assert(map[altName] === set);
-		}
-	    }
-	    //*/
-	}
+        const candidate = candidates[i];
+        const names = Object.keys(candidate.nameSourcesMap);
+        for (let name of names) {
+            if (!_.has(map, name)) {
+                map[name] = new Set<number>();
+            }
+            let set = map[name];
+            set.add(i);
+            // TODO: something tells me this may not be necessary. try with and
+            // without, and see if there's a difference. easier than actually
+            // understanding wtf I am doing. HA HA HA.
+            ///*
+            const nameVariations = getNameVariations(name, variations);
+            for (let altName of nameVariations) {
+                if (!_.has(map, altName)) {
+                    map[altName] = set;
+                } else {
+                    // if this fires, we've got mismatched name/variation somewhere
+                    Assert(map[altName] === set);
+                }
+            }
+            //*/
+        }
     }
     return map;
 };
@@ -356,22 +356,22 @@ export const buildAllCandidates = (sentence: Type/*, variations: Variations*/):
     let src = 1_000_000 * sentence.num; // up to 10000 variations of up to 100 names
     const sortedText = stripAndSort(sentence.text);
     for (const combo of sentence.combinations) {
-	const nameListMap = buildCandidateNameListMap(combo.split(' '), sentence.components);
-	for (let nameList of nameListMap.values()) {
-	    if (sortedText !== joinAndSort(nameList)) {
-		throw new Error(`sentence '${sentence.text}' != nameList '${nameList}'`);
-	    }
-	    const clues = buildClueList(sentence.num, nameList, src);
-	    candidates.push({
-		clues,
-		nameSourcesMap: buildNameSourcesMap(clues, sentence) // variations
-	    });
-	    src += 100;
-	}
+        const nameListMap = buildCandidateNameListMap(combo.split(' '), sentence.components);
+        for (let nameList of nameListMap.values()) {
+            if (sortedText !== joinAndSort(nameList)) {
+                throw new Error(`sentence '${sentence.text}' != nameList '${nameList}'`);
+            }
+            const clues = buildClueList(sentence.num, nameList, src);
+            candidates.push({
+                clues,
+                nameSourcesMap: buildNameSourcesMap(clues, sentence) // variations
+            });
+            src += 100;
+        }
     }
     return {
-	candidates,
-	nameIndicesMap: buildNameIndicesMap(candidates, sentence) // variations
+        candidates,
+        nameIndicesMap: buildNameIndicesMap(candidates, sentence) // variations
     };
 };
 

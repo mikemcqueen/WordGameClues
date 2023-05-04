@@ -28,8 +28,8 @@ import * as PreCompute from './cm-precompute';
 
 function Stringify (val) {
     return stringify(val, (value, indent, stringify) => {
-	if (typeof value == 'function') return "function";
-	return stringify(value);
+        if (typeof value == 'function') return "function";
+        return stringify(value);
     }, " ");
 }
 
@@ -72,7 +72,7 @@ function getSourceClues (source, countList, nameList) {
 function getClueSources (name, count, nameList) {
     const srcMap = ClueManager.getKnownSourceMap(count);
     return nameList.map(source => {
-	/*
+        /*
         if (count === 1) {
             const clue = _.find(ClueManager.getClueList(count), { name, src: source });
             const counts = clue.propertyCounts.synonym;
@@ -84,10 +84,10 @@ function getClueSources (name, count, nameList) {
                                                           Clue.PropertyName.Synonym));
             // TODO: duplicated in getSourceClues
             const totals = countsList.map(tp => tp.total);
-	    const primarys = countsList.map(tp => tp.primary);
+            const primarys = countsList.map(tp => tp.primary);
             source += ` : syn total(${totals}) primary(${primarys})`;
         }
-	*/
+        */
         return source;
     }).join(' - ');
 }
@@ -114,24 +114,24 @@ function showCountListArray (name, countListArray, text, hasNameList = false) {
 const showXorResults = (xorResults, options) => {
     let hash = {};
     for (let xorResult of xorResults) {
-	if (options.verbose) {
-	    console.log(`${NameCount.listToString(xorResult.ncList)}:` +
-		` ${NameCount.listToString(xorResult.primaryNameSrcList)}`);
-	    continue;
-	}
-	const nameList = NameCount.listToNameList(xorResult.ncList).toString();
-	const countList = NameCount.listToCountList(xorResult.ncList).toString();
-	if (!_.has(hash, countList)) {
-	    hash[countList] = new Set();
-	}
-	let set = hash[countList];
-	if (!set.has(nameList)) {
-	    set.add(nameList);
-	}
+        if (options.verbose) {
+            console.log(`${NameCount.listToString(xorResult.ncList)}:` +
+                ` ${NameCount.listToString(xorResult.primaryNameSrcList)}`);
+            continue;
+        }
+        const nameList = NameCount.listToNameList(xorResult.ncList).toString();
+        const countList = NameCount.listToCountList(xorResult.ncList).toString();
+        if (!_.has(hash, countList)) {
+            hash[countList] = new Set();
+        }
+        let set = hash[countList];
+        if (!set.has(nameList)) {
+            set.add(nameList);
+        }
     }
     if (options.verbose) return;
     for (let key of _.keys(hash)) {
-   	console.log(`${key} PRESENT as ${[...hash[key].entries()].join(' - ')}`);
+        console.log(`${key} PRESENT as ${[...hash[key].entries()].join(' - ')}`);
     }
 }
 
@@ -147,24 +147,23 @@ function show (options: any) {
 
     // TODO: move buildAllUseNcDataLists to clue-manager?  currently in combo-maker
 
-    // why only .or? probably because too slow if not
-    console.log(`test: ${options.test}`);
+    options.fast = true; // force fast
+    console.log(`test: ${options.test}, fast=${options.fast}`);
     if (!_.isEmpty(options.or)) {
         console.error('--or specified: forcing --fast');
-	options.fast = true; // force fast
     }
 
     const nameList = options.test.split(',').sort();
     if ((nameList.length > 1) && options.fast) {
-	//return fast_combo_wrapper(nameList, options);
-	let args = { xor: nameList, max: 2 };
-	let result = PreCompute.preCompute(2, ClueManager.getNumPrimarySources(), args);
-	if (result.success) {
-	    showXorResults(result.data!.useSourceLists.xor, options);
-	} else {
-            console.log('No matches');
-	}
-	process.exit(0);
+        //return fast_combo_wrapper(nameList, options);
+        let args = { xor: nameList, max: 2 };
+        let result = PreCompute.preCompute(2, ClueManager.getNumPrimarySources(), args);
+        if (result.success) {
+        showXorResults(result.data!.useSourceLists.xor, options);
+    } else {
+        console.log('No matches');
+    }
+        process.exit(0);
     }
     const nameCsv = nameList.toString();
     const result = ClueManager.getCountListArrays(nameCsv, options);
@@ -222,20 +221,20 @@ function getCompatiblePrimaryNameSrcList (listOfListOfPrimaryNameSrcLists) {
     //console.log(`${Stringify(comboLists)}`);
 
     for (const comboList of comboLists) {
-	const nameSrcList = comboList.reduce((nameSrcList, comboListValue, comboListIndex) => {
-	    let nsList = listOfListOfPrimaryNameSrcLists[comboListIndex][comboListValue];
-	    //console.log(`nameSrcList: ${nameSrcList}, clValue ${comboListValue}, clIndex ${comboListIndex}, nsList: ${nsList}`);
-	    if (!nsList || !_.isArray(nsList)) {
-		console.log(`nsList: ${nsList}, value ${comboListValue} index ${comboListIndex} lolPnsl(${comboListIndex}):` +
+        const nameSrcList = comboList.reduce((nameSrcList, comboListValue, comboListIndex) => {
+            let nsList = listOfListOfPrimaryNameSrcLists[comboListIndex][comboListValue];
+            //console.log(`nameSrcList: ${nameSrcList}, clValue ${comboListValue}, clIndex ${comboListIndex}, nsList: ${nsList}`);
+            if (!nsList || !_.isArray(nsList)) {
+                console.log(`nsList: ${nsList}, value ${comboListValue} index ${comboListIndex} lolPnsl(${comboListIndex}):` +
                             ` ${Stringify(listOfListOfPrimaryNameSrcLists[comboListIndex])} nameSrcList ${Stringify(nameSrcList)}`);
-		console.log(`lolopnsl: ${Stringify(listOfListOfPrimaryNameSrcLists)}`);
-	    }
-	    nameSrcList.push(...nsList);
-	    return nameSrcList;
-	}, []);
-	const uniqNameSrcList = _.uniqBy(nameSrcList, NameCount.count);
-	//console.log(`nameSrcList ${Stringify(nameSrcList)} len ${nameSrcList.length} uniqLen ${uniqNameSrcList.length}`);
-	if (uniqNameSrcList.length === nameSrcList.length) return uniqNameSrcList;
+                console.log(`lolopnsl: ${Stringify(listOfListOfPrimaryNameSrcLists)}`);
+            }
+            nameSrcList.push(...nsList);
+            return nameSrcList;
+        }, []);
+        const uniqNameSrcList = _.uniqBy(nameSrcList, NameCount.count);
+        //console.log(`nameSrcList ${Stringify(nameSrcList)} len ${nameSrcList.length} uniqLen ${uniqNameSrcList.length}`);
+        if (uniqNameSrcList.length === nameSrcList.length) return uniqNameSrcList;
     }
     return null;
 }
@@ -261,31 +260,31 @@ function flunky (nameList, /*allOrNcDataList,*/ options) {
     console.log(`maxArg: ${options.maxArg}`);
     let maxIter = options.maxArg ? options.maxArg : max;
     for (let count = maxIter; count >= min; --count) {
-	Timing(`wrapper count(${count})`);
-	const listArray = [...Array(count).keys()].map(_ => indexList);
-	let peco = Peco.makeNew({
-	    listArray,
-	    max: count * max
-	});
-	let comboCount = 0;
-	let comboList;
-	for (/*let */comboList = peco.firstCombination(); !_.isNull(comboList); comboList = peco.nextCombination()) {
-	    comboCount++;
-	    //console.log(`comboList: ${comboList}`); //***logging
-	    //if (1) continue;
-	    //if (_.uniq(comboList).length !== comboList.length) continue;
-	    //console.log(comboList);
-	    let subList = buildSubListFromIndexList(clueNameList, comboList);
-	    let comboNameList = [...nameList, ...subList];
-	    //console.log(`comboNameList: ${comboNameList}`);
-	    let validResultList = fast_combos_list(comboNameList, Object.assign(
+        Timing(`wrapper count(${count})`);
+        const listArray = [...Array(count).keys()].map(_ => indexList);
+        let peco = Peco.makeNew({
+            listArray,
+            max: count * max
+        });
+        let comboCount = 0;
+        let comboList;
+        for (/*let */comboList = peco.firstCombination(); !_.isNull(comboList); comboList = peco.nextCombination()) {
+            comboCount++;
+            //console.log(`comboList: ${comboList}`); //***logging
+            //if (1) continue;
+            //if (_.uniq(comboList).length !== comboList.length) continue;
+            //console.log(comboList);
+            let subList = buildSubListFromIndexList(clueNameList, comboList);
+            let comboNameList = [...nameList, ...subList];
+            //console.log(`comboNameList: ${comboNameList}`);
+            let validResultList = fast_combos_list(comboNameList, Object.assign(
                 _.clone(options), { quiet: true, skip_invalid: true }));
-	    addValidResults(validResults, validResultList, { slice_index: nameList.length });
-	}
-	Timing(`comboCount: ${comboCount}`);
-	
-	// Bigger idea: optional arg(s) to -t[COUNTLO[,COUNTHI]]
-	// build list of input clues from all clues of those counts
+            addValidResults(validResults, validResultList, { slice_index: nameList.length });
+        }
+        Timing(`comboCount: ${comboCount}`);
+        
+        // Bigger idea: optional arg(s) to -t[COUNTLO[,COUNTHI]]
+        // build list of input clues from all clues of those counts
     }
     display_valid_results(validResults);
 }
@@ -294,9 +293,9 @@ function fast_combo_wrapper (nameList, /*allOrNcDataList,*/ options) {
     console.error('fast_combo_wrapper');
     console.error(`--or: ${Stringify(options.or)}`);
     if (options.or) {
-	flunky(nameList, options);
+        flunky(nameList, options);
     } else {
-	let counts = fast_combos(nameList, options);
+        let counts = fast_combos(nameList, options);
         addOrRemove ({
             add:      options.add,
             remove:   options.remove,
@@ -308,11 +307,11 @@ function fast_combo_wrapper (nameList, /*allOrNcDataList,*/ options) {
 function get_clue_names (options: any) {
     let result: string[] = [];
     if (options.count_lo) {
-	//console.log(`get_clue_names: lo(${options.count_lo}) hi(${options.count_hi})`);
-	for (let count = options.count_lo; count <= options.count_hi; count += 1) {
-	    result.push(...ClueManager.getClueList(count).map(clue => clue.name));
-	}
-	result = _.uniq(result);
+        //console.log(`get_clue_names: lo(${options.count_lo}) hi(${options.count_hi})`);
+        for (let count = options.count_lo; count <= options.count_hi; count += 1) {
+            result.push(...ClueManager.getClueList(count).map(clue => clue.name));
+        }
+        result = _.uniq(result);
     }
     return result;
 }
@@ -320,58 +319,58 @@ function get_clue_names (options: any) {
 function fast_combos (nameList, options) {
     let counts = new Set();
     fast_combos_list(nameList, options)
-	.forEach(result => {
-	    let message = 'invalid';
-	    if (result.valid) {
-		message = `VALID (${result.sum}) ${result.compatibleNameSrcList} `
+        .forEach(result => {
+            let message = 'invalid';
+            if (result.valid) {
+                message = `VALID (${result.sum}) ${result.compatibleNameSrcList} `
                     + `REMAIN(${result.inversePrimarySources.length}): ${result.inversePrimarySources}`;
                 counts.add(result.sum);
-	    }
-	    console.log(`${result.ncList} ${message}`);
-	});
+            }
+            console.log(`${result.ncList} ${message}`);
+        });
     return counts;
 }
 
 function fast_combos_list (nameList, options) {
     const ncLists = ClueManager.buildNcListsFromNameList(nameList);
     if (_.isEmpty(ncLists)) {
-	if (!options.quiet) {
-	    console.log(`No ncLists for ${nameList}`);
-	}
-	//console.log(`nameList: ${nameList} - EMPTY`);
-	return [];
+        if (!options.quiet) {
+            console.log(`No ncLists for ${nameList}`);
+        }
+        //console.log(`nameList: ${nameList} - EMPTY`);
+        return [];
     }
     //console.log(`nameList: ${nameList}`);
     //ncLists.forEach(ncList => console.log(`  ncList: ${ncList}`));
     const lists = ClueManager.buildListsOfPrimaryNameSrcLists(ncLists);
     return lists.reduce((resultList, listOfListOfPrimaryNameSrcLists, index) => {
-	let add = false;
-	let result: any = {};
-	result.compatibleNameSrcList = getCompatiblePrimaryNameSrcList(listOfListOfPrimaryNameSrcLists);
-	result.valid = Boolean(result.compatibleNameSrcList);
-	result.ncList = ncLists[index];
-	if (result.valid) {
-	    result.sum = ncLists[index].reduce((sum, nc) => sum + nc.count, 0);
-	    result.inversePrimarySources = ClueManager.getInversePrimarySources(result.compatibleNameSrcList.map(ns => `${ns.count}`));
-	    add = true;
-	} else if (!options.skip_invalid) {
-	    add = true;
-	}
-	if (add) resultList.push(result);
-	//console.log(`${result.ncList} : ${result.valid ? 'VALID' : 'invalid'}`);
-	return resultList;
+        let add = false;
+        let result: any = {};
+        result.compatibleNameSrcList = getCompatiblePrimaryNameSrcList(listOfListOfPrimaryNameSrcLists);
+        result.valid = Boolean(result.compatibleNameSrcList);
+        result.ncList = ncLists[index];
+        if (result.valid) {
+            result.sum = ncLists[index].reduce((sum, nc) => sum + nc.count, 0);
+            result.inversePrimarySources = ClueManager.getInversePrimarySources(result.compatibleNameSrcList.map(ns => `${ns.count}`));
+            add = true;
+        } else if (!options.skip_invalid) {
+            add = true;
+        }
+        if (add) resultList.push(result);
+        //console.log(`${result.ncList} : ${result.valid ? 'VALID' : 'invalid'}`);
+        return resultList;
     }, []);
 }
 
 function addValidResults (validResults, validResultList, options) {
     validResultList.forEach(result => {
-	Expect(result.valid).is.ok();
-	let names = result.ncList.slice(options.slice_index).map(nc => nc.name).sort().toString();
-	if (!_.has(validResults, names)) {
-	    validResults[names] = [];
-	}
-	validResults[names].push(result);
-	//console.log(`${result.ncList} : VALID (${result.sum}): ${result.compatibleNameSrcList} `);
+        Expect(result.valid).is.ok();
+        let names = result.ncList.slice(options.slice_index).map(nc => nc.name).sort().toString();
+        if (!_.has(validResults, names)) {
+            validResults[names] = [];
+        }
+        validResults[names].push(result);
+        //console.log(`${result.ncList} : VALID (${result.sum}): ${result.compatibleNameSrcList} `);
     });
 }
 
@@ -382,7 +381,7 @@ function display_valid_results (validResults) {
 
 function showNcLists (ncLists) {
     for (let ncList of ncLists) {
-	console.log(`${ncList}`);
+        console.log(`${ncList}`);
     }
 }
 
@@ -391,9 +390,9 @@ function showNcLists (ncLists) {
 function validate (filename, options: any = {}) {
     const lines = readlines(filename);
     if (options.combos) {
-	validate_combos(lines, options);
+        validate_combos(lines, options);
     } else {
-	validate_sources(lines, options);
+        validate_sources(lines, options);
     }
 }
 
@@ -401,19 +400,19 @@ function validate_combos(lines, options): void {
     const combos: string[] = [];
     let input = lines;
     for (;;) {
-	Timing(``);
-	const raw_combo_list = all_combos(input, lines);
-	Timing(`all_combos (${raw_combo_list.length})`);
-	if (_.isEmpty(raw_combo_list)) break;
-	Debug(`raw: ${typeof(raw_combo_list)}, len: ${raw_combo_list.length}: ${raw_combo_list}`);
-	let valid_combo_list = valid_combos(raw_combo_list);
-	if (_.isEmpty(valid_combo_list)) break; 
-	Timing(`valid combos (${valid_combo_list.length})`);
-	combos.push(...valid_combo_list);
-	input = valid_combo_list;
+        Timing(``);
+        const raw_combo_list = all_combos(input, lines);
+        Timing(`all_combos (${raw_combo_list.length})`);
+        if (_.isEmpty(raw_combo_list)) break;
+        Debug(`raw: ${typeof(raw_combo_list)}, len: ${raw_combo_list.length}: ${raw_combo_list}`);
+        let valid_combo_list = valid_combos(raw_combo_list);
+        if (_.isEmpty(valid_combo_list)) break; 
+        Timing(`valid combos (${valid_combo_list.length})`);
+        combos.push(...valid_combo_list);
+        input = valid_combo_list;
     }
     combos.forEach(combo => {
-	console.log(`${combo}`);
+        console.log(`${combo}`);
     });
 }
 
@@ -422,21 +421,21 @@ function valid_combos(combo_list: string[], options: any = {}): string[] {
     options.any = true;
 
     combo_list.forEach(combo_str => {
-	//onst combo_str = _.join(combo, ',');
-	//Debug(`${typeof(combo)}: ${combo}`);
-	Debug(`${typeof(combo_str)}: ${combo_str} (${combo_str.split(',').length})`);
-	if (combo_str.split(',').length > 3) return; // continue
-//	const result = ClueManager.getCountListArrays(combo_str, options);
-	const result = show( {test: combo_str, save: false, fast: true });
-	if (!result || !(result.known.length + result.valid.length)) {
+        //onst combo_str = _.join(combo, ',');
+        //Debug(`${typeof(combo)}: ${combo}`);
+        Debug(`${typeof(combo_str)}: ${combo_str} (${combo_str.split(',').length})`);
+        if (combo_str.split(',').length > 3) return; // continue
+//      const result = ClueManager.getCountListArrays(combo_str, options);
+        const result = show( {test: combo_str, save: false, fast: true });
+        if (!result || !(result.known.length + result.valid.length)) {
             return;
-	}
-	//showCountListArray(result.invalid, 'INVALID');
-	//showCountListArray(result.known, 'PRESENT as', true);
-	  //showCountListArray(result.clues, 'PRESENT as clue with sources:', true);
-	//showCountListArray(result.valid, 'VALID');
-	Debug(`valid_combos adding: ${combo_str}`);
-	combos.push(combo_str);
+        }
+        //showCountListArray(result.invalid, 'INVALID');
+        //showCountListArray(result.known, 'PRESENT as', true);
+          //showCountListArray(result.clues, 'PRESENT as clue with sources:', true);
+        //showCountListArray(result.valid, 'VALID');
+        Debug(`valid_combos adding: ${combo_str}`);
+        combos.push(combo_str);
     });
     return combos;
 }
@@ -444,24 +443,24 @@ function valid_combos(combo_list: string[], options: any = {}): string[] {
 function all_combos(input_list: string[], word_list: string[]): string[] {
     const combos: string[] = [];
     for (const csvInput of input_list) {
-	const input = csvInput.split(',');
-	for (const word of word_list) {
-	    const combo = _.concat(input, word);
-	    // sort here, then sortedUniq. then no sort at join.
-	    const uniq = _.sortedUniq(combo.sort());
-	    if (combo.length != uniq.length) {
-		continue;
-	    }
-	    Debug(`all_combos adding: ${uniq}`);
-	    combos.push(_.join(uniq, ','));
-	}
+        const input = csvInput.split(',');
+        for (const word of word_list) {
+            const combo = _.concat(input, word);
+            // sort here, then sortedUniq. then no sort at join.
+            const uniq = _.sortedUniq(combo.sort());
+            if (combo.length != uniq.length) {
+                continue;
+            }
+            Debug(`all_combos adding: ${uniq}`);
+            combos.push(_.join(uniq, ','));
+        }
     }
     return _.uniq(combos);
 }
 
 function validate_sources(lines, options) {
     for (const line of lines) {
-	const result = ClueManager.getCountListArrays(line, options);
+        const result = ClueManager.getCountListArrays(line, options);
         if (!result || !result.valid) {
             console.log(`${line} ${!result ? 'doesnt exist??' : result.invalid ? 'invalid' : 'rejected'}`);
         }

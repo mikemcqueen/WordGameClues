@@ -28,11 +28,11 @@ auto makeUsedSourcesString(const UsedSources& usedSources) {
     } else {
       auto first = true;
       for (const auto source: usedSources[i]) {
-	if (!first) {
-	  result.append(",");
-	}
-	first = false;
-	result.append(std::to_string(source));
+        if (!first) {
+          result.append(",");
+        }
+        first = false;
+        result.append(std::to_string(source));
       }
     }
   }
@@ -117,7 +117,7 @@ void debugAddSourceToList(const SourceData& source,
     }
   }
   std::cerr << "adding " << NameCount::listToString(source.primaryNameSrcList)
-	    <<" to " << sources << endl;
+            <<" to " << sources << endl;
 }
 
 void debugAddSourceToList(const SourceData& source,
@@ -135,7 +135,7 @@ void debugAddSourceToList(const SourceData& source,
   // try:
   //std::cerr << "adding " << std::to_string(source.primaryNameSrcList) << 
   std::cerr << "adding " << NameCount::listToString(source.primaryNameSrcList)
-	    <<" to " << sources << std::endl;
+            <<" to " << sources << std::endl;
 }
 
 void debugSourceList(const SourceCRefList& sourceCRefList, std::string_view sv) {
@@ -168,9 +168,9 @@ void debugMergedSource(const SourceData& mergedSource, const SourceData& source1
   auto candidates = getCandidateCount(mergedSource);
   if (candidates > 1) {
     std::cerr << "candidates(" << candidates << "),"
-	      << " merged " << NameCount::listToString(source1.primaryNameSrcList)
-	      << " with " << NameCount::listToString(source2.primaryNameSrcList)
-	      << std::endl;
+              << " merged " << NameCount::listToString(source1.primaryNameSrcList)
+              << " with " << NameCount::listToString(source2.primaryNameSrcList)
+              << std::endl;
   }
 }
 
@@ -256,18 +256,18 @@ auto mergeCompatibleSourceLists(const SourceList& sourceList1,
   for (const auto& source1 : sourceList1) {
     for (const auto& source2 : sourceList2) {
       if (source1.isCompatibleWith(source2)) {
-	if (0) {
-	  std::cerr << makeUsedSourcesString(source1.usedSources) << " == "
-		    << makeUsedSourcesString(source2.usedSources) << std::endl;
-	}
-	auto mergedSource = mergeSources(source1, source2);
-	//debugMergedSource(mergedSource, source1, source2);
-	result.emplace_back(std::move(mergedSource));
+        if (0) {
+          std::cerr << makeUsedSourcesString(source1.usedSources) << " == "
+                    << makeUsedSourcesString(source2.usedSources) << std::endl;
+        }
+        auto mergedSource = mergeSources(source1, source2);
+        //debugMergedSource(mergedSource, source1, source2);
+        result.emplace_back(std::move(mergedSource));
       } else {
-	if (0) {
-	  std::cerr << makeUsedSourcesString(source1.usedSources) << " != "
-		    << makeUsedSourcesString(source2.usedSources) << std::endl;
-	}
+        if (0) {
+          std::cerr << makeUsedSourcesString(source1.usedSources) << " != "
+                    << makeUsedSourcesString(source2.usedSources) << std::endl;
+        }
       }
     }
   }
@@ -327,36 +327,36 @@ auto buildSourceListsForUseNcData(const vector<NCDataList>& useNcDataLists,
       //const auto& sourceList = getSourceList(ncDataList[i].ncList, sourceListMap);
       total += sourceList.size();
       for (const auto& source : sourceList) {
-	// TODO: NOT GOOD ENOUUGH. still need a set of strings in value type.
-	// HOWEVER, instead of listToSring'ing 75 million lists, how about we
-	// mark "duplicate count, different name", i.e. "aliased" sources in 
-	// clue-manager, and only listToString and add those to a separate
-	// map<bitset, set<String>> for ncLists with "shared" sourceBits.
-	// probably don't need a separate map. just don't bother populating
-	// and looking in the set unless its an aliased source.
-	
-	// Well,I had a strong opinion, above, there, and I don't think I ever
-	// resolved it. Apparently sourceBits aren't good enough here.
-	// I should probably figure out what I was thinking, especially now
-	// that usedSources is being phased in (and is not used here).
+        // TODO: NOT GOOD ENOUUGH. still need a set of strings in value type.
+        // HOWEVER, instead of listToSring'ing 75 million lists, how about we
+        // mark "duplicate count, different name", i.e. "aliased" sources in 
+        // clue-manager, and only listToString and add those to a separate
+        // map<bitset, set<String>> for ncLists with "shared" sourceBits.
+        // probably don't need a separate map. just don't bother populating
+        // and looking in the set unless its an aliased source.
+        
+        // Well,I had a strong opinion, above, there, and I don't think I ever
+        // resolved it. Apparently sourceBits aren't good enough here.
+        // I should probably figure out what I was thinking, especially now
+        // that usedSources is being phased in (and is not used here).
 
-	// usedSources is being used (in bitstring).  I think (maybe) the
-	// concern here was that I could produce two "variations" with the
-	// same primary sources. If I proceed with the new plan, where
-	// variations are only generated at (console) output time, then
-	// this doesn't matter.
+        // usedSources is being used (in bitstring).  I think (maybe) the
+        // concern here was that I could produce two "variations" with the
+        // same primary sources. If I proceed with the new plan, where
+        // variations are only generated at (console) output time, then
+        // this doesn't matter.
 
-	auto key = makeBitString(source);
-	auto it = hashList[i].find(key);
-	if (it != hashList[i].end()) {
-	  hash_hits++;
-	  continue;
-	}
-	hashList[i][key] = StringSet{};
-	//it = hashList[i].find(source.sourceBits);
-	//it->second.insert(key);
-	//debugSource(source, "source after mergeAll");
-	sourceLists[i].emplace_back(std::move(source));
+        auto key = makeBitString(source);
+        auto it = hashList[i].find(key);
+        if (it != hashList[i].end()) {
+          hash_hits++;
+          continue;
+        }
+        hashList[i][key] = StringSet{};
+        //it = hashList[i].find(source.sourceBits);
+        //it->second.insert(key);
+        //debugSource(source, "source after mergeAll");
+        sourceLists[i].emplace_back(std::move(source));
       }
     }
   }
@@ -419,7 +419,7 @@ bool filterAllXorIncompatibleIndices(Peco::IndexListVector& indexLists,
     for (auto second = 0u; second < indexLists.size(); ++second) {
       if (first == second) continue;
       if (!filterXorIncompatibleIndices(indexLists, first, second, sourceLists)) {
-	return false;
+        return false;
       }
     }
   }
@@ -456,7 +456,7 @@ SourceCRefList getCompatibleXorSources(const std::vector<int>& indexList,
   auto log = false;
   if (log) {
     std::cerr << "indexList(" << indexList.size() << ")"
-	      << " [" << list_to_string(indexList) << "]" << std::endl;
+              << " [" << list_to_string(indexList) << "]" << std::endl;
   }
   // auto reference type, uh, optional here?
   SourceCRefList sourceCRefList{};
@@ -467,7 +467,7 @@ SourceCRefList getCompatibleXorSources(const std::vector<int>& indexList,
   for (auto i = 1u; i < indexList.size(); ++i) {
     const auto& source = sourceLists[i][indexList[i]];
     if (!sourceBitsAreCompatible(sourceBits, source.sourceBits) ||
-	!usedSourcesAreCompatible(usedSources, source.usedSources))
+        !usedSourcesAreCompatible(usedSources, source.usedSources))
     {
       if (log) std::cerr << " incompatible" << std::endl;
       return {};
@@ -505,9 +505,9 @@ XorSourceList mergeCompatibleXorSources(const SourceCRefList& sourceList) {
   // I feel like this is still valid and worth removing or commenting
   assert(!primaryNameSrcList.empty() && "empty primaryNameSrcList");
   XorSource mergedSource(std::move(primaryNameSrcList),
-			 std::move(NameCount::listToSourceBits(primaryNameSrcList)),
-			 std::move(usedSources),
-			 std::move(ncList));
+                         std::move(NameCount::listToSourceBits(primaryNameSrcList)),
+                         std::move(usedSources),
+                         std::move(ncList));
   XorSourceList result{};
   result.emplace_back(std::move(mergedSource));
   return result;
@@ -516,7 +516,7 @@ XorSourceList mergeCompatibleXorSources(const SourceCRefList& sourceList) {
 auto list_size(const Peco::IndexList& indexList) {
   int size = 0;
   std::for_each(indexList.cbegin(), indexList.cend(),
-		[&size](int i){ ++size; });
+                [&size](int i){ ++size; });
   return size;
 }
 
