@@ -1,14 +1,12 @@
-* get rid of allCandidates passing through validator. just call
-  ClueManager.getAllCandidates() in getAllSourcesForPrimaryClueName
+* i think i'm going to have to use 1 as the first index maybe for source "index"
+  within a variation.  at least in c++.  I should do the same with variation.
+  lets me initialize the bitsets to all zero.
 
-* can we eliminate all candidate variations until post-processing?
-  * working on it
-  
 * so there is a problem with "ignore":true clues which depend on clues in "sentences"
   that don't support the ignore flag. this problem will go away when all clues
   are converted to sentences, presumably, but it's giving incorrect results
-  as it stands (hobbit, home appear in valid combinations for with xor.req,
-  for example, when they should be "used" by "eye".
+  as it stands (hobbit,home appear in valid combinations for with xor.req,
+  for example, when they should be "used" by "eye").
 
 * debug build of addon is running too fast and giving bad (too many) results.
   * ex: node clues -pf.71 -c2,15 -x2 --xor 21 --xor 'us 50' --xor 'koa' --xor currant -v |sort> yyy3
@@ -54,31 +52,47 @@
   initialize/default each set of sentence-bits to 0x1fff (13 bits on)
 
 * I think the match changed a bit from above.  now i've got multpile
-  values per sentence (up to 100, but i could limit it to 64 as well)
-  but the variation # stays the same.
+  values (sources really) per sentence (up to 100) but the variation #
+  stays the same.
   so still 13 bits for variation#.
-  6 or 7 bits for index (64 or 100)
-  128 = 13 + N * count (N = 6 or 7)
+  5, 6 or 7 bits for index (32 64 or 128)
+  128 = 13 + N * count 
   N = 115 / count
+  for N=5, count = 23
   for N=6, count = 19
   for N=7, count = 16
+  for N=8, count = 14
   that's how many primary sources from the same sentence can be stored
   in 128 bits.
-  64 or 100 is the total number of ?? what ?? of "names", meaning, of
-  possible components in any single combined sentence?  That sounds
-  too high. I wonder how much if any the "anagrams are components"
-  part of the legacy design impacted this number. If we leave anagrams
-  to post-processing, I could see reducing that number to 32 (5 bits)
-  for N=5, count = 23
-  and the number of variations could come down as well, because variations
-  no longer (?necessarily? - actually it's unsolved atm just theorized)
-  include anagrams/synonyms/homophones.
-  I could imagine though, that it would not be too constraining to limit
-  the variation count to 1000 (10 bits), but that's really not going to
-  buy us much. 256 (8 bits) would get us 1 more word (24) stored in a
-  128bit set for N=5. We could go there if we need to but I don't see
-  the need at the moment introduce a constraint on variation count when
-  I don't really understand the math.
+
+  128 is the total number of unique sources per sentence. this takes
+  into account the fact that we will be supporting different component-name
+  sets with completely different names for each sentence, such as between
+  v1 and v2 solutions.
+
+  128 is *probably* a safe number but might be limiting at some point,
+  so I think increasing it to 256 probably makes sense. That puts a
+  wrench in the 128 bit approach however.
+
+  16 (count, above) is the number of unique source "indexes" from a single
+  sentence, the combined primary sources of any compound clue/combination,
+  that can be stored in 128 bits. I don't think 16 is going to cut it, as
+  sentence 4 & 5 already have 22 & 21 primary sources in the v2 solution,
+  so that's obviously a constraint I'd like to avoid. Realistically, 32
+  will probably be fine.
+
+  So how do we get to support
+  * 256 total unique source component indexes per sentence
+  * 32 indexes at a time
+  
+  coocoo idea below. will *not* work for fast xor comparison. need to use bitset.
+
+  well 8 bits for component indexes x 32 indexes = std::array<uint8_t, 32>
+  and we could add an extra int for variation (-1 = unset)
+
+  I could also imagine, but don't know if this makes sense, having an
+  aggregate data structure with std::array<uint8_t, 32 * 9> (288 bytes) 
+  and std::array<int, 9>. two comparisons per call.  look into array comparison.
 
 * the first/next/nextIndex stuff in combo-maker looks sus
 

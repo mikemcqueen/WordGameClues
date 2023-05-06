@@ -53,7 +53,8 @@
   },
   "scripts": {
     "test": "make test",
-    "build": "node-gyp build"
+      "build": "node-gyp build",
+    "rebuild": "node-gyp rebuild"
   },
   "author": "Mike McQueen",
   "license": "MIT"
