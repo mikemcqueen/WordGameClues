@@ -12,6 +12,7 @@ const Peco        = require('../../modules/peco');
 const Log         = require('../../modules/log')('combo-maker');
 const My          = require('../../modules/util');
 const NativeComboMaker = require('../../../build/Release/experiment.node');
+//const NativeComboMaker = require('../../../build/Debug/experiment.node');
 
 const Assert      = require('assert');
 const Debug       = require('debug')('combo-maker');
@@ -270,19 +271,15 @@ const getCombosForUseNcLists = (sum: number, max: number, pcd: PreCompute.Data,
                 numCacheHits += 1;
             }
 
-            //console.log(`  found compatible sources: ${!listIsEmpty(mergedSourcesList)}`);
-
             // failed to find any compatible combos
             if (listIsEmpty(mergedSourcesList)) continue;
 
-            if (hash[key].isCompatible === undefined) {
+            if (_.isUndefined(hash[key].isCompatible)) {
                 isany += 1;
-                let flag = false;
-                hash[key].isCompatible = NativeComboMaker.isAnySourceCompatibleWithUseSources(mergedSourcesList, flag);
+                hash[key].isCompatible = NativeComboMaker.isAnySourceCompatibleWithUseSources(mergedSourcesList);
             }
             if (hash[key].isCompatible) {
                 combos.push(result.nameList!.toString());
-                //combos.push(...getSynonymCombosForMergedSourcesList(result.nameList!, mergedSourcesList, args));
             } else if (!cacheHit) {
                 numUseIncompatible += 1;
             }

@@ -11,12 +11,6 @@
 
 using namespace Napi;
 
-Napi::String greetHello(const Napi::CallbackInfo& info) {
-  Napi::Env env = info.Env();
-  std::string result = helloUser("John");
-  return Napi::String::New(env, result);
-}
-
 std::vector<std::string> makeStringList(Env& env, const Napi::Array& jsList) {
   std::vector<std::string> list{};
   for (auto i = 0u; i < jsList.Length(); ++i) {
@@ -29,7 +23,6 @@ std::vector<std::string> makeStringList(Env& env, const Napi::Array& jsList) {
   }
   return list;
 }
-
 
 /*
 cm::UsedSources makeUsedSources(Env& env, const Napi::Array& jsList) {
@@ -227,7 +220,7 @@ cm::SourceBits makeSourceBits(Napi::Env& env, const Napi::Array& jsList) {
     const auto jsPnsl = jsList[i].As<Object>().Get("primaryNameSrcList").As<Array>();
     for (auto j = 0u; j < jsPnsl.Length(); ++j) {
       const auto count = jsPnsl[j].As<Object>().Get("count").As<Number>().Int32Value();
-      if (count < 1'000'000) {
+      if (cm::Source::isLegacy(count)) {
         sourceBits.set(count);
       }
     }
@@ -285,7 +278,7 @@ cm::SourceCompatibilityData makeSourceCompatibilityData(Napi::Env& env,
     const auto jsPnsl = jsList[i].As<Object>().Get("primaryNameSrcList").As<Array>();
     for (auto j = 0u; j < jsPnsl.Length(); ++j) {
       const auto count = jsPnsl[j].As<Object>().Get("count").As<Number>().Int32Value();
-      if (count < 1'000'000) {
+      if (cm::Source::isLegacy(count)) {
         compatData.sourceBits.set(count);
       } else {
         compatData.addUsedSource(count);
@@ -306,9 +299,6 @@ cm::SourceCompatibilityList makeSourceCompatibilityList(Napi::Env& env,
       return {};
     }
     auto jsSourceList = jsList[i].As<Object>().Get("sourceList").As<Array>();
-    //auto jsUsedSources = jsList[i].As<Object>().Get("usedSources").As<Array>();
-    //cm::SourceCompatibilityData compatData(std::move(makeSourceBits(env, jsSourceList)),
-    // std::move(makeUsedSources(env, jsUsedSources)));
     cm::SourceCompatibilityData compatData = makeSourceCompatibilityData(env, jsSourceList);
     sourceCompatList.emplace_back(std::move(compatData));
   }
@@ -478,8 +468,6 @@ Value setOrArgDataList(const CallbackInfo& info) {
 }
 
 Object Init(Env env, Object exports) {
-  exports["greetHello"] = Function::New(env, greetHello);
-
   //  exports["buildSourceListsForUseNcData"] = Function::New(env, buildSourceListsForUseNcData);
   //  exports["mergeAllCompatibleSources"] = Function::New(env, mergeAllCompatibleSources);
   exports["mergeCompatibleXorSourceCombinations"] = Function::New(env, mergeCompatibleXorSourceCombinations);

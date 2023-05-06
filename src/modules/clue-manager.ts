@@ -68,10 +68,6 @@ type InternalStateBase = {
 
     variations: Sentence.Variations;  // "global" variations aggregated from all sentences
     sentences: Sentence.Type[];
-/*
-    variationMap: NameVariationMap;   // allows lookup from variation name -> actual clue name
-                                      // currently only used for clueCount:1
-*/
 
     uniquePrimaryClueNames: string[];
 
@@ -99,7 +95,6 @@ let initialState = (): InternalState => {
         knownSourceMapArray: [],
         ncResultMaps: [],
 
-        allCandidates: [],
         sentences: [],
         variations: Sentence.emptyVariations(),
 
@@ -118,7 +113,9 @@ let initialState = (): InternalState => {
         logLevel: 0,
         
         maxClues: 0,
-        numPrimarySources: 0
+        numPrimarySources: 0,
+
+        allCandidates: []
     };
 }
 
@@ -433,7 +430,7 @@ export const loadAllClues = function (args: any): void {
         State.numPrimarySources = numPrimarySources;
         State.clueListArray[1] = primaryClueList;
         // NB: call initUniquePrimaryClueNames() after State.clueListArray[1] assignment
-        // TODO: maybe I should have a "setPrimaryClueList()" method that does it.
+        // TODO: maybe I should have a "setPrimaryClueList()" funciton that does it.
         State.uniquePrimaryClueNames = initUniquePrimaryClueNames();
         addKnownPrimaryClues(primaryClueList);
     } else {
@@ -447,8 +444,6 @@ export const loadAllClues = function (args: any): void {
     }
     State.loaded = true;
 };
-
-//
 
 const getRejectFilename = function (count: number): string {
     return Path.format({

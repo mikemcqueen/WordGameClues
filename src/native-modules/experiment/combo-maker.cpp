@@ -40,29 +40,31 @@ auto isSourceCompatibleWithEveryOrArg(const SourceBits& sourceBits,
   return compatible;
 }
  
-auto isSourceXORCompatibleWithAnyXorSource(const SourceCompatibilityData& compatData,
-  const XorSourceList& xorSourceList)
+auto isSourceXorCompatibleWithAnyXorSource(
+  const SourceCompatibilityData& compatData, const XorSourceList& xorSourceList)
 {
   bool compatible = xorSourceList.empty(); // empty list == compatible
   for (const auto& xorSource : xorSourceList) {
-    compatible = compatData.isCompatibleWith(xorSource);
+    //xorSource;
+    compatible = compatData.isXorCompatibleWith(xorSource);
     if (compatible) break;
   }
   return compatible;
 };
 
-bool isAnySourceCompatibleWithUseSources(const SourceCompatibilityList& sourceCompatList) {
+bool isAnySourceCompatibleWithUseSources(
+  const SourceCompatibilityList& sourceCompatList)
+{
   if (sourceCompatList.empty()) return true;
   auto compatible = false;
   for (const auto& compatData : sourceCompatList) {
-    compatible = isSourceXORCompatibleWithAnyXorSource(compatData, PCD.xorSourceList);
+    compatible = isSourceXorCompatibleWithAnyXorSource(compatData, PCD.xorSourceList);
     // if there were --xor sources specified, and none are compatible with the
     // current source, no further compatibility checking is necessary; continue
     // to next source.
     if (!compatible) continue;
-
     // TODO
-    compatible = isSourceCompatibleWithEveryOrArg(compatData.sourceBits, PCD.orArgDataList);
+    //compatible = isSourceCompatibleWithEveryOrArg(compatData.sourceBits, PCD.orArgDataList);
     if (compatible) break;
   }
   return compatible;

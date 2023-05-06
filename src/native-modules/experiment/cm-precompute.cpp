@@ -19,9 +19,10 @@ namespace cm {
 int merges = 0;
 int list_merges = 0;
 
+#if !USEDSOURCES_BITSET
 // TODO: move to a UsedSources type
 auto makeUsedSourcesString(const UsedSources& usedSources) {
-  std::string result;
+  std::string result{ "hi" };
   for (auto i = 1u; i < usedSources.size(); i++) {
     if (usedSources[i].empty()) {
       result.append("-");
@@ -43,13 +44,13 @@ auto makeBitString(const SourceData& source) {
   return source.sourceBits.to_string().append("+")
     .append(makeUsedSourcesString(source.usedSources));
 };
-
-auto isCandidate (int src) { return src >= 1'000'000; }
-
+#endif
+  
+/*
 auto getCandidateCount(const SourceData& source) {
   auto count = 0;
   for (const auto& nameSrc : source.primaryNameSrcList) {
-    if (isCandidate(nameSrc.count)) {
+    if (Source::isCandidate(nameSrc.count)) {
       ++count;
     }
   }
@@ -75,10 +76,6 @@ auto hasConflictingCandidates(const SourceData& source) {
   return false;
 }
 
-auto hasCandidate(const SourceData& source) {
-  return getCandidateCount(source) > 0;
-}
-
 auto getCandidateCount(const SourceList& sourceList) {
   auto count = 0;
   for (const auto& source : sourceList) {
@@ -95,10 +92,6 @@ auto getCandidateCount(const SourceCRefList& sourceCRefList) {
   return count;
 }
 
-auto hasCandidate(const SourceCRefList& sourceCRefList) {
-  return getCandidateCount(sourceCRefList) > 0;
-}
-
 void debugSource(const SourceData& source, std::string_view sv) {
   if (getCandidateCount(source) < 2) return;
   std::cerr << sv << ": " << NameCount::listToString(source.primaryNameSrcList) << std::endl;
@@ -107,7 +100,6 @@ void debugSource(const SourceData& source, std::string_view sv) {
 void debugAddSourceToList(const SourceData& source,
   const SourceList& sourceList)
 {
-  //  if (!hasCandidate(source) || !hasCandidate(sourceCRefList)) return;
   if (getCandidateCount(source) + getCandidateCount(sourceList) < 2) return;
   std::string sources{};
   for (const auto& other : sourceList) {
@@ -123,7 +115,6 @@ void debugAddSourceToList(const SourceData& source,
 void debugAddSourceToList(const SourceData& source,
   const SourceCRefList& sourceCRefList)
 {
-  //  if (!hasCandidate(source) || !hasCandidate(sourceCRefList)) return;
   if (getCandidateCount(source) + getCandidateCount(sourceCRefList) < 2) return;
   std::string sources{};
   for (const auto sourceCRef : sourceCRefList) {
@@ -173,7 +164,9 @@ void debugMergedSource(const SourceData& mergedSource, const SourceData& source1
               << std::endl;
   }
 }
+*/
 
+#if !USEDSOURCES_BITSET
 auto sourceBitsAreCompatible(const SourceBits& bits1, const SourceBits& bits2) {
   return (bits1 & bits2).none();
 }
@@ -181,6 +174,7 @@ auto sourceBitsAreCompatible(const SourceBits& bits1, const SourceBits& bits2) {
 auto usedSourcesAreCompatible(const UsedSources& used1, const UsedSources& used2) {
   return SourceCompatibilityData::areUsedSourcesCompatible(used1, used2);
 }
+#endif // !USEDSOURCES_BITSET
 
 void mergeUsedSourcesInPlace(UsedSources& to, const UsedSources& from) {
 #if 0
@@ -216,7 +210,8 @@ auto mergeUsedSources(const UsedSources& used1, const UsedSources& used2) {
   mergeUsedSourcesInPlace(result, used2);
   return result;
 }
-
+  
+#if !USEDSOURCES_BITSET
 // TODO: potential template function for these two
 auto sourcesAreCompatible(const SourceData& source1, const SourceData& source2) {
   if (!sourceBitsAreCompatible(source1.sourceBits, source2.sourceBits)) {
@@ -231,21 +226,26 @@ auto sourcesAreCompatible(const MergedSources& mergedSources, const SourceData& 
   }
   return usedSourcesAreCompatible(mergedSources.usedSources, source.usedSources);
 }
-
-const SourceList& getSourceList(const NameCountList& ncList, const SourceListMap& sourceListMap) {
+#endif // USEDSOURCES_BITSET
+  
+const SourceList& getSourceList(const NameCountList& ncList,
+  const SourceListMap& sourceListMap)
+{
   assert((ncList.size() == 1) && "not implemented, but could be easily");
   return sourceListMap.at(ncList[0].toString());
 }
-
 
 auto mergeSources(const SourceData& source1, const SourceData& source2) {
   SourceData result{};
   result.primaryNameSrcList = std::move(NameCount::listMerge(source1.primaryNameSrcList,
     source2.primaryNameSrcList));
-  //debugSource(result, "merged source");
   result.ncList = std::move(NameCount::listMerge(source1.ncList, source2.ncList));
   result.sourceBits = std::move(source1.sourceBits | source2.sourceBits);
+#if !USEDSOURCES_BITSET
   result.usedSources = std::move(mergeUsedSources(source1.usedSources, source2.usedSources));
+#else
+  result.usedSources = std::move(source1.usedSources.merge(source2.usedSources));
+#endif
   return result;
 }
 
@@ -255,13 +255,12 @@ auto mergeCompatibleSourceLists(const SourceList& sourceList1,
   SourceList result{};
   for (const auto& source1 : sourceList1) {
     for (const auto& source2 : sourceList2) {
-      if (source1.isCompatibleWith(source2)) {
+      if (source1.isXorCompatibleWith(source2)) {
         if (0) {
           std::cerr << makeUsedSourcesString(source1.usedSources) << " == "
                     << makeUsedSourcesString(source2.usedSources) << std::endl;
         }
         auto mergedSource = mergeSources(source1, source2);
-        //debugMergedSource(mergedSource, source1, source2);
         result.emplace_back(std::move(mergedSource));
       } else {
         if (0) {
@@ -293,7 +292,8 @@ auto mergeAllCompatibleSources(const NameCountList& ncList,
     }
     const auto& nextSourceList = sourceListMap.at(ncList[i].toString());
     sourceList = std::move(mergeCompatibleSourceLists(sourceList, nextSourceList));
-    // TODO BUG this is broken for > 2; should be something like: if (sourceList.length !== ncIndex + 1) 
+    // TODO BUG this is broken for > 2; should be something like:
+    // if (sourceList.length !== ncIndex + 1) 
     if (sourceList.empty()) break;
   }
   return sourceList;
@@ -311,14 +311,18 @@ auto buildSourceListsForUseNcData(const vector<NCDataList>& useNcDataLists,
   // the lists-of-NcCRefLists into a single NcList.
 
   using StringSet = std::unordered_set<std::string>;
-  using BitStringToStringSetMap = std::unordered_map<string, StringSet>;
+#if !USEDSOURCES_BITSET
+  using HashMap = std::unordered_map<string, StringSet>;
+#else
+  using HashMap = std::unordered_map<SourceCompatibilityData, StringSet>;
+#endif
 
   srand(-1);
   int total = 0;
   int hash_hits = 0;
   int synonyms = 0;
   const auto size = useNcDataLists[0].size();
-  std::vector<BitStringToStringSetMap> hashList(size);
+  std::vector<HashMap> hashList(size);
   std::vector<SourceList> sourceLists(size);
   for (const auto& ncDataList : useNcDataLists) {
     for (auto i = 0u; i < ncDataList.size(); ++i) {
@@ -335,24 +339,24 @@ auto buildSourceListsForUseNcData(const vector<NCDataList>& useNcDataLists,
         // probably don't need a separate map. just don't bother populating
         // and looking in the set unless its an aliased source.
         
-        // Well,I had a strong opinion, above, there, and I don't think I ever
-        // resolved it. Apparently sourceBits aren't good enough here.
-        // I should probably figure out what I was thinking, especially now
-        // that usedSources is being phased in (and is not used here).
+        // usedSources is being used (in makeBitString). and there are lots
+        // of hash hits, so I know this is necessary. i'm not sure why its
+        // still not good enough though, according to above. Might have been
+        // due to fear of "name variations" with same source? that, we should
+        // should actually allow those name variations, and they are not
+        // currently allowed because we are checking sources only? That sounds
+        // right.
 
-        // usedSources is being used (in bitstring).  I think (maybe) the
-        // concern here was that I could produce two "variations" with the
-        // same primary sources. If I proceed with the new plan, where
-        // variations are only generated at (console) output time, then
-        // this doesn't matter.
-
-        auto key = makeBitString(source);
-        auto it = hashList[i].find(key);
-        if (it != hashList[i].end()) {
+#if !USEDSOURCES_BITSET
+        const auto key = makeBitString(source);
+#else
+        const auto& key = source;
+#endif
+        if (hashList[i].find(key) != hashList[i].end()) {
           hash_hits++;
           continue;
         }
-        hashList[i][key] = StringSet{};
+        hashList[i][key] = StringSet{}; // std::move ?
         //it = hashList[i].find(source.sourceBits);
         //it->second.insert(key);
         //debugSource(source, "source after mergeAll");
@@ -383,7 +387,7 @@ auto anyCompatibleXorSources(const SourceData& source,
   const Peco::IndexList& indexList, const SourceList& sourceList)
 {
   for (auto it = indexList.cbegin(); it != indexList.cend(); ++it) {
-    if (source.isCompatibleWith(sourceList[*it])) {
+    if (source.isXorCompatibleWith(sourceList[*it])) {
       return true;
     }
   }
@@ -437,6 +441,7 @@ auto list_to_string(const std::vector<int>& v) {
   return r;
 }
 
+/*
 auto set_to_string(const std::set<uint32_t>& s) {
   std::string r;
   auto first = true;
@@ -447,6 +452,7 @@ auto set_to_string(const std::set<uint32_t>& s) {
   }
   return r;
 }
+*/
 
 // this part is inner-loop and should be fast
 // NOTE: used to be 100s of millions potentially, now more like 10s of thousands.
@@ -462,23 +468,33 @@ SourceCRefList getCompatibleXorSources(const std::vector<int>& indexList,
   SourceCRefList sourceCRefList{};
   const auto& firstSource = sourceLists[0][indexList[0]];
   sourceCRefList.emplace_back(SourceCRef{firstSource});
+  SourceCompatibilityData compatData(firstSource.sourceBits, firstSource.usedSources);
+  /*
   SourceBits sourceBits{ firstSource.sourceBits }; // copy (ok)
   UsedSources usedSources{ firstSource.usedSources }; // copy (ok)
+  */
   for (auto i = 1u; i < indexList.size(); ++i) {
     const auto& source = sourceLists[i][indexList[i]];
-    if (!sourceBitsAreCompatible(sourceBits, source.sourceBits) ||
-        !usedSourcesAreCompatible(usedSources, source.usedSources))
+#if !USEDSOURCES_BITSET
+    if (!sourceBitsAreCompatible(compatData.sourceBits, source.sourceBits) ||
+        !usedSourcesAreCompatible(compatData.usedSources, source.usedSources))
+#else
+    if (!compatData.isXorCompatibleWith(source))
+#endif
     {
       if (log) std::cerr << " incompatible" << std::endl;
       return {};
     }
-    sourceBits |= source.sourceBits;
-    mergeUsedSourcesInPlace(usedSources, source.usedSources);
-    //debugAddSourceToList(source, sourceCRefList);
+    compatData.sourceBits |= source.sourceBits;
+#if !USEDSOURCES_BITSET
+    mergeUsedSourcesInPlace(compatData.usedSources, source.usedSources);
+#else
+    compatData.usedSources.mergeInPlace(source.usedSources);
+#endif    
     sourceCRefList.emplace_back(SourceCRef{source});
   }
   if (log) {
-    std::cerr << " " << set_to_string(usedSources[3]) << std::endl;
+    //std::cerr << " " << set_to_string(usedSources[3]) << std::endl;
     std::cerr << " compatible, result(" << sourceCRefList.size() << ")" << std::endl;
   }
   return sourceCRefList;
@@ -500,7 +516,11 @@ XorSourceList mergeCompatibleXorSources(const SourceCRefList& sourceList) {
     primaryNameSrcList.insert(primaryNameSrcList.end(), pnsl.begin(), pnsl.end()); // copy (by design?)
     const auto& ncl = sourceRef.get().ncList;
     ncList.insert(ncList.end(), ncl.begin(), ncl.end());                           // copy (by design?)
+#if !USEDSOURCES_BITSET
     mergeUsedSourcesInPlace(usedSources, sourceRef.get().usedSources);
+#else
+    usedSources.mergeInPlace(sourceRef.get().usedSources);
+#endif
   }
   // I feel like this is still valid and worth removing or commenting
   assert(!primaryNameSrcList.empty() && "empty primaryNameSrcList");
