@@ -1,4 +1,17 @@
-* debug build of addon is running too fast and giving bad results.
+* get rid of allCandidates passing through validator. just call
+  ClueManager.getAllCandidates() in getAllSourcesForPrimaryClueName
+
+* can we eliminate all candidate variations until post-processing?
+  * working on it
+  
+* so there is a problem with "ignore":true clues which depend on clues in "sentences"
+  that don't support the ignore flag. this problem will go away when all clues
+  are converted to sentences, presumably, but it's giving incorrect results
+  as it stands (hobbit, home appear in valid combinations for with xor.req,
+  for example, when they should be "used" by "eye".
+
+* debug build of addon is running too fast and giving bad (too many) results.
+  * ex: node clues -pf.71 -c2,15 -x2 --xor 21 --xor 'us 50' --xor 'koa' --xor currant -v |sort> yyy3
 
 * -t 20,s or 24,s are valid, shouldn't be. looks like restrictSameClueNumber
   is broke.

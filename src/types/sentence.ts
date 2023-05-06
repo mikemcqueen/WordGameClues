@@ -89,11 +89,24 @@ const copyCandidates = (srcCandidates: Candidate[]): Candidate[] => {
     return candidates;
 };
 
-export const copyCandidatesContainer = (container: CandidatesContainer): CandidatesContainer => {
+export const copyCandidatesContainer = (container: CandidatesContainer):
+    CandidatesContainer =>
+{
     return {
         candidates: copyCandidates(container.candidates),
         nameIndicesMap: copyStringToNumbersMap(container.nameIndicesMap)
     };
+};
+
+export const getCandidateSourcesForName = (container: CandidatesContainer,
+    name: string): number[] =>
+{
+    const sources: number[] = [];
+    const indices = container.nameIndicesMap[name] || [];
+    for (let index of indices) {
+        sources.push(...container.candidates[index].nameSourcesMap[name]);
+    }
+    return sources;
 };
 
 //////////
@@ -196,8 +209,8 @@ export let load = (dir: string, num: number): Type => {
 
 //////////
 
-const addVariations = (fromVariations: VariationMap,
-    toVariations: VariationMap): void =>
+const addVariations = (toVariations: VariationMap,
+    fromVariations: VariationMap): void =>
 {
     for (let key of Object.keys(fromVariations)) {
         if (_.has(toVariations, key)) {
@@ -216,10 +229,10 @@ const addVariations = (fromVariations: VariationMap,
     }
 };
 
-export const addAllVariations = (sentence: Type, variations: Variations): void => {
-    addVariations(sentence.anagrams, variations.anagrams);
-    addVariations(sentence.synonyms, variations.synonyms);
-    addVariations(sentence.homophones, variations.homophones);
+export const addAllVariations = (variations: Variations, sentence: Type): void => {
+    addVariations(variations.anagrams, sentence.anagrams);
+    addVariations(variations.synonyms, sentence.synonyms);
+    addVariations(variations.homophones, sentence.homophones);
 };
 
 //////////
@@ -253,22 +266,27 @@ const buildCandidateNameListMap = (componentList: string[],
                 copy.push(componentList[j]);
             }
             const nextIndex = i + offset;
-            if (/*(startIndex < componentList.length - 1) || */(nextIndex < copy.length)) {
+            if (nextIndex < copy.length) { // (startIndex < componentList.length - 1) ||
                 buildCandidateNameListMap(copy, components, nextIndex, results);
-            } else if ((startIndex == componentList.length - 1) && (nextIndex === copy.length)) {
+            } else if ((startIndex == componentList.length - 1) &&
+                (nextIndex === copy.length))
+            {
                 const key = copy.slice().sort().join('');
-                if (!results.has(key)) {
-                    results.set(key, copy);
-                    if (log) {
-                        console.error(`  OUT: ${copy} @ start(${componentList[startIndex]}), next(${copy[nextIndex]})` +
-                            `, startIndex ${startIndex} of ${componentList.length}, nextIndex ${nextIndex} of ${copy.length}`);
-                    }
-                }
-            } else {
+                if (results.has(key)) continue;
+                results.set(key, copy);
                 if (log) {
-                    console.error(`  skip: ${copy} @ start(${componentList[startIndex]}), next(${copy[nextIndex]})` +
-                        `, startIndex ${startIndex} of ${componentList.length}, nextIndex ${nextIndex} of ${copy.length}`);
+                    console.error(`  OUT: ${copy} @` +
+                        ` start(${componentList[startIndex]}),` +
+                        ` next(${copy[nextIndex]}), startIndex ${startIndex}` +
+                        ` of ${componentList.length}, nextIndex ${nextIndex}` +
+                        ` of ${copy.length}`);
                 }
+            } else if (log) {
+                console.error(`  skip: ${copy} @` +
+                    ` start(${componentList[startIndex]}),` +
+                    ` next(${copy[nextIndex]}), startIndex ${startIndex}` +
+                    ` of ${componentList.length}, nextIndex ${nextIndex}` +
+                    ` of ${copy.length}`);
             }
         }
     }
@@ -304,6 +322,7 @@ const buildNameSourcesMap = (clueList: ClueList.Primary, variations: Variations)
         }
         let set = map[clue.name];
         set.add(Number(clue.src));
+        ///*
         const nameVariations = getNameVariations(clue.name, variations);
         for (let name of nameVariations) {
             if (!_.has(map, name)) {
@@ -313,6 +332,7 @@ const buildNameSourcesMap = (clueList: ClueList.Primary, variations: Variations)
                 Assert(map[name] === set);
             }
         }
+        //*/
     }
     return map;
 };
@@ -325,6 +345,9 @@ const buildNameIndicesMap = (candidates: Candidate[], variations: Variations):
         const candidate = candidates[i];
         const names = Object.keys(candidate.nameSourcesMap);
         for (let name of names) {
+            // TODO: this is not ideal. we should be able to reuse the same set
+            // specific for a "component", with all variation names.
+            // It's probably not a big deal.
             if (!_.has(map, name)) {
                 map[name] = new Set<number>();
             }
@@ -333,7 +356,7 @@ const buildNameIndicesMap = (candidates: Candidate[], variations: Variations):
             // TODO: something tells me this may not be necessary. try with and
             // without, and see if there's a difference. easier than actually
             // understanding wtf I am doing. HA HA HA.
-            ///*
+            /*
             const nameVariations = getNameVariations(name, variations);
             for (let altName of nameVariations) {
                 if (!_.has(map, altName)) {
@@ -343,7 +366,7 @@ const buildNameIndicesMap = (candidates: Candidate[], variations: Variations):
                     Assert(map[altName] === set);
                 }
             }
-            //*/
+            */
         }
     }
     return map;

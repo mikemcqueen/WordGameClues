@@ -30,9 +30,6 @@ import * as Sentence from '../types/sentence';
 import * as Source from './source';
 import type { ValidateResult, ValidateSourcesResult } from './validator';
 
-//
-//
-
 const DATA_DIR     =  Path.normalize(`${Path.dirname(module.filename)}/../../../data/`);
 const REJECTS_DIR  = 'rejects';
 
@@ -70,7 +67,7 @@ type InternalStateBase = {
     ncResultMaps: NcResultMap[];      // map known NCs to result list
 
     variations: Sentence.Variations;  // "global" variations aggregated from all sentences
-    reverseVariations: Sentence.Variations; // reverse lookup of anagrams/homophones in above
+    sentences: Sentence.Type[];
 /*
     variationMap: NameVariationMap;   // allows lookup from variation name -> actual clue name
                                       // currently only used for clueCount:1
@@ -95,9 +92,6 @@ type InternalStateBase = {
 
 type InternalState = InternalStateBase & AllCandidatesContainer;
 
-//
-//
-
 let initialState = (): InternalState => {
     return {
         clueListArray: [],
@@ -106,8 +100,8 @@ let initialState = (): InternalState => {
         ncResultMaps: [],
 
         allCandidates: [],
+        sentences: [],
         variations: Sentence.emptyVariations(),
-        reverseVariations: Sentence.emptyVariations(),
 
         uniquePrimaryClueNames: [],
 
@@ -155,12 +149,18 @@ export function getAllCandidates (): AllCandidates {
     return State.allCandidates;
 }
 
-const getCandidatesContainer = (sentence: number): Sentence.CandidatesContainer => {
+export const getSentence = (num: number): Sentence.Type => {
+    return State.sentences[num];
+};
+
+export const getCandidatesContainer = (sentence: number):
+    Sentence.CandidatesContainer =>
+{
     return State.allCandidates[sentence];
 }
 
-export const copyAllCandidates = (allCandidates: AllCandidates = State.allCandidates):
-    AllCandidates =>
+export const copyAllCandidates = (allCandidates: AllCandidates
+    = State.allCandidates): AllCandidates =>
 {
     let result: AllCandidates = [];
     for (let [index, container] of allCandidates.entries()) {
@@ -206,7 +206,7 @@ function showStrList (strList: string[]): string {
     return _.isEmpty(result) ? "[]" : result;
 }
 
-let log = function (text: string): void {
+const log = (text: string): void => {
     let pad = '';
     let index;
     if (State.logging) {
@@ -215,8 +215,8 @@ let log = function (text: string): void {
     }
 };
 
-const anyCandidateHasClueName = (name: string,
-    allCandidates: AllCandidates = State.allCandidates): boolean =>
+const anyCandidateHasClueName = (name: string, allCandidates: AllCandidates
+    = State.allCandidates): boolean =>
 {
     for (let container of allCandidates) {
         if (!container) continue;
@@ -246,7 +246,9 @@ interface SaveClueListOptions {
     dir : string;
 }
 
-export let saveClueList = function (list: ClueList.Compound, count: number, options?: SaveClueListOptions): void {
+export const saveClueList = (list: ClueList.Compound, count: number,
+    options?: SaveClueListOptions): void =>
+{
     ClueList.save(list, getKnownFilename(count, options?.dir));
 };
 
@@ -263,7 +265,9 @@ interface LoadClueListOptions {
     dir : string;
 }
 
-export const loadClueList = function (count: number, options?: LoadClueListOptions): ClueList.Any {
+export const loadClueList = (count: number,
+    options?: LoadClueListOptions): ClueList.Any =>
+{
     const filename = getKnownFilename(count, options?.dir);
     return ClueList.makeFrom({ filename, primary: count === 1 });
 };
@@ -272,7 +276,7 @@ const loadSentence = (num: number, args: any): number => {
     console.error(`loading sentence ${num}`);
     let maxClues = 0;// TODO
     let sentence = Sentence.load(State.dir, num);
-    Sentence.addAllVariations(sentence, State.variations);
+    Sentence.addAllVariations(State.variations, sentence);
     // TODO: possible chicken/egg problem here. Passing State.variations here
     // is imperfect because we haven't loaded all variations from all sentences
     // yet, so early sentences will (potentially) get a subset of all variations.
@@ -281,10 +285,13 @@ const loadSentence = (num: number, args: any): number => {
     // is fully populated).
     const container = Sentence.buildAllCandidates(sentence); // , State.variations);
     State.allCandidates[num] = container;
+    State.sentences[num] = sentence;
     return maxClues;
 };
 
-const autoSource = (clueList: ClueList.Primary, args: any): [ClueList.Primary, number] => {
+const autoSource = (clueList: ClueList.Primary, args: any):
+    [ClueList.Primary, number] =>
+{
     let source = 0;
     let clueNumber = 0;
     let ignoredClues: ClueList.Primary = [];
@@ -306,15 +313,17 @@ const autoSource = (clueList: ClueList.Primary, args: any): [ClueList.Primary, n
         if (skipThisClue) continue;
         const isSameSrc = clue.src === "same";
         if (isSameSrc) {
-            // propagate the .source field from the first clue with a specific src
-            // to all subsequent clues with the "same" src.
-            if (clue.source) throw new Error(`${clue.name}.src="same" has source="${clue.source}"`);
+            // propagate the .source field from the first clue with a specific
+            // src to all subsequent clues with the "same" src.
+            if (clue.source) {
+                throw new Error(`${clue.name}.src="same" has source="${clue.source}"`);
+            }
             clue.source = firstClueWithSrc!.source;
         }
         if (clue.ignore) {
             if (clue.name) {
-                // setting clue.src = clue.name is a hack for property count propagation from
-                // dependent to parent ignored clues
+                // setting clue.src = clue.name is a hack for property count
+                // propagation from dependent to parent ignored clues
                 clue.src = clue.name; 
                 ignoredClues.push(clue);
             }
@@ -322,8 +331,8 @@ const autoSource = (clueList: ClueList.Primary, args: any): [ClueList.Primary, n
         }
         if (!isSameSrc) {
             source += 1;
-            // save the first clue with a specific src, to enable .source field propagation
-            // to subsequent clues with "same" src, above.
+            // save the first clue with a specific src, to enable .source field
+            // propagation to subsequent clues with "same" src, above.
             firstClueWithSrc = clue;
         }
         clue.src = `${source}`;
@@ -346,12 +355,12 @@ const addPrimaryNameSrcToMap = (name: string, src: string): void => { // TODO: s
 };
 
 const addPrimaryClueAndVariationsToMap = (clue: Clue.Primary,
-    variations = State.variations): void => 
+    variations: Sentence.Variations): void => 
 {
     addPrimaryNameSrcToMap(clue.name, clue.src);
     const nameVariations = Sentence.getNameVariations(clue.name, variations);
-    for (let name of nameVariations) {
-        addPrimaryNameSrcToMap(name, clue.src);
+    for (let nameVariation of nameVariations) {
+        addPrimaryNameSrcToMap(nameVariation, clue.src);
     }
 }
 
@@ -360,13 +369,14 @@ const addKnownPrimaryClues = (clueList: ClueList.Primary): void => {
     // legacy clues
     clueList.filter(clue => !clue.ignore)
         .forEach(clue => addPrimaryNameSrcToMap(clue.name, clue.src));
-
     // candidates clues
     for (let container of getAllCandidates()) {
         if (!container) continue;
         for (let candidate of container.candidates) {
             for (let clue of candidate.clues) {
-                addPrimaryClueAndVariationsToMap(clue);
+                const sentenceNum = Source.getCandidateSentence(Number(clue.src));
+                const sentence = getSentence(sentenceNum);
+                addPrimaryClueAndVariationsToMap(clue, sentence);
             }
         }
     }
@@ -397,40 +407,10 @@ const initUniquePrimaryClueNames = (): string[] => {
     // add from each sentence candidate set
     for (let [index, container] of getAllCandidates().entries()) {
         if (!container) continue;
-        for (let name of _.keys(container.nameIndicesMap)) {
+        for (let name of Object.keys(container.nameIndicesMap)) {
             addUniqueNameToList(name, result, hash);
-            // variation names are already in nameIndicesMap
-            //addUniqueNamesToList(State.variations.anagrams[name], result, hash);
-            //addUniqueNamesToList(State.variations.synonyms[name], result, hash);
-            //addUniqueNamesToList(State.variations.homophones[name], result, hash);
         }
     }
-    return result;
-}
-
-const addReverseVariations = (toMap: Sentence.VariationMap,
-    fromMap: Sentence.VariationMap): void =>
-{
-    for (let key of _.keys(fromMap)) {
-        for (let name of fromMap[key]) {
-            if (!_.has(toMap, name)) {
-                toMap[name] = [];
-            }
-            if (!toMap[name].find(elem => elem === name)) {
-                toMap[name].push(key);
-            }
-        }
-    }
-}
-
-// reverse look for anagrams, homophones.
-// not sure about synonyms but thinking no.
-const initReverseVariations = (variations: Sentence.Variations = State.variations):
-    Sentence.Variations =>
-{
-    let result = Sentence.emptyVariations();
-    addReverseVariations(result.anagrams, variations.anagrams);
-    addReverseVariations(result.homophones, variations.homophones);
     return result;
 }
 
@@ -452,10 +432,10 @@ export const loadAllClues = function (args: any): void {
         [primaryClueList, numPrimarySources] = autoSource(primaryClueList, args);
         State.numPrimarySources = numPrimarySources;
         State.clueListArray[1] = primaryClueList;
-        // initUniquePrimaryCluueNames() after clueListArray[] assignment
+        // NB: call initUniquePrimaryClueNames() after State.clueListArray[1] assignment
+        // TODO: maybe I should have a "setPrimaryClueList()" method that does it.
         State.uniquePrimaryClueNames = initUniquePrimaryClueNames();
         addKnownPrimaryClues(primaryClueList);
-        State.reverseVariations = initReverseVariations();
     } else {
         throw new Error('numPrimarySources not initialized without src="auto"');
     }
@@ -489,23 +469,24 @@ const massageValidateResults = (nc: NameCount.Type, results: ValidateResult[]): 
     initSrcBitsInAllResults(results);
 };
 
-const funnyBusiness = (set: Set<string>, nameSrcList: NameCount.List) : boolean => {
+const findConflicts = (set: Set<string>, nameSrcList: NameCount.List) : boolean => {
     for (let ncCsv of set.values()) {
         const ncList = NameCount.makeListFromCsv(ncCsv);
         Assert(ncList.length === nameSrcList.length);
-        let conflicts: string[][] = [];
+        let conflicts: string[][] = []; // array of 2-tuples
         for (let i = 0; i < ncList.length; ++i) {
             if (ncList[i].name != nameSrcList[i].name) {
                 conflicts.push([ncList[i].name, nameSrcList[i].name]);
             }
         }
-        // 1 is always bad. **probably** same with 3 but not proven.
-        // 2 and 4 are recoverable. only works for 2 for now (lazy).
+        // length 1 is always bad. *probably* same with 3 but not proven.
+        // lengths 2 and 4 are recoverable. only works for 2 for now (lazy).
         // ex: [ 'low' (13), 'owl' (70) ], [ 'owl' (13), 'low' (70) ]
         if ((conflicts.length != 2) ||
             (conflicts[0][0] != conflicts[1][1]) ||
             (conflicts[0][1] != conflicts[1][0]))
         {
+            console.error(`conflicts(${conflicts.length}): ${conflicts[0]}, ${conflicts[1]}`);
             return true;
         }
     }
@@ -515,25 +496,27 @@ const funnyBusiness = (set: Set<string>, nameSrcList: NameCount.List) : boolean 
 // TODO: return dstList, spread push @ caller
 // well, that might be tricky because I initialize map from dstList.
 //
-let appendUniqueResults = (ncStr: string, dstList: ValidateResult[],
+let appendUniqueResults = (dstList: ValidateResult[], ncStr: string, 
     srcList: ValidateResult[], args: any) : void => 
 {
-    let map = new Map<string, Set<string>>();
+    let hash = new Map<string, Set<string>>();
     for (let source of dstList) {
         const key = NameCount.listToCountList(source.nameSrcList).toString();
-        if (!map.has(key)) map.set(key, new Set<string>());
-        map.get(key)!.add(NameCount.listToString(source.nameSrcList));
+        if (!hash.has(key)) hash.set(key, new Set<string>());
+        hash.get(key)!.add(NameCount.listToString(source.nameSrcList));
     }
     for (let source of srcList) {
         source.nameSrcList = _.sortBy(source.nameSrcList, NameCount.count);
         const key = NameCount.listToCountList(source.nameSrcList).toString();
         const value = NameCount.listToString(source.nameSrcList);
-        if (map.has(key)) {
-            const set = map.get(key)!;
+        if (hash.has(key)) {
+            const set = hash.get(key)!;
             if (set.has(value)) continue; // strict duplicate
-            if (funnyBusiness(set, source.nameSrcList)) {
-                console.log(`${ncStr} =>`);
-                console.log(`set: ${Stringify(map.get(key))}\nvalue: ${value}`);
+            if (findConflicts(set, source.nameSrcList)) {
+                console.error(`nc: ${ncStr}`);
+                console.error(`  set: [${[...set.values()]}]`);
+                console.error(`  key: ${key}, value: ${value}`);
+                console.error(`  nameSrcList: [${NameCount.listToString(source.nameSrcList)}`);
                 if (!args.ignoreErrors) {
                     throw new Error(`${ncStr} has conflicting sources, probably a data bug.`);
                 }
@@ -541,7 +524,7 @@ let appendUniqueResults = (ncStr: string, dstList: ValidateResult[],
         } else {
             let set = new Set<string>();
             set.add(value);
-            map.set(key, set);
+            hash.set(key, set);
         }
         dstList.push(source);
     }
@@ -551,7 +534,7 @@ let appendUniqueResults = (ncStr: string, dstList: ValidateResult[],
 // validateCompoundClueAndUpdateState()
 // 
 let addCompoundClue = (clue: Clue.Compound, count: number, args: any):
-    ValidateSourcesResult =>
+    boolean =>
 {
     let nameList = clue.src.split(',').sort();
     let srcMap = getKnownSourceMap(count);
@@ -573,29 +556,22 @@ let addCompoundClue = (clue: Clue.Compound, count: number, args: any):
             srcMap[srcKey] = {
                 clues: [],
                 results: vsResult.list!
-                //,cluePropertyCountsMap: {}
             };
         }
     } else if (args.validateAll) {
         vsResult.list = srcMap[srcKey].results;
     }
-    
     if (vsResult.success && args.validateAll) {
-        let ncResultMap = State.ncResultMaps[count];
+        let ncResultMap = getNcResultMap(count);
         if (!ncResultMap) {
             ncResultMap = State.ncResultMaps[count] = {};
         }
         // TODO: makeCanonicalName
         let ncStr = NameCount.makeNew(clue.name, count).toString();
         if (!ncResultMap[ncStr]) {
-            //console.log(`adding ${ncStr} to ncResultMap`);
-            ncResultMap[ncStr] = {
-                list: [] // vsResult.list
-            };
+            ncResultMap[ncStr] = { list: [] };
         }
-        appendUniqueResults(ncStr, ncResultMap[ncStr].list, vsResult.list!, args);
-        //srcMap[srcKey].clueNamePropertyCountsMapMap[clue.name] = 
-        //  Clue.PropertyCounts.createMapFromClue(clue);
+        appendUniqueResults(ncResultMap[ncStr].list, ncStr, vsResult.list!, args);
         (srcMap[srcKey].clues as ClueList.Compound).push(clue);
     }
     // NOTE: added above, commented below
@@ -604,30 +580,12 @@ let addCompoundClue = (clue: Clue.Compound, count: number, args: any):
     // out validateAll as well, i'm not sure what the "not validateAll"
     // use case is anymore. (or what .clues is use for, for that matter).
     //(srcMap[srcKey].clues as ClueList.Compound).push(clue);
-    return vsResult;
+    return vsResult.success;
 };
 
-let addKnownCompoundClues = function (clueList: ClueList.Compound, clueCount: number, args: any): void {
-    Assert(clueCount > 1);
-    // this is currently only callable once per clueCount.
-    Assert(!getKnownClueMap(clueCount));
-    Assert(!getKnownSourceMap(clueCount));
-
-    State.knownClueMapArray[clueCount] = {};
-    State.knownSourceMapArray[clueCount] = {};
-
-    clueList.filter(clue => !clue.ignore).forEach(clue => {
-        clue.src = clue.src.split(',').sort().toString();
-        let result = addCompoundClue(clue, clueCount, args);
-        if (result.success) {
-            addKnownClue(clueCount, clue.name, clue.src);
-        } else if (!State.ignoreLoadErrors) {
-            console.error(`VALIDATE FAILED KNOWN COMPOUND CLUE: '${clue.src}':${clueCount}`);
-        }
-    });
-};
-
-let addKnownClue = function (count: number, name: string, source: string, nothrow: boolean = false): boolean {
+const addKnownClue = (count: number, name: string, source: string,
+    nothrow: boolean = false): boolean =>
+{
     let clueMap = getKnownClueMap(count);
     if (!_.has(clueMap, name)) {
         log(`clueMap[${name}] = [${source}]`);
@@ -640,6 +598,30 @@ let addKnownClue = function (count: number, name: string, source: string, nothro
         throw new Error(`duplicate clue name/source (${count}) ${name}:${source}`);
     }
     return true;
+};
+
+const addKnownCompoundClues = (clueList: ClueList.Compound, clueCount: number,
+    args: any): void =>
+{
+    Assert(clueCount > 1);
+    // this is currently only callable once per clueCount.
+    Assert(!getKnownClueMap(clueCount));
+    Assert(!getKnownSourceMap(clueCount));
+
+    State.knownClueMapArray[clueCount] = {};
+    State.knownSourceMapArray[clueCount] = {};
+
+    clueList
+        .filter(clue => !clue.ignore)
+        .forEach(clue => {
+            clue.src = clue.src.split(',').sort().toString();
+            if (addCompoundClue(clue, clueCount, args)) {
+                addKnownClue(clueCount, clue.name, clue.src);
+            } else if (!State.ignoreLoadErrors) {
+                console.error(`VALIDATE FAILED KNOWN COMPOUND CLUE:` +
+                    ` '${clue.src}':${clueCount}`);
+            }
+        });
 };
 
 let removeKnownClue = function (count: number, name: string, source: string, nothrow: boolean): boolean {
@@ -656,8 +638,6 @@ let removeKnownClue = function (count: number, name: string, source: string, not
     return true;
 };
 
-//
-
 let saveClues = function (counts: number|number[]): void {
     if (_.isNumber(counts)) {
         counts = [counts] as number[];
@@ -670,9 +650,9 @@ let saveClues = function (counts: number|number[]): void {
     }
 };
 
-//
-
-let addClue = function (count: number, clue: Clue.Compound, save = false, nothrow = false): boolean {
+let addClue = (count: number, clue: Clue.Compound, save = false, nothrow = false):
+    boolean =>
+{
     clue.src = clue.src.split(',').sort().toString();
     if (addKnownClue(count, clue.name, clue.src, nothrow)) {
         (getClueList(count) as ClueList.Compound).push(clue);
@@ -683,8 +663,6 @@ let addClue = function (count: number, clue: Clue.Compound, save = false, nothro
     }
     return false;
 };
-
-//
 
 let removeClue = function (count: number, clue: Clue.Compound, save = false, nothrow = false): boolean {
     // sort src
@@ -700,8 +678,6 @@ let removeClue = function (count: number, clue: Clue.Compound, save = false, not
     }
     return false;
 };
-
-//
 
 let addReject = function (srcNameList: string|string[], save = false): boolean {
     if (_.isString(srcNameList)) {
@@ -721,8 +697,6 @@ let addReject = function (srcNameList: string|string[], save = false): boolean {
     }
     return false;
 };
-
-//
 
 let addRejectSource = function (srcNameList: string|string[]): boolean {
     if (_.isString(srcNameList)) {
@@ -748,7 +722,6 @@ let addRejectSource = function (srcNameList: string|string[]): boolean {
 };
 
 // source is string containing sorted, comma-separated clues
-
 let isKnownSource = function (source: string, count = 0): boolean {
     // check for supplied count
     if (count > 0) {
@@ -759,12 +732,9 @@ let isKnownSource = function (source: string, count = 0): boolean {
 };
 
 // source: csv string or array of strings
-
 let isRejectSource = function (source: string | string[]): boolean {
     return _.has(State.rejectSourceMap, source.toString());
 };
-
-//
 
 export let getCountListForName = (name: string): CountList => {
     let countList: CountList = [...Array(State.knownClueMapArray.length).keys()]
@@ -778,7 +748,6 @@ export let getCountListForName = (name: string): CountList => {
 };
 
 // TODO this is failing with ncList.length > 1
-
 let primaryNcListToNameSrcLists = function (ncList: NameCount.List): NameCount.List[] {
     let log = 0 && (ncList.length > 1); // nameSrcLists.length > 1) {
     let srcLists = ncList.map(nc => primaryNcToSrcList(nc));
@@ -819,7 +788,8 @@ let primaryNcListToNameSrcSets = function (ncList: NameCount.List): Set<string>[
     }).getCombinations()
         .reduce((result: Set<string>[], indexList: number[]) => {
             let set = new Set<string>();
-            //indexList.forEach((value, index) => set.add(NameCount.makeNew(ncList[index].name, srcLists[index][value])));
+            //indexList.forEach((value, index) =>
+            //  set.add(NameCount.makeNew(ncList[index].name, srcLists[index][value])));
             indexList.forEach((value, index) =>
                 set.add(NameCount.makeCanonicalName(ncList[index].name,
                   _.toNumber(srcLists[index][value]))));
@@ -828,20 +798,17 @@ let primaryNcListToNameSrcSets = function (ncList: NameCount.List): Set<string>[
             }
             return result;
         }, []);
-    // TODO: put in some code to check for dupes, to see if we're actually seeing dupes. might slow down a little.
+    // TODO: put in some code to check for dupes, to see if we're actually seeing
+    //       dupes. might slow down a little.
     //return _.uniqBy(nameSrcLists, _.toString);
     return nameSrcSets;
 };
-
-//
 
 let primaryNcToSrcList = function (nc: NameCount.Type): string[] {
     if (nc.count !== 1) throw new Error(`nc.count must be 1 (${nc})`);
     const source = State.knownClueMapArray[1][nc.name];
     return (_.isArray(source) ? source : [source]) as string[];
 };
-
-//
 
 let makeSrcNameListArray = function (nc: NameCount.Type): string[][] {
     let srcNameListArray: string[][] = [];
@@ -851,29 +818,42 @@ let makeSrcNameListArray = function (nc: NameCount.Type): string[][] {
     return srcNameListArray;
 };
 
-//
+export interface FilterResult {
+    map: any;
+    known: number;
+    reject: number;
+    duplicate: number;
+}
 
-export let filter = function (srcCsvList: string[], clueCount: number, map: any = {}): any {
-    let known = 0;
-    let reject = 0;
-    let duplicate = 0;
+export const emptyFilterResult = (): FilterResult => {
+    return {
+        map: {},
+        known: 0,
+        reject: 0,
+        duplicate: 0
+    };
+}
+
+export const filter = (srcCsvList: string[], clueCount: number, result: FilterResult):
+    FilterResult =>
+{
     srcCsvList.forEach(srcCsv => {
         if (isRejectSource(srcCsv)) {
             log(`isRejectSource(${clueCount}) ${srcCsv}`);
-            ++reject;
+            ++result.reject;
         } else {
             if (isKnownSource(srcCsv, clueCount)) {
                 log(`isKnownSource(${clueCount}) ${srcCsv}`);
-                ++known;
+                ++result.known;
             }
-            if (_.has(map, srcCsv)) {
+            if (_.has(result.map, srcCsv)) {
                 log(`duplicate: ${srcCsv}`);
-                ++duplicate;
+                ++result.duplicate;
             }
-            map[srcCsv] = true;
+            result.map[srcCsv] = true;
         }
     });
-    return { map, known, reject, duplicate };
+    return result;
 };
 
 // TODO: return type.
@@ -888,8 +868,8 @@ const singleEntry = (nc: NameCount.Type, source: string): SourceData => {
                 sourceBits: CountBits.makeFrom(Sentence.legacySrcList(nameSrcList)),
                 usedSources: Source.getUsedSources(nameSrcList),
                 // TODO: these two shouldn't be here.
-                resultMap: undefined,
-                allCandidates: []
+                resultMap: undefined
+                //,allCandidates: []
             }
         ]
     };
@@ -936,13 +916,9 @@ const getKnownClues = (nameList: string|string[]): Record<string, Clue.Any[]> =>
     return nameClueMap;
 };
 
-//
-
 export const getKnownClueNames = (nameList: string | string[]): string[] => {
-    return _.keys(getKnownClues(nameList));
+    return Object.keys(getKnownClues(nameList));
 };
-
-//
 
 const getClueCountListArray = (nameList: string[]): CountList[] => {
     // each count list contains the clueMapArray indexes in which
@@ -958,8 +934,6 @@ const getClueCountListArray = (nameList: string[]): CountList[] => {
     }
     return countListArray;
 };
-
-//
 
 const getValidCounts = (nameList: string[], countListArray: any): number[] => {
     if ((nameList.length === 1) || isRejectSource(nameList)) return [];
@@ -1011,11 +985,8 @@ const getPrimarySources = (): string[] => {
         primarySources.push(clue.src);
         hash[clue.src] = true;
     }
-    //console.log(`primarysources: ${primarySources}`);
     return primarySources;
 };
-
-//
 
 export const getInversePrimarySources = (sources: string[]): string[] => {
     let inverseSources: string[] = [];
@@ -1026,8 +997,6 @@ export const getInversePrimarySources = (sources: string[]): string[] => {
     return inverseSources;
 };
 
-//
-
 const addClueForCounts = (countSet: Set<number>, name: string, src: string,
     propertyName: string, options: any): number =>
 {
@@ -1036,8 +1005,9 @@ const addClueForCounts = (countSet: Set<number>, name: string, src: string,
         .reduce((added: number, count: number) => {
             if (!propertyName) {
                 if (options.compound) {
-                    let result = addCompoundClue(clue, count, { validateAll: true, fast: true });
-                    if (!result.success) throw new Error(`addCompoundclue failed, ${clue}:${count}`);
+                    if (!addCompoundClue(clue, count, { validateAll: true, fast: true })) {
+                        throw new Error(`addCompoundClue failed, ${clue}:${count}`);
+                    }
                 }
                 if (addClue(count, clue, options.save, true)) { // save, nothrow
                     console.log(`${count}: added ${name} as ${src}`);
@@ -1118,7 +1088,6 @@ const getKnownClueIndexLists = (nameList: string[]): CountList[] => {
 //   isKnown
 //   isReject
 //
-
 export const addRemoveOrReject = (args: any, nameList: string[],
     countSet: Set<number>, options: any = {}): number =>
 {
@@ -1215,23 +1184,16 @@ const getListOfPrimaryNameSrcLists = (ncList: NameCount.List):
 {
     // TODO: can use reduce() here too 
     let listOfPrimaryNameSrcLists: NameCount.List[] = [];
-    //console.log(`ncList: ${ncList}`);
     for (const nc of ncList) {
-        if (!_.isNumber(nc.count) || _.isNaN(nc.count)) throw new Error(`Not a valid nc: ${nc}`);
-        //console.log(`  nc: ${nc}`);
+        Assert(!_.isNaN(nc.count), `${nc}`); // this might be dumb. can a number be NaN?
         let lastIndex = -1;
         let entries;
         for (;;) {
             entries = getKnownSourceMapEntries(nc, true);
-            if (!_.isArray(entries) || _.isEmpty(entries)) {
-                console.log(`  explosion, nc: ${nc}, `); //entries: ${Stringify(entries)}`);
-                process.exit(-1);
-            }
-            //console.log(`  entries: ${Stringify(entries)}`);
+            Assert(_.isArray(entries) && !_.isEmpty(entries), `${entries}`);
             if (nc.count === 1) {
                 break; // TODO BUGG this might be wrong for multiple equivalent primary sources
             }
-            
             let currIndex = -1;
             entries.every((item, index) => {
                 if (item.entry) return true;
@@ -1239,18 +1201,12 @@ const getListOfPrimaryNameSrcLists = (ncList: NameCount.List):
                 return false;
             });
             if (currIndex === -1) break;
-            if (currIndex === lastIndex) {
-                console.error(`currIndex == lastIndex (${currIndex})`);
-                process.exit(-1);
-            }
-            
+            Assert(currIndex !== lastIndex, `${currIndex}`);
+
             // TODO BUGG skip this part for primary clues?
             const sources = entries[currIndex].sources;
-            
-            //console.log(`adding nc: ${nc}, sources ${sources}`); // entries: ${Stringify(entries)}`);
-            
             const clue = { name: nc.name, src: sources };
-//            addCompoundClue(clue, nc.count, { validateAll: true });
+            //addCompoundClue(clue, nc.count, { validateAll: true });
             //
             // TODO
             //
@@ -1258,25 +1214,14 @@ const getListOfPrimaryNameSrcLists = (ncList: NameCount.List):
             //addClue(clue, nc.count)
             lastIndex = currIndex;
         }
-        
         // verify that no other entries are undefined
-        
-        const primaryNameSrcLists = _.flatten(entries.map((item, index) => {
+        const primaryNameSrcLists = entries.flatMap((item, index) => {
             const entry = item.entry;
-            if (!entry || !entry.results || !_.isArray(entry.results) || _.isEmpty(entry.results)) {
-                // || _.isEmpty(item.sources)) {
-                
-                console.log(`  explosion2, nc: ${nc}, sources: ${item.sources}`); //, entry: ${Stringify(entry)}, entries: ${Stringify(entries)}`);
-                
-                if (!entry) console.log('entry null');
-                else if (!entry.results) console.log('entry.results null');
-                else if (!_.isArray(entry.results)) console.log('entry.results not array');
-                else if (_.isEmpty(entry.results)) console.log('entry.results empty');
-                process.exit(-1);
-            }
+            Assert(entry && entry.results && _.isArray(entry.results) &&
+                _.isEmpty(entry.results), `${entry}`);
+                // && !_.isEmpty(item.sources));
             return entry.results.map((result: ValidateResult) => result.nameSrcList);
-        }));
-        //primaryNameSrcLists.forEach(nameSrcList => console.log(`    nameSrcList: ${nameSrcList}`));
+        });
         listOfPrimaryNameSrcLists.push(primaryNameSrcLists);
     }
     return listOfPrimaryNameSrcLists;
@@ -1304,14 +1249,14 @@ const getCompatiblePrimaryNameSrcList = (listOfListOfPrimaryNameSrcLists: any[])
     any =>
 {
     //console.log(`${Stringify(listOfListOfPrimaryNameSrcLists)}`);
-    const listArray = listOfListOfPrimaryNameSrcLists.map(listOfNameSrcLists => [...Array(listOfNameSrcLists.length).keys()]); // 0..nameSrcList.length
+    const listArray = listOfListOfPrimaryNameSrcLists.map(listOfNameSrcLists =>
+        [...Array(listOfNameSrcLists.length).keys()]); // 0..nameSrcList.length
     return Peco.makeNew({
         listArray,
         max: listOfListOfPrimaryNameSrcLists.reduce((sum, listOfNameSrcLists) => sum + listOfNameSrcLists.length, 0)
     }).getCombinations().some((comboList: number[]) => {
         const nameSrcList = comboList.reduce((nameSrcList, element, index) => {
             let nsList = listOfListOfPrimaryNameSrcLists[index][element];
-            //console.log(`nameSrcList: ${nameSrcList}, element ${element}, index ${index}, nsList: ${nsList}`);
             if (nsList) {
                 nameSrcList.push(...nsList);
             } else {
@@ -1335,7 +1280,6 @@ const getCompatiblePrimaryNameSrcList = (listOfListOfPrimaryNameSrcLists: any[])
 // Or I suppose I could just throw a "validateSources()" call into the "fast" method and
 // that might be a good compromise (have to supply fast:true or default to fast).
 //
-
 export const fast_getCountListArrays = (nameCsv: string, options: any): any[] => {
     const nameList = nameCsv.split(',').sort();
     Debug(`fast_getCountListArrays for ${nameList}`);
@@ -1343,7 +1287,6 @@ export const fast_getCountListArrays = (nameCsv: string, options: any): any[] =>
     /// TODO, check if existing sourcelist (knownSourceMapArray)
 
     const ncLists = buildNcListsFromNameList(nameList);
-    //console.log(`ncLists: ${ncLists}`);
     if (_.isEmpty(ncLists)) {
         console.log(`No ncLists for ${nameList}`);
         return [];
@@ -1412,7 +1355,6 @@ export const getCountListArrays = (nameCsv: string, options: any): any => {
         invalidHash[ncListStr] = result;
         
         if (!result.success) {
-            //console.log(`invalid: ${nameList}  CL ${clueCountList}  x ${x} sum ${sum}  validateAll=${validateAll}`);
             invalid.push(clueCountList);
         } else if (isRejectSource(nameList)) {
             rejects.push(clueCountList);
@@ -1427,12 +1369,12 @@ export const getCountListArrays = (nameCsv: string, options: any): any => {
                 //
                 
                 /*
-                 this.clueListArray[sum].forEach(clue => {
-                 if (clue.name === name) {
-                 clueSrcList.push(`"${clue.src}"`);
-                 }
-                 });
-                 */
+                this.clueListArray[sum].forEach(clue => {
+                    if (clue.name === name) {
+                        clueSrcList.push(`"${clue.src}"`);
+                    }
+                });
+                */
                 clues.push({ countList: clueCountList, nameList: srcList });
             }
         } else {
@@ -1519,7 +1461,7 @@ export let recursiveGetCluePropertyCount = function (
     const loggy = 0;
     if (top && loggy) console.log(`${Stringify(resultMap)}`);
 
-    const keys: string[] = _.keys(resultMap);
+    const keys: string[] = Object.keys(resultMap);
     let nodes: RecursiveNode[] = _.flatMap(keys, key => {
         // TODO: BUG:: key may be a ncCsv
         let val: any = resultMap[key];
@@ -1528,7 +1470,7 @@ export let recursiveGetCluePropertyCount = function (
         if (!_.isArray(val)) {
             let nc = NameCount.makeNew(key);
             let source: string;
-            let subkeys: string[] = _.keys(val);
+            let subkeys: string[] = Object.keys(val);
             let recurse = true;
             if (subkeys.length > 1) {
                 // A: more than one subkey

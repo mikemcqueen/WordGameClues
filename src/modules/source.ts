@@ -52,11 +52,16 @@ export interface ListContainer {
 
 export const isCandidate = (src: number): boolean => {
     return src >= 1_000_000;
-}
+};
 
-const getCandidateSentence = (src: number): [number, number] => {
+export const getCandidateSentence = (src: number): number => {
     Assert(isCandidate(src));
-    return [Math.floor(src / 1_000_000), src % 1_000_000];
+    return Math.floor(src / 1_000_000);
+};
+
+const getCandidateSource = (src: number): number => {
+    Assert(isCandidate(src));
+    return src % 1_000_000;
 }
 
 const getVariation = (src: number): number => {
@@ -108,11 +113,12 @@ export const addUsedSource = (usedSources: UsedSources, src: number, nothrow = f
     boolean =>
 {
     if (!isCandidate(src)) return true;
-    const [sentence, source] = getCandidateSentence(src);
+    const sentence = getCandidateSentence(src);
     if (usedSources[sentence] === undefined) {
 	usedSources[sentence] = new Set<number>();
     }
     let set = usedSources[sentence];
+    const source = getCandidateSource(src);
     // defensive incompatible variation index check
     if (set.size) {
 	// trick to get first elem from set.

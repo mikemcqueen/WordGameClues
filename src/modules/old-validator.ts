@@ -171,13 +171,13 @@ let getCompatibleResults = (args: CompatibleResultArgs): Validator.ValidateResul
 let buildValidateResult = (nameSrcList: NameCount.List, args: CompatibleResultArgs): Validator.ValidateResult => {
     return {
         ncList: args.ncList,
+        nameSrcList,
         resultMap: _.cloneDeep(args.pendingMap).addResult({
             origNcList: args.origNcList,
             primaryNcList: args.ncList,
             nameSrcList
         }).ensureUniquePrimaryLists(),
-        nameSrcList,
-	allCandidates: []
+	//,allCandidates: []
 	//,usedSources: []
     };
 };

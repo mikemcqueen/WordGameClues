@@ -232,7 +232,7 @@ const buildKnownNcSourceListMap = (first: number, last: number,
         fillKnownNcSourceListMapForSum(map, sum, max);
     }
     let d = new Duration(begin, new Date()).milliseconds;
-    console.error(` buildKnownNcSourceListMap: ${PrettyMs(d)}, size: ${map.size}`);
+    console.error(` buildKnownNcSourceListMap(${map.size}) - ${PrettyMs(d)}`);
     return map;
 };
 
@@ -450,7 +450,7 @@ const buildUseSourceListsFromNcData = (sourceListMap: Map<string, Source.AnyData
         args.allXorNcDataLists, Array.from(sourceListMap.entries())); // TODO? [...sourceListMap.entries()]
     setPrimarySrcBits(xorSourceList);
     let xdur = new Duration(xor0, new Date()).milliseconds;
-    console.error(` Native.mergeCompatibleXorSourceCombinations(${PrettyMs(xdur)})`);
+    console.error(` Native.mergeCompatibleXorSourceCombinations - ${PrettyMs(xdur)}`);
 
     // OR next
     let or0 = new Date();
@@ -472,7 +472,7 @@ const buildUseSourceListsFromNcData = (sourceListMap: Map<string, Source.AnyData
     let mark0 = new Date();
     markAllXorCompatibleOrSources(xorSourceList, orArgDataList);
     let mdur = new Duration(mark0, new Date()).milliseconds;
-    console.error(` mark(${PrettyMs(mdur)})`);
+    console.error(` mark - ${PrettyMs(mdur)}`);
 
     NativeComboMaker.setOrArgDataList(orArgDataList);
 
@@ -504,6 +504,6 @@ export const preCompute = (first: number, last: number, args: any): Result => {
     if (args.xor && listIsEmpty(useSourceLists.xor)) return { success: false };
 
     const d = new Duration(begin, new Date()).milliseconds;
-    console.error(`--Precompute(${PrettyMs(d)})`);
+    console.error(`--Precompute - ${PrettyMs(d)}`);
     return { success: true, data: { useSourceLists, sourceListMap } };
 };

@@ -390,8 +390,8 @@ export const makeCombos = (args: any): any => {
                 }
             });
     } else {
+        let totals = ClueManager.emptyFilterResult();
         const result = PreCompute.preCompute(first, last, args);
-        let comboMap = {};
         if (result.success) {
             PCD = result.data!;
             for (let sum = first; sum <= last; ++sum) {
@@ -403,14 +403,15 @@ export const makeCombos = (args: any): any => {
                 const comboList = makeCombosForSum(sum, args.max, args);
                 args.max = max;
                 total += comboList.length;
-                const filterResult = ClueManager.filter(comboList, sum, comboMap);
+                const filterResult = ClueManager.filter(comboList, sum, totals);
             }
         }
         let d = new Duration(begin, new Date()).milliseconds;
         if (!args.verbose) console.error('');
-        console.error(`--combos: ${PrettyMs(d)}`);
-        Debug(`total: ${total}, filtered(${_.size(comboMap)})`);
-        _.keys(comboMap).forEach((nameCsv: string) => console.log(nameCsv));
+        console.error(`--combos, total(${total}), known(${totals.known})` +
+            ` reject(${totals.reject}), dupes(${totals.duplicate}) - ${PrettyMs(d)}`);
+        Debug(`total: ${total}, filtered(${_.size(totals.map)})`);
+        Object.keys(totals.map).forEach((nameCsv: string) => console.log(nameCsv));
     }
     return 1;
 };

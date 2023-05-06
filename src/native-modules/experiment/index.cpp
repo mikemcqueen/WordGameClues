@@ -412,7 +412,7 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
 
   auto unwrap1 = high_resolution_clock::now();
   auto d_unwrap = duration_cast<milliseconds>(unwrap1 - unwrap0).count();
-  cerr << " native unwrap: " << d_unwrap << "ms" << endl;
+  cerr << " native unwrap - " << d_unwrap << "ms" << endl;
 
   //--
     
@@ -423,7 +423,7 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
 
   auto build1 = high_resolution_clock::now();
   auto d_build = duration_cast<milliseconds>(build1 - build0).count();
-  cerr << " native build: " << d_build << "ms" << endl;
+  cerr << " native build - " << d_build << "ms" << endl;
 
   //--
 
@@ -434,7 +434,7 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
     
     auto merge1 = high_resolution_clock::now();
     auto d_merge = duration_cast<milliseconds>(merge1 - merge0).count();
-    cerr << " native merge: " << d_merge << "ms" << endl;
+    cerr << " native merge - " << d_merge << "ms" << endl;
   } else {
     cm::PCD.xorSourceList = std::move(sourceLists.back());
   }
