@@ -172,6 +172,19 @@ struct SourceCompatibilityData {
   }
 #endif
 
+  static void mergeInPlace(UsedSources& to, const UsedSources& from) {
+#if !USEDSOURCES_BITSET
+    for (auto i = 1u; i < from.size(); ++i) {
+      for (auto fromSrc: from[i]) {
+        assert(to[i].find(fromSrc) == to[i].end());
+        to[i].insert(fromSrc);
+      }
+    }
+#else
+    to.mergeInPlace(from);
+#endif
+  }
+
   auto isXorCompatibleWith(const SourceCompatibilityData& other) const {
     if ((sourceBits & other.sourceBits).any()) {
       return false;
@@ -188,6 +201,24 @@ struct SourceCompatibilityData {
     return addUsedSource(usedSources, src);
 #else
     return usedSources.addSource(src);
+#endif
+  }
+
+  void mergeInPlace(const UsedSources& from) {
+#if !USEDSOURCES_BITSET
+    mergeInPlace(usedSources, from);
+#else
+    usedSources.mergeInPlace(from);
+#endif
+  }
+
+  auto merge(const UsedSources& from) const {
+#if !USEDSOURCES_BITSET
+    UsedSources result{usedSources}; // copy (ok)
+    mergeInPlace(result, from);
+    return result;
+#else
+    return usedSources.merge(from);
 #endif
   }
 };
@@ -392,7 +423,7 @@ inline void hash_combine(SizeT& seed, SizeT value) {
   seed ^= value + 0x9e3779b9 + (seed << 6) + (seed >> 2);
 }
 
-#if USEDSOURCES_SETBIT
+#if USEDSOURCES_BITSET
 template<>
 struct std::equal_to<cm::UsedSources> {
   constexpr bool operator()(const cm::UsedSources& lhs,
@@ -424,11 +455,16 @@ struct std::hash<cm::UsedSources> {
   }
 };
 
+inline auto hash_called = 0;
+inline auto equal_to_called = 0;
+
 template<>
 struct std::equal_to<cm::SourceCompatibilityData> {
-  constexpr bool operator()(const cm::SourceCompatibilityData& lhs,
+  //constexpr
+  bool operator()(const cm::SourceCompatibilityData& lhs,
     const cm::SourceCompatibilityData& rhs) const noexcept
   {
+    ++equal_to_called;
     return std::equal_to<cm::SourceBits>{}(lhs.sourceBits, rhs.sourceBits) &&
       std::equal_to<cm::UsedSources>{}(lhs.usedSources, rhs.usedSources);
   }
@@ -437,12 +473,13 @@ struct std::equal_to<cm::SourceCompatibilityData> {
 template<>
 struct std::hash<cm::SourceCompatibilityData> {
   std::size_t operator()(const cm::SourceCompatibilityData& data) const noexcept {
+    ++hash_called;
     std::size_t seed = 0;
     hash_combine(seed, std::hash<cm::SourceBits>{}(data.sourceBits));
     hash_combine(seed, std::hash<cm::UsedSources>{}(data.usedSources));
     return seed;
   }
 };
-#endif // USEDSOURCES_SETBIT
+#endif // USEDSOURCES_BITSET
 
 #endif // include_combo_maker_h

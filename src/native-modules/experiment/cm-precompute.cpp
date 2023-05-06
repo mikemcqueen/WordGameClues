@@ -16,9 +16,6 @@
 
 namespace cm {
 
-int merges = 0;
-int list_merges = 0;
-
 #if !USEDSOURCES_BITSET
 // TODO: move to a UsedSources type
 auto makeUsedSourcesString(const UsedSources& usedSources) {
@@ -166,68 +163,6 @@ void debugMergedSource(const SourceData& mergedSource, const SourceData& source1
 }
 */
 
-#if !USEDSOURCES_BITSET
-auto sourceBitsAreCompatible(const SourceBits& bits1, const SourceBits& bits2) {
-  return (bits1 & bits2).none();
-}
-  
-auto usedSourcesAreCompatible(const UsedSources& used1, const UsedSources& used2) {
-  return SourceCompatibilityData::areUsedSourcesCompatible(used1, used2);
-}
-#endif // !USEDSOURCES_BITSET
-
-void mergeUsedSourcesInPlace(UsedSources& to, const UsedSources& from) {
-#if 0
-  auto isCandidate = [](int source) { return source > 0; };
-  auto toCandidate = std::find_if(to.cbegin(), to.cend(), isCandidate) != to.cend();
-  auto fromCandidate = std::find_if(from.cbegin(), from.cend(), isCandidate) != from.cend();
-  if (toCandidate && fromCandidate) {
-    std::cerr << "merging to [";
-    std::copy(std::begin(to), std::end(to), std::ostream_iterator<int>(std::cerr, " "));
-    std::cerr << "] with [";
-    std::copy(std::begin(from), std::end(from), std::ostream_iterator<int>(std::cerr, " "));
-    std::cerr << "]" << std::endl;
-  }
-#endif
-  for (auto i = 1u; i < from.size(); ++i) {
-    for (auto fromSrc: from[i]) {
-      assert(to[i].find(fromSrc) == to[i].end());
-      to[i].insert(fromSrc);
-    }
-  }
-#if 0
-  if (toCandidate) { // && fromCandidate) {
-    std::cerr << "  to after: [";
-    std::copy(std::begin(to), std::end(to), std::ostream_iterator<int>(std::cerr, " "));
-    std::cerr << "]" << std::endl;
-  }
-  //return to;
-#endif
-}
-
-auto mergeUsedSources(const UsedSources& used1, const UsedSources& used2) {
-  UsedSources result{used1}; // copy (ok)
-  mergeUsedSourcesInPlace(result, used2);
-  return result;
-}
-  
-#if !USEDSOURCES_BITSET
-// TODO: potential template function for these two
-auto sourcesAreCompatible(const SourceData& source1, const SourceData& source2) {
-  if (!sourceBitsAreCompatible(source1.sourceBits, source2.sourceBits)) {
-    return false;
-  }
-  return usedSourcesAreCompatible(source1.usedSources, source2.usedSources);
-}
-
-auto sourcesAreCompatible(const MergedSources& mergedSources, const SourceData& source) {
-  if (!sourceBitsAreCompatible(mergedSources.sourceBits, source.sourceBits)) {
-    return false;
-  }
-  return usedSourcesAreCompatible(mergedSources.usedSources, source.usedSources);
-}
-#endif // USEDSOURCES_BITSET
-  
 const SourceList& getSourceList(const NameCountList& ncList,
   const SourceListMap& sourceListMap)
 {
@@ -241,11 +176,7 @@ auto mergeSources(const SourceData& source1, const SourceData& source2) {
     source2.primaryNameSrcList));
   result.ncList = std::move(NameCount::listMerge(source1.ncList, source2.ncList));
   result.sourceBits = std::move(source1.sourceBits | source2.sourceBits);
-#if !USEDSOURCES_BITSET
-  result.usedSources = std::move(mergeUsedSources(source1.usedSources, source2.usedSources));
-#else
-  result.usedSources = std::move(source1.usedSources.merge(source2.usedSources));
-#endif
+  result.usedSources = std::move(source1.merge(source2.usedSources));
   return result;
 }
 
@@ -256,17 +187,8 @@ auto mergeCompatibleSourceLists(const SourceList& sourceList1,
   for (const auto& source1 : sourceList1) {
     for (const auto& source2 : sourceList2) {
       if (source1.isXorCompatibleWith(source2)) {
-        if (0) {
-          std::cerr << makeUsedSourcesString(source1.usedSources) << " == "
-                    << makeUsedSourcesString(source2.usedSources) << std::endl;
-        }
         auto mergedSource = mergeSources(source1, source2);
         result.emplace_back(std::move(mergedSource));
-      } else {
-        if (0) {
-          std::cerr << makeUsedSourcesString(source1.usedSources) << " != "
-                    << makeUsedSourcesString(source2.usedSources) << std::endl;
-        }
       }
     }
   }
@@ -320,7 +242,6 @@ auto buildSourceListsForUseNcData(const vector<NCDataList>& useNcDataLists,
   srand(-1);
   int total = 0;
   int hash_hits = 0;
-  int synonyms = 0;
   const auto size = useNcDataLists[0].size();
   std::vector<HashMap> hashList(size);
   std::vector<SourceList> sourceLists(size);
@@ -364,12 +285,15 @@ auto buildSourceListsForUseNcData(const vector<NCDataList>& useNcDataLists,
       }
     }
   }
-  cerr << " hash_hits: " << hash_hits << ", synonyms: " << synonyms
-       << ", total: " << total << ", list_merges: " << list_merges 
-       << ", source_merges: " << merges << ", sourceLists: " << sourceLists.size() 
-       << ", " << std::accumulate(sourceLists.begin(), sourceLists.end(), 0u,
-         [](size_t total, const SourceList& list){ return total + list.size(); })
-       << std::endl;
+#if USEDSOURCES_BITSET
+  std::cerr << "  hash: " << hash_called << ", equal_to: "
+    << equal_to_called << std::endl;
+#endif
+  std::cerr << "  total sources: " << total << ", hash_hits: " << hash_hits
+    << ", sourceLists(" << sourceLists.size() << ")"
+    << ": " << std::accumulate(sourceLists.begin(), sourceLists.end(), 0u,
+    [](size_t total, const SourceList& list){ return total + list.size(); })
+    << std::endl;
   return sourceLists;
 }
 
@@ -459,43 +383,19 @@ auto set_to_string(const std::set<uint32_t>& s) {
 SourceCRefList getCompatibleXorSources(const std::vector<int>& indexList,
   const std::vector<SourceList>& sourceLists)
 {
-  auto log = false;
-  if (log) {
-    std::cerr << "indexList(" << indexList.size() << ")"
-              << " [" << list_to_string(indexList) << "]" << std::endl;
-  }
   // auto reference type, uh, optional here?
   SourceCRefList sourceCRefList{};
   const auto& firstSource = sourceLists[0][indexList[0]];
   sourceCRefList.emplace_back(SourceCRef{firstSource});
   SourceCompatibilityData compatData(firstSource.sourceBits, firstSource.usedSources);
-  /*
-  SourceBits sourceBits{ firstSource.sourceBits }; // copy (ok)
-  UsedSources usedSources{ firstSource.usedSources }; // copy (ok)
-  */
   for (auto i = 1u; i < indexList.size(); ++i) {
     const auto& source = sourceLists[i][indexList[i]];
-#if !USEDSOURCES_BITSET
-    if (!sourceBitsAreCompatible(compatData.sourceBits, source.sourceBits) ||
-        !usedSourcesAreCompatible(compatData.usedSources, source.usedSources))
-#else
-    if (!compatData.isXorCompatibleWith(source))
-#endif
-    {
-      if (log) std::cerr << " incompatible" << std::endl;
+    if (!compatData.isXorCompatibleWith(source)) {
       return {};
     }
     compatData.sourceBits |= source.sourceBits;
-#if !USEDSOURCES_BITSET
-    mergeUsedSourcesInPlace(compatData.usedSources, source.usedSources);
-#else
-    compatData.usedSources.mergeInPlace(source.usedSources);
-#endif    
+    compatData.mergeInPlace(source.usedSources);
     sourceCRefList.emplace_back(SourceCRef{source});
-  }
-  if (log) {
-    //std::cerr << " " << set_to_string(usedSources[3]) << std::endl;
-    std::cerr << " compatible, result(" << sourceCRefList.size() << ")" << std::endl;
   }
   return sourceCRefList;
 }
@@ -516,11 +416,7 @@ XorSourceList mergeCompatibleXorSources(const SourceCRefList& sourceList) {
     primaryNameSrcList.insert(primaryNameSrcList.end(), pnsl.begin(), pnsl.end()); // copy (by design?)
     const auto& ncl = sourceRef.get().ncList;
     ncList.insert(ncList.end(), ncl.begin(), ncl.end());                           // copy (by design?)
-#if !USEDSOURCES_BITSET
-    mergeUsedSourcesInPlace(usedSources, sourceRef.get().usedSources);
-#else
-    usedSources.mergeInPlace(sourceRef.get().usedSources);
-#endif
+    SourceCompatibilityData::mergeInPlace(usedSources, sourceRef.get().usedSources);
   }
   // I feel like this is still valid and worth removing or commenting
   assert(!primaryNameSrcList.empty() && "empty primaryNameSrcList");

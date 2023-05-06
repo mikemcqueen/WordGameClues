@@ -1,3 +1,7 @@
+
+* equal_to is getting called too much with USEDSOURCES_BITSET. this doesn't
+  impact combo-maker generation, only precompute.
+
 * i think i'm going to have to use 1 as the first index maybe for source "index"
   within a variation.  at least in c++.  I should do the same with variation.
   lets me initialize the bitsets to all zero.
@@ -7,9 +11,6 @@
   are converted to sentences, presumably, but it's giving incorrect results
   as it stands (hobbit,home appear in valid combinations for with xor.req,
   for example, when they should be "used" by "eye").
-
-* debug build of addon is running too fast and giving bad (too many) results.
-  * ex: node clues -pf.71 -c2,15 -x2 --xor 21 --xor 'us 50' --xor 'koa' --xor currant -v |sort> yyy3
 
 * -t 20,s or 24,s are valid, shouldn't be. looks like restrictSameClueNumber
   is broke.
