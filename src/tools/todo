@@ -1,28 +1,11 @@
-* I think opportunity for optimization is running out in mergecompatible. 
-  One last thing to try is somehow having mergecompatLists (and perhaps
-  getMergeData) take either a MergedSourcesList or a Source.List. Then
-  we'd need a variation of mergeSources took either as the first arg as well.
-
-* I really should be working on the uniquePrimaryNames and output post-processing though.
-
-* then -c --or arg support.
+* -c (and -t?) --or arg support.
 
 * Probaby want to add this to sentence3 components:
    "powerful": [ "powerful", "pure fowl" ]
 
-* so it seems i'm picking up the name variations again in uniquePrimaryNames
-  because i'm back to adding them to the nameSources/nameIndices maps. can
-  I initialize primary names before I do that?
-  This also seems likely related to the weirdness i'm seeing with
-  mergeAllCompatible. BTW i should have noticed the name variation issue, as
-  the output is the same but I never actually got around to doing variation
-  name lookup post processing! (I dont think)
+* -t --verbose
 
-* so If I really want to speed up precompute further, probably I should
-  port the whole getCombosForUseNcLists function and dependences (first/next)
-  to C++. I could start with just MergeCompatibleSources2 and dependencies
-  though. It's curious that didn't speed things up (probably was using older
-  version).
+* -t full support, including --add, will be necessary (might be working now)
 
 * "addon-mode" module return string "Debug" or "Release" for setting addon path
 
@@ -47,22 +30,60 @@
 * so, ClueManager.getClueList(1) is the culprit. In every case, I need
   to review what I am doing with the list when I call it with 1.
 
-* -t --verbose
-
-* -t full support, including --add, will be necessary (might be working now)
-
-* I wonder if I am still respecting max in peco, for the cases where that
-  makes sense.  did I comment it out, or just allow undefined?
-
-* Precompute is a tiny bit slower now. Maybe because I'm doing too much
-  copying in mergeAllCompatibleSources/XorSources? Any way to put a
-  stop to that? Like the optimization idea I might have in a comment there,
-  using something like a new CombinedSourceRefs data type 
-
 * All of the "getNumPrimarySources()" stuff is a bit weird now isn't it
   I should look into all uses and confirm what it means. And consider
   the "MaxPossiblePrimarySources" case as a possible solution (largest
   sourcelist variation from each sentence).
+
+* validateSources(name) -- enforce everywhere, for (2) below
+
+validatesources is apparently happy with old:3=not:1,not:1,old:1
+which is wrong because:
+1) FIXED: two nots from two different variations of sentence three. i though i checked
+   for and prevented this with the "candidates" thing somewhere
+2) TODO: this is like that weird case with "bird" being the "name" of a clue that had
+   "bird" as a source, and that should be disallowed.
+   
+clues3.json:  { "name": "old",             "src": "new,not" },
+
+
+* OPTIMIZITIONS:
+
+* adding "powerful" to sentence3 components list really caused the number
+  of combinations to explode. It's funny that it didn't actually change the
+  output, but that's probably due to the xor.req's I used. There is something
+  to investigate here and a couple of potential fixes for this:
+  0) Investigate: am I ensuring that the sentence words + all components
+     form a **unique** list? Should be in Sentence.getUniqueComponentNames
+     or something.
+  1) I think I can do a 2nd pass of index filtering. Iirc, the order of
+     filtering matters, and while I currently do something like "remove items
+     from list B that are incompatible with items in list A", I don't do
+     the inverse, or something like that, which may help.
+  2) I think there is potential for a filtering step in here somewhere, where,
+     for example, I look at all of the NameSrc results for a particular useNC,
+     and see what they have in common. I'm just spitballing, but something
+     like "well all NcDataCombinations for this NC have *this* and *that*
+     source, so lets leave those sourceBits in for the compatibility check,
+     but eliminate the words from the combinatorial set, or something.
+
+* I think opportunity for optimization is running out in mergecompatible. 
+  One last thing to try is somehow having mergecompatLists (and perhaps
+  getMergeData) take either a MergedSourcesList or a Source.List. Then
+  we'd need a variation of mergeSources took either as the first arg as well.
+
+* so If I really want to speed up combo-maker further, probably I should
+  port the whole getCombosForUseNcLists function and dependences (first/next)
+  to C++. I don't think just porting mergeCompatibleSources3 and dependencies
+  alone will do much as each call is short so the overhead of the call isn't
+  worth it, but there are a million (literally) calls.
+
+* Precompute is a tiny bit slower now. Maybe because I'm doing too much
+  copying in mergeAllCompatibleSources/XorSources? Any way to put a
+  stop to that? Like the optimization idea I might have in a comment there,
+  using something like a new CombinedSourceRefs data type.
+  Also the "copyOnMerge" logic I use in mergeCompatibleSources3 might be
+  of some help here.
 
 * USESOURCES_BITSET:
 
@@ -123,22 +144,9 @@
   aggregate data structure with std::array<uint8_t, 32 * 9> (288 bytes) 
   and std::array<int, 9>. two comparisons per call.  look into array comparison.
 
-* the first/next/nextIndex stuff in combo-maker looks sus
-
 * The below might go away in c++ though if I use bitset.
 * take a closer look at UsedSources declarations/comparisons in C++. I think
   I have all declarations covered with = { -1 }, but probably makes sense
   for the default constructor to do that. If there were a default constructor,
   which there isn't (that i'm in control of).
   Similarly, the >= 0 or > -1 comparisons should ideally all be in one spot.
-
-* validateSources(name) -- enforce everywhere
-
-validatesources is apparently happy with old:3=not:1,not:1,old:1
-which is wrong because:
-1) FIXED: two nots from two different variations of sentence three. i though i checked
-   for and prevented this with the "candidates" thing somewhere
-2) TODO: this is like that weird case with "bird" being the "name" of a clue that had
-   "bird" as a source, and that should be disallowed.
-   
-clues3.json:  { "name": "old",             "src": "new,not" },

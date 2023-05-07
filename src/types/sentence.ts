@@ -305,11 +305,12 @@ const buildClueList = (num: number, nameList: string[], src: number):
 };
 
 export const getNameVariations = (name: string, variations: Variations): string[] => {
-    let result: string[] = [];
-    result.push(...(variations.anagrams[name] || []));
-    result.push(...(variations.synonyms[name] || []));
-    result.push(...(variations.homophones[name] || []));
-    return result;
+    let names: string[] = [];
+    names.push(...(variations.anagrams[name] || []));
+    names.push(...(variations.synonyms[name] || []));
+    names.push(...(variations.homophones[name] || []));
+    let hash = new Set<string>(names);
+    return [...hash.values()];
 };
 
 const buildNameSourcesMap = (clueList: ClueList.Primary, variations: Variations):
@@ -322,17 +323,18 @@ const buildNameSourcesMap = (clueList: ClueList.Primary, variations: Variations)
         }
         let set = map[clue.name];
         set.add(Number(clue.src));
-        ///*
-        const nameVariations = getNameVariations(clue.name, variations);
-        for (let name of nameVariations) {
+        getNameVariations(clue.name, variations).forEach(name => {
             if (!_.has(map, name)) {
                 map[name] = set;
-            } else {
+            } else if (map[name] !== set) {
                 // if this fires, we've got mismatched name/variation somewhere
-                Assert(map[name] === set);
+                console.error(`sentence ${Source.getCandidateSentence(Number(clue.src))}` +
+                    `, variation '${name}' of component '${clue.name}`);
+                console.error(`  ${clue.name}: [${[...set.values()]}]`);
+                console.error(`  ${name}: [${[...map[name].values()]}]`);
+                Assert(false);
             }
-        }
-        //*/
+        });
     }
     return map;
 };
