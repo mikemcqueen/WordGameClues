@@ -1,3 +1,23 @@
+* I think opportunity for optimization is running out in mergecompatible. 
+  One last thing to try is somehow having mergecompatLists (and perhaps
+  getMergeData) take either a MergedSourcesList or a Source.List. Then
+  we'd need a variation of mergeSources took either as the first arg as well.
+
+* I really should be working on the uniquePrimaryNames and output post-processing though.
+
+* then -c --or arg support.
+
+* Probaby want to add this to sentence3 components:
+   "powerful": [ "powerful", "pure fowl" ]
+
+* so it seems i'm picking up the name variations again in uniquePrimaryNames
+  because i'm back to adding them to the nameSources/nameIndices maps. can
+  I initialize primary names before I do that?
+  This also seems likely related to the weirdness i'm seeing with
+  mergeAllCompatible. BTW i should have noticed the name variation issue, as
+  the output is the same but I never actually got around to doing variation
+  name lookup post processing! (I dont think)
+
 * so If I really want to speed up precompute further, probably I should
   port the whole getCombosForUseNcLists function and dependences (first/next)
   to C++. I could start with just MergeCompatibleSources2 and dependencies
@@ -30,8 +50,6 @@
 * -t --verbose
 
 * -t full support, including --add, will be necessary (might be working now)
-
-* -c --or arg support.
 
 * I wonder if I am still respecting max in peco, for the cases where that
   makes sense.  did I comment it out, or just allow undefined?

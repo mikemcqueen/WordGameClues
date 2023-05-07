@@ -154,21 +154,31 @@ const addAll = (set: Set<number>, values: number[]): void => {
     }
 }
 
+export const cloneUsedSources = (from: UsedSources): UsedSources => {
+    let result: UsedSources = [];
+    for (let i = 1; i < 10 /* cough */; ++i) {
+	if (from[i] !== undefined) {
+	    result[i] = new Set<number>(from[i]);
+        }
+    }
+    return result;
+}
+
 export const mergeUsedSourcesInPlace = (to: UsedSources, from: UsedSources):
     void =>
 {
     for (let i = 1; i < 10 /* cough */; ++i) {
-	const un_to = to[i] === undefined;
-        const un_from = from[i] === undefined;
-        if (un_to && un_from) continue;
-        if (un_to) {
+	const to_undef = to[i] === undefined;
+        const from_undef = from[i] === undefined;
+        if (to_undef && from_undef) continue;
+        if (to_undef) {
             to[i] = new Set<number>();
         }
-        const toSize = to[i].size;
-        if (!un_from) {
+        const to_size = to[i].size;
+        if (!from_undef) {
             addAll(to[i], [...from[i]]);
         }
-        Assert(to[i].size === (toSize + (from[i]?.size || 0)));
+        Assert(to[i].size === (to_size + (from[i]?.size || 0)));
     }
 }
 
@@ -177,9 +187,7 @@ export const mergeUsedSources = (first: UsedSources, second: UsedSources):
 {
     let result: UsedSources = [];
     for (let i = 1; i < 10 /* cough */; ++i) {
-	if ((first[i] === undefined) && (second[i] === undefined)) {
-	    continue;
-	}
+	if ((first[i] === undefined) && (second[i] === undefined)) continue;
 	const firstValues = (first[i] !== undefined) ? [...first[i]] : [];
 	const secondValues = (second[i] !== undefined) ? [...second[i]] : [];
 	//result[i] = new Set([...firstValues, ...secondValues]);

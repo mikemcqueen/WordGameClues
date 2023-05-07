@@ -52,7 +52,11 @@ interface CountArrayAndSize {
     size: number;
 }
 
-type MergedSources = Source.ListContainer & Source.CompatibilityData;
+interface OptionalCloneOnMerge {
+    cloneOnMerge?: boolean;
+}
+
+type MergedSources = Source.ListContainer & Source.CompatibilityData & OptionalCloneOnMerge;
 type MergedSourcesList = MergedSources[];
 
 let PCD: PreCompute.Data;
@@ -94,150 +98,111 @@ const listGetNumEmptySublists = (listOfLists: any[][]) => {
 };
 */
 
-let mcsl_call = 0;
-let mcsl_comp = 0;
-let mcsl_push = 0;
-let mcsl_1_1 = 0;
-let mcsl_1_push1 = 0;
-let mcsl_push01 = 0;
+let ms_copy = 0;
+let ms_inplace = 0;
+let ms_comp = 0;
+let ms_compat = 0;
 
-const mergeSourcesInPlace = (mergedSources: MergedSources,
-    source: Source.Data): void =>
+const mergeSourceInPlace = (mergedSources: MergedSources,
+    source: Source.Data): MergedSources =>
 {
+    ++ms_inplace;
     CountBits.orInPlace(mergedSources.sourceBits, source.sourceBits);
     Source.mergeUsedSourcesInPlace(mergedSources.usedSources, source.usedSources);
     mergedSources.sourceList.push(source);
+    return mergedSources;
 }
 
-const mergeCompatibleSourcesInPlace = (mergedSources: MergedSources,
-    source: Source.Data): boolean =>
-{
-    if (Source.isXorCompatible(mergedSources, source)) {
-        mergeSourcesInPlace(mergedSources, source);
-        return true;
-    }
-    return false;
-};
-
-const mergeSources = (mergedSources: MergedSources, source: Source.Data):
+const mergeSource = (mergedSources: MergedSources, source: Source.Data):
     MergedSources =>
 {
+    ++ms_copy;
     return {
-        sourceBits: CountBits.or(mergedSources.sourceBits, source.sourceBits),
+        //CountBits.or(mergedSources.sourceBits, source.sourceBits),
+        sourceBits: mergedSources.sourceBits.clone().union(source.sourceBits),
         usedSources: Source.mergeUsedSources(mergedSources.usedSources, source.usedSources),
         sourceList: [...mergedSources.sourceList, source]
     };
 };
 
-const mergeCompatibleSourceLists2 = (mergedSourcesList: MergedSourcesList,
-    sourceList: Source.List): MergedSourcesList =>
-{
-    ++mcsl_call;
-    if ((mergedSourcesList.length === 1) && (sourceList.length === 1)) {
-        ++mcsl_1_1;
-        return mergeCompatibleSourcesInPlace(mergedSourcesList[0], sourceList[0])
-            ? mergedSourcesList : [];
-    }
-
-    let push = 0;
-    let result: MergedSourcesList = [];
-    for (const mergedSources of mergedSourcesList) {
-        let compat = 0;
-        for (const source of sourceList) {
-            ++mcsl_comp;
-            if (!Source.isXorCompatible(mergedSources, source)) continue;
-            ++mcsl_push;
-            ++compat;
-            ++push;
-            result.push({
-                sourceBits: CountBits.or(mergedSources.sourceBits, source.sourceBits),
-                usedSources: Source.mergeUsedSources(mergedSources.usedSources, source.usedSources),
-                sourceList: [...mergedSources.sourceList, source]
-            });
-        }
-        if ((mergedSourcesList.length === 1) && (sourceList.length > 1) && (compat === 1)) ++mcsl_1_push1;
-    }
-    if (push < 2) ++mcsl_push01;
-    return result;
-};
-
 const makeMergedSourcesList = (sourceList: Source.List) : MergedSourcesList => {
-    let mergedSourcesList: MergedSourcesList = [];
+    let result: MergedSourcesList = [];
     for (const source of sourceList) {
-        mergedSourcesList.push({
-            sourceBits: CountBits.makeFrom(source.sourceBits),
-            usedSources: source.usedSources.slice(),
-            sourceList: [source]
+        result.push({
+            // CountBits.makeFrom(source.sourceBits),
+            sourceBits: source.sourceBits, // .clone(),
+            usedSources: source.usedSources, // Source.cloneUsedSources(source.usedSources),
+            sourceList: [source],
+            cloneOnMerge: true
         });
     }
-    return mergedSourcesList;
+    return result;
 };
 
-const mergeAllCompatibleSources2 = (ncList: NameCount.List,
-    sourceListMap: Map<string, Source.AnyData[]>): MergedSourcesList =>
-{
-    // because **maybe** broken for > 2 below
-    Assert(ncList.length <= 2, `${ncList} length > 2 (${ncList.length})`);
-    // TODO: reduce (or some) here
-    let mergedSourcesList = makeMergedSourcesList(sourceListMap.get(
-        NameCount.toString(ncList[0])) as Source.List);
-    for (let ncIndex = 1; ncIndex < ncList.length; ++ncIndex) {
-        const nextSourceList = sourceListMap.get(NameCount.toString(ncList[ncIndex])) as Source.List;
-        mergedSourcesList = mergeCompatibleSourceLists2(mergedSourcesList, nextSourceList);
-        // TODO BUG this is broken for > 2; should be something like: if (sourceList.length !== ncIndex + 1) 
-        if (listIsEmpty(mergedSourcesList)) break;
-    }
-    return mergedSourcesList;
-};
+interface MergeData {
+    mergedSources: MergedSources;
+    sourceList: Source.List;
+}
 
-const mergeSourceLists3 = (mergedSourcesList: MergedSourcesList,
-    sourceList: Source.List): MergedSourcesList =>
+const getCompatibleSourcesMergeData = (mergedSourcesList: MergedSourcesList,
+    sourceList: Source.List): MergeData[] =>
 {
-    if (listIsEmpty(mergedSourcesList)) return makeMergedSourcesList(sourceList);
-    if ((mergedSourcesList.length === 1) && (sourceList.length === 1)) {
-        // TODO: mergeSourcesInPlace
-        return mergeCompatibleSourcesInPlace(mergedSourcesList[0], sourceList[0])
-            ? mergedSourcesList : [];
-    }
-    let result: MergedSourcesList = [];
-    for (const mergedSources of mergedSourcesList) {
+    let result: MergeData[] = [];
+    for (let mergedSources of mergedSourcesList) {
+        let mergeData: MergeData = { mergedSources, sourceList: [] };
         for (const source of sourceList) {
-            result.push({
-                sourceBits: CountBits.or(mergedSources.sourceBits, source.sourceBits),
-                usedSources: Source.mergeUsedSources(mergedSources.usedSources, source.usedSources),
-                sourceList: [...mergedSources.sourceList, source]
-            });
+            ++ms_comp;
+            if (Source.isXorCompatible(mergedSources, source)) {
+                ++ms_compat;
+                mergeData.sourceList.push(source);
+            }
+        }
+        if (!listIsEmpty(mergeData.sourceList)) {
+            result.push(mergeData);
         }
     }
     return result;
 };
 
-const getCompatibleSourcePairs = (mergedSourcesList: MergedSourcesList,
-    sourceList: Source.List): [MergedSources, Source.Data][] =>
+let ms_111 = 0;
+
+const mergeSourcesInMergeData = (mergedSourcesList: MergedSourcesList,
+    mergeData: MergeData[], flag?: number): MergedSourcesList =>
 {
-    let sourcePairs: [MergedSources, Source.Data][] = [];
-    for (let mergedSources of mergedSourcesList) {
-        for (const source of sourceList) {
-            if (Source.isXorCompatible(mergedSources, source)) {
-                sourcePairs.push([mergedSources, source]);
-            }
+    /* does nothing.
+    if ((mergeData.length === 1) && (mergeData[0].sourceList.length === 1)) {
+        ++ms_111;
+        const data = mergeData[0];
+        if (!data.mergedSources.cloneOnMerge) {
+            const mergedSources = mergeSourceInPlace(data.mergedSources, data.sourceList[0]);
+            return (mergedSourcesList.length === 1) ? mergedSourcesList : [mergedSources];
+        } else {
+            return [mergeSource(data.mergedSources, data.sourceList[0])];
         }
     }
-    return sourcePairs;
-};
-
-const makeMergedSourcesListFromPairs = (mergedSourcesList: MergedSourcesList,
-    pairs: [MergedSources, Source.Data][]): MergedSourcesList =>
-{
-    if ((mergedSourcesList.length === 1) && (pairs.length === 1)) {
-        mergeSourcesInPlace(mergedSourcesList[0], pairs[0][1]);
-        return mergedSourcesList;
+    */
+    let result: MergedSourcesList = [];
+    for (let i = 0; i < mergeData.length; ++i) {
+        let data = mergeData[i];
+        for (let j = 0; j < data.sourceList.length; j++) {
+            const source = data.sourceList[j];
+            /* does nothing
+            // if this is the last source to be merged with this mergedSources
+            if ((j === data.sourceList.length - 1) && !data.mergedSources.cloneOnMerge) {
+                // merge in place
+                result.push(mergeSourceInPlace(data.mergedSources, source));
+            } else {
+            */
+            // else copy/merge
+            result.push(mergeSource(data.mergedSources, source));
+            //}
+        }
     }
-    return pairs.map(pair => mergeSources(pair[0], pair[1]));
-};
+    return result;
+}
 
 const mergeAllCompatibleSources3 = (ncList: NameCount.List,
-    sourceListMap: Map<string, Source.AnyData[]>): MergedSourcesList =>
+    sourceListMap: Map<string, Source.AnyData[]>, flag?: number): MergedSourcesList =>
 {
     // because **maybe** broken for > 2
     Assert(ncList.length <= 2, `${ncList} length > 2 (${ncList.length})`);
@@ -248,9 +213,11 @@ const mergeAllCompatibleSources3 = (ncList: NameCount.List,
             mergedSourcesList = makeMergedSourcesList(sources);
             continue;
         }
-        let pairs = getCompatibleSourcePairs(mergedSourcesList, sources);
-        mergedSourcesList = makeMergedSourcesListFromPairs(mergedSourcesList, pairs);
-        if (listIsEmpty(mergedSourcesList)) break;
+        const mergeData = getCompatibleSourcesMergeData(mergedSourcesList, sources);
+        if (listIsEmpty(mergeData)) {
+            return [];
+        }
+        mergedSourcesList = mergeSourcesInMergeData(mergedSourcesList, mergeData, flag);
     }
     return mergedSourcesList;
 };
@@ -259,7 +226,6 @@ const nextIndex = (countList: number[], clueIndexes: number[]): boolean => {
     // increment last index
     let index = clueIndexes.length - 1;
     clueIndexes[index] += 1;
-
     // while last index is maxed: reset to zero, increment next-to-last index, etc.
     while (clueIndexes[index] === ClueManager.getUniqueClueNameCount(countList[index])) {
         clueIndexes[index] = 0;
@@ -418,12 +384,6 @@ const getCombosForUseNcLists = (sum: number, max: number, pcd: PreCompute.Data,
             `no-use(${numUseIncompatible}) ` +
             `actual(${totalVariations - numCacheHits - numUseIncompatible}) ` +
             `isany: call(${isany_call}), compat(${isany_compat}) - ${duration}ms `);
-        if (0) {
-            console.error(`mcsl_call(${mcsl_call}), comp(${mcsl_comp}), push(${mcsl_push})` +
-                `, 1_1(${mcsl_1_1} - ${Math.floor((mcsl_1_1 / mcsl_call) * 100)}%)` +
-                `, push01(${mcsl_push01} - ${Math.floor((mcsl_push01 / mcsl_call) * 100)}%)` +
-                ` - call/comp ${Math.floor((mcsl_call / mcsl_comp) * 100)}%`);
-        }
     } else {
         process.stderr.write('.');
     }
@@ -532,6 +492,14 @@ export const makeCombos = (args: any): any => {
         if (!args.verbose) console.error('');
         console.error(`--combos, total(${total}), known(${totals.known})` +
             ` reject(${totals.reject}), dupes(${totals.duplicate}) - ${PrettyMs(d)}`);
+        if (1) {
+            console.error(`ms_copy(${ms_copy}), ms_inplace(${ms_inplace}), md_111(${ms_111})` +
+                `, ms_comp(${ms_comp}), ms_compat(${ms_compat})`);
+            //`, 1_1(${mcsl_1_1} - ${Math.floor((mcsl_1_1 / mcsl_call) * 100)}%)` +
+            //`, push01(${mcsl_push01} - ${Math.floor((mcsl_push01 / mcsl_call) * 100)}%)` +
+            //` - call/comp ${Math.floor((mcsl_call / mcsl_comp) * 100)}%`);
+        }
+
         Debug(`total: ${total}, filtered(${_.size(totals.map)})`);
         Object.keys(totals.map).forEach((nameCsv: string) => console.log(nameCsv));
     }
