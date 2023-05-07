@@ -274,7 +274,7 @@ Peco.prototype.listFirst = function (listArray, flags) {
     let list;
     
     if (!listArray) {
-        throw new Error('invalid countListArray, ' + listArray);
+        throw new Error('missing listArray, ' + listArray);
     }
 
     let srcCount = listArray.length;
@@ -283,9 +283,11 @@ Peco.prototype.listFirst = function (listArray, flags) {
     this.hash = new Set();
     for (let index = 0; index < srcCount; ++index) {
         this.indexList.push({
-            first:  start,
-            index:  start,
-            last:   (flags & Flag.NoDuplicates) ? listArray[index].length - (srcCount - index) : listArray[index].length - 1
+            first: start,
+            index: start,
+            last: (flags & Flag.NoDuplicates)
+                ? listArray[index].length - (srcCount - index)
+                : listArray[index].length - 1
         });
 	this.hash.add(start);
 	if (flags & Flag.NoDuplicates) ++start;
@@ -336,7 +338,8 @@ Peco.prototype.listNext = function (flags) {
         }
 	if ((flags & Flag.Combinations) && (flags & Flag.NoDuplicates)) {
             for (let inner = index + 1; inner <= lastIndex; ++inner) {
-		//if (this.indexList[inner].first < previousFirst) throw new Error (`inner ${inner} < prevFirsT ${previousFirst}`);
+		//if (this.indexList[inner].first < previousFirst)
+                //    throw new Error (`inner ${inner} < prevFirsT ${previousFirst}`);
 		let newFirst = this.indexList[inner - 1].index + 1;
 		if (newFirst > this.indexList[inner].last) {
 		    throw new Error (`newFirst ${newFirst} > last ${this.indexList[inner].last}`);

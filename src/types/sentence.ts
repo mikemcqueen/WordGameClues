@@ -337,8 +337,7 @@ const buildNameSourcesMap = (clueList: ClueList.Primary, variations: Variations)
     return map;
 };
 
-const buildNameIndicesMap = (candidates: Candidate[], variations: Variations):
-    NameIndicesMap => 
+const buildNameIndicesMap = (candidates: Candidate[]): NameIndicesMap => 
 {
     let map: NameIndicesMap = {};
     for (let i = 0; i < candidates.length; ++i) {
@@ -351,11 +350,9 @@ const buildNameIndicesMap = (candidates: Candidate[], variations: Variations):
             if (!_.has(map, name)) {
                 map[name] = new Set<number>();
             }
-            let set = map[name];
-            set.add(i);
-            // TODO: something tells me this may not be necessary. try with and
-            // without, and see if there's a difference. easier than actually
-            // understanding wtf I am doing. HA HA HA.
+            map[name].add(i);
+            // Ok so pretty sure this isn't needed because all variation names
+            // were already added to nameSourcesMap.
             /*
             const nameVariations = getNameVariations(name, variations);
             for (let altName of nameVariations) {
@@ -372,11 +369,12 @@ const buildNameIndicesMap = (candidates: Candidate[], variations: Variations):
     return map;
 };
 
-export const buildAllCandidates = (sentence: Type/*, variations: Variations*/):
+export const buildAllCandidates = (sentence: Type, variations: Variations):
     CandidatesContainer =>
 {
     let candidates: Candidate[] = [];
     let src = 1_000_000 * sentence.num; // up to 10000 variations of up to 100 names
+    // similar logic to getUniqueComponentNames() which is unfortunate
     const sortedText = stripAndSort(sentence.text);
     for (const combo of sentence.combinations) {
         const nameListMap = buildCandidateNameListMap(combo.split(' '), sentence.components);
@@ -387,16 +385,29 @@ export const buildAllCandidates = (sentence: Type/*, variations: Variations*/):
             const clues = buildClueList(sentence.num, nameList, src);
             candidates.push({
                 clues,
-                nameSourcesMap: buildNameSourcesMap(clues, sentence) // variations
+                nameSourcesMap: buildNameSourcesMap(clues, variations)
             });
             src += 100;
         }
     }
     return {
         candidates,
-        nameIndicesMap: buildNameIndicesMap(candidates, sentence) // variations
+        nameIndicesMap: buildNameIndicesMap(candidates)
     };
 };
+
+export const getUniqueComponentNames = (sentence: Type): Set<string> => {
+    let result = new Set<string>();
+    // similar logic to buildAllCandidates() which is unfortunate
+    for (const combo of sentence.combinations) {
+        const nameListMap = buildCandidateNameListMap(combo.split(' '),
+            sentence.components);
+        for (let nameList of nameListMap.values()) {
+            nameList.forEach(name => result.add(name));
+        }
+    }
+    return result;
+}
 
 export const legacySrcList = (nameSrcList: NameCount.List): number[] => {
     return nameSrcList.map(nc => nc.count).filter(src => !Source.isCandidate(src));

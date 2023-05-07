@@ -182,6 +182,7 @@ const mergeSourcesInMergeData = (mergedSourcesList: MergedSourcesList,
     }
     */
     let result: MergedSourcesList = [];
+    // TODO: since indexing isn't used below, i could use for..of
     for (let i = 0; i < mergeData.length; ++i) {
         let data = mergeData[i];
         for (let j = 0; j < data.sourceList.length; j++) {
@@ -449,6 +450,29 @@ const parallel_makeCombosForRange = (first: number, last: number, args: any): an
     //const filterResult = ClueManager.filter(data[i], args.sum, comboMap);
 };
 
+const makeNameVariationLists = (nameList: string[],
+    variations: Sentence.Variations): string[][] =>
+{
+    return nameList.map(name =>
+        [name, ...Sentence.getNameVariations(name, variations)]);
+}
+
+// combos: an iterable of nameCsvs
+const displayCombos = (combos: any, variations: Sentence.Variations): void => {
+    let hash = new Set<string>();
+    for (let nameCsv of combos) {
+        Peco.makeNew({
+            listArray: makeNameVariationLists(nameCsv.split(','), variations)
+        }).getCombinations().forEach(nameList => {
+            const nameCsv = nameList.sort().toString();
+            if (!hash.has(nameCsv)) {
+                hash.add(nameCsv);
+                console.log(nameCsv);
+            }
+        });
+    }
+}
+
 export const makeCombos = (args: any): any => {
     Assert(args.sum, 'missing sum');
     let sumRange: number[] = args.sum.split(',').map(_.toNumber);
@@ -467,9 +491,8 @@ export const makeCombos = (args: any): any => {
                 for (let arr of data) {
                     arr.forEach((comboStr: string) => comboSet.add(comboStr));
                 }
-                for (let combo of comboSet.keys()) {
-                    console.log(combo);
-                }
+                // TODO: no filtering here?
+                displayCombos(comboSet.values(), ClueManager.getVariations())
             });
     } else {
         let totals = ClueManager.emptyFilterResult();
@@ -499,9 +522,8 @@ export const makeCombos = (args: any): any => {
             //`, push01(${mcsl_push01} - ${Math.floor((mcsl_push01 / mcsl_call) * 100)}%)` +
             //` - call/comp ${Math.floor((mcsl_call / mcsl_comp) * 100)}%`);
         }
-
         Debug(`total: ${total}, filtered(${_.size(totals.map)})`);
-        Object.keys(totals.map).forEach((nameCsv: string) => console.log(nameCsv));
+        displayCombos(Object.keys(totals.map), ClueManager.getVariations());
     }
     return 1;
 };

@@ -146,6 +146,10 @@ export function getAllCandidates (): AllCandidates {
     return State.allCandidates;
 }
 
+export const getVariations = (): Sentence.Variations => {
+    return State.variations;
+};
+
 export const getSentence = (num: number): Sentence.Type => {
     return State.sentences[num];
 };
@@ -272,17 +276,7 @@ export const loadClueList = (count: number,
 const loadSentence = (num: number, args: any): number => {
     console.error(`loading sentence ${num}`);
     let maxClues = 0;// TODO
-    let sentence = Sentence.load(State.dir, num);
-    Sentence.addAllVariations(State.variations, sentence);
-    // TODO: possible chicken/egg problem here. Passing State.variations here
-    // is imperfect because we haven't loaded all variations from all sentences
-    // yet, so early sentences will (potentially) get a subset of all variations.
-    // probably we should store all sentences in an array somewhere, then build
-    // all candidates *after* all sentences have been loaded (and State.variations
-    // is fully populated).
-    const container = Sentence.buildAllCandidates(sentence); // , State.variations);
-    State.allCandidates[num] = container;
-    State.sentences[num] = sentence;
+    State.sentences[num] = Sentence.load(State.dir, num);
     return maxClues;
 };
 
@@ -295,17 +289,16 @@ const autoSource = (clueList: ClueList.Primary, args: any):
     let actualClues: ClueList.Primary = [];
     let firstClueWithSrc: Clue.Primary | undefined = undefined;
     let skipThisClue = false;
-    let maxSentenceClues = 0;
 
     for (let clue of clueList) {
         // clue.num check must happen before clue.ignore check
         if (clue.num) {
             clueNumber = Number(clue.num);
-            const sentence = args.useSentences && (clue.source === "sentence");
-            if (sentence) {
-                maxSentenceClues += loadSentence(clueNumber, args);
+            const isSentence: boolean = args.useSentences && (clue.source === "sentence");
+            if (isSentence) {
+                loadSentence(clueNumber, args);
             }
-            skipThisClue = sentence;
+            skipThisClue = isSentence;
         }
         if (skipThisClue) continue;
         const isSameSrc = clue.src === "same";
@@ -379,7 +372,7 @@ const addKnownPrimaryClues = (clueList: ClueList.Primary): void => {
     }
 };
 
-const addUniqueNameToList = (name: string, toList: string[],
+const addUniqueName = (toList: string[], name: string, 
     hash: Set<string>, addAlways?: boolean): void =>
 {
     let isUnique = !hash.has(name);
@@ -393,22 +386,59 @@ const addUniqueNameToList = (name: string, toList: string[],
     }
 }
 
-const initUniquePrimaryClueNames = (): string[] => {
+const initUniquePrimaryClueNames = (primaryClueList: ClueList.Primary,
+    uniqueComponentNames: Set<string>): string[] =>
+{
     let result: string[] = [];
     let hash = new Set<string>();
     // add from legacy cluelist
-    for (let clue of getClueList(1)) {
+    for (let clue of primaryClueList) {
         // true = always add name to list
-        addUniqueNameToList(clue.name, result, hash, true);
+        addUniqueName(result, clue.name, hash, true);
     }
-    // add from each sentence candidate set
-    for (let [index, container] of getAllCandidates().entries()) {
-        if (!container) continue;
-        for (let name of Object.keys(container.nameIndicesMap)) {
-            addUniqueNameToList(name, result, hash);
-        }
+    // add unique component names from sentences
+    for (let name of uniqueComponentNames.values()) {
+        addUniqueName(result, name, hash);
     }
     return result;
+
+}
+
+const primaryClueListPostProcessing = (primaryClueList: ClueList.Primary
+    /* sentences: Sentence.Type[]*/): void =>
+{
+    // todo: got this backwards
+    let sentences: Sentence.Type[] = State.sentences;
+    State.clueListArray[1] = primaryClueList;
+
+    // NOTE: order is important here
+
+    // Add all variations for all sentences to State.variations before building
+    // candidates. Candidates depend on variations, so we want a complete of set
+    // of variations before building any candidates.
+    let variations = Sentence.emptyVariations();
+    for (let sentence of sentences) {
+        if (!sentence) continue;
+        Sentence.addAllVariations(variations, sentence);
+    }
+
+    // 2nd pass through sentences
+    // Generate unique *component* names (no name variations)
+    // Build all candidates using name variations
+    let uniqueComponentNames = new Set<string>();
+    for (let i = 0; i < sentences.length; ++i) {
+        const sentence = sentences[i];
+        if (!sentence) continue;
+        Sentence.getUniqueComponentNames(sentence)
+            .forEach(name => uniqueComponentNames.add(name));
+        State.allCandidates[i] = Sentence.buildAllCandidates(sentence, variations);
+    }
+    State.uniquePrimaryClueNames = initUniquePrimaryClueNames(primaryClueList,
+        uniqueComponentNames);
+    State.variations = variations;
+    State.sentences = sentences;
+    // Call addKnownPrimaryClues() last, after candidates are built
+    addKnownPrimaryClues(primaryClueList);
 }
 
 // args:
@@ -426,13 +456,10 @@ export const loadAllClues = function (args: any): void {
     let primaryClueList: ClueList.Primary = loadClueList(1) as ClueList.Primary;
     if (primaryClueList[0].src === 'auto') {
         let numPrimarySources;
-        [primaryClueList, numPrimarySources] = autoSource(primaryClueList, args);
-        State.numPrimarySources = numPrimarySources;
-        State.clueListArray[1] = primaryClueList;
-        // NB: call initUniquePrimaryClueNames() after State.clueListArray[1] assignment
-        // TODO: maybe I should have a "setPrimaryClueList()" funciton that does it.
-        State.uniquePrimaryClueNames = initUniquePrimaryClueNames();
-        addKnownPrimaryClues(primaryClueList);
+        // should autosource should the sentence list?
+        [primaryClueList, numPrimarySources/*, sentences*/] = autoSource(primaryClueList, args);
+        State.numPrimarySources = numPrimarySources; // TODO: wrongish
+        primaryClueListPostProcessing(primaryClueList/*, sentences*/);
     } else {
         throw new Error('numPrimarySources not initialized without src="auto"');
     }
