@@ -28,7 +28,6 @@ const Stringify2  = require('stringify-object');
 
 import * as Clue from '../types/clue';
 import * as ClueManager from './clue-manager';
-//import * as CountBits from '../types/count-bits-roaring';
 import * as CountBits from '../types/count-bits-fastbitset';
 import * as MinMax from '../types/min-max';
 import * as NameCount from '../types/name-count';
@@ -85,6 +84,7 @@ const listIsEmpty = (list: any[]): boolean => {
     return list.length === 0;
 };
 
+/*
 const listGetNumEmptySublists = (listOfLists: any[][]) => {
     let numEmpty = 0;
     for (let list of listOfLists) {
@@ -92,21 +92,72 @@ const listGetNumEmptySublists = (listOfLists: any[][]) => {
     }
     return numEmpty;
 };
+*/
+
+let mcsl_call = 0;
+let mcsl_comp = 0;
+let mcsl_push = 0;
+let mcsl_1_1 = 0;
+let mcsl_1_push1 = 0;
+let mcsl_push01 = 0;
+
+const mergeSourcesInPlace = (mergedSources: MergedSources,
+    source: Source.Data): void =>
+{
+    CountBits.orInPlace(mergedSources.sourceBits, source.sourceBits);
+    Source.mergeUsedSourcesInPlace(mergedSources.usedSources, source.usedSources);
+    mergedSources.sourceList.push(source);
+}
+
+const mergeCompatibleSourcesInPlace = (mergedSources: MergedSources,
+    source: Source.Data): boolean =>
+{
+    if (Source.isXorCompatible(mergedSources, source)) {
+        mergeSourcesInPlace(mergedSources, source);
+        return true;
+    }
+    return false;
+};
+
+const mergeSources = (mergedSources: MergedSources, source: Source.Data):
+    MergedSources =>
+{
+    return {
+        sourceBits: CountBits.or(mergedSources.sourceBits, source.sourceBits),
+        usedSources: Source.mergeUsedSources(mergedSources.usedSources, source.usedSources),
+        sourceList: [...mergedSources.sourceList, source]
+    };
+};
 
 const mergeCompatibleSourceLists2 = (mergedSourcesList: MergedSourcesList,
     sourceList: Source.List): MergedSourcesList =>
 {
+    ++mcsl_call;
+    if ((mergedSourcesList.length === 1) && (sourceList.length === 1)) {
+        ++mcsl_1_1;
+        return mergeCompatibleSourcesInPlace(mergedSourcesList[0], sourceList[0])
+            ? mergedSourcesList : [];
+    }
+
+    let push = 0;
     let result: MergedSourcesList = [];
     for (const mergedSources of mergedSourcesList) {
+        let compat = 0;
         for (const source of sourceList) {
-            if (!Source.isXorCompatible(source, mergedSources)) continue;
+            ++mcsl_comp;
+            if (!Source.isXorCompatible(mergedSources, source)) continue;
+            ++mcsl_push;
+            ++compat;
+            ++push;
             result.push({
                 sourceBits: CountBits.or(mergedSources.sourceBits, source.sourceBits),
                 usedSources: Source.mergeUsedSources(mergedSources.usedSources, source.usedSources),
                 sourceList: [...mergedSources.sourceList, source]
             });
         }
+        if ((mergedSourcesList.length === 1) && (sourceList.length > 1) && (compat === 1)) ++mcsl_1_push1;
     }
+    if (push < 2) ++mcsl_push01;
     return result;
 };
 
@@ -134,6 +185,71 @@ const mergeAllCompatibleSources2 = (ncList: NameCount.List,
         const nextSourceList = sourceListMap.get(NameCount.toString(ncList[ncIndex])) as Source.List;
         mergedSourcesList = mergeCompatibleSourceLists2(mergedSourcesList, nextSourceList);
         // TODO BUG this is broken for > 2; should be something like: if (sourceList.length !== ncIndex + 1) 
+        if (listIsEmpty(mergedSourcesList)) break;
+    }
+    return mergedSourcesList;
+};
+
+const mergeSourceLists3 = (mergedSourcesList: MergedSourcesList,
+    sourceList: Source.List): MergedSourcesList =>
+{
+    if (listIsEmpty(mergedSourcesList)) return makeMergedSourcesList(sourceList);
+    if ((mergedSourcesList.length === 1) && (sourceList.length === 1)) {
+        // TODO: mergeSourcesInPlace
+        return mergeCompatibleSourcesInPlace(mergedSourcesList[0], sourceList[0])
+            ? mergedSourcesList : [];
+    }
+    let result: MergedSourcesList = [];
+    for (const mergedSources of mergedSourcesList) {
+        for (const source of sourceList) {
+            result.push({
+                sourceBits: CountBits.or(mergedSources.sourceBits, source.sourceBits),
+                usedSources: Source.mergeUsedSources(mergedSources.usedSources, source.usedSources),
+                sourceList: [...mergedSources.sourceList, source]
+            });
+        }
+    }
+    return result;
+};
+
+const getCompatibleSourcePairs = (mergedSourcesList: MergedSourcesList,
+    sourceList: Source.List): [MergedSources, Source.Data][] =>
+{
+    let sourcePairs: [MergedSources, Source.Data][] = [];
+    for (let mergedSources of mergedSourcesList) {
+        for (const source of sourceList) {
+            if (Source.isXorCompatible(mergedSources, source)) {
+                sourcePairs.push([mergedSources, source]);
+            }
+        }
+    }
+    return sourcePairs;
+};
+
+const makeMergedSourcesListFromPairs = (mergedSourcesList: MergedSourcesList,
+    pairs: [MergedSources, Source.Data][]): MergedSourcesList =>
+{
+    if ((mergedSourcesList.length === 1) && (pairs.length === 1)) {
+        mergeSourcesInPlace(mergedSourcesList[0], pairs[0][1]);
+        return mergedSourcesList;
+    }
+    return pairs.map(pair => mergeSources(pair[0], pair[1]));
+};
+
+const mergeAllCompatibleSources3 = (ncList: NameCount.List,
+    sourceListMap: Map<string, Source.AnyData[]>): MergedSourcesList =>
+{
+    // because **maybe** broken for > 2
+    Assert(ncList.length <= 2, `${ncList} length > 2 (${ncList.length})`);
+    let mergedSourcesList: MergedSourcesList = [];
+    for (let nc of ncList) {
+        const sources = sourceListMap.get(NameCount.toString(nc)) as Source.List;
+        if (listIsEmpty(mergedSourcesList)) {
+            mergedSourcesList = makeMergedSourcesList(sources);
+            continue;
+        }
+        let pairs = getCompatibleSourcePairs(mergedSourcesList, sources);
+        mergedSourcesList = makeMergedSourcesListFromPairs(mergedSourcesList, pairs);
         if (listIsEmpty(mergedSourcesList)) break;
     }
     return mergedSourcesList;
@@ -192,7 +308,8 @@ export const next = (countList: number[], clueIndexes: number[]): FirstNextResul
         })) {
             continue;
         }
-        nameList.sort();
+        // TODO: what if I could delay sorting until compatibility was established
+        //nameList.sort();
         NameCount.sortList(ncList);
         return { done: false, ncList, nameList };
     }
@@ -225,7 +342,8 @@ const getCombosForUseNcLists = (sum: number, max: number, pcd: PreCompute.Data,
     let numCacheHits = 0;
     let numMergeIncompatible = 0;
     let numUseIncompatible = 0;
-    let isany = 0;
+    let isany_call = 0;
+    let isany_compat = 0;
     
     const MILLY = 1000000n;
     const start = process.hrtime.bigint();
@@ -260,7 +378,7 @@ const getCombosForUseNcLists = (sum: number, max: number, pcd: PreCompute.Data,
             let cacheHit = false;
             let mergedSourcesList: MergedSourcesList = [];
             if (!hash[key]) {
-                mergedSourcesList = mergeAllCompatibleSources2(result.ncList!, pcd.sourceListMap);
+                mergedSourcesList = mergeAllCompatibleSources3(result.ncList!, pcd.sourceListMap);
                 if (listIsEmpty(mergedSourcesList)) {
                     ++numMergeIncompatible;
                 }
@@ -275,11 +393,12 @@ const getCombosForUseNcLists = (sum: number, max: number, pcd: PreCompute.Data,
             if (listIsEmpty(mergedSourcesList)) continue;
 
             if (_.isUndefined(hash[key].isCompatible)) {
-                isany += 1;
+                isany_call += 1;
                 hash[key].isCompatible = NativeComboMaker.isAnySourceCompatibleWithUseSources(mergedSourcesList);
+                if (hash[key].isCompatible) isany_compat += 1;
             }
             if (hash[key].isCompatible) {
-                combos.push(result.nameList!.toString());
+                combos.push(result.nameList!.sort().toString());
             } else if (!cacheHit) {
                 numUseIncompatible += 1;
             }
@@ -295,10 +414,16 @@ const getCombosForUseNcLists = (sum: number, max: number, pcd: PreCompute.Data,
     if (args.verbose) {
         console.error(`sum(${sum}) combos(${comboCount}) ` +
             `variations(${totalVariations}) cacheHits(${numCacheHits}) ` +
-            `merge-incompat(${numMergeIncompatible}) ` +
-            `use-incompat(${numUseIncompatible}) ` +
+            `no-merge(${numMergeIncompatible}) ` +
+            `no-use(${numUseIncompatible}) ` +
             `actual(${totalVariations - numCacheHits - numUseIncompatible}) ` +
-            `isany(${isany}) ${duration}ms `);
+            `isany: call(${isany_call}), compat(${isany_compat}) - ${duration}ms `);
+        if (0) {
+            console.error(`mcsl_call(${mcsl_call}), comp(${mcsl_comp}), push(${mcsl_push})` +
+                `, 1_1(${mcsl_1_1} - ${Math.floor((mcsl_1_1 / mcsl_call) * 100)}%)` +
+                `, push01(${mcsl_push01} - ${Math.floor((mcsl_push01 / mcsl_call) * 100)}%)` +
+                ` - call/comp ${Math.floor((mcsl_call / mcsl_comp) * 100)}%`);
+        }
     } else {
         process.stderr.write('.');
     }

@@ -45,7 +45,6 @@ auto isSourceXorCompatibleWithAnyXorSource(
 {
   bool compatible = xorSourceList.empty(); // empty list == compatible
   for (const auto& xorSource : xorSourceList) {
-    //xorSource;
     compatible = compatData.isXorCompatibleWith(xorSource);
     if (compatible) break;
   }

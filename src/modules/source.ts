@@ -148,6 +148,30 @@ export const getUsedSources = (nameSrcList: NameCount.List):
     return result;
 }
 
+const addAll = (set: Set<number>, values: number[]): void => {
+    for (let value of values) {
+        set.add(value);
+    }
+}
+
+export const mergeUsedSourcesInPlace = (to: UsedSources, from: UsedSources):
+    void =>
+{
+    for (let i = 1; i < 10 /* cough */; ++i) {
+	const un_to = to[i] === undefined;
+        const un_from = from[i] === undefined;
+        if (un_to && un_from) continue;
+        if (un_to) {
+            to[i] = new Set<number>();
+        }
+        const toSize = to[i].size;
+        if (!un_from) {
+            addAll(to[i], [...from[i]]);
+        }
+        Assert(to[i].size === (toSize + (from[i]?.size || 0)));
+    }
+}
+
 export const mergeUsedSources = (first: UsedSources, second: UsedSources):
     UsedSources =>
 {
@@ -158,8 +182,16 @@ export const mergeUsedSources = (first: UsedSources, second: UsedSources):
 	}
 	const firstValues = (first[i] !== undefined) ? [...first[i]] : [];
 	const secondValues = (second[i] !== undefined) ? [...second[i]] : [];
-	result[i] = new Set([...firstValues, ...secondValues]);
-	Assert(result[i].size === ((first[i]?.size || 0) + (second[i]?.size || 0)));
+	//result[i] = new Set([...firstValues, ...secondValues]);
+	let set = new Set<number>();
+        addAll(set, firstValues)
+        addAll(set, secondValues);
+        result[i] = set;
+        if (result[i].size !== ((first[i]?.size || 0) + (second[i]?.size || 0))) {
+            console.error(`result[${i}]: ${result[i].size} != ${first[i]?.size || 0} + ${second[i]?.size || 0}`);
+            console.error(`  first: [${firstValues}], second: [${secondValues}]`);
+            Assert(false);
+        }
     }
     return result;
 }

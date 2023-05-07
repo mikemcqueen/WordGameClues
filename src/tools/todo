@@ -1,10 +1,10 @@
+* so If I really want to speed up precompute further, probably I should
+  port the whole getCombosForUseNcLists function and dependences (first/next)
+  to C++. I could start with just MergeCompatibleSources2 and dependencies
+  though. It's curious that didn't speed things up (probably was using older
+  version).
 
-* equal_to is getting called too much with USEDSOURCES_BITSET. this doesn't
-  impact combo-maker generation, only precompute.
-
-* i think i'm going to have to use 1 as the first index maybe for source "index"
-  within a variation.  at least in c++.  I should do the same with variation.
-  lets me initialize the bitsets to all zero.
+* "addon-mode" module return string "Debug" or "Release" for setting addon path
 
 * so there is a problem with "ignore":true clues which depend on clues in "sentences"
   that don't support the ignore flag. this problem will go away when all clues
@@ -31,6 +31,8 @@
 
 * -t full support, including --add, will be necessary (might be working now)
 
+* -c --or arg support.
+
 * I wonder if I am still respecting max in peco, for the cases where that
   makes sense.  did I comment it out, or just allow undefined?
 
@@ -43,6 +45,14 @@
   I should look into all uses and confirm what it means. And consider
   the "MaxPossiblePrimarySources" case as a possible solution (largest
   sourcelist variation from each sentence).
+
+* USESOURCES_BITSET:
+
+* equal_to is getting called too much with USEDSOURCES_BITSET. this doesn't
+  impact combo-maker generation, only precompute.
+* i think i'm going to have to use 1 as the first index
+  maybe for source "index" within a variation. at least in c++. I should do
+  the same with variation. lets me initialize the bitsets to all zero.
 
 * so with 13 bits I can store 8191 (plus 1 "empty") variations
   with 9 * 13 = 117 bits i can store 9 variation values for the 9 sentences

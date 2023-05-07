@@ -15,6 +15,22 @@
             "args": [ "-pf.71", "-t", "newton", "-v", "--fast" ]
         },
         {
+            "type": "node",
+            "request": "launch",
+            "name": "cm xor.req",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "program": "${workspaceFolder}/src/tools/clues.js",
+            "args": [ "clues.js", "-pf.71", "-c2,15", "-x2",
+                "--xor", "us 50",
+                "--xor", "koa",
+                "--xor", "21",
+                "--xor", "currant",
+                "-v"
+            ]
+        },
+        {
             "type": "cppdbg",
             "request": "launch",
             "name": "Debug cm",

@@ -172,8 +172,8 @@ const SourceList& getSourceList(const NameCountList& ncList,
 
 auto mergeSources(const SourceData& source1, const SourceData& source2) {
   SourceData result{};
-  result.primaryNameSrcList = std::move(NameCount::listMerge(source1.primaryNameSrcList,
-    source2.primaryNameSrcList));
+  result.primaryNameSrcList = std::move(NameCount::listMerge(
+    source1.primaryNameSrcList, source2.primaryNameSrcList));
   result.ncList = std::move(NameCount::listMerge(source1.ncList, source2.ncList));
   result.sourceBits = std::move(source1.sourceBits | source2.sourceBits);
   result.usedSources = std::move(source1.merge(source2.usedSources));
@@ -186,10 +186,8 @@ auto mergeCompatibleSourceLists(const SourceList& sourceList1,
   SourceList result{};
   for (const auto& source1 : sourceList1) {
     for (const auto& source2 : sourceList2) {
-      if (source1.isXorCompatibleWith(source2)) {
-        auto mergedSource = mergeSources(source1, source2);
-        result.emplace_back(std::move(mergedSource));
-      }
+      if (!source1.isXorCompatibleWith(source2)) continue;
+      result.emplace_back(std::move(mergeSources(source1, source2)));
     }
   }
   return result;
