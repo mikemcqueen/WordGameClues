@@ -60,12 +60,19 @@ clues3.json:  { "name": "old",             "src": "new,not" },
      filtering matters, and while I currently do something like "remove items
      from list B that are incompatible with items in list A", I don't do
      the inverse, or something like that, which may help.
+     NOTE: I don't think filtering matters right now . It only affects native
+     peco-loop timing which is currently fast.
   2) I think there is potential for a filtering step in here somewhere, where,
      for example, I look at all of the NameSrc results for a particular useNC,
      and see what they have in common. I'm just spitballing, but something
      like "well all NcDataCombinations for this NC have *this* and *that*
      source, so lets leave those sourceBits in for the compatibility check,
      but eliminate the words from the combinatorial set, or something.
+     Eh. I don't think i'm on to anything important there either. I mean,
+     you either filter *as* you're considering sources to combine, or you
+     filter during the combining process *after* you build lists of prospective
+     sources to combine (or both). I am not convinced there is anything here
+     but probably worth thinking about more.
 
 * I think opportunity for optimization is running out in mergecompatible. 
   One last thing to try is somehow having mergecompatLists (and perhaps
@@ -77,6 +84,12 @@ clues3.json:  { "name": "old",             "src": "new,not" },
   to C++. I don't think just porting mergeCompatibleSources3 and dependencies
   alone will do much as each call is short so the overhead of the call isn't
   worth it, but there are a million (literally) calls.
+
+* Actually I'm not so sure about the above. I think the meat of the problem
+  is in the native isAnySourceXorCompatible call. Profiler suggests it really
+  comes down to the mechanism for compatibility checking between sources. I
+  should re-think the bitset approach. 
+
 
 * Precompute is a tiny bit slower now. Maybe because I'm doing too much
   copying in mergeAllCompatibleSources/XorSources? Any way to put a

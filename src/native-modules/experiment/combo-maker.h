@@ -133,7 +133,9 @@ struct SourceCompatibilityData {
   {}
 
 #if !USEDSOURCES_BITSET
-  static auto areUsedSourcesCompatible(const UsedSources& usedSources, const UsedSources& other) {
+  static auto areUsedSourcesXorCompatible(const UsedSources& usedSources, const UsedSources& other) {
+    // TODO: optimization, loop through first just checking variation.
+    //       2nd loop compare sets.
     for (auto i = 1u; i < usedSources.size(); ++i) {
       if (usedSources[i].empty() || other[i].empty()) continue;
       if (Source::getVariation(*usedSources[i].cbegin()) != 
@@ -141,8 +143,27 @@ struct SourceCompatibilityData {
       {
         return false;
       }
-      for (auto it = usedSources[i].cbegin(); it != usedSources[i].cend(); ++it) {
-        if (other[i].find(*it) != other[i].end()) {
+      for (auto it = other[i].cbegin(); it != other[i].cend(); ++it) {
+        if (usedSources[i].find(*it) != usedSources[i].end()) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  static auto areUsedSourcesAndCompatible(const UsedSources& usedSources, const UsedSources& other) {
+    // TODO: optimization, loop through first just checking variation.
+    //       2nd loop compare sets.
+    for (auto i = 1u; i < usedSources.size(); ++i) {
+      if (usedSources[i].empty() || other[i].empty()) continue;
+      if (Source::getVariation(*usedSources[i].cbegin()) != 
+          Source::getVariation(*other[i].cbegin()))
+      {
+        return false;
+      }
+      for (auto it = other[i].cbegin(); it != other[i].cend(); ++it) {
+        if (usedSources[i].find(*it) == usedSources[i].end()) {
           return false;
         }
       }
@@ -190,10 +211,25 @@ struct SourceCompatibilityData {
       return false;
     }
 #if !USEDSOURCES_BITSET
-    return areUsedSourcesCompatible(usedSources, other.usedSources);
+    return areUsedSourcesXorCompatible(usedSources, other.usedSources);
 #else
     return usedSources.isXorCompatibleWith(other.usedSources);
 #endif
+  }
+
+  auto isAndCompatibleWith(const SourceCompatibilityData& other) const {
+    auto andBits = sourceBits & other.sourceBits;
+    if (andBits != other.sourceBits) return false;
+#if !USEDSOURCES_BITSET
+    return areUsedSourcesAndCompatible(usedSources, other.usedSources);
+#else
+    return usedSources.isAndCompatibleWith(other.usedSources);
+#endif
+  }
+
+  // OR == XOR || AND
+  auto isOrCompatibleWith(const SourceCompatibilityData& other) const {
+    return isXorCompatibleWith(other) || isAndCompatibleWith(other);
   }
 
   auto addUsedSource(int src) {
