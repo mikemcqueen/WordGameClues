@@ -1,7 +1,19 @@
-* -c (and -t?) --or arg support.
+* output max variation count and max source count (per sentence) at load.
+* fail if max sources > 127 for now
 
-* Probaby want to add this to sentence3 components:
-   "powerful": [ "powerful", "pure fowl" ]
+* usesourcebits -> implement andCompatible
+* eventually bits per sentence could be based on max sources per sentence
+  (uniqueNameCount) and usedSources bitset size is the sum, rather than
+  being a fixed size (128*9)
+
+* add syn/hom of anagrams at .. post-process?
+* do i need a new variation category, "prefixes", for which we also do
+  a syn/hom lookup in post-process? e.g. cogburn -> cog -> tooth.
+  the alternative is that "cog" is ... what.. an anagram? and thus we
+  do a syn lookup? maybe "anagram" could be generalized? kinda nice to
+  have each "rule" encapsulated as a separate variation entry type.
+
+* -c (and -t?) --or arg support.
 
 * -t --verbose
 
@@ -68,11 +80,18 @@ clues3.json:  { "name": "old",             "src": "new,not" },
      like "well all NcDataCombinations for this NC have *this* and *that*
      source, so lets leave those sourceBits in for the compatibility check,
      but eliminate the words from the combinatorial set, or something.
-     Eh. I don't think i'm on to anything important there either. I mean,
+
+     - Eh. I don't think i'm on to anything important there either. I mean,
      you either filter *as* you're considering sources to combine, or you
      filter during the combining process *after* you build lists of prospective
      sources to combine (or both). I am not convinced there is anything here
      but probably worth thinking about more.
+
+     - after some more thought, i do think this is worth exploring. probably
+     i'll be screwed without some GPU processing i, at which point any data
+     optimizations will be kind of moot. we'll find out once all clues are
+     converted to sentences.
+
 
 * I think opportunity for optimization is running out in mergecompatible. 
   One last thing to try is somehow having mergecompatLists (and perhaps
@@ -85,7 +104,7 @@ clues3.json:  { "name": "old",             "src": "new,not" },
   alone will do much as each call is short so the overhead of the call isn't
   worth it, but there are a million (literally) calls.
 
-* Actually I'm not so sure about the above. I think the meat of the problem
+  - Actually I'm not so sure about the above. I think the meat of the problem
   is in the native isAnySourceXorCompatible call. Profiler suggests it really
   comes down to the mechanism for compatibility checking between sources. I
   should re-think the bitset approach. 

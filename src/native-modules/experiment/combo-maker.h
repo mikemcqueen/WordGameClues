@@ -15,7 +15,8 @@ namespace cm {
 
 constexpr auto kMaxLegacySources = 111; // bits
 constexpr auto kMaxSourcesPerSentence = 128; // bits
-constexpr auto kSentences = 9;
+constexpr auto MX = kMaxSourcesPerSentence;
+constexpr auto kNumSentences = 9;
 
 template<typename T, size_t N>
 constexpr auto make_array(T value) -> std::array<T, N> {
@@ -27,45 +28,64 @@ constexpr auto make_array(T value) -> std::array<T, N> {
 }
 
   namespace Source {
-    constexpr inline auto isCandidate(int src) { return src >= 1'000'000; }
-    constexpr inline auto isLegacy(int src) { return !isCandidate(src); }
-    constexpr inline auto getSentence(int src) { return src / 1'000'000; }
-    constexpr inline auto getSource(int src) { return src % 1'000'000; }
-    constexpr inline auto getVariation(int src) { return getSource(src) / 100; }
-    constexpr inline auto getIndex(int src) { return getSource(src) % 100; }
+    constexpr inline auto isCandidate(int src) noexcept { return src >= 1'000'000; }
+    constexpr inline auto isLegacy(int src) noexcept { return !isCandidate(src); }
+    constexpr inline auto getSentence(int src) noexcept { return src / 1'000'000; }
+    constexpr inline auto getSource(int src) noexcept { return src % 1'000'000; }
+    constexpr inline auto getVariation(int src) noexcept { return getSource(src) / 100; }
+    constexpr inline auto getIndex(int src) noexcept { return getSource(src) % 100; }
   } // namespace Source
 
 using SourceBits = std::bitset<kMaxLegacySources>;
 using SourceBitsList = std::vector<SourceBits>;
 
-#define USEDSOURCES_BITSET 0
+#define USEDSOURCES_BITSET 1
 
 #if !USEDSOURCES_BITSET
-using UsedSources = std::array<std::set<uint32_t>, 10>;
+using UsedSources = std::array<std::set<uint32_t>, kNumSentences + 1>;
 #else
 struct UsedSources {
-  static constexpr auto kMaxUsedSourcesPerSentence = 32;
+  using VariationIndex_t = int8_t; // 255, for now.
 
-  // 128 * 32 = 4096 bits, 512 bytes, 64 uint64_t
-  using Bits = std::bitset<kMaxSourcesPerSentence * kMaxUsedSourcesPerSentence>;
-  using Sentences = std::array<Bits, kSentences>;
-  using Variations = std::array<int, kSentences>;
+  // 8 bytes = 128 bits per sentence * 9 sentences = 144 bytes (1152 bits)
+  using Bits = std::bitset<kMaxSourcesPerSentence * kNumSentences>;
+  using Variations = std::array<VariationIndex_t, kNumSentences>;
 
-  Sentences sentences{};
-  Variations variations = make_array<int, kSentences>( -1 );
+  static constexpr std::array<uint32_t, kNumSentences> first_indices
+    { MX, MX*2, MX*3, MX*4, MX*5, MX*6, MX*7, MX*8, MX*9 };
+  static auto getFirstIndex(int sentence) { return first_indices[sentence]; }
 
-  Bits& getBits(int sentence) { return sentences[sentence - 1]; }
-  const Bits& getBits(int sentence) const { return sentences[sentence - 1]; }
+  Bits bits{};
+  Variations variations = make_array<VariationIndex_t, kNumSentences>( -1 );
+
+  constexpr Bits& getBits() noexcept { return bits; }
+  constexpr const Bits& getBits() const noexcept { return bits; }
 
   constexpr int getVariation(int sentence) const { return variations[sentence - 1]; }
   void setVariation(int sentence, int value) { variations[sentence - 1] = value; }
   constexpr bool hasVariation(int sentence) const { return getVariation(sentence) > -1; }
 
+  auto andBits(const Bits& other) const noexcept {
+#if 1
+    static Bits result{};
+    result.reset();
+    result |= getBits(); // possibly use static here
+#else
+    Bits result(getBits()); // possibly use static here
+#endif
+    result &= other;
+    return result;
+  }
+
   auto isXorCompatibleWith(const UsedSources& other) const {
+    // compare bits
+    if ((getBits() & other.getBits()).any()) return false;
+
+    // compare variations
     for (auto i = 0u; i < variations.size(); ++i) {
-      if ((variations[i] == -1) || (other.variations[i] == -1)) continue;
-      if (variations[i] != other.variations[i]) return false;
-      if ((sentences[i] & other.sentences[i]).any()) return false;
+      if ((variations[i] != -1) && (other.variations[i] != -1)) {
+        if (variations[i] != other.variations[i]) return false;
+      }
     }
     return true;
   }
@@ -79,20 +99,21 @@ struct UsedSources {
                 << ", src: " << variation << std::endl;
       assert(true && "addSource() variation mismatch");
     }
-    auto& bits = getBits(sentence);
-    auto pos = Source::getIndex(src) * kMaxSourcesPerSentence;
+    auto pos = Source::getIndex(src) + getFirstIndex(sentence);
     assert(!bits.test(pos));
     setVariation(sentence, variation);
     bits.set(pos);
   }
 
   auto mergeInPlace(const UsedSources& other) {
-    for (auto i = 1u; i <= sentences.size(); ++i) {
-      auto& bits = getBits(i);
-      // could assert bits here
-      bits |= other.getBits(i);
+    // merge bits
+    // TODO: option for compatibility checking
+    getBits() |= other.getBits();
+
+    for (auto i = 1u; i <= variations.size(); ++i) {
       if (hasVariation(i) && other.hasVariation(i)) {
-        assert(getVariation(i) == other.getVariation(i));
+        //assert(getVariation(i) == other.getVariation(i));
+        continue;
       } else if (!hasVariation(i)) {
         setVariation(i, other.getVariation(i));
       }
@@ -102,7 +123,7 @@ struct UsedSources {
   auto merge(const UsedSources& other) const {
     UsedSources result{ *this }; // copy
     result.mergeInPlace(other);
-    return other;
+    return result;
   }
 };
 #endif // USED_SOURCES_BITSET
@@ -223,7 +244,7 @@ struct SourceCompatibilityData {
 #if !USEDSOURCES_BITSET
     return areUsedSourcesAndCompatible(usedSources, other.usedSources);
 #else
-    return usedSources.isAndCompatibleWith(other.usedSources);
+    return false; // TODO: usedSources.isAndCompatibleWith(other.usedSources);
 #endif
   }
 
@@ -465,8 +486,8 @@ struct std::equal_to<cm::UsedSources> {
   constexpr bool operator()(const cm::UsedSources& lhs,
     const cm::UsedSources& rhs) const noexcept
   {
-    for (auto i = 0u; i < lhs.sentences.size(); ++i) {
-      if (!std::equal_to<cm::UsedSources::Bits>{}(lhs.sentences[i], rhs.sentences[i])) return false;
+    if (!std::equal_to<cm::UsedSources::Bits>{}(lhs.getBits(), rhs.getBits())) return false;
+    for (auto i = 0u; i < lhs.variations.size(); ++i) {
       if (lhs.variations[i] != rhs.variations[i]) return false;
     }
     return true;
@@ -476,16 +497,14 @@ struct std::equal_to<cm::UsedSources> {
 template<>
 struct std::hash<cm::UsedSources> {
   std::size_t operator()(const cm::UsedSources& usedSources) const noexcept {
-    std::size_t sentence_seed = 0;
-    for (const auto& sentence: usedSources.sentences) {
-      hash_combine(sentence_seed, std::hash<cm::UsedSources::Bits>{}(sentence));
-    }
+    std::size_t bits_seed = 0;
+    hash_combine(bits_seed, std::hash<cm::UsedSources::Bits>{}(usedSources.getBits()));
     std::size_t variation_seed = 0;
     for (const auto variation: usedSources.variations) {
       hash_combine(variation_seed, std::hash<int>{}(variation));
     }
     std::size_t seed = 0;
-    hash_combine(seed, sentence_seed);
+    hash_combine(seed, bits_seed);
     hash_combine(seed, variation_seed);
     return seed;
   }

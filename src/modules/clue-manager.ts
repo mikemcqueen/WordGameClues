@@ -429,9 +429,11 @@ const primaryClueListPostProcessing = (primaryClueList: ClueList.Primary
     for (let i = 0; i < sentences.length; ++i) {
         const sentence = sentences[i];
         if (!sentence) continue;
-        Sentence.getUniqueComponentNames(sentence)
-            .forEach(name => uniqueComponentNames.add(name));
-        State.allCandidates[i] = Sentence.buildAllCandidates(sentence, variations);
+        const names = Sentence.getUniqueComponentNames(sentence);
+        names.forEach(name => uniqueComponentNames.add(name));
+        const container = Sentence.buildAllCandidates(sentence, variations);
+        State.allCandidates[i] = container;
+        console.error(`sentence ${i}, names: ${names.size}, variations: ${container.candidates.length}`);
     }
     State.uniquePrimaryClueNames = initUniquePrimaryClueNames(primaryClueList,
         uniqueComponentNames);

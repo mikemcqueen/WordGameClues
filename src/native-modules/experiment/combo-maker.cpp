@@ -10,8 +10,8 @@ auto isSourceORCompatibleWithAnyOrSource(const SourceCompatibilityData& compatDa
 {
     auto compatible = false;
     for (const auto& orSource : orSourceList) {
-      // skip any sources that were already determined to be XOR incompatible or AND compatible
-      // with command-line supplied --xor sources.
+      // skip any sources that were already determined to be XOR incompatible
+      // or AND compatible with --xor sources.
       if (!orSource.xorCompatible || orSource.andCompatible) continue;
       compatible = compatData.isOrCompatibleWith(orSource.source);
       if (compatible) break;
@@ -37,7 +37,7 @@ auto isSourceCompatibleWithEveryOrArg(const SourceCompatibilityData& compatData,
 auto isSourceXORCompatibleWithAnyXorSource(
   const SourceCompatibilityData& compatData, const XorSourceList& xorSourceList)
 {
-  bool compatible = xorSourceList.empty(); // empty list == compatible
+  bool compatible = true; // empty list == compatible
   for (const auto& xorSource : xorSourceList) {
     compatible = compatData.isXorCompatibleWith(xorSource);
     if (compatible) break;
