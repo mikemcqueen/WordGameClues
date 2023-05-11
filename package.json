@@ -38,6 +38,7 @@
     "pretty-ms": "^2.1.0",
     "retry": "^0.10.1",
     "roaring": "^1.5.2",
+    "shelljs": "^0.8.5",
     "should": "^11.2.1",
     "simple-git": "^1.132.0",
     "sliced": "^1.0.1",
@@ -53,7 +54,7 @@
   },
   "scripts": {
     "test": "make test",
-      "build": "node-gyp build",
+    "build": "node-gyp build",
     "rebuild": "node-gyp rebuild"
   },
   "author": "Mike McQueen",
