@@ -28,69 +28,99 @@ class Lettercount
     private static BigDecimal TWO = new BigDecimal(2, mc);
     private static BigDecimal ONE = new BigDecimal(1, mc);
     private static BigDecimal ONE_HALF = new BigDecimal(.5, mc);
+    private static BigDecimal CV_HIGH = new BigDecimal(1.8, mc);
+    private static BigDecimal CV_AVERAGE = new BigDecimal(1.59, mc);
+    private static BigDecimal CV_LOW = new BigDecimal(1.4, mc);
     public static BigDecimal total;
+    public static DecimalFormat df = new DecimalFormat();
 
     static
     {
-        letterFrequencyMap.put('a', 	new BigDecimal(8.167, mc));
-        letterFrequencyMap.put('b', 	new BigDecimal(1.492, mc));
-        letterFrequencyMap.put('c', 	new BigDecimal(2.782, mc));
-        letterFrequencyMap.put('d', 	new BigDecimal(4.253, mc));
-        letterFrequencyMap.put('e', 	new BigDecimal(12.702, mc));
-        letterFrequencyMap.put('f', 	new BigDecimal(2.228, mc));
-        letterFrequencyMap.put('g', 	new BigDecimal(2.015, mc));
-        letterFrequencyMap.put('h', 	new BigDecimal(6.094, mc));
-        letterFrequencyMap.put('i', 	new BigDecimal(6.966, mc));
-        letterFrequencyMap.put('j', 	new BigDecimal(0.153, mc));
-        letterFrequencyMap.put('k', 	new BigDecimal(0.772, mc));
-        letterFrequencyMap.put('l', 	new BigDecimal(4.025, mc));
-        letterFrequencyMap.put('m', 	new BigDecimal(2.406, mc));
-        letterFrequencyMap.put('n', 	new BigDecimal(6.749, mc));
-        letterFrequencyMap.put('o', 	new BigDecimal(7.507, mc));
-        letterFrequencyMap.put('p', 	new BigDecimal(1.929, mc));
-        letterFrequencyMap.put('q', 	new BigDecimal(0.095, mc));
-        letterFrequencyMap.put('r', 	new BigDecimal(5.987, mc));
-        letterFrequencyMap.put('s', 	new BigDecimal(6.327, mc));
-        letterFrequencyMap.put('t', 	new BigDecimal(9.056, mc));
-        letterFrequencyMap.put('u', 	new BigDecimal(2.758, mc));
-        letterFrequencyMap.put('v', 	new BigDecimal(0.978, mc));
-        letterFrequencyMap.put('w', 	new BigDecimal(2.360, mc));
-        letterFrequencyMap.put('x', 	new BigDecimal(0.150, mc));
-        letterFrequencyMap.put('y', 	new BigDecimal(1.974, mc));
-        letterFrequencyMap.put('z', 	new BigDecimal(0.074, mc));
+        df.setMaximumFractionDigits(2);
+        df.setMinimumFractionDigits(2);
+        df.setGroupingUsed(false);
+    }
+
+    static
+    {
+        letterFrequencyMap.put('a',     new BigDecimal(8.167, mc));
+        letterFrequencyMap.put('b',     new BigDecimal(1.492, mc));
+        letterFrequencyMap.put('c',     new BigDecimal(2.782, mc));
+        letterFrequencyMap.put('d',     new BigDecimal(4.253, mc));
+        letterFrequencyMap.put('e',     new BigDecimal(12.702, mc));
+        letterFrequencyMap.put('f',     new BigDecimal(2.228, mc));
+        letterFrequencyMap.put('g',     new BigDecimal(2.015, mc));
+        letterFrequencyMap.put('h',     new BigDecimal(6.094, mc));
+        letterFrequencyMap.put('i',     new BigDecimal(6.966, mc));
+        letterFrequencyMap.put('j',     new BigDecimal(0.153, mc));
+        letterFrequencyMap.put('k',     new BigDecimal(0.772, mc));
+        letterFrequencyMap.put('l',     new BigDecimal(4.025, mc));
+        letterFrequencyMap.put('m',     new BigDecimal(2.406, mc));
+        letterFrequencyMap.put('n',     new BigDecimal(6.749, mc));
+        letterFrequencyMap.put('o',     new BigDecimal(7.507, mc));
+        letterFrequencyMap.put('p',     new BigDecimal(1.929, mc));
+        letterFrequencyMap.put('q',     new BigDecimal(0.095, mc));
+        letterFrequencyMap.put('r',     new BigDecimal(5.987, mc));
+        letterFrequencyMap.put('s',     new BigDecimal(6.327, mc));
+        letterFrequencyMap.put('t',     new BigDecimal(9.056, mc));
+        letterFrequencyMap.put('u',     new BigDecimal(2.758, mc));
+        letterFrequencyMap.put('v',     new BigDecimal(0.978, mc));
+        letterFrequencyMap.put('w',     new BigDecimal(2.360, mc));
+        letterFrequencyMap.put('x',     new BigDecimal(0.150, mc));
+        letterFrequencyMap.put('y',     new BigDecimal(1.974, mc));
+        letterFrequencyMap.put('z',     new BigDecimal(0.074, mc));
     }
  
     public static void main(String[] args) throws IOException {
         if (args.length < 1) {
-            System.out.println("Usage: java Lettercount <filename> [string1 ... stringN]");
+            System.out.println("Usage: java Lettercount [-r] <filename> [string1 ... stringN]");
             return;
         }
         
-        String sentence = load(args[0]);
+        boolean quiet = false;
+        boolean remainOnly = false;
+        int argIndex = 0;
+
+        if (args[argIndex].equals("-r")) {
+            ++argIndex;
+            quiet = true;
+            remainOnly = true;
+        }
+
+        String sentence = load(args[argIndex++]);
         int totalChars = sentence.length();
-        System.out.println("total: " + totalChars);
+        if (!quiet) {
+            System.out.println("total: " + totalChars);
+        }
         
         String ignoring = "";
-        for (int argIndex = 1; argIndex < args.length; ++argIndex) {
-	    ignoreLetters(args[argIndex], ignoreLetterCounts);
+        for (; argIndex < args.length; ++argIndex) {
+            ignoreLetters(args[argIndex], ignoreLetterCounts);
             ignoring = ignoring.concat(args[argIndex]);
-	}
+        }
         Map<Character, Integer> sentenceLetterCounts = new HashMap<>();
         ignoreLetters(sentence, sentenceLetterCounts);
         if (!validateIgnoreLetters(sentenceLetterCounts, ignoreLetterCounts)) {
             System.out.println("ignore letters: '" + ignoring + "' do not exist in '" + sentence + "'");
             return;
         }
-        System.out.println("ignoring: " + ignoring);
+        if (!quiet) {
+            System.out.println("ignoring: " + ignoring);
+        }
         
+        String vowels = "aeiou";
+        int numVowels = 0;
         String remain = "";
         for (char ch : sentence.toCharArray()) {
             if (!Character.isLowerCase(ch)) {
                 continue;
             }
-	    if (isIgnoreLetter(ch)) {
-		continue;
-	    }
+            if (isIgnoreLetter(ch)) {
+                continue;
+            }
+            if (vowels.indexOf(ch) != -1) {
+                ++numVowels;
+            }
             int count = 0;
             if (letterCounts.containsKey(ch)) {
                 count = letterCounts.get(ch);
@@ -99,8 +129,25 @@ class Lettercount
             remain += ch;
         }
         total = new BigDecimal(remain.length());
-        System.out.println("remain: " + remain.length() + ", " + remain);
+        if (remainOnly) {
+            System.out.println(remain);
+            return;
+        }
+        if (!quiet) {
+            System.out.println("remain: " + remain.length() + ", " + remain);
 
+            Factor factor = new Factor(remain.length(), numVowels);
+            boolean negative = factor.factor.compareTo(factor.expected) == -1;
+            String actual = negative ? "(" + df.format(factor.actual) + ")" : df.format(factor.actual);
+            if (factor.actual.compareTo(CV_HIGH) == 1) {
+                actual += " +++";
+            }
+            else if (factor.actual.compareTo(CV_LOW) == -1) {
+                //System.out.println(df.format(factor.factor) + " is less than " + df.format(CV_LOW));
+                actual += " ---";
+            }
+            System.out.println("C/V ratio: " + df.format(factor.expected) + " " + actual);
+        }
         dump(letterCounts);
     }
     
@@ -124,38 +171,34 @@ class Lettercount
                 count = map.get(ch);
             }
             map.put(ch, ++count);
-	}
+        }
     }
 
     private static boolean isIgnoreLetter(char ch) 
     {
-	if (!ignoreLetterCounts.containsKey(ch))
-	{
-	    return false;
-	}
-	int count = ignoreLetterCounts.get(ch);
-	if (count > 1)
-	{
-	    ignoreLetterCounts.put(ch, --count);
-	}
-	else
-	{
-	    ignoreLetterCounts.remove(ch);
-	}
-	return true;
+        if (!ignoreLetterCounts.containsKey(ch))
+        {
+            return false;
+        }
+        int count = ignoreLetterCounts.get(ch);
+        if (count > 1)
+        {
+            ignoreLetterCounts.put(ch, --count);
+        }
+        else
+        {
+            ignoreLetterCounts.remove(ch);
+        }
+        return true;
     }
 
     private static void dump(Map<Character, Integer> map)
     {
-            DecimalFormat df = new DecimalFormat();
-            df.setMaximumFractionDigits(2);
-            df.setMinimumFractionDigits(2);
-            df.setGroupingUsed(false);
         List<Map.Entry<Character, Integer>> entryList = new ArrayList<>(map.entrySet());
         java.util.Collections.sort(entryList, new ByFactor());
         for (Map.Entry<Character, Integer> entry : entryList) {
-	    Factor factor = getFactor(entry);
-
+            Factor factor = getFactor(entry);
+            
             String factorString = df.format(factor.factor);
 
             if (factor.factor.compareTo(TWO) == 1) {
@@ -186,21 +229,29 @@ class Lettercount
 
     private static Factor getFactor(Map.Entry<Character, Integer> entry)
     {
-	return new Factor(entry);
+        return new Factor(entry);
     }
 
     private static class Factor
     {
-	BigDecimal expected;
-	BigDecimal actual;
-	BigDecimal factor;
-	
-	public Factor(Map.Entry<Character, Integer> entry)
-	{
-	    actual = new BigDecimal(entry.getValue(), mc).divide(total, mc).scaleByPowerOfTen(2);
-	    expected = letterFrequencyMap.get(entry.getKey());
-	    factor = actual.divide(expected, mc);
-	}
+        BigDecimal expected;
+        BigDecimal actual;
+        BigDecimal factor;
+        
+        public Factor(Map.Entry<Character, Integer> entry)
+        {
+            actual = new BigDecimal(entry.getValue(), mc).divide(total, mc).scaleByPowerOfTen(2);
+            expected = letterFrequencyMap.get(entry.getKey());
+            factor = actual.divide(expected, mc);
+        }
+
+        public Factor(int length, int numVowels) {
+            actual =  new BigDecimal(length - numVowels, mc)
+                .divide(new BigDecimal(numVowels, mc), mc);
+            expected = CV_AVERAGE;
+            factor = actual.divide(expected, mc);
+        }
+
     }
 
     /*
@@ -220,12 +271,12 @@ class Lettercount
 
         public int compare(Map.Entry<Character, Integer> o1, Map.Entry<Character, Integer> o2)
         {
-	    return getFactor(o1).factor.compareTo(getFactor(o2).factor);
+            return getFactor(o1).factor.compareTo(getFactor(o2).factor);
         }
 
         public boolean equals(Map.Entry<Character, Integer> o1, Map.Entry<Character, Integer> o2)
         {
-	    return getFactor(o1).factor.compareTo(getFactor(o2).factor) == 0;
+            return getFactor(o1).factor.compareTo(getFactor(o2).factor) == 0;
         }
 
     }

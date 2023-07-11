@@ -288,9 +288,9 @@ auto buildSourceListsForUseNcData(const vector<NCDataList>& useNcDataLists,
     << equal_to_called << std::endl;
 #endif
   std::cerr << "  total sources: " << total << ", hash_hits: " << hash_hits
-    << ", sourceLists(" << sourceLists.size() << ")"
-    << ": " << std::accumulate(sourceLists.begin(), sourceLists.end(), 0u,
-    [](size_t total, const SourceList& list){ return total + list.size(); })
+    << ", sourceLists(" << sourceLists.size() << "): "
+    << std::accumulate(sourceLists.begin(), sourceLists.end(), 0u,
+      [](size_t total, const SourceList& list){ return total + list.size(); })
     << std::endl;
   return sourceLists;
 }
@@ -384,7 +384,7 @@ SourceCRefList getCompatibleXorSources(const std::vector<int>& indexList,
   // auto reference type, uh, optional here?
   SourceCRefList sourceCRefList{};
   const auto& firstSource = sourceLists[0][indexList[0]];
-  sourceCRefList.emplace_back(SourceCRef{firstSource});
+  sourceCRefList.emplace_back(SourceCRef{ firstSource });
   SourceCompatibilityData compatData(firstSource.sourceBits, firstSource.usedSources);
   for (auto i = 1u; i < indexList.size(); ++i) {
     const auto& source = sourceLists[i][indexList[i]];
@@ -393,7 +393,7 @@ SourceCRefList getCompatibleXorSources(const std::vector<int>& indexList,
     }
     compatData.sourceBits |= source.sourceBits;
     compatData.mergeInPlace(source.usedSources);
-    sourceCRefList.emplace_back(SourceCRef{source});
+    sourceCRefList.emplace_back(SourceCRef{ source });
   }
   return sourceCRefList;
 }
@@ -457,13 +457,14 @@ XorSourceList mergeCompatibleXorSourceCombinations(
   using namespace std::chrono;
 
   if (sourceLists.empty()) return {};
-  assert((getNumEmptySublists(sourceLists) == 0) && "mergeCompatibleXorSourceCombinations: empty sublist");
+  assert((getNumEmptySublists(sourceLists) == 0)
+    && "mergeCompatibleXorSourceCombinations: empty sublist");
   std::vector<int> lengths{};
   for (const auto& sl : sourceLists) {
     lengths.push_back(sl.size());
   }
-  cerr << "  initial lengths: " << vec_to_string(lengths)
-       << ", product: " << vec_product(lengths) << std::endl;
+  std::cerr << "  initial lengths: " << vec_to_string(lengths)
+            << ", product: " << vec_product(lengths) << std::endl;
   auto indexLists = Peco::initial_indices(lengths);
   bool valid = filterAllXorIncompatibleIndices(indexLists, sourceLists);
   
@@ -472,9 +473,9 @@ XorSourceList mergeCompatibleXorSourceCombinations(
   for (const auto& il : indexLists) {
     lengths.push_back(list_size(il));
   }
-  cerr << "  filtered lengths: " << vec_to_string(lengths)
-       << ", product: " << vec_product(lengths)
-       << ", valid: " << boolalpha << valid << std::endl;
+  std::cerr << "  filtered lengths: " << vec_to_string(lengths)
+            << ", product: " << vec_product(lengths)
+            << ", valid: " << boolalpha << valid << std::endl;
 #endif
   if (!valid) return {};
 
@@ -499,9 +500,9 @@ XorSourceList mergeCompatibleXorSourceCombinations(
   }
   auto peco1 = high_resolution_clock::now();
   auto d_peco = duration_cast<milliseconds>(peco1 - peco0).count();
-  cerr << " native peco loop: " << d_peco << "ms" << ", combos: " << combos
-       << ", compatible: " << compatible << ", merged: " << merged
-       << ", XorSources: " << xorSourceList.size() << std::endl;
+  std::cerr << " native peco loop: " << d_peco << "ms" << ", combos: " << combos
+            << ", compatible: " << compatible << ", merged: " << merged
+            << ", XorSources: " << xorSourceList.size() << std::endl;
   
   return xorSourceList;
 }

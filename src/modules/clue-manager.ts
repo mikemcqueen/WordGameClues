@@ -408,7 +408,7 @@ const primaryClueListPostProcessing = (primaryClueList: ClueList.Primary
     /* sentences: Sentence.Type[]*/): void =>
 {
     // todo: got this backwards
-    let sentences: Sentence.Type[] = State.sentences;
+    const sentences: Sentence.Type[] = State.sentences;
     State.clueListArray[1] = primaryClueList;
 
     // NOTE: order is important here
@@ -433,6 +433,7 @@ const primaryClueListPostProcessing = (primaryClueList: ClueList.Primary
         names.forEach(name => uniqueComponentNames.add(name));
         const container = Sentence.buildAllCandidates(sentence, variations);
         State.allCandidates[i] = container;
+        // just info, but i want it output to stderr
         console.error(`sentence ${i}, names: ${names.size}, variations: ${container.candidates.length}`);
     }
     State.uniquePrimaryClueNames = initUniquePrimaryClueNames(primaryClueList,

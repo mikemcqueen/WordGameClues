@@ -408,8 +408,8 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
     
   auto build0 = high_resolution_clock::now();
 
-  std::vector<cm::SourceList> sourceLists{};
-  sourceLists = std::move(cm::buildSourceListsForUseNcData(ncDataLists, cm::PCD.sourceListMap));
+  std::vector<cm::SourceList> sourceLists =
+    cm::buildSourceListsForUseNcData(ncDataLists, cm::PCD.sourceListMap);
 
   auto build1 = high_resolution_clock::now();
   auto d_build = duration_cast<milliseconds>(build1 - build0).count();
@@ -425,8 +425,10 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
     auto merge1 = high_resolution_clock::now();
     auto d_merge = duration_cast<milliseconds>(merge1 - merge0).count();
     cerr << " native merge - " << d_merge << "ms" << endl;
-  } else {
+  } else if (sourceLists.size() == 1) {
     cm::PCD.xorSourceList = std::move(sourceLists.back());
+  } else {
+    cm::PCD.xorSourceList = cm::SourceList{};
   }
     
   //--

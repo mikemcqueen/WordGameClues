@@ -9,7 +9,7 @@
         "greeting.cpp",
         "combo-maker.cpp",
         "cm-precompute.cpp",
-	"wrap.cpp"
+        "wrap.cpp"
       ],
       "include_dirs": [
         "<!@(node -p \"require('node-addon-api').include\")"

@@ -8,8 +8,8 @@ import _ from 'lodash'; // import statement to signal that we are a "module"
 
 const Peco        = require('../../modules/peco');
 
-const NativeComboMaker = require('../../../build/Release/experiment.node');
-//const NativeComboMaker = require('../../../build/Debug/experiment.node');
+//const NativeComboMaker = require('../../../build/Release/experiment.node');
+const NativeComboMaker = require('../../../build/Debug/experiment.node');
 
 const Assert      = require('assert');
 const Debug       = require('debug')('cm-precompute');
@@ -483,7 +483,7 @@ const buildUseSourceListsFromNcData = (sourceListMap: Map<string, Source.AnyData
 
 export const preCompute = (first: number, last: number, args: any): Result => {
     const begin = new Date();
-    args.allXorNcDataLists = buildAllUseNcDataLists(args.xor);
+    args.allXorNcDataLists = args.xor ? buildAllUseNcDataLists(args.xor) : [ [] ];
     const d1 = new Duration(begin, new Date()).milliseconds;
     console.error(` buildAllXorNcDataLists(${args.allXorNcDataLists.length})` +
         ` - ${PrettyMs(d1)}`);

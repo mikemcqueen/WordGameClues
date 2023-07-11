@@ -1,3 +1,20 @@
+* from notepad:  on elimination: this should only be relevant to combo-making.
+  once a component word is chosen for a particular sentence, all other
+  sententce combinations that do not contain that component word should be
+  eliminated.
+  "So I'll need to keep copies of the per-sentence combination list (list of
+  string sets - the sets themselves need not be copied), so that I can remove
+  the incompatible combinations on a per-generated-combo basis."
+  NOTE: it seems this may be relevant for --xor validation and precompute
+  as well?
+  * should auto-fail if conflicting --xor's are provided
+  * what about --or's? do we need to prune --xor's in that case?)
+
+  * need to iron it out more detail above and implement it.
+
+* NCData/List -> NcListContainer
+* experimental/simd
+
 * output max variation count and max source count (per sentence) at load.
 * fail if max sources > 127 for now
 
@@ -88,7 +105,7 @@ clues3.json:  { "name": "old",             "src": "new,not" },
      but probably worth thinking about more.
 
      - after some more thought, i do think this is worth exploring. probably
-     i'll be screwed without some GPU processing i, at which point any data
+     i'll be screwed without some GPU processing, at which point any data
      optimizations will be kind of moot. we'll find out once all clues are
      converted to sentences.
 
@@ -144,13 +161,22 @@ clues3.json:  { "name": "old",             "src": "new,not" },
   for N=6, count = 19
   for N=7, count = 16
   for N=8, count = 14
-  that's how many primary sources from the same sentence can be stored
-  in 128 bits.
+  that's how many primary sources (+ variation #) from the same sentence
+  can be stored in 128 bits.
 
   128 is the total number of unique sources per sentence. this takes
   into account the fact that we will be supporting different component-name
   sets with completely different names for each sentence, such as between
   v1 and v2 solutions.
+
+  ** I think the above might be wrong-thinking. I should be able to limit
+     it to 5 bits (32 max sources per "variation"), if I store variation
+     separately. thoughts in notebook.
+
+  ** I think the problem may come down to how I am storing unique names in 
+     a single "sourceIndicesMap" or whatever it's called. I aggregate all
+     unique names across all sentence variations and give them an index?
+     Is that what I do? Couuld I have a per-variation map instead.
 
   128 is *probably* a safe number but might be limiting at some point,
   so I think increasing it to 256 probably makes sense. That puts a
@@ -164,8 +190,16 @@ clues3.json:  { "name": "old",             "src": "new,not" },
   will probably be fine.
 
   So how do we get to support
-  * 256 total unique source component indexes per sentence
-  * 32 indexes at a time
+  * 256 total unique source component indexes per sentence = 8 bits
+  * 32 max indexes at a time
+  * 32 * 8bits = 256 bits?
+
+  or --
+  * 32 unique source component indexes per sentence variation = 5 bits 
+  * 32 max indexes at a time
+  * 32 * 5bits = 160 bits 
+  * 28 * 5 bits = 140 bits
+  * 25 * 5 bits = 125 bits
   
   coocoo idea below. will *not* work for fast xor comparison. need to use bitset.
 

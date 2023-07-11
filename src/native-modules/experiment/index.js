@@ -1,5 +1,6 @@
 const Stringify = require('stringify-object');
-const xp = require('./build/Release/experiment.node');
+//const xp = require('./build/Release/experiment.node');
+const xp = require('./build/Debug/experiment.node');
 
 let greet = () => {
     console.log('exports: ', xp);

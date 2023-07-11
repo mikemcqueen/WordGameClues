@@ -27,14 +27,14 @@ constexpr auto make_array(T value) -> std::array<T, N> {
   return a;
 }
 
-  namespace Source {
-    constexpr inline auto isCandidate(int src) noexcept { return src >= 1'000'000; }
-    constexpr inline auto isLegacy(int src) noexcept { return !isCandidate(src); }
-    constexpr inline auto getSentence(int src) noexcept { return src / 1'000'000; }
-    constexpr inline auto getSource(int src) noexcept { return src % 1'000'000; }
-    constexpr inline auto getVariation(int src) noexcept { return getSource(src) / 100; }
-    constexpr inline auto getIndex(int src) noexcept { return getSource(src) % 100; }
-  } // namespace Source
+namespace Source {
+  constexpr inline auto isCandidate(int src) noexcept { return src >= 1'000'000; }
+  constexpr inline auto isLegacy(int src) noexcept { return !isCandidate(src); }
+  constexpr inline auto getSentence(int src) noexcept { return src / 1'000'000; }
+  constexpr inline auto getSource(int src) noexcept { return src % 1'000'000; }
+  constexpr inline auto getVariation(int src) noexcept { return getSource(src) / 100; }
+  constexpr inline auto getIndex(int src) noexcept { return getSource(src) % 100; }
+} // namespace Source
 
 using SourceBits = std::bitset<kMaxLegacySources>;
 using SourceBitsList = std::vector<SourceBits>;
@@ -45,15 +45,17 @@ using SourceBitsList = std::vector<SourceBits>;
 using UsedSources = std::array<std::set<uint32_t>, kNumSentences + 1>;
 #else
 struct UsedSources {
-  using VariationIndex_t = int8_t; // 255, for now.
+  using VariationIndex_t = int16_t;
 
-  // 8 bytes = 128 bits per sentence * 9 sentences = 144 bytes (1152 bits)
+  // 128 bits per sentence * 9 sentences = 1152 bits, 144 bytes, 18 64-bit words
   using Bits = std::bitset<kMaxSourcesPerSentence * kNumSentences>;
   using Variations = std::array<VariationIndex_t, kNumSentences>;
 
-  static constexpr std::array<uint32_t, kNumSentences> first_indices
-    { MX, MX*2, MX*3, MX*4, MX*5, MX*6, MX*7, MX*8, MX*9 };
-  static auto getFirstIndex(int sentence) { return first_indices[sentence]; }
+  static /*constexpr*/ auto getFirstIndex(int sentence) {
+    //static constexpr std::array<uint32_t, kNumSentences> first_indices
+    //  { MX, MX*2, MX*3, MX*4, MX*5, MX*6, MX*7, MX*8, MX*9 };
+    return (sentence + 1) * kMaxSourcesPerSentence;
+  }
 
   Bits bits{};
   Variations variations = make_array<VariationIndex_t, kNumSentences>( -1 );
@@ -65,6 +67,7 @@ struct UsedSources {
   void setVariation(int sentence, int value) { variations[sentence - 1] = value; }
   constexpr bool hasVariation(int sentence) const { return getVariation(sentence) > -1; }
 
+  /*
   auto andBits(const Bits& other) const noexcept {
 #if 1
     static Bits result{};
@@ -76,6 +79,7 @@ struct UsedSources {
     result &= other;
     return result;
   }
+  */
 
   auto isXorCompatibleWith(const UsedSources& other) const {
     // compare bits
@@ -95,9 +99,10 @@ struct UsedSources {
     auto variation = Source::getVariation(src);
     //auto thisVariation = getVariation(sentence);
     if (hasVariation(sentence) && (getVariation(sentence) != variation)) {
-      std::cerr << "variation(" << sentence << "), this: " << getVariation(sentence)
-                << ", src: " << variation << std::endl;
-      assert(true && "addSource() variation mismatch");
+      std::cerr << "variation(" << sentence << "), this: "
+                << getVariation(sentence) << ", src: " << variation
+                << std::endl;
+      assert(false && "addSource() variation mismatch");
     }
     auto pos = Source::getIndex(src) + getFirstIndex(sentence);
     assert(!bits.test(pos));
@@ -202,11 +207,11 @@ struct SourceCompatibilityData {
     if (!set.empty()) {
       if (Source::getVariation(*set.begin()) != Source::getVariation(source)) {
         if (nothrow) return false;
-        throw "oopsie1"; // new Error(`oopsie ${anyElem}, ${source}`);
+        throw "oopsie"; // new Error(`oopsie ${anyElem}, ${source}`);
       }
       if (set.find(source) != set.end()) {
         if (nothrow) return false;
-        throw "oopsie2"; // new Error(`poopsie ${source}, [${[...set]}]`);
+        throw "poopsie"; // new Error(`poopsie ${source}, [${[...set]}]`);
       }
     }
     set.insert(source);

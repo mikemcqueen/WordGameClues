@@ -688,6 +688,8 @@ asdf_10.push_back(1);
 
    fputs("--done\n", stderr);
 
+   fflush(stdout);
+
    return (0);
 }
 
