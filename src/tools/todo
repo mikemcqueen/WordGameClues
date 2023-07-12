@@ -1,3 +1,21 @@
+* So I don't really understand what I'm doing in JavaScript. Yes I'm being
+  bit by the optimization bug again. But also, just trying to understand.
+  I have this Source.CompatabilityData.sourceBits thing, that I use, in
+  Source.isXorCompatible(). But then I *ALSO* loop through the usedSources
+  sets looking for a match.
+  * NO: Is this duplicate effort? What exaclty is in sourceBits if not the ..
+    sources..? in usedSources?
+  * YES: If it's not duplicate effort, why am I not using a CountBits instead of
+    a set within usedSources in Source.CompatabilityData?
+    Why? I don't know. Laziness? I think I determined that if I removed the
+    Native.isAnySourceXorCompatible() call, that the thing finishes fast.
+    So it's the C++ compares that matter, not the JS compares.
+    CONFIRM: try again
+  * Worth looking into: How am I serializing these "sourceBits" to Native code?
+    Or do I?
+  * Explanation: sourceBits is actually "legacySourceBits" for legacy clues.
+    CONFIRM: CompatabilityData.usedSources is apparently for sentences.
+
 * from notepad:  on elimination: this should only be relevant to combo-making.
   once a component word is chosen for a particular sentence, all other
   sententce combinations that do not contain that component word should be
@@ -5,10 +23,11 @@
   "So I'll need to keep copies of the per-sentence combination list (list of
   string sets - the sets themselves need not be copied), so that I can remove
   the incompatible combinations on a per-generated-combo basis."
-  NOTE: it seems this may be relevant for --xor validation and precompute
-  as well?
-  * should auto-fail if conflicting --xor's are provided
-  * what about --or's? do we need to prune --xor's in that case?)
+  * this is a potential real optimization I think, for combo-making. Eliminate
+    compares altogether vs. elimination via compare.
+  * it seems this may be relevant for --xor validation and precompute as well?
+    * DONE: should auto-fail if conflicting --xor's are provided
+    * what about --or's? do we need to prune --xor's in that case?)
 
   * need to iron it out more detail above and implement it.
 

@@ -72,20 +72,26 @@ const getVariation = (src: number): number => {
 export const isXorCompatible = (first: CompatibilityData,
     second: CompatibilityData): boolean =>
 {
+    // compare legacy source bits
     if (CountBits.intersects(first.sourceBits, second.sourceBits)) {
 	return false;
     }
+    // compare sentence-based sources
     for (let i = 1; i < 10 /* cough */; ++i) {
+        // i.e. "if there are no sentence-based sources"
 	if ((first.usedSources[i] === undefined) ||
 	    (second.usedSources[i] === undefined))
 	{
 	    continue; // one or both undefined, is compatible
 	}
+        // what is this magickk. extract first element from a set?
 	const [firstElem] = first.usedSources[i];
 	const [secondElem] = second.usedSources[i];
 	if (getVariation(firstElem) !== getVariation(secondElem)){
 	    return false; // variation incompatibility
 	}
+        // Not using CountBits here because the impact of the optimzation is small.
+        // All the JS code currently accounts for 18s out of 18m for .xor.req.
 	for (let firstSrc of first.usedSources[i]) {
 	    if (second.usedSources[i].has(firstSrc)) {
 		return false; // index incompatibility
@@ -207,13 +213,15 @@ export const mergeUsedSources = (first: UsedSources, second: UsedSources):
 export const makeData = (nc: NameCount.Type, validateResult: ValidateResult):
     Data =>
 {
-    Assert(validateResult.sourceBits && validateResult.usedSources, `makeData(): ${NameCount.toString(nc)}`);
-    Assert(NameCount.listHasCompatibleSources(validateResult.nameSrcList), `makeData(): ${NameCount.toString(nc)}`);
+    Assert(validateResult.sourceBits && validateResult.usedSources,
+        `makeData(): ${NameCount.toString(nc)}`);
+    Assert(NameCount.listHasCompatibleSources(validateResult.nameSrcList),
+        `makeData(): ${NameCount.toString(nc)}`);
     return {
 	primaryNameSrcList: validateResult.nameSrcList,
 	sourceBits: validateResult.sourceBits,
 	//usedSources: validateResult.usedSources, //TODO?
 	usedSources: getUsedSources(validateResult.nameSrcList),
-        ncList: [nc],
+        ncList: [nc]
     };
 };

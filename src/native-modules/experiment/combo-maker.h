@@ -15,7 +15,7 @@ namespace cm {
 
 constexpr auto kMaxLegacySources = 111; // bits
 constexpr auto kMaxSourcesPerSentence = 128; // bits
-constexpr auto MX = kMaxSourcesPerSentence;
+//constexpr auto MX = kMaxSourcesPerSentence;
 constexpr auto kNumSentences = 9;
 
 template<typename T, size_t N>
@@ -463,6 +463,14 @@ struct NCData {
 };
 
 using NCDataList = std::vector<NCData>;
+
+struct PerfData {
+  int calls;  // # of function calls
+  int64_t comps;  // # of compares
+  int compat; // # of compatible results. # of incompatible = calls - compat
+};
+
+inline PerfData isany_perf{};
 
 // functions
  

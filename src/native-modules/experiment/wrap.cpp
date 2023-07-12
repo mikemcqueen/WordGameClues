@@ -55,6 +55,14 @@ Array wrap(Env& env, const XorSourceList& xorSourceList) {
   return jsList;
 }
 
+Napi::Object wrap(Napi::Env& env, const PerfData& perf) {
+  Object jsObj = Object::New(env);
+  jsObj.Set("calls", Number::New(env, perf.calls));
+  jsObj.Set("comps", Number::New(env, perf.comps));
+  jsObj.Set("compat", Number::New(env, perf.compat));
+  return jsObj;
+}
+
 #if 0
 Object wrap(Env& env, const SourceData& source) {
   Object jsObj = Object::New(env);

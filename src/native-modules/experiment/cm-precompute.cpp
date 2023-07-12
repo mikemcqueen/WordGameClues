@@ -376,7 +376,7 @@ auto set_to_string(const std::set<uint32_t>& s) {
 }
 */
 
-// this part is inner-loop and should be fast
+// This is called in an inner-loop and should be fast.
 // NOTE: used to be 100s of millions potentially, now more like 10s of thousands.
 SourceCRefList getCompatibleXorSources(const std::vector<int>& indexList,
   const std::vector<SourceList>& sourceLists)

@@ -38,10 +38,13 @@ auto isSourceXORCompatibleWithAnyXorSource(
   const SourceCompatibilityData& compatData, const XorSourceList& xorSourceList)
 {
   bool compatible = true; // empty list == compatible
+  isany_perf.calls++;
   for (const auto& xorSource : xorSourceList) {
+    isany_perf.comps++;
     compatible = compatData.isXorCompatibleWith(xorSource);
     if (compatible) break;
   }
+  if (compatible) isany_perf.compat++;
   return compatible;
 };
 

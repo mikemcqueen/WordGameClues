@@ -440,16 +440,14 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
 // isAnySourceCompatibleWithUseSources
 //
 Value isAnySourceCompatibleWithUseSources(const CallbackInfo& info) {
-  using namespace std::chrono;
-
   Env env = info.Env();
   if (!info[0].IsArray()) {
     TypeError::New(env, "isAnySourceCompatibleWithUseSources: non-array parameter")
       .ThrowAsJavaScriptException();
     return env.Null();
   }
-  auto compatList = makeSourceCompatibilityList(env, info[0].As<Array>());
-  bool compatible = cm::isAnySourceCompatibleWithUseSources(compatList);
+  const auto compatList = makeSourceCompatibilityList(env, info[0].As<Array>());
+  const bool compatible = cm::isAnySourceCompatibleWithUseSources(compatList);
   return Boolean::New(env, compatible);
 }
 
@@ -457,8 +455,6 @@ Value isAnySourceCompatibleWithUseSources(const CallbackInfo& info) {
 // setOrArgDataList
 //
 Value setOrArgDataList(const CallbackInfo& info) {
-  using namespace std::chrono;
-
   Env env = info.Env();
   if (!info[0].IsArray()) {
       Napi::TypeError::New(env, "setOrArgDataList: non-array parameter")
@@ -469,12 +465,21 @@ Value setOrArgDataList(const CallbackInfo& info) {
   return env.Null();
 }
 
+//
+// getIsAnyPerfData
+//
+Value getIsAnyPerfData(const CallbackInfo& info) {
+  Env env = info.Env();
+  return cm::wrap(env, cm::isany_perf);
+}
+
 Object Init(Env env, Object exports) {
   //  exports["buildSourceListsForUseNcData"] = Function::New(env, buildSourceListsForUseNcData);
   //  exports["mergeAllCompatibleSources"] = Function::New(env, mergeAllCompatibleSources);
   exports["mergeCompatibleXorSourceCombinations"] = Function::New(env, mergeCompatibleXorSourceCombinations);
   exports["isAnySourceCompatibleWithUseSources"] = Function::New(env, isAnySourceCompatibleWithUseSources);
   exports["setOrArgDataList"] = Function::New(env, setOrArgDataList);
+  exports["getIsAnyPerfData"] = Function::New(env, getIsAnyPerfData);
 
   return exports;
 }

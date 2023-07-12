@@ -50,6 +50,7 @@ export type NameIndicesMap = StringToNumbersMap;
 
 export interface CandidatesContainer {
     candidates: Candidate[];
+    // Map a clue "name" to all of the candidates (via indices) that contain it
     nameIndicesMap: NameIndicesMap;
 }
 
@@ -348,6 +349,9 @@ const buildNameSourcesMap = (clueList: ClueList.Primary, variations: Variations)
     return map;
 };
 
+// The nameIndicesMap maps a "name" to all of the candidates (via indices)
+// that contain that name.
+//
 const buildNameIndicesMap = (candidates: Candidate[]): NameIndicesMap => 
 {
     let map: NameIndicesMap = {};

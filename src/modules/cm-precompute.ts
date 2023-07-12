@@ -8,8 +8,8 @@ import _ from 'lodash'; // import statement to signal that we are a "module"
 
 const Peco        = require('../../modules/peco');
 
-//const NativeComboMaker = require('../../../build/Release/experiment.node');
-const NativeComboMaker = require('../../../build/Debug/experiment.node');
+const NativeComboMaker = require('../../../build/Release/experiment.node');
+//const NativeComboMaker = require('../../../build/Debug/experiment.node');
 
 const Assert      = require('assert');
 const Debug       = require('debug')('cm-precompute');
@@ -247,7 +247,6 @@ const setPrimarySrcBits = (sourceList: Source.List): void => {
     }
 };
 
-/*
 const hasCandidate = (nc: NameCount.Type): boolean => { return nc.count >= 1_000_000; }
 const listCandidateCount = (ncList: NameCount.List): number => {
     let count = 0;
@@ -257,6 +256,7 @@ const listCandidateCount = (ncList: NameCount.List): number => {
     return count;
 }
 
+/*
 const debug = (s1: Source.Data, s2: Source.Data): void => {
     let c1 = listCandidateCount(s1.primaryNameSrcList);
     let c2 = listCandidateCount(s2.primaryNameSrcList);
@@ -416,7 +416,6 @@ const markAllXorCompatibleOrSources = (xorSourceList: XorSource[],
     }
 };
 
-/*
 const debugXorResults = (xorResults: XorSourceList) => {
     for (let xorResult of xorResults) {
         if (listCandidateCount(xorResult.primaryNameSrcList) > 1) {
@@ -425,7 +424,6 @@ const debugXorResults = (xorResults: XorSourceList) => {
         }
     }
 }
-*/
 
 const dumpNcDataLists = (ncDataLists: NCDataList[],
     sourceListMap: Map<string, Source.AnyData[]>): void =>
@@ -446,10 +444,12 @@ const buildUseSourceListsFromNcData = (sourceListMap: Map<string, Source.AnyData
 
     // XOR first
     let xor0 = new Date();
-    //dumpNcDataLists(args.allXorNcDataLists, sourceListMap);
+    if (0) dumpNcDataLists(args.allXorNcDataLists, sourceListMap);
     // TODO: setSourceListMap() ? extra call, extra overhead, i suppose?
     let xorSourceList: XorSourceList = NativeComboMaker.mergeCompatibleXorSourceCombinations(
         args.allXorNcDataLists, Array.from(sourceListMap.entries())); // TODO? [...sourceListMap.entries()]
+    if (0) debugXorResults(xorSourceList);
+    
     setPrimarySrcBits(xorSourceList);
     let xdur = new Duration(xor0, new Date()).milliseconds;
     console.error(` Native.mergeCompatibleXorSourceCombinations - ${PrettyMs(xdur)}`);

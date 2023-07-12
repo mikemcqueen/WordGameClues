@@ -11,8 +11,8 @@ const ResultMap   = require('../../types/result-map');
 const Peco        = require('../../modules/peco');
 const Log         = require('../../modules/log')('combo-maker');
 const My          = require('../../modules/util');
-//const NativeComboMaker = require('../../../build/Release/experiment.node');
-const NativeComboMaker = require('../../../build/Debug/experiment.node');
+const NativeComboMaker = require('../../../build/Release/experiment.node');
+//const NativeComboMaker = require('../../../build/Debug/experiment.node');
 
 const Assert      = require('assert');
 const Debug       = require('debug')('combo-maker');
@@ -40,6 +40,12 @@ import { ValidateResult } from './validator';
 
 // TODO: import from somewhere. also defined in clue-manager
 const DATA_DIR =  Path.normalize(`${Path.dirname(module.filename)}/../../../data/`);
+
+interface PerfData {
+    calls: number;
+    comps: number;
+    compat: number;
+}
 
 interface StringAnyMap {
     [key: string]: any;
@@ -164,7 +170,7 @@ const getCompatibleSourcesMergeData = (mergedSourcesList: MergedSourcesList,
     return result;
 };
 
-let ms_111 = 0;
+//let ms_111 = 0;
 
 const mergeSourcesInMergeData = (mergedSourcesList: MergedSourcesList,
     mergeData: MergeData[], flag?: number): MergedSourcesList =>
@@ -514,10 +520,16 @@ export const makeCombos = (args: any): any => {
         let d = new Duration(begin, new Date()).milliseconds;
         if (!args.verbose) console.error('');
         console.error(`--combos, total(${total}), known(${totals.known})` +
-            ` reject(${totals.reject}), dupes(${totals.duplicate}) - ${PrettyMs(d)}`);
+            `, reject(${totals.reject}), dupes(${totals.duplicate})` +
+            ` - ${PrettyMs(d)}`);
         if (1) {
-            console.error(`ms_copy(${ms_copy}), ms_inplace(${ms_inplace}), md_111(${ms_111})` +
-                `, ms_comp(${ms_comp}), ms_compat(${ms_compat})`);
+            console.error(`merge: copy(${ms_copy}), inplace(${ms_inplace})` +
+                `, comp(${ms_comp}), compat(${ms_compat})`);
+                //, ms_111(${ms_111})
+            const isany: PerfData = NativeComboMaker.getIsAnyPerfData();
+            console.error(`isAny: calls(${isany.calls}), comps(${isany.comps})` +
+                `, compat(${isany.compat})`);
+
             //`, 1_1(${mcsl_1_1} - ${Math.floor((mcsl_1_1 / mcsl_call) * 100)}%)` +
             //`, push01(${mcsl_push01} - ${Math.floor((mcsl_push01 / mcsl_call) * 100)}%)` +
             //` - call/comp ${Math.floor((mcsl_call / mcsl_comp) * 100)}%`);
