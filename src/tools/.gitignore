@@ -1,3 +1,5 @@
 bugs
 tmp
 updates
+**/*.o
+**/*.class

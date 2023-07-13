@@ -6,6 +6,9 @@
 
 import _ from 'lodash';
 
+// dumb but whatever
+import * as Source from '../modules/source';
+
 //
 //
 
@@ -38,7 +41,7 @@ function NameCount_t (name: string, count?: number, index?: number) {
 
 /*
     if (_.isNaN(this.count)) {
-	console.log(`BAD name:${name} count:${count}`);
+        console.log(`BAD name:${name} count:${count}`);
     }
 */
     
@@ -109,8 +112,8 @@ export let listCountSum = (ncList: List): number => {
 
 export function listAddCountsToSet (ncList: List, set: Set<number>): boolean {
     for (let nc of ncList) {
-	if (set.has(nc.count)) return false;
-	set.add(nc.count);
+        if (set.has(nc.count)) return false;
+        set.add(nc.count);
     }
     return true;
 }
@@ -149,6 +152,22 @@ export function sortList (ncList: List): List {
     return ncList;
 }
 
+export const listHasCompatibleSources = (nameSrcList: List):
+    boolean =>
+{
+    // TODO: uniqBy da debil
+    if (_.uniqBy(nameSrcList, count).length !== nameSrcList.length) {
+        return false;
+    }
+    // TODO: sloww probably, also requiring sentence is dumb
+    try {
+        Source.getUsedSources(nameSrcList);
+    } catch(e) {
+        //console.error('***incompatible usedSources***');
+        return false;
+    }
+    return true;
+}
 
 //
 

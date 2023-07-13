@@ -1,22 +1,237 @@
-merge needs:
-  --append
-  --filter-reject-urls
-  --filter-reject-sources
+* So I don't really understand what I'm doing in JavaScript. Yes I'm being
+  bit by the optimization bug again. But also, just trying to understand.
+  I have this Source.CompatabilityData.sourceBits thing, that I use, in
+  Source.isXorCompatible(). But then I *ALSO* loop through the usedSources
+  sets looking for a match.
+  * NO: Is this duplicate effort? What exaclty is in sourceBits if not the ..
+    sources..? in usedSources?
+  * BECAUSE: If it's not duplicate effort, why am I not using a CountBits instead of
+    a set within usedSources in Source.CompatabilityData?
+    Why? I don't know. Laziness? I think I determined that if I removed the
+    Native.isAnySourceXorCompatible() call, that the thing finishes fast.
+    So it's the C++ compares that matter, not the JS compares.
+    CONFIRM: try again
+  * Worth looking into: How am I serializing these "sourceBits" to Native code?
+    Or do I?
+  * Explanation: sourceBits is actually "legacySourceBits" for legacy clues.
+    CONFIRM: CompatabilityData.usedSources is apparently for sentences.
 
-those will all be defaults most likely.
+* from notepad:  on elimination: this should only be relevant to combo-making.
+  once a component word is chosen for a particular sentence, all other
+  sententce combinations that do not contain that component word should be
+  eliminated.
+  "So I'll need to keep copies of the per-sentence combination list (list of
+  string sets - the sets themselves need not be copied), so that I can remove
+  the incompatible combinations on a per-generated-combo basis."
+  * this is a potential real optimization I think, for combo-making. Eliminate
+    compares altogether vs. elimination via compare.
+  * it seems this may be relevant for --xor validation and precompute as well?
+    * DONE: should auto-fail if conflicting --xor's are provided
+    * what about --or's? do we need to prune --xor's in that case?)
 
-may want:
-  --filter urls,sources,all,none [all] default0
-  --no-filter [could be same args as above + restore (restore rejected urls)] 
-    (longer term feature, when the need arises)
+  * need to iron it out more detail above and implement it.
+
+* NCData/List -> NcListContainer
+* experimental/simd
+
+* output max variation count and max source count (per sentence) at load.
+* fail if max sources > 127 for now
+
+* usesourcebits -> implement andCompatible
+* eventually bits per sentence could be based on max sources per sentence
+  (uniqueNameCount) and usedSources bitset size is the sum, rather than
+  being a fixed size (128*9)
+
+* add syn/hom of anagrams at .. post-process?
+* do i need a new variation category, "prefixes", for which we also do
+  a syn/hom lookup in post-process? e.g. cogburn -> cog -> tooth.
+  the alternative is that "cog" is ... what.. an anagram? and thus we
+  do a syn lookup? maybe "anagram" could be generalized? kinda nice to
+  have each "rule" encapsulated as a separate variation entry type.
+
+* -c (and -t?) --or arg support.
+
+* -t --verbose
+
+* -t full support, including --add, will be necessary (might be working now)
+
+* "addon-mode" module return string "Debug" or "Release" for setting addon path
+
+* so there is a problem with "ignore":true clues which depend on clues in "sentences"
+  that don't support the ignore flag. this problem will go away when all clues
+  are converted to sentences, presumably, but it's giving incorrect results
+  as it stands (hobbit,home appear in valid combinations for with xor.req,
+  for example, when they should be "used" by "eye").
+
+* -t 20,s or 24,s are valid, shouldn't be. looks like restrictSameClueNumber
+  is broke.
+  * now it crashes. after putting in support for non-unique legacy clue names
+    into the uniquePrimaryClueNames list.
+  * so one idea is we could justa call Validator.validateSources(validateAll: false)
+    for any supplyed -t (or --xor, --or, etc) combo. If it doesn't pass
+    validator, then, duh, it's nto valid. The problem with this is if I want
+    to support name:count syntax: Validator doesn't (currently) support it.
+  * Maybe the crash on bad combos is something I can live with for now.
+
+* NameCount.listHasCompatibleSources looks unnecessary, or weird, or both
+
+* so, ClueManager.getClueList(1) is the culprit. In every case, I need
+  to review what I am doing with the list when I call it with 1.
+
+* All of the "getNumPrimarySources()" stuff is a bit weird now isn't it
+  I should look into all uses and confirm what it means. And consider
+  the "MaxPossiblePrimarySources" case as a possible solution (largest
+  sourcelist variation from each sentence).
+
+* validateSources(name) -- enforce everywhere, for (2) below
+
+validatesources is apparently happy with old:3=not:1,not:1,old:1
+which is wrong because:
+1) FIXED: two nots from two different variations of sentence three. i though i checked
+   for and prevented this with the "candidates" thing somewhere
+2) TODO: this is like that weird case with "bird" being the "name" of a clue that had
+   "bird" as a source, and that should be disallowed.
+   
+clues3.json:  { "name": "old",             "src": "new,not" },
 
 
---
+* OPTIMIZITIONS:
 
-the hasCommaSuffix/RejectSuffix problem, where to put this. filter? update? markdown?<<===
+* adding "powerful" to sentence3 components list really caused the number
+  of combinations to explode. It's funny that it didn't actually change the
+  output, but that's probably due to the xor.req's I used. There is something
+  to investigate here and a couple of potential fixes for this:
+  0) Investigate: am I ensuring that the sentence words + all components
+     form a **unique** list? Should be in Sentence.getUniqueComponentNames
+     or something.
+  1) I think I can do a 2nd pass of index filtering. Iirc, the order of
+     filtering matters, and while I currently do something like "remove items
+     from list B that are incompatible with items in list A", I don't do
+     the inverse, or something like that, which may help.
+     NOTE: I don't think filtering matters right now . It only affects native
+     peco-loop timing which is currently fast.
+  2) I think there is potential for a filtering step in here somewhere, where,
+     for example, I look at all of the NameSrc results for a particular useNC,
+     and see what they have in common. I'm just spitballing, but something
+     like "well all NcDataCombinations for this NC have *this* and *that*
+     source, so lets leave those sourceBits in for the compatibility check,
+     but eliminate the words from the combinatorial set, or something.
 
---
+     - Eh. I don't think i'm on to anything important there either. I mean,
+     you either filter *as* you're considering sources to combine, or you
+     filter during the combining process *after* you build lists of prospective
+     sources to combine (or both). I am not convinced there is anything here
+     but probably worth thinking about more.
 
-merge:
-* filter rejects from noteParse - compare filter reject code, ideally 1 place that accesses _filtered files
-* why am I sorting
+     - after some more thought, i do think this is worth exploring. probably
+     i'll be screwed without some GPU processing, at which point any data
+     optimizations will be kind of moot. we'll find out once all clues are
+     converted to sentences.
+
+
+* I think opportunity for optimization is running out in mergecompatible. 
+  One last thing to try is somehow having mergecompatLists (and perhaps
+  getMergeData) take either a MergedSourcesList or a Source.List. Then
+  we'd need a variation of mergeSources took either as the first arg as well.
+
+* so If I really want to speed up combo-maker further, probably I should
+  port the whole getCombosForUseNcLists function and dependences (first/next)
+  to C++. I don't think just porting mergeCompatibleSources3 and dependencies
+  alone will do much as each call is short so the overhead of the call isn't
+  worth it, but there are a million (literally) calls.
+
+  - Actually I'm not so sure about the above. I think the meat of the problem
+  is in the native isAnySourceXorCompatible call. Profiler suggests it really
+  comes down to the mechanism for compatibility checking between sources. I
+  should re-think the bitset approach. 
+
+
+* Precompute is a tiny bit slower now. Maybe because I'm doing too much
+  copying in mergeAllCompatibleSources/XorSources? Any way to put a
+  stop to that? Like the optimization idea I might have in a comment there,
+  using something like a new CombinedSourceRefs data type.
+  Also the "copyOnMerge" logic I use in mergeCompatibleSources3 might be
+  of some help here.
+
+* USESOURCES_BITSET:
+
+* equal_to is getting called too much with USEDSOURCES_BITSET. this doesn't
+  impact combo-maker generation, only precompute.
+* i think i'm going to have to use 1 as the first index
+  maybe for source "index" within a variation. at least in c++. I should do
+  the same with variation. lets me initialize the bitsets to all zero.
+
+* so with 13 bits I can store 8191 (plus 1 "empty") variations
+  with 9 * 13 = 117 bits i can store 9 variation values for the 9 sentences
+  in a 128-bit bitset.
+  rather than unwrapping UsedSources into a similar array of ints in c++,
+  unwrap into a 128-bit bitset, with the value shifted left 13 bits for
+  each sentence.
+  initialize/default each set of sentence-bits to 0x1fff (13 bits on)
+
+* I think the match changed a bit from above.  now i've got multpile
+  values (sources really) per sentence (up to 100) but the variation #
+  stays the same.
+  so still 13 bits for variation#.
+  5, 6 or 7 bits for index (32 64 or 128)
+  128 = 13 + N * count 
+  N = 115 / count
+  for N=5, count = 23
+  for N=6, count = 19
+  for N=7, count = 16
+  for N=8, count = 14
+  that's how many primary sources (+ variation #) from the same sentence
+  can be stored in 128 bits.
+
+  128 is the total number of unique sources per sentence. this takes
+  into account the fact that we will be supporting different component-name
+  sets with completely different names for each sentence, such as between
+  v1 and v2 solutions.
+
+  ** I think the above might be wrong-thinking. I should be able to limit
+     it to 5 bits (32 max sources per "variation"), if I store variation
+     separately. thoughts in notebook.
+
+  ** I think the problem may come down to how I am storing unique names in 
+     a single "sourceIndicesMap" or whatever it's called. I aggregate all
+     unique names across all sentence variations and give them an index?
+     Is that what I do? Couuld I have a per-variation map instead.
+
+  128 is *probably* a safe number but might be limiting at some point,
+  so I think increasing it to 256 probably makes sense. That puts a
+  wrench in the 128 bit approach however.
+
+  16 (count, above) is the number of unique source "indexes" from a single
+  sentence, the combined primary sources of any compound clue/combination,
+  that can be stored in 128 bits. I don't think 16 is going to cut it, as
+  sentence 4 & 5 already have 22 & 21 primary sources in the v2 solution,
+  so that's obviously a constraint I'd like to avoid. Realistically, 32
+  will probably be fine.
+
+  So how do we get to support
+  * 256 total unique source component indexes per sentence = 8 bits
+  * 32 max indexes at a time
+  * 32 * 8bits = 256 bits?
+
+  or --
+  * 32 unique source component indexes per sentence variation = 5 bits 
+  * 32 max indexes at a time
+  * 32 * 5bits = 160 bits 
+  * 28 * 5 bits = 140 bits
+  * 25 * 5 bits = 125 bits
+  
+  coocoo idea below. will *not* work for fast xor comparison. need to use bitset.
+
+  well 8 bits for component indexes x 32 indexes = std::array<uint8_t, 32>
+  and we could add an extra int for variation (-1 = unset)
+
+  I could also imagine, but don't know if this makes sense, having an
+  aggregate data structure with std::array<uint8_t, 32 * 9> (288 bytes) 
+  and std::array<int, 9>. two comparisons per call.  look into array comparison.
+
+* The below might go away in c++ though if I use bitset.
+* take a closer look at UsedSources declarations/comparisons in C++. I think
+  I have all declarations covered with = { -1 }, but probably makes sense
+  for the default constructor to do that. If there were a default constructor,
+  which there isn't (that i'm in control of).
+  Similarly, the >= 0 or > -1 comparisons should ideally all be in one spot.

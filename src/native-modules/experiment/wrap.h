@@ -20,6 +20,8 @@ Napi::Array wrap(Napi::Env& env, const SourceList& sourceList);
 
 Napi::Array wrap(Napi::Env& env, const MergedSourcesList& mergedSourcesList);
 
+Napi::Object wrap(Napi::Env& env, const PerfData& perf);
+
 }
 
 #endif // include_wrap_h

@@ -4,6 +4,18 @@ using namespace Napi;
 
 namespace cm {
 
+  /*
+Array wrap(Env& env, const UsedSources& usedSources) {
+  Array jsList = Array::New(env, usedSources.size());
+  for (auto i = 1u; i < usedSources.size(); ++i) {
+    if (usedSources[i]) {
+      jsList.Set(i, Number::New(env, usedSources[i]));
+    }
+  }
+  return jsList;
+}
+  */
+
 Object wrap(Env& env, const NameCount& nc) {
   Object jsObj = Object::New(env);
   jsObj.Set("name", String::New(env, nc.name));
@@ -29,6 +41,7 @@ Array wrap(Env& env, const std::vector<std::string>& strList) {
 
 Object wrap(Env& env, const XorSource& xorSource) {
   Object jsObj = Object::New(env);
+  //jsObj.Set("usedSources", wrap(env, xorSource.usedSources));
   jsObj.Set("primaryNameSrcList", wrap(env, xorSource.primaryNameSrcList));
   jsObj.Set("ncList", wrap(env, xorSource.ncList));
   return jsObj;
@@ -42,13 +55,24 @@ Array wrap(Env& env, const XorSourceList& xorSourceList) {
   return jsList;
 }
 
-Object wrap(Env& env, const SourceData& source) {
+Napi::Object wrap(Napi::Env& env, const PerfData& perf) {
+  Object jsObj = Object::New(env);
+  jsObj.Set("calls", Number::New(env, perf.calls));
+  jsObj.Set("comps", Number::New(env, perf.comps));
+  jsObj.Set("compat", Number::New(env, perf.compat));
+  jsObj.Set("range_calls", Number::New(env, perf.range_calls));
+  jsObj.Set("ss_attempt", Number::New(env, perf.ss_attempt));
+  jsObj.Set("ss_fail", Number::New(env, perf.ss_fail));
+  jsObj.Set("full", Number::New(env, perf.full));
+  return jsObj;
+}
+
 #if 0
+Object wrap(Env& env, const SourceData& source) {
   Object jsObj = Object::New(env);
   jsObj.Set("primaryNameSrcList", wrap(env, xorSource.primaryNameSrcList));
   jsObj.Set("ncList", wrap(env, xorSource.ncList));
   return jsObj;
-#endif
   auto jsObj = wrap(env, (const SourceBase&)source);
   jsObj.Set("sourceNcCsvList", wrap(env, source.sourceNcCsvList));
   return jsObj;
@@ -66,7 +90,7 @@ Object wrapMergedSource(Env& env, const SourceCRefList& sourceCRefList) {
   Object jsObj = Object::New(env);
   Array jsPnsl = Array::New(env);
   Array jsNcl = Array::New(env);
-  Array jsSncl = Array::New(env);
+  //Array jsSncl = Array::New(env);
   for (const auto sourceCRef : sourceCRefList) {
     const auto& source = sourceCRef.get();
     for (const auto& nc : source.primaryNameSrcList) {
@@ -75,13 +99,15 @@ Object wrapMergedSource(Env& env, const SourceCRefList& sourceCRefList) {
     for (const auto& nc : source.ncList) {
       jsNcl.Set(jsNcl.Length(), wrap(env, nc));
     }
+    /*
     for (const auto& str : source.sourceNcCsvList) {
       jsSncl.Set(jsSncl.Length(), String::New(env, str));
     }
+    */
   }
   jsObj.Set("primaryNameSrcList", jsPnsl);
   jsObj.Set("ncList", jsNcl);
-  jsObj.Set("sourceNcCsvList", jsSncl);
+  //jsObj.Set("sourceNcCsvList", jsSncl);
   return jsObj;
 }
 
@@ -92,5 +118,6 @@ Array wrap(Env& env, const MergedSourcesList& mergedSourcesList) {
   }
   return jsList;
 }
+#endif
 
 } // namespace cm

@@ -68,9 +68,11 @@ function Peco(args) {
     this.noDuplicates = args.noDuplicates;
 
     if (this.listArray) {
+	/*
         if (!this.max) {
             throw new Error('Peco: must specify max with listArray');
         }
+	*/
 	if (_.isEmpty(this.listArray)) {
             throw new Error('Peco: empty listArray');
 	}
@@ -101,7 +103,7 @@ function Peco(args) {
 //
 
 function setLogging(flag) {
-    if (!flag || (flag && !FORCE_QUIET)) {
+    if (!flag || !FORCE_QUIET) {
         LOGGING = flag;
     }
 }
@@ -272,7 +274,7 @@ Peco.prototype.listFirst = function (listArray, flags) {
     let list;
     
     if (!listArray) {
-        throw new Error('invalid countListArray, ' + listArray);
+        throw new Error('missing listArray, ' + listArray);
     }
 
     let srcCount = listArray.length;
@@ -281,9 +283,11 @@ Peco.prototype.listFirst = function (listArray, flags) {
     this.hash = new Set();
     for (let index = 0; index < srcCount; ++index) {
         this.indexList.push({
-            first:  start,
-            index:  start,
-            last:   (flags & Flag.NoDuplicates) ? listArray[index].length - (srcCount - index) : listArray[index].length - 1
+            first: start,
+            index: start,
+            last: (flags & Flag.NoDuplicates)
+                ? listArray[index].length - (srcCount - index)
+                : listArray[index].length - 1
         });
 	this.hash.add(start);
 	if (flags & Flag.NoDuplicates) ++start;
@@ -294,8 +298,8 @@ Peco.prototype.listFirst = function (listArray, flags) {
         this.log (`srcCount: ${srcCount} indexList: ${Stringify(this.indexList)}`);
     }
 
-    const sum = this.getIndexSum();
-    if (sum <= this.max) {
+    const sum = this.max ? this.getIndexSum() : undefined;
+    if (!this.max || (sum <= this.max)) {
 	this.log(`pecoList, getIndexSum ${sum}`);
         list = this.getPecoList();
     } else {
@@ -334,7 +338,8 @@ Peco.prototype.listNext = function (flags) {
         }
 	if ((flags & Flag.Combinations) && (flags & Flag.NoDuplicates)) {
             for (let inner = index + 1; inner <= lastIndex; ++inner) {
-		//if (this.indexList[inner].first < previousFirst) throw new Error (`inner ${inner} < prevFirsT ${previousFirst}`);
+		//if (this.indexList[inner].first < previousFirst)
+                //    throw new Error (`inner ${inner} < prevFirsT ${previousFirst}`);
 		let newFirst = this.indexList[inner - 1].index + 1;
 		if (newFirst > this.indexList[inner].last) {
 		    throw new Error (`newFirst ${newFirst} > last ${this.indexList[inner].last}`);
@@ -345,7 +350,7 @@ Peco.prototype.listNext = function (flags) {
 	    }
 	}
 
-        if (this.getIndexSum() > this.max) {
+        if (this.max && (this.getIndexSum() > this.max)) {
             continue;
         }
         /*

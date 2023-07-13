@@ -17,7 +17,7 @@ const ClueList       = require('../dist/types/clue-list');
 const NameCount      = require('../dist/types/name-count');
 
 const Peco           = require('./peco');
-const Debug          = require('debug')('combo-maker');
+const Debug          = require('debug')('combo-search');
 const Duration       = require('duration');
 
 //

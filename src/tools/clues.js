@@ -9,6 +9,7 @@ const _           = require('lodash');
 const ClueList    = require('../dist/types/clue-list');
 const ClueManager = require('../dist/modules/clue-manager');
 const ComboMaker  = require('../dist/modules/combo-maker');
+const Components  = require('../dist/modules/show-components');
 const MinMax      = require("../dist/types/min-max");
 const NameCount   = require('../dist/types/name-count');
 const Validator   = require('../dist/modules/validator');
@@ -16,7 +17,7 @@ const Validator   = require('../dist/modules/validator');
 const AltSources  = require('../modules/alt-sources');
 const Clues       = require('../modules/clue-types');
 const ComboSearch = require('../modules/combo-search');
-const Components  = require('../modules/show-components');
+
 const Debug       = require('debug')('clues');
 const Duration    = require('duration');
 const Expect      = require('should/as-function');
@@ -46,14 +47,10 @@ const CmdLineOptions = Opt.create(_.concat(Clues.Options, [
     ['x', 'max=COUNT',                         '  maximum # of sources to combine'],
 //  ['',  'and=NAME[:COUNT][,NAME[:COUNT]]+',  '  combos must have source NAME[:COUNT]'],
     ['',  'xor=NAME[:COUNT][,NAME[:COUNT]]+',  '  combos must not have, and must be compatible with, source NAME[:COUNT]s'],
-    ['',  'xormm=NAME[:COUNT][,NAME[:COUNT]]+[,MIN,MAX]',  '  form of --xor with min/max allowed synonym counts specified'],
     ['',  'or=NAME[:COUNT][,NAME[:COUNT]]+',   '  combos must either have, or be compatible with, source NAME[:COUNT]s'],
     ['',  'primary',                           '  show combos as primary source clues' ],
     ['l', 'parallel',                          '  use paralelljs' ],
     ['',  'slow',                              '  use (old) slow method of loading clues' ],
-    ['',  'use-syns=NAME+',                    '  specifies one or more clue names with which synonyms will be used' ],
-    ['',  'syn-min=COUNT',                     '  specifies the minimum number of synonyms allowed in any combo (default: 0)' ],
-    ['',  'syn-max=COUNT',                     '  specifies the maximum number of synonyms allowed in any combo (default: 1)' ],
     ['',  'copy-from=SOURCE',                  'copy clues from source cluetype; e.g. p1.1'],
     ['',  'save',                              '  save clue files'],
     ['',  'allow-dupe-source',                 '  allow duplicate sources'],
@@ -78,6 +75,7 @@ const CmdLineOptions = Opt.create(_.concat(Clues.Options, [
     ['',  'allow-used',                        '  allow used clues in clue combo generation' ],
     ['',  'any',                               '  any match (uh, probably should not use this)'],
     ['',  'production',                        'use production note store'],
+    ['',  'sentence',                          'load clues from sentence files (that have source="sentence" property)' ],
     ['',  'sort-all-clues',                    'sort all clue data files by src'],
     ['z', 'flags=OPTION+',                     'flags: 2=ignoreLoadErrors' ],
     ['v', 'verbose',                           'more output'],
@@ -101,67 +99,18 @@ function usage (msg) {
     process.exit(-1);
 }
 
-//
-
-function loadClues (clues, ignoreErrors, max, fast) {
+function loadClues (clues, ignoreErrors, max, options) {
     log('loading all clues...');
     ClueManager.loadAllClues({
         clues,
         ignoreErrors,
         max,
-        validateAll: true,
-        fast
+        useSentences: true,
+        fast: !options.slow,
+        validateAll: true
     });
     log('done.');
     return true;
-}
-
-// unused
-function convertUseToPrimarySources (args) {
-    // build ncList of supplied name:counts
-    const ncList = args.use.map(ncStr => NameCount.makeNew(ncStr));
-    for (const nc of ncList) {
-        if (!nc.count || _.isNaN(nc.count)) {
-            console.log('All -u names require a count (for now)');
-            return { success: false };
-        }
-    }
-
-    // TODO: some more clear way to extract just ".count"s into an array, then sum them
-    const sum = ncList.reduce((a, b) => Object({ count: (a.count + b.count) })).count;
-    const remain = ClueManager.getMaxClues() - sum;
-    if (remain < 1) {
-        console.log(`The sum of the specified clue counts (${sum})` +
-                    ` equals or exceeds the maximum clue count (${ClueManager.getMaxClues()})`);
-        return { success: false };
-    }
-    
-    Debug('convertNcStrToPrimarySources ' + args.use + 
-                ', sum: ' + sum + ', remain: ' + remain);
-
-    // first, make sure the supplied nameList:sum by itself is a valid clue
-    // combination, and find out how many primary-clue variations there
-    // are in which the clue names in args.nameList exist.
-    let vsResult = Validator.validateSources({
-        sum:         sum,
-        nameList:    ncList.map(nc => nc.name),
-        count:       args.use.length,
-        validateAll: true
-    });
-    if (!vsResult.success) {
-        console.log(`The ncStr [${args.use}] is not a valid clue combination`);
-        return { success: false };
-    }
-
-    console.log(`results: ${vsResult.list.length}`);
-
-    // TODO: for each primary-clue variation from validateResults
-    const nameSrcList = vsResult.list[0].nameSrcList;
-    return {
-        success: true,
-        sources: nameSrcList.map(nc => _.toString(nc.count)),
-        clues:   nameSrcList.map(nc => _.toString(nc.name))
-    };
 }
 
 //
@@ -172,7 +121,6 @@ function convertUseToPrimarySources (args) {
 //  sources: primarySourcesArg,
 //  use:     useClueList
 //
-
 function doCombos(args) {
     if (!_.isUndefined(args.sources)) {
         args.sources = _.chain(args.sources).split(',').map(_.toNumber).value();
@@ -183,8 +131,6 @@ function doCombos(args) {
     }
     ComboMaker.makeCombos(args);
 }
-
-//
 
 async function getNamedNoteNames(options) {
     if (options.production) Log.info('---PRODUCTION---');
@@ -205,8 +151,6 @@ async function getNamedNoteNames(options) {
         });
 }
 
-//
-
 function combo_maker(args) {
     return Promise.resolve(args.remaining ? getNamedNoteNames(args) : false)
         .then(noteNames => {
@@ -217,8 +161,6 @@ function combo_maker(args) {
             return doCombos(args);
         });
 }
-
-//
 
 function showSources(clueName) {
     let result;
@@ -250,8 +192,6 @@ function showSources(clueName) {
         });
     });
 }
-
-//
 
 function copyClues (fromType, options = {}) {
     const dir = fromType.baseDir;
@@ -323,8 +263,6 @@ function copyClues (fromType, options = {}) {
     console.log(`total: ${total}, copied: ${copied}`);
 }
 
-//
-
 function setLogging (flag) {
     ClueManager.setLogging(flag);
     ComboMaker.logging  = flag;
@@ -335,16 +273,11 @@ function setLogging (flag) {
     LOGGING = flag;
 }
 
-//
-
 function log (text) {
     if (LOGGING) {
         console.log(text);
     }
 }
-
-//
-//
 
 function sortAllClues (clueSource, max) {
     const dir = clueSource.baseDir;
@@ -383,8 +316,6 @@ async function main () {
     options.merge_style = Boolean(options['merge-style']);
     let showKnownArg = options['show-known'];
     options.copy_from = options['copy-from'];
-    options.use_syns = options['use-syns'];
-    options.synonymMinMax = MinMax.init(options['syn-min'], options['syn-max'], 0, 1);
     options.maxArg = maxArg;
     if (!maxArg) maxArg = 2; // TODO: default values in opt
     if (!options.count) {
@@ -410,13 +341,13 @@ async function main () {
         QUIET = true;
     }
 
-    /*
-    Validator.setAllowDupeFlags({
+    /****
+    OldValidator.setAllowDupeFlags({
         allowDupeNameSrc: false,
         allowDupeSrc:     options.allow_dupe_source,
         allowDupeName:    true
     });
-    */
+    ****/
 
     if (_.includes(options.flags, '2')) {
         ignoreLoadErrors = true;
@@ -440,12 +371,12 @@ async function main () {
 
     setLogging(_.includes(options.verbose, VERBOSE_FLAG_LOAD));
     let loadBegin = new Date();
-    if (!loadClues(clueSource, ignoreLoadErrors, load_max, !options.slow)) {
+    if (!loadClues(clueSource, ignoreLoadErrors, load_max, options)) {
         return 1;
     }
     let loadMillis = new Duration(loadBegin, new Date()).milliseconds;
     console.error(`loadClues(${PrettyMs(loadMillis)})`);
-    setLogging(options.verbose);
+    setLogging(false); //options.verbose);
 
     options.notebook = options.notebook || Note.getWorksheetName(clueSource);
 
@@ -458,39 +389,32 @@ async function main () {
             console.log('one or more -u NAME:COUNT required with that option');
             return 1;
         }
-        /*
-        if (!metaFlag) {
-            console.log('--meta required with that option');
-            return 1;
-        }
-        */
         Show.compatibleKnownClues({
             nameList: useClueList,
-            max:      options.count ? _.toNumber(options.count) : ClueManager.getMaxClues(),
-            root:     '../data/results/',
-            format:   {
-                csv:   options.csv,
+            max: options.count ? Number(options.count) : ClueManager.getMaxClues(),
+            root: '../data/results/',
+            format: {
+                csv: options.csv,
                 files: options.files
             }
         });
     } else if (options.test) {
-    let start = new Date();
+        let start = new Date();
         if (options.validate) {
             Components.validate(options.test, options);
         } else {
             Components.show(options);
         }
-    Timing(`count: ${Validator.count}, dupe: ${Validator.dupe}`);
-    const d = new Duration(start, new Date()).milliseconds;
-    Timing(`${PrettyMs(d)}`);
-
+        Timing(`count: ${Validator.count}, dupe: ${Validator.dupe}`);
+        const d = new Duration(start, new Date()).milliseconds;
+        Timing(`${PrettyMs(d)}`);
     } else if (showSourcesClueName) {
         showSources(showSourcesClueName);
     } else if (altSourcesArg || allAltSourcesFlag) {
         AltSources.show(allAltSourcesFlag ? {
             all    : true,
             output : options.output,
-            count  : _.toNumber(options.count)
+            count  : Number(options.count)
         } : {
             all    : false,
             name   : altSourcesArg,
@@ -517,11 +441,8 @@ async function main () {
             final:   options.final,
             or:      options.or,
             xor:     options.xor,
-            xormm:   options.xormm,
             parallel: options.parallel,
-            use_syns: options.use_syns,
-            synonymMinMax: options.synonymMinMax,
-	    verbose: options.verbose
+            verbose: options.verbose
         });
     }
     return 0;
@@ -534,5 +455,5 @@ main().catch(err => {
     console.error(err, err.stack);
 });
 if (LOGGING && !QUIET) {
-    console.log('runtime: ' + (new Duration(appBegin, new Date())).seconds + ' seconds');
+    console.error('runtime: ' + (new Duration(appBegin, new Date())).seconds + ' seconds');
 }
