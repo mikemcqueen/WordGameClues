@@ -384,15 +384,15 @@ const getCombosForUseNcLists = (sum: number, max: number, pcd: PreCompute.Data,
     });
 
     let duration = (process.hrtime.bigint() - start) / MILLY;
-    Debug(`sum(${sum}) combos(${comboCount}) variations(${totalVariations}) cacheHits(${numCacheHits}) ` +
-        `merge-incompatible(${numMergeIncompatible}) use-incompatible(${numUseIncompatible}) ` +
-        `actual(${totalVariations - numCacheHits - numUseIncompatible}) ${duration}ms`);
+    Debug(`sum(${sum}) combos(${comboCount}) variations(${totalVariations})` +
+        ` cacheHits(${numCacheHits}) merge-incompatible(${numMergeIncompatible})` +
+        ` use-incompatible(${numUseIncompatible})` +
+        ` actual(${totalVariations - numCacheHits - numUseIncompatible}) ${duration}ms`);
 
     if (args.verbose) {
         console.error(`sum(${sum}) combos(${comboCount}) ` +
             `variations(${totalVariations}) cacheHits(${numCacheHits}) ` +
-            `no-merge(${numMergeIncompatible}) ` +
-            `no-use(${numUseIncompatible}) ` +
+            `no-merge(${numMergeIncompatible}) no-use(${numUseIncompatible}) ` +
             `actual(${totalVariations - numCacheHits - numUseIncompatible}) ` +
             `isany: call(${isany_call}), compat(${isany_compat}) - ${duration}ms `);
     } else {
@@ -401,18 +401,6 @@ const getCombosForUseNcLists = (sum: number, max: number, pcd: PreCompute.Data,
     return combos;
 };
 
-//
-// args:
-//  count:   # of primary clues to combine
-//  max:     max # of sources to use
-//  use:     list of clue names and name:counts, also allowing pairs, e.g. ['john:1','bob','red,bird']
-//  // not supported: require: required clue counts, e.g. [3,5,8]
-//  // not supported: limit to these primary sources, e.g. [1,9,14]
-//
-// A "clueSourceList" is a list (array) where each element is a
-// object that contains a list (cluelist) and a count, such as
-// [{ list:clues1, count:1 },{ list:clues2, count:2 }].
-//
 export const makeCombosForSum = (sum: number, max: number, args: any): string[] => {
     if (_.isUndefined(args.maxResults)) {
         args.maxResults = 50000;
