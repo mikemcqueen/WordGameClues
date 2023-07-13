@@ -5,7 +5,7 @@
   sets looking for a match.
   * NO: Is this duplicate effort? What exaclty is in sourceBits if not the ..
     sources..? in usedSources?
-  * YES: If it's not duplicate effort, why am I not using a CountBits instead of
+  * BECAUSE: If it's not duplicate effort, why am I not using a CountBits instead of
     a set within usedSources in Source.CompatabilityData?
     Why? I don't know. Laziness? I think I determined that if I removed the
     Native.isAnySourceXorCompatible() call, that the thing finishes fast.

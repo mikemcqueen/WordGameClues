@@ -87,8 +87,10 @@ struct UsedSources {
 
     // compare variations
     for (auto i = 0u; i < variations.size(); ++i) {
-      if ((variations[i] != -1) && (other.variations[i] != -1)) {
-        if (variations[i] != other.variations[i]) return false;
+      if ((variations[i] > -1) && (other.variations[i] > -1)
+          && (variations[i] != other.variations[i]))
+      {
+        return false;
       }
     }
     return true;
@@ -352,10 +354,16 @@ struct OrArgData {
 };
 using OrArgDataList = std::vector<OrArgData>;
 
+// Map a variation to a vector of indices.
+// This is precomputed for xorSourceList, to help identify only those sources
+// which share the same per-sentence variation. There is one map per sentence.
+using VariationIndicesMap = std::unordered_map<int, std::vector<int>>;
+
 struct PreComputedData {
-  XorSourceList xorSourceList;
+  XorSourceList xorSourceList{};
   OrArgDataList orArgDataList;
   SourceListMap sourceListMap;
+  std::array<VariationIndicesMap, kNumSentences> variationIndicesMaps;
 };
 
 struct MergedSources : SourceCompatibilityData {
@@ -465,9 +473,13 @@ struct NCData {
 using NCDataList = std::vector<NCData>;
 
 struct PerfData {
-  int calls;  // # of function calls
-  int64_t comps;  // # of compares
-  int compat; // # of compatible results. # of incompatible = calls - compat
+  int calls;       // # of function calls
+  int range_calls; // # of calls with range
+  int64_t comps;   // # of compares
+  int compat;      // # of compatible results. # of incompatible = calls - compat
+  int ss_attempt;  // # of short-circuit attempts
+  int ss_fail;     // # of short-circute failures; # of successes = ss_attempt - ss_fail
+  int full;        // # of full range calls; eventually this should = calls - ss_attempt
 };
 
 inline PerfData isany_perf{};
@@ -482,7 +494,11 @@ auto buildSourceListsForUseNcData(const std::vector<NCDataList>& useNcDataLists,
 XorSourceList mergeCompatibleXorSourceCombinations(
   const std::vector<SourceList>& sourceLists);
 
-bool isAnySourceCompatibleWithUseSources(const SourceCompatibilityList& sourceCompatList);
+auto buildVariationIndicesMaps(const XorSourceList& xorSourceList)
+  -> std::array<VariationIndicesMap, kNumSentences>;
+
+bool isAnySourceCompatibleWithUseSources(
+  const SourceCompatibilityList& sourceCompatList);
 
 void mergeUsedSourcesInPlace(UsedSources& to, const UsedSources& from);
 

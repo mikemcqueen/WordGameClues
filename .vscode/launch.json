@@ -23,7 +23,7 @@
             ],
             "program": "${workspaceFolder}/src/tools/clues.js",
             "args": [ "clues.js", "-pf.71", "-c2,15", "-x2",
-                "--xor", "us 50",
+//                "--xor", "us 50",
                 "--xor", "koa",
                 "--xor", "21",
                 "--xor", "currant",
@@ -53,6 +53,20 @@
             "program": "/usr/local/bin/node",
             "cwd": "${workspaceFolder}/src/tools",
             "args": [ "clues.js", "-pf.71", "-t", "newton", "-v" ]
+        },
+        {
+            "type": "cppdbg",
+            "request": "launch",
+            "name": "Debug cm xor.req",
+            "program": "/usr/local/bin/node",
+            "cwd": "${workspaceFolder}/src/tools",
+            "args": [ "clues.js", "-pf.71", "-c2,15", "-x2",
+//                "--xor", "us 50",
+                "--xor", "koa",
+                "--xor", "21",
+                "--xor", "currant",
+                "-v"
+            ]
         }
     ]
 }

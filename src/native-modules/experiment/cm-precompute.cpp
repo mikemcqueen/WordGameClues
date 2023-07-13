@@ -507,4 +507,49 @@ XorSourceList mergeCompatibleXorSourceCombinations(
   return xorSourceList;
 }
 
+//////////
+
+auto buildVariationIndicesMaps(const XorSourceList& xorSourceList)
+  -> std::array<VariationIndicesMap, kNumSentences>
+{
+  auto variationIndicesMaps = std::array<VariationIndicesMap, kNumSentences>{};
+  for (size_t i = 0; i < xorSourceList.size(); ++i) {
+    std::array<int, kNumSentences> variations = { -1, -1, -1, -1, -1, -1, -1, -1, -1 };
+    for (const auto& nc : xorSourceList[i].primaryNameSrcList) {
+      using namespace Source;
+      if (isCandidate(nc.count)) {
+        auto sentence = getSentence(nc.count) - 1;
+        auto variation = getVariation(nc.count);
+        // could sanity check compare equal if not -1 here
+        variations[sentence] = variation;
+      }
+    }
+    for (auto s = 0; s < kNumSentences; ++s) {
+      //if (variations[s] > -1) {
+      auto& map = variationIndicesMaps[s];
+      if (map.find(variations[s]) == map.end()) {
+        map.insert(std::make_pair(variations[s], std::vector<int>{})); // TODO: {}, emplace?
+      }
+      map[variations[s]].push_back(i);
+      // could assert(true) on ibPair.second here
+      //}
+    }
+  }
+  if (1) {
+    for (auto s = 0; s < kNumSentences; ++s) {
+      const auto& map = variationIndicesMaps[s];
+      if (map.size() > 1) {
+        std::cerr << "S" << s << ": variations(" << map.size() << ")"
+                  << std::endl;
+        for (auto it = map.begin(); it != map.end(); ++it) {
+          auto [key, value] = *it;
+          std::cerr << "  v" << key << ": indices(" << value.size() << ")"
+                    << std::endl;
+        }
+      }
+    }
+  }
+  return variationIndicesMaps;
+}
+
 } // namespace cm

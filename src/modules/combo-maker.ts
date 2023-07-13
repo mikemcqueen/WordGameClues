@@ -45,6 +45,10 @@ interface PerfData {
     calls: number;
     comps: number;
     compat: number;
+    range_calls: number;
+    ss_attempt: number;
+    ss_fail: number;
+    full: number;
 }
 
 interface StringAnyMap {
@@ -527,8 +531,11 @@ export const makeCombos = (args: any): any => {
                 `, comp(${ms_comp}), compat(${ms_compat})`);
                 //, ms_111(${ms_111})
             const isany: PerfData = NativeComboMaker.getIsAnyPerfData();
-            console.error(`isAny: calls(${isany.calls}), comps(${isany.comps})` +
-                `, compat(${isany.compat})`);
+            console.error(`isAny: calls(${isany.calls})` +
+                `, range_calls(${isany.range_calls}), full_range(${isany.full})` +
+                `, comps(${isany.comps}), compat(${isany.compat})` +
+                `, ss_attempt(${isany.ss_attempt}), ss_fail(${isany.ss_fail})`);
+                
 
             //`, 1_1(${mcsl_1_1} - ${Math.floor((mcsl_1_1 / mcsl_call) * 100)}%)` +
             //`, push01(${mcsl_push01} - ${Math.floor((mcsl_push01 / mcsl_call) * 100)}%)` +

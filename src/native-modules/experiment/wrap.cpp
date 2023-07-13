@@ -60,6 +60,10 @@ Napi::Object wrap(Napi::Env& env, const PerfData& perf) {
   jsObj.Set("calls", Number::New(env, perf.calls));
   jsObj.Set("comps", Number::New(env, perf.comps));
   jsObj.Set("compat", Number::New(env, perf.compat));
+  jsObj.Set("range_calls", Number::New(env, perf.range_calls));
+  jsObj.Set("ss_attempt", Number::New(env, perf.ss_attempt));
+  jsObj.Set("ss_fail", Number::New(env, perf.ss_fail));
+  jsObj.Set("full", Number::New(env, perf.full));
   return jsObj;
 }
 
