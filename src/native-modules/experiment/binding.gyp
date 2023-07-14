@@ -5,10 +5,11 @@
       "cflags!": [ "-fno-exceptions" ],
       "cflags_cc!": [ "-fno-exceptions" ],
       "sources": [
-        "index.cpp",
-        "greeting.cpp",
-        "combo-maker.cpp",
+        "candidates.cpp",
         "cm-precompute.cpp",
+        "combo-maker.cpp",
+        "greeting.cpp",
+        "index.cpp",
         "wrap.cpp"
       ],
       "include_dirs": [

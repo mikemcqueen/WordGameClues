@@ -1,4 +1,5 @@
 #include <cassert>
+#include <chrono>
 #include <numeric>
 #include <iostream>
 #include <memory>
@@ -8,6 +9,7 @@
 #include <vector>
 #include "greeting.h"
 #include "combo-maker.h"
+#include "candidates.h"
 #include "dump.h"
 #include "wrap.h"
 
@@ -482,66 +484,6 @@ Value isAnySourceCompatibleWithUseSources(const CallbackInfo& info) {
   return Boolean::New(env, compatible);
 }
 
-using SourceCompatibilityLists = std::vector<cm::SourceCompatibilityList>;
-using IndexComboListMap = std::unordered_map<int, std::vector<std::string>>;
-
-//std::vector<SourceCompatibilityLists> allSumsSourceCompatLists{};
-//std::vector<IndexComboListMap> allSumsIndexComboListMaps{};
-
-struct OneSumCandidateData {
-  SourceCompatibilityLists sourceCompatLists;
-  IndexComboListMap indexComboListMap;
-};
-std::vector<OneSumCandidateData> allSumsCandidateData{};
-
-auto addCandidate(int sum, std::string&& combo, int index) {
-  IndexComboListMap& indexCombosMap =
-    allSumsCandidateData[sum - 2].indexComboListMap;
-  auto it = indexCombosMap.find(index);
-  assert(it != indexCombosMap.end());
-  it->second.emplace_back(std::move(combo));
-  return index;
-}
-
-auto addCandidate(int sum, std::string&& combo,
-  cm::SourceCompatibilityList&& compatList)
-{
-  int index{};
-  std::vector<std::string> comboList{};
-  comboList.emplace_back(std::move(combo));
-
-  if (sum == (int)allSumsCandidateData.size() + 2) {
-    //std::cerr << "  addCandidate1, path1" << std::endl;
-    // first time encountering sum; add new collection
-    SourceCompatibilityLists sourceCompatLists{};
-    sourceCompatLists.emplace_back(std::move(compatList));
-    index = sourceCompatLists.size() - 1;
-
-    IndexComboListMap indexComboListMap; 
-    auto [ignore, success] =
-      indexComboListMap.insert(std::make_pair(index, std::move(comboList)));
-    assert(success);
-
-    OneSumCandidateData oneSumData{
-      std::move(sourceCompatLists), std::move(indexComboListMap) };
-    allSumsCandidateData.emplace_back(std::move(oneSumData));
-  } else {
-    //std::cerr << "  addCandidate1, path2" << std::endl;
-    // sum encountered before; append to existing collection
-    SourceCompatibilityLists& sourceCompatLists =
-      allSumsCandidateData[sum - 2].sourceCompatLists;
-    sourceCompatLists.emplace_back(std::move(compatList));
-    index = sourceCompatLists.size() - 1;
-    
-    IndexComboListMap& indexComboListMap =
-      allSumsCandidateData[sum - 2].indexComboListMap;
-    auto [ignore, success] =
-      indexComboListMap.insert(std::make_pair(index, std::move(comboList)));
-    assert(success);
-  }
-  return index; // addCandidate(sum, std::move(combo), (int)allSumsCandidateData.size() - 1);
-}
-
 Value addCandidateForSum(const CallbackInfo& info) {
   Env env = info.Env();
   if (!info[0].IsNumber() || !info[1].IsString()
@@ -555,19 +497,13 @@ Value addCandidateForSum(const CallbackInfo& info) {
   assert(sum >= 2);
   auto combo = info[1].As<String>().Utf8Value();
   int index{};
-  //std::cerr << "addCandidateForSum, sum: " << sum << ", combo: " << combo
-  // << std::endl;
   if (info[2].IsArray()) {
-    //std::cerr << "  beforeMakeList" << std::endl;
     auto compatList = makePmrSourceCompatibilityList(env, info[2].As<Array>());
-    //std::cerr << "  beforeAddCandidate1" << std::endl;
-    index = addCandidate(sum, std::move(combo), std::move(compatList));
+    index = cm::addCandidate(sum, std::move(combo), std::move(compatList));
   } else {
     index = info[2].As<Number>().Int32Value();
-    //std::cerr << "  beforeAddCandidate2" << std::endl;
-    addCandidate(sum, std::move(combo), index);
+    cm::addCandidate(sum, std::move(combo), index);
   }
-  //std::cerr << "addCandidateForSum done" << std::endl;
   return Number::New(env, index);
 }
 
@@ -594,10 +530,9 @@ Value getIsAnyPerfData(const CallbackInfo& info) {
 }
 
 auto getCandidateStats(int sum) {
-  assert(sum >= 2);
   cm::CandidateStats cs;
   cs.sum = sum;
-  const auto& cd = allSumsCandidateData[sum - 2];
+  const auto& cd = cm::allSumsCandidateData[sum - 2];
   cs.sourceLists = (int)cd.sourceCompatLists.size();
   cs.totalSources = std::accumulate(
     cd.sourceCompatLists.cbegin(), cd.sourceCompatLists.cend(), 0,
@@ -620,10 +555,36 @@ Value getCandidateStatsForSum(const CallbackInfo& info) {
       return env.Null();
   }
   auto sum = info[0].As<Number>().Int32Value();
+  assert(sum >= 2);
   auto candidateStats = getCandidateStats(sum);
   return cm::wrap(env, candidateStats);
 }
 
+//
+// filterCandidatesForSum
+//
+Value filterCandidatesForSum(const CallbackInfo& info) {
+  Env env = info.Env();
+  if (!info[0].IsNumber()) {
+      Napi::TypeError::New(env, "fitlerCandidatesForSum: non-number parameter")
+        .ThrowAsJavaScriptException();
+      return env.Null();
+  }
+  auto sum = info[0].As<Number>().Int32Value();
+  assert(sum >= 2);
+  cm::filterCandidates(sum);
+  return env.Null();
+}
+
+//
+// getAllCombos
+//
+Value getAllCombos(const CallbackInfo& info) {
+  Env env = info.Env();
+  return env.Null();
+}
+
+//
 Object Init(Env env, Object exports) {
   //  exports["buildSourceListsForUseNcData"] = Function::New(env, buildSourceListsForUseNcData);
   //  exports["mergeAllCompatibleSources"] = Function::New(env, mergeAllCompatibleSources);
@@ -633,6 +594,8 @@ Object Init(Env env, Object exports) {
   exports["getIsAnyPerfData"] = Function::New(env, getIsAnyPerfData);
   exports["addCandidateForSum"] = Function::New(env, addCandidateForSum);
   exports["getCandidateStatsForSum"] = Function::New(env, getCandidateStatsForSum);
+  exports["filterCandidatesForSum"] = Function::New(env, filterCandidatesForSum);
+  exports["getAllCombos"] = Function::New(env, getAllCombos);
 
   return exports;
 }
