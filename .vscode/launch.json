@@ -22,7 +22,7 @@
                 "<node_internals>/**"
             ],
             "program": "${workspaceFolder}/src/tools/clues.js",
-            "args": [ "clues.js", "-pf.71", "-c2,15", "-x2",
+            "args": [ "clues.js", "-pf.71", "-c2,2", "-x2",
 //                "--xor", "us 50",
                 "--xor", "koa",
                 "--xor", "21",

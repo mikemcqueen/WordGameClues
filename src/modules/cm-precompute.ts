@@ -8,8 +8,8 @@ import _ from 'lodash'; // import statement to signal that we are a "module"
 
 const Peco        = require('../../modules/peco');
 
-const NativeComboMaker = require('../../../build/Release/experiment.node');
-//const NativeComboMaker = require('../../../build/Debug/experiment.node');
+//const NativeComboMaker = require('../../../build/Release/experiment.node');
+const NativeComboMaker = require('../../../build/Debug/experiment.node');
 
 const Assert      = require('assert');
 const Debug       = require('debug')('cm-precompute');

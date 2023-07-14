@@ -138,6 +138,7 @@ struct UsedSources {
 struct SourceCompatibilityData {
   SourceBits sourceBits;
   UsedSources usedSources;
+  bool compatible{};
 
   SourceCompatibilityData() = default;
   // copy consruct/assign allowed for now for precompute.mergeAllCompatibleXorSources
@@ -483,6 +484,14 @@ struct PerfData {
 };
 
 inline PerfData isany_perf{};
+
+struct CandidateStats {
+  int sum;
+  int sourceLists;
+  int totalSources;
+  int comboMapIndices;
+  int totalCombos;
+};
 
 // functions
  

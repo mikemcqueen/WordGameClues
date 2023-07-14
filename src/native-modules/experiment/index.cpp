@@ -1,9 +1,11 @@
-#include <vector>
+#include <cassert>
+#include <numeric>
+#include <iostream>
 #include <memory>
 #include <napi.h>
 #include <string>
-#include <iostream>
 #include <unordered_map>
+#include <vector>
 #include "greeting.h"
 #include "combo-maker.h"
 #include "dump.h"
@@ -305,6 +307,23 @@ cm::SourceCompatibilityList makeSourceCompatibilityList(Napi::Env& env,
   return sourceCompatList;
 }
 
+cm::SourceCompatibilityList makePmrSourceCompatibilityList(Napi::Env& env,
+  const Napi::Array& jsList)
+{
+  cm::SourceCompatibilityList sourceCompatList{};
+  for (auto i = 0u; i < jsList.Length(); ++i) {
+    if (!jsList[i].IsObject()) {
+      Napi::TypeError::New(env, "makePmrSourceCompatibiltyList: non-object element")
+        .ThrowAsJavaScriptException();
+      return {};
+    }
+    auto jsSourceList = jsList[i].As<Object>().Get("sourceList").As<Array>();
+    cm::SourceCompatibilityData compatData = makeSourceCompatibilityData(env, jsSourceList);
+    sourceCompatList.emplace_back(std::move(compatData));
+  }
+  return sourceCompatList;
+}
+
 cm::OrSourceData makeOrSource(Napi::Env& env, const Napi::Object& jsObject) {
   cm::OrSourceData orSource;
   orSource.source = std::move(makeSourceData(env, jsObject["source"].As<Object>()));
@@ -463,6 +482,95 @@ Value isAnySourceCompatibleWithUseSources(const CallbackInfo& info) {
   return Boolean::New(env, compatible);
 }
 
+using SourceCompatibilityLists = std::vector<cm::SourceCompatibilityList>;
+using IndexComboListMap = std::unordered_map<int, std::vector<std::string>>;
+
+//std::vector<SourceCompatibilityLists> allSumsSourceCompatLists{};
+//std::vector<IndexComboListMap> allSumsIndexComboListMaps{};
+
+struct OneSumCandidateData {
+  SourceCompatibilityLists sourceCompatLists;
+  IndexComboListMap indexComboListMap;
+};
+std::vector<OneSumCandidateData> allSumsCandidateData{};
+
+auto addCandidate(int sum, std::string&& combo, int index) {
+  IndexComboListMap& indexCombosMap =
+    allSumsCandidateData[sum - 2].indexComboListMap;
+  auto it = indexCombosMap.find(index);
+  assert(it != indexCombosMap.end());
+  it->second.emplace_back(std::move(combo));
+  return index;
+}
+
+auto addCandidate(int sum, std::string&& combo,
+  cm::SourceCompatibilityList&& compatList)
+{
+  int index{};
+  std::vector<std::string> comboList{};
+  comboList.emplace_back(std::move(combo));
+
+  if (sum == (int)allSumsCandidateData.size() + 2) {
+    //std::cerr << "  addCandidate1, path1" << std::endl;
+    // first time encountering sum; add new collection
+    SourceCompatibilityLists sourceCompatLists{};
+    sourceCompatLists.emplace_back(std::move(compatList));
+    index = sourceCompatLists.size() - 1;
+
+    IndexComboListMap indexComboListMap; 
+    auto [ignore, success] =
+      indexComboListMap.insert(std::make_pair(index, std::move(comboList)));
+    assert(success);
+
+    OneSumCandidateData oneSumData{
+      std::move(sourceCompatLists), std::move(indexComboListMap) };
+    allSumsCandidateData.emplace_back(std::move(oneSumData));
+  } else {
+    //std::cerr << "  addCandidate1, path2" << std::endl;
+    // sum encountered before; append to existing collection
+    SourceCompatibilityLists& sourceCompatLists =
+      allSumsCandidateData[sum - 2].sourceCompatLists;
+    sourceCompatLists.emplace_back(std::move(compatList));
+    index = sourceCompatLists.size() - 1;
+    
+    IndexComboListMap& indexComboListMap =
+      allSumsCandidateData[sum - 2].indexComboListMap;
+    auto [ignore, success] =
+      indexComboListMap.insert(std::make_pair(index, std::move(comboList)));
+    assert(success);
+  }
+  return index; // addCandidate(sum, std::move(combo), (int)allSumsCandidateData.size() - 1);
+}
+
+Value addCandidateForSum(const CallbackInfo& info) {
+  Env env = info.Env();
+  if (!info[0].IsNumber() || !info[1].IsString()
+    || !(info[2].IsArray() || info[2].IsNumber()))
+  {
+      Napi::TypeError::New(env, "addCandidate: invalid parameter type")
+        .ThrowAsJavaScriptException();
+      return env.Null();
+  }
+  const auto sum = info[0].As<Number>().Int32Value();
+  assert(sum >= 2);
+  auto combo = info[1].As<String>().Utf8Value();
+  int index{};
+  //std::cerr << "addCandidateForSum, sum: " << sum << ", combo: " << combo
+  // << std::endl;
+  if (info[2].IsArray()) {
+    //std::cerr << "  beforeMakeList" << std::endl;
+    auto compatList = makePmrSourceCompatibilityList(env, info[2].As<Array>());
+    //std::cerr << "  beforeAddCandidate1" << std::endl;
+    index = addCandidate(sum, std::move(combo), std::move(compatList));
+  } else {
+    index = info[2].As<Number>().Int32Value();
+    //std::cerr << "  beforeAddCandidate2" << std::endl;
+    addCandidate(sum, std::move(combo), index);
+  }
+  //std::cerr << "addCandidateForSum done" << std::endl;
+  return Number::New(env, index);
+}
+
 //
 // setOrArgDataList
 //
@@ -485,6 +593,37 @@ Value getIsAnyPerfData(const CallbackInfo& info) {
   return cm::wrap(env, cm::isany_perf);
 }
 
+auto getCandidateStats(int sum) {
+  assert(sum >= 2);
+  cm::CandidateStats cs;
+  cs.sum = sum;
+  const auto& cd = allSumsCandidateData[sum - 2];
+  cs.sourceLists = (int)cd.sourceCompatLists.size();
+  cs.totalSources = std::accumulate(
+    cd.sourceCompatLists.cbegin(), cd.sourceCompatLists.cend(), 0,
+    [](int sum, const auto& scl) { sum += (int)scl.size(); return sum; });
+  cs.comboMapIndices = (int)cd.indexComboListMap.size();
+  cs.totalCombos = std::accumulate(
+    cd.indexComboListMap.cbegin(), cd.indexComboListMap.cend(), 0,
+    [](int sum, const auto& kv) -> int { sum += kv.second.size(); return sum; });
+  return cs;
+}
+
+//
+// getCandidateStatsForSum
+//
+Value getCandidateStatsForSum(const CallbackInfo& info) {
+  Env env = info.Env();
+  if (!info[0].IsNumber()) {
+      Napi::TypeError::New(env, "getCandidateStatsForSum: non-number parameter")
+        .ThrowAsJavaScriptException();
+      return env.Null();
+  }
+  auto sum = info[0].As<Number>().Int32Value();
+  auto candidateStats = getCandidateStats(sum);
+  return cm::wrap(env, candidateStats);
+}
+
 Object Init(Env env, Object exports) {
   //  exports["buildSourceListsForUseNcData"] = Function::New(env, buildSourceListsForUseNcData);
   //  exports["mergeAllCompatibleSources"] = Function::New(env, mergeAllCompatibleSources);
@@ -492,6 +631,8 @@ Object Init(Env env, Object exports) {
   exports["isAnySourceCompatibleWithUseSources"] = Function::New(env, isAnySourceCompatibleWithUseSources);
   exports["setOrArgDataList"] = Function::New(env, setOrArgDataList);
   exports["getIsAnyPerfData"] = Function::New(env, getIsAnyPerfData);
+  exports["addCandidateForSum"] = Function::New(env, addCandidateForSum);
+  exports["getCandidateStatsForSum"] = Function::New(env, getCandidateStatsForSum);
 
   return exports;
 }

@@ -67,6 +67,16 @@ Napi::Object wrap(Napi::Env& env, const PerfData& perf) {
   return jsObj;
 }
 
+Napi::Object wrap(Napi::Env& env, const CandidateStats& cs) {
+  Object jsObj = Object::New(env);
+  jsObj.Set("sum", Number::New(env, cs.sum));
+  jsObj.Set("sourceLists", Number::New(env, cs.sourceLists));
+  jsObj.Set("totalSources", Number::New(env, cs.totalSources));
+  jsObj.Set("comboMapIndices", Number::New(env, cs.comboMapIndices));
+  jsObj.Set("totalCombos", Number::New(env, cs.totalCombos));
+  return jsObj;
+};
+
 #if 0
 Object wrap(Env& env, const SourceData& source) {
   Object jsObj = Object::New(env);

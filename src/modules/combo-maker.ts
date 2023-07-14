@@ -11,8 +11,8 @@ const ResultMap   = require('../../types/result-map');
 const Peco        = require('../../modules/peco');
 const Log         = require('../../modules/log')('combo-maker');
 const My          = require('../../modules/util');
-const NativeComboMaker = require('../../../build/Release/experiment.node');
-//const NativeComboMaker = require('../../../build/Debug/experiment.node');
+//const NativeComboMaker = require('../../../build/Release/experiment.node');
+const NativeComboMaker = require('../../../build/Debug/experiment.node');
 
 const Assert      = require('assert');
 const Debug       = require('debug')('combo-maker');
@@ -49,6 +49,14 @@ interface PerfData {
     ss_attempt: number;
     ss_fail: number;
     full: number;
+}
+
+interface CandidateStats {
+    sum: number;
+    sourceLists: number;
+    totalSources: number;
+    comboMapIndices: number;
+    totalCombos: number;
 }
 
 interface StringAnyMap {
@@ -319,8 +327,6 @@ const getCombosForUseNcLists = (sum: number, max: number, pcd: PreCompute.Data,
     let numCacheHits = 0;
     let numMergeIncompatible = 0;
     let numUseIncompatible = 0;
-    let isany_call = 0;
-    let isany_compat = 0;
     
     const MILLY = 1000000n;
     const start = process.hrtime.bigint();
@@ -351,8 +357,6 @@ const getCombosForUseNcLists = (sum: number, max: number, pcd: PreCompute.Data,
                 firstIter = false;
             }
             const key: string = NameCount.listToString(result.ncList!);
-
-            let cacheHit = false;
             let mergedSourcesList: MergedSourcesList = [];
             if (!hash[key]) {
                 mergedSourcesList = mergeAllCompatibleSources3(result.ncList!, pcd.sourceListMap);
@@ -362,23 +366,16 @@ const getCombosForUseNcLists = (sum: number, max: number, pcd: PreCompute.Data,
                 hash[key] = { mergedSourcesList };
             } else {
                 mergedSourcesList = hash[key].mergedSourcesList;
-                cacheHit = true;
                 numCacheHits += 1;
             }
 
             // failed to find any compatible combos
             if (listIsEmpty(mergedSourcesList)) continue;
-
-            if (_.isUndefined(hash[key].isCompatible)) {
-                isany_call += 1;
-                hash[key].isCompatible = NativeComboMaker.isAnySourceCompatibleWithUseSources(mergedSourcesList);
-                if (hash[key].isCompatible) isany_compat += 1;
-            }
-            if (hash[key].isCompatible) {
-                combos.push(result.nameList!.sort().toString());
-            } else if (!cacheHit) {
-                numUseIncompatible += 1;
-            }
+            
+            const combo = result.nameList!.sort().toString();
+            const listOrIndex = (hash[key].index === undefined) ?
+                mergedSourcesList : hash[key].index;
+            hash[key].index = NativeComboMaker.addCandidateForSum(sum, combo, listOrIndex);
         }
         totalVariations += numVariations;
     });
@@ -390,11 +387,17 @@ const getCombosForUseNcLists = (sum: number, max: number, pcd: PreCompute.Data,
         ` actual(${totalVariations - numCacheHits - numUseIncompatible}) ${duration}ms`);
 
     if (args.verbose) {
-        console.error(`sum(${sum}) combos(${comboCount}) ` +
-            `variations(${totalVariations}) cacheHits(${numCacheHits}) ` +
-            `no-merge(${numMergeIncompatible}) no-use(${numUseIncompatible}) ` +
-            `actual(${totalVariations - numCacheHits - numUseIncompatible}) ` +
-            `isany: call(${isany_call}), compat(${isany_compat}) - ${duration}ms `);
+        console.error(`sum(${sum}) combos(${comboCount})` +
+            ` variations(${totalVariations}) cacheHits(${numCacheHits})` +
+            ` no-merge(${numMergeIncompatible}) no-use(${numUseIncompatible})` +
+            ` actual(${totalVariations - numCacheHits - numUseIncompatible})` +
+            ` - ${duration}ms `);
+        const cs = NativeComboMaker.getCandidateStatsForSum(sum);
+        console.error(`  sourceLists(${cs.sourceLists})` +
+            `, totalSources(${cs.totalSources})` +
+            `, comboMapIndices(${cs.comboMapIndices})` +
+            `, totalCombos(${cs.totalCombos})`);
+        
     } else {
         process.stderr.write('.');
     }
