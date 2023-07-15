@@ -367,7 +367,7 @@ cm::OrArgDataList makeOrArgDataList(Napi::Env& env, const Napi::Array& jsList) {
   return orArgDataList;
 }
 
-#if 0 // unused
+/*
 Value buildSourceListsForUseNcData(const CallbackInfo& info) {
   Env env = info.Env();
   if (!info[0].IsArray() || !info[1].IsArray()) {
@@ -383,7 +383,7 @@ Value buildSourceListsForUseNcData(const CallbackInfo& info) {
   cm::buildSourceListsForUseNcData(ncDataLists, sourceListMap);
   return env.Null();
 }
-#endif
+*/
 
 namespace cm {
   extern PreComputedData PCD;
@@ -469,6 +469,7 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   return cm::wrap(env, cm::PCD.xorSourceList);
 }
 
+/*
 //
 // isAnySourceCompatibleWithUseSources
 //
@@ -483,6 +484,7 @@ Value isAnySourceCompatibleWithUseSources(const CallbackInfo& info) {
   const bool compatible = cm::isAnySourceCompatibleWithUseSources(compatList);
   return Boolean::New(env, compatible);
 }
+*/
 
 Value addCandidateForSum(const CallbackInfo& info) {
   Env env = info.Env();
@@ -572,7 +574,6 @@ Value filterCandidatesForSum(const CallbackInfo& info) {
   }
   auto sum = info[0].As<Number>().Int32Value();
   assert(sum >= 2);
-  std::cerr << "calling filterCandidates" << std::endl;
   cm::filterCandidates(sum);
   return env.Null();
 }
@@ -589,8 +590,8 @@ Value getAllCombos(const CallbackInfo& info) {
 Object Init(Env env, Object exports) {
   //  exports["buildSourceListsForUseNcData"] = Function::New(env, buildSourceListsForUseNcData);
   //  exports["mergeAllCompatibleSources"] = Function::New(env, mergeAllCompatibleSources);
+  //  exports["isAnySourceCompatibleWithUseSources"] = Function::New(env, isAnySourceCompatibleWithUseSources);
   exports["mergeCompatibleXorSourceCombinations"] = Function::New(env, mergeCompatibleXorSourceCombinations);
-  exports["isAnySourceCompatibleWithUseSources"] = Function::New(env, isAnySourceCompatibleWithUseSources);
   exports["setOrArgDataList"] = Function::New(env, setOrArgDataList);
   exports["getIsAnyPerfData"] = Function::New(env, getIsAnyPerfData);
   exports["addCandidateForSum"] = Function::New(env, addCandidateForSum);

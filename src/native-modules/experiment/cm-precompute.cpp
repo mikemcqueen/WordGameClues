@@ -509,10 +509,29 @@ XorSourceList mergeCompatibleXorSourceCombinations(
 
 //////////
 
+using VariationIndicesMapList = std::array<VariationIndicesMap, kNumSentences>;
+
+void dumpVariationIndicesMaps(
+  const VariationIndicesMapList& variationIndicesMaps)
+{
+  for (auto s = 0; s < kNumSentences; ++s) {
+    const auto& map = variationIndicesMaps[s];
+    if (map.size() > 1) {
+      std::cerr << "S" << s << ": variations(" << map.size() << ")"
+                << std::endl;
+      for (auto it = map.begin(); it != map.end(); ++it) {
+        auto [key, value] = *it;
+        std::cerr << "  v" << key << ": indices(" << value.size() << ")"
+                  << std::endl;
+      }
+    }
+  }
+}
+  
 auto buildVariationIndicesMaps(const XorSourceList& xorSourceList)
   -> std::array<VariationIndicesMap, kNumSentences>
 {
-  auto variationIndicesMaps = std::array<VariationIndicesMap, kNumSentences>{};
+  auto variationIndicesMaps = VariationIndicesMapList{};
   for (size_t i = 0; i < xorSourceList.size(); ++i) {
     std::array<int, kNumSentences> variations = { -1, -1, -1, -1, -1, -1, -1, -1, -1 };
     for (const auto& nc : xorSourceList[i].primaryNameSrcList) {
@@ -536,18 +555,7 @@ auto buildVariationIndicesMaps(const XorSourceList& xorSourceList)
     }
   }
   if (1) {
-    for (auto s = 0; s < kNumSentences; ++s) {
-      const auto& map = variationIndicesMaps[s];
-      if (map.size() > 1) {
-        std::cerr << "S" << s << ": variations(" << map.size() << ")"
-                  << std::endl;
-        for (auto it = map.begin(); it != map.end(); ++it) {
-          auto [key, value] = *it;
-          std::cerr << "  v" << key << ": indices(" << value.size() << ")"
-                    << std::endl;
-        }
-      }
-    }
+    dumpVariationIndicesMaps(variationIndicesMaps);
   }
   return variationIndicesMaps;
 }

@@ -9,8 +9,8 @@ namespace cm {
 
 PreComputedData PCD;
 
-auto isSourceORCompatibleWithAnyOrSource(const SourceCompatibilityData& compatData,
-  const OrSourceList& orSourceList)
+__device__ auto isSourceORCompatibleWithAnyOrSource(
+  const SourceCompatibilityData& compatData, const OrSourceList& orSourceList)
 {
   auto compatible = false;
   for (const auto& orSource : orSourceList) {
@@ -23,8 +23,8 @@ auto isSourceORCompatibleWithAnyOrSource(const SourceCompatibilityData& compatDa
   return compatible;
 };
 
-auto isSourceCompatibleWithEveryOrArg(const SourceCompatibilityData& compatData,
-  const OrArgDataList& orArgDataList)
+__device__ auto isSourceCompatibleWithEveryOrArg(
+  const SourceCompatibilityData& compatData, const OrArgDataList& orArgDataList)
 {
   auto compatible = true; // if no --or sources specified, compatible == true
   for (const auto& orArgData : orArgDataList) {
@@ -32,12 +32,26 @@ auto isSourceCompatibleWithEveryOrArg(const SourceCompatibilityData& compatData,
     // been determined in Precompute phase @ markAllANDCompatibleOrSources()
     // and skip the XOR check as well in this case.
     compatible = isSourceORCompatibleWithAnyOrSource(compatData,
-      orArgData.orSourceList);
+     orArgData.orSourceList);
     if (!compatible) break;
   }
   return compatible;
 }
  
+// "temporarily" re-added this original version without indices, as part of 
+// prototyping cuda integration
+__device__ auto isSourceXORCompatibleWithAnyXorSource(
+  const SourceCompatibilityData& compatData, const XorSourceList& xorSourceList)
+{
+  bool compatible = true; // empty list == compatible
+  for (const auto& xorSource: xorSourceList) {
+    compatible = compatData.isXorCompatibleWith(xorSource);
+    if (compatible) break;
+  }
+  return compatible;
+};
+
+//__device__
 auto isSourceXORCompatibleWithAnyXorSource(
   const SourceCompatibilityData& compatData, const XorSourceList& xorSourceList,
   const std::vector<int>& indices)
@@ -60,6 +74,7 @@ auto isSourceXORCompatibleWithAnyXorSource(
   return compatible;
 };
 
+//__device__
 auto isSourceXORCompatibleWithAnyXorSource(
   const SourceCompatibilityData& compatData, const XorSourceList& xorSourceList,
   const std::array<VariationIndicesMap, kNumSentences>& variationIndicesMaps)
@@ -97,17 +112,17 @@ auto isSourceXORCompatibleWithAnyXorSource(
   isany_perf.full++;
 #endif
   return isSourceXORCompatibleWithAnyXorSource(compatData, xorSourceList,
-    variationIndicesMaps[1].at(-1)); // hack: we know this is the full index list
+    variationIndicesMaps[1].at(-1)); // hack: we know "sentence" 2 doesn't exist
 }
   
-bool isAnySourceCompatibleWithUseSources(
+__device__ bool isAnySourceCompatibleWithUseSources(
   const SourceCompatibilityList& sourceCompatList)
 {
   if (sourceCompatList.empty()) return true;
   auto compatible = false;
   for (const auto& compatData : sourceCompatList) {
     compatible = isSourceXORCompatibleWithAnyXorSource(compatData,
-      PCD.xorSourceList, PCD.variationIndicesMaps);
+      PCD.xorSourceList); // , PCD.variationIndicesMaps);
     // if there were --xor sources specified, and none are compatible with the
     // current source, no further compatibility checking is necessary; continue
     // to next source.
@@ -121,66 +136,13 @@ bool isAnySourceCompatibleWithUseSources(
 __global__ void kernel(const SourceCompatibilityList *compatLists, size_t count) {
   auto index = blockIdx.x * blockDim.x + threadIdx.x;
   if (index >= count) return;
-}
-
-__global__ void test_kernel(int *data, size_t count) {
-  auto index = blockIdx.x * blockDim.x + threadIdx.x;
-  if (index >= count) return;
-  data[index] = 1;
-}
-
-void test() {
-  cudaError_t err = cudaSuccess;
-
-  int numElements = 1'000'000;
-  size_t size = numElements * sizeof(int);
-  printf("[%d elements]\n", numElements);
-
-  int *host_data = (int *)malloc(size);
-  //  for (int i = 0; i < numElements; ++i) 
-  //    host_data[i] = rand() / RAND_MAX;
-
-  // Allocate the device input vector A
-  int *device_data = nullptr;
-  err = cudaMalloc((void **)&device_data, size);
-  if (err != cudaSuccess) {
-    fprintf(stderr, "Failed to allocate device data (error code %s)!\n",
-            cudaGetErrorString(err));
-    throw std::runtime_error("failed to allocate device data");
-  }
-
-  int threadsPerBlock = 256;
-  int blocksPerGrid = (numElements + threadsPerBlock - 1) / threadsPerBlock;
-  fprintf(stderr, "CUDA kernel launch with %d blocks of %d threads\n", blocksPerGrid,
-         threadsPerBlock);
-  test_kernel<<<blocksPerGrid, threadsPerBlock>>>(device_data, numElements);
-
-  err = cudaMemcpy(host_data, device_data, size, cudaMemcpyDeviceToHost);
-  if (err != cudaSuccess) {
-    fprintf(stderr, "Failed to copy device data to host (error code %s)!\n",
-            cudaGetErrorString(err));
-    throw std::runtime_error("failed to allocate device data");
-  }
-
-  int ones{};
-  for (int i = 0; i < numElements; ++i) {
-    if (host_data[i] == 1) ++ones;
-  }
-  fprintf(stderr, "ones: actual(%d), expected(%d)\n", ones, numElements);
-
-  err = cudaFree(device_data);
-  if (err != cudaSuccess) {
-    fprintf(stderr, "Failed to free device data (error code %s)!\n",
-            cudaGetErrorString(err));
-    throw std::runtime_error("failed to allocate device data");
-  }
-  free(host_data);
+  isAnySourceCompatibleWithUseSources(compatLists[index]);
 }
 
 void filterCandidatesCuda(int sum) {
   std::cerr << "filerCandidatesCuda" << std::endl;
-  test();
-  //kernel<<<40, 32>>>(allSumsCandidateData[sum - 2].
+  const auto& sourceCompatLists = allSumsCandidateData[sum - 2].sourceCompatLists;
+  kernel<<<40, 32>>>(&sourceCompatLists[0], sourceCompatLists.size());
 }
 
 } // namespace cm

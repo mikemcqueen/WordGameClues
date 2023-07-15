@@ -1,7 +1,7 @@
 {
   "targets": [{
     "target_name": "experiment",
-    "cflags_cc": [ "-fPIC" ],
+    "cflags_cc": [ "-fPIC -std=c++20" ],
     "cflags!": [ "-fno-exceptions" ],
     "cflags_cc!": [ "-fno-exceptions" ],
     "ldflags": [ "-Wl,-rpath,/usr/local/cuda-12.2/targets/x86_64-linux/lib" ],
@@ -18,9 +18,8 @@
     "library_dirs": [
       '/usr/local/cuda-12.2/lib64'
     ],
-#    "libraries": [ '-lcuda', '-lcudart' ],
-    "libraries": [ '-lcudart' ],
-    "dependencies": [ "filter" ],
+    "libraries": [ '-lcudart' ], # '-lcuda'
+#    "dependencies": [ "filter" ],
     "defines": [ "NAPI_CPP_EXCEPTIONS" ]
   },
   {
@@ -28,7 +27,6 @@
     "type": "static_library",
     "sources": [ "filter.cu" ],
     "include_dirs": [
-#      '<@(raw_includes)'
     ],
     "rules": [{
       'extension': 'cu',           
@@ -38,8 +36,8 @@
       'outputs': [ '<(INTERMEDIATE_DIR)/<(RULE_INPUT_ROOT).o' ],
       'process_outputs_as_sources': 1,
       'action': [
-        'bash', 'nvcc.sh', '-Xcompiler', '-fPIC', '-c',
-        '<@(_inputs)', '-o', '<@(_outputs)'
+        'bash', 'nvcc.sh', '-Xcompiler', '-fPIC', '--expt-relaxed-constexpr',
+        '-std=c++20', '-c', '<@(_inputs)', '-o', '<@(_outputs)'
       ]
     }]
   }]

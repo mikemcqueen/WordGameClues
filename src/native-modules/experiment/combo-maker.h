@@ -1,8 +1,17 @@
 #ifndef include_combo_maker_h
 #define include_combo_maker_h
 
+#define CONSTEXPR_BITSET
+
+
 #include <array>
+#ifdef CONSTEXPR_BITSET
+#include "constexpr_bitset.h"
+using hax::bitset;
+#else
 #include <bitset>
+using std::bitset;
+#endif
 #include <cassert>
 #include <cstring>
 #include <iostream>
@@ -37,7 +46,7 @@ namespace Source {
   constexpr inline auto getIndex(int src) noexcept { return getSource(src) % 100; }
 } // namespace Source
 
-using SourceBits = std::bitset<kMaxLegacySources>;
+using SourceBits = bitset<kMaxLegacySources>;
 using SourceBitsList = std::vector<SourceBits>;
 
 #define USEDSOURCES_BITSET 1
@@ -49,7 +58,7 @@ struct UsedSources {
   using VariationIndex_t = int16_t;
 
   // 128 bits per sentence * 9 sentences = 1152 bits, 144 bytes, 18 64-bit words
-  using Bits = std::bitset<kMaxSourcesPerSentence * kNumSentences>;
+  using Bits = bitset<kMaxSourcesPerSentence * kNumSentences>;
   using Variations = std::array<VariationIndex_t, kNumSentences>;
 
   static /*constexpr*/ auto getFirstIndex(int sentence) {
@@ -82,7 +91,7 @@ struct UsedSources {
   }
   */
 
-  auto isXorCompatibleWith(const UsedSources& other) const {
+  constexpr auto isXorCompatibleWith(const UsedSources& other) const {
     // compare bits
     if ((getBits() & other.getBits()).any()) return false;
 
@@ -236,7 +245,8 @@ struct SourceCompatibilityData {
 #endif
   }
 
-  auto isXorCompatibleWith(const SourceCompatibilityData& other) const {
+  constexpr auto isXorCompatibleWith(const SourceCompatibilityData& other) const
+  {
     if ((sourceBits & other.sourceBits).any()) {
       return false;
     }
@@ -247,7 +257,8 @@ struct SourceCompatibilityData {
 #endif
   }
 
-  auto isAndCompatibleWith(const SourceCompatibilityData& other) const {
+  constexpr auto isAndCompatibleWith(const SourceCompatibilityData& other) const
+  {
     auto andBits = sourceBits & other.sourceBits;
     if (andBits != other.sourceBits) return false;
 #if !USEDSOURCES_BITSET
@@ -258,7 +269,8 @@ struct SourceCompatibilityData {
   }
 
   // OR == XOR || AND
-  auto isOrCompatibleWith(const SourceCompatibilityData& other) const {
+  constexpr auto isOrCompatibleWith(const SourceCompatibilityData& other) const
+  {
     return isXorCompatibleWith(other) || isAndCompatibleWith(other);
   }
 
@@ -287,12 +299,98 @@ struct SourceCompatibilityData {
     return usedSources.merge(from);
 #endif
   }
-};
+}; // SourceCompatibilityData
+using SourceCompatibilityList = std::vector<SourceCompatibilityData>;
 
 struct NameCount;
 using NameCountList = std::vector<NameCount>;
 
-using SourceCompatibilityList = std::vector<SourceCompatibilityData>;
+struct NameCount {
+  std::string name;
+  int count;
+
+  NameCount(std::string&& name, int count) : name(std::move(name)), count(count) {}
+  NameCount() = default;
+  NameCount(const NameCount&) = default;
+  NameCount& operator=(const NameCount&) = default;
+  NameCount(NameCount&&) = default;
+  NameCount& operator=(NameCount&&) = default;
+
+  std::string toString() const {
+    char buf[128] = { 0 };
+    snprintf(buf, sizeof(buf), "%s:%d", name.c_str(), count);
+    return buf;
+  }
+
+  static std::string listToString(const NameCountList& list) {
+    char buf[1280] = { 0 };
+    for (auto it = list.cbegin(); it != list.cend(); ++it) {
+      std::strcat(buf, it->toString().c_str());
+      if ((it + 1) != list.cend()) {
+        std::strcat(buf, ",");
+      }
+    }
+    return buf;
+  }
+
+  static std::string listToString(const std::vector<const NameCount*>& list) {
+    char buf[1280] = { 0 };
+    for (auto it = list.cbegin(); it != list.cend(); ++it) {
+      std::strcat(buf, (*it)->toString().c_str());
+      if ((it + 1) != list.cend()) {
+        std::strcat(buf, ",");
+      }
+    }
+    return buf;
+  }
+
+  static auto listToCountSet(const NameCountList& list) {
+    std::unordered_set<int> count_set;
+    for (const auto& nc : list) {
+      count_set.insert(nc.count);
+    }
+    return count_set;
+  }
+
+  static auto listToSourceBits(const NameCountList& list) {
+    SourceBits bits{};
+    for (const auto& nc : list) {
+      if (Source::isLegacy(nc.count)) {
+        bits.set(nc.count);
+      }
+    }
+    return bits;
+  }
+
+  static auto listToUsedSources(const NameCountList& list) {
+    UsedSources usedSources{};
+    for (const auto& nc : list) {
+      if (Source::isCandidate(nc.count)) {
+#if !USEDSOURCES_BITSET
+        SourceCompatibilityData::addUsedSource(usedSources, nc.count);
+#else
+        usedSources.addSource(nc.count);
+#endif
+      }
+    }
+    return usedSources;
+  }
+
+  static auto listMerge(const NameCountList& list1,
+    const NameCountList& list2)
+  {
+    auto result = list1; // copy (ok)
+    result.insert(result.end(), list2.begin(), list2.end()); // copy (ok)
+    return result;
+  }
+};
+
+struct NCData {
+  NameCountList ncList;
+};
+using NCDataList = std::vector<NCData>;
+
+  //struct NameCount;
 
 struct SourceData : SourceCompatibilityData {
   NameCountList primaryNameSrcList;
@@ -388,92 +486,6 @@ using MergedSourcesList = std::vector<MergedSources>;
 
 using StringList = std::vector<std::string>;
 
-struct NameCount {
-  std::string name;
-  int count;
-
-  NameCount(std::string&& name, int count) : name(std::move(name)), count(count) {}
-  NameCount() = default;
-  NameCount(const NameCount&) = default;
-  NameCount& operator=(const NameCount&) = default;
-  NameCount(NameCount&&) = default;
-  NameCount& operator=(NameCount&&) = default;
-
-  std::string toString() const {
-    char buf[128] = { 0 };
-    sprintf(buf, "%s:%d", name.c_str(), count);
-    return buf;
-  }
-
-  static std::string listToString(const std::vector<NameCount>& list) {
-    char buf[1280] = { 0 };
-    for (auto it = list.cbegin(); it != list.cend(); ++it) {
-      std::strcat(buf, it->toString().c_str());
-      if ((it + 1) != list.cend()) {
-        std::strcat(buf, ",");
-      }
-    }
-    return buf;
-  }
-
-  static std::string listToString(const std::vector<const NameCount*>& list) {
-    char buf[1280] = { 0 };
-    for (auto it = list.cbegin(); it != list.cend(); ++it) {
-      std::strcat(buf, (*it)->toString().c_str());
-      if ((it + 1) != list.cend()) {
-        std::strcat(buf, ",");
-      }
-    }
-    return buf;
-  }
-
-  static auto listToCountSet(const std::vector<NameCount>& list) {
-    std::unordered_set<int> count_set;
-    for (const auto& nc : list) {
-      count_set.insert(nc.count);
-    }
-    return count_set;
-  }
-
-  static auto listToSourceBits(const std::vector<NameCount>& list) {
-    SourceBits bits{};
-    for (const auto& nc : list) {
-      if (Source::isLegacy(nc.count)) {
-        bits.set(nc.count);
-      }
-    }
-    return bits;
-  }
-
-  static auto listToUsedSources(const std::vector<NameCount>& list) {
-    UsedSources usedSources{};
-    for (const auto& nc : list) {
-      if (Source::isCandidate(nc.count)) {
-#if !USEDSOURCES_BITSET
-        SourceCompatibilityData::addUsedSource(usedSources, nc.count);
-#else
-        usedSources.addSource(nc.count);
-#endif
-      }
-    }
-    return usedSources;
-  }
-
-  static auto listMerge(const std::vector<NameCount>& list1,
-    const std::vector<NameCount>& list2)
-  {
-    auto result = list1; // copy (ok)
-    result.insert(result.end(), list2.begin(), list2.end()); // copy (ok)
-    return result;
-  }
-};
-
-struct NCData {
-  NameCountList ncList;
-};
-
-using NCDataList = std::vector<NCData>;
-
 struct PerfData {
   int calls;       // # of function calls
   int range_calls; // # of calls with range
@@ -507,9 +519,6 @@ XorSourceList mergeCompatibleXorSourceCombinations(
 auto buildVariationIndicesMaps(const XorSourceList& xorSourceList)
   -> std::array<VariationIndicesMap, kNumSentences>;
 
-bool isAnySourceCompatibleWithUseSources(
-  const SourceCompatibilityList& sourceCompatList);
-
 void filterCandidatesCuda(int sum);
 
 void mergeUsedSourcesInPlace(UsedSources& to, const UsedSources& from);
@@ -522,12 +531,20 @@ inline void hash_combine(SizeT& seed, SizeT value) {
 }
 
 #if USEDSOURCES_BITSET
+
+inline auto hash_called = 0;
+inline auto equal_to_called = 0;
+
+template struct std::hash<cm::UsedSources::Bits>;
+
+namespace std {
+
 template<>
-struct std::equal_to<cm::UsedSources> {
+struct equal_to<cm::UsedSources> {
   constexpr bool operator()(const cm::UsedSources& lhs,
     const cm::UsedSources& rhs) const noexcept
   {
-    if (!std::equal_to<cm::UsedSources::Bits>{}(lhs.getBits(), rhs.getBits())) return false;
+    if (lhs.getBits() != rhs.getBits()) return false;
     for (auto i = 0u; i < lhs.variations.size(); ++i) {
       if (lhs.variations[i] != rhs.variations[i]) return false;
     }
@@ -536,46 +553,44 @@ struct std::equal_to<cm::UsedSources> {
 };
 
 template<>
-struct std::hash<cm::UsedSources> {
-  std::size_t operator()(const cm::UsedSources& usedSources) const noexcept {
-    std::size_t bits_seed = 0;
-    hash_combine(bits_seed, std::hash<cm::UsedSources::Bits>{}(usedSources.getBits()));
-    std::size_t variation_seed = 0;
+struct hash<cm::UsedSources> {
+  size_t operator()(const cm::UsedSources& usedSources) const noexcept {
+    size_t bits_seed = 0;
+    hash_combine(bits_seed, hash<cm::UsedSources::Bits>()(usedSources.getBits()));
+    size_t variation_seed = 0;
     for (const auto variation: usedSources.variations) {
-      hash_combine(variation_seed, std::hash<int>{}(variation));
+      hash_combine(variation_seed, hash<int>()(variation));
     }
-    std::size_t seed = 0;
+    size_t seed = 0;
     hash_combine(seed, bits_seed);
     hash_combine(seed, variation_seed);
     return seed;
   }
 };
 
-inline auto hash_called = 0;
-inline auto equal_to_called = 0;
-
 template<>
-struct std::equal_to<cm::SourceCompatibilityData> {
+struct equal_to<cm::SourceCompatibilityData> {
   //constexpr
   bool operator()(const cm::SourceCompatibilityData& lhs,
     const cm::SourceCompatibilityData& rhs) const noexcept
   {
     ++equal_to_called;
-    return std::equal_to<cm::SourceBits>{}(lhs.sourceBits, rhs.sourceBits) &&
-      std::equal_to<cm::UsedSources>{}(lhs.usedSources, rhs.usedSources);
+    return equal_to<cm::SourceBits>{}(lhs.sourceBits, rhs.sourceBits) &&
+      equal_to<cm::UsedSources>{}(lhs.usedSources, rhs.usedSources);
   }
 };
 
 template<>
-struct std::hash<cm::SourceCompatibilityData> {
-  std::size_t operator()(const cm::SourceCompatibilityData& data) const noexcept {
+struct hash<cm::SourceCompatibilityData> {
+  size_t operator()(const cm::SourceCompatibilityData& data) const noexcept {
     ++hash_called;
-    std::size_t seed = 0;
-    hash_combine(seed, std::hash<cm::SourceBits>{}(data.sourceBits));
-    hash_combine(seed, std::hash<cm::UsedSources>{}(data.usedSources));
+    size_t seed = 0;
+    hash_combine(seed, hash<cm::SourceBits>()(data.sourceBits));
+    hash_combine(seed, hash<cm::UsedSources>()(data.usedSources));
     return seed;
   }
 };
+} // namespace std
 #endif // USEDSOURCES_BITSET
 
 #endif // include_combo_maker_h

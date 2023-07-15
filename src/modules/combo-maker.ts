@@ -401,7 +401,6 @@ const getCombosForUseNcLists = (sum: number, max: number, pcd: PreCompute.Data,
     } else {
         process.stderr.write('.');
     }
-    console.error("calling filterCandidatesForSum");
     NativeComboMaker.filterCandidatesForSum(sum);
     return combos;
 };
