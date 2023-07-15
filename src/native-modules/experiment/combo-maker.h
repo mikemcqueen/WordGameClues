@@ -1,10 +1,11 @@
 #ifndef include_combo_maker_h
 #define include_combo_maker_h
 
+#include <array>
 #include <bitset>
 #include <cassert>
+#include <cstring>
 #include <iostream>
-#include <napi.h>
 #include <set>
 #include <string>
 #include <unordered_map>
@@ -407,9 +408,9 @@ struct NameCount {
   static std::string listToString(const std::vector<NameCount>& list) {
     char buf[1280] = { 0 };
     for (auto it = list.cbegin(); it != list.cend(); ++it) {
-      strcat(buf, it->toString().c_str());
+      std::strcat(buf, it->toString().c_str());
       if ((it + 1) != list.cend()) {
-        strcat(buf, ",");
+        std::strcat(buf, ",");
       }
     }
     return buf;
@@ -418,9 +419,9 @@ struct NameCount {
   static std::string listToString(const std::vector<const NameCount*>& list) {
     char buf[1280] = { 0 };
     for (auto it = list.cbegin(); it != list.cend(); ++it) {
-      strcat(buf, (*it)->toString().c_str());
+      std::strcat(buf, (*it)->toString().c_str());
       if ((it + 1) != list.cend()) {
-        strcat(buf, ",");
+        std::strcat(buf, ",");
       }
     }
     return buf;
@@ -508,6 +509,8 @@ auto buildVariationIndicesMaps(const XorSourceList& xorSourceList)
 
 bool isAnySourceCompatibleWithUseSources(
   const SourceCompatibilityList& sourceCompatList);
+
+void filterCandidatesCuda(int sum);
 
 void mergeUsedSourcesInPlace(UsedSources& to, const UsedSources& from);
 

@@ -572,6 +572,7 @@ Value filterCandidatesForSum(const CallbackInfo& info) {
   }
   auto sum = info[0].As<Number>().Int32Value();
   assert(sum >= 2);
+  std::cerr << "calling filterCandidates" << std::endl;
   cm::filterCandidates(sum);
   return env.Null();
 }
