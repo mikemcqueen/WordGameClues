@@ -451,18 +451,19 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
 
   //--
 
+  /*
   if (cm::PCD.xorSourceList.size()) {
     auto vmap0 = high_resolution_clock::now();
 
-    /* TODO make a vector
+    //TODO make a vector
     cm::PCD.variationIndicesMaps =
       std::move(cm::buildVariationIndicesMaps(cm::PCD.xorSourceList));
-    */
-
+    
     auto vmap1 = high_resolution_clock::now();
     auto d_vmap = duration_cast<milliseconds>(vmap1 - vmap0).count();
     cerr << " native variation map - " << d_vmap << "ms" << endl;
   }
+  */
 
   //--
 
@@ -504,7 +505,7 @@ Value addCandidateForSum(const CallbackInfo& info) {
     index = cm::addCandidate(sum, std::move(combo), std::move(compatList));
   } else {
     index = info[2].As<Number>().Int32Value();
-    cm::addCandidate(sum, std::move(combo), index);
+    cm::addCandidate(sum, combo, index);
   }
   return Number::New(env, index);
 }

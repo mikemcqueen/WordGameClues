@@ -62,7 +62,7 @@
             "program": "/usr/local/bin/node",
             "cwd": "${workspaceFolder}/src/tools",
             "localRoot": "${workspaceFolder}",            
-            "args": [ "clues.js", "-pf.71", "-c2,15", "-x2",
+            "args": [ "clues.js", "-pf.71", "-c2,5", "-x2",
 //                "--xor", "us 50",
                 "--xor", "koa",
                 "--xor", "21",

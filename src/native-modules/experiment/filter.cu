@@ -1,15 +1,11 @@
-//#define HOST_DEVICE_ATTRIBUTES __host__ __device__
+// filter.cu
 
-#include "candidates.h"
 #include <algorithm>
+#include <chrono>
 #include <exception>
 #include <numeric>
 #include <cuda_runtime.h>
-#include <thrust/device_vector.h>
-
-//#include <thrust/device_vector.h>
-//#include <helper_cuda.h>
-//#include "combo-maker.h"
+#include "candidates.h"
 
 namespace cm {
 
@@ -213,6 +209,7 @@ __global__ void kernel(const SourceCompatibilityData* compatData,
 {
   auto index = blockIdx.x * blockDim.x + threadIdx.x;
   if (index >= num_compatData) return;
+  /*
   if (index == 1) { //< DEBUG_MAX) {
     const auto& cd = compatData[index];
     const auto& v = cd.usedSources.variations;
@@ -223,9 +220,10 @@ __global__ void kernel(const SourceCompatibilityData* compatData,
     printf("----\n");
     printSources(xorSources[1392]);
   }
+  */
   bool compat = isSourceXORCompatibleWithAnyXorSource(compatData[index],
     xorSources, num_xorSources);
-  if (compat) printf("COMPAT: %d\n", index);
+  //if (compat) printf("COMPAT: %d\n", index);
   results[index] = compat ? 1 : 0;
 }
 
@@ -240,6 +238,8 @@ auto count(const SourceCompatibilityLists& compatLists) {
 }
  
 void filterCandidatesCuda(int sum) {
+  using namespace std::chrono;
+
   std::cerr << "++filterCandidatesCuda" << std::endl;
 
   cudaError_t err = cudaSuccess;
@@ -253,8 +253,9 @@ void filterCandidatesCuda(int sum) {
             cudaGetErrorString(err));
     throw std::runtime_error("failed to allocate device compatList");
   }
+
   int index{};
-  int compatFound = false;
+  //int compatFound = false;
   for (const auto& compatList: compatLists) {
     err = cudaMemcpy(&device_compatList[index], compatList.data(),
       compatList.size() * sizeof(SourceCompatibilityData),
@@ -264,10 +265,9 @@ void filterCandidatesCuda(int sum) {
         cudaGetErrorString(err));
       throw std::runtime_error("failed to copy compatLists host -> device");
     }
-
-
-    if (/*(DEBUG_MAX && (index < DEBUG_MAX)) ||*/ !compatFound) {
-      int source{ index };
+    /*
+    if ((DEBUG_MAX && (index < DEBUG_MAX)) || !compatFound) {
+    int source{ index };
       for (const auto& compatData: compatList) {
         int xorSource = -1;
         if (isSourceXORCompatibleWithAnyXorSource(compatData,
@@ -296,8 +296,7 @@ void filterCandidatesCuda(int sum) {
         source++;
       }
     }
-
-
+    */
     index += compatList.size();
   }
   std::cerr << "  done copying " << index << " sources" << std::endl;
@@ -334,46 +333,61 @@ void filterCandidatesCuda(int sum) {
             << ", xorSources(" << num_xorSources << ") " 
             << " done" << std::endl;
 
-  int threadsPerBlock = 32;
+  int threadsPerBlock = 256;
   int blocksPerGrid = (num_compatData + threadsPerBlock - 1) / threadsPerBlock;
   fprintf(stderr, "  kernel launch with %d blocks of %d threads...\n",
     blocksPerGrid, threadsPerBlock);
 
+  /*
   threadsPerBlock = DEBUG_MAX;
   blocksPerGrid = 1; 
-  #if 0
-
-  index = 0;
-  int show = threadsPerBlock * blocksPerGrid;
-  for (const auto& compatList: compatLists) {
-    for (const auto& compatData: compatList) {
-      const auto& v = compatData.usedSources.variations;
-      printf("idx: %d, variations %2d %2d %2d %2d %2d\n", index++,
-             v[0], v[1], v[2], v[3], v[4]);
-      if (!--show) break;
-    }
-    if (!show) break;
-  }
-  printf("------------------------------------------\n");
-  #endif
-
+  */
+  auto k0 = high_resolution_clock::now();
   kernel<<<blocksPerGrid, threadsPerBlock>>>(device_compatList, num_compatData,
     device_xorSources, num_xorSources, device_results);
-  std::cerr << "  kernel done" << std::endl;
+  auto k1 = high_resolution_clock::now();
+  auto d = duration_cast<milliseconds>(k1 - k0).count();
+  std::cerr << "  kernel done, " << d << "ms" << std::endl;
 
+#ifdef IMMEDIATE_RESULTS
   std::vector<result_t> results;
   results.resize(num_compatData);
+  std::cerr << "  copying " << results.size() << " results"
+            << " (" << results_bytes << " bytes)..."
+            << std::endl;
   err = cudaMemcpy(results.data(), device_results, results_bytes,
     cudaMemcpyDeviceToHost);
-  int numCompatible = std::accumulate(results.cbegin(), results.cend(), 0,
-    [](int numCompatible, result_t result) {
-      if (result) numCompatible++;
-      return numCompatible;
+  std::cerr << "  copy done" << std::endl;
+
+  auto& indexComboListMap = allSumsCandidateData[sum - 2].indexComboListMap;
+  int num_compat_combos{};
+  int num_compat_sourcelists{};
+  index = 0;
+  int list_index{};
+  for (const auto& compatList: compatLists) {
+    int result_index{ index };
+    for (const auto& compatData: compatList) {
+      if (results[result_index]) {
+        ++num_compat_sourcelists;
+        num_compat_combos += indexComboListMap.at(list_index).size();
+        break;
+      }
+      result_index++;
+    }
+    index += compatList.size();
+    ++list_index;
+  }
+  int num_compat_results = std::accumulate(results.cbegin(), results.cend(), 0,
+    [](int num_compatible, result_t result) mutable {
+      if (result) num_compatible++;
+      return num_compatible;
     });
-  /*  for (auto r: results) {
-    if (r == 1)
-    }*/
-  std::cerr << "  compatible: " << numCompatible << std::endl;
+  std::cerr << "  results: " << results.size()
+    << ", compat results: " << num_compat_results
+    << ", compat sourcelists: " << num_compat_sourcelists
+    << ", compat combos: " << num_compat_combos
+    << std::endl;
+#endif // IMMEDIATE_RESULTS
 
   err = cudaFree(device_results);
   if (err != cudaSuccess) {

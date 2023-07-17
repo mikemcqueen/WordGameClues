@@ -32,12 +32,12 @@ namespace cm {
     filterCandidatesCuda(sum);
   }
 
-  auto addCandidate(int sum, std::string&& combo, int index) -> int {
+  auto addCandidate(int sum, const std::string& combo, int index) -> int {
     IndexComboListMap& indexCombosMap =
       allSumsCandidateData[sum - 2].indexComboListMap;
     auto it = indexCombosMap.find(index);
     assert(it != indexCombosMap.end());
-    it->second.emplace_back(std::move(combo));
+    it->second.insert(combo);
     return index;
   }
   
@@ -45,17 +45,17 @@ namespace cm {
     cm::SourceCompatibilityList&& compatList) -> int
   {
     int index{};
-    std::vector<std::string> comboList{};
-    comboList.emplace_back(std::move(combo));
+    std::set<std::string> combos{};
+    combos.emplace(std::move(combo));
     
+    // TODO this could be simplified. add sumData if new sum, then common code.
     if (sum == (int)allSumsCandidateData.size() + 2) {
       SourceCompatibilityLists sourceCompatLists{};
       sourceCompatLists.emplace_back(std::move(compatList));
-      index = sourceCompatLists.size() - 1;
       
       IndexComboListMap indexComboListMap; 
       auto [ignore, success] =
-        indexComboListMap.insert(std::make_pair(index, std::move(comboList)));
+        indexComboListMap.insert(std::make_pair(index, std::move(combos)));
       assert(success);
       
       OneSumCandidateData oneSumData{ std::move(sourceCompatLists),
@@ -68,7 +68,7 @@ namespace cm {
       
       auto& indexComboListMap = allSumsCandidateData[sum - 2].indexComboListMap;
       auto [ignore, success] =
-        indexComboListMap.insert(std::make_pair(index, std::move(comboList)));
+        indexComboListMap.insert(std::make_pair(index, std::move(combos)));
       assert(success);
     }
     return index;
@@ -104,8 +104,8 @@ namespace cm {
       listAndSizes.device_list.push_back(std::move(compatData));
     }
     
-    std::vector<std::string> comboList{};
-    comboList.emplace_back(std::move(combo));
+    std::set<std::string> combos{};
+    combos.emplace(std::move(combo));
     
     IndexComboListMap indexComboListMap; 
     auto index = (int)listAndSizes.sizes.size() - 1;

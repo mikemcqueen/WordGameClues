@@ -1,45 +1,9 @@
-* so the constexpr_bitset stuff was done because I want to access bitset
-  functionality both on-host, and on-device, but the g++ compiler doesn't
-  understand __host__/__device. so combo-maker.h would fail to compile
-  under standard g++.  I think? (did I actually try it?)
+* xorSourceList only needs to be copied to device memory once.
 
-
-
-* So I don't really understand what I'm doing in JavaScript. Yes I'm being
-  bit by the optimization bug again. But also, just trying to understand.
-  I have this Source.CompatabilityData.sourceBits thing, that I use, in
-  Source.isXorCompatible(). But then I *ALSO* loop through the usedSources
-  sets looking for a match.
-  * NO: Is this duplicate effort? What exaclty is in sourceBits if not the ..
-    sources..? in usedSources?
-  * BECAUSE: If it's not duplicate effort, why am I not using a CountBits instead of
-    a set within usedSources in Source.CompatabilityData?
-    Why? I don't know. Laziness? I think I determined that if I removed the
-    Native.isAnySourceXorCompatible() call, that the thing finishes fast.
-    So it's the C++ compares that matter, not the JS compares.
-    CONFIRM: try again
-  * Worth looking into: How am I serializing these "sourceBits" to Native code?
-    Or do I?
-  * Explanation: sourceBits is actually "legacySourceBits" for legacy clues.
-    CONFIRM: CompatabilityData.usedSources is apparently for sentences.
-
-* from notepad:  on elimination: this should only be relevant to combo-making.
-  once a component word is chosen for a particular sentence, all other
-  sententce combinations that do not contain that component word should be
-  eliminated.
-  "So I'll need to keep copies of the per-sentence combination list (list of
-  string sets - the sets themselves need not be copied), so that I can remove
-  the incompatible combinations on a per-generated-combo basis."
-  * this is a potential real optimization I think, for combo-making. Eliminate
-    compares altogether vs. elimination via compare.
-  * it seems this may be relevant for --xor validation and precompute as well?
-    * DONE: should auto-fail if conflicting --xor's are provided
-    * what about --or's? do we need to prune --xor's in that case?)
-
-  * need to iron it out more detail above and implement it.
+* candidates.comboListMap should be a vector. It's not even strictly
+  necessary anymore.
 
 * NCData/List -> NcListContainer
-* experimental/simd
 
 * output max variation count and max source count (per sentence) at load.
 * fail if max sources > 127 for now
@@ -160,85 +124,17 @@ clues3.json:  { "name": "old",             "src": "new,not" },
   Also the "copyOnMerge" logic I use in mergeCompatibleSources3 might be
   of some help here.
 
-* USESOURCES_BITSET:
-
-* equal_to is getting called too much with USEDSOURCES_BITSET. this doesn't
-  impact combo-maker generation, only precompute.
-* i think i'm going to have to use 1 as the first index
-  maybe for source "index" within a variation. at least in c++. I should do
-  the same with variation. lets me initialize the bitsets to all zero.
-
-* so with 13 bits I can store 8191 (plus 1 "empty") variations
-  with 9 * 13 = 117 bits i can store 9 variation values for the 9 sentences
-  in a 128-bit bitset.
-  rather than unwrapping UsedSources into a similar array of ints in c++,
-  unwrap into a 128-bit bitset, with the value shifted left 13 bits for
-  each sentence.
-  initialize/default each set of sentence-bits to 0x1fff (13 bits on)
-
-* I think the match changed a bit from above.  now i've got multpile
-  values (sources really) per sentence (up to 100) but the variation #
-  stays the same.
-  so still 13 bits for variation#.
-  5, 6 or 7 bits for index (32 64 or 128)
-  128 = 13 + N * count 
-  N = 115 / count
-  for N=5, count = 23
-  for N=6, count = 19
-  for N=7, count = 16
-  for N=8, count = 14
-  that's how many primary sources (+ variation #) from the same sentence
-  can be stored in 128 bits.
-
-  128 is the total number of unique sources per sentence. this takes
-  into account the fact that we will be supporting different component-name
-  sets with completely different names for each sentence, such as between
-  v1 and v2 solutions.
-
-  ** I think the above might be wrong-thinking. I should be able to limit
-     it to 5 bits (32 max sources per "variation"), if I store variation
-     separately. thoughts in notebook.
-
-  ** I think the problem may come down to how I am storing unique names in 
-     a single "sourceIndicesMap" or whatever it's called. I aggregate all
-     unique names across all sentence variations and give them an index?
-     Is that what I do? Couuld I have a per-variation map instead.
-
-  128 is *probably* a safe number but might be limiting at some point,
-  so I think increasing it to 256 probably makes sense. That puts a
-  wrench in the 128 bit approach however.
-
-  16 (count, above) is the number of unique source "indexes" from a single
-  sentence, the combined primary sources of any compound clue/combination,
-  that can be stored in 128 bits. I don't think 16 is going to cut it, as
-  sentence 4 & 5 already have 22 & 21 primary sources in the v2 solution,
-  so that's obviously a constraint I'd like to avoid. Realistically, 32
-  will probably be fine.
-
-  So how do we get to support
-  * 256 total unique source component indexes per sentence = 8 bits
-  * 32 max indexes at a time
-  * 32 * 8bits = 256 bits?
-
-  or --
-  * 32 unique source component indexes per sentence variation = 5 bits 
-  * 32 max indexes at a time
-  * 32 * 5bits = 160 bits 
-  * 28 * 5 bits = 140 bits
-  * 25 * 5 bits = 125 bits
-  
-  coocoo idea below. will *not* work for fast xor comparison. need to use bitset.
-
-  well 8 bits for component indexes x 32 indexes = std::array<uint8_t, 32>
-  and we could add an extra int for variation (-1 = unset)
-
-  I could also imagine, but don't know if this makes sense, having an
-  aggregate data structure with std::array<uint8_t, 32 * 9> (288 bytes) 
-  and std::array<int, 9>. two comparisons per call.  look into array comparison.
-
-* The below might go away in c++ though if I use bitset.
-* take a closer look at UsedSources declarations/comparisons in C++. I think
-  I have all declarations covered with = { -1 }, but probably makes sense
-  for the default constructor to do that. If there were a default constructor,
-  which there isn't (that i'm in control of).
-  Similarly, the >= 0 or > -1 comparisons should ideally all be in one spot.
+** the below was a pre-cuda optimization idea
+* from notepad:  on elimination: this should only be relevant to combo-making.
+  once a component word is chosen for a particular sentence, all other
+  sententce combinations that do not contain that component word should be
+  eliminated.
+  "So I'll need to keep copies of the per-sentence combination list (list of
+  string sets - the sets themselves need not be copied), so that I can remove
+  the incompatible combinations on a per-generated-combo basis."
+  * this is a potential real optimization I think, for combo-making. Eliminate
+    compares altogether vs. elimination via compare.
+  * it seems this may be relevant for --xor validation and precompute as well?
+    * DONE: should auto-fail if conflicting --xor's are provided
+    * what about --or's? do we need to prune --xor's in that case?)
+  * need to iron it out more detail above and implement it.

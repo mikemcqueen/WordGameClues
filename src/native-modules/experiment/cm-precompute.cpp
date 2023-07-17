@@ -268,11 +268,7 @@ auto buildSourceListsForUseNcData(const vector<NCDataList>& useNcDataLists,
         // currently allowed because we are checking sources only? That sounds
         // right.
 
-#if !USEDSOURCES_BITSET
-        const auto key = makeBitString(source);
-#else
         const auto& key = source;
-#endif
         if (hashList[i].find(key) != hashList[i].end()) {
           hash_hits++;
           continue;
@@ -285,10 +281,8 @@ auto buildSourceListsForUseNcData(const vector<NCDataList>& useNcDataLists,
       }
     }
   }
-#if USEDSOURCES_BITSET
   std::cerr << "  hash: " << hash_called << ", equal_to: "
     << equal_to_called << std::endl;
-#endif
   std::cerr << "  total sources: " << total << ", hash_hits: " << hash_hits
     << ", sourceLists(" << sourceLists.size() << "): "
     << std::accumulate(sourceLists.begin(), sourceLists.end(), 0u,

@@ -9,7 +9,7 @@ namespace cm {
   using SourceCompatibilityLists = std::vector<SourceCompatibilityList>;
 
   // TODO: map is dumb. use vector. ComboLists
-  using IndexComboListMap = std::unordered_map<int, std::vector<std::string>>;
+  using IndexComboListMap = std::unordered_map<int, std::set<std::string>>;
   
   struct OneSumCandidateData {
     SourceCompatibilityLists sourceCompatLists;
@@ -22,12 +22,8 @@ namespace cm {
   
   //
 
-  auto addCandidate(int sum, std::string&& combo, int index) -> int;
+  auto addCandidate(int sum, const std::string& combo, int index) -> int;
   auto addCandidate(int sum, std::string&& combo,
-    cm::SourceCompatibilityList&& compatList) -> int;
-
-  auto deviceAddCandidate(int sum, std::string&& combo, int index) -> int;
-  auto deviceAddCandidate(int sum, std::string&& combo,
     cm::SourceCompatibilityList&& compatList) -> int;
 
   void filterCandidates(int sum);
