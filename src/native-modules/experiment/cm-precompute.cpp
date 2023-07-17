@@ -176,7 +176,9 @@ auto mergeSources(const SourceData& source1, const SourceData& source2) {
     source1.primaryNameSrcList, source2.primaryNameSrcList));
   result.ncList = std::move(NameCount::listMerge(source1.ncList, source2.ncList));
   result.sourceBits = std::move(source1.sourceBits | source2.sourceBits);
-  result.usedSources = std::move(source1.merge(source2.usedSources));
+  // might be faster here to call NameCount::listToLegacySources(result.ncList)p
+  result.legacySources = std::move(source1.copyMerge(source2.legacySources));
+  result.usedSources = std::move(source1.usedSources.copyMerge(source2.usedSources));
   return result;
 }
 
@@ -385,14 +387,15 @@ SourceCRefList getCompatibleXorSources(const std::vector<int>& indexList,
   SourceCRefList sourceCRefList{};
   const auto& firstSource = sourceLists[0][indexList[0]];
   sourceCRefList.emplace_back(SourceCRef{ firstSource });
-  SourceCompatibilityData compatData(firstSource.sourceBits, firstSource.usedSources);
+  SourceCompatibilityData compatData(firstSource.sourceBits,
+    firstSource.usedSources, firstSource.legacySources);
   for (auto i = 1u; i < indexList.size(); ++i) {
     const auto& source = sourceLists[i][indexList[i]];
     if (!compatData.isXorCompatibleWith(source)) {
       return {};
     }
-    compatData.sourceBits |= source.sourceBits;
-    compatData.mergeInPlace(source.usedSources);
+    // i changed this up
+    compatData.mergeInPlace(source);
     sourceCRefList.emplace_back(SourceCRef{ source });
   }
   return sourceCRefList;
@@ -414,14 +417,15 @@ XorSourceList mergeCompatibleXorSources(const SourceCRefList& sourceList) {
     primaryNameSrcList.insert(primaryNameSrcList.end(), pnsl.begin(), pnsl.end()); // copy (by design?)
     const auto& ncl = sourceRef.get().ncList;
     ncList.insert(ncList.end(), ncl.begin(), ncl.end());                           // copy (by design?)
-    SourceCompatibilityData::mergeInPlace(usedSources, sourceRef.get().usedSources);
+    usedSources.mergeInPlace(sourceRef.get().usedSources);
   }
   // I feel like this is still valid and worth removing or commenting
   assert(!primaryNameSrcList.empty() && "empty primaryNameSrcList");
   XorSource mergedSource(std::move(primaryNameSrcList),
-                         std::move(NameCount::listToSourceBits(primaryNameSrcList)),
-                         std::move(usedSources),
-                         std::move(ncList));
+    std::move(NameCount::listToSourceBits(primaryNameSrcList)),
+    std::move(usedSources),
+    std::move(NameCount::listToLegacySources(primaryNameSrcList)),
+    std::move(ncList));
   XorSourceList result{};
   result.emplace_back(std::move(mergedSource));
   return result;

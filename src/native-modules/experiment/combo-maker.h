@@ -1,9 +1,16 @@
-#ifndef include_combo_maker_h
-#define include_combo_maker_h
+#ifndef INCLUDE_COMBO_MAKER_H
+#define INCLUDE_COMBO_MAKER_H
 
+#if 1
 #define CONSTEXPR_BITSET
+#define HOST_DEVICE_ATTRIBUTES constexpr
+#endif
 
+#ifndef HOST_DEVICE_ATTRIBUTES
+#define HOST_DEVICE_ATTRIBUTES
+#endif
 
+#include <algorithm>
 #include <array>
 #ifdef CONSTEXPR_BITSET
 #include "constexpr_bitset.h"
@@ -25,8 +32,9 @@ namespace cm {
 
 constexpr auto kMaxLegacySources = 111; // bits
 constexpr auto kMaxSourcesPerSentence = 128; // bits
-//constexpr auto MX = kMaxSourcesPerSentence;
 constexpr auto kNumSentences = 9;
+constexpr auto kMaxUsedSourcesPerSentence = 32;
+constexpr auto kMaxUsedSources = kMaxUsedSourcesPerSentence * kNumSentences;
 
 template<typename T, size_t N>
 constexpr auto make_array(T value) -> std::array<T, N> {
@@ -44,30 +52,37 @@ namespace Source {
   constexpr inline auto getSource(int src) noexcept { return src % 1'000'000; }
   constexpr inline auto getVariation(int src) noexcept { return getSource(src) / 100; }
   constexpr inline auto getIndex(int src) noexcept { return getSource(src) % 100; }
+  constexpr inline auto getFirstIndex(int sentence) {
+    assert(sentence > 0);
+    return (sentence - 1) * kMaxUsedSourcesPerSentence;
+  }
 } // namespace Source
 
 using SourceBits = bitset<kMaxLegacySources>;
-using SourceBitsList = std::vector<SourceBits>;
+using LegacySources = std::array<int8_t, kMaxLegacySources>;
 
+template<typename T>
+void sortSources(T& sources) {
+  std::sort(sources.begin(), sources.end(), std::greater<int>());
+}
+  
 #define USEDSOURCES_BITSET 1
 
-#if !USEDSOURCES_BITSET
-using UsedSources = std::array<std::set<uint32_t>, kNumSentences + 1>;
-#else
 struct UsedSources {
   using VariationIndex_t = int16_t;
-
   // 128 bits per sentence * 9 sentences = 1152 bits, 144 bytes, 18 64-bit words
   using Bits = bitset<kMaxSourcesPerSentence * kNumSentences>;
+  // 32 bytes per sentence * 9 sentences = 2304? bits, 288 bytes, 36? 64-bit words
+  using Sources = std::array<int8_t, kMaxUsedSources>;
   using Variations = std::array<VariationIndex_t, kNumSentences>;
 
-  static /*constexpr*/ auto getFirstIndex(int sentence) {
-    //static constexpr std::array<uint32_t, kNumSentences> first_indices
-    //  { MX, MX*2, MX*3, MX*4, MX*5, MX*6, MX*7, MX*8, MX*9 };
-    return (sentence + 1) * kMaxSourcesPerSentence;
+  static /*constexpr*/ auto getFirstBitIndex(int sentence) {
+    assert(sentence > 0);
+    return (sentence - 1) * kMaxSourcesPerSentence;
   }
 
   Bits bits{};
+  Sources sources = make_array<int8_t, kMaxUsedSources>( -1 );
   Variations variations = make_array<VariationIndex_t, kNumSentences>( -1 );
 
   constexpr Bits& getBits() noexcept { return bits; }
@@ -91,41 +106,128 @@ struct UsedSources {
   }
   */
 
-  constexpr auto isXorCompatibleWith(const UsedSources& other) const {
-    // compare bits
-    if ((getBits() & other.getBits()).any()) return false;
+  constexpr static bool anySourcesMatch(const Sources& s1,
+    const Sources& s2)
+  {
+    // TODO: sanity check if sorted 
+
+    for (int s{ 1 }; s <= kNumSentences; ++s) {
+      auto start = Source::getFirstIndex(s);
+      for (int i{start}, j{start}, remain{kMaxUsedSourcesPerSentence};
+           remain > 0; --remain)
+      {
+        if ((s1[i] == -1) || (s2[j] == -1)) {
+          return false;
+        }
+        if (s1[i] == s2[j]) {
+          return true;
+        }
+        else if (s1[i] < s2[j]) {
+          i++;
+        }
+        else {
+          j++;
+        }
+      }
+    }
+    return false;
+  }
+
+  constexpr
+  auto isXorCompatibleWith(const UsedSources& other,
+    bool useBits = true, int* reason = nullptr) const
+  {
+    if (useBits) {
+      // compare bits
+      if ((getBits() & other.getBits()).any()) {
+        if (reason) *reason = 1;
+        return false;
+      }
+    } else if (anySourcesMatch(sources, other.sources)) {
+        if (reason) *reason = 2;
+      return false;
+    }
 
     // compare variations
     for (auto i = 0u; i < variations.size(); ++i) {
       if ((variations[i] > -1) && (other.variations[i] > -1)
           && (variations[i] != other.variations[i]))
       {
+        if (reason) *reason = 3;
         return false;
       }
     }
     return true;
   }
- 
+
+  /*
+  // TODO: private
   void addSource(int src) {
     auto sentence = Source::getSentence(src);
+    int first = Source::getFirstSourceIndex(sentence);
+    int offset{};
+    while (sources[first + offset] != -1) ++offset;
+    assert(offset < kMaxUsedSourcesPerSentence);
+    sources[first + offset] = Sources::getIndex(src);
+  }
+  */
+
+  // TODO: private
+  void addSources(const UsedSources& other) {
+    for (int sentence{ 1 }; sentence <= kNumSentences; ++sentence) {
+      int first = Source::getFirstIndex(sentence);
+      int other_offset{};
+      // continue if no other sources to merge for this sentence
+      if (other.sources[first + other_offset] == -1) continue;
+
+      // determine our starting offset for merging in new sources
+      int offset{};
+      while (sources[first + offset] != -1) ++offset;
+      
+      // copy sources from other to us
+      while (other.sources[first + other_offset] != -1) {
+        sources[first + offset++] = other.sources[first + other_offset++];
+      }
+      // sanity check
+      assert(offset < kMaxUsedSourcesPerSentence);
+    }
+  }
+
+  void addSource(int src) {
+    auto sentence = Source::getSentence(src);
+    assert(sentence > 0);
     auto variation = Source::getVariation(src);
-    //auto thisVariation = getVariation(sentence);
     if (hasVariation(sentence) && (getVariation(sentence) != variation)) {
       std::cerr << "variation(" << sentence << "), this: "
                 << getVariation(sentence) << ", src: " << variation
                 << std::endl;
       assert(false && "addSource() variation mismatch");
     }
-    auto pos = Source::getIndex(src) + getFirstIndex(sentence);
-    assert(!bits.test(pos));
+    assert(Source::getIndex(src) < kMaxSourcesPerSentence);
+
+    // variation
     setVariation(sentence, variation);
-    bits.set(pos);
+
+    // bits
+    auto bit_pos = Source::getIndex(src) + getFirstBitIndex(sentence);
+    assert(!bits.test(bit_pos));
+    bits.set(bit_pos);
+
+    // source
+    int first = Source::getFirstIndex(sentence);
+    int offset{};
+    while (sources[first + offset] != -1) ++offset;
+    assert(offset < kMaxUsedSourcesPerSentence);
+    sources[first + offset] = Source::getIndex(src);
   }
 
   auto mergeInPlace(const UsedSources& other) {
     // merge bits
     // TODO: option for compatibility checking
     getBits() |= other.getBits();
+
+    addSources(other);
+    sortSources(sources);
 
     for (auto i = 1u; i <= variations.size(); ++i) {
       if (hasVariation(i) && other.hasVariation(i)) {
@@ -137,21 +239,20 @@ struct UsedSources {
     }
   }
 
-  auto merge(const UsedSources& other) const {
+  auto copyMerge(const UsedSources& other) const {
     UsedSources result{ *this }; // copy
     result.mergeInPlace(other);
     return result;
   }
-};
-#endif // USED_SOURCES_BITSET
+}; // UsedSources
 
 struct SourceCompatibilityData {
   SourceBits sourceBits;
   UsedSources usedSources;
-  bool compatible{};
+  LegacySources legacySources = make_array<int8_t, kMaxLegacySources>(0);
 
   SourceCompatibilityData() = default;
-  // copy consruct/assign allowed for now for precompute.mergeAllCompatibleXorSources
+  // copy consruct/assign allowed for now, precompute.mergeAllCompatibleXorSources
   SourceCompatibilityData(const SourceCompatibilityData&) = default;
   SourceCompatibilityData& operator=(const SourceCompatibilityData&) = default;
   SourceCompatibilityData(SourceCompatibilityData&&) = default;
@@ -159,146 +260,102 @@ struct SourceCompatibilityData {
 
   // copy components
   SourceCompatibilityData(const SourceBits& sourceBits,
-      const UsedSources& usedSources):
-    sourceBits(sourceBits),
-    usedSources(usedSources)
+      const UsedSources& usedSources, const LegacySources& legacySources):
+    sourceBits(sourceBits), usedSources(usedSources),
+    legacySources(legacySources)
   {}
 
   // move components
   SourceCompatibilityData(SourceBits&& sourceBits,
-      UsedSources&& usedSources):
-    sourceBits(std::move(sourceBits)),
-    usedSources(std::move(usedSources))
+      UsedSources&& usedSources, LegacySources&& legacySources):
+    sourceBits(std::move(sourceBits)), usedSources(std::move(usedSources)),
+    legacySources(std::move(legacySources))
   {}
 
-#if !USEDSOURCES_BITSET
-  static auto areUsedSourcesXorCompatible(const UsedSources& usedSources, const UsedSources& other) {
-    // TODO: optimization, loop through first just checking variation.
-    //       2nd loop compare sets.
-    for (auto i = 1u; i < usedSources.size(); ++i) {
-      if (usedSources[i].empty() || other[i].empty()) continue;
-      if (Source::getVariation(*usedSources[i].cbegin()) != 
-          Source::getVariation(*other[i].cbegin()))
-      {
-        return false;
-      }
-      for (auto it = other[i].cbegin(); it != other[i].cend(); ++it) {
-        if (usedSources[i].find(*it) != usedSources[i].end()) {
-          return false;
-        }
-      }
-    }
-    return true;
-  }
-
-  static auto areUsedSourcesAndCompatible(const UsedSources& usedSources, const UsedSources& other) {
-    // TODO: optimization, loop through first just checking variation.
-    //       2nd loop compare sets.
-    for (auto i = 1u; i < usedSources.size(); ++i) {
-      if (usedSources[i].empty() || other[i].empty()) continue;
-      if (Source::getVariation(*usedSources[i].cbegin()) != 
-          Source::getVariation(*other[i].cbegin()))
-      {
-        return false;
-      }
-      for (auto it = other[i].cbegin(); it != other[i].cend(); ++it) {
-        if (usedSources[i].find(*it) == usedSources[i].end()) {
-          return false;
-        }
-      }
-    }
-    return true;
-  }
-
-  static auto addUsedSource(UsedSources& usedSources, int src) -> bool {
-    auto nothrow = false;
-    if (!Source::isCandidate(src)) throw "poop";
-    auto sentence = Source::getSentence(src);
-    auto source = Source::getSource(src);
-    auto& set = usedSources[sentence];
-    // defensive incompatible variation index check
-    if (!set.empty()) {
-      if (Source::getVariation(*set.begin()) != Source::getVariation(source)) {
-        if (nothrow) return false;
-        throw "oopsie"; // new Error(`oopsie ${anyElem}, ${source}`);
-      }
-      if (set.find(source) != set.end()) {
-        if (nothrow) return false;
-        throw "poopsie"; // new Error(`poopsie ${source}, [${[...set]}]`);
-      }
-    }
-    set.insert(source);
-    return true;
-  }
-#endif
-
-  static void mergeInPlace(UsedSources& to, const UsedSources& from) {
-#if !USEDSOURCES_BITSET
-    for (auto i = 1u; i < from.size(); ++i) {
-      for (auto fromSrc: from[i]) {
-        assert(to[i].find(fromSrc) == to[i].end());
-        to[i].insert(fromSrc);
-      }
-    }
-#else
-    to.mergeInPlace(from);
-#endif
-  }
-
-  constexpr auto isXorCompatibleWith(const SourceCompatibilityData& other) const
+  constexpr static bool anyLegacySourcesMatch(const LegacySources& s1,
+    const LegacySources& s2)
   {
-    if ((sourceBits & other.sourceBits).any()) {
+    for (int i{}; i < kMaxLegacySources; ++i) {
+      if (s1[i] && s2[i]) return true;
+    }
+    return false;
+  }
+  
+  constexpr
+  auto isXorCompatibleWith(const SourceCompatibilityData& other,
+    bool useBits = true, int* reason = nullptr) const
+  {
+    if (useBits) {
+      if ((sourceBits & other.sourceBits).any()) {
+        if (reason) *reason = 4;
+        return false;
+      }
+    } else if (anyLegacySourcesMatch(legacySources, other.legacySources)) {
+      if (reason) *reason = 5;
       return false;
     }
-#if !USEDSOURCES_BITSET
-    return areUsedSourcesXorCompatible(usedSources, other.usedSources);
-#else
-    return usedSources.isXorCompatibleWith(other.usedSources);
-#endif
+    return usedSources.isXorCompatibleWith(other.usedSources, useBits, reason);
   }
 
-  constexpr auto isAndCompatibleWith(const SourceCompatibilityData& other) const
+  constexpr
+  auto isAndCompatibleWith(const SourceCompatibilityData& other,
+    bool useBits = true) const
   {
     auto andBits = sourceBits & other.sourceBits;
     if (andBits != other.sourceBits) return false;
-#if !USEDSOURCES_BITSET
-    return areUsedSourcesAndCompatible(usedSources, other.usedSources);
-#else
     return false; // TODO: usedSources.isAndCompatibleWith(other.usedSources);
-#endif
   }
 
   // OR == XOR || AND
-  constexpr auto isOrCompatibleWith(const SourceCompatibilityData& other) const
+  constexpr
+  auto isOrCompatibleWith(const SourceCompatibilityData& other,
+    bool useBits = true) const
   {
-    return isXorCompatibleWith(other) || isAndCompatibleWith(other);
+    return isXorCompatibleWith(other, useBits)
+      || isAndCompatibleWith(other, useBits);
   }
 
-  auto addUsedSource(int src) {
-#if !USEDSOURCES_BITSET
-    return addUsedSource(usedSources, src);
-#else
-    return usedSources.addSource(src);
-#endif
+  static void addLegacySource(LegacySources& sources, int src) {
+    assert(!sources[src]);
+    sources[src] = 1;
   }
 
-  void mergeInPlace(const UsedSources& from) {
-#if !USEDSOURCES_BITSET
-    mergeInPlace(usedSources, from);
-#else
-    usedSources.mergeInPlace(from);
-#endif
+  void addSource(int src) {
+    if (cm::Source::isLegacy(src)) {
+      assert(!sourceBits.test(src));
+      sourceBits.set(src);
+      addLegacySource(legacySources, src);
+    } else {
+      usedSources.addSource(src);
+    }
   }
 
-  auto merge(const UsedSources& from) const {
-#if !USEDSOURCES_BITSET
-    UsedSources result{usedSources}; // copy (ok)
-    mergeInPlace(result, from);
-    return result;
-#else
-    return usedSources.merge(from);
-#endif
+  static void merge(LegacySources& to, const LegacySources& from) {
+    for (int i{}; i < kMaxLegacySources; ++i) {
+      if (from[i]) {
+        addLegacySource(to, i);
+      }
+    }
   }
+
+  auto copyMerge(const LegacySources& other) const {
+    LegacySources sources{ legacySources };
+    merge(sources, other);
+    return sources;
+  }
+
+  void mergeInPlace(const LegacySources& other) {
+    merge(legacySources, other);
+  }
+
+  void mergeInPlace(const SourceCompatibilityData& other) {
+    auto count = sourceBits.count();
+    sourceBits |= other.sourceBits;
+    assert(sourceBits.count() == count + other.sourceBits.count());
+    usedSources.mergeInPlace(other.usedSources);
+    mergeInPlace(other.legacySources);
+  }
+
 }; // SourceCompatibilityData
 using SourceCompatibilityList = std::vector<SourceCompatibilityData>;
 
@@ -309,7 +366,8 @@ struct NameCount {
   std::string name;
   int count;
 
-  NameCount(std::string&& name, int count) : name(std::move(name)), count(count) {}
+  NameCount(std::string&& name, int count) :
+    name(std::move(name)), count(count) {}
   NameCount() = default;
   NameCount(const NameCount&) = default;
   NameCount& operator=(const NameCount&) = default;
@@ -362,17 +420,24 @@ struct NameCount {
     return bits;
   }
 
+  static auto listToLegacySources(const NameCountList& list) {
+    auto sources = make_array<int8_t, kMaxLegacySources>(0);
+    for (const auto& nc : list) {
+      if (Source::isLegacy(nc.count)) {
+        sources[nc.count] = 1;
+      }
+    }
+    return sources;
+  }
+
   static auto listToUsedSources(const NameCountList& list) {
     UsedSources usedSources{};
     for (const auto& nc : list) {
       if (Source::isCandidate(nc.count)) {
-#if !USEDSOURCES_BITSET
-        SourceCompatibilityData::addUsedSource(usedSources, nc.count);
-#else
         usedSources.addSource(nc.count);
-#endif
       }
     }
+    sortSources(usedSources.sources);
     return usedSources;
   }
 
@@ -398,8 +463,10 @@ struct SourceData : SourceCompatibilityData {
 
   SourceData() = default;
   SourceData(NameCountList&& primaryNameSrcList, SourceBits&& sourceBits,
-      UsedSources&& usedSources, NameCountList&& ncList) :
-    SourceCompatibilityData(std::move(sourceBits), std::move(usedSources)),
+      UsedSources&& usedSources, LegacySources&& legacySources,
+      NameCountList&& ncList) :
+    SourceCompatibilityData(std::move(sourceBits), std::move(usedSources),
+      std::move(legacySources)),
     primaryNameSrcList(std::move(primaryNameSrcList)),
     ncList(std::move(ncList))
   {}
@@ -465,6 +532,7 @@ struct PreComputedData {
   SourceListMap sourceListMap;
   std::array<VariationIndicesMap, kNumSentences> variationIndicesMaps;
 };
+inline PreComputedData PCD;
 
 struct MergedSources : SourceCompatibilityData {
   SourceCRefList sourceCRefList;
@@ -477,8 +545,9 @@ struct MergedSources : SourceCompatibilityData {
 
   // copy from SourceData
   MergedSources(const SourceData& source) :
-      SourceCompatibilityData(source.sourceBits, source.usedSources),
-      sourceCRefList(SourceCRefList{SourceCRef{source}})
+    SourceCompatibilityData(source.sourceBits, source.usedSources,
+      source.legacySources),
+    sourceCRefList(SourceCRefList{SourceCRef{source}})
   {}
 };
 
@@ -519,8 +588,6 @@ XorSourceList mergeCompatibleXorSourceCombinations(
 auto buildVariationIndicesMaps(const XorSourceList& xorSourceList)
   -> std::array<VariationIndicesMap, kNumSentences>;
 
-void filterCandidatesCuda(int sum);
-
 void mergeUsedSourcesInPlace(UsedSources& to, const UsedSources& from);
 
 } // namespace cm
@@ -529,8 +596,6 @@ template <typename SizeT>
 inline void hash_combine(SizeT& seed, SizeT value) {
   seed ^= value + 0x9e3779b9 + (seed << 6) + (seed >> 2);
 }
-
-#if USEDSOURCES_BITSET
 
 inline auto hash_called = 0;
 inline auto equal_to_called = 0;
@@ -541,7 +606,8 @@ namespace std {
 
 template<>
 struct equal_to<cm::UsedSources> {
-  constexpr bool operator()(const cm::UsedSources& lhs,
+  HOST_DEVICE_ATTRIBUTES
+  bool operator()(const cm::UsedSources& lhs,
     const cm::UsedSources& rhs) const noexcept
   {
     if (lhs.getBits() != rhs.getBits()) return false;
@@ -591,6 +657,5 @@ struct hash<cm::SourceCompatibilityData> {
   }
 };
 } // namespace std
-#endif // USEDSOURCES_BITSET
 
-#endif // include_combo_maker_h
+#endif // INCLUDE_COMBO_MAKER_H

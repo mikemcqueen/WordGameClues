@@ -1,3 +1,10 @@
+* so the constexpr_bitset stuff was done because I want to access bitset
+  functionality both on-host, and on-device, but the g++ compiler doesn't
+  understand __host__/__device. so combo-maker.h would fail to compile
+  under standard g++.  I think? (did I actually try it?)
+
+
+
 * So I don't really understand what I'm doing in JavaScript. Yes I'm being
   bit by the optimization bug again. But also, just trying to understand.
   I have this Source.CompatabilityData.sourceBits thing, that I use, in

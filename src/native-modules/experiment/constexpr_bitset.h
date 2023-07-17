@@ -210,6 +210,7 @@ namespace hax _GLIBCXX_VISIBILITY(default)
 	return false;
       }
 
+      constexpr // HAX ADDED
       size_t
       _M_do_count() const _GLIBCXX_NOEXCEPT
       {
@@ -488,10 +489,12 @@ namespace hax _GLIBCXX_VISIBILITY(default)
       _M_is_any() const _GLIBCXX_NOEXCEPT
       { return _M_w != 0; }
 
+      constexpr // HAX ADDED
       size_t
       _M_do_count() const _GLIBCXX_NOEXCEPT
       { return __builtin_popcountl(_M_w); }
 
+      constexpr // HAX ADDED
       unsigned long
       _M_do_to_ulong() const _GLIBCXX_NOEXCEPT
       { return _M_w; }
@@ -635,7 +638,7 @@ namespace hax _GLIBCXX_VISIBILITY(default)
         _M_are_all() const _GLIBCXX_NOEXCEPT
         { return true; }
 
-      constexpr // HAX
+      constexpr // HAX ADDED
       bool
       _M_is_any() const _GLIBCXX_NOEXCEPT
       { return false; }
@@ -1206,6 +1209,7 @@ namespace hax _GLIBCXX_VISIBILITY(default)
        *  @throw  std::overflow_error  If there are too many bits to be
        *                               represented in an @c unsigned @c long.
        */
+      constexpr // HAX ADDED
       unsigned long
       to_ulong() const
       { return this->_M_do_to_ulong(); }
@@ -1325,6 +1329,7 @@ namespace hax _GLIBCXX_VISIBILITY(default)
 	{ _M_copy_to_string(__s, _CharT('0'), _CharT('1')); }
 
       /// Returns the number of bits which are set.
+      constexpr // HAX ADDED
       size_t
       count() const _GLIBCXX_NOEXCEPT
       { return this->_M_do_count(); }

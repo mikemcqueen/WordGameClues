@@ -96,14 +96,13 @@ cm::SourceData makeSourceData(Env& env, const Napi::Object& jsSourceData) {
   }
   // TODO: declare SourceData result; assign result.xxx = std::move(yyy);; return result
   // (no move-all-params constructor required)
-  //auto jsSourceNcCsvList = jsSourceData.Get("sourceNcCsvList");
   auto primaryNameSrcList = makeNameCountList(env, jsPrimaryNameSrcList.As<Array>());
   auto primarySrcBits = cm::NameCount::listToSourceBits(primaryNameSrcList);
   auto usedSources = cm::NameCount::listToUsedSources(primaryNameSrcList);
-  //auto sourceNcCsvList = makeStringList(env, jsSourceNcCsvList.As<Array>());
+  auto legacySources = cm::NameCount::listToLegacySources(primaryNameSrcList);
   auto ncList = makeNameCountList(env, jsNcList.As<Array>());
   return cm::SourceData(std::move(primaryNameSrcList), std::move(primarySrcBits),
-    std::move(usedSources), std::move(ncList)); // , std::move(sourceNcCsvList));
+    std::move(usedSources), std::move(legacySources), std::move(ncList));
 }
 
 cm::SourceList makeSourceList(Napi::Env& env, const Napi::Array& jsList) {
@@ -212,6 +211,7 @@ cm::UsedSourcesList makeUsedSourcesList(Napi::Env& env,
 }
 */
 
+/*
 // FromSourceList
 cm::SourceBits makeSourceBits(Napi::Env& env, const Napi::Array& jsList) {
   cm::SourceBits sourceBits{};
@@ -231,6 +231,7 @@ cm::SourceBits makeSourceBits(Napi::Env& env, const Napi::Array& jsList) {
   }
   return sourceBits;
 }
+*/
 
 /*
 // FromMergedSourcesList
@@ -282,12 +283,9 @@ cm::SourceCompatibilityData makeSourceCompatibilityData(Napi::Env& env,
     const auto jsPnsl = jsList[i].As<Object>().Get("primaryNameSrcList").As<Array>();
     for (auto j = 0u; j < jsPnsl.Length(); ++j) {
       const auto count = jsPnsl[j].As<Object>().Get("count").As<Number>().Int32Value();
-      if (cm::Source::isLegacy(count)) {
-        compatData.sourceBits.set(count);
-      } else {
-        compatData.addUsedSource(count);
-      }
+      compatData.addSource(count);
     }
+    cm::sortSources(compatData.usedSources.sources);
   }
   return compatData;
 }
@@ -303,28 +301,32 @@ cm::SourceCompatibilityList makeSourceCompatibilityList(Napi::Env& env,
       return {};
     }
     auto jsSourceList = jsList[i].As<Object>().Get("sourceList").As<Array>();
-    cm::SourceCompatibilityData compatData = makeSourceCompatibilityData(env, jsSourceList);
+    cm::SourceCompatibilityData compatData =
+      makeSourceCompatibilityData(env, jsSourceList);
     sourceCompatList.emplace_back(std::move(compatData));
   }
   return sourceCompatList;
 }
 
-cm::SourceCompatibilityList makePmrSourceCompatibilityList(Napi::Env& env,
+/*
+cm::SourceCompatDeviceList makeSourceCompatDeviceList(Napi::Env& env,
   const Napi::Array& jsList)
 {
-  cm::SourceCompatibilityList sourceCompatList{};
+  cm::SourceCompatDeviceList sourceCompatList{};
   for (auto i = 0u; i < jsList.Length(); ++i) {
     if (!jsList[i].IsObject()) {
-      Napi::TypeError::New(env, "makePmrSourceCompatibiltyList: non-object element")
+      Napi::TypeError::New(env, "makePmrSourceCompatDeviceList: non-object element")
         .ThrowAsJavaScriptException();
       return {};
     }
     auto jsSourceList = jsList[i].As<Object>().Get("sourceList").As<Array>();
-    cm::SourceCompatibilityData compatData = makeSourceCompatibilityData(env, jsSourceList);
+    cm::SourceCompatibilityData compatData =
+      makeSourceCompatibilityData(env, jsSourceList);
     sourceCompatList.emplace_back(std::move(compatData));
   }
   return sourceCompatList;
 }
+*/
 
 cm::OrSourceData makeOrSource(Napi::Env& env, const Napi::Object& jsObject) {
   cm::OrSourceData orSource;
@@ -385,11 +387,7 @@ Value buildSourceListsForUseNcData(const CallbackInfo& info) {
 }
 */
 
-namespace cm {
-  extern PreComputedData PCD;
-}
-
-#if 0 // unused
+/*
 Value mergeAllCompatibleSources(const CallbackInfo& info) {
   Env env = info.Env();
   if (!info[0].IsArray()) {
@@ -401,7 +399,7 @@ Value mergeAllCompatibleSources(const CallbackInfo& info) {
   auto mergedSourcesList = cm::mergeAllCompatibleSources(ncList, cm::PCD.sourceListMap);
   return cm::wrap(env, mergedSourcesList);
 }
-#endif
+*/
 
 //
 // mergeCompatibleXorSourceCombinations
@@ -456,8 +454,10 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   if (cm::PCD.xorSourceList.size()) {
     auto vmap0 = high_resolution_clock::now();
 
+    /* TODO make a vector
     cm::PCD.variationIndicesMaps =
       std::move(cm::buildVariationIndicesMaps(cm::PCD.xorSourceList));
+    */
 
     auto vmap1 = high_resolution_clock::now();
     auto d_vmap = duration_cast<milliseconds>(vmap1 - vmap0).count();
@@ -491,7 +491,7 @@ Value addCandidateForSum(const CallbackInfo& info) {
   if (!info[0].IsNumber() || !info[1].IsString()
     || !(info[2].IsArray() || info[2].IsNumber()))
   {
-      Napi::TypeError::New(env, "addCandidate: invalid parameter type")
+      Napi::TypeError::New(env, "addCandidateForSum: invalid parameter type")
         .ThrowAsJavaScriptException();
       return env.Null();
   }
@@ -500,7 +500,7 @@ Value addCandidateForSum(const CallbackInfo& info) {
   auto combo = info[1].As<String>().Utf8Value();
   int index{};
   if (info[2].IsArray()) {
-    auto compatList = makePmrSourceCompatibilityList(env, info[2].As<Array>());
+    auto compatList = makeSourceCompatibilityList(env, info[2].As<Array>());
     index = cm::addCandidate(sum, std::move(combo), std::move(compatList));
   } else {
     index = info[2].As<Number>().Int32Value();

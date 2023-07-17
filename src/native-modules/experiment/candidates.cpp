@@ -1,11 +1,12 @@
 // candidates.cpp
 
 #include <chrono>
-#include <span>
 #include "combo-maker.h"
 #include "candidates.h"
 
 namespace cm {
+  void filterCandidatesCuda(int sum);
+  
   #define NATIVE_FILTER 0
   #if NATIVE_FILTER
   void filterCandidatesNative(int sum) {
@@ -72,4 +73,64 @@ namespace cm {
     }
     return index;
   }
+
+  /*
+  auto deviceAddCandidate(int sum, std::string&& combo, int index) -> int {
+    IndexComboListMap& indexCombosMap =
+      allSumsCandidateData[sum - 2].indexComboListMap;
+    auto it = indexCombosMap.find(index);
+    assert(it != indexCombosMap.end());
+    it->second.emplace_back(std::move(combo));
+    return index;
+  }
+  */
+  
+  #if 0
+  auto deviceAddCandidate(int sum, std::string&& combo,
+    cm::SourceCompatibilityList&& compatList) -> int
+  {
+    //int index{};
+    /*
+    const auto size = compatList.size();
+    DeviceSourceCompatListAndSize listAndSize{ std::move(compatList), size };
+    */
+    if (sum == (int)allSumsCandidateData.size() + 2) {
+      allSumsCandidateData.emplace_back(DeviceSourceCompatListAndSizes{});
+    }
+    auto& listAndSizes = allSumsCandidateData[sum - 2]
+      .deviceSourceCompatListAndSizes;
+    listAndSizes.sizes.push_back(compatList.size());
+    for (auto& compatData: compatList) {
+      listAndSizes.device_list.push_back(std::move(compatData));
+    }
+    
+    std::vector<std::string> comboList{};
+    comboList.emplace_back(std::move(combo));
+    
+    IndexComboListMap indexComboListMap; 
+    auto index = (int)listAndSizes.sizes.size() - 1;
+    const auto [ignore, success] =
+      indexComboListMap.insert(std::make_pair(index, std::move(comboList)));
+    assert(success);
+      
+    /*
+    OneSumCandidateData oneSumData{ std::move(listAndSizes),
+      std::move(indexComboListMap) };
+    allSumsCandidateData.emplace_back(std::move(oneSumData));
+    } else {
+      auto& sourceCompatLists =
+        allSumsCandidateData[sum - 2].device_sourceCompatLists;
+      sourceCompatLists.emplace_back(std::move(listAndSize));
+      index = sourceCompatLists.size - 1;
+      
+      auto& indexComboListMap = allSumsCandidateData[sum - 2].indexComboListMap;
+      auto [ignore, success] =
+        indexComboListMap.insert(std::make_pair(index, std::move(comboList)));
+      assert(success);
+    }
+    */
+    return index;
+  }
+  #endif
 } // namespace cm
+
