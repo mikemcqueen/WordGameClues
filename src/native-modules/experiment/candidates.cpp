@@ -6,6 +6,8 @@
 
 namespace cm {
   void filterCandidatesCuda(int sum);
+  //  [[nodiscard]]
+  //  XorSource* cuda_allocCopyXorSources(const XorSourceList& xorSourceList);
   
   #define NATIVE_FILTER 0
   #if NATIVE_FILTER

@@ -58,8 +58,10 @@ namespace Source {
   }
 } // namespace Source
 
-using SourceBits = bitset<kMaxLegacySources>;
+using /*Legacy*/SourceBits = bitset<kMaxLegacySources>;
 using LegacySources = std::array<int8_t, kMaxLegacySources>;
+// 32 bytes per sentence * 9 sentences = 2304? bits, 288 bytes, 36? 64-bit words
+using Sources = std::array<int8_t, kMaxUsedSources>;
 
 template<typename T>
 void sortSources(T& sources) {
@@ -72,8 +74,6 @@ struct UsedSources {
   using VariationIndex_t = int16_t;
   // 128 bits per sentence * 9 sentences = 1152 bits, 144 bytes, 18 64-bit words
   using Bits = bitset<kMaxSourcesPerSentence * kNumSentences>;
-  // 32 bytes per sentence * 9 sentences = 2304? bits, 288 bytes, 36? 64-bit words
-  using Sources = std::array<int8_t, kMaxUsedSources>;
   using Variations = std::array<VariationIndex_t, kNumSentences>;
 
   static /*constexpr*/ auto getFirstBitIndex(int sentence) {
@@ -133,29 +133,73 @@ struct UsedSources {
     return false;
   }
 
+  constexpr static bool anySourcesMatch2(const Sources& s1,
+    const Sources& s2)
+  {
+    // TODO: sanity check if sorted 
+    int matches{};
+    for (int s{ 1 }; s <= kNumSentences; ++s) {
+      int8_t sources[kMaxUsedSourcesPerSentence + 1] = { 0 };
+      auto start = Source::getFirstIndex(s);
+      for (int i{}; i < kMaxUsedSourcesPerSentence + 1; ++i) {
+        auto index = s1[start + i] + 1;
+        sources[index] = index;
+      }
+      for (int i{}; i < kMaxUsedSourcesPerSentence + 1; ++i) {
+        auto index = s2[start + i] + 1;
+        matches += index && sources[index];
+      }
+    }
+    return matches;
+  }
+
+  constexpr
+  static auto allVariationsMatch(const Variations& v1,
+    const Variations& v2, bool native = true)
+  {
+    for (auto i{ 0u }; i < v1.size(); ++i) {
+      if ((v1[i] > -1) && (v2[i] > -1)
+          && (v1[i] != v2[i]))
+      {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  constexpr
+  static bool allVariationsMatch2(const Variations& v1,
+    const Variations& v2, bool native = true)
+  {
+    int mismatches{};
+    for (auto i{ 0u }; i < v1.size(); ++i) {
+      auto first = v1[i] + 1;
+      auto second = v2[i] + 1;
+      mismatches += first && second && (first != second);
+    }
+    return !mismatches;
+  }
+
   constexpr
   auto isXorCompatibleWith(const UsedSources& other,
-    bool useBits = true, int* reason = nullptr) const
+    bool native = true, int* reason = nullptr) const
   {
-    if (useBits) {
-      // compare bits
+    if (native) {
+      // compare bits (cpu)
       if ((getBits() & other.getBits()).any()) {
         if (reason) *reason = 1;
         return false;
       }
-    } else if (anySourcesMatch(sources, other.sources)) {
+    } else {
+      // compare sources (gpu)
+      if (anySourcesMatch2(sources, other.sources)) {
         if (reason) *reason = 2;
-      return false;
-    }
-
-    // compare variations
-    for (auto i = 0u; i < variations.size(); ++i) {
-      if ((variations[i] > -1) && (other.variations[i] > -1)
-          && (variations[i] != other.variations[i]))
-      {
-        if (reason) *reason = 3;
         return false;
       }
+    }
+    // compare variations
+    if (!allVariationsMatch2(variations, other.variations, native)) {
+      return false;
     }
     return true;
   }
@@ -249,6 +293,7 @@ struct UsedSources {
 struct SourceCompatibilityData {
   SourceBits sourceBits;
   UsedSources usedSources;
+  // TODO: is 0 a valid legacy source? maybe not?
   LegacySources legacySources = make_array<int8_t, kMaxLegacySources>(0);
 
   SourceCompatibilityData() = default;
@@ -528,6 +573,7 @@ using VariationIndicesMap = std::unordered_map<int, std::vector<int>>;
 
 struct PreComputedData {
   XorSourceList xorSourceList{};
+  XorSource* device_xorSources;
   OrArgDataList orArgDataList;
   SourceListMap sourceListMap;
   std::array<VariationIndicesMap, kNumSentences> variationIndicesMaps;
@@ -575,7 +621,7 @@ struct CandidateStats {
   int totalCombos;
 };
 
-// functions
+// functions TODO: precompute.h
  
 void debugSourceList(const SourceList& sourceList, std::string_view sv);
 
@@ -587,6 +633,9 @@ XorSourceList mergeCompatibleXorSourceCombinations(
 
 auto buildVariationIndicesMaps(const XorSourceList& xorSourceList)
   -> std::array<VariationIndicesMap, kNumSentences>;
+
+auto getSortedXorSourceIndices(const XorSourceList& xorSourceList)
+  -> std::vector<int>;
 
 void mergeUsedSourcesInPlace(UsedSources& to, const UsedSources& from);
 

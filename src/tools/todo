@@ -1,4 +1,6 @@
-* xorSourceList only needs to be copied to device memory once.
+
+* is 0 a valid legacy source? maybe not? i'm defaulting LegacySources to
+  in combo-maker.h
 
 * candidates.comboListMap should be a vector. It's not even strictly
   necessary anymore.

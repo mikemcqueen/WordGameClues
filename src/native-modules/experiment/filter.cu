@@ -63,20 +63,11 @@ auto isSourceXORCompatibleWithAnyXorSource(
   const std::vector<int>& indices)
 {
   bool compatible = true; // empty list == compatible
-#if PERF
-  isany_perf.range_calls++;
-#endif
   for (auto index : indices) {
     const auto& xorSource = xorSourceList[index];
-#if PERF
-    isany_perf.comps++;
-#endif
     compatible = compatData.isXorCompatibleWith(xorSource, false);
     if (compatible) break;
   }
-#if PERF
-  if (compatible) isany_perf.compat++;
-#endif
   return compatible;
 };
 
@@ -85,16 +76,10 @@ auto isSourceXORCompatibleWithAnyXorSource(
   const SourceCompatibilityData& compatData, const XorSourceList& xorSourceList,
   const std::array<VariationIndicesMap, kNumSentences>& variationIndicesMaps)
 {
-#if PERF
-  isany_perf.calls++;
-#endif
   for (auto s = 0; s < kNumSentences; ++s) {
     auto variation = compatData.usedSources.variations[s];
     const auto& map = variationIndicesMaps[s];
     if ((variation < 0) || (map.size() == 1)) continue;
-#if PERF
-    isany_perf.ss_attempt++;
-#endif
     if (auto it = map.find(variation); it != map.end()) {
       if (isSourceXORCompatibleWithAnyXorSource(compatData, xorSourceList,
         it->second))
@@ -109,14 +94,8 @@ auto isSourceXORCompatibleWithAnyXorSource(
         return true;
       }
     }
-#if PERF
-    isany_perf.ss_fail++;
-#endif
     return false;
   }
-#if PERF
-  isany_perf.full++;
-#endif
   return isSourceXORCompatibleWithAnyXorSource(compatData, xorSourceList,
     variationIndicesMaps[1].at(-1)); // hack: we know "sentence" 2 doesn't exist
 }
@@ -246,6 +225,11 @@ void filterCandidatesCuda(int sum) {
   const auto& compatLists = allSumsCandidateData[sum - 2].sourceCompatLists;
   auto num_compatData = count(compatLists);
   auto compatData_bytes = num_compatData * sizeof(SourceCompatibilityData);
+
+  auto ac0 = high_resolution_clock::now();
+  // begin alloc_copy 
+
+  // compatList
   SourceCompatibilityData *device_compatList = nullptr;
   err = cudaMalloc((void **)&device_compatList, compatData_bytes);
   if (err != cudaSuccess) {
@@ -253,9 +237,7 @@ void filterCandidatesCuda(int sum) {
             cudaGetErrorString(err));
     throw std::runtime_error("failed to allocate device compatList");
   }
-
   int index{};
-  //int compatFound = false;
   for (const auto& compatList: compatLists) {
     err = cudaMemcpy(&device_compatList[index], compatList.data(),
       compatList.size() * sizeof(SourceCompatibilityData),
@@ -265,61 +247,10 @@ void filterCandidatesCuda(int sum) {
         cudaGetErrorString(err));
       throw std::runtime_error("failed to copy compatLists host -> device");
     }
-    /*
-    if ((DEBUG_MAX && (index < DEBUG_MAX)) || !compatFound) {
-    int source{ index };
-      for (const auto& compatData: compatList) {
-        int xorSource = -1;
-        if (isSourceXORCompatibleWithAnyXorSource(compatData,
-          PCD.xorSourceList.data(), PCD.xorSourceList.size(), &xorSource)
-            ) // || (DEBUG_MAX && (source < DEBUG_MAX)))
-        {
-          const auto& v = compatData.usedSources.variations;
-          const auto& b = compatData.usedSources.bits;
-          printf("compat source: %d, variations %2d %2d"
-            ", legacyBits %ld, bits %ld"
-            ", xorSourceIndex = %d\n", source, v[0], v[2],
-                 compatData.sourceBits.to_ulong(), b.to_ulong(), xorSource);
-          printSources(compatData);
-
-          const auto& x = PCD.xorSourceList[xorSource];
-          const auto& xv = compatData.usedSources.variations;
-          const auto& xb = compatData.usedSources.bits;
-          printf("  xorSource: variations %2d %2d"
-            ", legacyBits %ld, bits %ld\n", xv[0], xv[2],
-            x.sourceBits.count(), xb.count());
-          printSources(x);
-          compatFound = true;
-          break;
-          xorSource = -1;
-        }
-        source++;
-      }
-    }
-    */
     index += compatList.size();
   }
-  std::cerr << "  done copying " << index << " sources" << std::endl;
 
-  // TODO: we only need to do this once! across all invocations.
-  auto num_xorSources = PCD.xorSourceList.size();
-  auto xorSources_bytes = num_xorSources * sizeof(XorSource);
-  XorSource *device_xorSources = nullptr;
-  err = cudaMalloc((void **)&device_xorSources, xorSources_bytes);
-  if (err != cudaSuccess) {
-    fprintf(stderr, "Failed to allocate device xorSources, errror: %s\n",
-      cudaGetErrorString(err));
-    throw std::runtime_error("failed to allocate device xorSources");
-  }
-  err = cudaMemcpy(device_xorSources, PCD.xorSourceList.data(),
-    xorSources_bytes, cudaMemcpyHostToDevice);
-  if (err != cudaSuccess) {
-    fprintf(stderr, "Failed to copy xorSources host -> device, error: %s\n",
-      cudaGetErrorString(err));
-    throw std::runtime_error("failed to copy xorSources host -> device");
-  }
-
-  //
+  // results
   auto results_bytes = num_compatData * sizeof(result_t);
   result_t *device_results = nullptr;
   err = cudaMalloc((void **)&device_results, results_bytes);
@@ -329,11 +260,14 @@ void filterCandidatesCuda(int sum) {
     throw std::runtime_error("failed to allocate device result");
   }
 
-  std::cerr << "  alloc/copy compatLists(" << num_compatData << ")"
-            << ", xorSources(" << num_xorSources << ") " 
-            << " done" << std::endl;
+  // end alloc-copy
+  auto ac1 = high_resolution_clock::now();
+  auto dur_ac = duration_cast<milliseconds>(ac1 - ac0).count();
+  std::cerr << "  alloc/copy " << compatLists.size() << " compatLists"
+            << " (" << num_compatData << ") done - " << dur_ac << "ms"
+            << std::endl;
 
-  int threadsPerBlock = 256;
+  int threadsPerBlock = 64;
   int blocksPerGrid = (num_compatData + threadsPerBlock - 1) / threadsPerBlock;
   fprintf(stderr, "  kernel launch with %d blocks of %d threads...\n",
     blocksPerGrid, threadsPerBlock);
@@ -344,20 +278,17 @@ void filterCandidatesCuda(int sum) {
   */
   auto k0 = high_resolution_clock::now();
   kernel<<<blocksPerGrid, threadsPerBlock>>>(device_compatList, num_compatData,
-    device_xorSources, num_xorSources, device_results);
+    PCD.device_xorSources, PCD.xorSourceList.size(), device_results);
   auto k1 = high_resolution_clock::now();
   auto d = duration_cast<milliseconds>(k1 - k0).count();
-  std::cerr << "  kernel done, " << d << "ms" << std::endl;
+  //std::cerr << "  kernel done, " << d << "ms" << std::endl;
 
+//#define IMMEDIATE_RESULTS
 #ifdef IMMEDIATE_RESULTS
   std::vector<result_t> results;
   results.resize(num_compatData);
-  std::cerr << "  copying " << results.size() << " results"
-            << " (" << results_bytes << " bytes)..."
-            << std::endl;
   err = cudaMemcpy(results.data(), device_results, results_bytes,
     cudaMemcpyDeviceToHost);
-  std::cerr << "  copy done" << std::endl;
 
   auto& indexComboListMap = allSumsCandidateData[sum - 2].indexComboListMap;
   int num_compat_combos{};
@@ -387,7 +318,6 @@ void filterCandidatesCuda(int sum) {
     << ", compat sourcelists: " << num_compat_sourcelists
     << ", compat combos: " << num_compat_combos
     << std::endl;
-#endif // IMMEDIATE_RESULTS
 
   err = cudaFree(device_results);
   if (err != cudaSuccess) {
@@ -396,12 +326,14 @@ void filterCandidatesCuda(int sum) {
     throw std::runtime_error("failed to free device results");
   }
 
+  /*
   err = cudaFree(device_xorSources);
   if (err != cudaSuccess) {
     fprintf(stderr, "Failed to free device xorSources (error code %s)!\n",
       cudaGetErrorString(err));
     throw std::runtime_error("failed to free device xorSources");
   }
+  */
 
   err = cudaFree(device_compatList);
   if (err != cudaSuccess) {
@@ -409,7 +341,34 @@ void filterCandidatesCuda(int sum) {
       cudaGetErrorString(err));
     throw std::runtime_error("failed to free device compatList");
   }
+#endif // IMMEDIATE_RESULTS
+
   std::cerr << "--filterCandidatesCuda" << std::endl;
+}
+
+[[nodiscard]]
+XorSource* cuda_allocCopyXorSources(const XorSourceList& xorSourceList,
+  const std::vector<int> sortedIndices)
+{
+  auto num_xorSources = xorSourceList.size();
+  auto xorSources_bytes = num_xorSources * sizeof(XorSource);
+  XorSource *device_xorSources = nullptr;
+  cudaError_t err = cudaMalloc((void **)&device_xorSources, xorSources_bytes);
+  if (err != cudaSuccess) {
+    fprintf(stderr, "Failed to allocate device xorSources, errror: %s\n",
+      cudaGetErrorString(err));
+    throw std::runtime_error("failed to allocate device xorSources");
+  }
+  for (auto i{ 0u }; i < sortedIndices.size(); ++i) {
+    err = cudaMemcpy(&device_xorSources[i], &xorSourceList[sortedIndices[i]],
+      sizeof(XorSource), cudaMemcpyHostToDevice);
+    if (err != cudaSuccess) {
+      fprintf(stderr, "Failed to copy xorSources host -> device, error: %s\n",
+              cudaGetErrorString(err));
+      throw std::runtime_error("failed to copy xorSources host -> device");
+    }
+  }
+  return device_xorSources;
 }
 
 } // namespace cm

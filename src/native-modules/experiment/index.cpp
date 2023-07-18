@@ -449,8 +449,16 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
     cm::PCD.xorSourceList = std::move(sourceLists.back());
   }
 
+  std::vector<int> xorSourceIndices =
+    cm::getSortedXorSourceIndices(cm::PCD.xorSourceList);
+
+  cm::PCD.device_xorSources = cm::cuda_allocCopyXorSources(
+    cm::PCD.xorSourceList, xorSourceIndices);
+
   //--
 
+  // NOTE that when I ressurect this I should be indexing via the
+  // sorted (index) list generated above
   /*
   if (cm::PCD.xorSourceList.size()) {
     auto vmap0 = high_resolution_clock::now();

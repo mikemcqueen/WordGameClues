@@ -313,7 +313,7 @@ auto anyCompatibleXorSources(const SourceData& source,
 }
 
 // TODO: comment this. code is tricky
-bool filterXorIncompatibleIndices(Peco::IndexListVector& indexLists, int first,
+auto filterXorIncompatibleIndices(Peco::IndexListVector& indexLists, int first,
   int second, const std::vector<SourceList>& sourceLists)
 {
   Peco::IndexList& firstList = indexLists[first];
@@ -333,7 +333,7 @@ bool filterXorIncompatibleIndices(Peco::IndexListVector& indexLists, int first,
   return !firstList.empty();
 }
 
-bool filterAllXorIncompatibleIndices(Peco::IndexListVector& indexLists,
+auto filterAllXorIncompatibleIndices(Peco::IndexListVector& indexLists,
   const std::vector<SourceList>& sourceLists)
 {
   if (indexLists.size() < 2u) return true;
@@ -449,13 +449,13 @@ std::string vec_to_string(const vector<int>& v) {
   return result;
 }
 
-XorSourceList mergeCompatibleXorSourceCombinations(
-  const std::vector<SourceList>& sourceLists)
+auto mergeCompatibleXorSourceCombinations(
+  const std::vector<SourceList>& sourceLists) -> XorSourceList
 {
   using namespace std::chrono;
 
   if (sourceLists.empty()) return {};
-  assert((getNumEmptySublists(sourceLists) == 0)
+  assert(!getNumEmptySublists(sourceLists)
     && "mergeCompatibleXorSourceCombinations: empty sublist");
   std::vector<int> lengths{};
   for (const auto& sl : sourceLists) {
@@ -556,6 +556,102 @@ auto buildVariationIndicesMaps(const XorSourceList& xorSourceList)
     dumpVariationIndicesMaps(variationIndicesMaps);
   }
   return variationIndicesMaps;
+}
+
+//////////
+
+namespace {
+
+  using SourceSet = std::unordered_set<int>;
+  using SourceCountMap = std::unordered_map<int, int>;
+  using SourceFreqMap = std::unordered_map<int, double>;
+  
+  struct SourceCounts {
+    void addToTotals(int source) {
+      auto it = totals_map.find(source);
+      if (it == totals_map.end()) {
+        totals_map.insert(std::make_pair(source, 1));
+      } else {
+        it->second++;
+      }
+    }
+
+    void addSources(int index, const Sources& sources) {
+      auto& source_set = source_sets[index];
+      for (int s{ 1 }; s <= kNumSentences; ++s) {
+        auto start = Source::getFirstIndex(s);
+        for (int i{}; i < kMaxUsedSourcesPerSentence; ++i) {
+          auto source = sources[start + i];
+          if (source == -1) break;
+          source_set.insert(source);
+          addToTotals(source);
+        }
+      }
+    }
+    
+    void addSources(int index, const LegacySources& legacySources) {
+      auto& source_set = source_sets[index];
+      for (int i{}; i < kMaxLegacySources; ++i) {
+        auto source = legacySources[i];
+        if (!source) continue;
+        source_set.insert(source);
+        addToTotals(source);
+      }
+    }
+    
+    std::vector<SourceSet> source_sets;
+    SourceCountMap totals_map;
+  }; // struct SourceCounts
+  
+  /*
+  auto getTotalCount(const SourceCountMap& countMap) {
+    return std::accumulate(countMap.begin(), countMap.end(), 0,
+      [](int total, int count) { // TODO: probably std::pair here
+        total += count;
+        return total;
+      });
+  }
+  */
+  
+  auto makeSourceCounts(const XorSourceList& xorSources) {
+    SourceCounts sourceCounts;
+    sourceCounts.source_sets.resize(xorSources.size());
+    std::for_each(xorSources.begin(), xorSources.end(),
+      [idx = 0, &sourceCounts](const XorSource& xorSource) mutable {
+        sourceCounts.addSources(idx, xorSource.usedSources.sources);
+        sourceCounts.addSources(idx, xorSource.legacySources);
+        idx++;
+      });
+    return sourceCounts;
+  }
+  
+  auto makeSourceFreqMap(const SourceCounts& sourceCounts) {
+    SourceFreqMap freqMap;
+    return freqMap;
+  }
+
+  auto makeSortedIndices(const XorSourceList& xorSourceList,
+    const SourceCounts& sourceCounts,
+    const SourceFreqMap& sourceFreqMap)
+  {
+    std::vector<int> indices(xorSourceList.size());
+    std::iota(indices.begin(), indices.end(), 0);
+    std::sort(indices.begin(), indices.end(),
+      [&sourceCounts/*, &sourceFreqMap*/](int i, int j) {
+        return sourceCounts.source_sets[i].size() <
+          sourceCounts.source_sets[j].size();
+      });
+    return indices;
+  }
+} // anon namespace
+  
+auto getSortedXorSourceIndices(const XorSourceList& xorSourceList)
+  -> std::vector<int>
+{
+  auto sourceCounts = makeSourceCounts(xorSourceList);
+  auto sourceFreqMap = makeSourceFreqMap(sourceCounts);
+  auto indices = makeSortedIndices(xorSourceList, sourceCounts, sourceFreqMap);
+  return indices;
 }
 
 } // namespace cm

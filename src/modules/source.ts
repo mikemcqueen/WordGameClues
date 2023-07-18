@@ -130,14 +130,14 @@ export const addUsedSource = (usedSources: UsedSources, src: number, nothrow = f
 	// trick to get first elem from set.
 	const [anyElem] = set;
 	if (getVariation(anyElem) !== getVariation(source)) {
-	    Debug(`oopsie ${anyElem} (${getVariation(anyElem)})` +
+            if (nothrow) return false;
+	    console.error(`oopsie ${anyElem} (${getVariation(anyElem)})` +
 		`, ${source} (${getVariation(source)})`);
-	    if (nothrow) return false;
 	    throw new Error(`oopsie`);
 	}
 	if (set.has(source)) {
-	    Debug(`poopsie ${source}, [${[...set]}]`);
 	    if (nothrow) return false;
+	    console.error(`poopsie ${source}, [${[...set]}]`);
 	    throw new Error(`poopsie`);
 	}
     }
