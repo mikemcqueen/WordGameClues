@@ -451,7 +451,6 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
 
   std::vector<int> xorSourceIndices =
     cm::getSortedXorSourceIndices(cm::PCD.xorSourceList);
-
   cm::PCD.device_xorSources = cm::cuda_allocCopyXorSources(
     cm::PCD.xorSourceList, xorSourceIndices);
 

@@ -38,7 +38,7 @@
       'process_outputs_as_sources': 1,
       'action': [
         'bash', 'nvcc.sh', '-Xcompiler', '-fPIC', '--expt-relaxed-constexpr',
-#        '-lineinfo',
+        '-g','-lineinfo', # debug
         '-arch', 'sm_61',
         '-std=c++20', '-c', '<@(_inputs)', '-o', '<@(_outputs)'
       ]

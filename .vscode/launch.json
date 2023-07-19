@@ -63,10 +63,10 @@
             "cwd": "${workspaceFolder}/src/tools",
             "localRoot": "${workspaceFolder}",            
             "sourceMap": true,
-            "args": [ "clues.js", "-pf.71", "-c2,3", "-x2",
+            "args": [ "clues.js", "-pf.71", "-c2,2", "-x2",
 //                "--xor", "us 50",
                 "--xor", "koa",
-                "--xor", "21",
+//                "--xor", "21",
                 "--xor", "currant",
                 "-v"
             ]
