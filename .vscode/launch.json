@@ -45,7 +45,7 @@
             "name": "Debug cm no --xor",
             "program": "/usr/local/bin/node",
             "cwd": "${workspaceFolder}/src/tools",
-            "args": [ "clues.js", "-pf.71", "-c2,15", "-x2", "-v" ]
+            "args": [ "clues.js", "-pf.71", "-c3,3", "-x2", "-v" ]
         },
         {
             "type": "cppdbg",

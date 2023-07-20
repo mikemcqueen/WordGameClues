@@ -18,7 +18,7 @@ namespace cm {
 
   //
   
-  inline std::vector<OneSumCandidateData> allSumsCandidateData{};
+  inline std::unordered_map<int, OneSumCandidateData> allSumsCandidateData{};
   
   //
 
@@ -28,6 +28,11 @@ namespace cm {
 
   [[nodiscard]] XorSource* cuda_allocCopyXorSources(
     const XorSourceList& xorSourceList, const std::vector<int> sortedIndices);
+
+  [[nodiscard]]
+  auto cuda_allocSentenceVariationIndices(
+    const SentenceVariationIndices& sentenceVariationIndices)
+    -> device::VariationIndices*;
 
   void filterCandidates(int sum);
 }

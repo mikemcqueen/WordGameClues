@@ -155,7 +155,7 @@ struct UsedSources {
 
   constexpr
   static auto allVariationsMatch(const Variations& v1,
-    const Variations& v2, bool native = true)
+    const Variations& v2, bool /*native*/ = true)
   {
     for (auto i{ 0u }; i < v1.size(); ++i) {
       if ((v1[i] > -1) && (v2[i] > -1)
@@ -169,7 +169,7 @@ struct UsedSources {
 
   constexpr
   static bool allVariationsMatch2(const Variations& v1,
-    const Variations& v2, bool native = true)
+    const Variations& v2, bool /*native*/ = true)
   {
     int mismatches{};
     for (auto i{ 0u }; i < v1.size(); ++i) {
@@ -344,7 +344,7 @@ struct SourceCompatibilityData {
 
   constexpr
   auto isAndCompatibleWith(const SourceCompatibilityData& other,
-    bool useBits = true) const
+    bool /*useBits*/ = true) const
   {
     auto andBits = sourceBits & other.sourceBits;
     if (andBits != other.sourceBits) return false;
@@ -566,17 +566,33 @@ struct OrArgData {
 };
 using OrArgDataList = std::vector<OrArgData>;
 
-// Map a variation to a vector of indices.
-// This is precomputed for xorSourceList, to help identify only those sources
-// which share the same per-sentence variation. There is one map per sentence.
-using VariationIndicesMap = std::unordered_map<int, std::vector<int>>;
+// These are precomputed on xorSourceList, to identify only those sources
+// which share the same per-sentence variation.
+
+// one list of indices per variation, plus '-1' (no) variation.
+// indices to outer vector are offset by 1; variation -1 is index 0.
+using VariationIndicesList = std::vector<std::vector<int>>;
+// one variationIndicesLists per sentence
+using SentenceVariationIndices = std::array<VariationIndicesList, kNumSentences>;
+
+// on-device version of above
+namespace device {
+  struct VariationIndices {
+    int* device_data;      // one chunk of allocated data; other pointers below
+                           // point inside this chunk. only this gets freed.
+    int* sourceIndices;    // -1 terminated for each variation
+    int* variationOffsets; // offsets into sourceIndices
+    int num_variations;
+  };
+};
 
 struct PreComputedData {
   XorSourceList xorSourceList{};
   XorSource* device_xorSources;
   OrArgDataList orArgDataList;
   SourceListMap sourceListMap;
-  std::array<VariationIndicesMap, kNumSentences> variationIndicesMaps;
+  SentenceVariationIndices sentenceVariationIndices;
+  device::VariationIndices* device_sentenceVariationIndices;
 };
 inline PreComputedData PCD;
 
@@ -631,8 +647,8 @@ auto buildSourceListsForUseNcData(const std::vector<NCDataList>& useNcDataLists,
 XorSourceList mergeCompatibleXorSourceCombinations(
   const std::vector<SourceList>& sourceLists);
 
-auto buildVariationIndicesMaps(const XorSourceList& xorSourceList)
-  -> std::array<VariationIndicesMap, kNumSentences>;
+auto buildSentenceVariationIndices(const XorSourceList& xorSourceList,
+const std::vector<int>& xorSourceIndices) -> SentenceVariationIndices;
 
 auto getSortedXorSourceIndices(const XorSourceList& xorSourceList)
   -> std::vector<int>;

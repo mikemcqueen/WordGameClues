@@ -507,55 +507,53 @@ auto mergeCompatibleXorSourceCombinations(
 
 //////////
 
-using VariationIndicesMapList = std::array<VariationIndicesMap, kNumSentences>;
-
-void dumpVariationIndicesMaps(
-  const VariationIndicesMapList& variationIndicesMaps)
+void dumpSentenceVariationIndices(
+  const SentenceVariationIndices& sentenceVariationIndices)
 {
-  for (auto s = 0; s < kNumSentences; ++s) {
-    const auto& map = variationIndicesMaps[s];
-    if (map.size() > 1) {
-      std::cerr << "S" << s << ": variations(" << map.size() << ")"
-                << std::endl;
-      for (auto it = map.begin(); it != map.end(); ++it) {
-        auto [key, value] = *it;
-        std::cerr << "  v" << key << ": indices(" << value.size() << ")"
+  for (int s{}; s < kNumSentences; ++s) {
+    const auto& variationIndicesList = sentenceVariationIndices.at(s);
+    if (variationIndicesList.size() > 1) {
+      std::cerr << "S" << s << ": variations(" << variationIndicesList.size()
+                << ")" << std::endl;
+      for (int v{}; v < (int)variationIndicesList.size(); ++v) {
+        const auto& indices = variationIndicesList.at(v);
+        std::cerr << "  v" << v - 1 << ": indices(" << indices.size() << ")"
                   << std::endl;
       }
     }
   }
 }
   
-auto buildVariationIndicesMaps(const XorSourceList& xorSourceList)
-  -> std::array<VariationIndicesMap, kNumSentences>
+auto buildSentenceVariationIndices(const XorSourceList& xorSourceList,
+  const std::vector<int>& xorSourceIndices) -> SentenceVariationIndices
 {
-  auto variationIndicesMaps = VariationIndicesMapList{};
-  for (size_t i = 0; i < xorSourceList.size(); ++i) {
-    std::array<int, kNumSentences> variations = { -1, -1, -1, -1, -1, -1, -1, -1, -1 };
-    for (const auto& nc : xorSourceList[i].primaryNameSrcList) {
+  auto sentenceVariationIndices = SentenceVariationIndices{};
+  for (size_t src_index = 0; src_index < xorSourceList.size(); ++src_index) {
+    std::array<int, kNumSentences> variations =
+      { -1, -1, -1, -1, -1, -1, -1, -1, -1 };
+    const auto& source = xorSourceList.at(xorSourceIndices.at(src_index));
+    for (const auto& nc : source.primaryNameSrcList) {
       using namespace Source;
       if (isCandidate(nc.count)) {
         auto sentence = getSentence(nc.count) - 1;
         auto variation = getVariation(nc.count);
         // could sanity check compare equal if not -1 here
-        variations[sentence] = variation;
+        variations.at(sentence) = variation;
       }
     }
-    for (auto s = 0; s < kNumSentences; ++s) {
-      //if (variations[s] > -1) {
-      auto& map = variationIndicesMaps[s];
-      if (map.find(variations[s]) == map.end()) {
-        map.insert(std::make_pair(variations[s], std::vector<int>{})); // TODO: {}, emplace?
+    for (int s{}; s < kNumSentences; ++s) {
+      auto& variationIndicesList = sentenceVariationIndices.at(s);
+      const size_t variation_index = variations.at(s) + 1;
+      if (variationIndicesList.size() <= variation_index) {
+        variationIndicesList.resize(variation_index + 1);
       }
-      map[variations[s]].push_back(i);
-      // could assert(true) on ibPair.second here
-      //}
+      variationIndicesList.at(variation_index).push_back(src_index);
     }
   }
   if (1) {
-    dumpVariationIndicesMaps(variationIndicesMaps);
+    dumpSentenceVariationIndices(sentenceVariationIndices);
   }
-  return variationIndicesMaps;
+  return sentenceVariationIndices;
 }
 
 //////////

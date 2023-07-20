@@ -449,28 +449,35 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
     cm::PCD.xorSourceList = std::move(sourceLists.back());
   }
 
-  std::vector<int> xorSourceIndices =
-    cm::getSortedXorSourceIndices(cm::PCD.xorSourceList);
-  cm::PCD.device_xorSources = cm::cuda_allocCopyXorSources(
-    cm::PCD.xorSourceList, xorSourceIndices);
+  //--
+
+  auto xsi0 = high_resolution_clock::now();
+
+  auto xorSourceIndices = cm::getSortedXorSourceIndices(cm::PCD.xorSourceList);
+  cm::PCD.device_xorSources =
+    cm::cuda_allocCopyXorSources(cm::PCD.xorSourceList, xorSourceIndices);
+
+  auto xsi1 = high_resolution_clock::now();
+  auto d_xsi = duration_cast<milliseconds>(xsi1 - xsi0).count();
+  cerr << " sorted xor source indices - " << d_xsi << "ms" << endl;
 
   //--
 
   // NOTE that when I ressurect this I should be indexing via the
   // sorted (index) list generated above
-  /*
   if (cm::PCD.xorSourceList.size()) {
-    auto vmap0 = high_resolution_clock::now();
+    auto svi0 = high_resolution_clock::now();
 
-    //TODO make a vector
-    cm::PCD.variationIndicesMaps =
-      std::move(cm::buildVariationIndicesMaps(cm::PCD.xorSourceList));
+    cm::PCD.sentenceVariationIndices =
+      std::move(cm::buildSentenceVariationIndices(cm::PCD.xorSourceList,
+        xorSourceIndices));
+    cm::PCD.device_sentenceVariationIndices =
+      cm::cuda_allocSentenceVariationIndices(cm::PCD.sentenceVariationIndices);
     
-    auto vmap1 = high_resolution_clock::now();
-    auto d_vmap = duration_cast<milliseconds>(vmap1 - vmap0).count();
-    cerr << " native variation map - " << d_vmap << "ms" << endl;
+    auto svi1 = high_resolution_clock::now();
+    auto d_svi = duration_cast<milliseconds>(svi1 - svi0).count();
+    cerr << " sentence variation indices - " << d_svi << "ms" << endl;
   }
-  */
 
   //--
 
@@ -542,7 +549,7 @@ Value getIsAnyPerfData(const CallbackInfo& info) {
 auto getCandidateStats(int sum) {
   cm::CandidateStats cs;
   cs.sum = sum;
-  const auto& cd = cm::allSumsCandidateData[sum - 2];
+  const auto& cd = cm::allSumsCandidateData.find(sum)->second;
   cs.sourceLists = (int)cd.sourceCompatLists.size();
   cs.totalSources = std::accumulate(
     cd.sourceCompatLists.cbegin(), cd.sourceCompatLists.cend(), 0,
