@@ -37,7 +37,11 @@
       'outputs': [ '<(INTERMEDIATE_DIR)/<(RULE_INPUT_ROOT).o' ],
       'process_outputs_as_sources': 1,
       'action': [
-        'bash', 'nvcc.sh', '-Xcompiler', '-fPIC', '--expt-relaxed-constexpr',
+        'bash', 'nvcc.sh', '--expt-relaxed-constexpr',
+        '-Xcompiler', '-fPIC',
+        #       '-Xcompiler', '-Wall',
+        '-Xcompiler', '-Wall', '-Xcompiler', '-Wextra', #'-Xcompiler', '-pedantic', #'-Werror', '-W'
+        '-Xcudafe', '--diag_suppress=declared_but_not_referenced',
         '-g','-lineinfo', # debug
         '-arch', 'sm_61',
         '-std=c++20', '-c', '<@(_inputs)', '-o', '<@(_outputs)'

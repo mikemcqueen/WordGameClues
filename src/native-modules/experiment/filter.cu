@@ -272,7 +272,7 @@ __host__ __device__ void printSources(const SourceCompatibilityData& scd) {
       const ResultList& results, const SourceCompatibilityLists& sources)
     {
       int num_compatible{};
-      for (int i{}; i < sourceIndices.size(); ++i) {
+      for (size_t i{}; i < sourceIndices.size(); ++i) {
         const auto result = results.at(i);
         assert(result == 0 || result == 1); // sanity check
         auto& data = list.at(sourceIndices.at(i).listIndex);
@@ -285,7 +285,7 @@ __host__ __device__ void printSources(const SourceCompatibilityData& scd) {
           data.state = State::compatible;
           num_compatible++;
         } else {
-          auto sourcelist_size = sources.at(data.sourceIndex.listIndex).size();
+          auto sourcelist_size = (int)sources.at(data.sourceIndex.listIndex).size();
           if (++data.sourceIndex.index >= sourcelist_size) {
             data.state = State::done;
           }
@@ -481,7 +481,7 @@ __host__ __device__ void printSources(const SourceCompatibilityData& scd) {
     if (!getRunningComplete(kernelVec, current)) {
       bool wrapped = false;
       do {
-        if (++current >= kernelVec.size()) {
+        if (++current >= (int)kernelVec.size()) {
           current = 0;
           if (wrapped) return false;
           wrapped = true;
@@ -500,7 +500,7 @@ __host__ __device__ void printSources(const SourceCompatibilityData& scd) {
       num_sources, PCD.device_xorSources, PCD.xorSourceList.size(),
       kd.device_source_indices, /*kd.source_indices.size(),*/ kd.device_results);
 
-#ifdef DEBUG
+#if 1 || defined(DEBUG)
     fprintf(stderr, "  kernel %d launched with %d blocks of %d threads...\n",
       kd.stream_index, blocksPerGrid, threadsPerBlock);
 #endif
@@ -582,6 +582,7 @@ void filterCandidatesCuda(int sum) {
   const int num_streams = KernelData::getNumStreams(sources.size());
   std::vector<KernelData> kernels(num_streams);
   KernelData::init(kernels, sources.size());
+  std::cerr << "using " << num_streams << " streams" << std::endl;
 
   IndexStates indexStates{ sources };
   //auto first{ true };
@@ -608,14 +609,16 @@ void filterCandidatesCuda(int sum) {
     auto num_compatible = indexStates.update(kd.source_indices, results, sources);
     total_compatible += num_compatible;
 
-#ifdef DEBUG
     std::cerr << "  kernel " << current_kernel << " done"
+#ifdef DEBUG
       //<< ", done: " << kd.num_done(indexStates)
-      << ", compatible reported: " << num_compatible
+      //<< ", compatible reported: " << num_compatible
       //<< " actual:" << kd.num_compatible(indexStates)
-      << ", total compatible: " << total_compatible
+      //<< ", total compatible: " << total_compatible
       //<< ", remaining: " << kd.num_ready(indexStates)
+#endif
       << " - " << d << "ms" << std::endl;
+#ifdef DEBUG
     assert(kd.num_list_indices == kd.num_ready(indexStates) +
       kd.num_compatible(indexStates) + kd.num_done(indexStates));
 #endif

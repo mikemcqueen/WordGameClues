@@ -192,13 +192,13 @@ struct UsedSources {
       }
     } else {
       // compare sources (gpu)
-      if (anySourcesMatch2(sources, other.sources)) {
+      if (anySourcesMatch(sources, other.sources)) {
         if (reason) *reason = 2;
         return false;
       }
     }
     // compare variations
-    if (!allVariationsMatch2(variations, other.variations, native)) {
+    if (!allVariationsMatch(variations, other.variations, native)) {
       return false;
     }
     return true;

@@ -794,7 +794,7 @@ namespace hax _GLIBCXX_VISIBILITY(default)
 #endif
       }
 
-      void _M_check(size_t __position, const char *__s) const
+      void _M_check(size_t __position, const char */*__s*/) const
       {
 	if (__position >= _Nb)
 #if 0 // HAX
