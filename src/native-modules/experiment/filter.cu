@@ -143,7 +143,10 @@ __host__ __device__ bool isAnySourceCompatibleWithUseSources(
   struct SourceIndex {
     int listIndex{};
     int index{};
-    int flat_index;
+
+    bool operator<(const SourceIndex& rhs) const {
+      return (listIndex < rhs.listIndex) || (index < rhs.index);
+    }
   };
 
   struct IndexStates {
@@ -196,8 +199,11 @@ __host__ __device__ bool isAnySourceCompatibleWithUseSources(
     }
 
     auto update(const std::vector<SourceIndex>& sourceIndices,
-      const ResultList& results, const SourceCompatibilityLists& sources)
+      const ResultList& results, const SourceCompatibilityLists& sources,
+      int stream_index) // for logging
     {
+      constexpr static const bool logging = true;
+      std::set<SourceIndex> compat_indices; // for logging
       int num_compatible{};
       for (size_t i{}; i < sourceIndices.size(); ++i) {
         const auto result = results.at(i);
@@ -211,11 +217,23 @@ __host__ __device__ bool isAnySourceCompatibleWithUseSources(
         if (result) {
           data.state = State::compatible;
           num_compatible++;
+          if constexpr (logging) {
+            compat_indices.insert(sourceIndices.at(i));
+          }
         } else {
           auto sourcelist_size = (int)sources.at(data.sourceIndex.listIndex).size();
           if (++data.sourceIndex.index >= sourcelist_size) {
             data.state = State::done;
           }
+        }
+      }
+      if constexpr (logging) {
+        if (compat_indices.size() && (compat_indices.size() < 200)) {
+          std::cerr << "stream " << stream_index << " update:";
+          for (const auto& src_index: compat_indices) {
+            std::cerr << " " << src_index.listIndex << ":" << src_index.index;
+          }
+          std::cerr << std::endl;
         }
       }
       return num_compatible;
@@ -315,7 +333,7 @@ __host__ __device__ bool isAnySourceCompatibleWithUseSources(
       #endif
         return false;
       }
-      #if 1 || defined(DEBUG)
+      #if 0 || defined(DEBUG)
       std::cerr << "  fill " << stream_index << ":"
                 << " added " << source_indices.size() << " sources"
                 << " from " << list_indices.size() << " sourcelists"
@@ -532,40 +550,41 @@ void filterCandidatesCuda(int sum) {
   int total_compatible{};
   int current_kernel = -1;
   while (getNextWithWorkRemaining(kernels, current_kernel)) {
-    auto& kd = kernels.at(current_kernel);
-    if (!kd.running) {
-      if (kd.fillSourceIndices(indexStates)) {
+    auto& kernel = kernels.at(current_kernel);
+    if (!kernel.running) {
+      if (kernel.fillSourceIndices(indexStates)) {
         // TODO: move alloc to separate func outside loop
         // consider copying all source data on stream0, 
         // and only copy indices array here
-        kd.allocCopy(indexStates);
-        runKernel(kd, device_sources);
+        kernel.allocCopy(indexStates);
+        runKernel(kernel, device_sources);
       }
       continue;
     }
 
     auto t0 = high_resolution_clock::now();
-    auto results = getKernelResults(kd);
+    auto results = getKernelResults(kernel);
     auto t1 = high_resolution_clock::now();
     auto d = duration_cast<milliseconds>(t1 - t0).count();
 
-    auto num_compatible = indexStates.update(kd.source_indices, results, sources);
+    auto num_compatible = indexStates.update(kernel.source_indices, results, sources,
+      kernel.stream_index);
     total_compatible += num_compatible;
 
-    compat_record.at(kd.stream_index).push_back(num_compatible);
+    compat_record.at(kernel.stream_index).push_back(num_compatible);
 
     #ifdef DEBUG
     std::cerr << "  kernel " << current_kernel << " done"
-      //<< ", done: " << kd.num_done(indexStates)
+      //<< ", done: " << kernel.num_done(indexStates)
       //<< ", compatible reported: " << num_compatible
-      //<< " actual:" << kd.num_compatible(indexStates)
+      //<< " actual:" << kernel.num_compatible(indexStates)
       //<< ", total compatible: " << total_compatible
-      //<< ", remaining: " << kd.num_ready(indexStates)
+      //<< ", remaining: " << kernel.num_ready(indexStates)
       << " - " << d << "ms" << std::endl;
-      #endif
+    #endif
     #ifdef DEBUG
-    assert(kd.num_list_indices == kd.num_ready(indexStates) +
-      kd.num_compatible(indexStates) + kd.num_done(indexStates));
+    assert(kernel.num_list_indices == kernel.num_ready(indexStates) +
+      kernel.num_compatible(indexStates) + kernel.num_done(indexStates));
     #endif
   }
   printCompatRecord(compat_record);
