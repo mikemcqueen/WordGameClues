@@ -315,7 +315,7 @@ __host__ __device__ bool isAnySourceCompatibleWithUseSources(
       #endif
         return false;
       }
-      #ifdef DEBUG
+      #if 1 || defined(DEBUG)
       std::cerr << "  fill " << stream_index << ":"
                 << " added " << source_indices.size() << " sources"
                 << " from " << list_indices.size() << " sourcelists"
@@ -427,7 +427,7 @@ __host__ __device__ bool isAnySourceCompatibleWithUseSources(
       num_sources, PCD.device_xorSources, PCD.xorSourceList.size(),
       kd.device_source_indices, /*kd.source_indices.size(),*/ kd.device_results);
 
-#if 1 || defined(DEBUG)
+#if 0 || defined(DEBUG)
     fprintf(stderr, "  kernel %d launched with %d blocks of %d threads...\n",
       kd.stream_index, blocksPerGrid, threadsPerBlock);
 #endif
@@ -494,6 +494,19 @@ __host__ __device__ bool isAnySourceCompatibleWithUseSources(
     return device_sources;
   }
 
+  void printCompatRecord(const std::vector<std::vector<int>>& compat_record) {
+    int total{};
+    for (size_t i{}; i < compat_record.size(); ++i) {
+      const auto& counts = compat_record.at(i);
+      std::cerr << "stream " << i << ":";
+      for (auto count: counts) {
+        std::cerr << " " << count;
+        total += count;
+      }
+      std::cerr << std::endl;
+    }
+    std::cerr << "total: " << total << std::endl;
+  }
 } // anonymous namespace
 
 namespace cm {
@@ -513,6 +526,7 @@ void filterCandidatesCuda(int sum) {
   KernelData::init(kernels, sources.size());
   std::cerr << "using " << num_streams << " streams" << std::endl;
 
+  std::vector<std::vector<int>> compat_record(num_streams);
   IndexStates indexStates{ sources };
   //auto first{ true };
   int total_compatible{};
@@ -538,20 +552,23 @@ void filterCandidatesCuda(int sum) {
     auto num_compatible = indexStates.update(kd.source_indices, results, sources);
     total_compatible += num_compatible;
 
+    compat_record.at(kd.stream_index).push_back(num_compatible);
+
+    #ifdef DEBUG
     std::cerr << "  kernel " << current_kernel << " done"
-#ifdef DEBUG
       //<< ", done: " << kd.num_done(indexStates)
       //<< ", compatible reported: " << num_compatible
       //<< " actual:" << kd.num_compatible(indexStates)
       //<< ", total compatible: " << total_compatible
       //<< ", remaining: " << kd.num_ready(indexStates)
-#endif
       << " - " << d << "ms" << std::endl;
-#ifdef DEBUG
+      #endif
+    #ifdef DEBUG
     assert(kd.num_list_indices == kd.num_ready(indexStates) +
       kd.num_compatible(indexStates) + kd.num_done(indexStates));
-#endif
+    #endif
   }
+  printCompatRecord(compat_record);
   std::cerr << "total compatible: " << total_compatible << " of "
             << sources.size() << std::endl;
 
