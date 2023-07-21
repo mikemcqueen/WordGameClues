@@ -288,6 +288,29 @@ struct UsedSources {
     result.mergeInPlace(other);
     return result;
   }
+
+    void dump() const {
+    auto first{true};
+    std::cerr << "sources:";
+    for (auto s{1}; s <= kNumSentences; ++s) {
+      if (getVariation(s) > -1) {
+        if (first) {
+          std::cerr << std::endl;
+          first = false;
+        }
+        std::cerr << "  s" << s << " v" << getVariation(s) << ":";
+        for (int i{}; i < kMaxUsedSourcesPerSentence; ++i) {
+          auto src = sources.at(Source::getFirstIndex(s) + i);
+          if (src > -1) {
+            std::cerr << " " << src;
+          }
+        }
+        std::cerr << std::endl;
+      }
+    }
+    if (first) std::cerr << " none" << std::endl;
+  }
+
 }; // UsedSources
 
 struct SourceCompatibilityData {
@@ -401,6 +424,20 @@ struct SourceCompatibilityData {
     mergeInPlace(other.legacySources);
   }
 
+  void dump(const char* header = nullptr) const {
+    if (header) std::cerr << header << std::endl;
+    usedSources.dump();
+    std::cerr << "legacy sources:";
+    auto any{false};
+    for (int i{}; i < kMaxLegacySources; ++i) {
+      if (legacySources.at(i)) {
+        std::cerr << " " << i;
+        any = true;
+      }
+    }
+    if (!any) std::cerr << " none";
+    std::cerr << std::endl;
+  }
 }; // SourceCompatibilityData
 using SourceCompatibilityList = std::vector<SourceCompatibilityData>;
 
