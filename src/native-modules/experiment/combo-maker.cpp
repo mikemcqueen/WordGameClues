@@ -79,7 +79,7 @@ auto buildCompatibleIndices(const SourceCompatibilityData& compatData,
 
 auto isSourceXORCompatibleWithAnyXorSource(
   const SourceCompatibilityData& compatData, const XorSourceList& xorSourceList,
-  const std::vector<int>& indices)
+  const std::vector<int>& indices, int* compat_index)
 {
   bool compatible = true; // empty list == compatible
   isany_perf.range_calls++;
@@ -89,6 +89,7 @@ auto isSourceXORCompatibleWithAnyXorSource(
     compatible = compatData.isXorCompatibleWith(xorSource);
     if (compatible) {
       global_compat_indices.insert(index);
+      if (compat_index) *compat_index = index;
       break;
     }
   }
@@ -98,7 +99,8 @@ auto isSourceXORCompatibleWithAnyXorSource(
 
 auto isSourceXORCompatibleWithAnyXorSource(
   const SourceCompatibilityData& compatData, const XorSourceList& xorSourceList,
-  const std::array<VariationIndicesMap, kNumSentences>& variationIndicesMaps)
+  const std::array<VariationIndicesMap, kNumSentences>& variationIndicesMaps,
+  int* compat_index)
 {
   isany_perf.calls++;
   for (auto s = 0; s < kNumSentences; ++s) {
@@ -108,14 +110,14 @@ auto isSourceXORCompatibleWithAnyXorSource(
     isany_perf.ss_attempt++;
     if (auto it = map.find(variation); it != map.end()) {
       if (isSourceXORCompatibleWithAnyXorSource(compatData, xorSourceList,
-        it->second))
+        it->second, compat_index))
       {
         return true;
       }
     }
     if (auto it = map.find(-1); it != map.end()) {
       if (isSourceXORCompatibleWithAnyXorSource(compatData, xorSourceList,
-        it->second))
+        it->second, compat_index))
       {
         return true;
       }
@@ -125,7 +127,7 @@ auto isSourceXORCompatibleWithAnyXorSource(
   }
   isany_perf.full++;
   return isSourceXORCompatibleWithAnyXorSource(compatData, xorSourceList,
-    variationIndicesMaps[1].at(-1)); // hack: we know this is the full index list
+    variationIndicesMaps[1].at(-1), compat_index); // hack: we know this is the full index list
 }
 
 } // anon namespace
@@ -135,13 +137,20 @@ bool isAnySourceCompatibleWithUseSources(
 {
   if (sourceCompatList.empty()) return true;
   auto compatible = false;
+  int src_index{};
   for (const auto& compatData : sourceCompatList) {
     //auto x_compatibleIndices = buildCompatibleIndices(compatData,
     //  PCD.variationIndicesMaps);
     //std::vector<int> compatibleIndices{}; 
-
+    int compat_index{-1};
     compatible = isSourceXORCompatibleWithAnyXorSource(compatData,
-      PCD.xorSourceList, PCD.variationIndicesMaps);
+      PCD.xorSourceList, PCD.variationIndicesMaps, &compat_index);
+    if (compatible && (compat_index == 2)) {
+      std::cerr << "compatible with " << compat_index << " "
+                << global_isany_call_counter << ":" << src_index
+                << std::endl;
+    }
+    ++src_index;
     // if there were --xor sources specified, and none are compatible with the
     // current source, no further compatibility checking is necessary; continue
     // to next source.
@@ -150,6 +159,7 @@ bool isAnySourceCompatibleWithUseSources(
       PCD.orArgDataList);
     if (compatible) break;
   }
+  ++global_isany_call_counter;
   return compatible;
 };
 

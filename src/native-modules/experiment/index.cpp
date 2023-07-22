@@ -496,6 +496,7 @@ Value dumpAndResetCompatIndices(const CallbackInfo& info) {
     std::cout << index << std::endl;
   }
   cm::global_compat_indices.clear();
+  cm::global_isany_call_counter = 0;
   return env.Null();
 }
 
