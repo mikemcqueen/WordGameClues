@@ -485,6 +485,20 @@ Value getIsAnyPerfData(const CallbackInfo& info) {
   return cm::wrap(env, cm::isany_perf);
 }
 
+//
+// dumpAndResetCompatIndices
+//
+Value dumpAndResetCompatIndices(const CallbackInfo& info) {
+  Env env = info.Env();
+  std::cout << "global_compat_indices("
+            << cm::global_compat_indices.size() << ")" << std::endl;
+  for (const auto index: cm::global_compat_indices) {
+    std::cout << index << std::endl;
+  }
+  cm::global_compat_indices.clear();
+  return env.Null();
+}
+
 Object Init(Env env, Object exports) {
   //  exports["buildSourceListsForUseNcData"] = Function::New(env, buildSourceListsForUseNcData);
   //  exports["mergeAllCompatibleSources"] = Function::New(env, mergeAllCompatibleSources);
@@ -492,6 +506,7 @@ Object Init(Env env, Object exports) {
   exports["isAnySourceCompatibleWithUseSources"] = Function::New(env, isAnySourceCompatibleWithUseSources);
   exports["setOrArgDataList"] = Function::New(env, setOrArgDataList);
   exports["getIsAnyPerfData"] = Function::New(env, getIsAnyPerfData);
+  exports["dumpAndResetCompatIndices"] = Function::New(env, dumpAndResetCompatIndices);
 
   return exports;
 }

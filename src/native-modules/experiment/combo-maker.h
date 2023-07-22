@@ -483,6 +483,7 @@ struct PerfData {
 };
 
 inline PerfData isany_perf{};
+inline std::set<int> global_compat_indices;
 
 // functions
  

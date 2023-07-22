@@ -369,7 +369,7 @@ const getCombosForUseNcLists = (sum: number, max: number, pcd: PreCompute.Data,
             // failed to find any compatible combos
             if (listIsEmpty(mergedSourcesList)) continue;
 
-            if (_.isUndefined(hash[key].isCompatible)) {
+            if (hash[key].isCompatible === undefined) {
                 isany_call += 1;
                 hash[key].isCompatible = NativeComboMaker.isAnySourceCompatibleWithUseSources(mergedSourcesList);
                 if (hash[key].isCompatible) isany_compat += 1;
@@ -382,8 +382,8 @@ const getCombosForUseNcLists = (sum: number, max: number, pcd: PreCompute.Data,
         }
         totalVariations += numVariations;
     });
-
     let duration = (process.hrtime.bigint() - start) / MILLY;
+    NativeComboMaker.dumpAndResetCompatIndices();
     Debug(`sum(${sum}) combos(${comboCount}) variations(${totalVariations})` +
         ` cacheHits(${numCacheHits}) merge-incompatible(${numMergeIncompatible})` +
         ` use-incompatible(${numUseIncompatible})` +

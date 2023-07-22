@@ -5,7 +5,9 @@
 
 namespace cm {
 
-PreComputedData PCD;
+  PreComputedData PCD;
+
+namespace {
 
 auto isSourceORCompatibleWithAnyOrSource(const SourceCompatibilityData& compatData,
   const OrSourceList& orSourceList)
@@ -85,7 +87,10 @@ auto isSourceXORCompatibleWithAnyXorSource(
     const auto& xorSource = xorSourceList[index];
     isany_perf.comps++;
     compatible = compatData.isXorCompatibleWith(xorSource);
-    if (compatible) break;
+    if (compatible) {
+      global_compat_indices.insert(index);
+      break;
+    }
   }
   if (compatible) isany_perf.compat++;
   return compatible;
@@ -122,6 +127,8 @@ auto isSourceXORCompatibleWithAnyXorSource(
   return isSourceXORCompatibleWithAnyXorSource(compatData, xorSourceList,
     variationIndicesMaps[1].at(-1)); // hack: we know this is the full index list
 }
+
+} // anon namespace
   
 bool isAnySourceCompatibleWithUseSources(
   const SourceCompatibilityList& sourceCompatList)
@@ -139,7 +146,8 @@ bool isAnySourceCompatibleWithUseSources(
     // current source, no further compatibility checking is necessary; continue
     // to next source.
     if (!compatible) continue;
-    compatible = isSourceCompatibleWithEveryOrArg(compatData, PCD.orArgDataList);
+    compatible = isSourceCompatibleWithEveryOrArg(compatData,
+      PCD.orArgDataList);
     if (compatible) break;
   }
   return compatible;
