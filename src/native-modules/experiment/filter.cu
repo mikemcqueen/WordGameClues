@@ -48,13 +48,11 @@ __device__ auto isSourceCompatibleWithEveryOrArg(
     const SourceCompatibilityData& source, const XorSource* xorSources,
     const int* indices, int* compat_index = nullptr, int* reason = nullptr)
   {
-    if (reason && (*reason == 100)) printf("ZZ 10\n");
     auto compatible{ false }; // important. explicit compatibility required
     for (int i{}; indices[i] > -1; ++i) {
       const auto& xorSource = xorSources[indices[i]];
       compatible = source.isXorCompatibleWith(xorSource, false, reason);
       if (compatible) {
-        if (reason && (*reason == 100)) printf("ZZ 11, index: %d\n", indices[i]);
         if (compat_index) *compat_index = indices[i];
         break;
       }
@@ -67,12 +65,10 @@ __device__ auto isSourceCompatibleWithEveryOrArg(
     const SourceCompatibilityData& source, const XorSource* xorSources,
     size_t numXorSources, int* compat_index = nullptr, int* reason = nullptr)
   {
-    if (reason && (*reason == 100)) printf("ZZ 20\n");
     bool compatible = true;
     for (size_t i{}; i < numXorSources; ++i) {
       compatible = source.isXorCompatibleWith(xorSources[i], false, reason);
       if (compatible) {
-        if (reason && (*reason == 100)) printf("ZZ 21, index: %ld\n", i);
         if (compat_index) *compat_index = i;
         break;
       }
@@ -87,7 +83,6 @@ __device__ auto isSourceCompatibleWithEveryOrArg(
     const device::VariationIndices* sentenceVariationIndices,
     int* compat_index = nullptr, int* reason = nullptr)
   {
-    if (reason && (*reason == 100)) printf("ZZ 1\n");
     for (int s{}; s < kNumSentences; ++s) {
       auto variation = source.usedSources.variations.at(s) + 1;
       const auto& variationIndices = sentenceVariationIndices[s];
@@ -133,7 +128,7 @@ __device__ auto isSourceCompatibleWithEveryOrArg(
     const device::VariationIndices* sentenceVariationIndices,
     const int* source_indices, int stream_index, result_t* results)
   {
-    constexpr const auto logging = true;
+    constexpr const auto logging = false;
 
     auto index = blockIdx.x * blockDim.x + threadIdx.x;
     if (index >= num_sources) return;
@@ -244,7 +239,7 @@ __device__ auto isSourceCompatibleWithEveryOrArg(
       const ResultList& results, const SourceCompatibilityLists& sources,
       int stream_index) // for logging
     {
-      constexpr static const bool logging = true;
+      constexpr static const bool logging = false;
       std::set<SourceIndex> compat_src_indices; // for logging
       int num_compatible{};
       for (size_t i{}; i < sourceIndices.size(); ++i) {
@@ -416,7 +411,7 @@ __device__ auto isSourceCompatibleWithEveryOrArg(
     }
 
     bool fillSourceIndices(IndexStates& indexStates) {
-      constexpr static const auto logging = true;
+      constexpr static const auto logging = false;
       auto num_ready = indexStates.num_ready(list_start_index,
         num_list_indices);
       int num_sourcelists{};
@@ -669,7 +664,7 @@ __device__ auto isSourceCompatibleWithEveryOrArg(
   void check(const SourceCompatibilityLists& sources, int list_index,
     int index)
   {
-    constexpr const auto logging = true;
+    constexpr const auto logging = false;
     if constexpr (logging) {
       char buf[32];
       snprintf(buf, sizeof(buf), "%d:%d", list_index, index);
@@ -705,9 +700,9 @@ void filterCandidatesCuda(int sum) {
     .sourceCompatLists;
   auto device_sources = allocCopySources(sources);
 
+  /*
   check(sources, 209, 1);
   dump(PCD.xorSourceList, PCD.xorSourceIndices, 0);
-  /*
   check(sources, 229, 1);
   check(sources, 232, 1);
   check(sources, 233, 1);
