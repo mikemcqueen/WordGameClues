@@ -15,34 +15,6 @@
 #include "peco.h"
 
 namespace cm {
-
-#if !USEDSOURCES_BITSET
-// TODO: move to a UsedSources type
-auto makeUsedSourcesString(const UsedSources& usedSources) {
-  std::string result{ "hi" };
-  for (auto i = 1u; i < usedSources.size(); i++) {
-    if (usedSources[i].empty()) {
-      result.append("-");
-    } else {
-      auto first = true;
-      for (const auto source: usedSources[i]) {
-        if (!first) {
-          result.append(",");
-        }
-        first = false;
-        result.append(std::to_string(source));
-      }
-    }
-  }
-  return result;
-};
-
-auto makeBitString(const SourceData& source) {
-  return source.sourceBits.to_string().append("+")
-    .append(makeUsedSourcesString(source.usedSources));
-};
-#endif
-  
 /*
 auto getCandidateCount(const SourceData& source) {
   auto count = 0;
@@ -188,8 +160,9 @@ auto mergeCompatibleSourceLists(const SourceList& sourceList1,
   SourceList result{};
   for (const auto& source1 : sourceList1) {
     for (const auto& source2 : sourceList2) {
-      if (!source1.isXorCompatibleWith(source2)) continue;
-      result.emplace_back(std::move(mergeSources(source1, source2)));
+      if (source1.isXorCompatibleWith(source2)) {
+        result.emplace_back(std::move(mergeSources(source1, source2)));
+      }
     }
   }
   return result;
@@ -207,7 +180,7 @@ auto mergeAllCompatibleSources(const NameCountList& ncList,
     std::cerr << "nc[0]: " << ncList[0].toString() << std::endl;
   }
   // TODO: find smallest sourcelist to copy first, then skip merge in loop?
-  SourceList sourceList{sourceListMap.at(ncList[0].toString())}; // copy
+  SourceList sourceList{ sourceListMap.at(ncList[0].toString()) }; // copy
   for (auto i = 1u; i < ncList.size(); ++i) {
     if (log) {
       std::cerr << " nc[" << i << "]: " << ncList[1].toString() << std::endl;
@@ -233,13 +206,9 @@ auto buildSourceListsForUseNcData(const vector<NCDataList>& useNcDataLists,
   // the lists-of-NcCRefLists into a single NcList.
 
   using StringSet = std::unordered_set<std::string>;
-#if !USEDSOURCES_BITSET
-  using HashMap = std::unordered_map<string, StringSet>;
-#else
   using HashMap = std::unordered_map<SourceCompatibilityData, StringSet>;
-#endif
 
-  srand(-1);
+  srand(-1); // why?
   int total = 0;
   int hash_hits = 0;
   const auto size = useNcDataLists[0].size();
@@ -507,22 +476,24 @@ auto mergeCompatibleXorSourceCombinations(
 
 //////////
 
-void dumpSentenceVariationIndices(
-  const SentenceVariationIndices& sentenceVariationIndices)
-{
-  for (int s{}; s < kNumSentences; ++s) {
-    const auto& variationIndicesList = sentenceVariationIndices.at(s);
-    if (variationIndicesList.size() > 1) {
-      std::cerr << "S" << s << ": variations(" << variationIndicesList.size()
-                << ")" << std::endl;
-      for (int v{}; v < (int)variationIndicesList.size(); ++v) {
-        const auto& indices = variationIndicesList.at(v);
-        std::cerr << "  v" << v - 1 << ": indices(" << indices.size() << ")"
-                  << std::endl;
+namespace {
+  void dumpSentenceVariationIndices(
+    const SentenceVariationIndices& sentenceVariationIndices)
+  {
+    for (int s{}; s < kNumSentences; ++s) {
+      const auto& variationIndicesList = sentenceVariationIndices.at(s);
+      if (!variationIndicesList.empty()) {
+        std::cerr << "S" << s << ": variations(" << variationIndicesList.size()
+                  << ")" << std::endl;
+        for (int v{}; v < (int)variationIndicesList.size(); ++v) {
+          const auto& indices = variationIndicesList.at(v);
+          std::cerr << "  v" << v - 1 << ": indices(" << indices.size() << ")"
+                    << std::endl;
+        }
       }
     }
   }
-}
+} // anon namespace
   
 auto buildSentenceVariationIndices(const XorSourceList& xorSourceList,
   const std::vector<int>& xorSourceIndices) -> SentenceVariationIndices
@@ -550,6 +521,25 @@ auto buildSentenceVariationIndices(const XorSourceList& xorSourceList,
       variationIndicesList.at(variation_index).push_back(src_index);
     }
   }
+  // Some sentences may contain no variations across all xorSources.
+  // At least, this is true in the current case when not all sentences use
+  // variations. TODO: TBD if this is still true after all sentences have
+  // been converted to use variations.
+  // Until that time, destroy the variationIndicesLists for those sentences
+  // with no variations, since these lists only contain a single element (0)
+  // representing the "-1" variation that contains all indices.
+  // It's redundant/unnecessary data and it's cleaner to be able to just test
+  // if a variationIndicesList is empty.
+  // Depending on resolution of TBD above, the "empty" check may eventually
+  // become redundant/unnecessary.
+  //for (auto& variationIndicesList : sentenceVariationIndices) {
+  std::for_each(sentenceVariationIndices.begin(),
+    sentenceVariationIndices.end(), [](auto& variationIndicesList)
+  {
+    if (variationIndicesList.size() == 1) {
+      variationIndicesList.clear();
+    }
+  });
   if (1) {
     dumpSentenceVariationIndices(sentenceVariationIndices);
   }
@@ -559,7 +549,6 @@ auto buildSentenceVariationIndices(const XorSourceList& xorSourceList,
 //////////
 
 namespace {
-
   using SourceSet = std::unordered_set<int>;
   using SourceCountMap = std::unordered_map<int, int>;
   using SourceFreqMap = std::unordered_map<int, double>;

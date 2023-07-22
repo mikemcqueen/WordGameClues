@@ -99,6 +99,7 @@ cm::SourceData makeSourceData(Env& env, const Napi::Object& jsSourceData) {
   auto primaryNameSrcList = makeNameCountList(env, jsPrimaryNameSrcList.As<Array>());
   auto primarySrcBits = cm::NameCount::listToSourceBits(primaryNameSrcList);
   auto usedSources = cm::NameCount::listToUsedSources(primaryNameSrcList);
+  usedSources.assert_valid();
   auto legacySources = cm::NameCount::listToLegacySources(primaryNameSrcList);
   auto ncList = makeNameCountList(env, jsNcList.As<Array>());
   return cm::SourceData(std::move(primaryNameSrcList), std::move(primarySrcBits),
@@ -434,6 +435,10 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   auto d_build = duration_cast<milliseconds>(build1 - build0).count();
   cerr << " native build - " << d_build << "ms" << endl;
 
+  for (const auto& src_list: sourceLists) {
+    cm::assert_valid(src_list);
+  }
+
   //--
 
   if (sourceLists.size() > 1) {
@@ -453,9 +458,10 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
 
   auto xsi0 = high_resolution_clock::now();
 
-  auto xorSourceIndices = cm::getSortedXorSourceIndices(cm::PCD.xorSourceList);
-  cm::PCD.device_xorSources =
-    cm::cuda_allocCopyXorSources(cm::PCD.xorSourceList, xorSourceIndices);
+  cm::PCD.xorSourceIndices =
+    std::move(cm::getSortedXorSourceIndices(cm::PCD.xorSourceList));
+  cm::PCD.device_xorSources = cm::cuda_allocCopyXorSources(
+    cm::PCD.xorSourceList, cm::PCD.xorSourceIndices);
 
   auto xsi1 = high_resolution_clock::now();
   auto d_xsi = duration_cast<milliseconds>(xsi1 - xsi0).count();
@@ -470,13 +476,14 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
 
     cm::PCD.sentenceVariationIndices =
       std::move(cm::buildSentenceVariationIndices(cm::PCD.xorSourceList,
-        xorSourceIndices));
+        cm::PCD.xorSourceIndices));
     cm::PCD.device_sentenceVariationIndices =
-      cm::cuda_allocSentenceVariationIndices(cm::PCD.sentenceVariationIndices);
+      cm::cuda_allocCopySentenceVariationIndices(
+        cm::PCD.sentenceVariationIndices);
     
     auto svi1 = high_resolution_clock::now();
     auto d_svi = duration_cast<milliseconds>(svi1 - svi0).count();
-    cerr << " sentence variation indices - " << d_svi << "ms" << endl;
+    cerr << " variation indices - " << d_svi << "ms" << endl;
   }
 
   //--

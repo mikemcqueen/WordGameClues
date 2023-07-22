@@ -81,15 +81,11 @@ struct UsedSources {
     return (sentence - 1) * kMaxSourcesPerSentence;
   }
 
-  Bits bits{};
-  Sources sources = make_array<int8_t, kMaxUsedSources>( -1 );
-  Variations variations = make_array<VariationIndex_t, kNumSentences>( -1 );
-
   constexpr Bits& getBits() noexcept { return bits; }
   constexpr const Bits& getBits() const noexcept { return bits; }
 
-  constexpr int getVariation(int sentence) const { return variations[sentence - 1]; }
-  void setVariation(int sentence, int value) { variations[sentence - 1] = value; }
+  constexpr int getVariation(int sentence) const { return variations.at(sentence - 1); }
+  void setVariation(int sentence, int value) { variations.at(sentence - 1) = value; }
   constexpr bool hasVariation(int sentence) const { return getVariation(sentence) > -1; }
 
   /*
@@ -106,6 +102,36 @@ struct UsedSources {
   }
   */
 
+private:
+  void addSources(const UsedSources& other) {
+    for (int sentence{ 1 }; sentence <= kNumSentences; ++sentence) {
+      const auto first = Source::getFirstIndex(sentence);
+      int other_offset{};
+      // does 'other' have sources for this sentence?
+      if (other.sources[first + other_offset] == -1) continue;
+
+      // ensure variations for this sentence are compatible
+      if (hasVariation(sentence)) {
+        assert(getVariation(sentence) == other.getVariation(sentence));
+      } else {
+        assert(other.hasVariation(sentence));
+        setVariation(sentence, other.getVariation(sentence));
+      }
+
+      // determine our starting offset for merging in new sources
+      int offset{};
+      while (sources[first + offset] != -1) ++offset;
+      
+      // copy sources from other to us
+      while (other.sources[first + other_offset] != -1) {
+        sources[first + offset++] = other.sources[first + other_offset++];
+      }
+      // sanity check
+      assert(offset < kMaxUsedSourcesPerSentence);
+    }
+  }
+
+public:
   constexpr static bool anySourcesMatch(const Sources& s1,
     const Sources& s2)
   {
@@ -199,6 +225,7 @@ struct UsedSources {
     }
     // compare variations
     if (!allVariationsMatch(variations, other.variations, native)) {
+      if (reason) *reason = 3;
       return false;
     }
     return true;
@@ -215,27 +242,6 @@ struct UsedSources {
     sources[first + offset] = Sources::getIndex(src);
   }
   */
-
-  // TODO: private
-  void addSources(const UsedSources& other) {
-    for (int sentence{ 1 }; sentence <= kNumSentences; ++sentence) {
-      int first = Source::getFirstIndex(sentence);
-      int other_offset{};
-      // continue if no other sources to merge for this sentence
-      if (other.sources[first + other_offset] == -1) continue;
-
-      // determine our starting offset for merging in new sources
-      int offset{};
-      while (sources[first + offset] != -1) ++offset;
-      
-      // copy sources from other to us
-      while (other.sources[first + other_offset] != -1) {
-        sources[first + offset++] = other.sources[first + other_offset++];
-      }
-      // sanity check
-      assert(offset < kMaxUsedSourcesPerSentence);
-    }
-  }
 
   void addSource(int src) {
     auto sentence = Source::getSentence(src);
@@ -272,15 +278,6 @@ struct UsedSources {
 
     addSources(other);
     sortSources(sources);
-
-    for (auto i = 1u; i <= variations.size(); ++i) {
-      if (hasVariation(i) && other.hasVariation(i)) {
-        //assert(getVariation(i) == other.getVariation(i));
-        continue;
-      } else if (!hasVariation(i)) {
-        setVariation(i, other.getVariation(i));
-      }
-    }
   }
 
   auto copyMerge(const UsedSources& other) const {
@@ -289,7 +286,22 @@ struct UsedSources {
     return result;
   }
 
-    void dump() const {
+  constexpr int countSources(int sentence) const {
+    int count{};
+    if (getVariation(sentence) > -1) {
+      for (int i{}; i < kMaxUsedSourcesPerSentence; ++i) {
+        auto src = sources.at(Source::getFirstIndex(sentence) + i);
+        // TODO: could add break here when we find a -1, but since
+        // this is for diagnostics mostly...
+        if (src > -1) {
+          ++count;
+        }
+      }
+    }
+    return count;
+  }
+
+  void dump() const {
     auto first{true};
     std::cerr << "sources:";
     for (auto s{1}; s <= kNumSentences; ++s) {
@@ -311,14 +323,20 @@ struct UsedSources {
     if (first) std::cerr << " none" << std::endl;
   }
 
+  constexpr void assert_valid() const {
+    for (int s{1}; s <= kNumSentences; ++s) {
+      if (hasVariation(s)) {
+        assert(sources[Source::getFirstIndex(s)] != -1);
+      }
+    }
+  }
+
+  Bits bits{};
+  Sources sources = make_array<int8_t, kMaxUsedSources>(-1);
+  Variations variations = make_array<VariationIndex_t, kNumSentences>(-1);
 }; // UsedSources
 
 struct SourceCompatibilityData {
-  SourceBits sourceBits;
-  UsedSources usedSources;
-  // TODO: is 0 a valid legacy source? maybe not?
-  LegacySources legacySources = make_array<int8_t, kMaxLegacySources>(0);
-
   SourceCompatibilityData() = default;
   // copy consruct/assign allowed for now, precompute.mergeAllCompatibleXorSources
   SourceCompatibilityData(const SourceCompatibilityData&) = default;
@@ -340,17 +358,16 @@ struct SourceCompatibilityData {
     legacySources(std::move(legacySources))
   {}
 
-  constexpr static bool anyLegacySourcesMatch(const LegacySources& s1,
-    const LegacySources& s2)
+  constexpr static bool anyLegacySourcesMatch(const LegacySources& ls1,
+    const LegacySources& ls2)
   {
     for (int i{}; i < kMaxLegacySources; ++i) {
-      if (s1[i] && s2[i]) return true;
+      if (ls1[i] && ls2[i]) return true;
     }
     return false;
   }
   
-  constexpr
-  auto isXorCompatibleWith(const SourceCompatibilityData& other,
+  constexpr auto isXorCompatibleWith(const SourceCompatibilityData& other,
     bool useBits = true, int* reason = nullptr) const
   {
     if (useBits) {
@@ -358,15 +375,14 @@ struct SourceCompatibilityData {
         if (reason) *reason = 4;
         return false;
       }
-    } else if (anyLegacySourcesMatch(legacySources, other.legacySources)) {
+    } else if (anyLegacySourcesMatch(legacySources, other.legacySources)) { 
       if (reason) *reason = 5;
       return false;
     }
     return usedSources.isXorCompatibleWith(other.usedSources, useBits, reason);
   }
 
-  constexpr
-  auto isAndCompatibleWith(const SourceCompatibilityData& other,
+  constexpr auto isAndCompatibleWith(const SourceCompatibilityData& other,
     bool /*useBits*/ = true) const
   {
     auto andBits = sourceBits & other.sourceBits;
@@ -375,8 +391,7 @@ struct SourceCompatibilityData {
   }
 
   // OR == XOR || AND
-  constexpr
-  auto isOrCompatibleWith(const SourceCompatibilityData& other,
+  constexpr auto isOrCompatibleWith(const SourceCompatibilityData& other,
     bool useBits = true) const
   {
     return isXorCompatibleWith(other, useBits)
@@ -424,6 +439,15 @@ struct SourceCompatibilityData {
     mergeInPlace(other.legacySources);
   }
 
+  // used for debug logging
+  constexpr int getFirstLegacySource() const {
+    for (int i{}; i < kMaxLegacySources; i++) {
+      const auto src = legacySources.at(i);
+      if (src) return i;
+    }
+    return -1;
+  }
+
   void dump(const char* header = nullptr) const {
     if (header) std::cerr << header << std::endl;
     usedSources.dump();
@@ -438,6 +462,15 @@ struct SourceCompatibilityData {
     if (!any) std::cerr << " none";
     std::cerr << std::endl;
   }
+
+  constexpr void assert_valid() const {
+    usedSources.assert_valid();
+  }
+
+  SourceBits sourceBits;
+  UsedSources usedSources;
+  // TODO: could be array of bool too
+  LegacySources legacySources = make_array<int8_t, kMaxLegacySources>(0);
 }; // SourceCompatibilityData
 using SourceCompatibilityList = std::vector<SourceCompatibilityData>;
 
@@ -445,9 +478,6 @@ struct NameCount;
 using NameCountList = std::vector<NameCount>;
 
 struct NameCount {
-  std::string name;
-  int count;
-
   NameCount(std::string&& name, int count) :
     name(std::move(name)), count(count) {}
   NameCount() = default;
@@ -519,7 +549,6 @@ struct NameCount {
         usedSources.addSource(nc.count);
       }
     }
-    sortSources(usedSources.sources);
     return usedSources;
   }
 
@@ -530,6 +559,9 @@ struct NameCount {
     result.insert(result.end(), list2.begin(), list2.end()); // copy (ok)
     return result;
   }
+
+  std::string name;
+  int count;
 };
 
 struct NCData {
@@ -540,9 +572,6 @@ using NCDataList = std::vector<NCData>;
   //struct NameCount;
 
 struct SourceData : SourceCompatibilityData {
-  NameCountList primaryNameSrcList;
-  NameCountList ncList;
-
   SourceData() = default;
   SourceData(NameCountList&& primaryNameSrcList, SourceBits&& sourceBits,
       UsedSources&& usedSources, LegacySources&& legacySources,
@@ -558,6 +587,9 @@ struct SourceData : SourceCompatibilityData {
   SourceData& operator=(const SourceData&) = default;
   SourceData(SourceData&&) = default;
   SourceData& operator=(SourceData&&) = default;
+
+  NameCountList primaryNameSrcList;
+  NameCountList ncList;
 };
 
 /*
@@ -624,18 +656,16 @@ namespace device {
 };
 
 struct PreComputedData {
-  XorSourceList xorSourceList{};
-  XorSource* device_xorSources;
+  XorSourceList xorSourceList;
+  std::vector<int> xorSourceIndices;
+  XorSource* device_xorSources{ nullptr };
   OrArgDataList orArgDataList;
   SourceListMap sourceListMap;
   SentenceVariationIndices sentenceVariationIndices;
-  device::VariationIndices* device_sentenceVariationIndices;
+  device::VariationIndices* device_sentenceVariationIndices{ nullptr };
 };
-inline PreComputedData PCD;
 
 struct MergedSources : SourceCompatibilityData {
-  SourceCRefList sourceCRefList;
-
   MergedSources() = default;
   MergedSources(const MergedSources&) = default; // allow, dangerous?
   MergedSources& operator=(const MergedSources&) = delete;
@@ -648,6 +678,8 @@ struct MergedSources : SourceCompatibilityData {
       source.legacySources),
     sourceCRefList(SourceCRefList{SourceCRef{source}})
   {}
+
+  SourceCRefList sourceCRefList;
 };
 
 using MergedSourcesList = std::vector<MergedSources>;
@@ -663,8 +695,6 @@ struct PerfData {
   int ss_fail;     // # of short-circute failures; # of successes = ss_attempt - ss_fail
   int full;        // # of full range calls; eventually this should = calls - ss_attempt
 };
-
-inline PerfData isany_perf{};
 
 struct CandidateStats {
   int sum;
@@ -685,12 +715,23 @@ XorSourceList mergeCompatibleXorSourceCombinations(
   const std::vector<SourceList>& sourceLists);
 
 auto buildSentenceVariationIndices(const XorSourceList& xorSourceList,
-const std::vector<int>& xorSourceIndices) -> SentenceVariationIndices;
+  const std::vector<int>& xorSourceIndices) -> SentenceVariationIndices;
 
 auto getSortedXorSourceIndices(const XorSourceList& xorSourceList)
   -> std::vector<int>;
 
 void mergeUsedSourcesInPlace(UsedSources& to, const UsedSources& from);
+
+inline constexpr void assert_valid(const SourceList& src_list) {
+  for (const auto& src: src_list) {
+    src.assert_valid();
+  }
+}
+
+// globals
+
+inline PerfData isany_perf{};
+inline PreComputedData PCD;
 
 } // namespace cm
 

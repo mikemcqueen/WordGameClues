@@ -17,10 +17,6 @@ namespace cm {
   };
 
   //
-  
-  inline std::unordered_map<int, OneSumCandidateData> allSumsCandidateData{};
-  
-  //
 
   auto addCandidate(int sum, const std::string& combo, int index) -> int;
   auto addCandidate(int sum, std::string&& combo,
@@ -30,11 +26,15 @@ namespace cm {
     const XorSourceList& xorSourceList, const std::vector<int> sortedIndices);
 
   [[nodiscard]]
-  auto cuda_allocSentenceVariationIndices(
+  auto cuda_allocCopySentenceVariationIndices(
     const SentenceVariationIndices& sentenceVariationIndices)
     -> device::VariationIndices*;
 
   void filterCandidates(int sum);
-}
+
+  //
+  
+  inline std::unordered_map<int, OneSumCandidateData> allSumsCandidateData{};
+} // namespace cm
 
 #endif // INCLUDE_CANDIDATES_H
