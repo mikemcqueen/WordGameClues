@@ -286,7 +286,7 @@ cm::SourceCompatibilityData makeSourceCompatibilityData(Napi::Env& env,
       const auto count = jsPnsl[j].As<Object>().Get("count").As<Number>().Int32Value();
       compatData.addSource(count);
     }
-    cm::sortSources(compatData.usedSources.sources);
+    compatData.usedSources.sortSources();
   }
   return compatData;
 }
@@ -446,6 +446,7 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
     
     cm::PCD.xorSourceList =
       std::move(cm::mergeCompatibleXorSourceCombinations(sourceLists));
+    cm::assert_valid(cm::PCD.xorSourceList);
     
     auto merge1 = high_resolution_clock::now();
     auto d_merge = duration_cast<milliseconds>(merge1 - merge0).count();
@@ -458,8 +459,18 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
 
   auto xsi0 = high_resolution_clock::now();
 
+#if 0 // for unsorted xorSources
+  auto unsorted = []() {
+    std::vector<int> v;
+    v.resize(cm::PCD.xorSourceList.size());
+    iota(v.begin(), v.end(), 0);
+    return v;
+  };// -> std::vector<int> ;
+  cm::PCD.xorSourceIndices = std::move(unsorted());
+#else
   cm::PCD.xorSourceIndices =
     std::move(cm::getSortedXorSourceIndices(cm::PCD.xorSourceList));
+#endif
   cm::PCD.device_xorSources = cm::cuda_allocCopyXorSources(
     cm::PCD.xorSourceList, cm::PCD.xorSourceIndices);
 

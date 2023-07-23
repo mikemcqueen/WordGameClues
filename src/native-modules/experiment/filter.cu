@@ -126,7 +126,8 @@ __device__ auto isSourceCompatibleWithEveryOrArg(
   void xorKernel(const SourceCompatibilityData* sources, size_t num_sources,
     const XorSource* xorSources, size_t num_xorSources,
     const device::VariationIndices* sentenceVariationIndices,
-    const int* source_indices, int stream_index, result_t* results)
+    const int* source_indices, int stream_index, result_t* results,
+    int special)
   {
     constexpr const auto logging = false;
 
@@ -135,34 +136,38 @@ __device__ auto isSourceCompatibleWithEveryOrArg(
     int compat_index{ -1 }, reason{ -1 };
     auto debug{ true };
 
+    const auto& source = sources[source_indices[index]];
     bool compat = isSourceXORCompatibleWithAnyXorSource(
-      sources[source_indices[index]], xorSources, num_xorSources,
+      source, xorSources, num_xorSources,
       sentenceVariationIndices, &compat_index,
       debug ? &reason : nullptr);
     if (compat) assert(compat_index > -1); // probably slowish
     results[index] = compat ? compat_index : -1;
 
     if constexpr (logging) {
+      const auto src_index = source_indices[index];
       if (debug) {
-        const auto& source = sources[source_indices[index]];
         const auto& us = source.usedSources;
-        printf("KERNEL: stream %d, index: %d, src_index: %d"
-               ", v1: %d (%d), v3: %d (%d)"
-               ", firstLegacySrc: %d"
+        printf("stream %d, index: %d, src_index: %d"
+               ", s1 v%d 1st:%d (%d)"
+               ", s3 v%d 1st:%d (%d)"
+               ", legacy 1st:%d (%d)"
                ", compat: %d, compat_index %d, reason %d\n",
-               stream_index, index, source_indices[index],
-               us.getVariation(1), us.countSources(1),
-               us.getVariation(3), us.countSources(3),
-               source.getFirstLegacySource(),
+               stream_index, index, src_index,
+               us.getVariation(1), us.getFirstSource(1), us.countSources(1),
+               us.getVariation(3), us.getFirstSource(3), us.countSources(3),
+               source.getFirstLegacySource(), source.countLegacySources(),
                compat, compat_index, reason);
         if (compat) {
           const auto& xor_source = xorSources[compat_index];
           const auto& xor_us = xor_source.usedSources;
-          printf("  Xor[%d]: v1: %d (%d), v3: %d (%d), firstLegacySrc: %d\n",
-                 compat_index,
-                 xor_us.getVariation(1), xor_us.countSources(1),
-                 xor_us.getVariation(3), xor_us.countSources(3),
-                 xor_source.getFirstLegacySource());
+          printf("  Xor[%d]: s1 v%d 1st:%d (%d), s3 v%d 1st:%d (%d)"
+                 ", legacy 1st:%d (%d)\n",
+                 compat_index, xor_us.getVariation(1), xor_us.getFirstSource(1),
+                 xor_us.countSources(1), xor_us.getVariation(3),
+                 xor_us.getFirstSource(3), xor_us.countSources(3),
+                 xor_source.getFirstLegacySource(),
+                 xor_source.countLegacySources());
         }
       }
     }
@@ -208,6 +213,10 @@ __device__ auto isSourceCompatibleWithEveryOrArg(
       return flat_indices.at(list_index);
     }
       
+    auto list_size(int list_index) const {
+      return list_sizes.at(list_index);
+    }
+      
     auto num_in_state(int first, int count, State state) const {
       int total{};
       for (int i{}; i < count; ++i) {
@@ -229,7 +238,7 @@ __device__ auto isSourceCompatibleWithEveryOrArg(
     }
  
     auto update(const std::vector<SourceIndex>& sourceIndices,
-      const ResultList& results, const SourceCompatibilityLists& sources,
+      ResultList& results, const SourceCompatibilityLists& sources,
       int stream_index) // for logging
     {
       constexpr static const bool logging = false;
@@ -237,19 +246,17 @@ __device__ auto isSourceCompatibleWithEveryOrArg(
       int num_compatible{};
       for (size_t i{}; i < sourceIndices.size(); ++i) {
         const auto result = results.at(i);
-        auto& indexState = list.at(sourceIndices.at(i).listIndex);
+        const auto src_index = sourceIndices.at(i);
+        auto& indexState = list.at(src_index.listIndex);
         // no longer (always) true, as indexState.index is incremented at
         // fill() time.
-        //assert(indexState.sourceIndex.listIndex ==
-        //  sourceIndices.at(i).listIndex);
+        //assert(indexState.sourceIndex.listIndex == src_index.listIndex);
         if constexpr (logging) {
-          const auto si = sourceIndices.at(i);
-          if ((stream_index == 0) && (si.index == 1)
-              && ((si.listIndex == 209) || (si.listIndex == 1174)))
-          {
+          if (src_index.index == -1) {// && other conditions
             std::cerr << "stream " << stream_index << " "
-                      << si.listIndex << ":" << si.index
+                      << src_index.listIndex << ":" << src_index.index
                       << ", results index: " << i
+                      << ", result: " << result
                       << ", compat: " << std::boolalpha << (result > -1)
                       << ", ready: " << indexState.ready_state()
                       << std::endl;
@@ -258,29 +265,39 @@ __device__ auto isSourceCompatibleWithEveryOrArg(
         // this should only ever happen if the number of lists in "ready"
         // state was less than minimum stride (we doubled up sources from
         // one or more lists).
-        if (!indexState.ready_state()) continue;
+        if (!indexState.ready_state()) {
+          // for debugging purposes, set these "duplicate results for same
+          // sentence" results to -1, so we can later determine the exact
+          // set of "first matched soruces".
+          results.at(i) = -1;
+          continue;
+        }
         if (result > -1) {
           indexState.state = State::compatible;
           num_compatible++;
-          if constexpr (logging) compat_src_indices.insert(sourceIndices.at(i));
+          if constexpr (logging) compat_src_indices.insert(src_index);
         }
         else {
-          // index was incremented when we grabbed it in fill(). if it was
-          // incremented past length, mark it done now.
-          auto sourcelist_size =
-            (int)sources.at(indexState.sourceIndex.listIndex).size();
-          if (indexState.sourceIndex.index >= sourcelist_size) {
+          // if this is the result for the last source in a sourcelist,
+          // mark the list (indexState) as done.
+          // note that doing it this way *will* put a dependency on the
+          // order in which we process sources within a list (currently,
+          // in-order), but presumably there'd be some sourceIndexIndices
+          // abomination that we could use to determine the *actual* index.
+          auto sourcelist_size = (int)sources.at(src_index.listIndex).size();
+          if (src_index.index >= sourcelist_size) {
             indexState.state = State::done;
           }
         }
       }
       if constexpr (logging) {
-        if (compat_src_indices.size() && (compat_src_indices.size() < 200)) {
-          std::cerr << "stream " << stream_index << " update:";
+        if (compat_src_indices.size()) {// && (compat_src_indices.size() < 200)) {
+          //std::cerr << "stream " << stream_index << " update:";
           for (const auto& src_index: compat_src_indices) {
-            std::cerr << " " << src_index.listIndex << ":" << src_index.index;
+            std::cout << "" << src_index.listIndex << ":" << src_index.index
+                      << std::endl;
           }
-          std::cerr << std::endl;
+          //std::cerr << std::endl;
         }
       }
       return num_compatible;
@@ -311,6 +328,7 @@ __device__ auto isSourceCompatibleWithEveryOrArg(
   //////////
 
   std::vector<cudaStream_t> streams;
+  int host_special{};
   
   // the pointers in this are allocated in device memory
   struct KernelData {
@@ -327,17 +345,20 @@ __device__ auto isSourceCompatibleWithEveryOrArg(
 
     static void init(std::vector<KernelData>& dataVec, int num_sourcelists) {
       const int stride = num_sourcelists / dataVec.size();
+      int leftovers = num_sourcelists % dataVec.size();
       assert((stride < max_workitems) && "not supported (but could be)");
       int start_index{};
-      for (auto i{ 0u }; i < dataVec.size(); ++i) {
+      for (size_t i{}; i < dataVec.size(); ++i) {
         auto& data = dataVec.at(i);
         data.list_start_index = start_index;
-        int remain = num_sourcelists - start_index;
-        data.source_indices.resize(remain < stride ? remain : stride);
-        // this is necessary because source_indices.size() may change, but the
-        // number of list_indices this stream is concerned with is constant
-        data.num_list_indices = data.source_indices.size();
-        start_index += stride;
+        int share_of_leftovers = leftovers ? (--leftovers, 1) : 0;
+        //if (leftovers) --leftovers;
+        // this separate accounting of "number of indices" is necessary because
+        // source_indices.size() may change, but the number of list_indices this
+        // stream is concerned with is constant
+        data.num_list_indices = stride + share_of_leftovers;
+        data.source_indices.resize(data.num_list_indices);
+        start_index += data.num_list_indices;
         if (i >= streams.size()) {
           cudaStream_t stream;
           cudaError_t err = cudaStreamCreate(&stream);
@@ -364,7 +385,8 @@ __device__ auto isSourceCompatibleWithEveryOrArg(
     }
 
     auto fillSourceIndices(IndexStates& indexStates, int num_indices) {
-      constexpr const auto dupe_checking = true;
+      constexpr const auto dupe_checking = false;
+
       std::set<std::string> dupe_check_indices{}; // debugging
       std::set<int> list_indices_used{};
       source_indices.resize(num_indices);
@@ -376,8 +398,27 @@ __device__ auto isSourceCompatibleWithEveryOrArg(
             indexStates.get_and_increment_index(list_index);
           if (opt_src_index.has_value()) {
             const auto src_index = opt_src_index.value();
+            assert(src_index.listIndex == list_index);
+
+            // DEBUGGGGGGGGGG
+            if (src_index.listIndex == -1) {
+              host_special = i;
+            }
+            const auto flat_index = indexStates.flat_index(src_index.listIndex) +
+              src_index.index;
+            if (src_index.listIndex == -1) {
+              //const auto list_size = indexStates.flat_index(src_index.listIndex + 1) -
+              //indexStates.flat_index(src_index.listIndex);
+              std::cerr << "flat_index: " << flat_index << " = "
+                        << src_index.listIndex << ":" << src_index.index
+                        << ", list size: " << indexStates.list_size(src_index.listIndex)
+                        << std::endl;
+            }
+
             source_indices.at(i++) = src_index;
-            list_indices_used.insert(src_index.listIndex);
+            // TODO this is slow and only used for logging and I don't like it.
+            // figure it out.
+            //list_indices_used.insert(src_index.listIndex);
 
             if constexpr (dupe_checking) {
               char buf[32];
@@ -399,7 +440,7 @@ __device__ auto isSourceCompatibleWithEveryOrArg(
           break;
         }
       }
-      return list_indices_used.size();
+      return 8008135; // list_indices_used.size();
     }
 
     bool fillSourceIndices(IndexStates& indexStates) {
@@ -586,7 +627,7 @@ __device__ auto isSourceCompatibleWithEveryOrArg(
       device_sources, num_sources,
       PCD.device_xorSources, PCD.xorSourceList.size(),
       PCD.device_sentenceVariationIndices, kernel.device_source_indices,
-      kernel.stream_index, kernel.device_results);
+      kernel.stream_index, kernel.device_results, host_special);
 
 #if 0 || defined(DEBUG)
     fprintf(stderr, "  kernel %d launched with %d blocks of %d threads...\n",
@@ -670,10 +711,9 @@ __device__ auto isSourceCompatibleWithEveryOrArg(
     std::cerr << "total: " << total << std::endl;
   }
 
-  void check(const SourceCompatibilityLists& sources, int list_index,
-    int index)
+  void check(const SourceCompatibilityLists& sources, int list_index, int index)
   {
-    constexpr const auto logging = false;
+    constexpr const auto logging = true;
     if constexpr (logging) {
       char buf[32];
       snprintf(buf, sizeof(buf), "%d:%d", list_index, index);
@@ -706,10 +746,7 @@ void filterCandidatesCuda(int sum) {
   const auto& sources = allSumsCandidateData.find(sum)->second
     .sourceCompatLists;
   auto device_sources = allocCopySources(sources);
-  /*
-  check(sources, 209, 1);
-  dump(PCD.xorSourceList, PCD.xorSourceIndices, 0);
-  */
+
   auto t0 = high_resolution_clock::now();
   const int num_streams = KernelData::getNumStreams(sources.size());
   std::vector<KernelData> kernels(num_streams);
@@ -743,19 +780,21 @@ void filterCandidatesCuda(int sum) {
       sources, kernel.stream_index);
     total_compatible += num_compatible;
 
+    #if 0
     for (size_t r{}; r < kernel.source_indices.size(); ++r) {
       const auto result = results.at(r);
       if (result > -1) compat_indices.insert(result);
     }
     compat_record.at(kernel.stream_index).push_back(num_compatible);
+    #endif
 
-#if 0 || defined(DEBUG)
+#if 1 || defined(DEBUG)
     std::cerr << "  kernel " << current_kernel << " done"
-      << ", done: " << kernel.num_done(indexStates)
+      //<< ", done: " << kernel.num_done(indexStates)
       //<< ", compat reported: " << num_compatible
-      << ", compat actual:" << kernel.num_compatible(indexStates)
+      //<< ", compat actual:" << kernel.num_compatible(indexStates)
       //<< ", total compatible: " << total_compatible
-      << ", remaining: " << kernel.num_ready(indexStates)
+      //<< ", remaining: " << kernel.num_ready(indexStates)
       << " - " << d_results << "ms" << std::endl;
 #endif
     #ifdef DEBUG
@@ -770,10 +809,11 @@ void filterCandidatesCuda(int sum) {
   std::cerr << "total compatible: " << total_compatible << " of "
             << sources.size() << " - " << d_kernel << "ms"
             << std::endl;
-
+  #if 0
   for (auto index: compat_indices) {
     std::cout << index << std::endl;
   }
+  #endif
 
   /*
   //  auto num_sources = count(compatLists);

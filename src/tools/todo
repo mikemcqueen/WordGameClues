@@ -1,4 +1,10 @@
+* whatever is matching with xorSource 2440 in the new branch probably matches
+  with something earlier in old branch. so figure out what matches in new,
+  and see what those match with in old.
 
+* we could also store a count (and eventually, list) of  which sources
+  match with which xorsource
+  
 * is 0 a valid legacy source? maybe not? i'm defaulting LegacySources to
   in combo-maker.h
 

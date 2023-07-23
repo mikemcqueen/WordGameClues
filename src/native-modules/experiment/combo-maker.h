@@ -63,11 +63,6 @@ using LegacySources = std::array<int8_t, kMaxLegacySources>;
 // 32 bytes per sentence * 9 sentences = 2304? bits, 288 bytes, 36? 64-bit words
 using Sources = std::array<int8_t, kMaxUsedSources>;
 
-template<typename T>
-void sortSources(T& sources) {
-  std::sort(sources.begin(), sources.end(), std::greater<int>());
-}
-  
 #define USEDSOURCES_BITSET 1
 
 struct UsedSources {
@@ -143,12 +138,12 @@ public:
            remain > 0; --remain)
       {
         if ((s1[i] == -1) || (s2[j] == -1)) {
-          return false;
+          break;
         }
         if (s1[i] == s2[j]) {
           return true;
         }
-        else if (s1[i] < s2[j]) {
+        else if (s1[i] > s2[j]) {
           i++;
         }
         else {
@@ -277,7 +272,7 @@ public:
     getBits() |= other.getBits();
 
     addSources(other);
-    sortSources(sources);
+    sortSources();
   }
 
   auto copyMerge(const UsedSources& other) const {
@@ -286,21 +281,30 @@ public:
     return result;
   }
 
+  constexpr int getFirstSource(int sentence) const {
+    return sources.at(Source::getFirstIndex(sentence));
+  }
+
   constexpr int countSources(int sentence) const {
     int count{};
     if (getVariation(sentence) > -1) {
       for (int i{}; i < kMaxUsedSourcesPerSentence; ++i) {
         auto src = sources.at(Source::getFirstIndex(sentence) + i);
-        // TODO: could add break here when we find a -1, but since
-        // this is for diagnostics mostly...
-        if (src > -1) {
-          ++count;
-        }
+        if (src < 0) break;
+        ++count;
       }
     }
     return count;
   }
 
+  void sortSources() {
+    for (int s{1}; s <= kNumSentences; ++s) {
+      std::sort(sources.data() + Source::getFirstIndex(s),
+                sources.data() + Source::getFirstIndex(s + 1),
+                std::greater<int8_t>());
+    }
+  }
+  
   void dump() const {
     auto first{true};
     std::cerr << "sources:";
@@ -313,9 +317,8 @@ public:
         std::cerr << "  s" << s << " v" << getVariation(s) << ":";
         for (int i{}; i < kMaxUsedSourcesPerSentence; ++i) {
           auto src = sources.at(Source::getFirstIndex(s) + i);
-          if (src > -1) {
-            std::cerr << " " << src;
-          }
+          if (src < 0) break;
+          std::cerr << " " << int(src);
         }
         std::cerr << std::endl;
       }
@@ -441,11 +444,20 @@ struct SourceCompatibilityData {
 
   // used for debug logging
   constexpr int getFirstLegacySource() const {
-    for (int i{}; i < kMaxLegacySources; i++) {
+    for (int i{}; i < kMaxLegacySources; ++i) {
       const auto src = legacySources.at(i);
       if (src) return i;
     }
     return -1;
+  }
+
+  constexpr int countLegacySources() const {
+    int count{};
+    for (int i{}; i < kMaxLegacySources; ++i) {
+      const auto src = legacySources.at(i);
+      if (src) ++count;
+    }
+    return count;
   }
 
   void dump(const char* header = nullptr) const {
@@ -549,6 +561,7 @@ struct NameCount {
         usedSources.addSource(nc.count);
       }
     }
+    usedSources.sortSources();
     return usedSources;
   }
 
