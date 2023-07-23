@@ -520,8 +520,8 @@ export const makeCombos = (args: any): any => {
             console.error(`merge: copy(${ms_copy}), inplace(${ms_inplace})` +
                 `, comp(${ms_comp}), compat(${ms_compat})`);
                 //, ms_111(${ms_111})
-            const isany: PerfData = NativeComboMaker.getIsAnyPerfData();
             /*
+            const isany: PerfData = NativeComboMaker.getIsAnyPerfData();
             console.error(`isAny: calls(${isany.calls})` +
                 `, range_calls(${isany.range_calls}), full_range(${isany.full})` +
                 `, comps(${isany.comps}), compat(${isany.compat})` +

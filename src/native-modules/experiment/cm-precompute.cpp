@@ -549,6 +549,7 @@ auto buildSentenceVariationIndices(const XorSourceList& xorSourceList,
 //////////
 
 namespace {
+  /*
   using SourceSet = std::unordered_set<int>;
   using SourceCountMap = std::unordered_map<int, int>;
   using SourceFreqMap = std::unordered_map<int, double>;
@@ -568,7 +569,7 @@ namespace {
       for (int s{ 1 }; s <= kNumSentences; ++s) {
         auto start = Source::getFirstIndex(s);
         for (int i{}; i < kMaxUsedSourcesPerSentence; ++i) {
-          auto source = sources[start + i];
+          auto source = sources.at(start + i);
           if (source == -1) break;
           source_set.insert(source);
           addToTotals(source);
@@ -579,7 +580,7 @@ namespace {
     void addSources(int index, const LegacySources& legacySources) {
       auto& source_set = source_sets[index];
       for (int i{}; i < kMaxLegacySources; ++i) {
-        auto source = legacySources[i];
+        auto source = legacySources.at(i);
         if (!source) continue;
         source_set.insert(source);
         addToTotals(source);
@@ -589,6 +590,7 @@ namespace {
     std::vector<SourceSet> source_sets;
     SourceCountMap totals_map;
   }; // struct SourceCounts
+  */
   
   /*
   auto getTotalCount(const SourceCountMap& countMap) {
@@ -600,45 +602,51 @@ namespace {
   }
   */
   
-  auto makeSourceCounts(const XorSourceList& xorSources) {
+  /* moved to combo-maker.h
+  template<typename T>
+  auto makeSourceCounts(const T& sourceList) {
     SourceCounts sourceCounts;
-    sourceCounts.source_sets.resize(xorSources.size());
-    std::for_each(xorSources.begin(), xorSources.end(),
-      [idx = 0, &sourceCounts](const XorSource& xorSource) mutable {
-        sourceCounts.addSources(idx, xorSource.usedSources.sources);
-        sourceCounts.addSources(idx, xorSource.legacySources);
+    sourceCounts.source_sets.resize(sourceList.size());
+    std::for_each(sourceList.begin(), sourceList.end(),
+      [idx = 0, &sourceCounts](const SourceData& source) mutable {
+        sourceCounts.addSources(idx, source.usedSources.sources);
+        sourceCounts.addSources(idx, source.legacySources);
         idx++;
       });
     return sourceCounts;
   }
+  */
   
+  /*
   auto makeSourceFreqMap(const SourceCounts& sourceCounts) {
     SourceFreqMap freqMap;
     return freqMap;
   }
 
-  auto makeSortedIndices(const XorSourceList& xorSourceList,
-    const SourceCounts& sourceCounts,
+  auto makeSortedIndices(const SourceCounts& sourceCounts,
     const SourceFreqMap& sourceFreqMap)
   {
-    std::vector<int> indices(xorSourceList.size());
+    std::vector<int> indices(sourceCounts.source_sets.size());
     std::iota(indices.begin(), indices.end(), 0);
     std::sort(indices.begin(), indices.end(),
-      [&sourceCounts/*, &sourceFreqMap*/](int i, int j) {
+      [&sourceCounts, &sourceFreqMap](int i, int j) {
         return sourceCounts.source_sets[i].size() <
           sourceCounts.source_sets[j].size();
       });
     return indices;
   }
+*/
 } // anon namespace
   
-auto getSortedXorSourceIndices(const XorSourceList& xorSourceList)
+/* moved to combo-maker.h
+template<typename T>
+auto getSortedSourceIndices(const T& sourceList)
   -> std::vector<int>
 {
-  auto sourceCounts = makeSourceCounts(xorSourceList);
+  auto sourceCounts = makeSourceCounts(sourceList);
   auto sourceFreqMap = makeSourceFreqMap(sourceCounts);
-  auto indices = makeSortedIndices(xorSourceList, sourceCounts, sourceFreqMap);
-  return indices;
+  return makeSortedIndices(sourceCounts, sourceFreqMap);
 }
+*/
 
 } // namespace cm

@@ -8,6 +8,7 @@
 #include <thread>
 #include <cuda_runtime.h>
 #include "candidates.h"
+#include "source-counts.h"
 
 namespace {
   using namespace cm;
@@ -685,24 +686,26 @@ __device__ auto isSourceCompatibleWithEveryOrArg(
     auto sources_bytes = count(sources) * sizeof(SourceCompatibilityData);
     SourceCompatibilityData* device_sources;
     err = cudaMalloc((void **)&device_sources, sources_bytes);
-    if (err != cudaSuccess) {
-      fprintf(stderr, "Failed to allocate sources, error: %s\n",
-        cudaGetErrorString(err));
-      throw std::runtime_error("failed to allocate sources");
-    }
+    assert((err == cudaSuccess) && "failed to allocate sources");
 
     // copy sources
     size_t index{};
     for (const auto& sourceList: sources) {
-      err = cudaMemcpy(&device_sources[index], sourceList.data(),
-        sourceList.size() * sizeof(SourceCompatibilityData),
-        cudaMemcpyHostToDevice);
-      if (err != cudaSuccess) {
-        fprintf(stderr, "Failed to copy sourcelist, error: %s\n",
-          cudaGetErrorString(err));
-        throw std::runtime_error("failed to copy sourcelist");
+      auto sourceIndices = cm::getSortedSourceIndices(sourceList, false);
+      if (sourceIndices.size()) {
+        for (size_t i{}; i < sourceIndices.size(); ++i) {
+          const auto& src = sourceList.at(sourceIndices.at(i));
+          err = cudaMemcpy(&device_sources[index++], &src,
+            sizeof(SourceCompatibilityData), cudaMemcpyHostToDevice);
+          assert((err == cudaSuccess) && "failed to copy source");
+        }
+      } else {
+        err = cudaMemcpy(&device_sources[index], sourceList.data(),
+          sourceList.size() * sizeof(SourceCompatibilityData),
+          cudaMemcpyHostToDevice);
+        assert((err == cudaSuccess) && "failed to copy sources");
+        index += sourceList.size();
       }
-      index += sourceList.size();
     }
     return device_sources;
   }

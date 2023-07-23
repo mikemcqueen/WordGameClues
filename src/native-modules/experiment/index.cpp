@@ -10,6 +10,7 @@
 #include "greeting.h"
 #include "combo-maker.h"
 #include "candidates.h"
+#include "source-counts.h"
 #include "dump.h"
 #include "wrap.h"
 
@@ -469,7 +470,7 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   cm::PCD.xorSourceIndices = std::move(unsorted());
 #else
   cm::PCD.xorSourceIndices =
-    std::move(cm::getSortedXorSourceIndices(cm::PCD.xorSourceList));
+    std::move(cm::getSortedSourceIndices(cm::PCD.xorSourceList));
 #endif
   cm::PCD.device_xorSources = cm::cuda_allocCopyXorSources(
     cm::PCD.xorSourceList, cm::PCD.xorSourceIndices);

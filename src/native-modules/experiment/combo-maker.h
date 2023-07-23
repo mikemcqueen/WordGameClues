@@ -717,8 +717,8 @@ struct CandidateStats {
   int totalCombos;
 };
 
-// functions TODO: precompute.h
- 
+// functions
+
 void debugSourceList(const SourceList& sourceList, std::string_view sv);
 
 auto buildSourceListsForUseNcData(const std::vector<NCDataList>& useNcDataLists,
@@ -729,9 +729,6 @@ XorSourceList mergeCompatibleXorSourceCombinations(
 
 auto buildSentenceVariationIndices(const XorSourceList& xorSourceList,
   const std::vector<int>& xorSourceIndices) -> SentenceVariationIndices;
-
-auto getSortedXorSourceIndices(const XorSourceList& xorSourceList)
-  -> std::vector<int>;
 
 void mergeUsedSourcesInPlace(UsedSources& to, const UsedSources& from);
 

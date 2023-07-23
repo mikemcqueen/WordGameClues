@@ -1,7 +1,7 @@
 {
   "targets": [{
     "target_name": "experiment",
-    "cflags_cc": [ "-fPIC -std=c++20" ],
+    "cflags_cc": [ "-fPIC -std=c++20 -Wno-unused-function" ],
     "cflags!": [ "-fno-exceptions" ],
     "cflags_cc!": [ "-fno-exceptions" ],
     "ldflags": [ "-Wl,-rpath,/usr/local/cuda/targets/x86_64-linux/lib" ],
