@@ -51,6 +51,8 @@ const CmdLineOptions = Opt.create(_.concat(Clues.Options, [
     ['',  'primary',                           '  show combos as primary source clues' ],
     ['l', 'parallel',                          '  use paralelljs' ],
     ['',  'slow',                              '  use (old) slow method of loading clues' ],
+    ['',  'streams=COUNT',                     '  use COUNT CUDA streams' ],
+    ['',  'workitems=COUNT',                   '  each CUDA stream processes COUNT workitems' ],
     ['',  'copy-from=SOURCE',                  'copy clues from source cluetype; e.g. p1.1'],
     ['',  'save',                              '  save clue files'],
     ['',  'allow-dupe-source',                 '  allow duplicate sources'],
@@ -122,6 +124,7 @@ function loadClues (clues, ignoreErrors, max, options) {
 //  use:     useClueList
 //
 function doCombos(args) {
+    /*
     if (!_.isUndefined(args.sources)) {
         args.sources = _.chain(args.sources).split(',').map(_.toNumber).value();
     }
@@ -129,6 +132,7 @@ function doCombos(args) {
     // is _chain even necessary here?
         args.require = _.chain(args.require).split(',').map(_.toNumber).value();
     }
+    */
     ComboMaker.makeCombos(args);
 }
 
@@ -425,24 +429,29 @@ async function main () {
         Debug(`from: ${from.baseDir}`);
         copyClues(from, options);
     } else if (options.count) {
+        /*
         let sources = options['primary-sources'];
         if (options.inverse) {
             sources = ClueManager.getInversePrimarySources(sources.split(',')).join(',');
             console.log(`inverse sources: ${sources}`);
         }
+        */
         return combo_maker({
             sum:     options.count,
             max:     maxArg,
-            require: options['require-counts'],
-            sources,
+            //require: options['require-counts'],
+            //sources,
             use:     useClueList,
             primary: options.primary,
             apple:   options.apple,
             final:   options.final,
             or:      options.or,
             xor:     options.xor,
+            //and:     options.and,
             parallel: options.parallel,
-            verbose: options.verbose
+            verbose: options.verbose,
+            streams: options.streams ? Number(options.streams) : 0,
+            workitems: options.workitems ? Number(options.workitems) : 0
         });
     }
     return 0;

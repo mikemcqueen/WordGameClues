@@ -600,14 +600,16 @@ Value getCandidateStatsForSum(const CallbackInfo& info) {
 //
 Value filterCandidatesForSum(const CallbackInfo& info) {
   Env env = info.Env();
-  if (!info[0].IsNumber()) {
+  if (!info[0].IsNumber() || !info[1].IsNumber() || !info[2].IsNumber()) {
       Napi::TypeError::New(env, "fitlerCandidatesForSum: non-number parameter")
         .ThrowAsJavaScriptException();
       return env.Null();
   }
   auto sum = info[0].As<Number>().Int32Value();
   assert(sum >= 2);
-  cm::filterCandidates(sum);
+  auto threads = info[1].As<Number>().Int32Value();
+  auto workitems = info[2].As<Number>().Int32Value();
+  cm::filterCandidates(sum, threads, workitems);
   return env.Null();
 }
 

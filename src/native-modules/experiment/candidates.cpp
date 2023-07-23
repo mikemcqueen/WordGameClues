@@ -5,7 +5,7 @@
 #include "candidates.h"
 
 namespace cm {
-  void filterCandidatesCuda(int sum);
+  void filterCandidatesCuda(int sum, int streams, int workitems);
   //  [[nodiscard]]
   //  XorSource* cuda_allocCopyXorSources(const XorSourceList& xorSourceList);
   
@@ -29,9 +29,9 @@ namespace cm {
   }
   #endif
 
-  void filterCandidates(int sum) {
+  void filterCandidates(int sum, int streams, int workitems) {
     //filterCandidatesNative(sum);
-    filterCandidatesCuda(sum);
+    filterCandidatesCuda(sum, streams, workitems);
   }
 
   auto addCandidate(int sum, const std::string& combo, int index) -> int {

@@ -401,7 +401,7 @@ const getCombosForUseNcLists = (sum: number, max: number, pcd: PreCompute.Data,
     } else {
         process.stderr.write('.');
     }
-    NativeComboMaker.filterCandidatesForSum(sum);
+    NativeComboMaker.filterCandidatesForSum(sum, args.streams, args.workitems);
     return combos;
 };
 
@@ -412,8 +412,6 @@ export const makeCombosForSum = (sum: number, max: number, args: any): string[] 
         // console.error(`Enforcing max results: ${args.maxResults}`);
     }
     // TODO move this a layer or two out; use "validateArgs" 
-    Assert(_.isEmpty(args.require), 'require not yet supported');
-    Assert(!args.sources, 'sources not yet supported');
     return getCombosForUseNcLists(sum, max, PCD, args);
 };
 
@@ -523,15 +521,12 @@ export const makeCombos = (args: any): any => {
                 `, comp(${ms_comp}), compat(${ms_compat})`);
                 //, ms_111(${ms_111})
             const isany: PerfData = NativeComboMaker.getIsAnyPerfData();
+            /*
             console.error(`isAny: calls(${isany.calls})` +
                 `, range_calls(${isany.range_calls}), full_range(${isany.full})` +
                 `, comps(${isany.comps}), compat(${isany.compat})` +
                 `, ss_attempt(${isany.ss_attempt}), ss_fail(${isany.ss_fail})`);
-                
-
-            //`, 1_1(${mcsl_1_1} - ${Math.floor((mcsl_1_1 / mcsl_call) * 100)}%)` +
-            //`, push01(${mcsl_push01} - ${Math.floor((mcsl_push01 / mcsl_call) * 100)}%)` +
-            //` - call/comp ${Math.floor((mcsl_call / mcsl_comp) * 100)}%`);
+            */
         }
         Debug(`total: ${total}, filtered(${_.size(totals.map)})`);
         displayCombos(Object.keys(totals.map), ClueManager.getVariations());

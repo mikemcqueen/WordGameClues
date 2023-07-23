@@ -334,19 +334,17 @@ __device__ auto isSourceCompatibleWithEveryOrArg(
   struct KernelData {
   private:
     static const int num_cores = 1280;
-    static const int min_workitems = 2 * num_cores;
-    static const int max_workitems = 2 * num_cores;
 
   public:
     //constexpr
     static int getNumStreams(size_t num_sources) {
-      return std::min(24ul, num_sources / min_workitems + 1);
+      return std::min(24ul, num_sources / min_workitems() + 1);
     }
 
     static void init(std::vector<KernelData>& dataVec, int num_sourcelists) {
       const int stride = num_sourcelists / dataVec.size();
       int leftovers = num_sourcelists % dataVec.size();
-      assert((stride < max_workitems) && "not supported (but could be)");
+      assert((stride < max_workitems()) && "not supported (but could be)");
       int start_index{};
       for (size_t i{}; i < dataVec.size(); ++i) {
         auto& data = dataVec.at(i);
@@ -368,6 +366,18 @@ __device__ auto isSourceCompatibleWithEveryOrArg(
         data.stream_index = i;
         data.stream = streams[i];
       }
+    }
+
+    static int min_workitems(int override = 0) {
+      static int the_min_workitems = 2 * num_cores;
+      if (override) the_min_workitems = override;
+      return the_min_workitems;
+    }
+
+    static int max_workitems(int override = 0) {
+      static int the_max_workitems = 2 * num_cores;
+      if (override) the_max_workitems = override;
+      return the_max_workitems;
     }
 
     //
@@ -450,9 +460,9 @@ __device__ auto isSourceCompatibleWithEveryOrArg(
       int num_sourcelists{};
       if (num_ready) {
         auto num_indices = num_ready;
-        if (num_ready < num_list_indices) num_indices = min_workitems;
+        if (num_ready < num_list_indices) num_indices = min_workitems();
         // TODO: should probably be a percentage, not a fixed #
-        if (num_ready < 250) num_indices = max_workitems;
+        if (num_ready < 250) num_indices = max_workitems();
         num_sourcelists = fillSourceIndices(indexStates, num_indices);
       } else {
         source_indices.resize(0);
@@ -478,7 +488,7 @@ __device__ auto isSourceCompatibleWithEveryOrArg(
       cudaError_t err = cudaSuccess;
       // alloc source indices
       if (!device_source_indices) {
-        auto sources_bytes = max_workitems * sizeof(int);
+        auto sources_bytes = max_workitems() * sizeof(int);
         err = cudaMallocAsync((void **)&device_source_indices, sources_bytes,
           stream);
         if (err != cudaSuccess) {
@@ -489,7 +499,7 @@ __device__ auto isSourceCompatibleWithEveryOrArg(
       }
 
       std::vector<int> flat_indices;
-      flat_indices.reserve(min_workitems);
+      flat_indices.reserve(min_workitems());
       for (const auto& sourceIndex: source_indices) {
         flat_indices.push_back(
           indexStates.flat_index(sourceIndex.listIndex) + sourceIndex.index);
@@ -505,7 +515,7 @@ __device__ auto isSourceCompatibleWithEveryOrArg(
       
       // alloc results
       if (!device_results) {
-        auto results_bytes = max_workitems * sizeof(result_t);
+        auto results_bytes = max_workitems() * sizeof(result_t);
         err = cudaMallocAsync((void **)&device_results, results_bytes, stream);
         if (err != cudaSuccess) {
           fprintf(stderr, "Failed to allocate stream %d results, error: %s\n",
@@ -518,7 +528,7 @@ __device__ auto isSourceCompatibleWithEveryOrArg(
       if constexpr (debug_indices) {
         // alloc indices (debugging)
         if (!device_compat_indices) {
-          auto indices_bytes = max_workitems * sizeof(int);
+          auto indices_bytes = max_workitems() * sizeof(int);
           err = cudaMallocAsync((void **)&device_compat_indices, indices_bytes, stream);
           if (err != cudaSuccess) {
             fprintf(stderr, "Failed to allocate stream %d indices, error: %s\n",
@@ -740,7 +750,7 @@ __device__ auto isSourceCompatibleWithEveryOrArg(
 
 namespace cm {
 
-void filterCandidatesCuda(int sum) {
+void filterCandidatesCuda(int sum, int streams, int workitems) {
   using namespace std::chrono;
 
   const auto& sources = allSumsCandidateData.find(sum)->second
@@ -748,7 +758,10 @@ void filterCandidatesCuda(int sum) {
   auto device_sources = allocCopySources(sources);
 
   auto t0 = high_resolution_clock::now();
-  const int num_streams = KernelData::getNumStreams(sources.size());
+  KernelData::min_workitems(workitems);
+  KernelData::max_workitems(workitems);
+  const int num_streams = streams ?
+    streams : KernelData::getNumStreams(sources.size());
   std::vector<KernelData> kernels(num_streams);
   KernelData::init(kernels, sources.size());
   std::cerr << "using " << num_streams << " streams" << std::endl;
