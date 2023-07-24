@@ -540,7 +540,7 @@ auto buildSentenceVariationIndices(const XorSourceList& xorSourceList,
       variationIndicesList.clear();
     }
   });
-  if (1) {
+  if (0) {
     dumpSentenceVariationIndices(sentenceVariationIndices);
   }
   return sentenceVariationIndices;

@@ -3,17 +3,21 @@
 #include <algorithm>
 #include <chrono>
 #include <exception>
+#include <limits>
 #include <numeric>
 #include <optional>
 #include <thread>
+#include <tuple>
 #include <cuda_runtime.h>
 #include "candidates.h"
 #include "source-counts.h"
 
+//#define STREAM_LOG
+
 namespace {
   using namespace cm;
 
-  /*
+/*
 __device__ auto isSourceORCompatibleWithAnyOrSource(
   const SourceCompatibilityData& source, const OrSourceList& orSourceList)
 {
@@ -130,16 +134,29 @@ __device__ auto isSourceCompatibleWithEveryOrArg(
     const int* source_indices, int stream_index, result_t* results,
     int special)
   {
+    //__shared__ SourceCompatibilityData buffer[64];
     constexpr const auto logging = false;
 
-    auto index = blockIdx.x * blockDim.x + threadIdx.x;
+    const auto index = blockIdx.x * blockDim.x + threadIdx.x;
     if (index >= num_sources) return;
     int compat_index{ -1 }, reason{ -1 };
     auto debug{ true };
 
     const auto& source = sources[source_indices[index]];
+#if 0
+    const auto buffer_index = threadIdx.x / blockDim.x +
+      threadIdx.x % blockDim.x;
+    //for (int i = threadIdx.x / blockDim.x; i < 64; i += warpSize) {
+    buffer[buffer_index] = source;
+      //}
+    //    __syncthreads();
+#endif
+
+    const auto* the_source = &source;
+    //auto* the_source = &buffer[threadIdx.x];
+
     bool compat = isSourceXORCompatibleWithAnyXorSource(
-      source, xorSources, num_xorSources,
+      *the_source, xorSources, num_xorSources,
       sentenceVariationIndices, &compat_index,
       debug ? &reason : nullptr);
     if (compat) assert(compat_index > -1); // probably slowish
@@ -209,9 +226,9 @@ __device__ auto isSourceCompatibleWithEveryOrArg(
         flat_index += sourceList.size();
       }
     }
-
-    auto flat_index(int list_index) const {
-      return flat_indices.at(list_index);
+    
+    auto flat_index(SourceIndex src_index) const {
+      return flat_indices.at(src_index.listIndex) + src_index.index;
     }
       
     auto list_size(int list_index) const {
@@ -221,7 +238,9 @@ __device__ auto isSourceCompatibleWithEveryOrArg(
     auto num_in_state(int first, int count, State state) const {
       int total{};
       for (int i{}; i < count; ++i) {
-        if (list.at(first + i).state == state) total++;
+        if (list.at(first + i).state == state) {
+          ++total;
+        }
       }
       return total;
     }
@@ -245,6 +264,7 @@ __device__ auto isSourceCompatibleWithEveryOrArg(
       constexpr static const bool logging = false;
       std::set<SourceIndex> compat_src_indices; // for logging
       int num_compatible{};
+      int num_done{};
       for (size_t i{}; i < sourceIndices.size(); ++i) {
         const auto result = results.at(i);
         const auto src_index = sourceIndices.at(i);
@@ -275,7 +295,7 @@ __device__ auto isSourceCompatibleWithEveryOrArg(
         }
         if (result > -1) {
           indexState.state = State::compatible;
-          num_compatible++;
+          ++num_compatible;
           if constexpr (logging) compat_src_indices.insert(src_index);
         }
         else {
@@ -334,43 +354,60 @@ __device__ auto isSourceCompatibleWithEveryOrArg(
   // the pointers in this are allocated in device memory
   struct KernelData {
   private:
-    static const int num_cores = 1280;
+    static const auto num_cores = 1280;
+    static const auto max_chunks = 20ul;
 
-  public:
-    //constexpr
-    static int getNumStreams(size_t num_sources) {
-      return std::min(24ul, num_sources / min_workitems() + 1);
+    static auto calc_stride(const int num_sourcelists) {
+      const auto num_chunks = num_sourcelists / max_workitems() + 1;
+      assert((num_chunks < max_chunks) && "chunks not supported (but could be)");
+      const auto stride = num_sourcelists / num_chunks;
+      assert((stride < max_workitems()) && "stride not supported (but could be)");
+      return stride;
     }
 
-    static void init(std::vector<KernelData>& dataVec, int num_sourcelists) {
-      const int stride = num_sourcelists / dataVec.size();
-      int leftovers = num_sourcelists % dataVec.size();
-      assert((stride < max_workitems()) && "not supported (but could be)");
+  public:
+    static auto calc_num_streams(const size_t num_sourcelists) {
+      const auto num_strides = num_sourcelists / calc_stride(num_sourcelists);
+      return std::min(20ul, num_strides + num_strides / 2 + 1);
+    }
+
+    static void init(std::vector<KernelData>& kernelVec,
+      const size_t num_sourcelists)
+    {
+      const auto stride = calc_stride(num_sourcelists);
+      auto num_primary_streams = num_sourcelists / stride;
+      int leftovers = num_sourcelists % stride;
       int start_index{};
-      for (size_t i{}; i < dataVec.size(); ++i) {
-        auto& data = dataVec.at(i);
-        data.list_start_index = start_index;
-        int share_of_leftovers = leftovers ? (--leftovers, 1) : 0;
-        //if (leftovers) --leftovers;
-        // this separate accounting of "number of indices" is necessary because
-        // source_indices.size() may change, but the number of list_indices this
-        // stream is concerned with is constant
-        data.num_list_indices = stride + share_of_leftovers;
-        data.source_indices.resize(data.num_list_indices);
-        start_index += data.num_list_indices;
+      for (size_t i{}; i < kernelVec.size(); ++i) {
+        auto& kernel = kernelVec.at(i);
+        if (i < num_primary_streams) {
+          kernel.list_start_index = start_index;
+          int share_of_leftovers = leftovers ? (--leftovers, 1) : 0;
+          // this separate accounting of "number of indices" is necessary
+          // because source_indices.size() may change, but the number of
+          // lists that this stream is concerned with stays constant.
+          kernel.num_list_indices = stride + share_of_leftovers;
+          start_index += kernel.num_list_indices;
+          kernel.source_indices.resize(kernel.num_list_indices);
+          
+        } else {
+          // mark all "extra" streams as unattachle, with no work remaining
+          kernel.is_attachable = false;
+          kernel.source_indices.resize(0);
+        }
         if (i >= streams.size()) {
           cudaStream_t stream;
           cudaError_t err = cudaStreamCreate(&stream);
-          assert(err == cudaSuccess);
+          assert((err == cudaSuccess) && "failed to create stream");
           streams.push_back(stream);
         }
-        data.stream_index = i;
-        data.stream = streams[i];
+        kernel.stream_index = i;
+        kernel.stream = streams[i];
       }
     }
 
     static int min_workitems(int override = 0) {
-      static int the_min_workitems = 2 * num_cores;
+      static int the_min_workitems = num_cores + (num_cores / 2);
       if (override) the_min_workitems = override;
       return the_min_workitems;
     }
@@ -379,6 +416,11 @@ __device__ auto isSourceCompatibleWithEveryOrArg(
       static int the_max_workitems = 2 * num_cores;
       if (override) the_max_workitems = override;
       return the_max_workitems;
+    }
+
+    static int next_sequence_num() {
+      static int sequence_num{};
+      return sequence_num++;
     }
 
     //
@@ -399,7 +441,7 @@ __device__ auto isSourceCompatibleWithEveryOrArg(
       constexpr const auto dupe_checking = false;
 
       std::set<std::string> dupe_check_indices{}; // debugging
-      std::set<int> list_indices_used{};
+      //std::set<int> list_indices_used{};
       source_indices.resize(num_indices);
       for (int i{}; i < num_indices; /* nothing */) {
         auto any{ false };
@@ -412,12 +454,12 @@ __device__ auto isSourceCompatibleWithEveryOrArg(
             assert(src_index.listIndex == list_index);
 
             // DEBUGGGGGGGGGG
+            #if 0
             if (src_index.listIndex == -1) {
               host_special = i;
             }
-            const auto flat_index = indexStates.flat_index(src_index.listIndex) +
-              src_index.index;
             if (src_index.listIndex == -1) {
+              const auto flat_index = indexStates.flat_index(src_index);
               //const auto list_size = indexStates.flat_index(src_index.listIndex + 1) -
               //indexStates.flat_index(src_index.listIndex);
               std::cerr << "flat_index: " << flat_index << " = "
@@ -425,6 +467,7 @@ __device__ auto isSourceCompatibleWithEveryOrArg(
                         << ", list size: " << indexStates.list_size(src_index.listIndex)
                         << std::endl;
             }
+            #endif
 
             source_indices.at(i++) = src_index;
             // TODO this is slow and only used for logging and I don't like it.
@@ -461,9 +504,10 @@ __device__ auto isSourceCompatibleWithEveryOrArg(
       int num_sourcelists{};
       if (num_ready) {
         auto num_indices = num_ready;
-        if (num_ready < num_list_indices) num_indices = min_workitems();
+        if (num_ready < num_list_indices) num_indices = max_workitems();
+        if (is_attached()) num_indices = min_workitems();
         // TODO: should probably be a percentage, not a fixed #
-        if (num_ready < 250) num_indices = max_workitems();
+        //if (num_ready < 250) num_indices = max_workitems();
         num_sourcelists = fillSourceIndices(indexStates, num_indices);
       } else {
         source_indices.resize(0);
@@ -492,27 +536,24 @@ __device__ auto isSourceCompatibleWithEveryOrArg(
         auto sources_bytes = max_workitems() * sizeof(int);
         err = cudaMallocAsync((void **)&device_source_indices, sources_bytes,
           stream);
-        if (err != cudaSuccess) {
-          fprintf(stderr, "Failed to allocate stream %d source indices"
-            ", error: %s\n", stream_index, cudaGetErrorString(err));
-          throw std::runtime_error("failed to allocate source indices");
-        }
+        assert((err == cudaSuccess) && "failed to allocate source indices");
       }
 
       std::vector<int> flat_indices;
-      flat_indices.reserve(min_workitems());
-      for (const auto& sourceIndex: source_indices) {
-        flat_indices.push_back(
-          indexStates.flat_index(sourceIndex.listIndex) + sourceIndex.index);
+      flat_indices.reserve(source_indices.size());
+      for (const auto& src_index: source_indices) {
+        flat_indices.push_back(indexStates.flat_index(src_index));
       }
       // copy (flat) source indices
+      #if 0
+      std::cerr << "copying " << flat_indices.size() << " indices"
+                << " to device_indices(" << device_source_indices << ")"
+                << " on stream " << stream_index << " (" << stream << ")"
+                << std::endl;
+      #endif
       err = cudaMemcpyAsync(device_source_indices, flat_indices.data(),
         flat_indices.size() * sizeof(int), cudaMemcpyHostToDevice, stream);
-      if (err != cudaSuccess) {
-        fprintf(stderr, "Failed to copy stream %d source indices, error: %s\n",
-          stream_index, cudaGetErrorString(err));
-        throw std::runtime_error("failed to copy source indices");
-      }
+      assert((err == cudaSuccess) && "failed to copy source indices");
       
       // alloc results
       if (!device_results) {
@@ -545,11 +586,36 @@ __device__ auto isSourceCompatibleWithEveryOrArg(
       return !source_indices.empty();
     }
 
+    void attach(struct KernelData& kernel) {
+      assert(!is_running && !is_attached() && kernel.is_running);
+      num_attached = 0;
+      attached_to = kernel.stream_index;
+      is_attachable = false;
+      has_run = true;
+      list_start_index = kernel.list_start_index;
+      num_list_indices = kernel.num_list_indices;
+      // signal work remaining
+      source_indices.resize(1);
+
+      kernel.num_attached++;
+
+#ifdef STREAM_LOG
+      std::cerr << "stream " << stream_index << " attaching to stream "
+                << kernel.stream_index << std::endl;
+#endif
+    }
+
+    bool is_attached() const { return attached_to > -1; }
+
     int list_start_index; // starting index in SourceCompatibiliityLists
     int num_list_indices; // # of above list entries we are concerned with
-    int stream_index;
-    bool has_run{ false };
-    bool running{ false };
+    int stream_index{ -1 };
+    int num_attached{};
+    int sequence_num{};
+    int attached_to{ -1 };      // stream_index of stream we're attached to
+    bool is_attachable{ true }; // can be attached to 
+    bool is_running{ false };   // is running (may be complete; output not retrieved)
+    bool has_run{ false };      // has run at least once
     int* device_source_indices{ nullptr }; // in
     result_t *device_results{ nullptr }; // out
     cudaStream_t stream{ nullptr };
@@ -559,11 +625,32 @@ __device__ auto isSourceCompatibleWithEveryOrArg(
 
   //////////
 
-  bool anyWithWorkRemaining(const std::vector<KernelData>& kernelVec) {
-    for (const auto& kernel : kernelVec) {
-      if (kernel.hasWorkRemaining()) return true;
+  struct ValueIndex {
+    int value{};
+    int index{ -1 };
+  };
+
+  auto anyWithWorkRemaining(const std::vector<KernelData>& kernelVec,
+    bool attachable_only = false) -> std::optional<int>
+  {
+    // NOTE: list initialization
+    ValueIndex fewest_attached = { std::numeric_limits<int>::max() };
+    for (size_t i{}; i < kernelVec.size(); ++i) {
+      const auto& kernel = kernelVec[i];
+      if (kernel.hasWorkRemaining() &&
+        (!attachable_only || kernel.is_attachable))
+      {
+        if (kernel.num_attached < fewest_attached.value) {
+          fewest_attached.value = kernel.num_attached;
+          fewest_attached.index = i;
+          if (!fewest_attached.value) break;
+        }
+      }
     }
-    return false;
+    if (fewest_attached.index > -1) {
+      return std::make_optional(fewest_attached.index);
+    }
+    return std::nullopt;
   }
 
   bool anyIdleWithWorkRemaining(const std::vector<KernelData>& kernelVec,
@@ -571,7 +658,7 @@ __device__ auto isSourceCompatibleWithEveryOrArg(
   {
     for (size_t i{}; i < kernelVec.size(); ++i) {
       const auto& kernel = kernelVec[i];
-      if (!kernel.running && kernel.hasWorkRemaining()) {
+      if (!kernel.is_running && kernel.hasWorkRemaining()) {
         index = i;
         return true;
       }
@@ -579,45 +666,88 @@ __device__ auto isSourceCompatibleWithEveryOrArg(
     return false;
   }
 
+  auto anyReadyToAttach(const std::vector<KernelData>& kernelVec)
+    -> std::optional<int>
+  {
+    for (size_t i{}; i < kernelVec.size(); ++i) {
+      const auto& kernel = kernelVec[i];
+      if (!kernel.is_running && !kernel.is_attached() &&
+          !kernel.hasWorkRemaining())
+      {
+        return std::make_optional(i);
+      }
+    }
+    return std::nullopt;
+  }
+
+  // TODO: std::optional, and above here
   bool anyRunningComplete(const std::vector<KernelData>& kernelVec,
     int& index)
   {
-    // it would be better here to start at index+1 and wrap
+    // NOTE: list initialization
+    ValueIndex lowest = { std::numeric_limits<int>::max() };
     for (size_t i{}; i < kernelVec.size(); ++i) {
       const auto& kernel = kernelVec[i];
-      if (kernel.running && (cudaSuccess == cudaStreamQuery(kernel.stream))) {
-        index = i;
-        return true;
+      if (kernel.is_running && (cudaSuccess == cudaStreamQuery(kernel.stream))) {
+        if (kernel.sequence_num < lowest.value) {
+          lowest.value = kernel.sequence_num;
+          lowest.index = i;
+        }
       }
+    }
+    if (lowest.index > -1) {
+      index = lowest.index;
+      return true;
     }
     return false;
   }
 
-  bool getNextWithWorkRemaining(const std::vector<KernelData>& kernelVec,
+  bool getNextWithWorkRemaining(std::vector<KernelData>& kernelVec,
     int& current)
   {
     using namespace std::chrono_literals;
 
-    // First priority: ensure all streams have started at least once
+    // First: ensure all primary streams have started at least once
     if (++current >= (int)kernelVec.size()) {
       current = 0;
-    } else if (!kernelVec[current].has_run) {
+    } else {
+      const auto& kernel = kernelVec[current];
+      if (!kernel.is_running && !kernel.has_run && kernel.hasWorkRemaining()) {
+        return true;
+      }
+    }
+
+    // Second: process results for any "running" stream that has completed
+    if (anyRunningComplete(kernelVec, current)) {
       return true;
     }
 
-    // Second priority: run any idle (non-running) stream with work remaining
+    // Third: run any idle (non-running) stream with work remaining
     if (anyIdleWithWorkRemaining(kernelVec, current)) {
       return true;
     }
 
-    // There are no idle streams with work remaining, but there may be running
-    // streams with work remaining. Put another way, are there any streams
-    // (at all) with work remaining? If not, we're done.
-    if (!anyWithWorkRemaining(kernelVec)) {
-      return false;
+    // There is no idle stream that has work remaining. Is there an attachable
+    // running stream that has work remaining?
+    std::optional<int> opt_attachable = anyWithWorkRemaining(kernelVec, true);
+    if (opt_attachable.has_value()) {
+      // Is there an idle stream that can attach to it? If so, attach it.
+      std::optional<int> opt_attach = anyReadyToAttach(kernelVec);
+      if (opt_attach.has_value()) {
+        kernelVec.at(opt_attach.value())
+          .attach(kernelVec.at(opt_attachable.value()));
+        current = opt_attach.value();
+        return true;
+      }
+    } else {
+      // There is no idle stream, and no attachable running stream that has work
+      // remaining. Is there any stream with work remaining? If not, we're done.
+      if (!anyWithWorkRemaining(kernelVec).has_value()) {
+        return false;
+      }
     }
 
-    // There are running streams with work remaining. Wait for one to complete.
+    // Wait for one to complete.
     while (!anyRunningComplete(kernelVec, current)) {
       // TODO events
       std::this_thread::sleep_for(10ms);
@@ -632,18 +762,22 @@ __device__ auto isSourceCompatibleWithEveryOrArg(
     auto num_sources = kernel.source_indices.size();
     int threadsPerBlock = 32;
     int blocksPerGrid = (num_sources + threadsPerBlock - 1) / threadsPerBlock;
-    kernel.has_run = true;
-    kernel.running = true;
+    kernel.is_running = true;
+    kernel.sequence_num = KernelData::next_sequence_num();
     xorKernel<<<blocksPerGrid, threadsPerBlock, 0, kernel.stream>>>(
       device_sources, num_sources,
       PCD.device_xorSources, PCD.xorSourceList.size(),
       PCD.device_sentenceVariationIndices, kernel.device_source_indices,
       kernel.stream_index, kernel.device_results, host_special);
 
-#if 0 || defined(DEBUG)
-    fprintf(stderr, "  kernel %d launched with %d blocks of %d threads...\n",
-      kernel.stream_index, blocksPerGrid, threadsPerBlock);
+#ifdef STREAM_LOG
+    std::cerr << "  stream " << kernel.stream_index << " starting, sequence: "
+              << kernel.sequence_num << std::endl;
 #endif
+    #if 0 || defined(DEBUG)
+    fprintf(stderr, "  stream %d (%d) launched with %d blocks of %d threads\n",
+      kernel.stream_index, kernel.sequence_num, blocksPerGrid, threadsPerBlock);
+    #endif
   }
 
   // todo: kernel.getResults()
@@ -654,12 +788,7 @@ __device__ auto isSourceCompatibleWithEveryOrArg(
     cudaStreamSynchronize(kernel.stream);
     cudaError_t err = cudaMemcpyAsync(results.data(), kernel.device_results,
       results_bytes, cudaMemcpyDeviceToHost, kernel.stream);
-    kernel.running = false;
-    if (err != cudaSuccess) {
-      fprintf(stderr, "Failed to copy results from device -> host, error: %s\n",
-              cudaGetErrorString(err));
-      throw std::runtime_error("failed to copy results from device -> host");
-    }
+    assert((err == cudaSuccess) && "failed to copy results from device -> host");
     return results;
   }
 
@@ -667,7 +796,7 @@ __device__ auto isSourceCompatibleWithEveryOrArg(
     const IndexStates& indexStates)
   {
     for (auto& k: kernels) {
-      std::cerr << "  kernel " << k.stream_index << ": " 
+      std::cerr << "  stream " << k.stream_index << ": " 
                 << k.num_ready(indexStates) << std::endl;
     }
   }
@@ -724,6 +853,33 @@ __device__ auto isSourceCompatibleWithEveryOrArg(
     std::cerr << "total: " << total << std::endl;
   }
 
+  int median(std::vector<int>& a) {
+    const int n = a.size();
+    if (!(n % 2)) {
+      std::nth_element(a.begin(), a.begin() + n / 2, a.end());
+      std::nth_element(a.begin(), a.begin() + (n - 1) / 2, a.end());
+      return (a[(n - 1) / 2] + a[n / 2]) / 2;
+    }
+    std::nth_element(a.begin(), a.begin() + n / 2, a.end());
+    return a[n / 2];
+  }
+
+  auto sources_stats(const SourceCompatibilityLists& sources) {
+    std::vector<int> sizes;
+    sizes.reserve(sources.size());
+    size_t mode{}, sum{};
+    for (const auto& src_list: sources) {
+      const auto size = src_list.size();
+      if (size > mode) {
+        mode = size;
+      }
+      sum += size;
+      sizes.push_back(size);
+    }
+    // mean, median, mode
+    return std::make_tuple(sum / sources.size(), median(sizes), mode);
+  }
+
   void check(const SourceCompatibilityLists& sources, int list_index, int index)
   {
     constexpr const auto logging = true;
@@ -753,21 +909,41 @@ __device__ auto isSourceCompatibleWithEveryOrArg(
 
 namespace cm {
 
-void filterCandidatesCuda(int sum, int streams, int workitems) {
+void filterCandidatesCuda(int sum, int num_streams, int workitems) {
   using namespace std::chrono;
 
   const auto& sources = allSumsCandidateData.find(sum)->second
     .sourceCompatLists;
   auto device_sources = allocCopySources(sources);
 
+  const auto [mean, median, mode] = sources_stats(sources);
+  const auto src_data_bytes = sizeof(SourceCompatibilityData);
+  const auto necessary_bytes = sizeof(LegacySources) + sizeof(Sources) +
+    sizeof(UsedSources::Variations);
+  std::cerr << "sizeof SourceData: " << src_data_bytes
+            << ", necessary: " << necessary_bytes
+            << ", mean: " << mean
+            << " (" << mean * src_data_bytes
+            << ", " << mean * necessary_bytes << ")"
+            << ", median: " << median
+            << " (" << median * src_data_bytes
+            << ", " << median * necessary_bytes << ")"
+            << ", mode: " << mode
+            << " (" << mode * src_data_bytes
+            << ", " << mode * necessary_bytes << ")"
+            << std::endl;
+
   auto t0 = high_resolution_clock::now();
-  KernelData::min_workitems(workitems);
+  //KernelData::min_workitems(workitems);
   KernelData::max_workitems(workitems);
-  const int num_streams = streams ?
-    streams : KernelData::getNumStreams(sources.size());
+  if (!num_streams) num_streams = KernelData::calc_num_streams(sources.size());
   std::vector<KernelData> kernels(num_streams);
   KernelData::init(kernels, sources.size());
-  std::cerr << "using " << num_streams << " streams" << std::endl;
+  std::cerr << "sourcelists: " << sources.size()
+            << ", workitems: " << KernelData::max_workitems()
+            << ", streams: " << num_streams
+            << ", primary: " << sources.size() / KernelData::max_workitems()
+            << std::endl;
 
   std::set<int> compat_indices;
   std::vector<std::vector<int>> compat_record(num_streams);
@@ -776,42 +952,55 @@ void filterCandidatesCuda(int sum, int streams, int workitems) {
   int current_kernel{ -1 };
   while (getNextWithWorkRemaining(kernels, current_kernel)) {
     auto& kernel = kernels.at(current_kernel);
-    if (!kernel.running) {
+    if (!kernel.is_running) {
       if (kernel.fillSourceIndices(indexStates)) {
         // TODO: move alloc to separate func outside loop
         // consider copying all source data on stream0, 
         // and only copy indices array here
         kernel.allocCopy(indexStates);
         runKernel(kernel, device_sources);
+      } else if (kernel.is_attached()) {
+#ifdef STREAM_LOG
+        std::cerr << "stream " << kernel.stream_index
+                  << " detached from " << kernel.attached_to
+                  << " - no more work"
+                  << std::endl;
+#endif
+        kernels.at(kernel.attached_to).is_attachable = false;
+        kernel.attached_to = -1;
       }
       continue;
     }
+
+    kernel.has_run = true;
+    kernel.is_running = false;
 
     auto r0 = high_resolution_clock::now();
     auto results = getKernelResults(kernel);
     auto r1 = high_resolution_clock::now();
     auto d_results = duration_cast<milliseconds>(r1 - r0).count();
 
-    auto num_compatible = indexStates.update(kernel.source_indices, results,
-      sources, kernel.stream_index);
+    auto num_compatible = indexStates.update(kernel.source_indices,
+      results, sources, kernel.stream_index);
     total_compatible += num_compatible;
 
-    #if 0
+#if 0
     for (size_t r{}; r < kernel.source_indices.size(); ++r) {
       const auto result = results.at(r);
       if (result > -1) compat_indices.insert(result);
     }
     compat_record.at(kernel.stream_index).push_back(num_compatible);
-    #endif
+#endif
 
-#if 1 || defined(DEBUG)
-    std::cerr << "  kernel " << current_kernel << " done"
+#ifdef STREAM_LOG
+    std::cerr << "  stream " << current_kernel << " done"
       //<< ", done: " << kernel.num_done(indexStates)
       //<< ", compat reported: " << num_compatible
       //<< ", compat actual:" << kernel.num_compatible(indexStates)
       //<< ", total compatible: " << total_compatible
+      // TODO remaining is showing weird value, look into it
       //<< ", remaining: " << kernel.num_ready(indexStates)
-      << " - " << d_results << "ms" << std::endl;
+              << " - " << d_results << "ms" << std::endl;
 #endif
     #ifdef DEBUG
     assert(kernel.num_list_indices == kernel.num_ready(indexStates) +
