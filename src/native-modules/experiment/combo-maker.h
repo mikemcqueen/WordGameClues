@@ -52,9 +52,10 @@ struct UsedSources {
   using Variations = std::array<VariationIndex_t, kNumSentences>;
 
   static /*constexpr*/ auto getFirstIndex(int sentence) {
+    assert(sentence > 0);
     //static constexpr std::array<uint32_t, kNumSentences> first_indices
     //  { MX, MX*2, MX*3, MX*4, MX*5, MX*6, MX*7, MX*8, MX*9 };
-    return (sentence + 1) * kMaxSourcesPerSentence;
+    return (sentence - 1) * kMaxSourcesPerSentence;
   }
 
   Bits bits{};
@@ -132,6 +133,28 @@ struct UsedSources {
     result.mergeInPlace(other);
     return result;
   }
+
+    void dump() const {
+    auto first{true};
+    std::cerr << "sources:";
+    for (auto s{1}; s <= kNumSentences; ++s) {
+      if (getVariation(s) > -1) {
+        if (first) {
+          std::cerr << std::endl;
+          first = false;
+        }
+        std::cerr << "  s" << s << " v" << getVariation(s) << ":";
+        for (int i{}; i < kMaxSourcesPerSentence; ++i) {
+          if (bits.test((s - 1) * kMaxSourcesPerSentence + i)) {
+            std::cerr << " " << i;
+          }
+        }
+        std::cerr << std::endl;
+      }
+    }
+    if (first) std::cerr << " none " << std::endl;
+  }
+
 };
 #endif // USED_SOURCES_BITSET
 
@@ -284,6 +307,21 @@ struct SourceCompatibilityData {
 #else
     return usedSources.merge(from);
 #endif
+  }
+
+  void dump(const char* header = nullptr) const {
+    if (header) std::cerr << header << std::endl;
+    usedSources.dump();
+    std::cerr << "legacy sources:";
+    auto any{false};
+    for (int i{}; i < kMaxLegacySources; ++i) {
+      if (sourceBits.test(i)) {
+        std::cerr << " " << i;
+        any = true;
+      }
+    }
+    if (!any) std::cerr << " none";
+    std::cerr << std::endl;
   }
 };
 

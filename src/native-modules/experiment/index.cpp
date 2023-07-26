@@ -382,6 +382,14 @@ Value mergeAllCompatibleSources(const CallbackInfo& info) {
 }
 #endif
 
+void dump_xor(int index) {
+  const auto& xorSources = cm::PCD.xorSourceList;
+  const auto& src = xorSources.at(index);
+  char buf[32];
+  snprintf(buf, sizeof(buf), "xor: (%d)", index);
+  src.dump(buf);
+}
+
 //
 // mergeCompatibleXorSourceCombinations
 //
@@ -429,6 +437,8 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   } else if (sourceLists.size() == 1) {
     cm::PCD.xorSourceList = std::move(sourceLists.back());
   }
+
+  dump_xor(2408);
 
   //--
 
@@ -490,8 +500,10 @@ Value getIsAnyPerfData(const CallbackInfo& info) {
 //
 Value dumpAndResetCompatIndices(const CallbackInfo& info) {
   Env env = info.Env();
+  #if 0
   std::cout << "global_compat_indices("
             << cm::global_compat_indices.size() << ")" << std::endl;
+  #endif
   for (const auto index: cm::global_compat_indices) {
     std::cout << index << std::endl;
   }
