@@ -411,19 +411,20 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
 
   Env env = info.Env();
   if (!info[0].IsArray() || !info[1].IsArray()) {
-      Napi::TypeError::New(env, "mergeCompatibleXorSourceCombinations: non-array parameter")
+      Napi::TypeError::New(env,
+        "mergeCompatibleXorSourceCombinations: non-array parameter")
         .ThrowAsJavaScriptException();
       return env.Null();
   }
 
   auto unwrap0 = high_resolution_clock::now();
-
   auto ncDataLists = makeNcDataLists(env, info[0].As<Array>());
-  cm::PCD.sourceListMap = std::move(makeSourceListMap(env, info[1].As<Array>()));
-
+  cm::PCD.sourceListMap =
+    std::move(makeSourceListMap(env, info[1].As<Array>()));
   auto unwrap1 = high_resolution_clock::now();
-  auto d_unwrap = duration_cast<milliseconds>(unwrap1 - unwrap0).count();
-  cerr << " native unwrap - " << d_unwrap << "ms" << endl;
+  [[maybe_unused]] auto d_unwrap = 
+    duration_cast<milliseconds>(unwrap1 - unwrap0).count();
+  //std::cerr << " native unwrap - " << d_unwrap << "ms" << std::endl;
 
   //--
     
@@ -433,8 +434,9 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
     cm::buildSourceListsForUseNcData(ncDataLists, cm::PCD.sourceListMap);
 
   auto build1 = high_resolution_clock::now();
-  auto d_build = duration_cast<milliseconds>(build1 - build0).count();
-  cerr << " native build - " << d_build << "ms" << endl;
+  [[maybe_unused]] auto d_build =
+    duration_cast<milliseconds>(build1 - build0).count();
+  //std::cerr << " native build - " << d_build << "ms" << std::endl;
 
   for (const auto& src_list: sourceLists) {
     cm::assert_valid(src_list);
@@ -451,16 +453,16 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
     
     auto merge1 = high_resolution_clock::now();
     auto d_merge = duration_cast<milliseconds>(merge1 - merge0).count();
-    cerr << " native merge - " << d_merge << "ms" << endl;
+    std::cerr << " native merge - " << d_merge << "ms" << std::endl;
   } else if (sourceLists.size() == 1) {
     cm::PCD.xorSourceList = std::move(sourceLists.back());
   }
 
   //--
 
-  auto xsi0 = high_resolution_clock::now();
+  auto xs0 = high_resolution_clock::now();
 
-#if 0 // for unsorted xorSources
+#if 1 // for unsorted xorSources
   auto unsorted = []() {
     std::vector<int> v;
     v.resize(cm::PCD.xorSourceList.size());
@@ -475,9 +477,10 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   cm::PCD.device_xorSources = cm::cuda_allocCopyXorSources(
     cm::PCD.xorSourceList, cm::PCD.xorSourceIndices);
 
-  auto xsi1 = high_resolution_clock::now();
-  auto d_xsi = duration_cast<milliseconds>(xsi1 - xsi0).count();
-  cerr << " sorted xor source indices - " << d_xsi << "ms" << endl;
+  auto xs1 = high_resolution_clock::now();
+  auto d_xs = duration_cast<milliseconds>(xs1 - xs0).count();
+  std::cerr << " copy xor sources (" << cm::PCD.xorSourceList.size() << ")"
+            << " - " << d_xs << "ms" << std::endl;
 
   //--
 
@@ -495,7 +498,7 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
     
     auto svi1 = high_resolution_clock::now();
     auto d_svi = duration_cast<milliseconds>(svi1 - svi0).count();
-    cerr << " variation indices - " << d_svi << "ms" << endl;
+    std::cerr << " variation indices - " << d_svi << "ms" << std::endl;
   }
 
   //--
@@ -576,7 +579,9 @@ auto getCandidateStats(int sum) {
   cs.comboMapIndices = (int)cd.indexComboListMap.size();
   cs.totalCombos = std::accumulate(
     cd.indexComboListMap.cbegin(), cd.indexComboListMap.cend(), 0,
-    [](int sum, const auto& kv) -> int { sum += kv.second.size(); return sum; });
+    [](int sum, const auto& kv) -> int {
+      sum += kv.second.size(); return sum;
+    });
   return cs;
 }
 

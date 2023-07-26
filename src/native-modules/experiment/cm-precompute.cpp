@@ -250,6 +250,7 @@ auto buildSourceListsForUseNcData(const vector<NCDataList>& useNcDataLists,
       }
     }
   }
+  #if defined(PRECOMPUTE_LOGGING)
   std::cerr << "  hash: " << hash_called << ", equal_to: "
     << equal_to_called << std::endl;
   std::cerr << "  total sources: " << total << ", hash_hits: " << hash_hits
@@ -257,6 +258,7 @@ auto buildSourceListsForUseNcData(const vector<NCDataList>& useNcDataLists,
     << std::accumulate(sourceLists.begin(), sourceLists.end(), 0u,
       [](size_t total, const SourceList& list){ return total + list.size(); })
     << std::endl;
+  #endif
   return sourceLists;
 }
 
@@ -457,7 +459,8 @@ auto mergeCompatibleXorSourceCombinations(
        indexList = peco.next_combination())
   {
     ++combos;
-    SourceCRefList sourceCRefList = getCompatibleXorSources(*indexList, sourceLists);
+    SourceCRefList sourceCRefList =
+      getCompatibleXorSources(*indexList, sourceLists);
     if (sourceCRefList.empty()) continue;
     ++compatible;
     XorSourceList mergedSources = mergeCompatibleXorSources(sourceCRefList);
@@ -466,10 +469,13 @@ auto mergeCompatibleXorSourceCombinations(
     xorSourceList.emplace_back(std::move(mergedSources.back()));
   }
   auto peco1 = high_resolution_clock::now();
-  auto d_peco = duration_cast<milliseconds>(peco1 - peco0).count();
+  [[maybe_unused]] auto d_peco =
+    duration_cast<milliseconds>(peco1 - peco0).count();
+  #if defined(PRECOMPUTE_LOGGING)
   std::cerr << " native peco loop: " << d_peco << "ms" << ", combos: " << combos
             << ", compatible: " << compatible << ", merged: " << merged
             << ", XorSources: " << xorSourceList.size() << std::endl;
+  #endif
   
   return xorSourceList;
 }

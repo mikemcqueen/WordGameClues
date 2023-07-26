@@ -452,7 +452,7 @@ const buildUseSourceListsFromNcData = (sourceListMap: Map<string, Source.AnyData
     
     setPrimarySrcBits(xorSourceList);
     let xdur = new Duration(xor0, new Date()).milliseconds;
-    console.error(` Native.mergeCompatibleXorSourceCombinations - ${PrettyMs(xdur)}`);
+    //console.error(` Native.mergeCompatibleXorSourceCombinations - ${PrettyMs(xdur)}`);
 
     // OR next
     let or0 = new Date();
@@ -485,8 +485,8 @@ export const preCompute = (first: number, last: number, args: any): Result => {
     const begin = new Date();
     args.allXorNcDataLists = args.xor ? buildAllUseNcDataLists(args.xor) : [ [] ];
     const d1 = new Duration(begin, new Date()).milliseconds;
-    console.error(` buildAllXorNcDataLists(${args.allXorNcDataLists.length})` +
-        ` - ${PrettyMs(d1)}`);
+    //console.error(` buildAllXorNcDataLists(${args.allXorNcDataLists.length})` +
+    //  ` - ${PrettyMs(d1)}`);
     if (args.xor && listIsEmpty(args.allXorNcDataLists)) return { success: false };
 
     const build2 = new Date();
@@ -501,8 +501,8 @@ export const preCompute = (first: number, last: number, args: any): Result => {
     const build3 = new Date();
     const useSourceLists = buildUseSourceListsFromNcData(sourceListMap, args);
     const d3 = new Duration(build3, new Date()).milliseconds;
-    console.error(` buildUseSourceListsFromNcData, xor(${useSourceLists.xor.length})` +
-        ` - ${PrettyMs(d3)}`);
+    //console.error(` buildUseSourceListsFromNcData, xor(${useSourceLists.xor.length})` +
+    //` - ${PrettyMs(d3)}`);
     if (args.xor && listIsEmpty(useSourceLists.xor)) return { success: false };
 
     const d = new Duration(begin, new Date()).milliseconds;
