@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <chrono>
 #include <exception>
+//#include <format>
 #include <limits>
 #include <numeric>
 #include <optional>
@@ -92,7 +93,7 @@ namespace {
   }
 
   using result_t = uint8_t;
-  using index_t = uint16_t;
+  using index_t = uint32_t;
 
   struct SourceIndex {
     index_t listIndex{};
@@ -100,6 +101,11 @@ namespace {
 
     bool operator<(const SourceIndex& rhs) const {
       return (listIndex < rhs.listIndex) || (index < rhs.index);
+    }
+
+    constexpr const char* as_string(char *buf) const {
+      sprintf(buf, "%d:%d", listIndex, index);
+      return buf;
     }
   };
 
@@ -215,12 +221,24 @@ namespace {
           #endif
         }
         #if 0
-        if (src_idx.index &&
-            ((src_idx.listIndex >= 2655) && (src_idx.listIndex <= 2656)))
+        if (//(src_idx.index == 2) && ((src_idx.listIndex == 142) && (xor_src_idx >= 1390) && (xor_src_idx <= 1400)))
+            (src_idx.index == 0) && ((src_idx.listIndex >= 12591) && (src_idx.listIndex <= 12597)
+                                     /* && (xor_src_idx >= 37645)*/ && (xor_src_idx == 37648)))
         {
-          printf("%d:%d compat: %d, idx: %d, xor_src_idx: %d, flat_index: %d\n",
-                 src_idx.listIndex, src_idx.index, block_results[threadIdx.x],
+          if (0) {
+            printf("%d\n", xor_src_idx);
+          } else {
+            /*
+            printf("%d:%d compat: %d, idx: %d, xor_src_idx: %d, flat_index: %d\n",
+            src_idx.listIndex, src_idx.index, block_results[threadIdx.x],
                  idx, xor_src_idx, flat_index);
+            */
+            printf("%d:%d xor %d, flat: %d\n", src_idx.listIndex, src_idx.index,
+                   xor_src_idx, flat_index);
+            char buf[32];
+            source.dump(src_idx.as_string(buf), true);
+            xor_sources[xor_src_idx].dump("37648", true);
+          }
         }
         #endif
         for (int reduce_idx = blockDim.x / 2; reduce_idx > 0; reduce_idx /= 2) {
@@ -232,7 +250,7 @@ namespace {
         }
         if (!threadIdx.x && block_results[threadIdx.x]) {
           #if 0
-          if (((src_idx.listIndex == 2655)))
+          if (((src_idx.listIndex == 12596)))
             // || (src_idx.listIndex == 1907) || (src_idx.listIndex == 1908)))
           {
             printf("incr %d:%d @ %d, block_result: %d\n",
@@ -275,7 +293,7 @@ namespace {
       }
     }
     
-    index_t flat_index(SourceIndex src_index) const {
+    uint32_t flat_index(SourceIndex src_index) const {
       return list_start_indices.at(src_index.listIndex) + src_index.index;
     }
       
@@ -344,7 +362,7 @@ namespace {
         else {
           // if this is the result for the last source in a sourcelist,
           // mark the list (indexState) as done.
-          auto sourcelist_size = (int)sources.at(src_index.listIndex).size();
+          auto sourcelist_size = sources.at(src_index.listIndex).size();
           if (src_index.index >= sourcelist_size) {
             indexState.state = State::done;
           }
@@ -379,8 +397,8 @@ namespace {
     }
     
     std::vector<Data> list;
-    std::vector<index_t> list_start_indices;
-    std::vector<int> list_sizes;
+    std::vector<uint32_t> list_start_indices;
+    std::vector<uint32_t> list_sizes;
   }; // struct IndexStates
 
   //////////
@@ -920,12 +938,26 @@ namespace {
     return std::make_tuple(sum / sources.size(), median(sizes), mode);
   }
 
-  void check(const SourceCompatibilityLists& sources, int list_index, int index)
+  auto flat_index(const SourceCompatibilityLists& sources,
+    const SourceIndex src_idx)
+  {
+    uint32_t flat{};
+    for (size_t i{}; i < src_idx.listIndex; ++i) {
+      flat += sources.at(i).size();
+    }
+    return flat + src_idx.index;
+  }
+
+  void check(const SourceCompatibilityLists& sources, 
+    index_t list_index, index_t index)
   {
     constexpr const auto logging = true;
     if constexpr (logging) {
-      char buf[32];
-      snprintf(buf, sizeof(buf), "%d:%d", list_index, index);
+      SourceIndex src_idx{ list_index, index };
+      char idx_buf[32];
+      char buf[64];
+      snprintf(buf, sizeof(buf), "%s, flat: %d", src_idx.as_string(idx_buf),
+               flat_index(sources, src_idx));
       auto& source = sources.at(list_index).at(index);
       source.dump(buf);
       int compat_index{ -1 };
@@ -958,8 +990,8 @@ void filterCandidatesCuda(int sum, int num_streams, int workitems) {
   IndexStates indexStates{ sources };
   auto device_list_start_indices = allocCopyListStartIndices(indexStates);
 
-  //check(sources, 2657, 0);
-  //dump_xor(2408);
+  //check(sources, 12596, 0);
+  //dump_xor(37648);
 
   KernelData::max_workitems(workitems);
   if (!num_streams) num_streams = 2; // KernelData::calc_num_streams(sources.size());

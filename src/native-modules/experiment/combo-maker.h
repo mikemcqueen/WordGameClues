@@ -305,25 +305,51 @@ public:
     }
   }
   
-  void dump() const {
+  constexpr void dump(bool device = false) const {
     auto first{true};
-    std::cerr << "sources:";
+    if (device) {
+      printf("sources:");
+    } else {
+      std::cerr << "sources:";
+    }
     for (auto s{1}; s <= kNumSentences; ++s) {
       if (getVariation(s) > -1) {
         if (first) {
-          std::cerr << std::endl;
+          if (device) {
+            printf("\n");
+          } else {
+            std::cerr << std::endl;
+          }
           first = false;
         }
-        std::cerr << "  s" << s << " v" << getVariation(s) << ":";
+        if (device) {
+          printf(" s%dv%d:", s, getVariation(s));
+        } else {
+          std::cerr << "  s" << s << " v" << getVariation(s) << ":";
+        }
         for (int i{}; i < kMaxUsedSourcesPerSentence; ++i) {
           auto src = sources.at(Source::getFirstIndex(s) + i);
           if (src < 0) break;
-          std::cerr << " " << int(src);
+          if (device) {
+            printf(" %d", src);
+          } else {
+            std::cerr << " " << int(src);
+          }
         }
-        std::cerr << std::endl;
+        if (device) {
+          printf("\n");
+        } else {
+          std::cerr << std::endl;
+        }
       }
     }
-    if (first) std::cerr << " none" << std::endl;
+    if (first) {
+      if (device) {
+        printf(" none\n");
+      } else {
+        std::cerr << " none" << std::endl;
+      }
+    }
   }
 
   constexpr void assert_valid() const {
@@ -460,19 +486,41 @@ struct SourceCompatibilityData {
     return count;
   }
 
-  void dump(const char* header = nullptr) const {
-    if (header) std::cerr << header << std::endl;
+  constexpr void dump(const char* header = nullptr, bool device = false) const {
+    if (header) {
+      if (!device) {
+        std::cerr << header << std::endl;
+      }
+    }
     usedSources.dump();
-    std::cerr << "legacy sources:";
+    if (device) {
+      printf("legacy sources:");
+    } else {
+      std::cerr << "legacy sources:";
+    }
     auto any{false};
     for (int i{}; i < kMaxLegacySources; ++i) {
       if (legacySources.at(i)) {
-        std::cerr << " " << i;
+        if (device) {
+          printf(" %d", i);
+        } else {
+          std::cerr << " " << i;
+        }
         any = true;
       }
     }
-    if (!any) std::cerr << " none";
-    std::cerr << std::endl;
+    if (!any) {
+      if (device) { 
+        printf(" none");
+      } else {
+        std::cerr << " none";
+      }
+    }
+    if (device) {
+      printf("\n");
+    } else {
+      std::cerr << std::endl;
+    }
   }
 
   constexpr void assert_valid() const {
