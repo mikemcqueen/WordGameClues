@@ -30,7 +30,10 @@ namespace cm {
     const SentenceVariationIndices& sentenceVariationIndices)
     -> device::VariationIndices*;
 
-  void filterCandidates(int sum, int threads, int workitems);
+  void filterCandidates(int sum, int threads_per_block, int streams,
+    int workitems);
+  void filterCandidatesCuda(int sum, int threads_per_block, int streams,
+    int workitems);
 
   //
   

@@ -157,6 +157,8 @@ namespace {
     return old_actual == old_expected;
   }
 
+  __device__ auto once = false;
+
   __global__
   void xorKernel(const SourceCompatibilityData* __restrict__ sources,
     const unsigned num_sources, const XorSource* __restrict__ xor_sources,
@@ -166,10 +168,10 @@ namespace {
     const index_t* __restrict__ list_start_indices,
     result_t* results, int stream_index, int special)
   {
-    extern __shared__ result_t shared[];
-    result_t* block_results = shared;
+    extern __shared__ uint16_t shared[];
+    uint16_t* block_results = shared;
     SourceCompatibilityData* fast_source =
-      (SourceCompatibilityData*)&shared[gridDim.x * blockDim.x];
+      (SourceCompatibilityData *)&shared[blockDim.x];
 
     // should only happen with very low xor_sources count 
     // 64 * 63 + 63 = 4095 
@@ -177,6 +179,7 @@ namespace {
     if (thread_id >= num_xor_sources) return;
 
     auto reason{ -1 };
+    auto once_only = true;
 
     // zero-out results
     const auto threads_per_grid = gridDim.x * blockDim.x;
@@ -209,52 +212,80 @@ namespace {
           false, &reason))
         {
           block_results[threadIdx.x] = 1;
-          #if 0
-          if (//!src_idx.index &&
-              ((src_idx.listIndex == 2655))) {
+          #if 1
+          if (!src_idx.index && (src_idx.listIndex == 50)) {
             // || (src_idx.listIndex == 1907) || (src_idx.listIndex == 1908))) {
-            printf("%d %d:%d compat: blockIdx: %d, threadIdx: %d"
-                   ", xor_src_idx: %d, flat_index: %d\n",
-                   idx, src_idx.listIndex, src_idx.index, blockIdx.x,
-                   threadIdx.x, xor_src_idx, flat_index);
+            printf("MATCH %d %d:%d, xor %d, flat %d\n",
+                   idx, src_idx.listIndex, src_idx.index,
+                   xor_src_idx, flat_index);
           }
           #endif
         }
-        #if 0
+        #if 1
         if (//(src_idx.index == 2) && ((src_idx.listIndex == 142) && (xor_src_idx >= 1390) && (xor_src_idx <= 1400)))
-            (src_idx.index == 0) && ((src_idx.listIndex >= 12591) && (src_idx.listIndex <= 12597)
-                                     /* && (xor_src_idx >= 37645)*/ && (xor_src_idx == 37648)))
+            (src_idx.index == 0) && ((src_idx.listIndex >= 50) && (src_idx.listIndex <= 50)))
+              /* && (xor_src_idx >= 37645) && (xor_src_idx == 37648)))*/
         {
-          if (0) {
-            printf("%d\n", xor_src_idx);
-          } else {
-            /*
-            printf("%d:%d compat: %d, idx: %d, xor_src_idx: %d, flat_index: %d\n",
-            src_idx.listIndex, src_idx.index, block_results[threadIdx.x],
-                 idx, xor_src_idx, flat_index);
-            */
-            printf("%d:%d xor %d, flat: %d\n", src_idx.listIndex, src_idx.index,
-                   xor_src_idx, flat_index);
-            char buf[32];
-            source.dump(src_idx.as_string(buf), true);
-            xor_sources[xor_src_idx].dump("37648", true);
+          if (!once_only || !once) {
+            once = true;
+            __syncthreads();
+            if (1) { // !once_only || !threadIdx.x) {
+              if (0) {
+                printf("%d\n", xor_src_idx);
+              } else {
+                /*
+                  printf("%d:%d compat: %d, idx: %d, xor_src_idx: %d, flat_index: %d\n",
+                  src_idx.listIndex, src_idx.index, block_results[threadIdx.x],
+                  idx, xor_src_idx, flat_index);
+                */
+                printf("%d %d:%d, xor %d, flat: %d, thread: %d\n", idx, src_idx.listIndex, src_idx.index,
+                       xor_src_idx, flat_index, threadIdx.x);
+                char big_buf[256];
+                char smol_buf[32];
+                char id_buf[32];
+                source.dump(src_idx.as_string(id_buf), true, big_buf, smol_buf);
+                //xor_sources[xor_src_idx].dump("37648", true);
+              }
+            }
           }
         }
         #endif
+        #if 1
+        __syncthreads();
+        if ((src_idx.listIndex == 50) && (src_idx.index == 0)) {
+          int count{};
+          for (int i{}; i < blockDim.x; ++i) {
+            if (block_results[i]) {
+              ++count;
+            }
+          }
+          if (count) {
+            printf("blk: %d, thrd: %d, cnt %d\n", blockIdx.x, threadIdx.x, count);
+          }
+        }
+        #endif
+
         for (int reduce_idx = blockDim.x / 2; reduce_idx > 0; reduce_idx /= 2) {
           __syncthreads();
           if (threadIdx.x < reduce_idx) {
-            block_results[threadIdx.x] +=
-              block_results[reduce_idx + threadIdx.x];
+            #if 0
+            if ((blockIdx.x == 72) && !threadIdx.x &&
+                (block_results[threadIdx.x] || block_results[reduce_idx + threadIdx.x])) {
+              printf("blk: %d, thrd: %d, %d\n", blockIdx.x, reduce_idx + threadIdx.x,
+                     block_results[reduce_idx + threadIdx.x]);
+            }
+            #endif
+            block_results[threadIdx.x] += block_results[reduce_idx + threadIdx.x];
           }
         }
         if (!threadIdx.x && block_results[threadIdx.x]) {
           #if 0
-          if (((src_idx.listIndex == 12596)))
+          if (((src_idx.listIndex == 50)))
             // || (src_idx.listIndex == 1907) || (src_idx.listIndex == 1908)))
           {
-            printf("incr %d:%d @ %d, block_result: %d\n",
+            printf("incr %d:%d @ idx %d, thread: %d, block, %d: block_result: %d\n",
                    src_idx.listIndex, src_idx.index, idx,
+                   threadIdx.x, blockIdx.x,
                    block_results[threadIdx.x]);
           }
           #endif
@@ -773,19 +804,20 @@ namespace {
   }
 
   void runKernel(KernelData& kernel,
+    int threads_per_block,
     const SourceCompatibilityData* device_sources,
     const index_t* device_list_start_indices)
   {
     auto num_sources = kernel.source_indices.size();
     auto num_sm = 10;
     auto threads_per_sm = 2048;
-    auto block_size = 64; // aka threads per block
+    auto block_size = threads_per_block ? threads_per_block : 128;
     auto blocks_per_sm = threads_per_sm / block_size;
     assert(blocks_per_sm * block_size == threads_per_sm);
     
     //auto blocksPerGrid = (num_sources + threadsPerBlock - 1) / threadsPerBlock;
     auto grid_size = num_sm * blocks_per_sm; // aka blocks per grid
-    auto shared_bytes = (block_size + grid_size) * sizeof(result_t) +
+    auto shared_bytes = block_size * sizeof(uint16_t) +
       sizeof(SourceCompatibilityData);
     kernel.is_running = true;
     kernel.sequence_num = KernelData::next_sequence_num();
@@ -981,7 +1013,9 @@ namespace {
 
 namespace cm {
 
-void filterCandidatesCuda(int sum, int num_streams, int workitems) {
+void filterCandidatesCuda(int sum, int threads_per_block, int num_streams,
+    int workitems)
+{
   using namespace std::chrono;
 
   const auto& sources = allSumsCandidateData.find(sum)->second
@@ -990,7 +1024,8 @@ void filterCandidatesCuda(int sum, int num_streams, int workitems) {
   IndexStates indexStates{ sources };
   auto device_list_start_indices = allocCopyListStartIndices(indexStates);
 
-  //check(sources, 12596, 0);
+  check(sources, 50, 0);
+  check(sources, 51, 0);
   //dump_xor(37648);
 
   KernelData::max_workitems(workitems);
@@ -1019,7 +1054,8 @@ void filterCandidatesCuda(int sum, int num_streams, int workitems) {
     //assert(kernel.source_indices.size() <= KernelData::max_workitems());
     auto k0 = high_resolution_clock::now();
     if (!kernel.is_running) {
-      runKernel(kernel, device_sources, device_list_start_indices);
+      runKernel(kernel, threads_per_block, device_sources,
+        device_list_start_indices);
     }
     auto r0 = high_resolution_clock::now();
 

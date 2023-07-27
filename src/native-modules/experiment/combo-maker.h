@@ -305,10 +305,16 @@ public:
     }
   }
   
-  constexpr void dump(bool device = false) const {
+  constexpr void dump(bool device = false, char* buf = nullptr, char* smolbuf = nullptr) const {
+    char big_buf[256];
+    char smol_buf[32];
+    if (!buf) buf = big_buf;
+    if (!smolbuf) smolbuf = smol_buf;
+    *buf = 0;
+    *smolbuf = 0;
     auto first{true};
     if (device) {
-      printf("sources:");
+      strcat(buf, "sources:");
     } else {
       std::cerr << "sources:";
     }
@@ -316,14 +322,15 @@ public:
       if (getVariation(s) > -1) {
         if (first) {
           if (device) {
-            printf("\n");
+            strcat(buf, "\n");
           } else {
             std::cerr << std::endl;
           }
           first = false;
         }
         if (device) {
-          printf(" s%dv%d:", s, getVariation(s));
+          sprintf(smolbuf, " s%d v%d:", s, getVariation(s));
+          strcat(buf, smolbuf);
         } else {
           std::cerr << "  s" << s << " v" << getVariation(s) << ":";
         }
@@ -331,13 +338,14 @@ public:
           auto src = sources.at(Source::getFirstIndex(s) + i);
           if (src < 0) break;
           if (device) {
-            printf(" %d", src);
+            sprintf(smolbuf, " %d", src);
+            strcat(buf, smolbuf);
           } else {
             std::cerr << " " << int(src);
           }
         }
         if (device) {
-          printf("\n");
+          strcat(buf, "\n");
         } else {
           std::cerr << std::endl;
         }
@@ -345,10 +353,13 @@ public:
     }
     if (first) {
       if (device) {
-        printf(" none\n");
+        strcat(buf, " none\n");
       } else {
         std::cerr << " none" << std::endl;
       }
+    }
+    if (device) {
+      printf("%s", buf);
     }
   }
 
@@ -486,15 +497,25 @@ struct SourceCompatibilityData {
     return count;
   }
 
-  constexpr void dump(const char* header = nullptr, bool device = false) const {
+  constexpr void dump(const char* header = nullptr, bool device = false,
+    char* buf = nullptr, char* smolbuf = nullptr) const
+  {
+    char big_buf[256] = "-";
+    char smol_buf[32] = { 0 };
+    if (!buf) buf = big_buf;
+    if (!smolbuf) smolbuf = smol_buf;
+    *buf = 0;
+    *smolbuf = 0;
     if (header) {
-      if (!device) {
+      if (device) {
+        sprintf(buf, "%s\n", header);
+      } else {
         std::cerr << header << std::endl;
       }
     }
     usedSources.dump();
     if (device) {
-      printf("legacy sources:");
+      strcat(buf, "legacy sources:");
     } else {
       std::cerr << "legacy sources:";
     }
@@ -502,7 +523,8 @@ struct SourceCompatibilityData {
     for (int i{}; i < kMaxLegacySources; ++i) {
       if (legacySources.at(i)) {
         if (device) {
-          printf(" %d", i);
+          sprintf(smolbuf, " %d", i);
+          strcat(buf, smolbuf);
         } else {
           std::cerr << " " << i;
         }
@@ -511,13 +533,13 @@ struct SourceCompatibilityData {
     }
     if (!any) {
       if (device) { 
-        printf(" none");
+        strcat(buf, " none");
       } else {
         std::cerr << " none";
       }
     }
     if (device) {
-      printf("\n");
+      printf("%s\n", buf);
     } else {
       std::cerr << std::endl;
     }

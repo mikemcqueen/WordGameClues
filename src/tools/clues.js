@@ -51,8 +51,8 @@ const CmdLineOptions = Opt.create(_.concat(Clues.Options, [
     ['',  'primary',                           '  show combos as primary source clues' ],
     ['l', 'parallel',                          '  use paralelljs' ],
     ['',  'slow',                              '  use (old) slow method of loading clues' ],
-    ['',  'streams=COUNT',                     '  use COUNT CUDA streams' ],
-    ['',  'workitems=COUNT',                   '  each CUDA stream processes COUNT workitems' ],
+    ['',  'streams=COUNT',                     '  use COUNT streams (CUDA)'],
+    ['',  'tpb=COUNT',                         '  use COUNT threads per block (CUDA)'],
     ['',  'copy-from=SOURCE',                  'copy clues from source cluetype; e.g. p1.1'],
     ['',  'save',                              '  save clue files'],
     ['',  'allow-dupe-source',                 '  allow duplicate sources'],
@@ -115,6 +115,7 @@ function loadClues (clues, ignoreErrors, max, options) {
     return true;
 }
 
+/*
 //
 // args:
 //  sum:     countArg,
@@ -124,7 +125,6 @@ function loadClues (clues, ignoreErrors, max, options) {
 //  use:     useClueList
 //
 function doCombos(args) {
-    /*
     if (!_.isUndefined(args.sources)) {
         args.sources = _.chain(args.sources).split(',').map(_.toNumber).value();
     }
@@ -132,9 +132,8 @@ function doCombos(args) {
     // is _chain even necessary here?
         args.require = _.chain(args.require).split(',').map(_.toNumber).value();
     }
-    */
-    ComboMaker.makeCombos(args);
 }
+    */
 
 async function getNamedNoteNames(options) {
     if (options.production) Log.info('---PRODUCTION---');
@@ -162,7 +161,7 @@ function combo_maker(args) {
                 Log.info(`note names: ${noteNames}`);
                 args.note_names = noteNames;
             }
-            return doCombos(args);
+            return ComboMaker.makeCombos(args);
         });
 }
 
@@ -450,6 +449,7 @@ async function main () {
             //and:     options.and,
             parallel: options.parallel,
             verbose: options.verbose,
+            tpb: options.tpb ? Number(options.tpb) : 0,
             streams: options.streams ? Number(options.streams) : 0,
             workitems: options.workitems ? Number(options.workitems) : 0
         });
