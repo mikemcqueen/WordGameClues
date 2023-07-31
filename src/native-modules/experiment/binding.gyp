@@ -19,7 +19,7 @@
     "library_dirs": [
       '/usr/local/cuda/lib64'
     ],
-    "libraries": [ '-lcudart' ], # '-lcuda'
+    "libraries": [ '-lcudart', '-lcudadevrt' ],
     "dependencies": [ "filter" ],
     "defines": [ "NAPI_CPP_EXCEPTIONS" ]
   },
@@ -33,18 +33,21 @@
       'extension': 'cu',           
       'inputs': [ '<(RULE_INPUT_PATH)' ],
       'rule_name': 'cuda on linux',
-      'message': "compile cuda file on linux",
-      'outputs': [ '<(INTERMEDIATE_DIR)/<(RULE_INPUT_ROOT).o' ],
+      'message': 'compile and device link cuda file on linux',
+      'outputs': [
+        '<(INTERMEDIATE_DIR)/<(RULE_INPUT_ROOT).o',
+        '<(INTERMEDIATE_DIR)/<(RULE_INPUT_ROOT)_link.o'
+       ],
       'process_outputs_as_sources': 1,
       'action': [
-        'bash', 'nvcc.sh', '--expt-relaxed-constexpr',
+        'bash', 'nvcc.sh', '<@(_outputs)', '--expt-relaxed-constexpr',
         '-Xcompiler', '-fPIC',
-        #       '-Xcompiler', '-Wall',
-        '-Xcompiler', '-Wall', '-Xcompiler', '-Wextra', #'-Xcompiler', '-pedantic', #'-Werror', '-W'
+        '-Xcompiler', '-Wall', '-Xcompiler', '-Wextra',
+        #'-Xcompiler', '-pedantic', #'-Werror', '-W' # shit i couldn't get working
         '-Xcudafe', '--diag_suppress=declared_but_not_referenced',
         '-g','-lineinfo', # debug
-        '-arch', 'sm_61',
-        '-std=c++20', '-c', '<@(_inputs)', '-o', '<@(_outputs)'
+        '-DCUDA_FORCE_CDP1_IF_SUPPORTED',
+        '-std=c++20', '-dc', '<@(_inputs)'
       ]
     }]
   }]
