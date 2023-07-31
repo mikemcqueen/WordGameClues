@@ -617,8 +617,8 @@ Value filterCandidatesForSum(const CallbackInfo& info) {
   assert(sum >= 2);
   auto threads_per_block = info[1].As<Number>().Int32Value();
   auto streams = info[2].As<Number>().Int32Value();
-  auto workitems = info[3].As<Number>().Int32Value();
-  cm::filterCandidates(sum, threads_per_block, streams, workitems);
+  auto stride = info[3].As<Number>().Int32Value();
+  cm::filterCandidates(sum, threads_per_block, streams, stride);
   return env.Null();
 }
 

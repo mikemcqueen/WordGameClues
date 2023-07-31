@@ -52,6 +52,7 @@ const CmdLineOptions = Opt.create(_.concat(Clues.Options, [
     ['l', 'parallel',                          '  use paralelljs' ],
     ['',  'slow',                              '  use (old) slow method of loading clues' ],
     ['',  'streams=COUNT',                     '  use COUNT streams (CUDA)'],
+    ['',  'stride=COUNT',                      '  use COUNT source indices per stream (CUDA)'],
     ['',  'tpb=COUNT',                         '  use COUNT threads per block (CUDA)'],
     ['',  'copy-from=SOURCE',                  'copy clues from source cluetype; e.g. p1.1'],
     ['',  'save',                              '  save clue files'],
@@ -451,7 +452,7 @@ async function main () {
             verbose: options.verbose,
             tpb: options.tpb ? Number(options.tpb) : 0,
             streams: options.streams ? Number(options.streams) : 0,
-            workitems: options.workitems ? Number(options.workitems) : 0
+            stride: options.stride ? Number(options.stride) : 0
         });
     }
     return 0;
