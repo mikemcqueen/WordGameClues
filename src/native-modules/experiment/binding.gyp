@@ -46,7 +46,7 @@
         #'-Xcompiler', '-pedantic', #'-Werror', '-W' # shit i couldn't get working
         '-Xcudafe', '--diag_suppress=declared_but_not_referenced',
         '-g','-lineinfo', # debug
-        '-DCUDA_FORCE_CDP1_IF_SUPPORTED',
+        #'-DCUDA_FORCE_CDP1_IF_SUPPORTED',
         '-std=c++20', '-dc', '<@(_inputs)'
       ]
     }]
