@@ -42,7 +42,7 @@ public:
   static IndexListVector initial_indices(const std::vector<int>& lengths) {
     IndexListVector indexLists;
     indexLists.resize(lengths.size());
-    for (auto i = 0u; i < indexLists.size(); ++i) {
+    for (size_t i{}; i < indexLists.size(); ++i) {
       initialize_list(indexLists[i], lengths[i]);
     }
     return indexLists;
@@ -51,7 +51,7 @@ public:
 private:
   take_type take() {
     if (done_) return nullptr;
-    for (auto i = 0u; i < iterators_.size(); ++i) {
+    for (size_t i{}; i < iterators_.size(); ++i) {
       result_[i] = *std::next(iterators_[i]);
     }
     return &result_;
@@ -59,7 +59,7 @@ private:
 
   void reset_iterators(int size) {
     iterators_.resize(size);
-    for (int i = 0; i < size; ++i) {
+    for (int i{}; i < size; ++i) {
       assert(!index_lists_[i].empty());
       iterators_[i] = index_lists_[i].before_begin();
     }
@@ -67,7 +67,7 @@ private:
 
   static void initialize_list(IndexList& indexList, int size) {
     indexList.clear();
-    for (int i = size - 1; i >= 0; --i) {
+    for (int i{ size - 1 }; i >= 0; --i) {
       indexList.emplace_front(i);
     }
   }

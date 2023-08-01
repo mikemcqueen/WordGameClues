@@ -147,8 +147,9 @@ auto mergeSources(const SourceData& source1, const SourceData& source2) {
   result.primaryNameSrcList = std::move(NameCount::listMerge(
     source1.primaryNameSrcList, source2.primaryNameSrcList));
   result.ncList = std::move(NameCount::listMerge(source1.ncList, source2.ncList));
-  result.sourceBits = std::move(source1.sourceBits | source2.sourceBits);
-  // might be faster here to call NameCount::listToLegacySources(result.ncList)p
+  result.legacySourceBits =
+    std::move(source1.legacySourceBits | source2.legacySourceBits);
+  // might be faster here to call NameCount::listToLegacySources(result.ncList)
   result.legacySources = std::move(source1.copyMerge(source2.legacySources));
   result.usedSources = std::move(source1.usedSources.copyMerge(source2.usedSources));
   return result;
@@ -208,7 +209,7 @@ auto buildSourceListsForUseNcData(const vector<NCDataList>& useNcDataLists,
   using StringSet = std::unordered_set<std::string>;
   using HashMap = std::unordered_map<SourceCompatibilityData, StringSet>;
 
-  srand(-1); // why?
+  srand(-1); // why? hash?
   int total = 0;
   int hash_hits = 0;
   const auto size = useNcDataLists[0].size();
@@ -275,7 +276,7 @@ auto getNumEmptySublists(const std::vector<SourceList>& sourceLists) {
 auto anyCompatibleXorSources(const SourceData& source,
   const Peco::IndexList& indexList, const SourceList& sourceList)
 {
-  for (auto it = indexList.cbegin(); it != indexList.cend(); ++it) {
+  for (auto it = indexList.begin(); it != indexList.end(); ++it) {
     if (source.isXorCompatibleWith(sourceList[*it])) {
       return true;
     }
@@ -289,8 +290,7 @@ auto filterXorIncompatibleIndices(Peco::IndexListVector& indexLists, int first,
 {
   Peco::IndexList& firstList = indexLists[first];
   for (auto it_first = firstList.before_begin();
-       std::next(it_first) != firstList.end();
-       /* nothing */)
+    std::next(it_first) != firstList.end(); /* nothing */)
   {
     const auto& first_source = sourceLists[first][*std::next(it_first)];
     bool any_compat = anyCompatibleXorSources(first_source, indexLists[second],
@@ -308,10 +308,12 @@ auto filterAllXorIncompatibleIndices(Peco::IndexListVector& indexLists,
   const std::vector<SourceList>& sourceLists)
 {
   if (indexLists.size() < 2u) return true;
-  for (auto first = 0u; first < indexLists.size(); ++first) {
-    for (auto second = 0u; second < indexLists.size(); ++second) {
+  for (size_t first{}; first < indexLists.size(); ++first) {
+    for (size_t second{}; second < indexLists.size(); ++second) {
       if (first == second) continue;
-      if (!filterXorIncompatibleIndices(indexLists, first, second, sourceLists)) {
+      if (!filterXorIncompatibleIndices(indexLists, first, second,
+        sourceLists))
+      {
         return false;
       }
     }
@@ -352,7 +354,7 @@ SourceCRefList getCompatibleXorSources(const std::vector<int>& indexList,
   SourceCRefList sourceCRefList{};
   const auto& firstSource = sourceLists[0][indexList[0]];
   sourceCRefList.emplace_back(SourceCRef{ firstSource });
-  SourceCompatibilityData compatData(firstSource.sourceBits,
+  SourceCompatibilityData compatData(firstSource.legacySourceBits,
     firstSource.usedSources, firstSource.legacySources);
   for (auto i = 1u; i < indexList.size(); ++i) {
     const auto& source = sourceLists[i][indexList[i]];
@@ -387,7 +389,7 @@ XorSourceList mergeCompatibleXorSources(const SourceCRefList& sourceList) {
   // I feel like this is still valid and worth removing or commenting
   assert(!primaryNameSrcList.empty() && "empty primaryNameSrcList");
   XorSource mergedSource(std::move(primaryNameSrcList),
-    std::move(NameCount::listToSourceBits(primaryNameSrcList)),
+    std::move(NameCount::listToLegacySourceBits(primaryNameSrcList)),
     std::move(usedSources),
     std::move(NameCount::listToLegacySources(primaryNameSrcList)),
     std::move(ncList));
@@ -551,108 +553,5 @@ auto buildSentenceVariationIndices(const XorSourceList& xorSourceList,
   }
   return sentenceVariationIndices;
 }
-
-//////////
-
-namespace {
-  /*
-  using SourceSet = std::unordered_set<int>;
-  using SourceCountMap = std::unordered_map<int, int>;
-  using SourceFreqMap = std::unordered_map<int, double>;
-  
-  struct SourceCounts {
-    void addToTotals(int source) {
-      auto it = totals_map.find(source);
-      if (it == totals_map.end()) {
-        totals_map.insert(std::make_pair(source, 1));
-      } else {
-        it->second++;
-      }
-    }
-
-    void addSources(int index, const Sources& sources) {
-      auto& source_set = source_sets[index];
-      for (int s{ 1 }; s <= kNumSentences; ++s) {
-        auto start = Source::getFirstIndex(s);
-        for (int i{}; i < kMaxUsedSourcesPerSentence; ++i) {
-          auto source = sources.at(start + i);
-          if (source == -1) break;
-          source_set.insert(source);
-          addToTotals(source);
-        }
-      }
-    }
-    
-    void addSources(int index, const LegacySources& legacySources) {
-      auto& source_set = source_sets[index];
-      for (int i{}; i < kMaxLegacySources; ++i) {
-        auto source = legacySources.at(i);
-        if (!source) continue;
-        source_set.insert(source);
-        addToTotals(source);
-      }
-    }
-    
-    std::vector<SourceSet> source_sets;
-    SourceCountMap totals_map;
-  }; // struct SourceCounts
-  */
-  
-  /*
-  auto getTotalCount(const SourceCountMap& countMap) {
-    return std::accumulate(countMap.begin(), countMap.end(), 0,
-      [](int total, int count) { // TODO: probably std::pair here
-        total += count;
-        return total;
-      });
-  }
-  */
-  
-  /* moved to combo-maker.h
-  template<typename T>
-  auto makeSourceCounts(const T& sourceList) {
-    SourceCounts sourceCounts;
-    sourceCounts.source_sets.resize(sourceList.size());
-    std::for_each(sourceList.begin(), sourceList.end(),
-      [idx = 0, &sourceCounts](const SourceData& source) mutable {
-        sourceCounts.addSources(idx, source.usedSources.sources);
-        sourceCounts.addSources(idx, source.legacySources);
-        idx++;
-      });
-    return sourceCounts;
-  }
-  */
-  
-  /*
-  auto makeSourceFreqMap(const SourceCounts& sourceCounts) {
-    SourceFreqMap freqMap;
-    return freqMap;
-  }
-
-  auto makeSortedIndices(const SourceCounts& sourceCounts,
-    const SourceFreqMap& sourceFreqMap)
-  {
-    std::vector<int> indices(sourceCounts.source_sets.size());
-    std::iota(indices.begin(), indices.end(), 0);
-    std::sort(indices.begin(), indices.end(),
-      [&sourceCounts, &sourceFreqMap](int i, int j) {
-        return sourceCounts.source_sets[i].size() <
-          sourceCounts.source_sets[j].size();
-      });
-    return indices;
-  }
-*/
-} // anon namespace
-  
-/* moved to combo-maker.h
-template<typename T>
-auto getSortedSourceIndices(const T& sourceList)
-  -> std::vector<int>
-{
-  auto sourceCounts = makeSourceCounts(sourceList);
-  auto sourceFreqMap = makeSourceFreqMap(sourceCounts);
-  return makeSortedIndices(sourceCounts, sourceFreqMap);
-}
-*/
 
 } // namespace cm

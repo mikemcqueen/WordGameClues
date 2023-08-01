@@ -485,7 +485,14 @@ namespace {
     auto blocks_per_sm = threads_per_sm / block_size;
     assert(blocks_per_sm * block_size == threads_per_sm);
     auto grid_size = num_sm * blocks_per_sm; // aka blocks per grid
-    auto shared_bytes = 0; // block_size * sizeof(block_result_t);
+    auto shared_bytes = block_size * (sizeof(UsedSources::SourceBits) +
+      sizeof(LegacySourceBits));
+
+    #if 0
+    std::cerr << "lsb: " << sizeof(LegacySourceBits)
+              << ", usb: " << sizeof(UsedSources::SourceBits)
+              << std::endl;
+    #endif
 
     kernel.is_running = true;
     kernel.sequence_num = KernelData::next_sequence_num();

@@ -98,7 +98,7 @@ cm::SourceData makeSourceData(Env& env, const Napi::Object& jsSourceData) {
   // TODO: declare SourceData result; assign result.xxx = std::move(yyy);; return result
   // (no move-all-params constructor required)
   auto primaryNameSrcList = makeNameCountList(env, jsPrimaryNameSrcList.As<Array>());
-  auto primarySrcBits = cm::NameCount::listToSourceBits(primaryNameSrcList);
+  auto primarySrcBits = cm::NameCount::listToLegacySourceBits(primaryNameSrcList);
   auto usedSources = cm::NameCount::listToUsedSources(primaryNameSrcList);
   usedSources.assert_valid();
   auto legacySources = cm::NameCount::listToLegacySources(primaryNameSrcList);
