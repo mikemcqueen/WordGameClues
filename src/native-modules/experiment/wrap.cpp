@@ -49,7 +49,7 @@ Object wrap(Env& env, const XorSource& xorSource) {
 
 Array wrap(Env& env, const XorSourceList& xorSourceList) {
   Array jsList = Array::New(env, xorSourceList.size());
-  for (auto i = 0u; i < xorSourceList.size(); ++i) {
+  for (size_t i{}; i < xorSourceList.size(); ++i) {
     jsList.Set(i, wrap(env, xorSourceList[i]));
   }
   return jsList;

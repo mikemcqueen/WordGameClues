@@ -54,7 +54,7 @@ auto makeSourceCounts(const T& sourceList) {
   sourceCounts.source_sets.resize(sourceList.size());
   std::for_each(sourceList.begin(), sourceList.end(),
     [idx = 0, &sourceCounts](const auto& source) mutable {
-      sourceCounts.addSources(idx, source.usedSources.sources);
+sourceCounts.addSources(idx, source.usedSources.sources);
       sourceCounts.addSources(idx, source.legacySources);
       idx++;
     });

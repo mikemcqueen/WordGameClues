@@ -10,12 +10,52 @@
 #include <tuple>
 #include <cuda_runtime.h>
 #include "candidates.h"
-#include "source-counts.h"
+//#include "source-counts.h"
 
 //#define STREAM_LOG
 
 namespace {
+
+  #define USE_SHARED_MEMORY_SOURCE 0
+
   using namespace cm;
+
+  template<int size>
+  __device__ bool intersects_shared(bitset<size> src, uint32_t* other) {
+    for (unsigned int i{}, o{threadIdx.x}; i < bitset<size>::wc();
+      i++, o += blockDim.x)
+    {
+      if (src.word(i) & other[o]) return true;
+    }
+    return false;
+  }
+
+  __device__
+  auto usedSourcesAreXorCompatible(const UsedSources& src,
+    const UsedSources& other, uint32_t* other_src_bits)
+  {
+    // compare bits (gpu shared memory)
+    if (intersects_shared(src.getBits(), other_src_bits)) {
+      return false;
+    }
+    // compare variations
+    if (!UsedSources::allVariationsMatch(src.variations, other.variations)) {
+      return false;
+    }
+    return true;
+  }
+
+  __device__
+  auto sourcesAreXorCompatible(const SourceCompatibilityData& src,
+    const SourceCompatibilityData& other,
+    uint32_t* other_src_bits, uint32_t* other_legacy_src_bits)
+  {
+    if (intersects_shared(src.legacySourceBits, other_legacy_src_bits)) {
+      return false;
+    }
+    return usedSourcesAreXorCompatible(src.usedSources, other.usedSources,
+      other_src_bits);
+  }
 
   __device__
   auto isSourceXORCompatibleWithAnyXorSource(
@@ -76,15 +116,23 @@ namespace {
   __device__ void store(T* addr, T val) {
     *(volatile T*)addr = val;
   }
-
+ 
   __global__
   void xorKernel(const SourceCompatibilityData* __restrict__ sources,
-    const unsigned num_sources, const XorSource* __restrict__ xor_sources,
+    const unsigned num_sources,
+    const SourceCompatibilityData* __restrict__ xor_sources,
     const unsigned num_xor_sources,
     const SourceIndex* __restrict__ source_indices,
     const index_t* __restrict__ list_start_indices,
     result_t* results, int stream_idx)
   {
+#if USE_SHARED_MEMORY_SOURCE
+    extern __shared__ uint32_t shared[];
+    UsedSources::SourceBits::word_type* src_bits = shared;
+    LegacySourceBits::word_type* legacy_src_bits = 
+      &shared[blockDim.x * UsedSources::SourceBits::wc()];
+#endif
+
     // should only happen with very low xor_sources count 
     // 64 * 63 + 63 = 4095 
     //const auto thread_id = blockDim.x * blockIdx.x + threadIdx.x;
@@ -102,14 +150,29 @@ namespace {
       const auto& source = sources[flat_index];
       auto& result = results[src_idx.listIndex];
 
+#if USE_SHARED_MEMORY_SOURCE
+      for (unsigned i{}, b{threadIdx.x}; i < UsedSources::SourceBits::wc();
+        ++i, b += blockDim.x)
+      {
+        src_bits[b] = source.usedSources.bits.word(i);
+        if (i < LegacySourceBits::wc()) {
+          legacy_src_bits[b] = source.legacySourceBits.word(i);
+        }
+      }
+#endif
+
       // for each xor_source
       for (int start_idx = blockIdx.x * blockDim.x;
         start_idx + threadIdx.x < num_xor_sources;
         start_idx += threads_per_grid)
       {
         if (load(&result)) break;
-        if (source.isXorCompatibleWith(xor_sources[start_idx + threadIdx.x],
-          false))
+#if USE_SHARED_MEMORY_SOURCE
+        if (sourcesAreXorCompatible(xor_sources[start_idx + threadIdx.x],
+         source, src_bits, legacy_src_bits))
+#else
+        if (source.isXorCompatibleWith(xor_sources[start_idx + threadIdx.x], false))
+#endif
         {
           store(&result, (uint8_t)1);
         }
@@ -485,8 +548,12 @@ namespace {
     auto blocks_per_sm = threads_per_sm / block_size;
     assert(blocks_per_sm * block_size == threads_per_sm);
     auto grid_size = num_sm * blocks_per_sm; // aka blocks per grid
+#if USE_SHARED_MEMORY_SOURCE
     auto shared_bytes = block_size * (sizeof(UsedSources::SourceBits) +
       sizeof(LegacySourceBits));
+#else
+    auto shared_bytes = 0;
+#endif
 
     #if 0
     std::cerr << "lsb: " << sizeof(LegacySourceBits)
@@ -568,21 +635,11 @@ namespace {
     // copy sources
     size_t index{};
     for (const auto& sourceList: sources) {
-      auto sourceIndices = cm::getSortedSourceIndices(sourceList, false);
-      if (sourceIndices.size()) {
-        for (size_t i{}; i < sourceIndices.size(); ++i) {
-          const auto& src = sourceList.at(sourceIndices.at(i));
-          err = cudaMemcpyAsync(&device_sources[index++], &src,
-            sizeof(SourceCompatibilityData), cudaMemcpyHostToDevice, stream);
-          assert((err == cudaSuccess) && "failed to copy source");
-        }
-      } else {
-        err = cudaMemcpyAsync(&device_sources[index], sourceList.data(),
-          sourceList.size() * sizeof(SourceCompatibilityData),
-          cudaMemcpyHostToDevice, stream);
-        assert((err == cudaSuccess) && "failed to copy sources");
-        index += sourceList.size();
-      }
+      err = cudaMemcpyAsync(&device_sources[index], sourceList.data(),
+        sourceList.size() * sizeof(SourceCompatibilityData),
+        cudaMemcpyHostToDevice, stream);
+      assert((err == cudaSuccess) && "failed to copy sources");
+      index += sourceList.size();
     }
     return device_sources;
   }
@@ -842,26 +899,26 @@ void filterCandidatesCuda(int sum, int threads_per_block, int num_streams,
 #endif
 }
 
-[[nodiscard]]
-XorSource* cuda_allocCopyXorSources(const XorSourceList& xorSourceList,
-  const std::vector<int> sortedIndices)
+[[nodiscard]] SourceCompatibilityData* cuda_allocCopyXorSources(
+  const XorSourceList& xorSourceList)
 {
-  auto xorSources_bytes = xorSourceList.size() * sizeof(XorSource);
-  XorSource *device_xorSources = nullptr;
-  cudaError_t err = cudaMalloc((void **)&device_xorSources, xorSources_bytes);
+  auto xorsrc_bytes = xorSourceList.size() * sizeof(SourceCompatibilityData);
+  SourceCompatibilityData *device_xorSources = nullptr;
+  cudaError_t err = cudaMallocAsync((void **)&device_xorSources,
+    xorsrc_bytes, cudaStreamPerThread);
   if (err != cudaSuccess) {
     fprintf(stderr, "Failed to allocate device xorSources, error: %s\n",
       cudaGetErrorString(err));
-    throw std::runtime_error("failed to allocate device xorSources");
+    assert(!"failed to allocate device xorSources");
   }
-  for (size_t i{}; i < sortedIndices.size(); ++i) {
+  for (size_t i{}; i < xorSourceList.size(); ++i) {
     err = cudaMemcpyAsync(&device_xorSources[i],
-      &xorSourceList.at(sortedIndices[i]), sizeof(XorSource),
-      cudaMemcpyHostToDevice);
+      &xorSourceList.at(i), sizeof(SourceCompatibilityData),
+      cudaMemcpyHostToDevice, cudaStreamPerThread);
     if (err != cudaSuccess) {
-      fprintf(stderr, "Failed to copy xorSources host -> device, error: %s\n",
+      fprintf(stderr, "copy xorSource to device, error: %s\n",
               cudaGetErrorString(err));
-      throw std::runtime_error("failed to copy xorSources host -> device");
+      assert(!"failed to copy xorSource to device");
     }
   }
   return device_xorSources;

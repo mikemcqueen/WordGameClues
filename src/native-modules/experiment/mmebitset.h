@@ -47,6 +47,7 @@ template <int size>
 class bitset {
 public:
   using word_type = uint32_t;
+  //constexpr int word_count = (size+31)/32;
 
   constexpr bitset() { reset(); }
 
@@ -100,13 +101,17 @@ public:
 
 #ifdef __CUDA_ARCH__
   // shared memory implementation, one bit word every blockDim.x words
-  constexpr bool shr_intersects(word_type* shrd_mem) const {
-    for (int i{}, o{threadIdx.x}; i < wc(); i++, o += blockDim.x) {
+  constexpr bool shared_intersects(word_type* shrd_mem) const {
+    for (unsigned int i{}, o{threadIdx.x}; i < wc(); i++, o += blockDim.x) {
       if (bits[i] & shrd_mem[o]) return true;
     }
     return false;
   }
 #endif
+
+  constexpr word_type word(int i) const {
+    return bits[i];
+  }
 
   void reset() {
     for (int i=0; i<(size+31)/32; i++)
@@ -129,9 +134,11 @@ public:
     return (bits[bit/32] & mask) ? true : false;
   }
 
+  #if 0
   constexpr bool operator [] (unsigned int bit) const {
     return test(bit);
   }
+  #endif
   
   bitset<size> operator | (const bitset<size> &a) const {
     bitset<size> rv;

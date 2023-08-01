@@ -10,7 +10,6 @@
 #include "greeting.h"
 #include "combo-maker.h"
 #include "candidates.h"
-#include "source-counts.h"
 #include "dump.h"
 #include "wrap.h"
 
@@ -100,11 +99,19 @@ cm::SourceData makeSourceData(Env& env, const Napi::Object& jsSourceData) {
   auto primaryNameSrcList = makeNameCountList(env, jsPrimaryNameSrcList.As<Array>());
   auto primarySrcBits = cm::NameCount::listToLegacySourceBits(primaryNameSrcList);
   auto usedSources = cm::NameCount::listToUsedSources(primaryNameSrcList);
+#if 0
   usedSources.assert_valid();
+#endif
+#if USE_DEPRECATED_SOURCES
   auto legacySources = cm::NameCount::listToLegacySources(primaryNameSrcList);
+#endif
   auto ncList = makeNameCountList(env, jsNcList.As<Array>());
   return cm::SourceData(std::move(primaryNameSrcList), std::move(primarySrcBits),
-    std::move(usedSources), std::move(legacySources), std::move(ncList));
+    std::move(usedSources),
+#if USE_DEPRECATED_SOURCES
+    std::move(legacySources),
+#endif
+    std::move(ncList));
 }
 
 cm::SourceList makeSourceList(Napi::Env& env, const Napi::Array& jsList) {
@@ -287,7 +294,9 @@ cm::SourceCompatibilityData makeSourceCompatibilityData(Napi::Env& env,
       const auto count = jsPnsl[j].As<Object>().Get("count").As<Number>().Int32Value();
       compatData.addSource(count);
     }
+#if USE_DEPRECATED_SOURCES
     compatData.usedSources.sortSources();
+#endif
   }
   return compatData;
 }
@@ -438,9 +447,11 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
     duration_cast<milliseconds>(build1 - build0).count();
   //std::cerr << " native build - " << d_build << "ms" << std::endl;
 
+#if 1
   for (const auto& src_list: sourceLists) {
     cm::assert_valid(src_list);
   }
+#endif
 
   //--
 
@@ -449,7 +460,9 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
     
     cm::PCD.xorSourceList =
       std::move(cm::mergeCompatibleXorSourceCombinations(sourceLists));
+#if 1
     cm::assert_valid(cm::PCD.xorSourceList);
+#endif
     
     auto merge1 = high_resolution_clock::now();
     auto d_merge = duration_cast<milliseconds>(merge1 - merge0).count();
@@ -462,20 +475,8 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
 
   auto xs0 = high_resolution_clock::now();
 
-#if 1 // for unsorted xorSources
-  auto unsorted = []() {
-    std::vector<int> v;
-    v.resize(cm::PCD.xorSourceList.size());
-    iota(v.begin(), v.end(), 0);
-    return v;
-  };// -> std::vector<int> ;
-  cm::PCD.xorSourceIndices = std::move(unsorted());
-#else
-  cm::PCD.xorSourceIndices =
-    std::move(cm::getSortedSourceIndices(cm::PCD.xorSourceList));
-#endif
   cm::PCD.device_xorSources = cm::cuda_allocCopyXorSources(
-    cm::PCD.xorSourceList, cm::PCD.xorSourceIndices);
+    cm::PCD.xorSourceList);
 
   auto xs1 = high_resolution_clock::now();
   auto d_xs = duration_cast<milliseconds>(xs1 - xs0).count();
@@ -487,6 +488,7 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   // NOTE that when I ressurect this I should be indexing via the
   // sorted (index) list generated above
   if (cm::PCD.xorSourceList.size()) {
+#if 0
     auto svi0 = high_resolution_clock::now();
 
     cm::PCD.sentenceVariationIndices =
@@ -499,10 +501,13 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
     auto svi1 = high_resolution_clock::now();
     auto d_svi = duration_cast<milliseconds>(svi1 - svi0).count();
     std::cerr << " variation indices - " << d_svi << "ms" << std::endl;
+#endif
   }
 
   //--
 
+  std::cerr << "wrapping " << cm::PCD.xorSourceList.size() << " xor sources"
+            << std::endl;
   return cm::wrap(env, cm::PCD.xorSourceList);
 }
 

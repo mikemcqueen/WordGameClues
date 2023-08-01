@@ -147,10 +147,9 @@ auto mergeSources(const SourceData& source1, const SourceData& source2) {
   result.primaryNameSrcList = std::move(NameCount::listMerge(
     source1.primaryNameSrcList, source2.primaryNameSrcList));
   result.ncList = std::move(NameCount::listMerge(source1.ncList, source2.ncList));
-  result.legacySourceBits =
-    std::move(source1.legacySourceBits | source2.legacySourceBits);
+  result.legacySourceBits = std::move(source1.legacySourceBits | source2.legacySourceBits);
   // might be faster here to call NameCount::listToLegacySources(result.ncList)
-  result.legacySources = std::move(source1.copyMerge(source2.legacySources));
+  //result.legacySources = std::move(source1.copyMerge(source2.legacySources));
   result.usedSources = std::move(source1.usedSources.copyMerge(source2.usedSources));
   return result;
 }
@@ -355,8 +354,8 @@ SourceCRefList getCompatibleXorSources(const std::vector<int>& indexList,
   const auto& firstSource = sourceLists[0][indexList[0]];
   sourceCRefList.emplace_back(SourceCRef{ firstSource });
   SourceCompatibilityData compatData(firstSource.legacySourceBits,
-    firstSource.usedSources, firstSource.legacySources);
-  for (auto i = 1u; i < indexList.size(); ++i) {
+    firstSource.usedSources); //, firstSource.legacySources);
+  for (size_t i{1}; i < indexList.size(); ++i) {
     const auto& source = sourceLists[i][indexList[i]];
     if (!compatData.isXorCompatibleWith(source)) {
       return {};
@@ -391,7 +390,7 @@ XorSourceList mergeCompatibleXorSources(const SourceCRefList& sourceList) {
   XorSource mergedSource(std::move(primaryNameSrcList),
     std::move(NameCount::listToLegacySourceBits(primaryNameSrcList)),
     std::move(usedSources),
-    std::move(NameCount::listToLegacySources(primaryNameSrcList)),
+    //std::move(NameCount::listToLegacySources(primaryNameSrcList)),
     std::move(ncList));
   XorSourceList result{};
   result.emplace_back(std::move(mergedSource));

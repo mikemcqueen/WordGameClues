@@ -90,20 +90,13 @@ struct UsedSources {
   */
 
 private:
+#if USE_DEPRECATED_SOURCES
   void addSources(const UsedSources& other) {
     for (int sentence{ 1 }; sentence <= kNumSentences; ++sentence) {
       const auto first = Source::getFirstIndex(sentence);
       int other_offset{};
       // does 'other' have sources for this sentence?
       if (other.sources[first + other_offset] == -1) continue;
-
-      // ensure variations for this sentence are compatible
-      if (hasVariation(sentence)) {
-        assert(getVariation(sentence) == other.getVariation(sentence));
-      } else {
-        assert(other.hasVariation(sentence));
-        setVariation(sentence, other.getVariation(sentence));
-      }
 
       // determine our starting offset for merging in new sources
       int offset{};
@@ -117,8 +110,22 @@ private:
       assert(offset < kMaxUsedSourcesPerSentence);
     }
   }
+#endif
+
+  void addVariations(const UsedSources& other) {
+    for (int sentence{ 1 }; sentence <= kNumSentences; ++sentence) {
+      if (!other.hasVariation(sentence)) continue;
+      // ensure variations for this sentence are compatible
+      if (hasVariation(sentence)) {
+        assert(getVariation(sentence) == other.getVariation(sentence));
+      } else {
+        setVariation(sentence, other.getVariation(sentence));
+      }
+    }
+  }
 
 public:
+#if USE_DEPRECATED_SOURCES
   constexpr static bool anySourcesMatch(const Sources& s1,
     const Sources& s2)
   {
@@ -165,6 +172,7 @@ public:
     }
     return matches;
   }
+#endif
 
   constexpr
   static auto allVariationsMatch(const Variations& v1,
@@ -195,27 +203,33 @@ public:
   auto isXorCompatibleWith(const UsedSources& other,
     bool native = true, int* /*reason*/ = nullptr) const
   {
-    if (native) {
-      // compare bits (cpu)
-      if ((getBits() & other.getBits()).any()) {
-        //if (reason) *reason = 1;
-        return false;
-      }
-    } else {
-      if (getBits().intersects(other.getBits())) {
-      // compare sources (gpu)
-      //      if (anySourcesMatch(sources, other.sources)) {
-        //if (reason) *reason = 2;
-        return false;
-      }
+    // compare bits
+    if (getBits().intersects(other.getBits())) {
+      return false;
     }
     // compare variations
     if (!allVariationsMatch(variations, other.variations, native)) {
-      //if (reason) *reason = 3;
       return false;
     }
     return true;
   }
+
+#ifdef __CUDA_ARCH__
+  constexpr
+  auto isXorCompatibleWith(const UsedSources& other,
+    uint32_t* other_src_bits)
+  {
+    // compare bits (gpu shared memory)
+    if (getBits().shared_intersects(other_src_bits)) {
+      return false;
+    }
+    // compare variations
+    if (!allVariationsMatch(variations, other.variations)) {
+      return false;
+    }
+    return true;
+  }
+#endif
 
   /*
   // TODO: private
@@ -249,21 +263,25 @@ public:
     assert(!bits.test(bit_pos));
     bits.set(bit_pos);
 
+#if USE_DEPRECATED_SOURCES
     // source
     int first = Source::getFirstIndex(sentence);
     int offset{};
     while (sources[first + offset] != -1) ++offset;
     assert(offset < kMaxUsedSourcesPerSentence);
     sources[first + offset] = Source::getIndex(src);
+#endif
   }
 
   auto mergeInPlace(const UsedSources& other) {
     // merge bits
-    // TODO: option for compatibility checking
     getBits() |= other.getBits();
-
+    // merge variation. haxoid. should be separate function.
+    addVariations(other);
+#if USE_DEPRECATED_SOURCES
     addSources(other);
     sortSources();
+#endif
   }
 
   auto copyMerge(const UsedSources& other) const {
@@ -272,6 +290,7 @@ public:
     return result;
   }
 
+#if USE_DEPRECATED_SOURCES
   constexpr int getFirstSource(int sentence) const {
     return sources.at(Source::getFirstIndex(sentence));
   }
@@ -295,6 +314,7 @@ public:
                 std::greater<int8_t>());
     }
   }
+#endif
   
   constexpr void dump(bool device = false, char* buf = nullptr, char* smolbuf = nullptr) const {
     char big_buf[256];
@@ -303,6 +323,7 @@ public:
     if (!smolbuf) smolbuf = smol_buf;
     *buf = 0;
     *smolbuf = 0;
+#if USE_DEPRECATED_SOURCES
     auto first{true};
     if (device) {
       strcat(buf, "sources:");
@@ -349,6 +370,7 @@ public:
         std::cerr << " none" << std::endl;
       }
     }
+#endif
     if (device) {
       printf("%s", buf);
     }
@@ -357,13 +379,15 @@ public:
   constexpr void assert_valid() const {
     for (int s{1}; s <= kNumSentences; ++s) {
       if (hasVariation(s)) {
-        assert(sources[Source::getFirstIndex(s)] != -1);
+        assert(bits.count() > 0); // sources[Source::getFirstIndex(s)] != -1);
       }
     }
   }
 
   SourceBits bits{};
+#if USE_DEPRECATED_SOURCES
   Sources sources = make_array<int8_t, kMaxUsedSources>(-1);
+#endif
   Variations variations = make_array<VariationIndex_t, kNumSentences>(-1);
 }; // UsedSources
 
@@ -377,19 +401,30 @@ struct SourceCompatibilityData {
 
   // copy components
   SourceCompatibilityData(const LegacySourceBits& legacySourceBits,
-      const UsedSources& usedSources, const LegacySources& legacySources):
-    legacySourceBits(legacySourceBits), usedSources(usedSources),
-    legacySources(legacySources)
+      const UsedSources& usedSources
+#if USE_DEPRECATED_SOURCES
+      ,const LegacySources& legacySources
+#endif
+    ): legacySourceBits(legacySourceBits), usedSources(usedSources)
+#if USE_DEPRECATED_SOURCES
+    ,legacySources(legacySources)
+#endif
   {}
 
   // move components
   SourceCompatibilityData(LegacySourceBits&& legacySourceBits,
-      UsedSources&& usedSources, LegacySources&& legacySources):
-    legacySourceBits(std::move(legacySourceBits)),
-    usedSources(std::move(usedSources)),
-    legacySources(std::move(legacySources))
+      UsedSources&& usedSources
+#if USE_DEPRECATED_SOURCES
+      ,LegacySources&& legacySources
+#endif
+    ): legacySourceBits(std::move(legacySourceBits)),
+    usedSources(std::move(usedSources))
+#if USE_DEPRECATED_SOURCES
+    ,legacySources(std::move(legacySources))
+#endif
   {}
 
+#if USE_DEPRECATED_SOURCES
   constexpr static bool anyLegacySourcesMatch(const LegacySources& ls1,
     const LegacySources& ls2)
   {
@@ -398,22 +433,27 @@ struct SourceCompatibilityData {
     }
     return false;
   }
+#endif
   
   constexpr auto isXorCompatibleWith(const SourceCompatibilityData& other,
     bool useBits = true, int* reason = nullptr) const
   {
-    if (useBits) {
-      if ((legacySourceBits & other.legacySourceBits).any()) {
-        //if (reason) *reason = 4;
-        return false;
-      }
-    } else if (legacySourceBits.intersects(other.legacySourceBits)) {
-    //} else if (anyLegacySourcesMatch(legacySources, other.legacySources)) { 
-      //if (reason) *reason = 5;
+    if (legacySourceBits.intersects(other.legacySourceBits)) {
       return false;
     }
     return usedSources.isXorCompatibleWith(other.usedSources, useBits, reason);
   }
+
+#ifdef __CUDA_ARCH__
+  constexpr auto isXorCompatibleWith(const SourceCompatibilityData& other,
+    uint32_t* other_src_bits, uint32_t* other_legacy_src_bits)
+  {
+    if (legacySourceBits.shared_intersects(other_legacy_src_bits)) {
+      return false;
+    }
+    return usedSources.isXorCompatibleWith(other.usedSources, other_src_bits);
+  }
+#endif
 
   auto isAndCompatibleWith(const SourceCompatibilityData& other,
     bool /*useBits*/ = true) const
@@ -431,21 +471,26 @@ struct SourceCompatibilityData {
       || isAndCompatibleWith(other, useBits);
   }
 
+#if USE_DEPRECATED_SOURCES
   static void addLegacySource(LegacySources& sources, int src) {
     assert(!sources[src]);
     sources[src] = 1;
   }
+#endif
 
   void addSource(int src) {
     if (cm::Source::isLegacy(src)) {
       assert(!legacySourceBits.test(src));
       legacySourceBits.set(src);
+#if USE_DEPRECATED_SOURCES
       addLegacySource(legacySources, src);
+#endif
     } else {
       usedSources.addSource(src);
     }
   }
 
+#if USE_DEPRECATED_SOURCES
   static void merge(LegacySources& to, const LegacySources& from) {
     for (int i{}; i < kMaxLegacySources; ++i) {
       if (from[i]) {
@@ -463,15 +508,19 @@ struct SourceCompatibilityData {
   void mergeInPlace(const LegacySources& other) {
     merge(legacySources, other);
   }
+#endif
 
   void mergeInPlace(const SourceCompatibilityData& other) {
     auto count = legacySourceBits.count();
     legacySourceBits |= other.legacySourceBits;
     assert(legacySourceBits.count() == count + other.legacySourceBits.count());
     usedSources.mergeInPlace(other.usedSources);
+#if USE_DEPRECATED_SOURCES
     mergeInPlace(other.legacySources);
+#endif
   }
 
+#if USE_DEPRECATED_SOURCES
   // used for debug logging
   constexpr int getFirstLegacySource() const {
     for (int i{}; i < kMaxLegacySources; ++i) {
@@ -489,6 +538,7 @@ struct SourceCompatibilityData {
     }
     return count;
   }
+#endif
 
   constexpr void dump(const char* header = nullptr, bool device = false,
     char* buf = nullptr, char* smolbuf = nullptr) const
@@ -507,6 +557,7 @@ struct SourceCompatibilityData {
       }
     }
     usedSources.dump();
+#if USE_DEPRECATED_SOURCES
     if (device) {
       strcat(buf, "legacy sources:");
     } else {
@@ -531,6 +582,7 @@ struct SourceCompatibilityData {
         std::cerr << " none";
       }
     }
+#endif
     if (device) {
       printf("%s\n", buf);
     } else {
@@ -544,8 +596,10 @@ struct SourceCompatibilityData {
 
   LegacySourceBits legacySourceBits;
   UsedSources usedSources;
+#if USE_DEPRECATED_SOURCES
   // TODO: could be array of bool too
   LegacySources legacySources = make_array<int8_t, kMaxLegacySources>(0);
+#endif
 }; // SourceCompatibilityData
 using SourceCompatibilityList = std::vector<SourceCompatibilityData>;
 
@@ -607,6 +661,7 @@ struct NameCount {
     return bits;
   }
 
+#if USE_DEPRECATED_SOURCES
   static auto listToLegacySources(const NameCountList& list) {
     auto sources = make_array<int8_t, kMaxLegacySources>(0);
     for (const auto& nc : list) {
@@ -616,6 +671,7 @@ struct NameCount {
     }
     return sources;
   }
+#endif
 
   static auto listToUsedSources(const NameCountList& list) {
     UsedSources usedSources{};
@@ -624,7 +680,9 @@ struct NameCount {
         usedSources.addSource(nc.count);
       }
     }
+#if USE_DEPRECATED_SOURCES
     usedSources.sortSources();
+#endif
     return usedSources;
   }
 
@@ -652,11 +710,15 @@ struct SourceData : SourceCompatibilityData {
   SourceData(NameCountList&& primaryNameSrcList,
       LegacySourceBits&& legacySourceBits,
       UsedSources&& usedSources,
+#if USE_DEPRECATED_SOURCES
       LegacySources&& legacySources,
+#endif
       NameCountList&& ncList) :
-    SourceCompatibilityData(std::move(legacySourceBits), std::move(usedSources),
-      std::move(legacySources)),
-    primaryNameSrcList(std::move(primaryNameSrcList)),
+    SourceCompatibilityData(std::move(legacySourceBits), std::move(usedSources)
+#if USE_DEPRECATED_SOURCES
+    ,std::move(legacySources)
+#endif
+    ), primaryNameSrcList(std::move(primaryNameSrcList)),
     ncList(std::move(ncList))
   {}
 
@@ -736,7 +798,7 @@ namespace device {
 struct PreComputedData {
   XorSourceList xorSourceList;
   std::vector<int> xorSourceIndices;
-  XorSource* device_xorSources{ nullptr };
+  SourceCompatibilityData* device_xorSources{ nullptr };
   OrArgDataList orArgDataList;
   SourceListMap sourceListMap;
   SentenceVariationIndices sentenceVariationIndices;
@@ -752,9 +814,11 @@ struct MergedSources : SourceCompatibilityData {
 
   // copy from SourceData
   MergedSources(const SourceData& source) :
-    SourceCompatibilityData(source.legacySourceBits, source.usedSources,
-      source.legacySources),
-    sourceCRefList(SourceCRefList{SourceCRef{source}})
+    SourceCompatibilityData(source.legacySourceBits, source.usedSources
+#if USE_DEPRECATED_SOURCES
+      ,source.legacySources
+#endif
+    ), sourceCRefList(SourceCRefList{SourceCRef{source}})
   {}
 
   SourceCRefList sourceCRefList;

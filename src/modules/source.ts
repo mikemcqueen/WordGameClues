@@ -84,14 +84,16 @@ export const isXorCompatible = (first: CompatibilityData,
 	{
 	    continue; // one or both undefined, is compatible
 	}
-        // what is this magickk. extract first element from a set?
+        // magickk extract first element from a set
 	const [firstElem] = first.usedSources[i];
 	const [secondElem] = second.usedSources[i];
-	if (getVariation(firstElem) !== getVariation(secondElem)){
+	if (getVariation(firstElem) !== getVariation(secondElem)) {
 	    return false; // variation incompatibility
 	}
-        // Not using CountBits here because the impact of the optimzation is small.
-        // All the JS code currently accounts for 18s out of 18m for .xor.req.
+        // Not using CountBits here because the impact of the optimzation is
+        // relatively small. At the time of this comment all the JS code
+        // accounts for 18s out of 18m for .xor.req.
+        // (code is faster now, might be worth taking a look)
 	for (let firstSrc of first.usedSources[i]) {
 	    if (second.usedSources[i].has(firstSrc)) {
 		return false; // index incompatibility

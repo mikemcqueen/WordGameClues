@@ -22,8 +22,8 @@ namespace cm {
   auto addCandidate(int sum, std::string&& combo,
     cm::SourceCompatibilityList&& compatList) -> int;
 
-  [[nodiscard]] XorSource* cuda_allocCopyXorSources(
-    const XorSourceList& xorSourceList, const std::vector<int> sortedIndices);
+  [[nodiscard]] SourceCompatibilityData* cuda_allocCopyXorSources(
+    const XorSourceList& xorSourceList);
 
   [[nodiscard]]
   auto cuda_allocCopySentenceVariationIndices(
@@ -31,9 +31,9 @@ namespace cm {
     -> device::VariationIndices*;
 
   void filterCandidates(int sum, int threads_per_block, int streams,
-    int workitems);
+    int stride);
   void filterCandidatesCuda(int sum, int threads_per_block, int streams,
-    int workitems);
+    int stride);
 
   //
   
