@@ -1,3 +1,8 @@
+* additional thoughts on optimizaiton:
+ - only call addCandidate every 1000+ candidates. maintain a list and
+   bulk push them.
+ 
+
 * we could also store a count (and eventually, list) of  which sources
   match with which xorsource
   

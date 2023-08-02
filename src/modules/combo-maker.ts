@@ -510,6 +510,7 @@ export const makeCombos = (args: any): any => {
                 total += comboList.length;
                 const filterResult = ClueManager.filter(comboList, sum, totals);
             }
+            NativeComboMaker.getResult();
         }
         let d = new Duration(begin, new Date()).milliseconds;
         if (!args.verbose) console.error('');

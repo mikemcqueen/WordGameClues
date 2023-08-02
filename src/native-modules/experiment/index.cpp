@@ -506,8 +506,6 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
 
   //--
 
-  std::cerr << "wrapping " << cm::PCD.xorSourceList.size() << " xor sources"
-            << std::endl;
   return cm::wrap(env, cm::PCD.xorSourceList);
 }
 
@@ -628,10 +626,11 @@ Value filterCandidatesForSum(const CallbackInfo& info) {
 }
 
 //
-// getAllCombos
+// getResult
 //
-Value getAllCombos(const CallbackInfo& info) {
+Value getResult(const CallbackInfo& info) {
   Env env = info.Env();
+  cm::get_filter_results();
   return env.Null();
 }
 
@@ -646,7 +645,7 @@ Object Init(Env env, Object exports) {
   exports["addCandidateForSum"] = Function::New(env, addCandidateForSum);
   exports["getCandidateStatsForSum"] = Function::New(env, getCandidateStatsForSum);
   exports["filterCandidatesForSum"] = Function::New(env, filterCandidatesForSum);
-  exports["getAllCombos"] = Function::New(env, getAllCombos);
+  exports["getResult"] = Function::New(env, getResult);
 
   return exports;
 }

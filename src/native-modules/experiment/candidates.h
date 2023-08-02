@@ -1,6 +1,7 @@
 #ifndef INCLUDE_CANDIDATES_H
 #define INCLUDE_CANDIDATES_H
 
+#include <future>
 #include <unordered_map>
 #include <vector>
 #include "combo-maker.h"
@@ -34,6 +35,8 @@ namespace cm {
     int stride);
   void filterCandidatesCuda(int sum, int threads_per_block, int streams,
     int stride);
+
+  int get_filter_results();
 
   //
   
