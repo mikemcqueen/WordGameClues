@@ -16,61 +16,39 @@
 
 namespace {
 
-#define USE_SHARED_MEMORY_SOURCE 0
-
 using namespace cm;
 
-// shared memory versions
-template <int size>
-__device__ bool intersects_shared(bitset<size> src, uint32_t* other) {
-  for (unsigned int i{}, o{threadIdx.x}; i < bitset<size>::wc();
-       i++, o += blockDim.x) {
-    if (src.word(i) & other[o])
-      return true;
-  }
-  return false;
-}
-
-__device__ auto usedSourcesAreXorCompatible(
-  const UsedSources& src, const UsedSources& other, uint32_t* other_src_bits) {
-  // compare bits (gpu shared memory)
-  if (intersects_shared(src.getBits(), other_src_bits)) {
-    return false;
-  }
-  // compare variations
-  if (!UsedSources::allVariationsMatch(src.variations, other.variations)) {
-    return false;
-  }
-  return true;
-}
-
-__device__ auto sourcesAreXorCompatible(const SourceCompatibilityData& src,
-  const SourceCompatibilityData& other, uint32_t* other_src_bits,
-  uint32_t* other_legacy_src_bits) {
-  if (intersects_shared(src.legacySourceBits, other_legacy_src_bits)) {
-    return false;
-  }
-  return usedSourcesAreXorCompatible(
-    src.usedSources, other.usedSources, other_src_bits);
-}
-
-__device__ auto isSourceXORCompatibleWithAnyXorSource(
-  const SourceCompatibilityData& source, const XorSource* xorSources,
-  const int* indices, int* compat_index = nullptr, int* reason = nullptr) {
-  auto compatible{false};  // important. explicit compatibility required
-  for (int i{}; indices[i] > -1; ++i) {
-    const auto& xorSource = xorSources[indices[i]];
-    compatible = source.isXorCompatibleWith(xorSource, false, reason);
-    if (compatible) {
-      if (compat_index)
-        *compat_index = indices[i];
+__device__ auto isSourceORCompatibleWithAnyOrSource(
+  const SourceCompatibilityData& source, const OrSourceList& orSourceList) {
+  auto compatible = false;
+  for (const auto& orSource : orSourceList) {
+    // skip any sources that were already determined to be XOR incompatible
+    // or AND compatible with --xor sources.
+    // Wait, what? why not "&& !andCompatible" ?
+    if (!orSource.xorCompatible || orSource.andCompatible)
+      continue;
+    compatible = source.isOrCompatibleWith(orSource.source);
+    if (compatible)
       break;
-    }
+  }
+  return compatible;
+};
+
+__device__ auto isSourceCompatibleWithEveryOrArg(
+  const SourceCompatibilityData& source,
+  const OrArgDataList& orArgDataList) {
+  auto compatible = true;  // if no --or sources specified, compatible == true
+  for (const auto& orArgData : orArgDataList) {
+    // TODO: skip calls to here if container.compatible = true  which may have
+    // been determined in Precompute phase @ markAllANDCompatibleOrSources()
+    // and skip the XOR check as well in this case.
+    compatible =
+      isSourceORCompatibleWithAnyOrSource(source, orArgData.orSourceList);
+    if (!compatible)
+      break;
   }
   return compatible;
 }
-
-  //////////
 
 __device__ __host__ auto isSourceXORCompatibleWithAnyXorSource(
   const SourceCompatibilityData& source, const XorSource* xorSources,
@@ -112,20 +90,13 @@ template <typename T> __device__ void store(T* addr, T val) {
   *(volatile T*)addr = val;
 }
 
-__global__ void xorKernel(const SourceCompatibilityData* __restrict__ sources,
+__global__ void xor_kernel(const SourceCompatibilityData* __restrict__ sources,
   const unsigned num_sources,
   const SourceCompatibilityData* __restrict__ xor_sources,
   const unsigned num_xor_sources,
   const SourceIndex* __restrict__ source_indices,
   const index_t* __restrict__ list_start_indices, result_t* results,
   int stream_idx) {
-#if USE_SHARED_MEMORY_SOURCE
-  extern __shared__ uint32_t shared[];
-  UsedSources::SourceBits::word_type* src_bits = shared;
-  LegacySourceBits::word_type* legacy_src_bits =
-    &shared[blockDim.x * UsedSources::SourceBits::wc()];
-#endif
-
   // should only happen with very low xor_sources count
   // 64 * 63 + 63 = 4095
   // const auto thread_id = blockDim.x * blockIdx.x + threadIdx.x;
@@ -143,32 +114,15 @@ __global__ void xorKernel(const SourceCompatibilityData* __restrict__ sources,
     const auto& source = sources[flat_index];
     auto& result = results[src_idx.listIndex];
 
-#if USE_SHARED_MEMORY_SOURCE
-    for (unsigned i{}, b{threadIdx.x}; i < UsedSources::SourceBits::wc();
-         ++i, b += blockDim.x) {
-      src_bits[b] = source.usedSources.bits.word(i);
-      if (i < LegacySourceBits::wc()) {
-        legacy_src_bits[b] = source.legacySourceBits.word(i);
-      }
-    }
-#endif
-
     // for each xor_source
     for (int start_idx = blockIdx.x * blockDim.x;
          start_idx + threadIdx.x < num_xor_sources;
          start_idx += threads_per_grid) {
       if (load(&result))
         break;
-#if USE_SHARED_MEMORY_SOURCE
-      if (sourcesAreXorCompatible(xor_sources[start_idx + threadIdx.x], source,
-            src_bits, legacy_src_bits))
-#else
-      if (source.isXorCompatibleWith(
-            xor_sources[start_idx + threadIdx.x], false))
-#endif
-      {
-          store(&result, (uint8_t)1);
-      }
+      if (!source.isXorCompatibleWith(xor_sources[start_idx + threadIdx.x]))
+        continue;
+      store(&result, (uint8_t)1);
     }
   }
 }
@@ -523,47 +477,35 @@ bool get_next_available(std::vector<KernelData>& kernelVec, int& current) {
   return true;
 }
 
-void runKernel(KernelData& kernel, int threads_per_block,
+void run_xor_kernel(KernelData& kernel, int threads_per_block,
   const SourceCompatibilityData* device_sources, result_t* device_results,
   const index_t* device_list_start_indices) {
-
+  //
   auto num_sm = 10;
   auto threads_per_sm = 2048;
   auto block_size = threads_per_block ? threads_per_block : 128;
   auto blocks_per_sm = threads_per_sm / block_size;
   assert(blocks_per_sm * block_size == threads_per_sm);
   auto grid_size = num_sm * blocks_per_sm;  // aka blocks per grid
-#if USE_SHARED_MEMORY_SOURCE
-    auto shared_bytes = block_size * (sizeof(UsedSources::SourceBits) +
-      sizeof(LegacySourceBits));
-#else
-    auto shared_bytes = 0;
+  auto shared_bytes = 0;
+
+  kernel.is_running = true;
+  kernel.sequence_num = KernelData::next_sequence_num();
+  kernel.start_time = std::chrono::high_resolution_clock::now();
+  dim3 grid_dim(grid_size);
+  dim3 block_dim(block_size);
+  xor_kernel<<<grid_dim, block_dim, shared_bytes, kernel.stream>>>(
+    device_sources, kernel.source_indices.size(), PCD.device_xorSources,
+    PCD.xorSourceList.size(), kernel.device_source_indices,
+    device_list_start_indices, device_results, kernel.stream_idx);
+
+#if 0 || defined(STREAM_LOG)
+  std::cerr << "stream " << kernel.stream_idx
+            << " started with " << grid_size << " blocks"
+            << " of " << block_size << " threads"
+          //<< " starting, sequence: " << kernel.sequence_num
+            << std::endl;
 #endif
-
-    #if 0
-    std::cerr << "lsb: " << sizeof(LegacySourceBits)
-              << ", usb: " << sizeof(UsedSources::SourceBits)
-              << std::endl;
-    #endif
-
-    kernel.is_running = true;
-    kernel.sequence_num = KernelData::next_sequence_num();
-    kernel.start_time = std::chrono::high_resolution_clock::now();
-    dim3 grid_dim(grid_size);
-    dim3 block_dim(block_size);
-    xorKernel<<<grid_dim, block_dim, shared_bytes, kernel.stream>>>(
-      device_sources, kernel.source_indices.size(),
-      PCD.device_xorSources, PCD.xorSourceList.size(),
-      kernel.device_source_indices,
-      device_list_start_indices, device_results, kernel.stream_idx);
-
-    #if 0 || defined(STREAM_LOG)
-    std::cerr << "stream " << kernel.stream_idx
-              << " started with " << grid_size << " blocks"
-              << " of " << block_size << " threads"
-             //<< " starting, sequence: " << kernel.sequence_num
-              << std::endl;
-    #endif
 }
 
 // todo: kernel.getResults()
@@ -589,14 +531,6 @@ auto getKernelResults(KernelData& kernel, result_t* device_results) {
   assert((err == cudaSuccess) && "cudaStreamSynchronize");
   kernel.is_running = false;
   return results;
-}
-
-void showAllNumReady(
-  const std::vector<KernelData>& kernels, const IndexStates& idx_states) {
-  for (auto& k : kernels) {
-    std::cerr << "  stream " << k.stream_idx << ": " << k.num_ready(idx_states)
-              << std::endl;
-  }
 }
 
 auto count(const SourceCompatibilityLists& sources) {
@@ -631,7 +565,7 @@ auto* allocCopySources(const SourceCompatibilityLists& sources) {
   return device_sources;
 }
 
-auto allocZeroResults(size_t num_results) {  // TODO cudaStream_t stream) {
+auto allocAndZeroResults(size_t num_results) {  // TODO cudaStream_t stream) {
   cudaStream_t stream = cudaStreamPerThread;
   cudaError_t err = cudaSuccess;
   // alloc results
@@ -657,47 +591,6 @@ auto* allocCopyListStartIndices(const IndexStates& index_states) {
     indices_bytes, cudaMemcpyHostToDevice, stream);
   assert((err == cudaSuccess) && "copy list start indices");
   return device_indices;
-}
-
-void printCompatRecord(const std::vector<std::vector<int>>& compat_record) {
-  int total{};
-  for (size_t i{}; i < compat_record.size(); ++i) {
-    const auto& counts = compat_record.at(i);
-    std::cerr << "stream " << i << ":";
-    for (auto count : counts) {
-      std::cerr << " " << count;
-      total += count;
-    }
-    std::cerr << std::endl;
-  }
-  std::cerr << "total: " << total << std::endl;
-}
-
-int median(std::vector<int>& a) {
-  const int n = a.size();
-  if (!(n % 2)) {
-    std::nth_element(a.begin(), a.begin() + n / 2, a.end());
-    std::nth_element(a.begin(), a.begin() + (n - 1) / 2, a.end());
-    return (a[(n - 1) / 2] + a[n / 2]) / 2;
-  }
-  std::nth_element(a.begin(), a.begin() + n / 2, a.end());
-  return a[n / 2];
-}
-
-auto sources_stats(const SourceCompatibilityLists& sources) {
-  std::vector<int> sizes;
-  sizes.reserve(sources.size());
-  size_t mode{}, sum{};
-  for (const auto& src_list : sources) {
-    const auto size = src_list.size();
-    if (size > mode) {
-      mode = size;
-    }
-    sum += size;
-    sizes.push_back(size);
-  }
-  // mean, median, mode
-  return std::make_tuple(sum / sources.size(), median(sizes), mode);
 }
 
 auto flat_index(
@@ -739,7 +632,8 @@ void dump_xor(int index) {
 
 int filter_task(int sum, int threads_per_block, int num_streams, int stride) {
   using namespace std::chrono;
-  cudaError_t err = cudaDeviceSetLimit(cudaLimitPrintfFifoSize, 7'500'000);
+  [[maybe_unused]] cudaError_t err = cudaSuccess;
+  err = cudaDeviceSetLimit(cudaLimitPrintfFifoSize, 7'500'000);
 
   const auto& sources =
     allSumsCandidateData.find(sum)->second.sourceCompatLists;
@@ -758,9 +652,9 @@ int filter_task(int sum, int threads_per_block, int num_streams, int stride) {
             << ", stride: " << stride << std::endl;
 #endif
 
-  auto device_results = allocZeroResults(sources.size());
+  auto device_results = allocAndZeroResults(sources.size());
 
-  int total_compatible{};
+  int total_compat{};
   int current_kernel{-1};
   int actual_num_compat{};
   auto t0 = high_resolution_clock::now();
@@ -771,14 +665,14 @@ int filter_task(int sum, int threads_per_block, int num_streams, int stride) {
         kernel.is_running = false;
         continue;
       }
-      #if 0
+#if 0
       std::cerr << "stream " << kernel.stream_idx
                 << " source_indices: " << kernel.source_indices.size()
                 << ", ready: " << kernel.num_ready(idx_states)
                 << std::endl;
-      #endif
+#endif
       kernel.allocCopy(idx_states);
-      runKernel(kernel, threads_per_block, device_sources, device_results,
+      run_xor_kernel(kernel, threads_per_block, device_sources, device_results,
         device_list_start_indices);
       continue;
     }
@@ -786,87 +680,30 @@ int filter_task(int sum, int threads_per_block, int num_streams, int stride) {
     kernel.has_run = true;
     kernel.is_running = false;
 
-    auto r0 = high_resolution_clock::now();
-
     auto results = getKernelResults(kernel, device_results);
-
-    auto r1 = high_resolution_clock::now();
-    auto d_results = duration_cast<milliseconds>(r1 - r0).count();
     auto k1 = high_resolution_clock::now();
     auto d_kernel = duration_cast<milliseconds>(k1 - kernel.start_time).count();
 
-    auto num_compatible = idx_states.update(kernel.source_indices,
-      results, kernel.stream_idx);
-    total_compatible += num_compatible;
+    auto num_compat =
+      idx_states.update(kernel.source_indices, results, kernel.stream_idx);
+    total_compat += num_compat;
 
-    #if 0
+#if 0
     actual_num_compat = std::accumulate(results.begin(), results.end(), 0,
       [](int sum, result_t r) { return r ? sum + 1 : sum; });
     std::cerr << "stream " << kernel.stream_idx
-              << " compat results: " << num_compatible
+              << " compat results: " << num_compat
               << " actual: " << actual_num_compat
               << " - results: " << d_results << "ms"
               << ", kernel: " << d_kernel << "ms"
               << std::endl;
-    #endif
+#endif
   }
   auto t1 = high_resolution_clock::now();
-  #if 0
-  for (size_t i{}; i < kernels.size(); ++i) {
-    kernels.at(i).dump();
-  }
-  #endif
   auto d_total = duration_cast<milliseconds>(t1 - t0).count();
   std::cerr << "sum(" << sum << ")"
-            << " total compatible : " << total_compatible << " of "
+            << " total compat: " << total_compat << " of "
             << sources.size() << " - " << d_total << "ms" << std::endl;
-
-//#define IMMEDIATE_RESULTS
-#ifdef IMMEDIATE_RESULTS
-  std::vector<result_t> results;
-  results.resize(num_source);
-  err = cudaMemcpy(results.data(), device_results, results_bytes,
-                   cudaMemcpyDeviceToHost, stream);
-  assert();
-
-  auto& indexComboListMap = allSumsCandidateData.find(sum)->second
-    .indexComboListMap;
-  int num_compat_combos{};
-  int num_compat_sourcelists{};
-  index = 0;
-  int list_index{};
-  for (const auto& compatList: compatLists) {
-    int result_index{ index };
-    for (const auto& source: compatList) {
-      if (results.at(result_index)) {
-        ++num_compat_sourcelists;
-        num_compat_combos += indexComboListMap.at(list_index).size();
-        break;
-      }
-      result_index++;
-    }
-    index += compatList.size();
-    ++list_index;
-  }
-  int num_compat_results = std::accumulate(results.cbegin(), results.cend(), 0,
-    [](int num_compatible, result_t result) mutable {
-      if (result) num_compatible++;
-      return num_compatible;
-    });
-  std::cerr << "  results: " << results.size()
-    << ", compat results: " << num_compat_results
-    << ", compat sourcelists: " << num_compat_sourcelists
-    << ", compat combos: " << num_compat_combos
-    << std::endl;
-
-  err = cudaFree(device_results);
-  if (err != cudaSuccess) {
-    fprintf(stderr, "Failed to free device results (error code %s)!\n",
-      cudaGetErrorString(err));
-    throw std::runtime_error("failed to free device results");
-  }
-#endif // IMMEDIATE_RESULTS
-
 #if 0
   err = cudaFree(device_sources);
   if (err != cudaSuccess) {

@@ -174,11 +174,9 @@ public:
   }
 #endif
 
-  constexpr
-  static auto allVariationsMatch(const Variations& v1,
-    const Variations& v2, bool /*native*/ = true)
-  {
-    for (auto i{ 0u }; i < v1.size(); ++i) {
+  constexpr static auto allVariationsMatch(
+    const Variations& v1, const Variations& v2, bool /*native*/ = true) {
+    for (size_t i{}; i < v1.size(); ++i) {
       if ((v1[i] > -1) && (v2[i] > -1) && (v1[i] != v2[i])) {
         return false;
       }
@@ -186,10 +184,8 @@ public:
     return true;
   }
 
-  constexpr
-  static bool allVariationsMatch2(const Variations& v1,
-    const Variations& v2, bool /*native*/ = true)
-  {
+  constexpr static bool allVariationsMatch2(
+    const Variations& v1, const Variations& v2, bool /*native*/ = true) {
     int mismatches{};
     for (auto i{ 0u }; i < v1.size(); ++i) {
       auto first = v1[i] + 1;
@@ -199,26 +195,54 @@ public:
     return !mismatches;
   }
 
-  constexpr
-  auto isXorCompatibleWith(const UsedSources& other,
-    bool native = true, int* /*reason*/ = nullptr) const
-  {
+  constexpr auto isXorCompatibleWith(const UsedSources& other,
+    bool native = true, int* /*reason*/ = nullptr) const {
     // compare bits
-    if (getBits().intersects(other.getBits())) {
+    if (getBits().intersects(other.getBits()))
       return false;
-    }
     // compare variations
-    if (!allVariationsMatch(variations, other.variations, native)) {
+    if (!allVariationsMatch(variations, other.variations, native))
       return false;
-    }
+    return true;
+  }
+
+  // there is a potential optimization here, in the case where we
+  // are checking OR compatibility. we may have failed due to XOR
+  // compatibilty of variations failed, and here we are, potentially
+  // checking variations again. we should only check variations
+  // once in such a condition.
+  // Logically, something like:
+  //
+  // if (allVariationsMatch(a,b)) {
+  //   if (a.isXorCompatibleWith(b, NoVariationCheck)
+  //       a.isAndCompatibleWith(b, NoVariationCheck)) {
+  //     return true;
+  //   }
+  // }
+  // return false;
+  //
+  // Another optimizatoin is that rather than testing Xor + And
+  // separately, we have new bitset function something like
+  // "is_disjoint_from_or_subset_of()" which I think covers
+  // both cases.  "disjoint_from" is just the oppposite of
+  // intersects(), right?
+  // So we could specialize "Or" compatibility testing with that
+  // bitset function, (and a variations check), rather than
+  // calling two separate Xor/And functions here.
+
+  auto isAndCompatibleWith(
+    const UsedSources& other, bool /*useBits*/ = true) const {
+    if (!getBits().is_subset_of(other.getBits()))
+      return false;
+    // compare variations
+    if (!allVariationsMatch(variations, other.variations))
+      return false;
     return true;
   }
 
 #ifdef __CUDA_ARCH__
-  constexpr
-  auto isXorCompatibleWith(const UsedSources& other,
-    uint32_t* other_src_bits)
-  {
+  constexpr auto isXorCompatibleWith(
+    const UsedSources& other, uint32_t* other_src_bits) {
     // compare bits (gpu shared memory)
     if (getBits().shared_intersects(other_src_bits)) {
       return false;
@@ -389,7 +413,7 @@ public:
   Sources sources = make_array<int8_t, kMaxUsedSources>(-1);
 #endif
   Variations variations = make_array<VariationIndex_t, kNumSentences>(-1);
-}; // UsedSources
+ };  // UsedSources
 
 struct SourceCompatibilityData {
   SourceCompatibilityData() = default;
@@ -458,9 +482,9 @@ struct SourceCompatibilityData {
   auto isAndCompatibleWith(const SourceCompatibilityData& other,
     bool /*useBits*/ = true) const
   {
-    auto andBits = legacySourceBits & other.legacySourceBits;
-    if (andBits != other.legacySourceBits) return false;
-    return false; // TODO: usedSources.isAndCompatibleWith(other.usedSources);
+    if (!legacySourceBits.is_subset_of(other.legacySourceBits))
+      return false;
+    return usedSources.isAndCompatibleWith(other.usedSources);
   }
 
   // OR == XOR || AND
