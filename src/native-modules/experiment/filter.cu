@@ -90,6 +90,39 @@ template <typename T> __device__ void store(T* addr, T val) {
   *(volatile T*)addr = val;
 }
 
+// one block per source
+__global__ void xor_kernel_per_block(
+  const SourceCompatibilityData* __restrict__ sources,
+  const unsigned num_sources,
+  const SourceCompatibilityData* __restrict__ xor_sources,
+  const unsigned num_xor_sources,
+  const SourceIndex* __restrict__ source_indices,
+  const index_t* __restrict__ list_start_indices, result_t* results,
+  int stream_idx) {
+  //
+  const auto threads_per_grid = gridDim.x * blockDim.x;
+  // for each source (one block per source)
+  for (unsigned idx{blockIdx.x}; idx < num_sources; idx += gridDim.x) {
+    const auto src_idx = source_indices[idx];
+    const auto flat_index =
+      list_start_indices[src_idx.listIndex] + src_idx.index;
+    const auto& source = sources[flat_index];
+    auto& result = results[src_idx.listIndex];
+
+    // for each xor_source (one block per xor source)
+    for (unsigned xor_idx{threadIdx.x}; xor_idx < num_xor_sources;
+         xor_idx += blockDim.x) {
+      if (source.isXorCompatibleWith(xor_sources[xor_idx])) {
+        store(&result, (uint8_t)1);
+      }
+      __syncthreads();
+      if (load(&result))
+        break;
+    }
+  }
+}
+
+// entire grid per source
 __global__ void xor_kernel(const SourceCompatibilityData* __restrict__ sources,
   const unsigned num_sources,
   const SourceCompatibilityData* __restrict__ xor_sources,
@@ -97,14 +130,7 @@ __global__ void xor_kernel(const SourceCompatibilityData* __restrict__ sources,
   const SourceIndex* __restrict__ source_indices,
   const index_t* __restrict__ list_start_indices, result_t* results,
   int stream_idx) {
-  // should only happen with very low xor_sources count
-  // 64 * 63 + 63 = 4095
-  // const auto thread_id = blockDim.x * blockIdx.x + threadIdx.x;
-  // I question the validity of this.
-  // should it not be > max(num_sources, num_xor_sources)
-  // does this check matter? (performance)
-  // if (thread_id >= num_xor_sources) return;
-
+  //
   const auto threads_per_grid = gridDim.x * blockDim.x;
   // for each source
   for (unsigned idx{}; idx < num_sources; ++idx) {
@@ -483,9 +509,9 @@ void run_xor_kernel(KernelData& kernel, int threads_per_block,
   //
   auto num_sm = 10;
   auto threads_per_sm = 2048;
-  auto block_size = threads_per_block ? threads_per_block : 128;
+  auto block_size = threads_per_block ? threads_per_block : 1024;
   auto blocks_per_sm = threads_per_sm / block_size;
-  assert(blocks_per_sm * block_size == threads_per_sm);
+  //  assert(blocks_per_sm * block_size == threads_per_sm);
   auto grid_size = num_sm * blocks_per_sm;  // aka blocks per grid
   auto shared_bytes = 0;
 
@@ -494,7 +520,7 @@ void run_xor_kernel(KernelData& kernel, int threads_per_block,
   kernel.start_time = std::chrono::high_resolution_clock::now();
   dim3 grid_dim(grid_size);
   dim3 block_dim(block_size);
-  xor_kernel<<<grid_dim, block_dim, shared_bytes, kernel.stream>>>(
+  xor_kernel_per_block<<<grid_dim, block_dim, shared_bytes, kernel.stream>>>(
     device_sources, kernel.source_indices.size(), PCD.device_xorSources,
     PCD.xorSourceList.size(), kernel.device_source_indices,
     device_list_start_indices, device_results, kernel.stream_idx);
