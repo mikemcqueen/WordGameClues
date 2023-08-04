@@ -200,7 +200,7 @@ auto mergeAllCompatibleSources(const NameCountList& ncList,
 {
   // because **maybe** broken for > 2 below
   assert(ncList.size() <= 2 && "ncList.length > 2");
-  auto log = false;
+  constexpr auto log = false;
   if (log) {
     std::cerr << "nc[0]: " << ncList[0].toString() << std::endl;
   }

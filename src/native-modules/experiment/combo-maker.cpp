@@ -164,29 +164,24 @@ void check(const SourceCompatibilityList& sources, int list_index, int index)
 }
   
 bool isAnySourceCompatibleWithUseSources(
-  const SourceCompatibilityList& sourceCompatList)
+  const SourceCompatibilityList& sources)
 {
-  assert(!sourceCompatList.empty());// return true;
+  assert(!sources.empty());// return true;
 
-  const auto& sources = sourceCompatList;
-  check(sources, 2655, 1);
-  check(sources, 2655, 2);
-  check(sources, 2656, 1);
-  check(sources, 2656, 2);
   //check(sources, 2657, 0);
   //dump_xor(2408);
 
   auto compatible = false;
 
-  for (size_t src_index{}; src_index < sourceCompatList.size(); ++src_index) {
-    const auto& compatData = sourceCompatList.at(src_index);
-    //auto x_compatibleIndices = buildCompatibleIndices(compatData,
+  for (size_t src_index{}; src_index < sources.size(); ++src_index) {
+    const auto& src = sources.at(src_index);
+    //auto x_compatibleIndices = buildCompatibleIndices(src,
     //  PCD.variationIndicesMaps);
     //std::vector<int> compatibleIndices{}; 
     int compat_index{-1};
-    compatible = isSourceXORCompatibleWithAnyXorSource(compatData,
+    compatible = isSourceXORCompatibleWithAnyXorSource(src,
       PCD.xorSourceList, PCD.variationIndicesMaps, &compat_index);
-    #if 1
+    #if 0
     if (compatible) {
       std::cout << global_isany_call_counter << ":" << src_index
                 << std::endl;
@@ -196,7 +191,7 @@ bool isAnySourceCompatibleWithUseSources(
     // current source, no further compatibility checking is necessary; continue
     // to next source.
     if (!compatible) continue;
-    compatible = isSourceCompatibleWithEveryOrArg(compatData,
+    compatible = isSourceCompatibleWithEveryOrArg(src,
       PCD.orArgDataList);
     if (compatible) break;
   }

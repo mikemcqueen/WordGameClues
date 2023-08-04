@@ -438,8 +438,6 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
     cm::PCD.xorSourceList = std::move(sourceLists.back());
   }
 
-  dump_xor(2408);
-
   //--
 
   if (cm::PCD.xorSourceList.size()) {
@@ -503,10 +501,10 @@ Value dumpAndResetCompatIndices(const CallbackInfo& info) {
   #if 0
   std::cout << "global_compat_indices("
             << cm::global_compat_indices.size() << ")" << std::endl;
-  #endif
   for (const auto index: cm::global_compat_indices) {
     std::cout << index << std::endl;
   }
+  #endif
   cm::global_compat_indices.clear();
   cm::global_isany_call_counter = 0;
   return env.Null();
