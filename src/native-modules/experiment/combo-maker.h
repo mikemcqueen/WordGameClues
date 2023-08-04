@@ -46,16 +46,20 @@ namespace Source {
   constexpr inline auto getSource(int src) noexcept { return src % 1'000'000; }
   constexpr inline auto getVariation(int src) noexcept { return getSource(src) / 100; }
   constexpr inline auto getIndex(int src) noexcept { return getSource(src) % 100; }
+#if 0 // unused
   constexpr inline auto getFirstIndex(int sentence) {
     assert(sentence > 0);
     return (sentence - 1) * kMaxUsedSourcesPerSentence;
   }
+#endif
 } // namespace Source
 
 using LegacySourceBits = bitset<kMaxLegacySources>;
+#if 0
 using LegacySources = std::array<int8_t, kMaxLegacySources>;
 // 32 bytes per sentence * 9 sentences = 2304? bits, 288 bytes, 36? 64-bit words
 using Sources = std::array<int8_t, kMaxUsedSources>;
+#endif
 
 struct UsedSources {
   using VariationIndex_t = int16_t;
@@ -90,27 +94,6 @@ struct UsedSources {
   */
 
 private:
-#if USE_DEPRECATED_SOURCES
-  void addSources(const UsedSources& other) {
-    for (int sentence{ 1 }; sentence <= kNumSentences; ++sentence) {
-      const auto first = Source::getFirstIndex(sentence);
-      int other_offset{};
-      // does 'other' have sources for this sentence?
-      if (other.sources[first + other_offset] == -1) continue;
-
-      // determine our starting offset for merging in new sources
-      int offset{};
-      while (sources[first + offset] != -1) ++offset;
-      
-      // copy sources from other to us
-      while (other.sources[first + other_offset] != -1) {
-        sources[first + offset++] = other.sources[first + other_offset++];
-      }
-      // sanity check
-      assert(offset < kMaxUsedSourcesPerSentence);
-    }
-  }
-#endif
 
   void addVariations(const UsedSources& other) {
     for (int sentence{ 1 }; sentence <= kNumSentences; ++sentence) {
@@ -125,55 +108,6 @@ private:
   }
 
 public:
-#if USE_DEPRECATED_SOURCES
-  constexpr static bool anySourcesMatch(const Sources& s1,
-    const Sources& s2)
-  {
-    // TODO: sanity check if sorted 
-
-    for (int s{ 1 }; s <= kNumSentences; ++s) {
-      auto start = Source::getFirstIndex(s);
-      for (int i{start}, j{start}, remain{kMaxUsedSourcesPerSentence};
-           remain > 0; --remain)
-      {
-        if ((s1[i] == -1) || (s2[j] == -1)) {
-          break;
-        }
-        if (s1[i] == s2[j]) {
-          return true;
-        }
-        else if (s1[i] > s2[j]) {
-          i++;
-        }
-        else {
-          j++;
-        }
-      }
-    }
-    return false;
-  }
-
-  constexpr static bool anySourcesMatch2(const Sources& s1,
-    const Sources& s2)
-  {
-    // TODO: sanity check if sorted 
-    int matches{};
-    for (int s{ 1 }; s <= kNumSentences; ++s) {
-      int8_t sources[kMaxUsedSourcesPerSentence + 1] = { 0 };
-      auto start = Source::getFirstIndex(s);
-      for (int i{}; i < kMaxUsedSourcesPerSentence + 1; ++i) {
-        auto index = s1[start + i] + 1;
-        sources[index] = index;
-      }
-      for (int i{}; i < kMaxUsedSourcesPerSentence + 1; ++i) {
-        auto index = s2[start + i] + 1;
-        matches += index && sources[index];
-      }
-    }
-    return matches;
-  }
-#endif
-
   constexpr static auto allVariationsMatch(
     const Variations& v1, const Variations& v2, bool /*native*/ = true) {
     for (size_t i{}; i < v1.size(); ++i) {
@@ -286,15 +220,6 @@ public:
     auto bit_pos = Source::getIndex(src) + getFirstBitIndex(sentence);
     assert(!bits.test(bit_pos));
     bits.set(bit_pos);
-
-#if USE_DEPRECATED_SOURCES
-    // source
-    int first = Source::getFirstIndex(sentence);
-    int offset{};
-    while (sources[first + offset] != -1) ++offset;
-    assert(offset < kMaxUsedSourcesPerSentence);
-    sources[first + offset] = Source::getIndex(src);
-#endif
   }
 
   auto mergeInPlace(const UsedSources& other) {
@@ -302,10 +227,6 @@ public:
     getBits() |= other.getBits();
     // merge variation. haxoid. should be separate function.
     addVariations(other);
-#if USE_DEPRECATED_SOURCES
-    addSources(other);
-    sortSources();
-#endif
   }
 
   auto copyMerge(const UsedSources& other) const {
@@ -314,32 +235,6 @@ public:
     return result;
   }
 
-#if USE_DEPRECATED_SOURCES
-  constexpr int getFirstSource(int sentence) const {
-    return sources.at(Source::getFirstIndex(sentence));
-  }
-
-  constexpr int countSources(int sentence) const {
-    int count{};
-    if (getVariation(sentence) > -1) {
-      for (int i{}; i < kMaxUsedSourcesPerSentence; ++i) {
-        auto src = sources.at(Source::getFirstIndex(sentence) + i);
-        if (src < 0) break;
-        ++count;
-      }
-    }
-    return count;
-  }
-
-  void sortSources() {
-    for (int s{1}; s <= kNumSentences; ++s) {
-      std::sort(sources.data() + Source::getFirstIndex(s),
-                sources.data() + Source::getFirstIndex(s + 1),
-                std::greater<int8_t>());
-    }
-  }
-#endif
-  
   constexpr void dump(bool device = false, char* buf = nullptr, char* smolbuf = nullptr) const {
     char big_buf[256];
     char smol_buf[32];
@@ -347,54 +242,6 @@ public:
     if (!smolbuf) smolbuf = smol_buf;
     *buf = 0;
     *smolbuf = 0;
-#if USE_DEPRECATED_SOURCES
-    auto first{true};
-    if (device) {
-      strcat(buf, "sources:");
-    } else {
-      std::cerr << "sources:";
-    }
-    for (auto s{1}; s <= kNumSentences; ++s) {
-      if (getVariation(s) > -1) {
-        if (first) {
-          if (device) {
-            strcat(buf, "\n");
-          } else {
-            std::cerr << std::endl;
-          }
-          first = false;
-        }
-        if (device) {
-          sprintf(smolbuf, " s%d v%d:", s, getVariation(s));
-          strcat(buf, smolbuf);
-        } else {
-          std::cerr << "  s" << s << " v" << getVariation(s) << ":";
-        }
-        for (int i{}; i < kMaxUsedSourcesPerSentence; ++i) {
-          auto src = sources.at(Source::getFirstIndex(s) + i);
-          if (src < 0) break;
-          if (device) {
-            sprintf(smolbuf, " %d", src);
-            strcat(buf, smolbuf);
-          } else {
-            std::cerr << " " << int(src);
-          }
-        }
-        if (device) {
-          strcat(buf, "\n");
-        } else {
-          std::cerr << std::endl;
-        }
-      }
-    }
-    if (first) {
-      if (device) {
-        strcat(buf, " none\n");
-      } else {
-        std::cerr << " none" << std::endl;
-      }
-    }
-#endif
     if (device) {
       printf("%s", buf);
     }
@@ -409,9 +256,6 @@ public:
   }
 
   SourceBits bits{};
-#if USE_DEPRECATED_SOURCES
-  Sources sources = make_array<int8_t, kMaxUsedSources>(-1);
-#endif
   Variations variations = make_array<VariationIndex_t, kNumSentences>(-1);
  };  // UsedSources
 
@@ -424,44 +268,21 @@ struct SourceCompatibilityData {
   SourceCompatibilityData& operator=(SourceCompatibilityData&&) = default;
 
   // copy components
-  SourceCompatibilityData(const LegacySourceBits& legacySourceBits,
-      const UsedSources& usedSources
-#if USE_DEPRECATED_SOURCES
-      ,const LegacySources& legacySources
-#endif
-    ): legacySourceBits(legacySourceBits), usedSources(usedSources)
-#if USE_DEPRECATED_SOURCES
-    ,legacySources(legacySources)
-#endif
-  {}
+  SourceCompatibilityData(
+    const LegacySourceBits& legacySourceBits, const UsedSources& usedSources)
+      : legacySourceBits(legacySourceBits),
+        usedSources(usedSources) {
+  }
 
   // move components
-  SourceCompatibilityData(LegacySourceBits&& legacySourceBits,
-      UsedSources&& usedSources
-#if USE_DEPRECATED_SOURCES
-      ,LegacySources&& legacySources
-#endif
-    ): legacySourceBits(std::move(legacySourceBits)),
-    usedSources(std::move(usedSources))
-#if USE_DEPRECATED_SOURCES
-    ,legacySources(std::move(legacySources))
-#endif
-  {}
-
-#if USE_DEPRECATED_SOURCES
-  constexpr static bool anyLegacySourcesMatch(const LegacySources& ls1,
-    const LegacySources& ls2)
-  {
-    for (int i{}; i < kMaxLegacySources; ++i) {
-      if (ls1[i] && ls2[i]) return true;
-    }
-    return false;
+  SourceCompatibilityData(
+    LegacySourceBits&& legacySourceBits, UsedSources&& usedSources)
+      : legacySourceBits(std::move(legacySourceBits)),
+        usedSources(std::move(usedSources)) {
   }
-#endif
-  
+
   constexpr auto isXorCompatibleWith(const SourceCompatibilityData& other,
-    bool useBits = true, int* reason = nullptr) const
-  {
+    bool useBits = true, int* reason = nullptr) const {
     if (legacySourceBits.intersects(other.legacySourceBits)) {
       return false;
     }
@@ -495,74 +316,21 @@ struct SourceCompatibilityData {
       || isAndCompatibleWith(other, useBits);
   }
 
-#if USE_DEPRECATED_SOURCES
-  static void addLegacySource(LegacySources& sources, int src) {
-    assert(!sources[src]);
-    sources[src] = 1;
-  }
-#endif
-
   void addSource(int src) {
     if (cm::Source::isLegacy(src)) {
       assert(!legacySourceBits.test(src));
       legacySourceBits.set(src);
-#if USE_DEPRECATED_SOURCES
-      addLegacySource(legacySources, src);
-#endif
     } else {
       usedSources.addSource(src);
     }
   }
-
-#if USE_DEPRECATED_SOURCES
-  static void merge(LegacySources& to, const LegacySources& from) {
-    for (int i{}; i < kMaxLegacySources; ++i) {
-      if (from[i]) {
-        addLegacySource(to, i);
-      }
-    }
-  }
-
-  auto copyMerge(const LegacySources& other) const {
-    LegacySources sources{ legacySources };
-    merge(sources, other);
-    return sources;
-  }
-
-  void mergeInPlace(const LegacySources& other) {
-    merge(legacySources, other);
-  }
-#endif
 
   void mergeInPlace(const SourceCompatibilityData& other) {
     auto count = legacySourceBits.count();
     legacySourceBits |= other.legacySourceBits;
     assert(legacySourceBits.count() == count + other.legacySourceBits.count());
     usedSources.mergeInPlace(other.usedSources);
-#if USE_DEPRECATED_SOURCES
-    mergeInPlace(other.legacySources);
-#endif
   }
-
-#if USE_DEPRECATED_SOURCES
-  // used for debug logging
-  constexpr int getFirstLegacySource() const {
-    for (int i{}; i < kMaxLegacySources; ++i) {
-      const auto src = legacySources.at(i);
-      if (src) return i;
-    }
-    return -1;
-  }
-
-  constexpr int countLegacySources() const {
-    int count{};
-    for (int i{}; i < kMaxLegacySources; ++i) {
-      const auto src = legacySources.at(i);
-      if (src) ++count;
-    }
-    return count;
-  }
-#endif
 
   constexpr void dump(const char* header = nullptr, bool device = false,
     char* buf = nullptr, char* smolbuf = nullptr) const
@@ -581,32 +349,6 @@ struct SourceCompatibilityData {
       }
     }
     usedSources.dump();
-#if USE_DEPRECATED_SOURCES
-    if (device) {
-      strcat(buf, "legacy sources:");
-    } else {
-      std::cerr << "legacy sources:";
-    }
-    auto any{false};
-    for (int i{}; i < kMaxLegacySources; ++i) {
-      if (legacySources.at(i)) {
-        if (device) {
-          sprintf(smolbuf, " %d", i);
-          strcat(buf, smolbuf);
-        } else {
-          std::cerr << " " << i;
-        }
-        any = true;
-      }
-    }
-    if (!any) {
-      if (device) { 
-        strcat(buf, " none");
-      } else {
-        std::cerr << " none";
-      }
-    }
-#endif
     if (device) {
       printf("%s\n", buf);
     } else {
@@ -620,10 +362,6 @@ struct SourceCompatibilityData {
 
   LegacySourceBits legacySourceBits;
   UsedSources usedSources;
-#if USE_DEPRECATED_SOURCES
-  // TODO: could be array of bool too
-  LegacySources legacySources = make_array<int8_t, kMaxLegacySources>(0);
-#endif
 }; // SourceCompatibilityData
 using SourceCompatibilityList = std::vector<SourceCompatibilityData>;
 
@@ -685,18 +423,6 @@ struct NameCount {
     return bits;
   }
 
-#if USE_DEPRECATED_SOURCES
-  static auto listToLegacySources(const NameCountList& list) {
-    auto sources = make_array<int8_t, kMaxLegacySources>(0);
-    for (const auto& nc : list) {
-      if (Source::isLegacy(nc.count)) {
-        sources[nc.count] = 1;
-      }
-    }
-    return sources;
-  }
-#endif
-
   static auto listToUsedSources(const NameCountList& list) {
     UsedSources usedSources{};
     for (const auto& nc : list) {
@@ -704,9 +430,6 @@ struct NameCount {
         usedSources.addSource(nc.count);
       }
     }
-#if USE_DEPRECATED_SOURCES
-    usedSources.sortSources();
-#endif
     return usedSources;
   }
 
@@ -732,19 +455,13 @@ using NCDataList = std::vector<NCData>;
 struct SourceData : SourceCompatibilityData {
   SourceData() = default;
   SourceData(NameCountList&& primaryNameSrcList,
-      LegacySourceBits&& legacySourceBits,
-      UsedSources&& usedSources,
-#if USE_DEPRECATED_SOURCES
-      LegacySources&& legacySources,
-#endif
-      NameCountList&& ncList) :
-    SourceCompatibilityData(std::move(legacySourceBits), std::move(usedSources)
-#if USE_DEPRECATED_SOURCES
-    ,std::move(legacySources)
-#endif
-    ), primaryNameSrcList(std::move(primaryNameSrcList)),
-    ncList(std::move(ncList))
-  {}
+    LegacySourceBits&& legacySourceBits, UsedSources&& usedSources,
+    NameCountList&& ncList)
+      : SourceCompatibilityData(
+        std::move(legacySourceBits), std::move(usedSources)),
+        primaryNameSrcList(std::move(primaryNameSrcList)),
+        ncList(std::move(ncList)) {
+  }
 
   // copy assign allowed for now for precompute.mergeAllCompatibleXorSources
   SourceData(const SourceData&) = default;
@@ -785,7 +502,7 @@ using XorSource = SourceData;
 using XorSourceList = std::vector<XorSource>;
 
 struct OrSourceData {
-  SourceData source;
+  SourceCompatibilityData source;
   bool xorCompatible = false;
   bool andCompatible = false;
 };
@@ -795,14 +512,21 @@ using OrSourceList = std::vector<OrSourceData>;
 //
 struct OrArgData {
   OrSourceList orSourceList;
-  bool compatible = false;
+  bool compatible{false};
 };
-using OrArgDataList = std::vector<OrArgData>;
+using OrArgList = std::vector<OrArgData>;
+
+namespace device {
+  struct OrArgData {
+    OrSourceData* or_sources;
+    unsigned num_or_sources;
+    bool compatible;
+  };
+}
 
 // These are precomputed on xorSourceList, to identify only those sources
 // which share the same per-sentence variation.
-
-// one list of indices per variation, plus '-1' (no) variation.
+// One list of indices per variation, plus '-1' (no) variation.
 // indices to outer vector are offset by 1; variation -1 is index 0.
 using VariationIndicesList = std::vector<std::vector<int>>;
 // one variationIndicesLists per sentence
@@ -822,11 +546,12 @@ namespace device {
 struct PreComputedData {
   XorSourceList xorSourceList;
   std::vector<int> xorSourceIndices;
-  SourceCompatibilityData* device_xorSources{ nullptr };
-  OrArgDataList orArgDataList;
+  SourceCompatibilityData* device_xorSources{nullptr};
+  OrArgList orArgList;
+  device::OrArgData* device_or_args{nullptr};
   SourceListMap sourceListMap;
   SentenceVariationIndices sentenceVariationIndices;
-  device::VariationIndices* device_sentenceVariationIndices{ nullptr };
+  device::VariationIndices* device_sentenceVariationIndices{nullptr};
 };
 
 struct MergedSources : SourceCompatibilityData {
@@ -837,13 +562,10 @@ struct MergedSources : SourceCompatibilityData {
   MergedSources& operator=(MergedSources&&) = default;
 
   // copy from SourceData
-  MergedSources(const SourceData& source) :
-    SourceCompatibilityData(source.legacySourceBits, source.usedSources
-#if USE_DEPRECATED_SOURCES
-      ,source.legacySources
-#endif
-    ), sourceCRefList(SourceCRefList{SourceCRef{source}})
-  {}
+  MergedSources(const SourceData& source)
+      : SourceCompatibilityData(source.legacySourceBits, source.usedSources),
+        sourceCRefList(SourceCRefList{SourceCRef{source}}) {
+  }
 
   SourceCRefList sourceCRefList;
 };

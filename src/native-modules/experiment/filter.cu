@@ -19,15 +19,18 @@ namespace {
 using namespace cm;
 
 __device__ auto isSourceORCompatibleWithAnyOrSource(
-  const SourceCompatibilityData& source, const OrSourceList& orSourceList) {
+  const SourceCompatibilityData& source, const OrSourceData* or_sources,
+  unsigned num_or_sources) {
+  //
   auto compatible = false;
-  for (const auto& orSource : orSourceList) {
+  for (unsigned i{}; i < num_or_sources; ++i) {
     // skip any sources that were already determined to be XOR incompatible
     // or AND compatible with --xor sources.
     // Wait, what? why not "&& !andCompatible" ?
-    if (!orSource.xorCompatible || orSource.andCompatible)
+    const auto& or_src = or_sources[i];
+    if (!or_src.xorCompatible || or_src.andCompatible)
       continue;
-    compatible = source.isOrCompatibleWith(orSource.source);
+    compatible = source.isOrCompatibleWith(or_src.source);
     if (compatible)
       break;
   }
@@ -35,15 +38,17 @@ __device__ auto isSourceORCompatibleWithAnyOrSource(
 };
 
 __device__ auto isSourceCompatibleWithEveryOrArg(
-  const SourceCompatibilityData& source,
-  const OrArgDataList& orArgDataList) {
+  const SourceCompatibilityData& source, const device::OrArgData* or_args,
+  unsigned num_or_args) {
+  //
   auto compatible = true;  // if no --or sources specified, compatible == true
-  for (const auto& orArgData : orArgDataList) {
+  for (unsigned i{}; i < num_or_args; ++i) {
     // TODO: skip calls to here if container.compatible = true  which may have
     // been determined in Precompute phase @ markAllANDCompatibleOrSources()
     // and skip the XOR check as well in this case.
-    compatible =
-      isSourceORCompatibleWithAnyOrSource(source, orArgData.orSourceList);
+    const auto& or_arg = or_args[i];
+    compatible = isSourceORCompatibleWithAnyOrSource(
+      source, or_arg.or_sources, or_arg.num_or_sources);
     if (!compatible)
       break;
   }
@@ -90,25 +95,22 @@ template <typename T> __device__ __forceinline__ void store(T* addr, T val) {
   *(volatile T*)addr = val;
 }
 
-__device__ int xor_compat[1024]; // # of blocks
+//__device__ int xor_compat[1024]; // # of blocks
 
 // one block per source
 __global__ void xor_kernel_new(
   const SourceCompatibilityData* __restrict__ sources,
   const unsigned num_sources,
   const SourceCompatibilityData* __restrict__ xor_sources,
-  const unsigned num_xor_sources,
-  const SourceIndex* __restrict__ source_indices,
+  const unsigned num_xor_sources, const device::OrArgData* __restrict__ or_args,
+  const unsigned num_or_args, const SourceIndex* __restrict__ source_indices,
   const index_t* __restrict__ list_start_indices, result_t* results,
   int stream_idx) {
   //
-  __shared__ int shrd_xor_compat;
+  __shared__ bool shrd_xor_compat;
   auto& is_xor_compat = shrd_xor_compat; // xor_compat[blockIdx.x];
   // for each source (one block per source)
   for (unsigned idx{blockIdx.x}; idx < num_sources; idx += gridDim.x) {
-    //SourceCompatibilityData const* source = nullptr;
-    //result_t* result = nullptr;
-
     const auto src_idx = source_indices[idx];
     const auto flat_index =
       list_start_indices[src_idx.listIndex] + src_idx.index;
@@ -117,7 +119,7 @@ __global__ void xor_kernel_new(
 
     __syncthreads();
     if (!threadIdx.x) {
-      store(&is_xor_compat, 0);
+      store(&is_xor_compat, false);
     }
     // for each xor_source (one thread per xor_source)
     for (unsigned xor_chunk{}; xor_chunk * blockDim.x < num_xor_sources;
@@ -126,15 +128,15 @@ __global__ void xor_kernel_new(
       const auto xor_idx = xor_chunk * blockDim.x + threadIdx.x;
       if (xor_idx < num_xor_sources) {
         if (source.isXorCompatibleWith(xor_sources[xor_idx])) {
-          // shrd_xor_compat = 1;
-          // store(&result, 1);
-          store(&is_xor_compat, 1);
+          // TODO: Do I need volatile when read/writing shrd mem?
+          store(&is_xor_compat, true);
         }
       }
       __syncthreads();
-      // if (shrd_xor_compat)
-      // if (load(&result))
-      if (load(&is_xor_compat)) {
+      if (!load(&is_xor_compat)) {
+        continue;
+      }
+      if (isSourceCompatibleWithEveryOrArg(source, or_args, num_or_args)) {
         if (!threadIdx.x) {
           store(&result, (result_t)1);
         }
@@ -145,8 +147,7 @@ __global__ void xor_kernel_new(
 }
 
 // one block per source
-__global__ void xor_kernel(
-  const SourceCompatibilityData* __restrict__ sources,
+__global__ void xor_kernel(const SourceCompatibilityData* __restrict__ sources,
   const unsigned num_sources,
   const SourceCompatibilityData* __restrict__ xor_sources,
   const unsigned num_xor_sources,
@@ -566,8 +567,9 @@ void run_xor_kernel(KernelData& kernel, int threads_per_block,
   cudaStreamSynchronize(cudaStreamPerThread);
   xor_kernel_new<<<grid_dim, block_dim, shared_bytes, kernel.stream>>>(
     device_sources, kernel.source_indices.size(), PCD.device_xorSources,
-    PCD.xorSourceList.size(), kernel.device_source_indices,
-    device_list_start_indices, device_results, kernel.stream_idx);
+    PCD.xorSourceList.size(), PCD.device_or_args, PCD.orArgList.size(),
+    kernel.device_source_indices, device_list_start_indices, device_results,
+    kernel.stream_idx);
 
 #if 0 || defined(STREAM_LOG)
   std::cerr << "stream " << kernel.stream_idx
@@ -586,18 +588,16 @@ auto copy_device_results(
 
   std::vector<result_t> results(num_results);
   auto results_bytes = num_results * sizeof(result_t);
-
   err = cudaMemcpyAsync(results.data(), device_results, results_bytes,
     cudaMemcpyDeviceToHost, stream);
   if (err != cudaSuccess) {
     fprintf(stdout, "copy device results, error: %s", cudaGetErrorString(err));
     assert((err != cudaSuccess) && "copy device results");
   }
-
   err = cudaStreamSynchronize(stream);
   assert((err == cudaSuccess) && "cudaStreamSynchronize");
   return results;
-  }
+}
 
 // TODO: kernel.get_results()? just to call out to free function?  maybe
 auto getKernelResults(KernelData& kernel, result_t* device_results) {
@@ -706,6 +706,13 @@ auto makeCompatibleSources(const SourceList& sources) {
   return compat_sources;
 }
 
+auto countIndices(const VariationIndicesList& variationIndices) {
+  return std::accumulate(variationIndices.begin(), variationIndices.end(), 0,
+    [](int total, const auto& indices) {
+      total += indices.size();
+      return total;
+    });
+}
 
 void dump_xor(int index) {
   const XorSourceList& xorSources = PCD.xorSourceList;
@@ -830,7 +837,7 @@ int filter_task(
   }
 #endif
   return 0;
-    }
+}
 
 static std::vector<std::future<int>> filter_futures_;
 
@@ -858,6 +865,7 @@ void filterCandidatesCuda(
 
 [[nodiscard]] SourceCompatibilityData* cuda_allocCopyXorSources(
   const XorSourceList& xorSourceList) {
+  //
   auto xorsrc_bytes = xorSourceList.size() * sizeof(SourceCompatibilityData);
   SourceCompatibilityData* device_xorSources = nullptr;
   cudaError_t err = cudaMallocAsync(
@@ -867,18 +875,6 @@ void filterCandidatesCuda(
       cudaGetErrorString(err));
     assert(!"failed to allocate device xorSources");
   }
-#if 0
-  for (size_t i{}; i < xorSourceList.size(); ++i) {
-    err = cudaMemcpyAsync(&device_xorSources[i], &xorSourceList.at(i),
-      sizeof(SourceCompatibilityData), cudaMemcpyHostToDevice,
-      cudaStreamPerThread);
-    if (err != cudaSuccess) {
-      fprintf(stderr, "copy xorSource to device, error: %s\n",
-        cudaGetErrorString(err));
-      assert(!"failed to copy xorSource to device");
-    }
-  }
-#else
   auto compat_sources = makeCompatibleSources(xorSourceList);
   err = cudaMemcpyAsync(device_xorSources, compat_sources.data(),
     xorsrc_bytes, cudaMemcpyHostToDevice, cudaStreamPerThread);
@@ -887,78 +883,106 @@ void filterCandidatesCuda(
       stderr, "copy xorSource to device, error: %s\n", cudaGetErrorString(err));
     assert(!"failed to copy xorSource to device");
   }
-#endif
   return device_xorSources;
 }
 
-  auto countIndices(const VariationIndicesList& variationIndices) {
-    return std::accumulate(variationIndices.cbegin(), variationIndices.cend(),
-      0, [](int total, const auto& indices) {
-        total += indices.size();
-        return total;
-      });
-  }
+[[nodiscard]] device::OrArgData* cuda_allocCopyOrArgs(
+  const OrArgList& orArgList) {
+  //
+  cudaError_t err = cudaSuccess;
+  // host-side vector of device::orArgData that each contain pointers
+  // to device memory, that we can blast to device with one copy
+  std::vector<device::OrArgData> or_args;
+  or_args.reserve(orArgList.size());
+  for (size_t i{}; i < orArgList.size(); ++i) {
+    const auto& or_arg = orArgList.at(i);
+    const auto& or_src_list = or_arg.orSourceList;
+    auto or_src_bytes = or_src_list.size() * sizeof(OrSourceData);
+    OrSourceData* device_or_sources;
+    err = cudaMallocAsync(
+      (void**)&device_or_sources, or_src_bytes, cudaStreamPerThread);
+    assert((err == cudaSuccess) && "alloc device or sources");
 
-  [[nodiscard]] auto cuda_allocCopySentenceVariationIndices(
-    const SentenceVariationIndices& sentenceVariationIndices)
-    -> device::VariationIndices* {
-    cudaError_t err = cudaSuccess;
-    using DeviceVariationIndicesArray =
-      std::array<device::VariationIndices, kNumSentences>;
-    DeviceVariationIndicesArray deviceVariationIndicesArray;
-    for (int s{}; s < kNumSentences; ++s) {
-      auto& variationIndices = sentenceVariationIndices.at(s);
-      // 2 * size to account for one -1 indices terminator per variation
-      const auto device_data_bytes =
-        (countIndices(variationIndices) + (2 * variationIndices.size()))
-        * sizeof(int);
-      auto& deviceVariationIndices = deviceVariationIndicesArray.at(s);
-      err = cudaMalloc(
-        (void**)&deviceVariationIndices.device_data, device_data_bytes);
+    err = cudaMemcpyAsync(device_or_sources, or_src_list.data(),
+      or_src_bytes, cudaMemcpyHostToDevice, cudaStreamPerThread);
+    assert((err == cudaSuccess) && "copy device or sources");
+    or_args.emplace_back(device::OrArgData{
+        device_or_sources, (unsigned)or_src_list.size(), or_arg.compatible});
+  }
+  auto or_arg_bytes = or_args.size() * sizeof(device::OrArgData);
+  device::OrArgData* device_or_args;
+  err =
+    cudaMallocAsync((void**)&device_or_args, or_arg_bytes, cudaStreamPerThread);
+  assert((err == cudaSuccess) && "alloc device or args");
+
+  err = cudaMemcpyAsync(device_or_args, or_args.data(), or_arg_bytes,
+    cudaMemcpyHostToDevice, cudaStreamPerThread);
+  assert((err == cudaSuccess) && "copy device or args");
+
+  return device_or_args;
+}
+
+[[nodiscard]] auto cuda_allocCopySentenceVariationIndices(
+  const SentenceVariationIndices& sentenceVariationIndices)
+  -> device::VariationIndices* {
+  //
+  cudaError_t err = cudaSuccess;
+  using DeviceVariationIndicesArray =
+    std::array<device::VariationIndices, kNumSentences>;
+  DeviceVariationIndicesArray deviceVariationIndicesArray;
+  for (int s{}; s < kNumSentences; ++s) {
+    auto& variationIndices = sentenceVariationIndices.at(s);
+    // 2 * size to account for one -1 indices terminator per variation
+    const auto device_data_bytes =
+      (countIndices(variationIndices) + (2 * variationIndices.size()))
+      * sizeof(int);
+    auto& deviceVariationIndices = deviceVariationIndicesArray.at(s);
+    err = cudaMalloc(
+      (void**)&deviceVariationIndices.device_data, device_data_bytes);
+    assert(err == cudaSuccess);
+
+    const static int terminator = -1;
+    std::vector<int> variationOffsets;
+    const auto num_variations{variationIndices.size()};
+    deviceVariationIndices.variationOffsets =
+      deviceVariationIndices.device_data;
+    deviceVariationIndices.num_variations = num_variations;
+    deviceVariationIndices.sourceIndices =
+      &deviceVariationIndices.device_data[num_variations];
+    size_t offset{};
+    for (const auto& indices : variationIndices) {
+      variationOffsets.push_back(offset);
+      // NOTE: Async. I'm going to need to preserve sentenceVariationIndices
+      // until copy is complete - (kernel execution/synhronize?)
+      const auto indices_bytes = indices.size() * sizeof(int);
+      err = cudaMemcpyAsync(&deviceVariationIndices.sourceIndices[offset],
+        indices.data(), indices_bytes, cudaMemcpyHostToDevice);
       assert(err == cudaSuccess);
-      
-      const static int terminator = -1;
-      std::vector<int> variationOffsets;
-      const auto num_variations{ variationIndices.size() };
-      deviceVariationIndices.variationOffsets = deviceVariationIndices.device_data;
-      deviceVariationIndices.num_variations = num_variations;
-      deviceVariationIndices.sourceIndices =
-        &deviceVariationIndices.device_data[num_variations];
-      size_t offset{};
-      for (const auto& indices: variationIndices) {
-        variationOffsets.push_back(offset);
-        // NOTE: Async. I'm going to need to preserve sentenceVariationIndices
-        // until copy is complete - (kernel execution/synhronize?)
-        const auto indices_bytes = indices.size() * sizeof(int);
-        err = cudaMemcpyAsync(&deviceVariationIndices.sourceIndices[offset],
-          indices.data(), indices_bytes, cudaMemcpyHostToDevice);
-        assert(err == cudaSuccess);
-        offset += indices.size();
-        err = cudaMemcpyAsync(&deviceVariationIndices.sourceIndices[offset],
-          &terminator, sizeof(terminator), cudaMemcpyHostToDevice);
-        assert(err == cudaSuccess);
-        offset += 1;
-      }
-      const auto variationOffsets_bytes = variationOffsets.size() * sizeof(int);
-      err = cudaMemcpyAsync(deviceVariationIndices.variationOffsets,
-        variationOffsets.data(), variationOffsets_bytes,
-        cudaMemcpyHostToDevice);
+      offset += indices.size();
+      err = cudaMemcpyAsync(&deviceVariationIndices.sourceIndices[offset],
+        &terminator, sizeof(terminator), cudaMemcpyHostToDevice);
       assert(err == cudaSuccess);
+      offset += 1;
     }
-    //  const auto sentenceVariationIndices_bytes = 
-    //    kNumSentences * sizeof(device::VariationIndices);
-    const auto variationIndices_bytes =
-      kNumSentences * sizeof(device::VariationIndices);
-    device::VariationIndices* device_variationIndices;
-    err = cudaMalloc((void **)&device_variationIndices, variationIndices_bytes);
+    const auto variationOffsets_bytes = variationOffsets.size() * sizeof(int);
+    err = cudaMemcpyAsync(deviceVariationIndices.variationOffsets,
+      variationOffsets.data(), variationOffsets_bytes, cudaMemcpyHostToDevice);
     assert(err == cudaSuccess);
-    
-    err = cudaMemcpyAsync(device_variationIndices,
-                          deviceVariationIndicesArray.data(), variationIndices_bytes,
-                          cudaMemcpyHostToDevice);
-    assert(err == cudaSuccess);
-    
-    return device_variationIndices;
   }
+  //  const auto sentenceVariationIndices_bytes =
+  //    kNumSentences * sizeof(device::VariationIndices);
+  const auto variationIndices_bytes =
+    kNumSentences * sizeof(device::VariationIndices);
+  device::VariationIndices* device_variationIndices;
+  err = cudaMalloc((void**)&device_variationIndices, variationIndices_bytes);
+  assert(err == cudaSuccess);
 
-  }  // namespace cm
+  err =
+    cudaMemcpyAsync(device_variationIndices, deviceVariationIndicesArray.data(),
+      variationIndices_bytes, cudaMemcpyHostToDevice);
+  assert(err == cudaSuccess);
+
+  return device_variationIndices;
+}
+
+}  // namespace cm

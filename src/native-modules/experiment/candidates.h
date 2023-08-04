@@ -26,6 +26,9 @@ namespace cm {
   [[nodiscard]] SourceCompatibilityData* cuda_allocCopyXorSources(
     const XorSourceList& xorSourceList);
 
+  [[nodiscard]] device::OrArgData* cuda_allocCopyOrArgs(
+    const OrArgList& orArgList);
+
   [[nodiscard]] auto cuda_allocCopySentenceVariationIndices(
     const SentenceVariationIndices& sentenceVariationIndices)
     -> device::VariationIndices*;
