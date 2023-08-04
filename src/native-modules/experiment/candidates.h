@@ -11,7 +11,7 @@ namespace cm {
 
   // TODO: map is dumb. use vector. ComboLists
   using IndexComboListMap = std::unordered_map<int, std::set<std::string>>;
-  
+
   struct OneSumCandidateData {
     SourceCompatibilityLists sourceCompatLists;
     IndexComboListMap indexComboListMap;
@@ -26,20 +26,19 @@ namespace cm {
   [[nodiscard]] SourceCompatibilityData* cuda_allocCopyXorSources(
     const XorSourceList& xorSourceList);
 
-  [[nodiscard]]
-  auto cuda_allocCopySentenceVariationIndices(
+  [[nodiscard]] auto cuda_allocCopySentenceVariationIndices(
     const SentenceVariationIndices& sentenceVariationIndices)
     -> device::VariationIndices*;
 
-  void filterCandidates(int sum, int threads_per_block, int streams,
-    int stride);
-  void filterCandidatesCuda(int sum, int threads_per_block, int streams,
-    int stride);
+  void filterCandidates(
+    int sum, int threads_per_block, int streams, int stride, int iters);
+  void filterCandidatesCuda(
+    int sum, int threads_per_block, int streams, int stride, int iters);
 
   int get_filter_results();
 
   //
-  
+
   inline std::unordered_map<int, OneSumCandidateData> allSumsCandidateData{};
 } // namespace cm
 

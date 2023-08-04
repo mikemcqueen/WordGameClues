@@ -47,7 +47,8 @@
         '-Xcudafe', '--diag_suppress=declared_but_not_referenced',
         '-O3', '-dopt=on',
         '-Xptxas=-v',
-        #'-g', '-lineinfo', # debug
+        #'-g',
+        '-lineinfo', # debug
         #'-DCUDA_FORCE_CDP1_IF_SUPPORTED',
         '-std=c++20', '-dc', '<@(_inputs)'
       ]

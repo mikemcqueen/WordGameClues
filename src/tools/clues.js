@@ -54,6 +54,7 @@ const CmdLineOptions = Opt.create(_.concat(Clues.Options, [
     ['',  'streams=COUNT',                     '  use COUNT streams (CUDA)'],
     ['',  'stride=COUNT',                      '  use COUNT source indices per stream (CUDA)'],
     ['',  'tpb=COUNT',                         '  use COUNT threads per block (CUDA)'],
+    ['',  'iters=COUNT',                       '  run COUNT iterations (only valid if no range specified with -c)'],
     ['',  'copy-from=SOURCE',                  'copy clues from source cluetype; e.g. p1.1'],
     ['',  'save',                              '  save clue files'],
     ['',  'allow-dupe-source',                 '  allow duplicate sources'],
@@ -452,7 +453,8 @@ async function main () {
             verbose: options.verbose,
             tpb: options.tpb ? Number(options.tpb) : 0,
             streams: options.streams ? Number(options.streams) : 0,
-            stride: options.stride ? Number(options.stride) : 0
+            stride: options.stride ? Number(options.stride) : 0,
+            iters: options.iters ? Number(options.iters) : 0
         });
     }
     return 0;

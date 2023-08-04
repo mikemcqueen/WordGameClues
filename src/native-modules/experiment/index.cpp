@@ -609,19 +609,19 @@ Value getCandidateStatsForSum(const CallbackInfo& info) {
 //
 Value filterCandidatesForSum(const CallbackInfo& info) {
   Env env = info.Env();
-  if (!info[0].IsNumber() || !info[1].IsNumber() ||
-      !info[2].IsNumber() || !info[3].IsNumber())
-  {
-      Napi::TypeError::New(env, "fitlerCandidatesForSum: non-number parameter")
-        .ThrowAsJavaScriptException();
-      return env.Null();
+  if (!info[0].IsNumber() || !info[1].IsNumber() || !info[2].IsNumber()
+      || !info[3].IsNumber() || !info[3].IsNumber()) {
+    Napi::TypeError::New(env, "fitlerCandidatesForSum: non-number parameter")
+      .ThrowAsJavaScriptException();
+    return env.Null();
   }
   auto sum = info[0].As<Number>().Int32Value();
   assert(sum >= 2);
   auto threads_per_block = info[1].As<Number>().Int32Value();
   auto streams = info[2].As<Number>().Int32Value();
   auto stride = info[3].As<Number>().Int32Value();
-  cm::filterCandidates(sum, threads_per_block, streams, stride);
+  auto iters = info[4].As<Number>().Int32Value();
+  cm::filterCandidates(sum, threads_per_block, streams, stride, iters);
   return env.Null();
 }
 

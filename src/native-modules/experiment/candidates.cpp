@@ -5,8 +5,8 @@
 #include "candidates.h"
 
 namespace cm {
-  void filterCandidatesCuda(int sum, int threads_per_block, int streams,
-    int workitems);
+  //  void filterCandidatesCuda(int sum, int threads_per_block, int streams,
+  //    int workitems);
   //  [[nodiscard]]
   //  XorSource* cuda_allocCopyXorSources(const XorSourceList& xorSourceList);
   
@@ -30,11 +30,9 @@ namespace cm {
   }
   #endif
 
-  void filterCandidates(int sum, int threads_per_block, int streams,
-    int workitems)
-  {
-    //filterCandidatesNative(sum);
-    filterCandidatesCuda(sum, threads_per_block, streams, workitems);
+  void filterCandidates(
+    int sum, int threads_per_block, int streams, int stride, int iters) {
+    filterCandidatesCuda(sum, threads_per_block, streams, stride, iters);
   }
 
   auto addCandidate(int sum, const std::string& combo, int index) -> int {
