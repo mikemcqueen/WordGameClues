@@ -864,9 +864,10 @@ export const filter = (srcCsvList: string[], clueCount: number, result: FilterRe
 {
     srcCsvList.forEach(srcCsv => {
         if (isRejectSource(srcCsv)) {
-            log(`isRejectSource(${clueCount}) ${srcCsv}`);
+            //log(`isRejectSource(${clueCount}) ${srcCsv}`);
             ++result.reject;
         } else {
+            /*
             if (isKnownSource(srcCsv, clueCount)) {
                 log(`isKnownSource(${clueCount}) ${srcCsv}`);
                 ++result.known;
@@ -875,6 +876,7 @@ export const filter = (srcCsvList: string[], clueCount: number, result: FilterRe
                 log(`duplicate: ${srcCsv}`);
                 ++result.duplicate;
             }
+            */
             result.map[srcCsv] = true;
         }
     });

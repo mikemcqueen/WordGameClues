@@ -5,18 +5,6 @@ using namespace Napi;
 
 namespace cm {
 
-  /*
-Array wrap(Env& env, const UsedSources& usedSources) {
-  Array jsList = Array::New(env, usedSources.size());
-  for (auto i = 1u; i < usedSources.size(); ++i) {
-    if (usedSources[i]) {
-      jsList.Set(i, Number::New(env, usedSources[i]));
-    }
-  }
-  return jsList;
-}
-  */
-
 Object wrap(Env& env, const NameCount& nc) {
   Object jsObj = Object::New(env);
   jsObj.Set("name", String::New(env, nc.name));
@@ -26,7 +14,7 @@ Object wrap(Env& env, const NameCount& nc) {
 
 Array wrap(Env& env, const std::vector<NameCount>& ncList) {
   Array jsList = Array::New(env, ncList.size());
-  for (auto i = 0u; i < ncList.size(); ++i) {
+  for (size_t i{}; i < ncList.size(); ++i) {
     jsList.Set(i, wrap(env, ncList[i]));
   }
   return jsList;
@@ -34,7 +22,7 @@ Array wrap(Env& env, const std::vector<NameCount>& ncList) {
 
 Array wrap(Env& env, const std::vector<std::string>& strList) {
   Array jsList = Array::New(env, strList.size());
-  for (auto i = 0u; i < strList.size(); ++i) {
+  for (size_t i{}; i < strList.size(); ++i) {
     jsList.Set(i, String::New(env, strList[i]));
   }
   return jsList;
@@ -42,7 +30,6 @@ Array wrap(Env& env, const std::vector<std::string>& strList) {
 
 Object wrap(Env& env, const XorSource& xorSource) {
   Object jsObj = Object::New(env);
-  //jsObj.Set("usedSources", wrap(env, xorSource.usedSources));
   jsObj.Set("primaryNameSrcList", wrap(env, xorSource.primaryNameSrcList));
   jsObj.Set("ncList", wrap(env, xorSource.ncList));
   return jsObj;
@@ -89,6 +76,16 @@ Napi::Object wrap(Napi::Env& env, const CandidateStats& cs) {
   return jsObj;
 };
 
+// unordered_set<std::string>
+Array wrap(Env& env, const filter_result_t& filter_result) {
+  Array jsList = Array::New(env, filter_result.size());
+  int i{};
+  for (const auto& combo : filter_result) {
+    jsList.Set(i++, String::New(env, combo));
+  }
+  return jsList;
+}
+
 #if 0
 Object wrap(Env& env, const SourceData& source) {
   Object jsObj = Object::New(env);
@@ -102,7 +99,7 @@ Object wrap(Env& env, const SourceData& source) {
 
 Array wrap(Env& env, const SourceList& sourceList) {
   Array jsList = Array::New(env, sourceList.size());
-  for (auto i = 0u; i < sourceList.size(); ++i) {
+  for (size_t i{}; i < sourceList.size(); ++i) {
     jsList.Set(i, wrap(env, sourceList[i]));
   }
   return jsList;
@@ -135,7 +132,7 @@ Object wrapMergedSource(Env& env, const SourceCRefList& sourceCRefList) {
 
 Array wrap(Env& env, const MergedSourcesList& mergedSourcesList) {
   Array jsList = Array::New(env, mergedSourcesList.size());
-  for (auto i = 0u; i < mergedSourcesList.size(); ++i) {
+  for (size_t i{}; i < mergedSourcesList.size(); ++i) {
     jsList.Set(i, wrapMergedSource(env, mergedSourcesList[i].sourceCRefList));
   }
   return jsList;

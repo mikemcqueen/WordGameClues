@@ -551,7 +551,7 @@ Value getCandidateStatsForSum(const CallbackInfo& info) {
 Value filterCandidatesForSum(const CallbackInfo& info) {
   Env env = info.Env();
   if (!info[0].IsNumber() || !info[1].IsNumber() || !info[2].IsNumber()
-      || !info[3].IsNumber() || !info[3].IsNumber()) {
+      || !info[3].IsNumber() || !info[4].IsNumber()) {
     Napi::TypeError::New(env, "fitlerCandidatesForSum: non-number parameter")
       .ThrowAsJavaScriptException();
     return env.Null();
@@ -571,8 +571,8 @@ Value filterCandidatesForSum(const CallbackInfo& info) {
 //
 Value getResult(const CallbackInfo& info) {
   Env env = info.Env();
-  cm::get_filter_results();
-  return env.Null();
+  auto result = cm::get_filter_result();
+  return cm::wrap(env, result);
 }
 
 //

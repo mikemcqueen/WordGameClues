@@ -506,12 +506,14 @@ export const makeCombos = (args: any): any => {
                 let max = args.max;
                 args.max = Math.min(args.max, args.sum);
                 // TODO: return # of combos filtered due to note name match
-                const comboList = makeCombosForSum(sum, args.max, args);
+                /*const comboList = */makeCombosForSum(sum, args.max, args);
                 args.max = max;
-                total += comboList.length;
-                const filterResult = ClueManager.filter(comboList, sum, totals);
+                //total += comboList.length;
+                //ClueManager.filter(comboList, sum, totals);
             }
-            NativeComboMaker.getResult();
+            const comboList = NativeComboMaker.getResult();
+            total += comboList.length;
+            ClueManager.filter(comboList, 0, totals);
         }
         let d = new Duration(begin, new Date()).milliseconds;
         if (!args.verbose) console.error('');

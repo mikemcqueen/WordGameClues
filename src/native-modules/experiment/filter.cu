@@ -327,12 +327,10 @@ private:
   static const auto max_chunks = 20ul;
 
 public:
-  static void init(
-    std::vector<KernelData>& kernelVec, size_t num_src_lists, size_t stride) {
-    stride = std::min(num_src_lists, stride);
+  static void init(std::vector<KernelData>& kernelVec, size_t stride) {
     for (size_t i{}; i < kernelVec.size(); ++i) {
       auto& kernel = kernelVec.at(i);
-      kernel.num_src_lists = num_src_lists;
+      //kernel.num_src_lists = num_src_lists;
       kernel.num_list_indices = stride;
       if (i >= streams.size()) {
         cudaStream_t stream;
@@ -449,7 +447,7 @@ public:
               << std::endl;
   }
 
-  int num_src_lists;  // total # of sourcelists (== # of device_results)
+  //  int num_src_lists;  // total # of sourcelists (== # of device_results)
                       // TODO: doesn't belong here
   int num_list_indices;
   int stream_idx{-1};
@@ -580,14 +578,13 @@ void run_xor_kernel(KernelData& kernel, int threads_per_block,
 #endif
 }
 
-auto copy_device_results(
-  result_t* device_results, int num_results, cudaStream_t stream) {
+void copy_device_results(std::vector<result_t>& results,
+  result_t* device_results, cudaStream_t stream) {
   //
   cudaError_t err = cudaStreamSynchronize(stream);
   assert((err == cudaSuccess) && "sychronize");
 
-  std::vector<result_t> results(num_results);
-  auto results_bytes = num_results * sizeof(result_t);
+  auto results_bytes = results.size() * sizeof(result_t);
   err = cudaMemcpyAsync(results.data(), device_results, results_bytes,
     cudaMemcpyDeviceToHost, stream);
   if (err != cudaSuccess) {
@@ -596,14 +593,15 @@ auto copy_device_results(
   }
   err = cudaStreamSynchronize(stream);
   assert((err == cudaSuccess) && "cudaStreamSynchronize");
-  return results;
 }
 
 // TODO: kernel.get_results()? just to call out to free function?  maybe
+/*
 auto getKernelResults(KernelData& kernel, result_t* device_results) {
   return copy_device_results(
     device_results, kernel.num_src_lists, kernel.stream);
 }
+*/
 
 auto count(const SourceCompatibilityLists& sources) {
   size_t num{};
@@ -725,7 +723,8 @@ void dump_xor(int index) {
 
 int run_filter_task(std::vector<KernelData>& kernels, int threads_per_block,
   IndexStates& idx_states, const SourceCompatibilityData* device_sources,
-  result_t* device_results, const index_t* device_list_start_indices) {
+  result_t* device_results, const index_t* device_list_start_indices,
+  std::vector<result_t>& results) {
   //
   using namespace std::chrono;
   int total_compat{};
@@ -744,15 +743,14 @@ int run_filter_task(std::vector<KernelData>& kernels, int threads_per_block,
                 << std::endl;
 #endif
       kernel.allocCopy(idx_states);
-      run_xor_kernel(kernel, threads_per_block, device_sources, device_results,
-        device_list_start_indices);
+      run_xor_kernel(kernel, threads_per_block, device_sources,
+        device_results, device_list_start_indices);
       continue;
     }
 
     kernel.has_run = true;
     kernel.is_running = false;
-
-    auto results = getKernelResults(kernel, device_results);
+    copy_device_results(results, device_results, kernel.stream);
     auto k1 = high_resolution_clock::now();
     auto d_kernel = duration_cast<milliseconds>(k1 - kernel.start_time).count();
 
@@ -773,58 +771,65 @@ int run_filter_task(std::vector<KernelData>& kernels, int threads_per_block,
   return total_compat;
 }
 
-int filter_task(
+std::unordered_set<std::string> get_compat_combos(
+  const std::vector<result_t>& results,
+  const OneSumCandidateData& candidate_data) {
+  //
+  std::unordered_set<std::string> compat_combos{};
+  int flat_index{};
+  for (size_t i{}; i < candidate_data.sourceCompatLists.size(); ++i) {
+    const auto& src_list = candidate_data.sourceCompatLists.at(i);
+    if (results.at(i)) {
+      const auto& combos = candidate_data.indexComboListMap.at(i);
+      compat_combos.insert(combos.begin(), combos.end());
+    }
+  }
+  return compat_combos;
+}
+
+std::unordered_set<std::string> filter_task(
   int sum, int threads_per_block, int num_streams, int stride, int iters) {
   //
+  num_streams = num_streams ? num_streams : 3;
+  stride = stride ? stride : 1024;
+  iters = iters ? iters : 1;
+
   using namespace std::chrono;
   [[maybe_unused]] cudaError_t err = cudaSuccess;
   err = cudaDeviceSetLimit(cudaLimitPrintfFifoSize, 7'500'000);
 
-  const auto& sources =
-    allSumsCandidateData.find(sum)->second.sourceCompatLists;
-  auto device_sources = allocCopySources(sources);
-  IndexStates idx_states{sources};
+  const auto& candidate_data = allSumsCandidateData.find(sum)->second;
+  const auto& src_lists = candidate_data.sourceCompatLists;
+  auto device_sources = allocCopySources(src_lists);
+  IndexStates idx_states{src_lists};
   auto device_list_start_indices = allocCopyListStartIndices(idx_states);
+  auto device_results = allocResults(src_lists.size());
 
-  if (!num_streams)
-    num_streams = 1;
   std::vector<KernelData> kernels(num_streams);
-  stride = stride ? stride : 1024;
-  KernelData::init(kernels, sources.size(), stride);
+  stride = std::min((int)src_lists.size(), stride);
+  KernelData::init(kernels, stride);
 
 #if 0
-  std::cerr << "sourcelists: " << sources.size() << ", streams: " << num_streams
+  std::cerr << "sourcelists: " << src_lists.size() << ", streams: " << num_streams
             << ", stride: " << stride << std::endl;
 #endif
-
-  auto device_results = allocResults(sources.size());
-
-  if (!iters)
-    iters = 1;
+  std::vector<result_t> results(src_lists.size());
   for(int i{}; i < iters; ++i) {
     KernelData::reset(kernels);
     idx_states.reset();
-    zeroResults(device_results, sources.size(), cudaStreamPerThread);
-
-#if 0
-    auto results =
-      copy_device_results(device_results, sources.size(), cudaStreamPerThread);
-    auto num_compat_results = std::accumulate(results.begin(), results.end(), 0,
-      [](int sum, result_t r) { return r ? sum + 1 : sum; });
-    std::cerr << " START"
-              << " compat results: " << num_compat_results << std::endl;
-#endif
-
+    zeroResults(device_results, src_lists.size(), cudaStreamPerThread);
     auto t0 = high_resolution_clock::now();
+
     auto total_compat = run_filter_task(kernels, threads_per_block, idx_states,
-      device_sources, device_results, device_list_start_indices);
+      device_sources, device_results, device_list_start_indices, results);
+
     auto t1 = high_resolution_clock::now();
     auto d_total = duration_cast<milliseconds>(t1 - t0).count();
     std::cerr << "sum(" << sum << ")";
     if (iters > 1) {
       std::cerr << " iter: " << i;
     }
-    std::cerr << " total compat: " << total_compat << " of " << sources.size()
+    std::cerr << " total compat: " << total_compat << " of " << src_lists.size()
               << " - " << d_total << "ms" << std::endl;
   }
 
@@ -836,12 +841,12 @@ int filter_task(
     throw std::runtime_error("failed to free device sources");
   }
 #endif
-  return 0;
+  return get_compat_combos(results, candidate_data);
 }
 
-static std::vector<std::future<int>> filter_futures_;
+static std::vector<std::future<filter_result_t>> filter_futures_;
 
-void add_filter_future(std::future<int>&& filter_future) {
+void add_filter_future(std::future<filter_result_t>&& filter_future) {
   filter_futures_.emplace_back(std::move(filter_future));
 }
 
@@ -849,12 +854,25 @@ void add_filter_future(std::future<int>&& filter_future) {
 
 namespace cm {
 
-int get_filter_results() {
+filter_result_t get_filter_result() {
+  filter_result_t unique_combos;
+  std::string results{"results: "};
+  int total{-1};
   for (auto& fut : filter_futures_) {
-    if (fut.valid())
-      fut.get();
+    assert(fut.valid());
+    auto combos = fut.get();
+    if (total > -1) {
+      results.append(", ");
+    } else {
+      total = 0;
+    }
+    results.append(std::to_string(combos.size()));
+    total += combos.size();
+    unique_combos.insert(combos.begin(), combos.end());
   }
-  return 0;
+  std::cerr << results << ", total: " << total
+            << ", unique: " << unique_combos.size() << std::endl;
+  return unique_combos;
 }
 
 void filterCandidatesCuda(

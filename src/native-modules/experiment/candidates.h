@@ -38,7 +38,8 @@ namespace cm {
   void filterCandidatesCuda(
     int sum, int threads_per_block, int streams, int stride, int iters);
 
-  int get_filter_results();
+  using filter_result_t = std::unordered_set<std::string>;
+  filter_result_t get_filter_result();
 
   //
 
