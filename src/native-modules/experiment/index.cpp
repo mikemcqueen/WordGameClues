@@ -481,7 +481,15 @@ Value setOrArgDataList(const CallbackInfo& info) {
         .ThrowAsJavaScriptException();
       return env.Null();
   }
-  cm::PCD.orArgDataList = makeOrArgDataList(env, info[0].As<Array>());
+  cm::PCD.orArgDataList = std::move(makeOrArgDataList(env, info[0].As<Array>()));
+  #if 0
+  for (const auto& or_arg : cm::PCD.orArgDataList) {
+    for (size_t i{}; i < or_arg.orSourceList.size(); ++i) {
+      std::cerr << "-----or_source[" << i << "]-----" << std::endl;
+      or_arg.orSourceList.at(i).dump();
+    }
+  }
+  #endif
   return env.Null();
 }
 
@@ -490,6 +498,7 @@ Value setOrArgDataList(const CallbackInfo& info) {
 //
 Value getIsAnyPerfData(const CallbackInfo& info) {
   Env env = info.Env();
+  std::cerr << "or_incompat: " << cm::isany_perf.or_incompat << std::endl;
   return cm::wrap(env, cm::isany_perf);
 }
 

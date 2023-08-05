@@ -5,7 +5,7 @@
 
 namespace cm {
 
-  PreComputedData PCD;
+PreComputedData PCD;
 
 namespace {
 
@@ -13,12 +13,22 @@ auto isSourceORCompatibleWithAnyOrSource(const SourceCompatibilityData& compatDa
   const OrSourceList& orSourceList)
 {
     auto compatible = false;
+    int i{-1};
     for (const auto& orSource : orSourceList) {
+      i++;
       // skip any sources that were already determined to be XOR incompatible
       // or AND compatible with --xor sources.
-      if (!orSource.xorCompatible || orSource.andCompatible) continue;
+      if (!orSource.xorCompatible || orSource.andCompatible) {
+        continue;
+      }
       compatible = compatData.isOrCompatibleWith(orSource.source);
-      if (compatible) break;
+      if (compatible) {
+        #if 0
+        std::cerr << "*****compatible or_source[" << i << "]*****" << std::endl;
+        orSource.dump();
+        #endif
+        break;
+      }
     }
     return compatible;
 };
@@ -194,6 +204,7 @@ bool isAnySourceCompatibleWithUseSources(
     compatible = isSourceCompatibleWithEveryOrArg(src,
       PCD.orArgDataList);
     if (compatible) break;
+    isany_perf.or_incompat++;
   }
   ++global_isany_call_counter;
   return compatible;

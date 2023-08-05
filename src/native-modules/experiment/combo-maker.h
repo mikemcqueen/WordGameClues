@@ -134,7 +134,7 @@ struct UsedSources {
     return result;
   }
 
-    void dump() const {
+  void dump() const {
     auto first{true};
     std::cerr << "sources:";
     for (auto s{1}; s <= kNumSentences; ++s) {
@@ -323,7 +323,7 @@ struct SourceCompatibilityData {
     if (!any) std::cerr << " none";
     std::cerr << std::endl;
   }
-};
+}; // struct SourceCompatibilityData
 
 struct NameCount;
 using NameCountList = std::vector<NameCount>;
@@ -378,6 +378,12 @@ using XorSource = SourceData;
 using XorSourceList = std::vector<XorSource>;
 
 struct OrSourceData {
+  void dump() const {
+    std::cerr << "xorCompatible: " << std::boolalpha <<  xorCompatible << std::endl;
+    std::cerr << "andCompatible: " << std::boolalpha <<  andCompatible << std::endl;
+    source.dump();
+  }
+
   SourceData source;
   bool xorCompatible = false;
   bool andCompatible = false;
@@ -518,6 +524,7 @@ struct PerfData {
   int ss_attempt;  // # of short-circuit attempts
   int ss_fail;     // # of short-circute failures; # of successes = ss_attempt - ss_fail
   int full;        // # of full range calls; eventually this should = calls - ss_attempt
+  int or_incompat;
 };
 
 inline PerfData isany_perf{};
