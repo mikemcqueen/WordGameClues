@@ -1,5 +1,5 @@
 #include <algorithm>
-//#include <format>
+#include <cstdio>
 #include <iostream>
 #include "combo-maker.h"
 
@@ -204,6 +204,12 @@ bool isAnySourceCompatibleWithUseSources(
     if (!isany_perf.or_incompat) {
       std::cerr << "-----incompatible with orArgs-----" << std::endl;
       src.dump();
+      const auto& or_src = PCD.orArgDataList[0].orSourceList[0].source;
+      std::cerr << "-----orArg-----" << std::endl;
+      or_src.dump();
+      bool xor_compat = src.isXorCompatibleWith(or_src);
+      bool and_compat = src.isAndCompatibleWith(or_src);
+      fprintf(stderr, "xor: %d, and: %d\n", xor_compat, and_compat);
     }
 
     isany_perf.or_incompat++;

@@ -84,7 +84,7 @@ struct UsedSources {
 
   auto isXorCompatibleWith(const UsedSources& other) const {
     // compare bits
-    if ((getBits() & other.getBits()).any()) return false;
+    if (getBits().any() && (getBits() & other.getBits()).any()) return false;
 
     // compare variations
     for (auto i = 0u; i < variations.size(); ++i) {
@@ -97,6 +97,23 @@ struct UsedSources {
     return true;
   }
  
+  // TODO: duplicating variation check with Or compatibility check
+  auto isAndCompatibleWith(const UsedSources& other) const {
+    if (getBits().any() && ((getBits() & other.getBits()) != getBits())) {
+        return false;
+    }
+
+    // compare variations
+    for (auto i = 0u; i < variations.size(); ++i) {
+      if ((variations[i] > -1) && (other.variations[i] > -1)
+          && (variations[i] != other.variations[i]))
+      {
+        return false;
+      }
+    }
+    return true;
+  }
+
   void addSource(int src) {
     auto sentence = Source::getSentence(src);
     auto variation = Source::getVariation(src);
@@ -258,7 +275,7 @@ struct SourceCompatibilityData {
   }
 
   auto isXorCompatibleWith(const SourceCompatibilityData& other) const {
-    if ((sourceBits & other.sourceBits).any()) {
+    if (sourceBits.any() && (sourceBits & other.sourceBits).any()) {
       return false;
     }
 #if !USEDSOURCES_BITSET
@@ -269,13 +286,10 @@ struct SourceCompatibilityData {
   }
 
   auto isAndCompatibleWith(const SourceCompatibilityData& other) const {
-    auto andBits = sourceBits & other.sourceBits;
-    if (andBits != other.sourceBits) return false;
-#if !USEDSOURCES_BITSET
-    return areUsedSourcesAndCompatible(usedSources, other.usedSources);
-#else
-    return false; // TODO: usedSources.isAndCompatibleWith(other.usedSources);
-#endif
+    if (sourceBits.any() && ((sourceBits & other.sourceBits) != sourceBits)) {
+      return false;
+    }
+    return usedSources.isAndCompatibleWith(other.usedSources);
   }
 
   // OR == XOR || AND

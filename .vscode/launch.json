@@ -60,11 +60,12 @@
             "name": "Debug cm xor.req",
             "program": "/usr/local/bin/node",
             "cwd": "${workspaceFolder}/src/tools",
-            "args": [ "clues.js", "-pf.71", "-c2,15", "-x2",
+            "args": [ "clues.js", "-pf.71", "-c2,2", "-x2",
 //                "--xor", "us 50",
                 "--xor", "koa",
                 "--xor", "21",
                 "--xor", "currant",
+                "--or", "hobbit"
                 "-v"
             ]
         }
