@@ -109,7 +109,7 @@ private:
 
 public:
   constexpr static auto allVariationsMatch(
-    const Variations& v1, const Variations& v2, bool /*native*/ = true) {
+    const Variations& v1, const Variations& v2) {
     for (size_t i{}; i < v1.size(); ++i) {
       if ((v1[i] > -1) && (v2[i] > -1) && (v1[i] != v2[i])) {
         return false;
@@ -119,7 +119,7 @@ public:
   }
 
   constexpr static bool allVariationsMatch2(
-    const Variations& v1, const Variations& v2, bool /*native*/ = true) {
+    const Variations& v1, const Variations& v2) {
     int mismatches{};
     for (auto i{ 0u }; i < v1.size(); ++i) {
       auto first = v1[i] + 1;
@@ -129,13 +129,12 @@ public:
     return !mismatches;
   }
 
-  constexpr auto isXorCompatibleWith(const UsedSources& other,
-    bool native = true, int* /*reason*/ = nullptr) const {
+  constexpr auto isXorCompatibleWith(const UsedSources& other) const {
     // compare bits
     if (getBits().intersects(other.getBits()))
       return false;
     // compare variations
-    if (!allVariationsMatch(variations, other.variations, native))
+    if (!allVariationsMatch(variations, other.variations))
       return false;
     return true;
   }
@@ -176,7 +175,7 @@ public:
 
 #ifdef __CUDA_ARCH__
   constexpr auto isXorCompatibleWith(
-    const UsedSources& other, uint32_t* other_src_bits) {
+    const UsedSources& other, uint32_t* other_src_bits) const {
     // compare bits (gpu shared memory)
     if (getBits().shared_intersects(other_src_bits)) {
       return false;
@@ -281,18 +280,17 @@ struct SourceCompatibilityData {
         usedSources(std::move(usedSources)) {
   }
 
-  constexpr auto isXorCompatibleWith(const SourceCompatibilityData& other,
-    bool useBits = true, int* reason = nullptr) const {
+  constexpr auto isXorCompatibleWith(
+    const SourceCompatibilityData& other) const {
     if (legacySourceBits.intersects(other.legacySourceBits)) {
       return false;
     }
-    return usedSources.isXorCompatibleWith(other.usedSources, useBits, reason);
+    return usedSources.isXorCompatibleWith(other.usedSources);
   }
 
 #ifdef __CUDA_ARCH__
   constexpr auto isXorCompatibleWith(const SourceCompatibilityData& other,
-    uint32_t* other_src_bits, uint32_t* other_legacy_src_bits)
-  {
+    uint32_t* other_src_bits, uint32_t* other_legacy_src_bits) const {
     if (legacySourceBits.shared_intersects(other_legacy_src_bits)) {
       return false;
     }
@@ -309,11 +307,9 @@ struct SourceCompatibilityData {
   }
 
   // OR == XOR || AND
-  constexpr auto isOrCompatibleWith(const SourceCompatibilityData& other,
-    bool useBits = true) const
-  {
-    return isXorCompatibleWith(other, useBits)
-      || isAndCompatibleWith(other, useBits);
+  constexpr auto isOrCompatibleWith(
+    const SourceCompatibilityData& other) const {
+    return isXorCompatibleWith(other) || isAndCompatibleWith(other);
   }
 
   void addSource(int src) {
@@ -362,7 +358,7 @@ struct SourceCompatibilityData {
 
   LegacySourceBits legacySourceBits;
   UsedSources usedSources;
-}; // SourceCompatibilityData
+  };  // SourceCompatibilityData
 using SourceCompatibilityList = std::vector<SourceCompatibilityData>;
 
 struct NameCount;

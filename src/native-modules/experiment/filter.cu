@@ -18,6 +18,14 @@ namespace {
 
 using namespace cm;
 
+template <typename T> __device__ __forceinline__ T load(const T* addr) {
+  return *(const volatile T*)addr;
+}
+
+template <typename T> __device__ __forceinline__ void store(T* addr, T val) {
+  *(volatile T*)addr = val;
+}
+
 __device__ auto isSourceORCompatibleWithAnyOrSource(
   const SourceCompatibilityData& source, const OrSourceData* or_sources,
   unsigned num_or_sources) {
@@ -37,6 +45,8 @@ __device__ auto isSourceORCompatibleWithAnyOrSource(
   return compatible;
 };
 
+__device__ bool first = true;
+
 __device__ auto isSourceCompatibleWithEveryOrArg(
   const SourceCompatibilityData& source, const device::OrArgData* or_args,
   unsigned num_or_args) {
@@ -47,23 +57,27 @@ __device__ auto isSourceCompatibleWithEveryOrArg(
     // been determined in Precompute phase @ markAllANDCompatibleOrSources()
     // and skip the XOR check as well in this case.
     const auto& or_arg = or_args[i];
+    //if (is_first) printf(" orSources[%d]: %d\n", i, or_arg.num_or_sources);
     compatible = isSourceORCompatibleWithAnyOrSource(
       source, or_arg.or_sources, or_arg.num_or_sources);
-    if (!compatible)
+    if (!compatible) {
+      if (load(&first)) {
+        printf("or-incompatible!\n");
+        store(&first, false);
+      }
       break;
+    }
   }
   return compatible;
 }
 
 __device__ __host__ auto isSourceXORCompatibleWithAnyXorSource(
   const SourceCompatibilityData& source, const XorSource* xorSources,
-  size_t numXorSources, int* compat_index = nullptr, int* reason = nullptr) {
+  size_t numXorSources) {
   bool compatible = true;
   for (size_t i{}; i < numXorSources; ++i) {
-    compatible = source.isXorCompatibleWith(xorSources[i], false, reason);
+    compatible = source.isXorCompatibleWith(xorSources[i]);
     if (compatible) {
-      if (compat_index)
-        *compat_index = i;
       break;
     }
   }
@@ -87,14 +101,6 @@ struct SourceIndex {
   }
 };
 
-template <typename T> __device__ __forceinline__ T load(const T* addr) {
-  return *(const volatile T*)addr;
-}
-
-template <typename T> __device__ __forceinline__ void store(T* addr, T val) {
-  *(volatile T*)addr = val;
-}
-
 //__device__ int xor_compat[1024]; // # of blocks
 
 // one block per source
@@ -107,8 +113,8 @@ __global__ void xor_kernel_new(
   const index_t* __restrict__ list_start_indices, result_t* results,
   int stream_idx) {
   //
-  __shared__ bool shrd_xor_compat;
-  auto& is_xor_compat = shrd_xor_compat; // xor_compat[blockIdx.x];
+  __shared__ bool is_xor_compat;
+  __shared__ bool is_or_compat;
   // for each source (one block per source)
   for (unsigned idx{blockIdx.x}; idx < num_sources; idx += gridDim.x) {
     const auto src_idx = source_indices[idx];
@@ -136,12 +142,20 @@ __global__ void xor_kernel_new(
       if (!load(&is_xor_compat)) {
         continue;
       }
-      if (isSourceCompatibleWithEveryOrArg(source, or_args, num_or_args)) {
-        if (!threadIdx.x) {
-          store(&result, (result_t)1);
+      // TODO: this is dumb running it on thread 0. should chunk it.
+      if (!threadIdx.x) {
+        if (isSourceCompatibleWithEveryOrArg(source, or_args, num_or_args)) {
+          store(&is_or_compat, true);
         }
-        break;
       }
+      __syncthreads();
+      if (!load(&is_or_compat)) {
+        continue;
+      }
+      if (!threadIdx.x) {
+        store(&result, (result_t)1);
+      }
+      break;
     }
   }
 }
@@ -688,11 +702,11 @@ void check(
       flat_index(sources, src_idx));
     auto& source = sources.at(list_index).at(index);
     source.dump(buf);
-    int compat_index{-1};
-    auto compat = isSourceXORCompatibleWithAnyXorSource(source,
-      PCD.xorSourceList.data(), PCD.xorSourceList.size(), &compat_index);
-    std::cerr << "compat: " << compat << " (" << compat_index << ")"
-              << std::endl;
+    //int compat_index{-1};
+    auto compat = isSourceXORCompatibleWithAnyXorSource(
+      source, PCD.xorSourceList.data(), PCD.xorSourceList.size());
+    std::cerr << "compat: " << compat
+              << std::endl;  //<< " (" << compat_index << ")"
   }
 }
 
