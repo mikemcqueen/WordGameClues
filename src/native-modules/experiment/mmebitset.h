@@ -94,19 +94,22 @@ public:
 
   // test "XOR compatibility" without constructing new object
   constexpr bool intersects(const bitset<size> &a) const {
-    for (int i=0; i<wc(); i++) {
-      if (bits[i] & a.bits[i]) return true;
+    for (int i{}; i < wc(); i++) {
+      if (bits[i] & a.bits[i]) {
+        return true;
+      }
     }
     return false;
   }
 
   // test "AND compatibility" without constructing new object
   constexpr bool is_subset_of(const bitset<size>& a) const {
-    for (int i=0; i<wc(); i++) {
-      if ((bits[i] & a.bits[i]) == bits[i])
-        return true;
+    for (int i{}; i < wc(); i++) {
+      if (bits[i] && ((bits[i] & a.bits[i]) != bits[i])) {
+        return false;
+      }
     }
-    return false;
+    return true;
   }
 
 #ifdef __CUDA_ARCH__

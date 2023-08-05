@@ -45,8 +45,6 @@ __device__ auto isSourceORCompatibleWithAnyOrSource(
   return compatible;
 };
 
-__device__ bool first = true;
-
 __device__ auto isSourceCompatibleWithEveryOrArg(
   const SourceCompatibilityData& source, const device::OrArgData* or_args,
   unsigned num_or_args) {
@@ -57,14 +55,9 @@ __device__ auto isSourceCompatibleWithEveryOrArg(
     // been determined in Precompute phase @ markAllANDCompatibleOrSources()
     // and skip the XOR check as well in this case.
     const auto& or_arg = or_args[i];
-    //if (is_first) printf(" orSources[%d]: %d\n", i, or_arg.num_or_sources);
     compatible = isSourceORCompatibleWithAnyOrSource(
       source, or_arg.or_sources, or_arg.num_or_sources);
     if (!compatible) {
-      if (load(&first)) {
-        printf("or-incompatible!\n");
-        store(&first, false);
-      }
       break;
     }
   }
@@ -101,7 +94,23 @@ struct SourceIndex {
   }
 };
 
-//__device__ int xor_compat[1024]; // # of blocks
+__device__ bool first = true;
+
+__device__ void check_source(
+  const SourceCompatibilityData& source, const device::OrArgData* or_args) {
+  //
+  if (source.usedSources.hasVariation(3)
+      && (source.usedSources.getVariation(3) == 0)
+      && source.usedSources.getBits().test(UsedSources::getFirstBitIndex(3))
+      && source.legacySourceBits.test(1)) {
+    printf("---match---\n");
+    source.dump(nullptr, true);
+    const auto& or_src = or_args[0].or_sources[0].source;
+    bool xor_compat = source.isXorCompatibleWith(or_src);
+    bool and_compat = source.isAndCompatibleWith(or_src);
+    printf("xor: %d, and: %d\n", xor_compat, and_compat);
+  }
+}
 
 // one block per source
 __global__ void xor_kernel_new(
@@ -126,6 +135,7 @@ __global__ void xor_kernel_new(
     __syncthreads();
     if (!threadIdx.x) {
       store(&is_xor_compat, false);
+      store(&is_or_compat, false);
     }
     // for each xor_source (one thread per xor_source)
     for (unsigned xor_chunk{}; xor_chunk * blockDim.x < num_xor_sources;
@@ -139,9 +149,12 @@ __global__ void xor_kernel_new(
         }
       }
       __syncthreads();
+      // if source is not XOR compatible with any --xor sources
       if (!load(&is_xor_compat)) {
         continue;
       }
+      // source is XOR compatible with an --xor source. now check --or arg
+      // compatibility
       // TODO: this is dumb running it on thread 0. should chunk it.
       if (!threadIdx.x) {
         if (isSourceCompatibleWithEveryOrArg(source, or_args, num_or_args)) {
@@ -149,10 +162,16 @@ __global__ void xor_kernel_new(
         }
       }
       __syncthreads();
+      // if source is not OR compatible with any source of every --or arg
       if (!load(&is_or_compat)) {
+        if (!threadIdx.x) {
+          // reset is_xor_compat. sync will happen at loop entrance.
+          store(&is_xor_compat, false);
+        }
         continue;
       }
       if (!threadIdx.x) {
+        check_source(source, or_args);
         store(&result, (result_t)1);
       }
       break;

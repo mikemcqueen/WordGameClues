@@ -67,7 +67,7 @@ struct UsedSources {
   using SourceBits = bitset<kMaxSourcesPerSentence * kNumSentences>;
   using Variations = std::array<VariationIndex_t, kNumSentences>;
 
-  static auto getFirstBitIndex(int sentence) {
+  constexpr static auto getFirstBitIndex(int sentence) {
     assert(sentence > 0);
     return (sentence - 1) * kMaxSourcesPerSentence;
   }
@@ -163,7 +163,7 @@ public:
   // bitset function, (and a variations check), rather than
   // calling two separate Xor/And functions here.
 
-  auto isAndCompatibleWith(
+  constexpr auto isAndCompatibleWith(
     const UsedSources& other, bool /*useBits*/ = true) const {
     if (!getBits().is_subset_of(other.getBits()))
       return false;
@@ -241,8 +241,49 @@ public:
     if (!smolbuf) smolbuf = smol_buf;
     *buf = 0;
     *smolbuf = 0;
+    auto first{true};
     if (device) {
-      printf("%s", buf);
+      printf("sources:");
+    } else {
+      std::cerr << "sources:";
+    }
+    for (auto s{1}; s <= kNumSentences; ++s) {
+      if (getVariation(s) > -1) {
+        if (first) {
+          if (device) {
+            printf("\n");
+          } else {
+            std::cerr << std::endl;
+          }
+          first = false;
+        }
+        if (device) {
+          printf("  s%d v%d:", s, getVariation(s));
+        } else {
+          std::cerr << "  s" << s << " v" << getVariation(s) << ":";
+        }
+        for (int i{}; i < kMaxSourcesPerSentence; ++i) {
+          if (bits.test((s - 1) * kMaxSourcesPerSentence + i)) {
+            if (device) {
+              printf(" %d", i);
+            } else {
+              std::cerr << " " << i;
+            }
+          }
+        }
+        if (device) {
+            printf("\n");
+        } else {
+          std::cerr << std::endl;
+        }
+      }
+    }
+    if (first) {
+      if (device) {
+        printf(" none\n");
+      } else {
+        std::cerr << " none" << std::endl;
+      }
     }
   }
 
@@ -298,9 +339,8 @@ struct SourceCompatibilityData {
   }
 #endif
 
-  auto isAndCompatibleWith(const SourceCompatibilityData& other,
-    bool /*useBits*/ = true) const
-  {
+  constexpr auto isAndCompatibleWith(
+    const SourceCompatibilityData& other) const {
     if (!legacySourceBits.is_subset_of(other.legacySourceBits))
       return false;
     return usedSources.isAndCompatibleWith(other.usedSources);
@@ -344,9 +384,32 @@ struct SourceCompatibilityData {
         std::cerr << header << std::endl;
       }
     }
-    usedSources.dump();
+    usedSources.dump(device);
     if (device) {
-      printf("%s\n", buf);
+      printf("legacy sources:");
+    } else {
+      std::cerr << "legacy sources:";
+    }
+    auto any{false};
+    for (int i{}; i < kMaxLegacySources; ++i) {
+      if (legacySourceBits.test(i)) {
+        if (device) {
+          printf(" %d", i);
+        } else {
+          std::cerr << " " << i;
+        }
+        any = true;
+      }
+    }
+    if (!any) {
+      if (device) {
+        printf(" none");
+      } else {
+        std::cerr << " none";
+      }
+    }
+    if (device) {
+      printf("\n");
     } else {
       std::cerr << std::endl;
     }
