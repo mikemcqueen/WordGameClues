@@ -23,10 +23,6 @@ auto isSourceORCompatibleWithAnyOrSource(const SourceCompatibilityData& compatDa
       }
       compatible = compatData.isOrCompatibleWith(orSource.source);
       if (compatible) {
-        #if 0
-        std::cerr << "*****compatible or_source[" << i << "]*****" << std::endl;
-        orSource.dump();
-        #endif
         break;
       }
     }
@@ -204,6 +200,12 @@ bool isAnySourceCompatibleWithUseSources(
     compatible = isSourceCompatibleWithEveryOrArg(src,
       PCD.orArgDataList);
     if (compatible) break;
+
+    if (!isany_perf.or_incompat) {
+      std::cerr << "-----incompatible with orArgs-----" << std::endl;
+      src.dump();
+    }
+
     isany_perf.or_incompat++;
   }
   ++global_isany_call_counter;
