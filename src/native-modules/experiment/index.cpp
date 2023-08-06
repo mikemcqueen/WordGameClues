@@ -498,7 +498,9 @@ Value setOrArgs(const CallbackInfo& info) {
 
   auto t0 = high_resolution_clock::now();
 
-  cm::PCD.device_or_args = cm::cuda_allocCopyOrArgs(cm::PCD.orArgList);
+  auto sources_count_pair = cm::cuda_allocCopyOrSources(cm::PCD.orArgList);
+  cm::PCD.device_or_sources = sources_count_pair.first;
+  cm::PCD.num_or_sources = sources_count_pair.second;
 
   auto t1 = high_resolution_clock::now();
   auto d_t = duration_cast<milliseconds>(t1 - t0).count();

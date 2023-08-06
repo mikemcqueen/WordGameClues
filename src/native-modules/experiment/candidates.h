@@ -3,6 +3,7 @@
 
 #include <future>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 #include "combo-maker.h"
 
@@ -26,8 +27,8 @@ namespace cm {
   [[nodiscard]] SourceCompatibilityData* cuda_allocCopyXorSources(
     const XorSourceList& xorSourceList);
 
-  [[nodiscard]] device::OrArgData* cuda_allocCopyOrArgs(
-    const OrArgList& orArgList);
+  [[nodiscard]] std::pair<device::OrSourceData*, unsigned>
+  cuda_allocCopyOrSources(const OrArgList& orArgList);
 
   [[nodiscard]] auto cuda_allocCopySentenceVariationIndices(
     const SentenceVariationIndices& sentenceVariationIndices)

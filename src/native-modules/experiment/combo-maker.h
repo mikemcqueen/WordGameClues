@@ -129,46 +129,23 @@ public:
     return !mismatches;
   }
 
-  constexpr auto isXorCompatibleWith(const UsedSources& other) const {
+  constexpr auto isXorCompatibleWith(
+    const UsedSources& other, bool check_variations = true) const {
     // compare bits
     if (getBits().intersects(other.getBits()))
       return false;
     // compare variations
-    if (!allVariationsMatch(variations, other.variations))
+    if (check_variations && !allVariationsMatch(variations, other.variations))
       return false;
     return true;
   }
 
-  // there is a potential optimization here, in the case where we
-  // are checking OR compatibility. we may have failed due to XOR
-  // compatibilty of variations failed, and here we are, potentially
-  // checking variations again. we should only check variations
-  // once in such a condition.
-  // Logically, something like:
-  //
-  // if (allVariationsMatch(a,b)) {
-  //   if (a.isXorCompatibleWith(b, NoVariationCheck)
-  //       a.isAndCompatibleWith(b, NoVariationCheck)) {
-  //     return true;
-  //   }
-  // }
-  // return false;
-  //
-  // Another optimizatoin is that rather than testing Xor + And
-  // separately, we have new bitset function something like
-  // "is_disjoint_from_or_subset_of()" which I think covers
-  // both cases.  "disjoint_from" is just the oppposite of
-  // intersects(), right?
-  // So we could specialize "Or" compatibility testing with that
-  // bitset function, (and a variations check), rather than
-  // calling two separate Xor/And functions here.
-
   constexpr auto isAndCompatibleWith(
-    const UsedSources& other, bool /*useBits*/ = true) const {
+    const UsedSources& other, bool check_variations = true) const {
     if (!getBits().is_subset_of(other.getBits()))
       return false;
     // compare variations
-    if (!allVariationsMatch(variations, other.variations))
+    if (check_variations && !allVariationsMatch(variations, other.variations))
       return false;
     return true;
   }
@@ -322,11 +299,11 @@ struct SourceCompatibilityData {
   }
 
   constexpr auto isXorCompatibleWith(
-    const SourceCompatibilityData& other) const {
+    const SourceCompatibilityData& other, bool check_variations = true) const {
     if (legacySourceBits.intersects(other.legacySourceBits)) {
       return false;
     }
-    return usedSources.isXorCompatibleWith(other.usedSources);
+    return usedSources.isXorCompatibleWith(other.usedSources, check_variations);
   }
 
 #ifdef __CUDA_ARCH__
@@ -340,16 +317,30 @@ struct SourceCompatibilityData {
 #endif
 
   constexpr auto isAndCompatibleWith(
-    const SourceCompatibilityData& other) const {
+    const SourceCompatibilityData& other, bool check_variations = true) const {
     if (!legacySourceBits.is_subset_of(other.legacySourceBits))
       return false;
-    return usedSources.isAndCompatibleWith(other.usedSources);
+    return usedSources.isAndCompatibleWith(other.usedSources, check_variations);
   }
 
   // OR == XOR || AND
+  // Another optimizatoin is that rather than testing Xor + And
+  // separately, we have new bitset function something like
+  // "is_disjoint_from_or_subset_of()" which I think covers
+  // both cases.  "disjoint_from" is just the oppposite of
+  // intersects(), right?
+  // So we could specialize "Or" compatibility testing with that
+  // bitset function, (and a variations check), rather than
+  // calling two separate Xor/And functions here.
   constexpr auto isOrCompatibleWith(
     const SourceCompatibilityData& other) const {
-    return isXorCompatibleWith(other) || isAndCompatibleWith(other);
+    // TODO: add allVariationsMatch() member function (non-static) to UsedSources
+    if (!UsedSources::allVariationsMatch(
+          usedSources.variations, other.usedSources.variations)) {
+      return false;
+    }
+    return isXorCompatibleWith(other, false)
+           || isAndCompatibleWith(other, false);
   }
 
   void addSource(int src) {
@@ -576,11 +567,17 @@ struct OrArgData {
 using OrArgList = std::vector<OrArgData>;
 
 namespace device {
+  struct OrSourceData {
+    SourceCompatibilityData source;
+    unsigned or_arg_idx;
+  };
+
+  /*
   struct OrArgData {
     OrSourceData* or_sources;
     unsigned num_or_sources;
-    bool compatible;
   };
+  */
 }
 
 // These are precomputed on xorSourceList, to identify only those sources
@@ -607,7 +604,8 @@ struct PreComputedData {
   std::vector<int> xorSourceIndices;
   SourceCompatibilityData* device_xorSources{nullptr};
   OrArgList orArgList;
-  device::OrArgData* device_or_args{nullptr};
+  device::OrSourceData* device_or_sources{nullptr}; 
+  unsigned num_or_sources;  // # of device_or_sources
   SourceListMap sourceListMap;
   SentenceVariationIndices sentenceVariationIndices;
   device::VariationIndices* device_sentenceVariationIndices{nullptr};

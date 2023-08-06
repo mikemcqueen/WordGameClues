@@ -26,6 +26,7 @@ template <typename T> __device__ __forceinline__ void store(T* addr, T val) {
   *(volatile T*)addr = val;
 }
 
+#if 0
 __device__ auto isSourceORCompatibleWithAnyOrSource(
   const SourceCompatibilityData& source, const OrSourceData* or_sources,
   unsigned num_or_sources) {
@@ -46,8 +47,8 @@ __device__ auto isSourceORCompatibleWithAnyOrSource(
 };
 
 __device__ auto isSourceCompatibleWithEveryOrArg(
-  const SourceCompatibilityData& source, const device::OrArgData* or_args,
-  unsigned num_or_args) {
+  const SourceCompatibilityData& source, const device::OrSourceData* or_sources,
+  unsigned num_or_sources) {
   //
   auto compatible = true;  // if no --or sources specified, compatible == true
   for (unsigned i{}; i < num_or_args; ++i) {
@@ -63,6 +64,7 @@ __device__ auto isSourceCompatibleWithEveryOrArg(
   }
   return compatible;
 }
+#endif
 
 __device__ __host__ auto isSourceXORCompatibleWithAnyXorSource(
   const SourceCompatibilityData& source, const XorSource* xorSources,
@@ -94,10 +96,11 @@ struct SourceIndex {
   }
 };
 
+#if 0
 __device__ bool first = true;
 
 __device__ void check_source(
-  const SourceCompatibilityData& source, const device::OrArgData* or_args) {
+  const SourceCompatibilityData& source, const device::OrSourceData* or_sources) {
   //
   if (source.usedSources.hasVariation(3)
       && (source.usedSources.getVariation(3) == 0)
@@ -111,19 +114,107 @@ __device__ void check_source(
     printf("xor: %d, and: %d\n", xor_compat, and_compat);
   }
 }
+#endif
+
+__device__ bool is_source_or_compatibile(const SourceCompatibilityData& source,
+  const unsigned num_or_args,
+  const device::OrSourceData* __restrict__ or_sources,
+  const unsigned num_or_sources) {
+  //
+  extern __shared__ result_t or_arg_results[];
+
+  // ASSUMPTION: # of --or args will always be smaller than block size.
+  if (threadIdx.x < num_or_args) {
+    or_arg_results[threadIdx.x] = (result_t)0;
+  }
+  __syncthreads();
+  for (unsigned or_chunk{}; or_chunk * blockDim.x < num_or_sources;
+       ++or_chunk) {
+    //__syncthreads();
+    const auto or_idx = or_chunk * blockDim.x + threadIdx.x;
+    // TODO: if this works without sync in loop, i can possibly move this
+    // conditional to loop definition 
+    if (or_idx < num_or_sources) {
+      const auto& or_src = or_sources[or_idx];
+      if (source.isOrCompatibleWith(or_src.source)) {
+        store(&or_arg_results[or_src.or_arg_idx], (result_t)1);
+      }
+    }
+  }
+  // i could safely initialize reduce_idx to 16 I think (max 32 --or args)
+  for (int reduce_idx = blockDim.x / 2; reduce_idx > 0; reduce_idx /= 2) {
+    __syncthreads();
+    if (reduce_idx + threadIdx.x < num_or_args) {
+      or_arg_results[threadIdx.x] += or_arg_results[reduce_idx + threadIdx.x];
+    }
+  }
+  if (!threadIdx.x) {
+    if (or_arg_results[threadIdx.x]) {
+      // printf("or_args: %d of %d\n", or_arg_results[threadIdx.x], num_or_args);
+    }
+    return or_arg_results[threadIdx.x] == num_or_args;
+  }
+  return false;
+}
+
+__device__ bool is_source_xor_or_compatible(
+  const SourceCompatibilityData& source,
+  const SourceCompatibilityData* __restrict__ xor_sources,
+  const unsigned num_xor_sources, const unsigned num_or_args,
+  const device::OrSourceData* __restrict__ or_sources,
+  const unsigned num_or_sources) {
+  //
+  //  extern __shared__ bool or_arg_results[];
+  __shared__ bool is_xor_compat;
+  __shared__ bool is_or_compat;
+
+  if (!threadIdx.x) {
+    store(&is_xor_compat, false);
+    store(&is_or_compat, false);
+  }
+  // for each xor_source (one thread per xor_source)
+  for (unsigned xor_chunk{}; xor_chunk * blockDim.x < num_xor_sources;
+       ++xor_chunk) {
+    __syncthreads();
+    const auto xor_idx = xor_chunk * blockDim.x + threadIdx.x;
+    if (xor_idx < num_xor_sources) {
+      if (source.isXorCompatibleWith(xor_sources[xor_idx])) {
+        // TODO: Do I need volatile when read/writing shrd mem?
+        store(&is_xor_compat, true);
+      }
+    }
+    __syncthreads();
+    // if source is not XOR compatible with any --xor sources
+    if (!load(&is_xor_compat)) {
+      continue;
+    }
+    // source must also be OR compatible with at least one source of each or_arg
+    if (is_source_or_compatibile(source, num_or_args, or_sources, num_or_sources)) {
+      store(&is_or_compat, true);
+    }
+    __syncthreads();
+    if (!load(&is_or_compat)) {
+      if (!threadIdx.x) {
+        // reset is_xor_compat. sync will happen at loop entrance.
+        store(&is_xor_compat, false);
+      }
+      continue;
+    }
+    return true;
+  }
+  return false;
+}
 
 // one block per source
 __global__ void xor_kernel_new(
   const SourceCompatibilityData* __restrict__ sources,
   const unsigned num_sources,
   const SourceCompatibilityData* __restrict__ xor_sources,
-  const unsigned num_xor_sources, const device::OrArgData* __restrict__ or_args,
-  const unsigned num_or_args, const SourceIndex* __restrict__ source_indices,
+  const unsigned num_xor_sources, const unsigned num_or_args,
+  const device::OrSourceData* __restrict__ or_sources,
+  const unsigned num_or_sources, const SourceIndex* __restrict__ source_indices,
   const index_t* __restrict__ list_start_indices, result_t* results,
   int stream_idx) {
-  //
-  __shared__ bool is_xor_compat;
-  __shared__ bool is_or_compat;
   // for each source (one block per source)
   for (unsigned idx{blockIdx.x}; idx < num_sources; idx += gridDim.x) {
     const auto src_idx = source_indices[idx];
@@ -133,48 +224,12 @@ __global__ void xor_kernel_new(
     auto& result = results[src_idx.listIndex];
 
     __syncthreads();
-    if (!threadIdx.x) {
-      store(&is_xor_compat, false);
-      store(&is_or_compat, false);
-    }
-    // for each xor_source (one thread per xor_source)
-    for (unsigned xor_chunk{}; xor_chunk * blockDim.x < num_xor_sources;
-         ++xor_chunk) {
-      __syncthreads();
-      const auto xor_idx = xor_chunk * blockDim.x + threadIdx.x;
-      if (xor_idx < num_xor_sources) {
-        if (source.isXorCompatibleWith(xor_sources[xor_idx])) {
-          // TODO: Do I need volatile when read/writing shrd mem?
-          store(&is_xor_compat, true);
-        }
-      }
-      __syncthreads();
-      // if source is not XOR compatible with any --xor sources
-      if (!load(&is_xor_compat)) {
-        continue;
-      }
-      // source is XOR compatible with an --xor source. now check --or arg
-      // compatibility
-      // TODO: this is dumb running it on thread 0. should chunk it.
+    if (is_source_xor_or_compatible(source, xor_sources, num_xor_sources,
+          num_or_args, or_sources, num_or_sources)) {
+      // check_source(source, or_args);
       if (!threadIdx.x) {
-        if (isSourceCompatibleWithEveryOrArg(source, or_args, num_or_args)) {
-          store(&is_or_compat, true);
-        }
-      }
-      __syncthreads();
-      // if source is not OR compatible with any source of every --or arg
-      if (!load(&is_or_compat)) {
-        if (!threadIdx.x) {
-          // reset is_xor_compat. sync will happen at loop entrance.
-          store(&is_xor_compat, false);
-        }
-        continue;
-      }
-      if (!threadIdx.x) {
-        check_source(source, or_args);
         store(&result, (result_t)1);
       }
-      break;
     }
   }
 }
@@ -244,8 +299,8 @@ struct IndexStates {
   }
 
   void reset() {
-    std::for_each(list.begin(), list.end(),
-      [](Data& data) mutable { data.reset(); });
+    std::for_each(
+      list.begin(), list.end(), [](Data& data) mutable { data.reset(); });
     next_fill_idx = 0;
     done = false;
   }
@@ -348,7 +403,7 @@ struct IndexStates {
   std::vector<uint32_t> list_sizes;
 };  // struct IndexStates
 
-  //////////
+//////////
 
 std::vector<cudaStream_t> streams;
 
@@ -588,7 +643,9 @@ void run_xor_kernel(KernelData& kernel, int threads_per_block,
   auto blocks_per_sm = threads_per_sm / block_size;
   //  assert(blocks_per_sm * block_size == threads_per_sm);
   auto grid_size = num_sm * blocks_per_sm;  // aka blocks per grid
-  auto shared_bytes = 0;
+  auto shared_bytes = PCD.orArgList.size() * sizeof(result_t);
+  // enforce assumption in is_source_or_compatible()
+  assert(PCD.orArgList.size() < block_size);
 
   kernel.is_running = true;
   kernel.sequence_num = KernelData::next_sequence_num();
@@ -598,9 +655,9 @@ void run_xor_kernel(KernelData& kernel, int threads_per_block,
   cudaStreamSynchronize(cudaStreamPerThread);
   xor_kernel_new<<<grid_dim, block_dim, shared_bytes, kernel.stream>>>(
     device_sources, kernel.source_indices.size(), PCD.device_xorSources,
-    PCD.xorSourceList.size(), PCD.device_or_args, PCD.orArgList.size(),
-    kernel.device_source_indices, device_list_start_indices, device_results,
-    kernel.stream_idx);
+    PCD.xorSourceList.size(), PCD.orArgList.size(), PCD.device_or_sources,
+    PCD.num_or_sources, kernel.device_source_indices, device_list_start_indices,
+    device_results, kernel.stream_idx);
 
 #if 0 || defined(STREAM_LOG)
   std::cerr << "stream " << kernel.stream_idx
@@ -937,40 +994,31 @@ void filterCandidatesCuda(
   return device_xorSources;
 }
 
-[[nodiscard]] device::OrArgData* cuda_allocCopyOrArgs(
-  const OrArgList& orArgList) {
-  //
+[[nodiscard]] std::pair<device::OrSourceData*, unsigned>
+cuda_allocCopyOrSources(const OrArgList& orArgList) {
   cudaError_t err = cudaSuccess;
-  // host-side vector of device::orArgData that each contain pointers
-  // to device memory, that we can blast to device with one copy
-  std::vector<device::OrArgData> or_args;
-  or_args.reserve(orArgList.size());
-  for (size_t i{}; i < orArgList.size(); ++i) {
-    const auto& or_arg = orArgList.at(i);
-    const auto& or_src_list = or_arg.orSourceList;
-    auto or_src_bytes = or_src_list.size() * sizeof(OrSourceData);
-    OrSourceData* device_or_sources;
-    err = cudaMallocAsync(
-      (void**)&device_or_sources, or_src_bytes, cudaStreamPerThread);
-    assert((err == cudaSuccess) && "alloc device or sources");
-
-    err = cudaMemcpyAsync(device_or_sources, or_src_list.data(),
-      or_src_bytes, cudaMemcpyHostToDevice, cudaStreamPerThread);
-    assert((err == cudaSuccess) && "copy device or sources");
-    or_args.emplace_back(device::OrArgData{
-        device_or_sources, (unsigned)or_src_list.size(), or_arg.compatible});
+  // build host-side vector of compatible device::OrSourceData that we can
+  // blast to device with one copy
+  std::vector<device::OrSourceData> or_sources;
+  for (unsigned arg_idx{}; arg_idx < orArgList.size(); ++arg_idx) {
+    const auto& or_arg = orArgList.at(arg_idx);
+    for (const auto& or_src: or_arg.orSourceList) {
+      if (or_src.xorCompatible) {
+        or_sources.emplace_back(device::OrSourceData{or_src.source, arg_idx});
+      }
+    }
   }
-  auto or_arg_bytes = or_args.size() * sizeof(device::OrArgData);
-  device::OrArgData* device_or_args;
-  err =
-    cudaMallocAsync((void**)&device_or_args, or_arg_bytes, cudaStreamPerThread);
-  assert((err == cudaSuccess) && "alloc device or args");
+  const auto or_src_bytes = or_sources.size() * sizeof(device::OrSourceData);
+  device::OrSourceData* device_or_sources;
+  err = cudaMallocAsync(
+    (void**)&device_or_sources, or_src_bytes, cudaStreamPerThread);
+  assert((err == cudaSuccess) && "alloc device or sources");
 
-  err = cudaMemcpyAsync(device_or_args, or_args.data(), or_arg_bytes,
+  err = cudaMemcpyAsync(device_or_sources, or_sources.data(), or_src_bytes,
     cudaMemcpyHostToDevice, cudaStreamPerThread);
-  assert((err == cudaSuccess) && "copy device or args");
+  assert((err == cudaSuccess) && "copy device or sources");
 
-  return device_or_args;
+  return std::make_pair(device_or_sources, or_sources.size());
 }
 
 [[nodiscard]] auto cuda_allocCopySentenceVariationIndices(
