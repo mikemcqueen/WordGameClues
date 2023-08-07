@@ -111,7 +111,6 @@ __device__ bool is_source_xor_or_compatible(
   const device::OrSourceData* __restrict__ or_sources,
   const unsigned num_or_sources) {
   //
-  //  extern __shared__ bool or_arg_results[];
   __shared__ bool is_xor_compat;
   __shared__ bool is_or_compat;
 
@@ -127,11 +126,13 @@ __device__ bool is_source_xor_or_compatible(
     if (xor_idx < num_xor_sources) {
       if (source.isXorCompatibleWith(xor_sources[xor_idx])) {
         // TODO: Do I need volatile when read/writing shrd mem?
+        // TODO: unnecessary store due to __sync
         store(&is_xor_compat, true);
       }
     }
     __syncthreads();
     // if source is not XOR compatible with any --xor sources
+    // TODO: unnecessary load due to __sync
     if (!load(&is_xor_compat)) {
       continue;
     }
@@ -140,12 +141,15 @@ __device__ bool is_source_xor_or_compatible(
       // of each or_arg
       if (is_source_or_compatibile(
             source, num_or_args, or_sources, num_or_sources)) {
+        // TODO: unnecessary store due to __sync
         store(&is_or_compat, true);
       }
       __syncthreads();
+      // TODO: unnecessary load due to __sync
       if (!load(&is_or_compat)) {
         if (!threadIdx.x) {
           // reset is_xor_compat. sync will happen at loop entrance.
+          // TODO: unnecessary store due to __sync
           store(&is_xor_compat, false);
         }
         continue;
@@ -187,41 +191,12 @@ __global__ void xor_kernel_new(
   }
 }
 
-// one block per source
-__global__ void xor_kernel(const SourceCompatibilityData* __restrict__ sources,
-  const unsigned num_sources,
-  const SourceCompatibilityData* __restrict__ xor_sources,
-  const unsigned num_xor_sources,
-  const SourceIndex* __restrict__ source_indices,
-  const index_t* __restrict__ list_start_indices, result_t* results,
-  int stream_idx) {
-  // for each source (one block per source)
-  for (unsigned idx{blockIdx.x}; idx < num_sources; idx += gridDim.x) {
-    const auto src_idx = source_indices[idx];
-    const auto flat_index =
-      list_start_indices[src_idx.listIndex] + src_idx.index;
-    const auto& source = sources[flat_index];
-    auto& result = results[src_idx.listIndex];
-
-    // for each xor_source (one thread per xor_source)
-    for (unsigned xor_idx{threadIdx.x}; xor_idx < num_xor_sources;
-         xor_idx += blockDim.x) {
-      if (source.isXorCompatibleWith(xor_sources[xor_idx])) {
-        store(&result, (uint8_t)1);
-      }
-      __syncthreads();
-      // TODO: try that warp-broadcast thing here maybe
-      if (load(&result))
-        break;
-    }
-  }
-}
-
-void run_xor_kernel(StreamData& kernel, int threads_per_block,
+void run_xor_kernel(StreamData& stream, int threads_per_block,
   const SourceCompatibilityData* device_sources, result_t* device_results,
   const index_t* device_list_start_indices) {
   //
-  auto num_sm = 10;
+  int num_sm;
+  cudaDeviceGetAttribute(&num_sm, cudaDevAttrMultiProcessorCount, 0);
   auto threads_per_sm = 2048;
   auto block_size = threads_per_block ? threads_per_block : 1024;
   auto blocks_per_sm = threads_per_sm / block_size;
@@ -231,23 +206,23 @@ void run_xor_kernel(StreamData& kernel, int threads_per_block,
   // enforce assumption in is_source_or_compatible()
   assert(PCD.orArgList.size() < block_size);
 
-  kernel.is_running = true;
-  kernel.sequence_num = StreamData::next_sequence_num();
-  kernel.start_time = std::chrono::high_resolution_clock::now();
+  stream.is_running = true;
+  stream.sequence_num = StreamData::next_sequence_num();
+  stream.start_time = std::chrono::high_resolution_clock::now();
   dim3 grid_dim(grid_size);
   dim3 block_dim(block_size);
   cudaStreamSynchronize(cudaStreamPerThread);
-  xor_kernel_new<<<grid_dim, block_dim, shared_bytes, kernel.cuda_stream>>>(
-    device_sources, kernel.source_indices.size(), PCD.device_xorSources,
+  xor_kernel_new<<<grid_dim, block_dim, shared_bytes, stream.cuda_stream>>>(
+    device_sources, stream.source_indices.size(), PCD.device_xorSources,
     PCD.xorSourceList.size(), PCD.orArgList.size(), PCD.device_or_sources,
-    PCD.num_or_sources, kernel.device_source_indices, device_list_start_indices,
-    device_results, kernel.stream_idx);
+    PCD.num_or_sources, stream.device_source_indices, device_list_start_indices,
+    device_results, stream.stream_idx);
 
 #if 0 || defined(STREAM_LOG)
-  std::cerr << "stream " << kernel.stream_idx
+  std::cerr << "stream " << stream.stream_idx
             << " started with " << grid_size << " blocks"
             << " of " << block_size << " threads"
-          //<< " starting, sequence: " << kernel.sequence_num
+          //<< " starting, sequence: " << stream.sequence_num
             << std::endl;
 #endif
 }
@@ -269,11 +244,11 @@ void copy_device_results(std::vector<result_t>& results,
   assert((err == cudaSuccess) && "cudaStreamSynchronize");
 }
 
-// TODO: kernel.get_results()? just to call out to free function?  maybe
+// TODO: stream.get_results()? just to call out to free function?  maybe
 /*
-auto getKernelResults(StreamData& kernel, result_t* device_results) {
+auto getKernelResults(StreamData& stream, result_t* device_results) {
   return copy_device_results(
-    device_results, kernel.num_src_lists, kernel.stream);
+    device_results, stream.num_src_lists, stream.stream);
 }
 */
 
@@ -402,40 +377,40 @@ int run_filter_task(StreamSwarm& streams, int threads_per_block,
   //
   using namespace std::chrono;
   int total_compat{};
-  int current_kernel{-1};
+  int current_stream{-1};
   int actual_num_compat{};
-  while (streams.get_next_available(current_kernel)) {
-    auto& kernel = streams.at(current_kernel);
-    if (!kernel.is_running) {
-      if (!kernel.fillSourceIndices(idx_states)) {
+  while (streams.get_next_available(current_stream)) {
+    auto& stream = streams.at(current_stream);
+    if (!stream.is_running) {
+      if (!stream.fillSourceIndices(idx_states)) {
         continue;
       }
 #if 0
-      std::cerr << "stream " << kernel.stream_idx
-                << " source_indices: " << kernel.source_indices.size()
-                << ", ready: " << kernel.num_ready(idx_states)
+      std::cerr << "stream " << stream.stream_idx
+                << " source_indices: " << stream.source_indices.size()
+                << ", ready: " << stream.num_ready(idx_states)
                 << std::endl;
 #endif
-      kernel.allocCopy(idx_states);
-      run_xor_kernel(kernel, threads_per_block, device_sources,
+      stream.allocCopy(idx_states);
+      run_xor_kernel(stream, threads_per_block, device_sources,
         device_results, device_list_start_indices);
       continue;
     }
 
-    kernel.has_run = true;
-    kernel.is_running = false;
-    copy_device_results(results, device_results, kernel.cuda_stream);
+    stream.has_run = true;
+    stream.is_running = false;
+    copy_device_results(results, device_results, stream.cuda_stream);
     auto k1 = high_resolution_clock::now();
-    auto d_kernel = duration_cast<milliseconds>(k1 - kernel.start_time).count();
+    auto d_kernel = duration_cast<milliseconds>(k1 - stream.start_time).count();
 
     auto num_compat =
-      idx_states.update(kernel.source_indices, results, kernel.stream_idx);
+      idx_states.update(stream.source_indices, results, stream.stream_idx);
     total_compat += num_compat;
 
 #if 0
     auto num_actual_compat = std::accumulate(results.begin(), results.end(), 0,
       [](int sum, result_t r) { return r ? sum + 1 : sum; });
-    std::cerr << " stream " << kernel.stream_idx
+    std::cerr << " stream " << stream.stream_idx
               << " compat results: " << num_compat
               << ", total: " << total_compat
               << ", actual: " << num_actual_compat
