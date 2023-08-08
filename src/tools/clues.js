@@ -81,7 +81,7 @@ const CmdLineOptions = Opt.create(_.concat(Clues.Options, [
     ['',  'production',                        'use production note store'],
     ['',  'sentence',                          'load clues from sentence files (that have source="sentence" property)' ],
     ['',  'sort-all-clues',                    'sort all clue data files by src'],
-    ['z', 'flags=OPTION+',                     'flags: 2=ignoreLoadErrors' ],
+    ['z', 'flags=OPTION+',                     'flags: 2=ignoreErrors' ],
     ['v', 'verbose',                           'more output'],
     ['h', 'help',                              'this screen']
 ])).bindHelp();
@@ -103,14 +103,15 @@ function usage (msg) {
     process.exit(-1);
 }
 
-function loadClues (clues, ignoreErrors, max, options) {
+function loadClues (clues, max, options) {
     log('loading all clues...');
     ClueManager.loadAllClues({
         clues,
-        ignoreErrors,
         max,
         useSentences: true,
+        ignoreErrors: options.ignoreErrors,
         fast: !options.slow,
+        addVariations: (options.test !== undefined),
         validateAll: true
     });
     log('done.');
@@ -305,7 +306,7 @@ function sortAllClues (clueSource, max) {
 
 async function main () {
     let needCount;
-    let ignoreLoadErrors;
+    let ignoreErrors;
 
     const opt = CmdLineOptions.parseSystem();
     const options = opt.options;
@@ -355,8 +356,8 @@ async function main () {
     ****/
 
     if (_.includes(options.flags, '2')) {
-        ignoreLoadErrors = true;
-        Debug('ignoreLoadErrors=true');
+        options.ignoreErrors = true;
+        Debug('ignoreErrors=true');
     }
 
     let clueSource = Clues.getByOptions(options);
@@ -376,7 +377,7 @@ async function main () {
 
     setLogging(_.includes(options.verbose, VERBOSE_FLAG_LOAD));
     let loadBegin = new Date();
-    if (!loadClues(clueSource, ignoreLoadErrors, load_max, options)) {
+    if (!loadClues(clueSource, load_max, options)) {
         return 1;
     }
     let loadMillis = new Duration(loadBegin, new Date()).milliseconds;

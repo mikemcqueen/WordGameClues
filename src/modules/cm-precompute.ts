@@ -8,8 +8,8 @@ import _ from 'lodash'; // import statement to signal that we are a "module"
 
 const Peco        = require('../../modules/peco');
 
-const NativeComboMaker = require('../../../build/Release/experiment.node');
-//const NativeComboMaker = require('../../../build/Debug/experiment.node');
+//const NativeComboMaker = require('../../../build/Release/experiment.node');
+const NativeComboMaker = require('../../../build/Debug/experiment.node');
 
 const Assert      = require('assert');
 const Debug       = require('debug')('cm-precompute');
@@ -170,9 +170,9 @@ const buildAllUseNcDataLists = (useArgsList: string[]): NCDataList[] => {
 
 //////////
 
-const getSourceList = (nc: NameCount.Type): Source.List => {
+const getSourceList = (nc: NameCount.Type, args: any): Source.List => {
     const sourceList: Source.List = [];
-    ClueManager.getKnownSourceMapEntries(nc)
+    ClueManager.getKnownSourceMapEntries(nc, false, args.ignoreErrors)
         .forEach((sourceData: ClueManager.SourceData) => {
             sourceList.push(...sourceData.results
                 .map((result: ValidateResult) => Source.makeData(nc, result)));
@@ -181,22 +181,26 @@ const getSourceList = (nc: NameCount.Type): Source.List => {
 };
 
 const addNcListToSourceListMap = (ncList: NameCount.List,
-    map: Map<string, Source.AnyData[]>) : void =>
+    map: Map<string, Source.AnyData[]>, args: any) : void =>
 {
     for (let nc of ncList) {
         const key = NameCount.toString(nc)
         if (!map.has(key)) {
-            const sourceList = getSourceList(nc);
+            const sourceList = getSourceList(nc, args);
             if (listIsEmpty(sourceList)) {
-                throw new Error(`empty sourceList: ${key}`);
+                if (!args.ignoreErrors) {
+                    throw new Error(`empty sourceList: ${key}`);
+                }
+                console.error(`empty sourceList: ${key}`);
+            } else {
+                map.set(key, sourceList);
             }
-            map.set(key, sourceList);
         }
     }
 };
 
 const fillKnownNcSourceListMapForSum = (map: Map<string, Source.AnyData[]>,
-    sum: number, max: number) : void =>
+    sum: number, max: number, args: any) : void =>
 {
     // Given a sum, such as 4, and a max # of numbers to combine, such as 2, generate
     // an array of addend arrays ("count lists"), for each 2 <= N <= max, that add up
@@ -206,7 +210,7 @@ const fillKnownNcSourceListMapForSum = (map: Map<string, Source.AnyData[]>,
     countListArray.forEach((countList: number[]) => {
         let sourceIndexes: number[] = [];
         let result = ComboMaker.first(countList, sourceIndexes);
-        if (result.done) return; // continue; 
+        if (result.done) return; // continue;
 
         let firstIter = true;
         while (!result.done) {
@@ -216,7 +220,7 @@ const fillKnownNcSourceListMapForSum = (map: Map<string, Source.AnyData[]>,
                 result = ComboMaker.next(countList, sourceIndexes);
                 if (result.done) break;
             }
-            addNcListToSourceListMap(result.ncList!, map);
+            addNcListToSourceListMap(result.ncList!, map, args);
         }
     });
 };
@@ -231,7 +235,7 @@ const buildKnownNcSourceListMap = (first: number, last: number,
     for (let sum = first; sum <= last; ++sum) {
         // TODO: move this to last calculation, above?
         let max = Math.min(args.max, sum);
-        fillKnownNcSourceListMapForSum(map, sum, max);
+        fillKnownNcSourceListMapForSum(map, sum, max, args);
     }
     let d = new Duration(begin, new Date()).milliseconds;
     console.error(` buildKnownNcSourceListMap(${map.size}) - ${PrettyMs(d)}`);

@@ -210,15 +210,12 @@ const show = (options: any): any => {
 
     options.fast = true; // force fast
     console.log(`test: ${options.test}, fast=${options.fast}`);
-    if (!_.isEmpty(options.or)) {
-        console.error('--or specified: forcing --fast');
-    }
 
     const nameList = options.test.split(',').sort();
     if (options.fast) {
         // TODO: maybe all of this belongs in ClueManager. Because getCountListArrays()
         //       is called from so many places.
-        const args = { xor: nameList, max: 2 };
+        const args = { xor: nameList, max: 2, ignoreErrors: options.ignoreErrors };
         const pcResult = PreCompute.preCompute(2, ClueManager.getNumPrimarySources(), args);
         const result = getCountListArrays(nameList, pcResult, options);
         showCountLists(nameList, result, options);

@@ -7,12 +7,12 @@
         {
             "type": "node",
             "request": "launch",
-            "name": "--test",
+            "name": "clues -t",
             "skipFiles": [
                 "<node_internals>/**"
             ],
             "program": "${workspaceFolder}/src/tools/clues.js",
-            "args": [ "-pf.71", "-t", "newton", "-v", "--fast" ]
+            "args": [ "-pf.72", "-z2", "-t", "vacuum", "-v" ]
         },
         {
             "type": "node",
@@ -50,10 +50,10 @@
         {
             "type": "cppdbg",
             "request": "launch",
-            "name": "Debug show-components",
+            "name": "cpp -t",
             "program": "/usr/local/bin/node",
             "cwd": "${workspaceFolder}/src/tools",
-            "args": [ "clues.js", "-pf.71", "-t", "newton", "-v" ]
+            "args": [ "clues.js", "-pf.72", "-v", "-z2", "-t", "vacuum" ]
         },
         {
             "type": "cppdbg",
@@ -61,8 +61,6 @@
             "name": "Debug cm xor.req",
             "program": "/usr/local/bin/node",
             "cwd": "${workspaceFolder}/src/tools",
-            "localRoot": "${workspaceFolder}",            
-            "sourceMap": true,
             "args": [ "clues.js", "-pf.71", "-c2,2", "-x2",
 //                "--xor", "us 50",
 //                "--xor", "koa",

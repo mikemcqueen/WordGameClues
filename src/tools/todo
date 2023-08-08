@@ -1,11 +1,21 @@
+* bug: "woodwardtattletale" is getting picked up as a uniquePrimaryName in
+  clue-manager. I suspect due to wonkery in Sentence.ts alien tech.
+
+* I may have figured out what that NO_DUPLICATES thing in peco was all
+  about. in cm-precompute.ts fillKnownNcSourceListMapForSum, with sum=2
+  we apparently iterate over all 1,1 combinations, including duplicates
+  like 'newton:1','newton:1' currently. probably should disable that?
+  (it's a tiny fraction of combos so probably not a big deal)
+
 * additional thoughts on optimizaiton:
  - only call addCandidate every 1000+ candidates. maintain a list and
    bulk push them.
- 
+ - there's some "i didnt do this coz it's 18s out of 18m" comment in
+   combo-maker.ts that I could look into. related to using CountBits
+   I think.
+ - also copyOnMerge logic in mergeAllSources might be worthwhile to
+   look into
 
-* we could also store a count (and eventually, list) of  which sources
-  match with which xorsource
-  
 * candidates.comboListMap should be a vector. It's not even strictly
   necessary anymore.
 
@@ -25,10 +35,6 @@
   the alternative is that "cog" is ... what.. an anagram? and thus we
   do a syn lookup? maybe "anagram" could be generalized? kinda nice to
   have each "rule" encapsulated as a separate variation entry type.
-
-* -c (and -t?) --or arg support.
-
-* -t --verbose
 
 * -t full support, including --add, will be necessary (might be working now)
 
@@ -116,12 +122,6 @@ clues3.json:  { "name": "old",             "src": "new,not" },
   to C++. I don't think just porting mergeCompatibleSources3 and dependencies
   alone will do much as each call is short so the overhead of the call isn't
   worth it, but there are a million (literally) calls.
-
-  - Actually I'm not so sure about the above. I think the meat of the problem
-  is in the native isAnySourceXorCompatible call. Profiler suggests it really
-  comes down to the mechanism for compatibility checking between sources. I
-  should re-think the bitset approach. 
-
 
 * Precompute is a tiny bit slower now. Maybe because I'm doing too much
   copying in mergeAllCompatibleSources/XorSources? Any way to put a

@@ -386,8 +386,18 @@ const addUniqueName = (toList: string[], name: string,
     }
 }
 
+const addUniqueVariationNames = (toList: string[],
+    variations: Sentence.VariationMap, hash: Set<string>): void =>
+{
+    for (let key of Object.keys(variations)) {
+        for (let name of variations[key]) {
+            addUniqueName(toList, name, hash);
+        }
+    }
+}
+
 const initUniquePrimaryClueNames = (primaryClueList: ClueList.Primary,
-    uniqueComponentNames: Set<string>): string[] =>
+    uniqueComponentNames: Set<string>, sentences?: Sentence.Type[]): string[] =>
 {
     let result: string[] = [];
     let hash = new Set<string>();
@@ -400,12 +410,29 @@ const initUniquePrimaryClueNames = (primaryClueList: ClueList.Primary,
     for (let name of uniqueComponentNames.values()) {
         addUniqueName(result, name, hash);
     }
+    // add variation names
+    // This is necessary because of complicated reasons. show-components uses
+    // ComboMaker's PreCompute(). PreCompute uses first/next() iterators to
+    // populate the "sourceListMap" that is passed on to the C++ addon code
+    // for actually generating combos. We don't want to add these in that case,
+    // (I think), because it's much faster to generate combos with a smaller
+    // input list, and just add additional combos with substitutded variation
+    // names after results are computed.
+    // In the case of show-components though, we need these added. Otherwise
+    // it's impossible to -t <anagram/synonym/homonym>.
+    if (sentences) {
+        for (let sentence of sentences) {
+            if (!sentence) continue;
+            addUniqueVariationNames(result, sentence.anagrams, hash);
+            addUniqueVariationNames(result, sentence.synonyms, hash);
+            addUniqueVariationNames(result, sentence.homophones, hash);
+        }
+    }
     return result;
-
 }
 
-const primaryClueListPostProcessing = (primaryClueList: ClueList.Primary
-    /* sentences: Sentence.Type[]*/): void =>
+const primaryClueListPostProcessing = (primaryClueList: ClueList.Primary,
+    addVariations: boolean): void =>
 {
     // todo: got this backwards
     const sentences: Sentence.Type[] = State.sentences;
@@ -437,7 +464,7 @@ const primaryClueListPostProcessing = (primaryClueList: ClueList.Primary
         console.error(`sentence ${i}, names: ${names.size}, variations: ${container.candidates.length}`);
     }
     State.uniquePrimaryClueNames = initUniquePrimaryClueNames(primaryClueList,
-        uniqueComponentNames);
+      uniqueComponentNames, addVariations ? sentences : undefined);
     State.variations = variations;
     State.sentences = sentences;
     // Call addKnownPrimaryClues() last, after candidates are built
@@ -462,7 +489,8 @@ export const loadAllClues = function (args: any): void {
         // should autosource should the sentence list?
         [primaryClueList, numPrimarySources/*, sentences*/] = autoSource(primaryClueList, args);
         State.numPrimarySources = numPrimarySources; // TODO: wrongish
-        primaryClueListPostProcessing(primaryClueList/*, sentences*/);
+        // if using -t, add primary variations to uniqueNames
+        primaryClueListPostProcessing(primaryClueList, args.addVariations);
     } else {
         throw new Error('numPrimarySources not initialized without src="auto"');
     }
@@ -904,13 +932,17 @@ const singleEntry = (nc: NameCount.Type, source: string): SourceData => {
 
 // returns: array of SourceData --or-- array of { entry: SourceData, sources: string }
 // 
-export const getKnownSourceMapEntries = (nc: NameCount.Type, andSources = false):
+export const getKnownSourceMapEntries = (nc: NameCount.Type, andSources = false, ignoreErrors = false):
     any[] =>
 {
     const clueMap = State.knownClueMapArray[nc.count];
     if (!clueMap) throw new Error(`No clueMap at ${nc.count}`);
     const sourcesList = clueMap[nc.name];
-    if (!sourcesList) throw new Error(`No sourcesList at ${nc.name}`);
+    if (!sourcesList) {
+        if (!ignoreErrors) throw new Error(`No sourcesList at ${nc.name}:${nc.count}`);
+        console.error(`No sourcesList at ${nc.name}:${nc.count}`);
+        return [];
+    }
     return sourcesList
         .map(sources => sources.split(',').sort().toString()) // sort sources
         .map((sources, index) => {

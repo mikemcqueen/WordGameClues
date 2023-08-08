@@ -127,13 +127,15 @@ __device__ bool is_source_xor_or_compatible(
       if (source.isXorCompatibleWith(xor_sources[xor_idx])) {
         // TODO: Do I need volatile when read/writing shrd mem?
         // TODO: unnecessary store due to __sync
-        store(&is_xor_compat, true);
+        //store(&is_xor_compat, true);
+        is_xor_compat = true;
       }
     }
     __syncthreads();
     // if source is not XOR compatible with any --xor sources
     // TODO: unnecessary load due to __sync
-    if (!load(&is_xor_compat)) {
+    //if (!load(&is_xor_compat)) {
+    if (!is_xor_compat) {
       continue;
     }
     if (num_or_args > 0) {
@@ -142,15 +144,18 @@ __device__ bool is_source_xor_or_compatible(
       if (is_source_or_compatibile(
             source, num_or_args, or_sources, num_or_sources)) {
         // TODO: unnecessary store due to __sync
-        store(&is_or_compat, true);
+        //store(&is_or_compat, true);
+        is_or_compat = true;
       }
       __syncthreads();
       // TODO: unnecessary load due to __sync
-      if (!load(&is_or_compat)) {
+      //if (!load(&is_or_compat)) {
+      if (!is_or_compat) {
         if (!threadIdx.x) {
           // reset is_xor_compat. sync will happen at loop entrance.
           // TODO: unnecessary store due to __sync
-          store(&is_xor_compat, false);
+          //store(&is_xor_compat, false);
+          is_xor_compat = false;
         }
         continue;
       }
