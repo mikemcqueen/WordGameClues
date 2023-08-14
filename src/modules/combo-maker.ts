@@ -11,8 +11,8 @@ const ResultMap   = require('../../types/result-map');
 const Peco        = require('../../modules/peco');
 const Log         = require('../../modules/log')('combo-maker');
 const My          = require('../../modules/util');
-//const NativeComboMaker = require('../../../build/Release/experiment.node');
-const NativeComboMaker = require('../../../build/Debug/experiment.node');
+const NativeComboMaker = require('../../../build/Release/experiment.node');
+//const NativeComboMaker = require('../../../build/Debug/experiment.node');
 
 const Assert      = require('assert');
 const Debug       = require('debug')('combo-maker');

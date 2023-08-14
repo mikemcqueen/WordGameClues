@@ -60,7 +60,6 @@ const CmdLineOptions = Opt.create(_.concat(Clues.Options, [
     ['',  'allow-dupe-source',                 '  allow duplicate sources'],
     ['',  'merge-style',                       '  merge-style, no validation except for immediate sources'],
     ['',  'remaining',                         '  only word combos not present in any named note'],
-    ['q', 'require-counts=COUNT+',             '  require clue(s) of specified COUNT(s)' ],
     ['i', 'primary-sources=SOURCE[,SOURCE,...]','limit results to the specified primary SOURCE(s)'],
     ['',  'inverse',                           '  or the inverse of those source(s); use with -i'],
     ['k', 'show-known',                        'show compatible known clues; -u <clue> required' ],
@@ -81,8 +80,10 @@ const CmdLineOptions = Opt.create(_.concat(Clues.Options, [
     ['',  'production',                        'use production note store'],
     ['',  'sentence',                          'load clues from sentence files (that have source="sentence" property)' ],
     ['',  'sort-all-clues',                    'sort all clue data files by src'],
+    ['R', 'remove-all-invalid',                'remove all invalid (validation error) clues'],
     ['z', 'flags=OPTION+',                     'flags: 2=ignoreErrors' ],
     ['v', 'verbose',                           'more output'],
+    ['q', 'quiet',                             'less output'],
     ['h', 'help',                              'this screen']
 ])).bindHelp();
 
@@ -109,10 +110,12 @@ function loadClues (clues, max, options) {
         clues,
         max,
         useSentences: true,
+        quiet: options.quiet,
         ignoreErrors: options.ignoreErrors,
         fast: !options.slow,
         addVariations: (options.test !== undefined),
-        validateAll: true
+        validateAll: true,
+        removeAllInvalid: options.removeAllInvalid
     });
     log('done.');
     return true;
@@ -320,6 +323,7 @@ async function main () {
     options.allow_dupe_source = options['allow-dupe-source'] ? true : false;
     options.allow_used = options['allow-used'] ? true : false;
     options.merge_style = Boolean(options['merge-style']);
+    options.removeAllInvalid = Boolean(options['remove-all-invalid']);
     let showKnownArg = options['show-known'];
     options.copy_from = options['copy-from'];
     options.maxArg = maxArg;
@@ -441,8 +445,6 @@ async function main () {
         return combo_maker({
             sum:     options.count,
             max:     maxArg,
-            //require: options['require-counts'],
-            //sources,
             use:     useClueList,
             primary: options.primary,
             apple:   options.apple,
@@ -452,6 +454,7 @@ async function main () {
             //and:     options.and,
             parallel: options.parallel,
             verbose: options.verbose,
+            quiet: options.quiet,
             tpb: options.tpb ? Number(options.tpb) : 0,
             streams: options.streams ? Number(options.streams) : 0,
             stride: options.stride ? Number(options.stride) : 0,

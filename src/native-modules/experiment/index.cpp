@@ -439,6 +439,7 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
 
   //--
 
+  std::cerr << "wrap starting" << std::endl;
   return cm::wrap(env, cm::PCD.xorSourceList);
 }
 

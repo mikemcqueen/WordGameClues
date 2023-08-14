@@ -118,7 +118,6 @@ const stripAndSort = (text: string): string => {
 };
 
 // join strings, sort resulting letters
-
 const joinAndSort = (arr: string[]): string => {
     return sortString(arr.join(''));
 };
@@ -210,55 +209,50 @@ export let load = (dir: string, num: number): Type => {
 
 //////////
 
+// TODO: assumes sorted order. could add to set instead.
+const listsEqual = (a: string[], b: string[]): boolean => {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; ++i) {
+        if (a[i] !== b[i]) return false;
+    }
+    return true;
+}
+
 const addVariations = (toVariations: VariationMap,
     fromVariations: VariationMap): void =>
 {
     for (let key of Object.keys(fromVariations)) {
-        if (_.has(toVariations, key)) {
-            // this could be more relaxed; i could compare values to ensure equality
-            throw new Error(`duplicate variation: ${key} (could be relaxed)`);
+        if (toVariations.hasOwnProperty(key)) {
+            if (!listsEqual(toVariations[key], fromVariations[key])) {
+                // this could be more relaxed; listsEqual assumes sorted
+                throw new Error(`incompatible variation: ${key} (could be relaxed)`);
+            }
+            continue;
         }
         const wordList = fromVariations[key];
         toVariations[key] = wordList;
         for (let word of wordList) {
             if (_.has(toVariations, word)) {
-                // this could be more relaxed; i could compare values to ensure equality
-                throw new Error(`duplicate variation ${key}: ${word} (couuld be relaxed)`);
+                throw new Error(`duplicate variation ${key}: ${word}`);
             }
             toVariations[word] = wordList;
         }
     }
 };
 
-export const addAllVariations = (variations: Variations, sentence: Type): void => {
+export const addAllVariations = (variations: Variations,
+    sentence: Type): void =>
+{
     addVariations(variations.anagrams, sentence.anagrams);
     addVariations(variations.synonyms, sentence.synonyms);
     addVariations(variations.homophones, sentence.homophones);
 };
 
-//////////
-
-const buildAlternateCombinationWords = (combinationWords: string[],
-    alternate: string, index: number): [string[], number] =>
-{
-    let result: string[] = combinationWords.slice(0, index);
-    let offset = 0;
-    const alternateWords = alternate.split(' ');
-    if (alternateWords.length > 1) {
-        result.push(...alternateWords);
-    } else {
-        result.push(alternate);
-        offset = 1;
-    }
-    for (let j = index + 1; j < combinationWords.length; ++j) {
-        result.push(combinationWords[j]);
-    }
-    return [result, offset];
-}
-
-// TODO: alien technology. revisit or ignore at your peril.
-// pretty sure this has some profound wrongness about it.
-const buildCandidateNameListMap = (combinationWords: string[], // from sentence.combinations[n].split(' ')
+// domestically engineered version
+// TODO: this could return a set. or an array. like [...result.values()]
+//       the map is useful during construction but unnecessary for the
+//       consumer.
+const buildCandidateNameListMap = (combinationWords: string[],
     components: VariationMap, startIndex = 0,
     results = new Map<string, string[]>()): Map<string, string[]> => 
 {
@@ -267,37 +261,33 @@ const buildCandidateNameListMap = (combinationWords: string[], // from sentence.
         console.error(`  IN: ${combinationWords} @ ${combinationWords[startIndex]}` +
             ` (${startIndex} of ${combinationWords.length})`);
     }
+    let add = true;
     for (let i = startIndex; i < combinationWords.length; ++i) {
         const component = combinationWords[i];
-        const replace = _.has(components, component);
-        const alternates: string[] = replace ? components[component] : [component];
-        for (let alternate of alternates) {
-            let [altCombinationWords, offset] =
-                buildAlternateCombinationWords(combinationWords, alternate, i);
-            const nextIndex = i + offset;
-            if (nextIndex < altCombinationWords.length) { // (startIndex < componentList.length - 1) ||
-                buildCandidateNameListMap(altCombinationWords, components, nextIndex, results);
-                continue;
+        if (components.hasOwnProperty(component)) {
+            // this word has a matching entry in the component map. for each alternate
+            // component, fudge the alternate component word(s) and any remaining
+            // combination words into a new combinationWords array and call recursively
+            const alternates: string[] = components[component];
+            for (let alternate of alternates) {
+                let newCombinationWords = [
+                    ...combinationWords.slice(0, i),
+                    ...alternate.split(' '),
+                    ...combinationWords.slice(i + 1, combinationWords.length)
+                ];
+                // if one of the alternate words is the same as the component, skip
+                // over it so we don't end up in an infinite recursive loop
+                let skip = (alternate === component) ? 1 : 0;
+                buildCandidateNameListMap(newCombinationWords, components, i + skip, results);
             }
-            Assert(nextIndex === altCombinationWords.length);
-            let skipped = false;
-            if (startIndex === combinationWords.length - 1)
-                //&& (nextIndex === altCombinationWords.length))
-            {
-                const key = altCombinationWords.slice().sort().join('');
-                if (results.has(key)) continue;
-                results.set(key, altCombinationWords);
-            } else {
-                //Assert(nextIndex === altCombinationWords.length);
-                skipped = true;
-            }
-            if (log) {
-                console.error(`  ${skipped ? "skip" : "OUT"}: ${altCombinationWords} @` +
-                    ` start(${combinationWords[startIndex]}),` +
-                    ` next(${skipped ? "none" : altCombinationWords[nextIndex]}),` +
-                    ` startIndex ${startIndex} of ${combinationWords.length},` +
-                    ` nextIndex ${nextIndex} of ${altCombinationWords.length}`);
-            }
+            add = false;
+            break;
+        }
+    }
+    if (add) {
+        const key = combinationWords.slice().sort().join('');
+        if (!results.has(key)) {
+            results.set(key, combinationWords);
         }
     }
     return results;
@@ -387,7 +377,7 @@ const buildNameIndicesMap = (candidates: Candidate[]): NameIndicesMap =>
 export const buildAllCandidates = (sentence: Type, variations: Variations):
     CandidatesContainer =>
 {
-    let log = false;
+    let log = true;
     let candidates: Candidate[] = [];
     let src = 1_000_000 * sentence.num; // up to 10000 variations of up to 100 names
     // TODO: similar logic to getUniqueComponentNames() which is unfortunate
@@ -395,9 +385,9 @@ export const buildAllCandidates = (sentence: Type, variations: Variations):
     for (const combo of sentence.combinations) {
         const nameListMap = buildCandidateNameListMap(combo.split(' '), sentence.components);
         if (log) {
-            console.error(`nameListMap(${nameListMap.size}) keys:`);
-            for (let key of nameListMap.keys()) {
-                console.error(`  ${key}`);
+            console.error(`nameListMap(${nameListMap.size}) :`);
+            for (let list of nameListMap.values()) {
+                console.error(`  ${list}`);
             }
         }
         for (let nameList of nameListMap.values()) {

@@ -1,5 +1,22 @@
-* bug: "woodwardtattletale" is getting picked up as a uniquePrimaryName in
-  clue-manager. I suspect due to wonkery in Sentence.ts alien tech.
+* so it's not the only question that matters, but it seems like a big question,
+  why am I passing primaryNameSrcList and ncList of XorSources back to node?
+  Sure I use them to generate sourceBits and usedSources, but are they used
+  for anything else? I'm probably merging them and shit, but why, what do I
+  do with it all when I'm done? I have a feeling, that I am passing the NcLists
+  to Native.addCandidate() as well, from where it is *ONLY USED TO GENERATE
+  SOURCEBITS* on the add-on side (I think). So is the *ONLY* reason I am
+  maintaining ncLists on the node side, is to use them as the "wire protocol"
+  for Node<->Addon communication of sourceBits!?
+
+* tricky situation that should be fixed (and in general, beyond this specific
+  tricky instance). blue is a synonym of navy in clues 1.  we later go on to
+  derive "navy" as a solution to "dark,blue".  but if the source of the "blue"
+  in this case is the synonym of navy, it should not be allowed.
+
+  to achieve this, it feels like we'll have to (optionally? for components.show)
+  attach the "source/origin component" to variation sources. e.g. "navy" gets
+  attached to that primary synonym "blue", somehow. when --add'ing, check and
+  fail if --add'ed word matches any primary "origin" words.
 
 * I may have figured out what that NO_DUPLICATES thing in peco was all
   about. in cm-precompute.ts fillKnownNcSourceListMapForSum, with sum=2

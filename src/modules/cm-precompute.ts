@@ -8,8 +8,8 @@ import _ from 'lodash'; // import statement to signal that we are a "module"
 
 const Peco        = require('../../modules/peco');
 
-//const NativeComboMaker = require('../../../build/Release/experiment.node');
-const NativeComboMaker = require('../../../build/Debug/experiment.node');
+const NativeComboMaker = require('../../../build/Release/experiment.node');
+//const NativeComboMaker = require('../../../build/Debug/experiment.node');
 
 const Assert      = require('assert');
 const Debug       = require('debug')('cm-precompute');
@@ -172,7 +172,7 @@ const buildAllUseNcDataLists = (useArgsList: string[]): NCDataList[] => {
 
 const getSourceList = (nc: NameCount.Type, args: any): Source.List => {
     const sourceList: Source.List = [];
-    ClueManager.getKnownSourceMapEntries(nc, false, args.ignoreErrors)
+    ClueManager.getKnownSourceMapEntries(nc, false, args)
         .forEach((sourceData: ClueManager.SourceData) => {
             sourceList.push(...sourceData.results
                 .map((result: ValidateResult) => Source.makeData(nc, result)));
@@ -191,7 +191,9 @@ const addNcListToSourceListMap = (ncList: NameCount.List,
                 if (!args.ignoreErrors) {
                     throw new Error(`empty sourceList: ${key}`);
                 }
-                console.error(`empty sourceList: ${key}`);
+                if (!args.quiet) {
+                    console.error(`empty sourceList: ${key}`);
+                }
             } else {
                 map.set(key, sourceList);
             }
@@ -447,16 +449,16 @@ const buildUseSourceListsFromNcData = (sourceListMap: Map<string, Source.AnyData
     const failure = emptyUseSourceLists();
 
     // XOR first
-    let xor0 = new Date();
     if (0) dumpNcDataLists(args.allXorNcDataLists, sourceListMap);
     // TODO: setSourceListMap() ? extra call, extra overhead, i suppose?
     let xorSourceList: XorSourceList = NativeComboMaker.mergeCompatibleXorSourceCombinations(
         args.allXorNcDataLists, Array.from(sourceListMap.entries())); // TODO? [...sourceListMap.entries()]
+    args.allXorNcDataLists = undefined;
     if (0) debugXorResults(xorSourceList);
-    
+    console.error('wrap ended');
+    console.error('setBits starting');
     setPrimarySrcBits(xorSourceList);
-    let xdur = new Duration(xor0, new Date()).milliseconds;
-    //console.error(` Native.mergeCompatibleXorSourceCombinations - ${PrettyMs(xdur)}`);
+    console.error('setBits ended');
 
     // OR next
     let or0 = new Date();

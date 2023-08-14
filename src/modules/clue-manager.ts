@@ -416,7 +416,7 @@ const initUniquePrimaryClueNames = (primaryClueList: ClueList.Primary,
     // populate the "sourceListMap" that is passed on to the C++ addon code
     // for actually generating combos. We don't want to add these in that case,
     // (I think), because it's much faster to generate combos with a smaller
-    // input list, and just add additional combos with substitutded variation
+    // input list, and just add additional combos with substituted variation
     // names after results are computed.
     // In the case of show-components though, we need these added. Otherwise
     // it's impossible to -t <anagram/synonym/homonym>.
@@ -670,9 +670,11 @@ const addKnownCompoundClues = (clueList: ClueList.Compound, clueCount: number,
             clue.src = clue.src.split(',').sort().toString();
             if (addCompoundClue(clue, clueCount, args)) {
                 addKnownClue(clueCount, clue.name, clue.src);
+            } else if (args.removeAllInvalid) {
+                removeClue(clueCount, clue, true, false, true); // save, nothrow, force
             } else if (!State.ignoreLoadErrors) {
                 console.error(`VALIDATE FAILED KNOWN COMPOUND CLUE:` +
-                    ` '${clue.src}':${clueCount}`);
+                    ` '${clue.src}':${clueCount}, -t ${clue.src} --remove ${clue.name}`);
             }
         });
 };
@@ -717,10 +719,12 @@ let addClue = (count: number, clue: Clue.Compound, save = false, nothrow = false
     return false;
 };
 
-let removeClue = function (count: number, clue: Clue.Compound, save = false, nothrow = false): boolean {
+let removeClue = function (count: number, clue: Clue.Compound,
+    save = false, nothrow = false, force = false): boolean
+{
     // sort src
     clue.src = clue.src.split(',').sort().toString();
-    if (removeKnownClue(count, clue.name, clue.src, nothrow)) {
+    if (force || removeKnownClue(count, clue.name, clue.src, nothrow)) {
         _.remove(State.clueListArray[count], function (elem: Clue.Compound) {
             return (elem.name === clue.name) && (elem.src === clue.src);
         });
@@ -930,17 +934,24 @@ const singleEntry = (nc: NameCount.Type, source: string): SourceData => {
     };
 };
 
-// returns: array of SourceData --or-- array of { entry: SourceData, sources: string }
+// returns:
+// array of SourceData
+//   --or--
+// array of { entry: SourceData, sources: string }
 // 
-export const getKnownSourceMapEntries = (nc: NameCount.Type, andSources = false, ignoreErrors = false):
-    any[] =>
+export const getKnownSourceMapEntries = (nc: NameCount.Type,
+    andSources = false, args: any = {}): any[] =>
 {
     const clueMap = State.knownClueMapArray[nc.count];
     if (!clueMap) throw new Error(`No clueMap at ${nc.count}`);
     const sourcesList = clueMap[nc.name];
     if (!sourcesList) {
-        if (!ignoreErrors) throw new Error(`No sourcesList at ${nc.name}:${nc.count}`);
-        console.error(`No sourcesList at ${nc.name}:${nc.count}`);
+        if (!args.ignoreErrors) {
+            throw new Error(`No sourcesList at ${nc.name}:${nc.count}`);
+        }
+        if (!args.quiet) {
+            console.error(`No sourcesList at ${nc.name}:${nc.count}`);
+        }
         return [];
     }
     return sourcesList
@@ -1061,6 +1072,7 @@ const addClueForCounts = (countSet: Set<number>, name: string, src: string,
 {
     const clue: Clue.Compound = { name, src };
     return Array.from(countSet)
+        .filter((count: number) => { return !options.max || (count <= options.max); })
         .reduce((added: number, count: number) => {
             if (!propertyName) {
                 if (options.compound) {

@@ -93,7 +93,7 @@ export const isXorCompatible = (first: CompatibilityData,
         // Not using CountBits here because the impact of the optimzation is
         // relatively small. At the time of this comment all the JS code
         // accounts for 18s out of 18m for .xor.req.
-        // (code is faster now, might be worth taking a look)
+        // (code is *a* *lot* faster now, this is worth taking another a look at)
 	for (let firstSrc of first.usedSources[i]) {
 	    if (second.usedSources[i].has(firstSrc)) {
 		return false; // index incompatibility
@@ -151,8 +151,10 @@ export const getUsedSources = (nameSrcList: NameCount.List):
     UsedSources =>
 {
     let result: UsedSources = [];
+/*
     nameSrcList.filter(nameSrc => isCandidate(nameSrc.count))
 	.forEach(nameSrc => addUsedSource(result, nameSrc.count));
+*/
     return result;
 }
 

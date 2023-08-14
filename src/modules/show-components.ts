@@ -215,7 +215,12 @@ const show = (options: any): any => {
     if (options.fast) {
         // TODO: maybe all of this belongs in ClueManager. Because getCountListArrays()
         //       is called from so many places.
-        const args = { xor: nameList, max: 2, ignoreErrors: options.ignoreErrors };
+        const args = {
+            xor: nameList,
+            max: 2,
+            quiet: options.quiet,
+            ignoreErrors: options.ignoreErrors
+        };
         const pcResult = PreCompute.preCompute(2, ClueManager.getNumPrimarySources(), args);
         const result = getCountListArrays(nameList, pcResult, options);
         showCountLists(nameList, result, options);
@@ -247,6 +252,7 @@ const showCountLists = (nameList: string[], result: any, options: any): any => {
     // TODO: extract this to helper function, maybe in clue-manager
     // NOTE: explicit undefined check here is necessary
     const save = _.isUndefined(options.save) ? true : options.save;
+    // good lord this function call is something else
     const count = ClueManager.addRemoveOrReject({
         add:      options.add,
         remove:   options.remove,
@@ -254,7 +260,10 @@ const showCountLists = (nameList: string[], result: any, options: any): any => {
         reject:   options.reject,
         isKnown:  !_.isEmpty(result.known),
         isReject: !_.isEmpty(result.reject)
-    }, nameList, result.addRemoveSet, { save });
+    }, nameList, result.addRemoveSet, {
+        save,
+        max: options.max ? Number(options.max) : 0
+    });
     if (options.add || options.remove) {
         console.log(`${options.add ? "added" : "removed"} ${count} clues`);
     }

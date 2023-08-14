@@ -21,7 +21,7 @@
             "skipFiles": [
                 "<node_internals>/**"
             ],
-            "localRoot": "${workspaceFolder",
+            "localRoot": "${workspaceFolder}",
             "program": "${workspaceFolder}/src/tools/clues.js",
             "args": [ "clues.js", "-pf.71", "-c2,2", "-x2",
 //                "--xor", "us 50",

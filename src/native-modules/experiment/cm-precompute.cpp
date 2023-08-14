@@ -404,8 +404,8 @@ auto list_size(const Peco::IndexList& indexList) {
   return size;
 }
 
-int vec_product(const vector<int>& v) {
-  int result{1};
+auto vec_product(const vector<int>& v) {
+  int64_t result{1};
   for (auto i : v) {
     result *= i;
   }
