@@ -397,7 +397,7 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
     
     cm::PCD.xorSourceList =
       std::move(cm::mergeCompatibleXorSourceCombinations(sourceLists));
-#if 1
+#if 0
     cm::assert_valid(cm::PCD.xorSourceList);
 #endif
     
@@ -417,7 +417,7 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
 
   auto xs1 = high_resolution_clock::now();
   auto d_xs = duration_cast<milliseconds>(xs1 - xs0).count();
-  std::cerr << " copy xor sources (" << cm::PCD.xorSourceList.size() << ")"
+  std::cerr << " copy xor sources to device (" << cm::PCD.xorSourceList.size() << ")"
             << " - " << d_xs << "ms" << std::endl;
 
   //--

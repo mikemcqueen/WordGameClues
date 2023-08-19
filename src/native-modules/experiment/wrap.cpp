@@ -38,7 +38,7 @@ Object wrap(Env& env, const XorSource& xorSource) {
 Array wrap(Env& env, const XorSourceList& xorSourceList) {
   using namespace std::chrono;
 
-  std::cerr << "wrapping xor sources";
+  std::cerr << "  wrapping xor sources";
 
   auto t0 = high_resolution_clock::now();
 

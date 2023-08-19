@@ -451,8 +451,6 @@ const dumpNcDataLists = (ncDataLists: NCDataList[],
 const buildUseSourceListsFromNcData = (sourceListMap: Map<string, Source.AnyData[]>,
     args: any): UseSourceLists =>
 {
-    const failure = emptyUseSourceLists();
-
     // XOR first
     if (0) dumpNcDataLists(args.allXorNcDataLists, sourceListMap);
     // TODO: setSourceListMap() ? extra call, extra overhead, i suppose?
@@ -460,10 +458,7 @@ const buildUseSourceListsFromNcData = (sourceListMap: Map<string, Source.AnyData
         args.allXorNcDataLists, Array.from(sourceListMap.entries())); // TODO? [...sourceListMap.entries()]
     args.allXorNcDataLists = undefined;
     if (0) debugXorResults(xorSourceList);
-    console.error('wrap ended');
-    console.error('setBits starting');
     setPrimarySrcBits(xorSourceList);
-    console.error('setBits ended');
 
     // OR next
     let or0 = new Date();

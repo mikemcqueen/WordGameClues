@@ -147,10 +147,12 @@ auto mergeSources(const SourceData& source1, const SourceData& source2) {
   result.primaryNameSrcList = std::move(NameCount::listMerge(
     source1.primaryNameSrcList, source2.primaryNameSrcList));
   result.ncList = std::move(NameCount::listMerge(source1.ncList, source2.ncList));
-  result.legacySourceBits = std::move(source1.legacySourceBits | source2.legacySourceBits);
+  result.legacySourceBits =
+    std::move(source1.legacySourceBits | source2.legacySourceBits);
   // might be faster here to call NameCount::listToLegacySources(result.ncList)
   //result.legacySources = std::move(source1.copyMerge(source2.legacySources));
-  result.usedSources = std::move(source1.usedSources.copyMerge(source2.usedSources));
+  result.usedSources =
+    std::move(source1.usedSources.copyMerge(source2.usedSources));
   return result;
 }
 
@@ -175,7 +177,7 @@ auto mergeAllCompatibleSources(const NameCountList& ncList,
 {
   // because **maybe** broken for > 2 below
   assert(ncList.size() <= 2 && "ncList.length > 2");
-  auto log = false;
+  constexpr auto log = false;
   if (log) {
     std::cerr << "nc[0]: " << ncList[0].toString() << std::endl;
   }
@@ -250,7 +252,7 @@ auto buildSourceListsForUseNcData(const vector<NCDataList>& useNcDataLists,
       }
     }
   }
-  #if defined(PRECOMPUTE_LOGGING)
+#if defined(PRECOMPUTE_LOGGING)
   std::cerr << "  hash: " << hash_called << ", equal_to: "
     << equal_to_called << std::endl;
   std::cerr << "  total sources: " << total << ", hash_hits: " << hash_hits
@@ -258,7 +260,7 @@ auto buildSourceListsForUseNcData(const vector<NCDataList>& useNcDataLists,
     << std::accumulate(sourceLists.begin(), sourceLists.end(), 0u,
       [](size_t total, const SourceList& list){ return total + list.size(); })
     << std::endl;
-  #endif
+#endif
   return sourceLists;
 }
 
@@ -344,8 +346,10 @@ auto set_to_string(const std::set<uint32_t>& s) {
 }
 */
 
+int64_t get_compat_merge = 0;
+
 // This is called in an inner-loop and should be fast.
-// NOTE: used to be 100s of millions potentially, now more like 10s of thousands.
+// Called potentially billions of times.
 SourceCRefList getCompatibleXorSources(const std::vector<int>& indexList,
   const std::vector<SourceList>& sourceLists)
 {
@@ -354,13 +358,13 @@ SourceCRefList getCompatibleXorSources(const std::vector<int>& indexList,
   const auto& firstSource = sourceLists[0][indexList[0]];
   sourceCRefList.emplace_back(SourceCRef{ firstSource });
   SourceCompatibilityData compatData(firstSource.legacySourceBits,
-    firstSource.usedSources); //, firstSource.legacySources);
+    firstSource.usedSources);
   for (size_t i{1}; i < indexList.size(); ++i) {
     const auto& source = sourceLists[i][indexList[i]];
     if (!compatData.isXorCompatibleWith(source)) {
       return {};
     }
-    // i changed this up
+    ++get_compat_merge;
     compatData.mergeInPlace(source);
     sourceCRefList.emplace_back(SourceCRef{ source });
   }
@@ -390,7 +394,6 @@ XorSourceList mergeCompatibleXorSources(const SourceCRefList& sourceList) {
   XorSource mergedSource(std::move(primaryNameSrcList),
     std::move(NameCount::listToLegacySourceBits(primaryNameSrcList)),
     std::move(usedSources),
-    //std::move(NameCount::listToLegacySources(primaryNameSrcList)),
     std::move(ncList));
   XorSourceList result{};
   result.emplace_back(std::move(mergedSource));
@@ -445,20 +448,19 @@ auto mergeCompatibleXorSourceCombinations(
   }
   std::cerr << "  filtered lengths: " << vec_to_string(lengths)
             << ", product: " << vec_product(lengths)
-            << ", valid: " << boolalpha << valid << std::endl;
+            << ", valid: " << std::boolalpha << valid << std::endl;
 #endif
   if (!valid) return {};
 
   auto peco0 = high_resolution_clock::now();
 
-  int combos = 0;
+  int64_t combos = 0;
   int compatible = 0;
   int merged = 0;
   XorSourceList xorSourceList{};
   Peco peco(std::move(indexLists));
   for (auto indexList = peco.first_combination(); indexList;
-       indexList = peco.next_combination())
-  {
+       indexList = peco.next_combination()) {
     ++combos;
     SourceCRefList sourceCRefList =
       getCompatibleXorSources(*indexList, sourceLists);
@@ -472,12 +474,14 @@ auto mergeCompatibleXorSourceCombinations(
   auto peco1 = high_resolution_clock::now();
   [[maybe_unused]] auto d_peco =
     duration_cast<milliseconds>(peco1 - peco0).count();
-  #if defined(PRECOMPUTE_LOGGING)
-  std::cerr << " native peco loop: " << d_peco << "ms" << ", combos: " << combos
-            << ", compatible: " << compatible << ", merged: " << merged
+#if 1 || defined(PRECOMPUTE_LOGGING)
+  std::cerr << " native peco loop: " << d_peco << "ms"
+            << ", combos: " << combos << ", compatible: " << compatible
+            << ", get_compat_merge: " << get_compat_merge
+            << ", merged: " << merged
             << ", XorSources: " << xorSourceList.size() << std::endl;
-  #endif
-  
+#endif
+
   return xorSourceList;
 }
 
