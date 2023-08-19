@@ -96,8 +96,8 @@ cm::SourceData makeSourceData(Env& env, const Object& jsSourceData) {
       .ThrowAsJavaScriptException();
     return {};
   }
-  // TODO: declare SourceData result; assign result.xxx = std::move(yyy);; return result
-  // (no move-all-params constructor required)
+  // TODO: declare SourceData result; assign result.xxx = std::move(yyy);;
+  // return result (no move-all-params constructor required)
   auto primaryNameSrcList =
     makeNameCountList(env, jsPrimaryNameSrcList.As<Array>());
   auto primarySrcBits =
@@ -119,7 +119,8 @@ cm::SourceList makeSourceList(Env& env, const Array& jsList) {
         .ThrowAsJavaScriptException();
       return {};
     }
-    sourceList.emplace_back(std::move(makeSourceData(env, jsList[i].As<Object>())));
+    sourceList.emplace_back(
+      std::move(makeSourceData(env, jsList[i].As<Object>())));
   }
   return sourceList;
 }
@@ -147,8 +148,7 @@ cm::NCDataList makeNcDataList(Env& env, const Array& jsList) {
   return list;
 }
 
-std::vector<cm::NCDataList> makeNcDataLists(
-  Env& env, const Array& jsList) {
+std::vector<cm::NCDataList> makeNcDataLists(Env& env, const Array& jsList) {
   //
   std::vector<cm::NCDataList> lists;  
   for (auto i = 0u; i < jsList.Length(); ++i) {
@@ -186,7 +186,8 @@ cm::SourceListMap makeSourceListMap(Env& env, const Array& jsList) {
 }
 
 // FromSourceData
-cm::SourceCompatibilityData makeSourceCompatData(Env& env, const Object& jsSourceData) {
+cm::SourceCompatibilityData makeSourceCompatData(
+  Env& env, const Object& jsSourceData) {
   // TODO: addPnslToCompatData(jsSouceData, compatData);
   cm::SourceCompatibilityData compatData{};
   const auto jsPnsl = jsSourceData.Get("primaryNameSrcList").As<Array>();
@@ -211,9 +212,9 @@ cm::SourceCompatibilityData makeSourceCompatData(Env& env, const Object& jsSourc
 }
 
 // FromSourceList
-cm::SourceCompatibilityData makeSourceCompatibilityData(Env& env,
-  const Array& jsSourceList)
-{
+cm::SourceCompatibilityData makeSourceCompatibilityData(
+  Env& env, const Array& jsSourceList) {
+
   cm::SourceCompatibilityData compatData{};
   for (auto i = 0u; i < jsSourceList.Length(); ++i) {
     if (!jsSourceList[i].IsObject()) {
@@ -222,18 +223,20 @@ cm::SourceCompatibilityData makeSourceCompatibilityData(Env& env,
       return {};
     }
     // TODO: addPnslToCompatData(jsSourceList[i].As<Object>(), compatData);
-    const auto jsPnsl = jsSourceList[i].As<Object>().Get("primaryNameSrcList").As<Array>();
+    const auto jsPnsl =
+      jsSourceList[i].As<Object>().Get("primaryNameSrcList").As<Array>();
     for (size_t j{}; j < jsPnsl.Length(); ++j) {
-      const auto count = jsPnsl[j].As<Object>().Get("count").As<Number>().Int32Value();
+      const auto count =
+        jsPnsl[j].As<Object>().Get("count").As<Number>().Int32Value();
       compatData.addSource(count);
     }
   }
   return compatData;
 }
 
-cm::SourceCompatibilityList makeSourceCompatibilityList(Env& env,
-  const Array& jsList)
-{
+cm::SourceCompatibilityList makeSourceCompatibilityList(
+  Env& env, const Array& jsList) {
+
   cm::SourceCompatibilityList sourceCompatList{};
   for (auto i = 0u; i < jsList.Length(); ++i) {
     if (!jsList[i].IsObject()) {
@@ -286,7 +289,8 @@ cm::OrSourceList makeOrSourceList(Env& env, const Array& jsList) {
         .ThrowAsJavaScriptException();
       return {};
     }
-    orSourceList.emplace_back(std::move(makeOrSource(env, jsList[i].As<Object>())));
+    orSourceList.emplace_back(
+      std::move(makeOrSource(env, jsList[i].As<Object>())));
   }
   return orSourceList;
 }
@@ -439,7 +443,6 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
 
   //--
 
-  std::cerr << "wrap starting" << std::endl;
   return cm::wrap(env, cm::PCD.xorSourceList);
 }
 

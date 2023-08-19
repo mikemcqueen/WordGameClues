@@ -241,17 +241,17 @@ const mergeAllCompatibleSources3 = (ncList: NameCount.List,
     return mergedSourcesList;
 };
 
-const nextIndex = (countList: number[], clueIndexes: number[]): boolean => {
+const nextIndex = (countList: number[], clueIndices: number[]): boolean => {
     // increment last index
-    let index = clueIndexes.length - 1;
-    clueIndexes[index] += 1;
+    let index = clueIndices.length - 1;
+    clueIndices[index] += 1;
     // while last index is maxed: reset to zero, increment next-to-last index, etc.
-    while (clueIndexes[index] === ClueManager.getUniqueClueNameCount(countList[index])) {
-        clueIndexes[index] = 0;
+    while (clueIndices[index] === ClueManager.getUniqueClueNameCount(countList[index])) {
+        clueIndices[index] = 0;
         if (--index < 0) {
             return false;
         }
-        clueIndexes[index] += 1;
+        clueIndices[index] += 1;
     }
     return true;
 };
@@ -277,39 +277,45 @@ const skip = (clueCount: number, clueIndex: number): boolean => {
     return Boolean(clue.ignore || clue.skip);
 }
 
-export const next = (countList: number[], clueIndexes: number[]): FirstNextResult => {
+export const next = (countList: number[], clueIndices: number[]): FirstNextResult => {
     for (;;) {
-        if (!nextIndex(countList, clueIndexes)) {
+        if (!nextIndex(countList, clueIndices)) {
             return { done: true };
         }
         let ncList: NameCount.List = [];    // e.g. [ { name: "pollock", count: 2 }, { name: "jackson", count: 4 } ]
         let nameList: string[] = [];        // e.g. [ "pollock", "jackson" ]
-        if (!countList.every((count, index) => {
-            if (skip(count, clueIndexes[index])) return false;
-            let name = ClueManager.getUniqueClueName(count, clueIndexes[index]);
+        if (countList.every((count, index) => {
+            if (skip(count, clueIndices[index])) return false;
+            let name = ClueManager.getUniqueClueName(count, clueIndices[index]);
+            if (nameList.length) {
+                // because we are only comparing to nameList[0]
+                Assert((nameList.length < 2) && "logic broken");
+                // no duplicate names allowed
+                if (nameList[0] === name) return false;
+            }
             nameList.push(name);
+            // TODO: ncList.push({ name, count });
             ncList.push(NameCount.makeNew(name, count));
             return true; // every.continue;
         })) {
-            continue;
+            // TODO: what if I could delay sorting until compatibility was established
+            //nameList.sort();
+            NameCount.sortList(ncList);
+            return { done: false, ncList, nameList };
         }
-        // TODO: what if I could delay sorting until compatibility was established
-        //nameList.sort();
-        NameCount.sortList(ncList);
-        return { done: false, ncList, nameList };
     }
 };
 
-export const first = (countList: number[], clueIndexes: number[]): FirstNextResult => {
+export const first = (countList: number[], clueIndices: number[]): FirstNextResult => {
     // TODO: _.fill?
     for (let index = 0; index < countList.length; ++index) {
         if (ClueManager.getUniqueClueNameCount(countList[index]) === 0) {
             return { done: true };
         }
-        clueIndexes[index] = 0;
+        clueIndices[index] = 0;
     }
-    clueIndexes[clueIndexes.length - 1] = -1;
-    return next(countList, clueIndexes);
+    clueIndices[clueIndices.length - 1] = -1;
+    return next(countList, clueIndices);
 };
 
 //
@@ -340,8 +346,8 @@ const getCombosForUseNcLists = (sum: number, max: number, pcd: PreCompute.Data,
     countListArray.forEach((countList: number[]) => {
         comboCount += 1;
 
-        let clueIndexes: number[] = [];
-        let result = first(countList, clueIndexes);
+        let clueIndices: number[] = [];
+        let result = first(countList, clueIndices);
         if (result.done) return; // continue; 
 
         let numVariations = 1;
@@ -350,7 +356,7 @@ const getCombosForUseNcLists = (sum: number, max: number, pcd: PreCompute.Data,
         let firstIter = true;
         while (!result.done) {
             if (!firstIter) {
-                result = next(countList, clueIndexes);
+                result = next(countList, clueIndices);
                 if (result.done) break;
                 numVariations += 1;
             } else {

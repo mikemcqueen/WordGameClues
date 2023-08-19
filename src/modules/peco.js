@@ -91,12 +91,6 @@ function Peco(args) {
         if (this.count > this.sum) {
             throw new Error(`Peco: count(${this.count}) > sum(${this.sum})`);
         }
-        if (this.require && this.exclude &&
-            _.intersection(this.require, this.exclude).length > 0)
-        {
-            throw new Error('Peco: require and exclude contain same number(s), ' +
-                            _.intersection(this.require, this.exclude));
-        }
     }
 }
 

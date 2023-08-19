@@ -301,15 +301,6 @@ const autoSource = (clueList: ClueList.Primary, args: any):
             skipThisClue = isSentence;
         }
         if (skipThisClue) continue;
-        const isSameSrc = clue.src === "same";
-        if (isSameSrc) {
-            // propagate the .source field from the first clue with a specific
-            // src to all subsequent clues with the "same" src.
-            if (clue.source) {
-                throw new Error(`${clue.name}.src="same" has source="${clue.source}"`);
-            }
-            clue.source = firstClueWithSrc!.source;
-        }
         if (clue.ignore) {
             if (clue.name) {
                 // setting clue.src = clue.name is a hack for property count
@@ -319,7 +310,15 @@ const autoSource = (clueList: ClueList.Primary, args: any):
             }
             continue;
         }
-        if (!isSameSrc) {
+        const isSameSrc = clue.src === "same";
+        if (isSameSrc) {
+            // propagate the .source field from the first clue with a specific
+            // src to all subsequent clues with the "same" src.
+            if (clue.source) {
+                throw new Error(`${clue.name}.src="same" has source="${clue.source}"`);
+            }
+            clue.source = firstClueWithSrc!.source;
+        } else {
             source += 1;
             // save the first clue with a specific src, to enable .source field
             // propagation to subsequent clues with "same" src, above.

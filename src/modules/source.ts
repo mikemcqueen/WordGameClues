@@ -151,10 +151,8 @@ export const getUsedSources = (nameSrcList: NameCount.List):
     UsedSources =>
 {
     let result: UsedSources = [];
-/*
     nameSrcList.filter(nameSrc => isCandidate(nameSrc.count))
 	.forEach(nameSrc => addUsedSource(result, nameSrc.count));
-*/
     return result;
 }
 

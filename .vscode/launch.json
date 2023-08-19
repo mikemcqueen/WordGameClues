@@ -17,27 +17,27 @@
         {
             "type": "node",
             "request": "launch",
-            "name": "cm xor.req",
+            "name": "nodejs 2,2 xor 21",
             "skipFiles": [
                 "<node_internals>/**"
             ],
             "localRoot": "${workspaceFolder}",
             "program": "${workspaceFolder}/src/tools/clues.js",
-            "args": [ "clues.js", "-pf.71", "-c2,2", "-x2",
+            "args": [ "clues.js", "-pf.72", "-c2,2", "-x2",
 //                "--xor", "us 50",
-                "--xor", "koa",
+//                "--xor", "koa",
                 "--xor", "21",
-                "--xor", "currant",
+//                "--xor", "currant",
                 "-v"
             ]
         },
         {
             "type": "cppdbg",
             "request": "launch",
-            "name": "Debug cm",
+            "name": "cppdbg 2,2 xor 21",
             "program": "/usr/local/bin/node",
             "cwd": "${workspaceFolder}/src/tools",
-            "args": [ "clues.js", "-pf.71", "-c2,15", "-x2", "--xor", "us 50", "-v" ]
+            "args": [ "clues.js", "-pf.72", "-c2,2", "-x2", "--xor", "21", "-v" ]
         },
         {
             "type": "cppdbg",
@@ -45,7 +45,7 @@
             "name": "Debug cm no --xor",
             "program": "/usr/local/bin/node",
             "cwd": "${workspaceFolder}/src/tools",
-            "args": [ "clues.js", "-pf.71", "-c3,3", "-x2", "-v" ]
+            "args": [ "clues.js", "-pf.72", "-c3,3", "-x2", "-v" ]
         },
         {
             "type": "cppdbg",
@@ -61,7 +61,7 @@
             "name": "Debug cm xor.req",
             "program": "/usr/local/bin/node",
             "cwd": "${workspaceFolder}/src/tools",
-            "args": [ "clues.js", "-pf.71", "-c2,2", "-x2",
+            "args": [ "clues.js", "-pf.72", "-c2,2", "-x2",
 //                "--xor", "us 50",
 //                "--xor", "koa",
                 "--xor", "21",

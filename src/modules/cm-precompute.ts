@@ -210,16 +210,24 @@ const fillKnownNcSourceListMapForSum = (map: Map<string, Source.AnyData[]>,
     let countListArray: number[][] = Peco.makeNew({ sum, max }).getCombinations();
     // for each countList
     countListArray.forEach((countList: number[]) => {
-        let sourceIndexes: number[] = [];
-        let result = ComboMaker.first(countList, sourceIndexes);
-        if (result.done) return; // continue;
+        let sourceIndices: number[] = [];
 
+        /* compare if output is same for this:
+        for (let result = ComboMaker.first(countList, sourceIndices);
+             !result.done;
+             result = ComboMaker.next(countList, sourceIndices))
+        {
+            addNcListToSourceListMap(result.ncList!, map, args);
+        }
+        */
+        let result = ComboMaker.first(countList, sourceIndices);
+        //if (result.done) return; // continue;
         let firstIter = true;
         while (!result.done) {
             if (firstIter) {
                 firstIter = false;
             } else {
-                result = ComboMaker.next(countList, sourceIndexes);
+                result = ComboMaker.next(countList, sourceIndices);
                 if (result.done) break;
             }
             addNcListToSourceListMap(result.ncList!, map, args);
@@ -230,12 +238,9 @@ const fillKnownNcSourceListMapForSum = (map: Map<string, Source.AnyData[]>,
 const buildKnownNcSourceListMap = (first: number, last: number,
     args: any): Map<string, Source.AnyData[]> =>
 {
-    // TODO: correct-ish, but hacky, and bound to fail soon
-    last = ClueManager.getNumPrimarySources();
     let map = new Map<string, Source.AnyData[]>();
     let begin = new Date();
     for (let sum = first; sum <= last; ++sum) {
-        // TODO: move this to last calculation, above?
         let max = Math.min(args.max, sum);
         fillKnownNcSourceListMapForSum(map, sum, max, args);
     }
@@ -502,7 +507,7 @@ export const preCompute = (first: number, last: number, args: any): Result => {
         ` - ${PrettyMs(d2)}`);
     if (args.or && listIsEmpty(args.allOrNcDataLists)) return { success: false };
     
-    const sourceListMap = buildKnownNcSourceListMap(first, last, args);
+    const sourceListMap = buildKnownNcSourceListMap(2, 35, args);
 
     const build3 = new Date();
     const useSourceLists = buildUseSourceListsFromNcData(sourceListMap, args);
