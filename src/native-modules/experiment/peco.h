@@ -9,10 +9,12 @@
 
 class Peco {
 public:
-  using IndexList = std::forward_list<int>;
+  using index_t = uint32_t;
+  using IndexVector = std::vector<index_t>;
+  using IndexList = std::forward_list<index_t>;
   using IndexListVector = std::vector<IndexList>;
   //const?
-  using take_type = std::vector<int>*;
+  using take_type = IndexVector*;
 
   Peco() = delete;
   Peco(IndexListVector&& indexLists) : index_lists_(std::move(indexLists)) {
@@ -39,7 +41,7 @@ public:
     return take();
   }
 
-  static IndexListVector initial_indices(const std::vector<int>& lengths) {
+  static IndexListVector initial_indices(const std::vector<size_t>& lengths) {
     IndexListVector indexLists;
     indexLists.resize(lengths.size());
     for (size_t i{}; i < indexLists.size(); ++i) {
@@ -57,9 +59,9 @@ private:
     return &result_;
   }
 
-  void reset_iterators(int size) {
+  void reset_iterators(size_t size) {
     iterators_.resize(size);
-    for (int i{}; i < size; ++i) {
+    for (size_t i{}; i < size; ++i) {
       assert(!index_lists_[i].empty());
       iterators_[i] = index_lists_[i].before_begin();
     }
@@ -74,7 +76,7 @@ private:
 
   IndexListVector index_lists_;
   std::vector<IndexList::const_iterator> iterators_;
-  std::vector<int> result_;
+  std::vector<index_t> result_;
   bool done_;
 };
 

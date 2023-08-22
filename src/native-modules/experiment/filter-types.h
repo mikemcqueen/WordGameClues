@@ -6,6 +6,8 @@
 #include <iostream>
 #include <optional>
 #include <vector>
+#include <cuda_runtime.h>
+#include "candidates.h"
 
 namespace cm {
 
@@ -17,6 +19,7 @@ struct SourceIndex {
   index_t index{};
 
   bool operator<(const SourceIndex& rhs) const {
+    // TODO: should be && ?
     return (listIndex < rhs.listIndex) || (index < rhs.index);
   }
 
@@ -121,13 +124,13 @@ struct IndexStates {
         ++num_done;
       }
     }
-#if 0
+    if (logging) {
       std::cerr << "stream " << stream_idx
                 << " update, total: " << src_indices.size()
                 << ", compat: " << num_compatible
                 << ", done: " << num_done << std::endl;
-#endif
-      return num_compatible;
+    }
+    return num_compatible;
   }
 
   auto get(index_t list_index) const {
@@ -147,7 +150,7 @@ struct IndexStates {
     return std::nullopt;
   }
 
-  int num_lists() const {
+  size_t num_lists() const {
     return list.size();
   }
 
@@ -159,7 +162,7 @@ struct IndexStates {
   }
 
   bool done{false};
-  int next_fill_idx{0};
+  index_t next_fill_idx{0};
   std::vector<Data> list;
   std::vector<uint32_t> list_start_indices;
   std::vector<uint32_t> list_sizes;
@@ -197,9 +200,9 @@ public:
   auto fillSourceIndices(IndexStates& idx_states, int max_idx) {
     source_indices.resize(idx_states.done ? 0 : max_idx);
     for (int idx{}; !idx_states.done && (idx < max_idx);) {
-      auto num_skipped_idx{0};  // how many idx were skipped in a row
+      size_t num_skipped_idx{};  // how many idx were skipped in a row
       // this loop logic is funky and brittle, but intentional
-      for (auto list_idx = idx_states.get_next_fill_idx(); /*nada*/;
+      for (auto list_idx = idx_states.get_next_fill_idx(); /* empty */;
            list_idx = idx_states.get_next_fill_idx()) {
         const auto opt_src_idx = idx_states.get_and_increment_index(list_idx);
         if (opt_src_idx.has_value()) {

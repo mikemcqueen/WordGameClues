@@ -10,6 +10,7 @@
       "cm-precompute.cpp",
       "greeting.cpp",
       "index.cpp",
+      "merge-support.cpp",
       "wrap.cpp"
     ],
     "include_dirs": [
@@ -20,7 +21,7 @@
       '/usr/local/cuda/lib64'
     ],
     "libraries": [ '-lcudart', '-lcudadevrt' ],
-    "dependencies": [ "filter" ],
+    "dependencies": [ "merge", "filter" ],
     "defines": [ "NAPI_CPP_EXCEPTIONS" ]
   },
   {
@@ -47,8 +48,39 @@
         '-Xcudafe', '--diag_suppress=declared_but_not_referenced',
         '-O3', '-dopt=on',
         '-Xptxas=-v',
-        #'-g',
-        '-lineinfo', # debug
+        #'-g', # debug
+        '-lineinfo',
+        #'-DCUDA_FORCE_CDP1_IF_SUPPORTED',
+        '-std=c++20', '-dc', '<@(_inputs)'
+      ]
+    }]
+  },
+  {
+    "target_name": "merge",
+    "type": "static_library",
+    "sources": [ "merge.cu" ],
+    "include_dirs": [
+    ],
+    "rules": [{
+      'extension': 'cu',           
+      'inputs': [ '<(RULE_INPUT_PATH)' ],
+      'rule_name': 'cuda on linux',
+      'message': 'compile and device link cuda file on linux',
+      'outputs': [
+        '<(INTERMEDIATE_DIR)/<(RULE_INPUT_ROOT).o',
+        '<(INTERMEDIATE_DIR)/<(RULE_INPUT_ROOT)_link.o'
+       ],
+      'process_outputs_as_sources': 1,
+      'action': [
+        'bash', 'nvcc.sh', '<@(_outputs)', '--expt-relaxed-constexpr',
+        '-Xcompiler', '-fPIC',
+        '-Xcompiler', '-Wall', '-Xcompiler', '-Wextra',
+        #'-Xcompiler', '-pedantic', #'-Werror', '-W' # shit i couldn't get working
+        '-Xcudafe', '--diag_suppress=declared_but_not_referenced',
+        '-O3', '-dopt=on',
+        '-Xptxas=-v',
+        #'-g', # debug
+        '-lineinfo',
         #'-DCUDA_FORCE_CDP1_IF_SUPPORTED',
         '-std=c++20', '-dc', '<@(_inputs)'
       ]

@@ -670,6 +670,15 @@ inline constexpr void assert_valid(const SourceList& src_list) {
   }
 }
 
+inline std::vector<SourceCompatibilityData> makeCompatibleSources(
+  const SourceList& sources) {
+  std::vector<SourceCompatibilityData> compat_sources;
+  for (const auto& src : sources) {
+    compat_sources.push_back(src);
+  }
+  return compat_sources;
+}
+
 // globals
 
 inline PerfData isany_perf{};

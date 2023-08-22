@@ -12,6 +12,7 @@
 #include "candidates.h"
 #include "dump.h"
 #include "wrap.h"
+#include "merge.h"
 
 namespace {
 
@@ -382,7 +383,7 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   auto build1 = high_resolution_clock::now();
   [[maybe_unused]] auto d_build =
     duration_cast<milliseconds>(build1 - build0).count();
-  //std::cerr << " native build - " << d_build << "ms" << std::endl;
+  std::cerr << " native build - " << d_build << "ms" << std::endl;
 
 #if 1
   for (const auto& src_list: sourceLists) {
@@ -396,7 +397,7 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
     auto merge0 = high_resolution_clock::now();
     
     cm::PCD.xorSourceList =
-      std::move(cm::mergeCompatibleXorSourceCombinations(sourceLists));
+      std::move(cm::cuda_mergeCompatibleXorSourceCombinations(sourceLists));
 #if 0
     cm::assert_valid(cm::PCD.xorSourceList);
 #endif

@@ -126,15 +126,13 @@ __device__ bool is_source_xor_or_compatible(
     if (xor_idx < num_xor_sources) {
       if (source.isXorCompatibleWith(xor_sources[xor_idx])) {
         // TODO: Do I need volatile when read/writing shrd mem?
-        // TODO: unnecessary store due to __sync
-        //store(&is_xor_compat, true);
+        // store(&is_xor_compat, true); // unnecessary store due to __sync
         is_xor_compat = true;
       }
     }
     __syncthreads();
     // if source is not XOR compatible with any --xor sources
-    // TODO: unnecessary load due to __sync
-    //if (!load(&is_xor_compat)) {
+    // if (!load(&is_xor_compat)) { // unnecessary load due to __sync
     if (!is_xor_compat) {
       continue;
     }
@@ -143,18 +141,15 @@ __device__ bool is_source_xor_or_compatible(
       // of each or_arg
       if (is_source_or_compatibile(
             source, num_or_args, or_sources, num_or_sources)) {
-        // TODO: unnecessary store due to __sync
-        //store(&is_or_compat, true);
+        // store(&is_or_compat, true); // unnecessary store due to __sync
         is_or_compat = true;
       }
       __syncthreads();
-      // TODO: unnecessary load due to __sync
-      //if (!load(&is_or_compat)) {
+      //if (!load(&is_or_compat)) { // unnecessary load due to __sync
       if (!is_or_compat) {
         if (!threadIdx.x) {
           // reset is_xor_compat. sync will happen at loop entrance.
-          // TODO: unnecessary store due to __sync
-          //store(&is_xor_compat, false);
+          // store(&is_xor_compat, false); // unnecessary store due to __sync
           is_xor_compat = false;
         }
         continue;
@@ -165,7 +160,6 @@ __device__ bool is_source_xor_or_compatible(
   return false;
 }
 
-// one block per source
 __global__ void xor_kernel_new(
   const SourceCompatibilityData* __restrict__ sources,
   const unsigned num_sources,
@@ -175,8 +169,6 @@ __global__ void xor_kernel_new(
   const unsigned num_or_sources, const SourceIndex* __restrict__ source_indices,
   const index_t* __restrict__ list_start_indices, result_t* results,
   int stream_idx) {
-  //
-  //  extern __shared__ result_t or_arg_results[];
   // for each source (one block per source)
   for (unsigned idx{blockIdx.x}; idx < num_sources; idx += gridDim.x) {
     const auto src_idx = source_indices[idx];
@@ -205,7 +197,7 @@ void run_xor_kernel(StreamData& stream, int threads_per_block,
   auto threads_per_sm = 2048;
   auto block_size = threads_per_block ? threads_per_block : 1024;
   auto blocks_per_sm = threads_per_sm / block_size;
-  //  assert(blocks_per_sm * block_size == threads_per_sm);
+  // assert(blocks_per_sm * block_size == threads_per_sm);
   auto grid_size = num_sm * blocks_per_sm;  // aka blocks per grid
   auto shared_bytes = PCD.orArgList.size() * sizeof(result_t);
   // enforce assumption in is_source_or_compatible()
@@ -350,14 +342,6 @@ void check(
   }
 }
 
-auto makeCompatibleSources(const SourceList& sources) {
-  std::vector<SourceCompatibilityData> compat_sources;
-  for (const auto& src : sources) {
-    compat_sources.push_back(src);
-  }
-  return compat_sources;
-}
-
 auto countIndices(const VariationIndicesList& variationIndices) {
   return std::accumulate(variationIndices.begin(), variationIndices.end(), 0,
     [](int total, const auto& indices) {
@@ -461,7 +445,6 @@ std::unordered_set<std::string> filter_task(
 
   stride = std::min((int)src_lists.size(), stride);
   StreamSwarm streams(num_streams, stride);
-  //  StreamData::init(kernels, stride);
 
 #if 0
   std::cerr << "sourcelists: " << src_lists.size() << ", streams: " << num_streams
@@ -616,7 +599,7 @@ cuda_allocCopyOrSources(const OrArgList& orArgList) {
     for (const auto& indices : variationIndices) {
       variationOffsets.push_back(offset);
       // NOTE: Async. I'm going to need to preserve sentenceVariationIndices
-      // until copy is complete - (kernel execution/synhronize?)
+      // until copy is complete - (kernel execution/synchronize?)
       const auto indices_bytes = indices.size() * sizeof(int);
       err = cudaMemcpyAsync(&deviceVariationIndices.sourceIndices[offset],
         indices.data(), indices_bytes, cudaMemcpyHostToDevice);

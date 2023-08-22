@@ -13,6 +13,7 @@
 #include "combo-maker.h"
 #include "dump.h"
 #include "peco.h"
+#include "merge.h"
 
 namespace cm {
 /*
@@ -266,6 +267,7 @@ auto buildSourceListsForUseNcData(const vector<NCDataList>& useNcDataLists,
 
 //////////
 
+/*
 auto getNumEmptySublists(const std::vector<SourceList>& sourceLists) {
   auto count = 0;
   for (const auto& sl : sourceLists) {
@@ -291,7 +293,7 @@ auto filterXorIncompatibleIndices(Peco::IndexListVector& indexLists, int first,
 {
   Peco::IndexList& firstList = indexLists[first];
   for (auto it_first = firstList.before_begin();
-    std::next(it_first) != firstList.end(); /* nothing */)
+    std::next(it_first) != firstList.end();)
   {
     const auto& first_source = sourceLists[first][*std::next(it_first)];
     bool any_compat = anyCompatibleXorSources(first_source, indexLists[second],
@@ -333,7 +335,6 @@ auto list_to_string(const std::vector<int>& v) {
   return r;
 }
 
-/*
 auto set_to_string(const std::set<uint32_t>& s) {
   std::string r;
   auto first = true;
@@ -350,7 +351,7 @@ int64_t get_compat_merge = 0;
 
 // This is called in an inner-loop and should be fast.
 // Called potentially billions of times.
-SourceCRefList getCompatibleXorSources(const std::vector<int>& indexList,
+SourceCRefList getCompatibleXorSources(const Peco::IndexVector& indexList,
   const std::vector<SourceList>& sourceLists)
 {
   // auto reference type, uh, optional here?
@@ -400,6 +401,7 @@ XorSourceList mergeCompatibleXorSources(const SourceCRefList& sourceList) {
   return result;
 }
 
+/*
 auto list_size(const Peco::IndexList& indexList) {
   int size = 0;
   std::for_each(indexList.cbegin(), indexList.cend(),
@@ -423,6 +425,7 @@ std::string vec_to_string(const vector<int>& v) {
   }
   return result;
 }
+*/
 
 auto mergeCompatibleXorSourceCombinations(
   const std::vector<SourceList>& sourceLists) -> XorSourceList
@@ -432,7 +435,8 @@ auto mergeCompatibleXorSourceCombinations(
   if (sourceLists.empty()) return {};
   assert(!getNumEmptySublists(sourceLists)
     && "mergeCompatibleXorSourceCombinations: empty sublist");
-  std::vector<int> lengths{};
+  std::vector<size_t> lengths{};
+  lengths.reserve(sourceLists.size());
   for (const auto& sl : sourceLists) {
     lengths.push_back(sl.size());
   }
