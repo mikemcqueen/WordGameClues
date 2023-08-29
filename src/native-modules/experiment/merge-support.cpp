@@ -22,23 +22,24 @@ auto anyCompatibleXorSources(const SourceData& source,
 }
 
 // TODO: comment this. code is tricky
-auto filterXorIncompatibleIndices(Peco::IndexListVector& indexLists, int first,
-  int second, const std::vector<SourceList>& sourceLists)
-{
-  Peco::IndexList& firstList = indexLists[first];
-  for (auto it_first = firstList.before_begin();
-    std::next(it_first) != firstList.end(); /* nothing */)
+auto filterXorIncompatibleIndices(Peco::IndexListVector& index_lists,
+  int first_list_idx, int second_list_idx,
+  const std::vector<SourceList>& src_lists) {
+  //
+  Peco::IndexList& first_list = index_lists[first_list_idx];
+  for (auto it_first = first_list.before_begin();
+    std::next(it_first) != first_list.end(); /* nothing */)
   {
-    const auto& first_source = sourceLists[first][*std::next(it_first)];
-    bool any_compat = anyCompatibleXorSources(first_source, indexLists[second],
-      sourceLists[second]);
+    const auto& first_src = src_lists[first_list_idx][*std::next(it_first)];
+    bool any_compat = anyCompatibleXorSources(
+      first_src, index_lists[second_list_idx], src_lists[second_list_idx]);
     if (!any_compat) {
-      firstList.erase_after(it_first);
+      first_list.erase_after(it_first);
     } else {
       ++it_first;
     }
   }
-  return !firstList.empty();
+  return !first_list.empty();
 }
 
 auto get_flat_indices(Peco& peco, int num_combinations, bool first = false) {
@@ -190,13 +191,13 @@ auto run_merge_task(
     device_list_start_indices, device_flat_indices, row_size, num_rows,
     device_results);
 
-  //  cudaStreamSynchronize(stream);
-  copy_results(results, device_results, stream);
+  cudaStreamSynchronize(stream);
+  //copy_results(results, device_results, stream);
 
   auto k1 = high_resolution_clock::now();
   auto d_kernel = duration_cast<milliseconds>(k1 - k0).count();
   std::cerr << "kernel finished in " << d_kernel << "ms" << std::endl;
-  return 1;
+  return d_kernel;
 }
 
 }  // namespace
@@ -218,9 +219,8 @@ bool filterAllXorIncompatibleIndices(Peco::IndexListVector& indexLists,
   for (size_t first{}; first < indexLists.size(); ++first) {
     for (size_t second{}; second < indexLists.size(); ++second) {
       if (first == second) continue;
-      if (!filterXorIncompatibleIndices(indexLists, first, second,
-        sourceLists))
-      {
+      if (!filterXorIncompatibleIndices(
+            indexLists, first, second, sourceLists)) {
         return false;
       }
     }
@@ -256,7 +256,9 @@ auto cuda_mergeCompatibleXorSourceCombinations(
   const std::vector<SourceList>& sourceLists) -> XorSourceList {
   using namespace std::chrono;
 
-  if (sourceLists.empty()) return {};
+  if (sourceLists.empty()) {
+    return {};
+  }
   assert(!getNumEmptySublists(sourceLists) && "cuda_merge: empty sublist");
   std::vector<size_t> lengths{};
   lengths.reserve(sourceLists.size());
