@@ -11,12 +11,24 @@ namespace {
 using namespace cm;
 
 __global__ void src_list_compat_kernel(
-  const SourceCompatibilityData* device_sources1,
-  const SourceCompatibilityData* device_sources2,
-  const index_t* device_indices1, unsigned num_device_indices1,
-  const index_t* device_indices2, unsigned num_device_indices2,
-  result_t* device_compat_results) {
-  //
+  const SourceCompatibilityData* sources1,
+  const SourceCompatibilityData* sources2,
+  const index_t* src1_indices, unsigned num_src1_indices,
+  const index_t* src2_indices, unsigned num_src2_indices,
+  result_t* compat_results) {
+  // for each source (one block per source)
+  for (unsigned idx1{blockIdx.x}; idx1 < num_src1_indices; idx1 += gridDim.x) {
+    const auto src1_idx = src1_indices[idx1];
+    const auto& src1 = sources1[src1_idx];
+
+    for (unsigned idx2{threadIdx.x}; idx2 < num_src2_indices;
+         idx2 += blockDim.x) {
+      const auto src2_idx = src2_indices[idx2];
+      const auto& src2 = sources2[src2_idx];
+      const auto result_idx = idx1 * num_src2_indices + idx2;
+      compat_results[result_idx] = src1.isXorCompatibleWith(src2) ? 1 : 0;
+    }
+  }
 }
 
 struct ComboIndex {
@@ -134,6 +146,7 @@ int run_list_pair_compat_kernel(const SourceCompatibilityData* device_sources1,
   src_list_compat_kernel<<<grid_dim, block_dim, shared_bytes, stream>>>(
     device_sources1, device_sources2, device_indices1, num_device_indices1,
     device_indices2, num_device_indices2, device_compat_results);
+  return 0;
 }
 
 }  // namespace cm

@@ -139,7 +139,8 @@ template <typename T> auto sum_sizes(const std::vector<T>& vecs) {
   return sum;
 }
 
-auto alloc_copy_src_lists(const std::vector<SourceList>& src_lists) {
+auto alloc_copy_src_lists(
+  const std::vector<SourceList>& src_lists, size_t* num_bytes = nullptr) {
   // alloc sources
   const cudaStream_t stream = cudaStreamPerThread;
   cudaError_t err = cudaSuccess;
@@ -161,10 +162,14 @@ auto alloc_copy_src_lists(const std::vector<SourceList>& src_lists) {
     }
     index += src_list.size();
   }
+  if (num_bytes) {
+    *num_bytes = sources_bytes;
+  }
   return device_sources;
 }
 
-auto alloc_copy_idx_lists(const std::vector<IndexList>& idx_lists) {
+auto alloc_copy_idx_lists(
+  const std::vector<IndexList>& idx_lists, size_t* num_bytes = nullptr) {
   // alloc indices
   const cudaStream_t stream = cudaStreamPerThread;
   cudaError_t err = cudaSuccess;
@@ -185,6 +190,9 @@ auto alloc_copy_idx_lists(const std::vector<IndexList>& idx_lists) {
     }
     index += idx_list.size();
   }
+  if (num_bytes) {
+    *num_bytes = indices_bytes;
+  }
   return device_indices;
 }
 
@@ -199,7 +207,8 @@ auto make_start_indices(const std::vector<T>& vecs) {
   return start_indices;
 }
 
-auto alloc_copy_start_indices(const IndexList& start_indices) {
+auto alloc_copy_start_indices(
+  const IndexList& start_indices, size_t* num_bytes = nullptr) {
   cudaStream_t stream = cudaStreamPerThread;
   cudaError_t err = cudaSuccess;
   // alloc indices
@@ -211,6 +220,9 @@ auto alloc_copy_start_indices(const IndexList& start_indices) {
   err = cudaMemcpyAsync(device_indices, start_indices.data(),
     indices_bytes, cudaMemcpyHostToDevice, stream);
   assert((err == cudaSuccess) && "merge copy start indices");
+  if (num_bytes) {
+    *num_bytes = indices_bytes;
+  }
   return device_indices;
 }
 
@@ -229,7 +241,8 @@ void for_each_list_pair(
   }
 }
 
-auto alloc_compat_matrices(const std::vector<IndexList>& idx_lists) {
+auto alloc_compat_matrices(
+  const std::vector<IndexList>& idx_lists, size_t* num_bytes = nullptr) {
   size_t num_iterated_list_pairs{};
   uint64_t num_results{};
   for_each_list_pair(idx_lists, [&](size_t i, size_t j, size_t n) {
@@ -257,6 +270,9 @@ auto alloc_compat_matrices(const std::vector<IndexList>& idx_lists) {
   result_t* device_compat_matrices;
   err = cudaMallocAsync((void**)&device_compat_matrices, matrix_bytes, stream);
   assert((err == cudaSuccess) && "merge alloc compat matrices");
+  if (num_bytes) {
+    *num_bytes = matrix_bytes;
+  }
   return device_compat_matrices;
 }
 
@@ -385,27 +401,57 @@ auto cuda_mergeCompatibleXorSourceCombinations(
     return {};
   }
 
+  std::cerr << " copying data to device...";
+
+  auto cdd0 = high_resolution_clock::now();
+
+  size_t total_bytes_allocated{};
+  size_t total_bytes_copied{};
+  size_t num_bytes{};
   // alloc/copy source lists and generate start indices
-  auto device_src_lists = alloc_copy_src_lists(src_lists);
+  auto device_src_lists = alloc_copy_src_lists(src_lists, &num_bytes);
+  total_bytes_allocated += num_bytes;
+  total_bytes_copied += num_bytes;
   auto src_list_start_indices = make_start_indices(src_lists);
 
   // alloc/copy index lists and generate start indices
-  auto device_idx_lists = alloc_copy_idx_lists(idx_lists);
+  auto device_idx_lists = alloc_copy_idx_lists(idx_lists, &num_bytes);
+  total_bytes_allocated += num_bytes;
+  total_bytes_copied += num_bytes;
   auto idx_list_start_indices = make_start_indices(idx_lists);
 
   // alloc compatibility result matrices and generate start indices
-  auto device_compat_matrices = alloc_compat_matrices(idx_lists);
+  auto device_compat_matrices = alloc_compat_matrices(idx_lists, &num_bytes);
+  total_bytes_allocated += num_bytes;
   auto compat_matrix_start_indices =
     make_compat_matrix_start_indices(idx_lists);
 
+  // sync if we want accurate timing
+  cudaStreamSynchronize(cudaStreamPerThread);
+  auto cdd1 = high_resolution_clock::now();
+  auto cdd_dur = duration_cast<milliseconds>(cdd1 - cdd0).count();
+  std::cerr << " complete"  << " - " << cdd_dur << "ms"<< std::endl;
+  std::cerr << "  allocated: " << total_bytes_allocated
+            << ", copied: " << total_bytes_copied << std::endl;
+
+  auto lp0 = high_resolution_clock::now();
+
   // the only unnecessary capture here is src_lists
   for_each_list_pair(idx_lists, [&](size_t i, size_t j, size_t n) {
+    std::cerr << " launching list_pair_compat_kernel " << n << " for [" << i << ", "
+              << j << "]" << std::endl;
     run_list_pair_compat_kernel(&device_src_lists[src_list_start_indices.at(i)],
       &device_src_lists[src_list_start_indices.at(j)],
       &device_idx_lists[idx_list_start_indices.at(i)], idx_lists.at(i).size(),
       &device_idx_lists[idx_list_start_indices.at(j)], idx_lists.at(j).size(),
       &device_compat_matrices[compat_matrix_start_indices.at(n)]);
   });
+
+  // temp
+  cudaStreamSynchronize(cudaStreamPerThread);
+  auto lp1 = high_resolution_clock::now();
+  auto lp_dur = duration_cast<milliseconds>(lp1 - lp0).count();
+  std::cerr << " list_pair_compat_kernels complete - " << lp_dur << "ms" << std::endl;
 
   // alloc/copy start indices
   auto device_src_list_start_indices =
@@ -415,6 +461,7 @@ auto cuda_mergeCompatibleXorSourceCombinations(
   auto device_compat_matrix_start_indices =
     alloc_copy_start_indices(compat_matrix_start_indices);
 
+#if 0
   const int row_size = src_lists.size();
   const int num_rows = 100'000'000;
   auto device_results = alloc_results(num_rows);
@@ -437,6 +484,7 @@ auto cuda_mergeCompatibleXorSourceCombinations(
   std::cerr << "completed " << num_iter << " iters "
             << " of " << num_rows << " rows, total " << total_rows
             << " rows - " << d_task << "ms" << std::endl;
+#endif
 
   // auto peco0 = high_resolution_clock::now();
 
