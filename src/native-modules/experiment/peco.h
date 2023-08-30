@@ -13,7 +13,7 @@ public:
   using IndexVector = std::vector<index_t>;
   using IndexList = std::forward_list<index_t>;
   using IndexListVector = std::vector<IndexList>;
-  //const?
+  // TODO: const?
   using take_type = IndexVector*;
 
   Peco() = delete;
@@ -41,6 +41,10 @@ public:
     return take();
   }
 
+  // TODO:
+  // these static methods actually made sense to be in this class at one point,
+  // but I think they're kinda standalone at this point and don't really belong
+  // here
   static IndexListVector initial_indices(const std::vector<size_t>& lengths) {
     IndexListVector indexLists;
     indexLists.resize(lengths.size());
@@ -48,6 +52,17 @@ public:
       initialize_list(indexLists[i], lengths[i]);
     }
     return indexLists;
+  }
+
+  static std::vector<IndexVector> to_vectors(const IndexListVector& idx_lists) {
+    std::vector<IndexVector> idx_vectors(idx_lists.size());
+    for (size_t i{}; i < idx_lists.size(); ++i) {
+      const auto& idx_list = idx_lists.at(i);
+      auto& idx_vector = idx_vectors.at(i);
+      idx_vector.resize(std::distance(idx_list.begin(), idx_list.end()));
+      std::copy(idx_list.begin(), idx_list.end(), idx_vector.begin());
+    }
+    return idx_vectors;
   }
 
 private:

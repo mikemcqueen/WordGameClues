@@ -12,15 +12,17 @@
 namespace cm {
 
 using result_t = uint8_t;
+
 using index_t = uint32_t;
+using IndexList = std::vector<index_t>;
 
 struct SourceIndex {
   index_t listIndex{};
   index_t index{};
 
-  bool operator<(const SourceIndex& rhs) const {
-    // TODO: should be && ?
-    return (listIndex < rhs.listIndex) || (index < rhs.index);
+  constexpr bool operator<(const SourceIndex& rhs) const {
+    return (listIndex < rhs.listIndex)
+           || ((listIndex == rhs.listIndex) && (index < rhs.index));
   }
 
   constexpr const char* as_string(char* buf) const {
@@ -30,8 +32,7 @@ struct SourceIndex {
 };
 
 struct IndexStates {
-  enum class State
-  {
+  enum class State {
     ready,
     compatible,
     done

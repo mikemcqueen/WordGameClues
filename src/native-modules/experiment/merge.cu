@@ -7,10 +7,20 @@
 #include "combo-maker.h"
 
 namespace {
-  using namespace cm;
+
+using namespace cm;
+
+__global__ void src_list_compat_kernel(
+  const SourceCompatibilityData* device_sources1,
+  const SourceCompatibilityData* device_sources2,
+  const index_t* device_indices1, unsigned num_device_indices1,
+  const index_t* device_indices2, unsigned num_device_indices2,
+  result_t* device_compat_results) {
+  //
+}
 
 struct ComboIndex {
-  index_t row_idx;    // orw index
+  index_t row_idx;    // row index
   index_t elem1_idx;  // first element of the combination
   index_t elem2_idx;  // second element of the combination
 };
@@ -98,6 +108,32 @@ int run_merge_kernel(cudaStream_t stream, int threads_per_block,
             << std::endl;
 #endif
   return 0;
+}
+
+int run_list_pair_compat_kernel(const SourceCompatibilityData* device_sources1,
+  const SourceCompatibilityData* device_sources2,
+  const index_t* device_indices1, unsigned num_device_indices1,
+  const index_t* device_indices2, unsigned num_device_indices2,
+  result_t* device_compat_results) {
+  //
+  int num_sm;
+  cudaDeviceGetAttribute(&num_sm, cudaDevAttrMultiProcessorCount, 0);
+  auto threads_per_sm = 2048;
+  auto block_size = 256;
+  auto blocks_per_sm = threads_per_sm / block_size;
+  auto grid_size = num_sm * blocks_per_sm;  // aka blocks per grid
+  auto shared_bytes = 0;
+
+  //  stream.is_running = true;
+  //  stream.sequence_num = StreamData::next_sequence_num();
+  //  stream.start_time = std::chrono::high_resolution_clock::now();
+  dim3 grid_dim(grid_size);
+  dim3 block_dim(block_size);
+  cudaStream_t stream = cudaStreamPerThread;
+  cudaStreamSynchronize(cudaStreamPerThread);
+  src_list_compat_kernel<<<grid_dim, block_dim, shared_bytes, stream>>>(
+    device_sources1, device_sources2, device_indices1, num_device_indices1,
+    device_indices2, num_device_indices2, device_compat_results);
 }
 
 }  // namespace cm

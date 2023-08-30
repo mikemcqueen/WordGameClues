@@ -8,7 +8,7 @@ BraceWrapping:
  # After the control statement
  AfterControlStatement: false
  # enum definition behind
- AfterEnum: true
+ AfterEnum: false
  # After the function definition
  AfterFunction: false
  # After the namespace definition
