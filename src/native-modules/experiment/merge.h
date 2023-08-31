@@ -11,6 +11,16 @@ namespace cm {
 
 using merge_result_t = int;
 
+struct MatrixDim {
+  index_t rows;
+  index_t columns;
+};
+
+struct MatrixCell {
+  index_t row;
+  index_t column;
+};
+
 int getNumEmptySublists(const std::vector<SourceList>& sourceLists);
 
 bool filterAllXorIncompatibleIndices(Peco::IndexListVector& indexLists,
@@ -27,9 +37,14 @@ auto cuda_mergeCompatibleXorSourceCombinations(
 
 int run_list_pair_compat_kernel(const SourceCompatibilityData* device_sources1,
   const SourceCompatibilityData* device_sources2,
-  const index_t* device_indices1, unsigned num_device_indices1,
-  const index_t* device_indices2, unsigned num_device_indices2,
+  const index_t* device_indices1, unsigned num_indices1,
+  const index_t* device_indices2, unsigned num_indices2,
   result_t* device_compat_results);
+
+int run_get_compat_combos_kernel(unsigned first_combo, unsigned max_combos,
+  const result_t* device_compat_matrices, const index_t* device_compat_matrix_start_indices,
+  MatrixDim* device_compat_matrix_dims, unsigned num_compat_matrices,
+  result_t* device_results);
 
 int run_merge_kernel(cudaStream_t stream, int threads_per_block,
   const SourceCompatibilityData* device_sources,

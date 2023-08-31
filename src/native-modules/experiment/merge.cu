@@ -10,7 +10,9 @@ namespace {
 
 using namespace cm;
 
-__global__ void src_list_compat_kernel(
+constexpr auto kMaxMatrices = 10u;
+
+__global__ void list_pair_compat_kernel(
   const SourceCompatibilityData* sources1,
   const SourceCompatibilityData* sources2,
   const index_t* src1_indices, unsigned num_src1_indices,
@@ -28,6 +30,37 @@ __global__ void src_list_compat_kernel(
       const auto result_idx = idx1 * num_src2_indices + idx2;
       compat_results[result_idx] = src1.isXorCompatibleWith(src2) ? 1 : 0;
     }
+  }
+}
+
+__global__ void get_compat_combos_kernel(unsigned first_combo, unsigned max_combos,
+  const result_t* compat_matrices,
+  const index_t* compat_matrix_start_indices,
+  MatrixDim* compat_matrix_dims, unsigned num_compat_matrices,
+  result_t* results) {
+  //
+  const unsigned threads_per_grid = gridDim.x * blockDim.x;
+  const unsigned thread_idx = blockIdx.x * blockDim.x + threadIdx.x;
+  for (unsigned idx{thread_idx}; idx < max_combos; idx += threads_per_grid) {
+    index_t offset_indices[kMaxMatrices];
+    auto tmp_idx{idx};
+    for (int m{(int)num_compat_matrices - 1}; m >= 0; --m) {
+      auto matrix_size = compat_matrix_dims[m].rows * compat_matrix_dims[m].columns;
+      offset_indices[m] = tmp_idx % matrix_size;
+      tmp_idx /= matrix_size;
+    }
+    bool compatible = true;
+    for (unsigned m{}; m < num_compat_matrices; ++m) {
+      auto result =
+        compat_matrices[compat_matrix_start_indices[m] + offset_indices[m]];
+      //if (!compat_matrices[compat_matrix_start_indices[m] + offset_indices[m]]) {
+      if (!result) {
+        compatible = false;
+        break;
+      }
+      assert(result == 1);
+    }
+    results[idx] = compatible ? 1 : 0;
   }
 }
 
@@ -136,16 +169,40 @@ int run_list_pair_compat_kernel(const SourceCompatibilityData* device_sources1,
   auto grid_size = num_sm * blocks_per_sm;  // aka blocks per grid
   auto shared_bytes = 0;
 
-  //  stream.is_running = true;
-  //  stream.sequence_num = StreamData::next_sequence_num();
-  //  stream.start_time = std::chrono::high_resolution_clock::now();
   dim3 grid_dim(grid_size);
   dim3 block_dim(block_size);
   cudaStream_t stream = cudaStreamPerThread;
   cudaStreamSynchronize(cudaStreamPerThread);
-  src_list_compat_kernel<<<grid_dim, block_dim, shared_bytes, stream>>>(
+  list_pair_compat_kernel<<<grid_dim, block_dim, shared_bytes, stream>>>(
     device_sources1, device_sources2, device_indices1, num_device_indices1,
     device_indices2, num_device_indices2, device_compat_results);
+  return 0;
+}
+
+int run_get_compat_combos_kernel(unsigned first_combo, unsigned max_combos,
+  const result_t* device_compat_matrices,
+  const index_t* device_compat_matrix_start_indices,
+  MatrixDim* device_compat_matrix_dims, unsigned num_compat_matrices,
+  result_t* device_results) {
+  //
+  assert((num_compat_matrices <= kMaxMatrices)
+         && "max compat matrix count exceeded (easy fix)");
+  int num_sm;
+  cudaDeviceGetAttribute(&num_sm, cudaDevAttrMultiProcessorCount, 0);
+  auto threads_per_sm = 2048;
+  auto block_size = 256;
+  auto blocks_per_sm = threads_per_sm / block_size;
+  auto grid_size = num_sm * blocks_per_sm;  // aka blocks per grid
+  auto shared_bytes = 0;
+
+  dim3 grid_dim(grid_size);
+  dim3 block_dim(block_size);
+  cudaStream_t stream = cudaStreamPerThread;
+  cudaStreamSynchronize(cudaStreamPerThread);
+  get_compat_combos_kernel<<<grid_dim, block_dim, shared_bytes, stream>>>(
+    first_combo, max_combos, device_compat_matrices,
+    device_compat_matrix_start_indices, device_compat_matrix_dims,
+    num_compat_matrices, device_results);
   return 0;
 }
 

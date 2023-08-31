@@ -100,27 +100,27 @@ void zero_results(merge_result_t* results, size_t num_results, cudaStream_t stre
   cudaError_t err = cudaSuccess;
   auto results_bytes = num_results * sizeof(merge_result_t);
   err = cudaMemsetAsync(results, 0, results_bytes, stream);
-  assert((err == cudaSuccess) && "zero results");
+  assert((err == cudaSuccess) && "merge zero results");
 }
 
 auto alloc_results(size_t num_results) {  // TODO cudaStream_t stream) {
   cudaStream_t stream = cudaStreamPerThread;
   cudaError_t err = cudaSuccess;
   // alloc results
-  auto results_bytes = num_results * sizeof(merge_result_t);
-  merge_result_t* device_results;
+  auto results_bytes = num_results * sizeof(result_t);
+  result_t* device_results;
   err = cudaMallocAsync((void**)&device_results, results_bytes, stream);
-  assert((err == cudaSuccess) && "alloc results");
+  assert((err == cudaSuccess) && "merge alloc results");
   return device_results;
 }
 
-void copy_results(std::vector<merge_result_t>& results,
-  merge_result_t* device_results, cudaStream_t stream) {
+void copy_results(std::vector<result_t>& results,
+  result_t* device_results, cudaStream_t stream) {
   //
   cudaError_t err = cudaStreamSynchronize(stream);
-  assert((err == cudaSuccess) && "sychronize");
+  assert((err == cudaSuccess) && "merge copy sychronize1");
 
-  auto results_bytes = results.size() * sizeof(merge_result_t);
+  auto results_bytes = results.size() * sizeof(result_t);
   err = cudaMemcpyAsync(results.data(), device_results, results_bytes,
     cudaMemcpyDeviceToHost, stream);
   if (err != cudaSuccess) {
@@ -128,7 +128,7 @@ void copy_results(std::vector<merge_result_t>& results,
     assert((err != cudaSuccess) && "merge copy device results");
   }
   err = cudaStreamSynchronize(stream);
-  assert((err == cudaSuccess) && "cudaStreamSynchronize");
+  assert((err == cudaSuccess) && "merge copy cudaStreamSynchronize2");
 }
 
 template <typename T> auto sum_sizes(const std::vector<T>& vecs) {
@@ -294,6 +294,31 @@ auto make_compat_matrix_start_indices(const std::vector<IndexList>& idx_lists) {
   return start_indices;
 }
 
+auto alloc_copy_compat_matrix_dims(
+  const std::vector<IndexList>& idx_lists, size_t* num_bytes = nullptr) {
+  //
+  std::vector<MatrixDim> matrix_dims;
+  for_each_list_pair(idx_lists, [&](size_t i, size_t j, size_t n) {
+    matrix_dims.push_back({(index_t)idx_lists.at(i).size(), (index_t)idx_lists.at(j).size()});
+  });
+  cudaStream_t stream = cudaStreamPerThread;
+  cudaError_t err = cudaSuccess;
+  // alloc matrix data
+  auto matrix_dims_bytes = matrix_dims.size() * sizeof(MatrixDim);
+  MatrixDim* device_matrix_dims;
+  err = cudaMallocAsync((void**)&device_matrix_dims, matrix_dims_bytes, stream);
+  assert((err == cudaSuccess) && "merge alloc compat matrix data");
+  // copy matrix data
+  err = cudaMemcpyAsync(device_matrix_dims, matrix_dims.data(), matrix_dims_bytes,
+    cudaMemcpyHostToDevice, stream);
+  assert((err == cudaSuccess) && "merge copy compat matrix data");
+  if (num_bytes) {
+    *num_bytes = matrix_dims_bytes;
+  }
+  return device_matrix_dims;
+}
+
+  /*
 auto alloc_copy_flat_indices(const IndexList& flat_indices) {
   cudaStream_t stream = cudaStreamPerThread;
   cudaError_t err = cudaSuccess;
@@ -308,6 +333,7 @@ auto alloc_copy_flat_indices(const IndexList& flat_indices) {
   assert((err == cudaSuccess) && "merge copy flat indices");
   return device_indices;
 }
+  */
 
 auto run_merge_task(const SourceCompatibilityData* device_sources,
   const index_t* device_list_start_indices, const index_t* device_flat_indices,
@@ -454,45 +480,55 @@ auto cuda_mergeCompatibleXorSourceCombinations(
   std::cerr << " list_pair_compat_kernels complete - " << lp_dur << "ms" << std::endl;
 
   // alloc/copy start indices
+  /*
   auto device_src_list_start_indices =
     alloc_copy_start_indices(src_list_start_indices);
   auto device_idx_list_start_indices =
     alloc_copy_start_indices(idx_list_start_indices);
+  */
   auto device_compat_matrix_start_indices =
     alloc_copy_start_indices(compat_matrix_start_indices);
+  auto device_compat_matrix_dims = alloc_copy_compat_matrix_dims(idx_lists);
 
-#if 0
-  const int row_size = src_lists.size();
-  const int num_rows = 100'000'000;
-  auto device_results = alloc_results(num_rows);
+  //  const int row_size = src_lists.size();
+  auto first_combo = 0u;
+  const auto max_combos = 100'000'000u;
+  auto device_results = alloc_results(max_combos);
 
-  auto t0 = high_resolution_clock::now();
+  int n{};
+  std::cerr << " launching get_compat_combos_kernel " << n << " for ["
+            << first_combo << ", " << max_combos << "]" << std::endl;
 
-  int num_iter{};
-  int64_t total_rows{};
-  for (auto first{true};;first = false, ++num_iter) {
-    /*
-    run_merge_task(device_src_lists, device_src_list_start_indices,
-      device_flat_indices, row_size, flat_indices.size() / row_size,
-      device_results);
-    */
-  }
+  auto gcc0 = high_resolution_clock::now();
+  run_get_compat_combos_kernel(first_combo, max_combos, device_compat_matrices,
+    device_compat_matrix_start_indices, device_compat_matrix_dims,
+    compat_matrix_start_indices.size(), device_results);
 
-  auto t1 = high_resolution_clock::now();
-  auto d_task = duration_cast<milliseconds>(t1 - t0).count();
+  // temp
+  cudaStreamSynchronize(cudaStreamPerThread);
+  auto gcc1 = high_resolution_clock::now();
+  auto gcc_dur = duration_cast<milliseconds>(gcc1 - gcc0).count();
 
-  std::cerr << "completed " << num_iter << " iters "
-            << " of " << num_rows << " rows, total " << total_rows
-            << " rows - " << d_task << "ms" << std::endl;
-#endif
+  std::cerr << " completed "
+            // << num_iter << " iters "
+            // << " of " << num_rows << " rows, total " << total_rows  << " rows
+            << " - " << gcc_dur << "ms" << std::endl;
 
-  // auto peco0 = high_resolution_clock::now();
+  std::vector<result_t> results(max_combos);
+  auto cr0 = high_resolution_clock::now();
+  copy_results(results, device_results, cudaStreamPerThread);
+  auto hits = std::accumulate(
+    results.begin(), results.end(), 0, [](int total, result_t result) {
+      if (result) {
+        ++total;
+      }
+      return total;
+    });
+  auto cr1 = high_resolution_clock::now();
+  auto cr_dur = duration_cast<milliseconds>(cr1 - cr0).count();
+  std::cerr << " copied results, hits(" << hits << ")"
+            << " - " << cr_dur << "ms" << std::endl;
 
-  /*
-  int64_t combos = 0;
-  int compatible = 0;
-  int merged = 0;
-  */
   XorSourceList xorSourceList{};
 
   /*
@@ -503,8 +539,6 @@ auto cuda_mergeCompatibleXorSourceCombinations(
     if (mergedSources.empty()) continue;
     xorSourceList.emplace_back(std::move(mergedSources.back()));
   }
-  */
-  /*
   auto peco1 = high_resolution_clock::now();
   [[maybe_unused]] auto d_peco =
     duration_cast<milliseconds>(peco1 - peco0).count();
