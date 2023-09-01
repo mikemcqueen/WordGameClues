@@ -1,3 +1,7 @@
+* running multiple list_pair_compat kernels in merge stage seems unnecessary;
+  i could make that kernel more loopy and handle all list pairs in one call.
+  low priority though, as it finishes the current impl in under 25ms.
+
 * HACK: 35 passed to buildKnownNcSourceListMap, in cm-precompute.ts.
   The problem here is that we have no defined upper-bound on how many primary
   sources a single "clue" or "useSource" could represent. 21 for example,

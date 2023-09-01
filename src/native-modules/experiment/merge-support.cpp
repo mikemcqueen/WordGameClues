@@ -454,11 +454,10 @@ void host_show_num_compat_combos(const uint64_t first_combo,
       row_indices.at(i) = tmp_idx % list_size;
       tmp_idx /= list_size;
     }
-    bool compat = true;
     // not using for_each_list_pair here because I may need to translate
     // this to a cuda kernel, this is more likely what it will look like.
-    int n{};
-    for (size_t i{}; i < compat_matrices.size() - 1; ++i) {
+    bool compat = true;
+    for (size_t i{}, n{}; compat && (i < compat_matrices.size() - 1); ++i) {
       for (size_t j{i + 1}; j < compat_matrices.size(); ++j, ++n) {
         auto offset = row_indices.at(i) * list_sizes.at(j) + row_indices.at(j);
         assert(((!i && (j == 1)) || n) && "yeah no");
