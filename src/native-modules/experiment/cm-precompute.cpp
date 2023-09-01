@@ -375,8 +375,8 @@ SourceCRefList getCompatibleXorSources(const Peco::IndexVector& indexList,
 // here is called much less often, less speed critical
 XorSourceList mergeCompatibleXorSources(const SourceCRefList& sourceList) {
   // TODO: this is kind of a weird way of doing things that requires a
-  // XorSource (SourceData) multi-type move constructor. couldn't I
-  // just start with an XorSource here initialized to sourceList[0] values
+  // XorSource (SourceData) multi-type move constructor. couldn't I just
+  // start with an XorSource here initialized to sourceList[0] values
   // and merge-in-place all the subsequent elements? could even be a
   // SourceData member function.
   // TODO: Also, why am I not just |='ing srcbits in the loop?
@@ -460,7 +460,6 @@ auto mergeCompatibleXorSourceCombinations(
 
   int64_t combos = 0;
   int compatible = 0;
-  int merged = 0;
   XorSourceList xorSourceList{};
   Peco peco(std::move(indexLists));
   for (auto indexList = peco.first_combination(); indexList;
@@ -472,7 +471,6 @@ auto mergeCompatibleXorSourceCombinations(
     ++compatible;
     XorSourceList mergedSources = mergeCompatibleXorSources(sourceCRefList);
     if (mergedSources.empty()) continue;
-    ++merged;
     xorSourceList.emplace_back(std::move(mergedSources.back()));
   }
   auto peco1 = high_resolution_clock::now();
@@ -482,7 +480,6 @@ auto mergeCompatibleXorSourceCombinations(
   std::cerr << " native peco loop: " << d_peco << "ms"
             << ", combos: " << combos << ", compatible: " << compatible
             << ", get_compat_merge: " << get_compat_merge
-            << ", merged: " << merged
             << ", XorSources: " << xorSourceList.size() << std::endl;
 #endif
 

@@ -58,12 +58,12 @@
         {
             "type": "cppdbg",
             "request": "launch",
-            "name": "Debug cm xor.req",
+            "name": "cppdbg xor.req",
             "program": "/usr/local/bin/node",
             "cwd": "${workspaceFolder}/src/tools",
             "args": [ "clues.js", "-pf.72", "-c2,2", "-x2",
 //                "--xor", "us 50",
-//                "--xor", "koa",
+                "--xor", "koa",
                 "--xor", "21",
                 "--xor", "currant",
                 "-v"
