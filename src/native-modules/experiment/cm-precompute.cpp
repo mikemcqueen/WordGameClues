@@ -409,14 +409,6 @@ auto list_size(const Peco::IndexList& indexList) {
   return size;
 }
 
-auto vec_product(const vector<int>& v) {
-  int64_t result{1};
-  for (auto i : v) {
-    result *= i;
-  }
-  return result;
-}
-
 std::string vec_to_string(const vector<int>& v) {
   std::string result{};
   for (auto i : v) {
@@ -426,6 +418,14 @@ std::string vec_to_string(const vector<int>& v) {
   return result;
 }
 */
+
+auto vec_product(const vector<int>& v) {
+  int64_t result{1};
+  for (auto i : v) {
+    result *= i;
+  }
+  return result;
+}
 
 auto mergeCompatibleXorSourceCombinations(
   const std::vector<SourceList>& sourceLists) -> XorSourceList

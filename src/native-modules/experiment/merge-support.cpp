@@ -42,6 +42,18 @@ auto filterXorIncompatibleIndices(Peco::IndexListVector& index_lists,
   return !first_list.empty();
 }
 
+template <typename T>
+auto multiply_with_overflow_check(const std::vector<T>& values) {
+  uint64_t total{1};
+  for (auto v : values) {
+    if (v > std::numeric_limits<uint64_t>::max() / total) {
+      throw std::overflow_error("Multiplication overflow");
+    }
+    total *= v;
+  }
+  return total;
+}
+
 // Given a vector of source lists, generate a vector of index lists: one for
 // each source list, representing every source in every list. Then filter out
 // incompatible indices from each index list, returning a vector of compatible
@@ -55,15 +67,16 @@ std::vector<IndexList> get_compatible_indices(
     lengths.push_back(sl.size());
   }
   std::cerr << "  initial lengths: " << vec_to_string(lengths)
-            << ", product: " << vec_product(lengths) << std::endl;
+            << ", product: " << multiply_with_overflow_check(lengths)
+            << std::endl;
   auto idx_lists = Peco::initial_indices(lengths);
   bool valid = filterAllXorIncompatibleIndices(idx_lists, src_lists);
   lengths.clear();
   for (const auto& il : idx_lists) {
-    lengths.push_back(list_size(il));
+    lengths.push_back(std::distance(il.begin(), il.end())); // list_size(il));
   }
   std::cerr << "  filtered lengths: " << vec_to_string(lengths)
-            << ", product: " << vec_product(lengths)
+            << ", product: " << multiply_with_overflow_check(lengths)
             << ", valid: " << std::boolalpha << valid << std::endl;
   // "valid" means all resulting index lists have non-zero length
   if (!valid) {
@@ -333,9 +346,8 @@ void debug_copy_show_compat_matrix_hit_count(
 auto get_compat_matrices(
   const std::vector<SourceList>& src_lists, std::vector<IndexList> idx_lists) {
   //
-  std::vector<std::vector<result_t>> host_compat_matrices;
-
   using namespace std::chrono;
+  std::vector<std::vector<result_t>> host_compat_matrices;
   auto t0 = high_resolution_clock::now();
 
   int total_compat{};
@@ -416,17 +428,6 @@ void host_show_num_compat_combos(const uint64_t first_combo,
             << "]: " << num_compat << " - " << t_dur << "ms" << std::endl;
 }
 
-auto multiply_with_overflow_check(std::vector<index_t> values) {
-  uint64_t total{1};
-  for (auto v : values) {
-    if (v > std::numeric_limits<uint64_t>::max() / total) {
-      throw std::overflow_error("Multiplication overflow");
-    }
-    total *= v;
-  }
-  return total;
-}
-
 //
 auto process_results(const std::vector<result_t>& results, uint64_t start_idx,
   uint64_t num_results, std::vector<uint64_t>& result_indices) {
@@ -449,15 +450,6 @@ auto run_get_compat_combos_task(const result_t* device_compat_matrices,
 
   using namespace std::chrono;
   uint64_t first_combo{};
-  // this number because im lazy:
-  // * 200M kernel finishes in ~35ms, which DOES NOT give us enough time to do
-  //   all the things we want, when interleaving streams:
-  //   * copy results from device (~10ms)
-  //   * iterate results and append indices to "hit indices" list. (~150ms)
-  //   * mayyybe do some source-merging on CPU. not sure. very possibly though,
-  //     given that the #of hits is a overall a very small (??ms)
-  // * it seems like a decent sized chunk of device memory to alloc/copy, esp
-  //   if there are multiple streams (x2, x3 that amount).
   uint64_t num_combos{200'000'000};
   const uint64_t max_combos{multiply_with_overflow_check(list_sizes)};
   // TODO: free
@@ -475,7 +467,6 @@ auto run_get_compat_combos_task(const result_t* device_compat_matrices,
                 << first_combo << ", " << first_combo + num_combos << "]"
                 << std::endl;
     }
-
     auto gcc0 = high_resolution_clock::now();
 
     run_get_compat_combos_kernel(first_combo, num_combos,
@@ -486,12 +477,10 @@ auto run_get_compat_combos_task(const result_t* device_compat_matrices,
     cudaStreamSynchronize(cudaStreamPerThread);
     auto gcc1 = high_resolution_clock::now();
     auto gcc_dur = duration_cast<milliseconds>(gcc1 - gcc0).count();
-
     if constexpr (logging) {
       std::cerr << " completed get_compat_combos_kernel " << n << " - "
                 << gcc_dur << "ms" << std::endl;
     }
-
     auto cpr0 = high_resolution_clock::now();
 
     sync_copy_results(host_results, num_combos, device_results, cudaStreamPerThread);
@@ -506,6 +495,54 @@ auto run_get_compat_combos_task(const result_t* device_compat_matrices,
     }
   }
   return result_indices;
+}
+
+auto get_src_indices(
+  uint64_t combo_idx, const std::vector<IndexList>& idx_lists) {
+  std::vector<index_t> src_indices(idx_lists.size());
+  for (int i{(int)idx_lists.size() - 1}; i >= 0; --i) {
+    const auto& idx_list = idx_lists.at(i);
+    src_indices.at(i) = idx_list.at(combo_idx % idx_list.size());
+    combo_idx /= idx_list.size();
+  }
+  return src_indices;
+}
+
+XorSource merge_sources(const std::vector<index_t>& src_indices,
+  const std::vector<SourceList>& src_lists) {
+  // this code is taken from cm-precompute.cpp.
+  // TODO: this is kind of a weird way of doing things that requires a
+  // XorSource (SourceData) multi-type move constructor. couldn't I just
+  // start with an XorSource here initialized to sourceList[0] values
+  // and merge-in-place all the subsequent elements? could even be a
+  // SourceData member function.
+  // TODO: Also, why am I not just |='ing legacySrcBits in the loop?
+  NameCountList primaryNameSrcList{};
+  NameCountList ncList{};
+  UsedSources usedSources{};
+  for (size_t i{}; i < src_indices.size(); ++i) {
+    const auto& src = src_lists.at(i).at(src_indices.at(i));
+    const auto& pnsl = src.primaryNameSrcList;
+    primaryNameSrcList.insert(primaryNameSrcList.end(), pnsl.begin(), pnsl.end()); // copy (by design?)
+    const auto& ncl = src.ncList;
+    ncList.insert(ncList.end(), ncl.begin(), ncl.end());                           // copy (by design?)
+    usedSources.mergeInPlace(src.usedSources);
+  }
+  assert(!primaryNameSrcList.empty() && "empty primaryNameSrcList");
+  return XorSource{std::move(primaryNameSrcList),
+    std::move(NameCount::listToLegacySourceBits(primaryNameSrcList)),
+    std::move(usedSources), std::move(ncList)};
+}
+
+auto host_merge(const std::vector<SourceList>& src_lists,
+  const std::vector<IndexList>& idx_lists,
+  const std::vector<uint64_t>& combo_indices) {
+  XorSourceList xorSourceList;
+  for (auto combo_idx : combo_indices) {
+    auto src_indices = get_src_indices(combo_idx, idx_lists);
+    xorSourceList.emplace_back(merge_sources(src_indices, src_lists));
+  }
+  return xorSourceList;
 }
 
 }  // namespace
@@ -537,20 +574,11 @@ bool filterAllXorIncompatibleIndices(Peco::IndexListVector& idx_lists,
 }
 
 int list_size(const Peco::IndexList& indexList) {
-  // TODO: WTF am I doing here. forward_list doesn't have a size()?
-  // iterator arithmetic doesn't work? std::accumulate doesn't work?
+  // TODO: use std::distance?
   int size = 0;
   std::for_each(indexList.cbegin(), indexList.cend(),
                 [&size](int i){ ++size; });
   return size;
-}
-
-int64_t vec_product(const std::vector<size_t>& v) {
-  int64_t result{1};
-  for (auto i : v) {
-    result *= i;
-  }
-  return result;
 }
 
 std::string vec_to_string(const std::vector<size_t>& v) {
@@ -582,20 +610,25 @@ auto cuda_mergeCompatibleXorSourceCombinations(
   size_t total_bytes_copied{};
   size_t num_bytes{};
   // alloc/copy source lists and generate start indices
+  // TODO: free
   auto device_src_lists = alloc_copy_src_lists(src_lists, &num_bytes);
   total_bytes_allocated += num_bytes;
   total_bytes_copied += num_bytes;
   auto src_list_start_indices = make_start_indices(src_lists);
 
   // alloc/copy index lists and generate start indices
+  // TODO: free
   auto device_idx_lists = alloc_copy_idx_lists(idx_lists, &num_bytes);
   total_bytes_allocated += num_bytes;
   total_bytes_copied += num_bytes;
   auto idx_list_start_indices = make_start_indices(idx_lists);
 
   // alloc compatibility result matrices and generate start indices
-  auto device_compat_matrices = alloc_compat_matrices(idx_lists, &num_bytes);
-  total_bytes_allocated += num_bytes;
+  size_t num_compat_matrix_bytes{};
+  // TODO: free
+  auto device_compat_matrices =
+    alloc_compat_matrices(idx_lists, &num_compat_matrix_bytes);
+  total_bytes_allocated += num_compat_matrix_bytes;
   auto compat_matrix_start_indices =
     make_compat_matrix_start_indices(idx_lists);
 
@@ -628,36 +661,31 @@ auto cuda_mergeCompatibleXorSourceCombinations(
   std::cerr << " list_pair_compat_kernels complete - " << lp_dur << "ms" << std::endl;
 
   // debugging
-  //debug_copy_show_compat_matrix_hit_count(device_compat_matrices, num_bytes);
+  // debug_copy_show_compat_matrix_hit_count(device_compat_matrices,
+  // num_compat_matrix_bytes);
 
   // alloc/copy start indices
+  // TODO: free
   auto device_compat_matrix_start_indices =
     alloc_copy_start_indices(compat_matrix_start_indices);
 
   // run get_compat_combos kernels
+  const auto list_sizes = make_list_sizes(idx_lists);
   auto gcc0 = high_resolution_clock::now();
-  auto result_indices = run_get_compat_combos_task(device_compat_matrices,
-    device_compat_matrix_start_indices, make_list_sizes(idx_lists));
+  auto combo_indices = run_get_compat_combos_task(
+    device_compat_matrices, device_compat_matrix_start_indices, list_sizes);
   auto gcc1 = high_resolution_clock::now();
   auto gcc_dur = duration_cast<milliseconds>(gcc1 - gcc0).count();
-  std::cerr << " get_compat_combos kernels complete (" << result_indices.size()
+  std::cerr << " get_compat_combos kernels complete (" << combo_indices.size()
             << ") - " << gcc_dur << "ms" << std::endl;
 
 #if defined(HOST_SIDE_COMPARISON)
-  // host-side compat check for debugging/comparison
-  // TODO: throw this accumulator into host_show_num_compat.
-  const auto max_combos = std::accumulate(idx_lists.begin(),
-    idx_lists.end(), (uint64_t)1, [](uint64_t total, const IndexList& idx_list) {
-      // TODO: multiply_with_overflow_check
-      total *= idx_list.size();
-      return total;
-    });
-  auto host_compat_matrices = get_compat_matrices(src_lists, idx_lists);
-  host_show_num_compat_combos(
-    0, max_combos, host_compat_matrices, make_list_sizes(idx_lists));
+  // host-side compat combo counter for debugging/comparison. slow.
+  host_show_num_compat_combos(0, multiply_with_overflow_check(list_sizes),
+    get_compat_matrices(src_lists, idx_lists), list_sizes);
 #endif
 
-  XorSourceList xorSourceList{};
+  auto xorSourceList = host_merge(src_lists, idx_lists, combo_indices);
   return xorSourceList;
 }
 
