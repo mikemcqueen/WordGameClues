@@ -114,21 +114,21 @@ auto alloc_results(size_t num_results) {  // TODO cudaStream_t stream) {
   return device_results;
 }
 
-void copy_results(std::vector<result_t>& results,
+void sync_copy_results(std::vector<result_t>& results, unsigned num_results,
   result_t* device_results, cudaStream_t stream) {
   //
   cudaError_t err = cudaStreamSynchronize(stream);
-  assert((err == cudaSuccess) && "merge copy sychronize1");
+  assert((err == cudaSuccess) && "merge copy results pre-sync");
 
-  auto results_bytes = results.size() * sizeof(result_t);
+  auto results_bytes = num_results * sizeof(result_t);
   err = cudaMemcpyAsync(results.data(), device_results, results_bytes,
     cudaMemcpyDeviceToHost, stream);
   if (err != cudaSuccess) {
     fprintf(stdout, "merge copy results, error: %s", cudaGetErrorString(err));
-    assert((err != cudaSuccess) && "merge copy device results");
+    assert((err != cudaSuccess) && "merge copy results");
   }
   err = cudaStreamSynchronize(stream);
-  assert((err == cudaSuccess) && "merge copy cudaStreamSynchronize2");
+  assert((err == cudaSuccess) && "merge copy results post-sync");
 }
 
 template <typename T> auto sum_sizes(const std::vector<T>& vecs) {
@@ -249,14 +249,6 @@ auto alloc_compat_matrices(
     num_results += idx_lists.at(i).size() * idx_lists.at(j).size();
     ++num_iterated_list_pairs;
   });
-  /*
-  for (size_t i{}; i < idx_lists.size() - 1; ++i) {
-    for (size_t j{i + 1}; j < idx_lists.size(); ++j) {
-      num_results += idx_lists.at(i).size() * idx_lists.at(j).size();
-      ++num_iterated_list_pairs;
-    }
-  }
-  */
   // because we use 32 bit start-indices.
   assert((num_results < std::numeric_limits<index_t>::max())
          && "numeric limit exceeded");
@@ -283,45 +275,36 @@ auto make_compat_matrix_start_indices(const std::vector<IndexList>& idx_lists) {
     start_indices.push_back(index);
     index += idx_lists.at(i).size() * idx_lists.at(j).size();
   });
-  /*
-  for (size_t i{}; i < idx_lists.size() - 1; ++i) {
-    for (size_t j{i + 1}; j < idx_lists.size(); ++j) {
-      start_indices.push_back(index);
-      index += idx_lists.at(i).size() * idx_lists.at(j).size();
-    }
-  }
-  */
   return start_indices;
 }
 
-auto make_matrix_dims(const std::vector<IndexList>& idx_lists) {
-  std::vector<MatrixDim> matrix_dims;
-  for_each_list_pair(idx_lists, [&](size_t i, size_t j, size_t n) {
-    matrix_dims.push_back(
-      {(index_t)idx_lists.at(i).size(), (index_t)idx_lists.at(j).size()});
-  });
-  return matrix_dims;
+auto make_list_sizes(const std::vector<IndexList>& idx_lists) {
+  IndexList sizes;
+  sizes.reserve(idx_lists.size());
+  for (const auto& idx_list : idx_lists) {
+    sizes.push_back(idx_list.size());
+  }
+  return sizes;
 }
 
-auto alloc_copy_compat_matrix_dims(
-  const std::vector<IndexList>& idx_lists, size_t* num_bytes = nullptr) {
+auto alloc_copy_list_sizes(
+  const std::vector<index_t>& list_sizes, size_t* num_bytes = nullptr) {
   //
-  auto matrix_dims = make_matrix_dims(idx_lists);
   cudaStream_t stream = cudaStreamPerThread;
   cudaError_t err = cudaSuccess;
-  // alloc matrix data
-  auto matrix_dims_bytes = matrix_dims.size() * sizeof(MatrixDim);
-  MatrixDim* device_matrix_dims;
-  err = cudaMallocAsync((void**)&device_matrix_dims, matrix_dims_bytes, stream);
-  assert((err == cudaSuccess) && "merge alloc compat matrix data");
-  // copy matrix data
-  err = cudaMemcpyAsync(device_matrix_dims, matrix_dims.data(), matrix_dims_bytes,
+  // alloc list sizes
+  auto list_sizes_bytes = list_sizes.size() * sizeof(index_t);
+  index_t* device_list_sizes;
+  err = cudaMallocAsync((void**)&device_list_sizes, list_sizes_bytes, stream);
+  assert((err == cudaSuccess) && "merge alloc list sizes");
+  // copy list sizes
+  err = cudaMemcpyAsync(device_list_sizes, list_sizes.data(), list_sizes_bytes,
     cudaMemcpyHostToDevice, stream);
-  assert((err == cudaSuccess) && "merge copy compat matrix data");
+  assert((err == cudaSuccess) && "merge copy list sizes");
   if (num_bytes) {
-    *num_bytes = matrix_dims_bytes;
+    *num_bytes = list_sizes_bytes;
   }
-  return device_matrix_dims;
+  return device_list_sizes;
 }
 
 // for debugging
@@ -391,58 +374,13 @@ auto get_compat_matrices(
   return host_compat_matrices;
 }
 
-void host_show_num_compat_combos(unsigned first_combo, unsigned max_combos,
-  const std::vector<std::vector<result_t>>& compat_matrices) {
-  //
-  using namespace std::chrono;
-  auto t0 = high_resolution_clock::now();
-
-  IndexList offset_indices(10);
-  int num_compat{};
-  for (auto idx{first_combo}; idx < max_combos; ++idx) {
-    auto tmp_idx{idx};
-    for (int m{(int)compat_matrices.size() - 1}; m >= 0; --m) {
-      auto matrix_size = compat_matrices.at(m).size();
-      offset_indices.at(m) = tmp_idx % matrix_size;
-      tmp_idx /= matrix_size;
-    }
-    bool compat = true;
-    for (unsigned m{}; m < compat_matrices.size(); ++m) {
-      if (!compat_matrices.at(m).at(offset_indices.at(m))) {
-        compat = false;
-        break;
-      }
-    }
-    if (compat) {
-      ++num_compat;
-    }
-  }
-
-  auto t1 = high_resolution_clock::now();
-  auto t_dur = duration_cast<milliseconds>(t1 - t0).count();
-  std::cerr << " host_show_num_compat_combos "
-            << " for [" << first_combo << ", " << max_combos
-            << "]: " << num_compat << " - " << t_dur << "ms" << std::endl;
-}
-
-auto make_list_sizes(const std::vector<IndexList>& idx_lists) {
-  std::vector<index_t> sizes;
-  sizes.reserve(idx_lists.size());
-  for (const auto& idx_list : idx_lists) {
-    sizes.push_back(idx_list.size());
-  }
-  return sizes;
-}
-
 //
 void host_show_num_compat_combos(const uint64_t first_combo,
   const uint64_t num_combos,
   const std::vector<std::vector<result_t>>& compat_matrices,
-  const std::vector<MatrixDim>& compat_matrix_dims,
   const IndexList& list_sizes) {
   //
   assert(list_sizes.size() == compat_matrices.size());
-  assert(compat_matrix_dims.size() == compat_matrices.size());
   using namespace std::chrono;
   auto t0 = high_resolution_clock::now();
   IndexList row_indices(10);
@@ -460,22 +398,12 @@ void host_show_num_compat_combos(const uint64_t first_combo,
     for (size_t i{}, n{}; compat && (i < compat_matrices.size() - 1); ++i) {
       for (size_t j{i + 1}; j < compat_matrices.size(); ++j, ++n) {
         auto offset = row_indices.at(i) * list_sizes.at(j) + row_indices.at(j);
-        assert(((!i && (j == 1)) || n) && "yeah no");
         if (!compat_matrices.at(n).at(offset)) {
           compat = false;
           break;
         }
       }
     }
-
-    /*
-    for (unsigned m{}; m < compat_matrices.size(); ++m) {
-      if (!compat_matrices.at(m).at(offset_indices.at(m))) {
-        compat = false;
-        break;
-      }
-    }
-    */
     if (compat) {
       ++num_compat;
     }
@@ -488,46 +416,96 @@ void host_show_num_compat_combos(const uint64_t first_combo,
             << "]: " << num_compat << " - " << t_dur << "ms" << std::endl;
 }
 
-/*
-auto alloc_copy_flat_indices(const IndexList& flat_indices) {
-  cudaStream_t stream = cudaStreamPerThread;
-  cudaError_t err = cudaSuccess;
-  // alloc indices
-  auto indices_bytes = flat_indices.size() * sizeof(index_t);
-  index_t* device_indices;
-  err = cudaMallocAsync((void**)&device_indices, indices_bytes, stream);
-  assert((err == cudaSuccess) && "merge alloc flat indices");
-  // copy indices
-  err = cudaMemcpyAsync(device_indices, flat_indices.data(), indices_bytes,
-    cudaMemcpyHostToDevice, stream);
-  assert((err == cudaSuccess) && "merge copy flat indices");
-  return device_indices;
+auto multiply_with_overflow_check(std::vector<index_t> values) {
+  uint64_t total{1};
+  for (auto v : values) {
+    if (v > std::numeric_limits<uint64_t>::max() / total) {
+      throw std::overflow_error("Multiplication overflow");
+    }
+    total *= v;
+  }
+  return total;
 }
-*/
 
-auto run_merge_task(const SourceCompatibilityData* device_sources,
-  const index_t* device_list_start_indices, const index_t* device_flat_indices,
-  unsigned row_size, unsigned num_rows, merge_result_t* device_results) {
+//
+auto process_results(const std::vector<result_t>& results, uint64_t start_idx,
+  uint64_t num_results, std::vector<uint64_t>& result_indices) {
+  uint64_t hits{};
+  for (uint64_t i{}; i < num_results; ++i) {
+    if (results[i]) {
+      result_indices.push_back(start_idx + i);
+      ++hits;
+    }
+  }
+  return hits;
+}
+
+//
+auto run_get_compat_combos_task(const result_t* device_compat_matrices,
+  const index_t* device_compat_matrix_start_indices,
+  const std::vector<index_t>& list_sizes) {
   //
+  constexpr auto logging = false;
+
   using namespace std::chrono;
+  uint64_t first_combo{};
+  // this number because im lazy:
+  // * 200M kernel finishes in ~35ms, which DOES NOT give us enough time to do
+  //   all the things we want, when interleaving streams:
+  //   * copy results from device (~10ms)
+  //   * iterate results and append indices to "hit indices" list. (~150ms)
+  //   * mayyybe do some source-merging on CPU. not sure. very possibly though,
+  //     given that the #of hits is a overall a very small (??ms)
+  // * it seems like a decent sized chunk of device memory to alloc/copy, esp
+  //   if there are multiple streams (x2, x3 that amount).
+  uint64_t num_combos{200'000'000};
+  const uint64_t max_combos{multiply_with_overflow_check(list_sizes)};
+  // TODO: free
+  auto device_list_sizes = alloc_copy_list_sizes(list_sizes);
+  auto device_results = alloc_results(num_combos);
+  std::vector<result_t> host_results(num_combos);
+  std::vector<uint64_t> result_indices;
+  for (int n{};; ++n, first_combo += num_combos) {
+    num_combos = std::min(num_combos, max_combos - first_combo);
+    if (!num_combos) {
+      break;
+    }
+    if constexpr (logging) {
+      std::cerr << " launching get_compat_combos_kernel " << n << " for ["
+                << first_combo << ", " << first_combo + num_combos << "]"
+                << std::endl;
+    }
 
-  cudaStream_t stream = cudaStreamPerThread;
-  const auto threads_per_block = 256;
-  std::vector<merge_result_t> results(num_rows);
+    auto gcc0 = high_resolution_clock::now();
 
-  auto k0 = high_resolution_clock::now();
+    run_get_compat_combos_kernel(first_combo, num_combos,
+      device_compat_matrices, device_compat_matrix_start_indices,
+      list_sizes.size(), device_list_sizes, device_results);
 
-  run_merge_kernel(stream, threads_per_block, device_sources,
-    device_list_start_indices, device_flat_indices, row_size, num_rows,
-    device_results);
+    // sync is only necessary for accurate timing
+    cudaStreamSynchronize(cudaStreamPerThread);
+    auto gcc1 = high_resolution_clock::now();
+    auto gcc_dur = duration_cast<milliseconds>(gcc1 - gcc0).count();
 
-  cudaStreamSynchronize(stream);
-  // copy_results(results, device_results, stream);
+    if constexpr (logging) {
+      std::cerr << " completed get_compat_combos_kernel " << n << " - "
+                << gcc_dur << "ms" << std::endl;
+    }
 
-  auto k1 = high_resolution_clock::now();
-  auto d_kernel = duration_cast<milliseconds>(k1 - k0).count();
-  std::cerr << "kernel finished in " << d_kernel << "ms" << std::endl;
-  return d_kernel;
+    auto cpr0 = high_resolution_clock::now();
+
+    sync_copy_results(host_results, num_combos, device_results, cudaStreamPerThread);
+    auto num_hits =
+      process_results(host_results, first_combo, num_combos, result_indices);
+
+    auto cpr1 = high_resolution_clock::now();
+    auto cpr_dur = duration_cast<milliseconds>(cpr1 - cpr0).count();
+    if constexpr (logging) {
+      std::cerr << " copy/process results, hits: " << num_hits << " - "
+                << cpr_dur << "ms" << std::endl;
+    }
+  }
+  return result_indices;
 }
 
 }  // namespace
@@ -598,7 +576,6 @@ auto cuda_mergeCompatibleXorSourceCombinations(
   }
 
   std::cerr << " copying data to device...";
-
   auto cdd0 = high_resolution_clock::now();
 
   size_t total_bytes_allocated{};
@@ -632,6 +609,7 @@ auto cuda_mergeCompatibleXorSourceCombinations(
 
   auto lp0 = high_resolution_clock::now();
 
+  // run list_pair_compat kernels
   // the only unnecessary capture here is src_lists
   for_each_list_pair(idx_lists, [&](size_t i, size_t j, size_t n) {
     std::cerr << " launching list_pair_compat_kernel " << n << " for [" << i << ", "
@@ -643,103 +621,43 @@ auto cuda_mergeCompatibleXorSourceCombinations(
       &device_compat_matrices[compat_matrix_start_indices.at(n)]);
   });
 
-  // temp
+  // sync if we want accurate timing
   cudaStreamSynchronize(cudaStreamPerThread);
   auto lp1 = high_resolution_clock::now();
   auto lp_dur = duration_cast<milliseconds>(lp1 - lp0).count();
   std::cerr << " list_pair_compat_kernels complete - " << lp_dur << "ms" << std::endl;
 
   // debugging
-  debug_copy_show_compat_matrix_hit_count(device_compat_matrices, num_bytes);
-
-  auto host_compat_matrices = get_compat_matrices(src_lists, idx_lists);
+  //debug_copy_show_compat_matrix_hit_count(device_compat_matrices, num_bytes);
 
   // alloc/copy start indices
-  /*
-  auto device_src_list_start_indices =
-    alloc_copy_start_indices(src_list_start_indices);
-  auto device_idx_list_start_indices =
-    alloc_copy_start_indices(idx_list_start_indices);
-  */
   auto device_compat_matrix_start_indices =
     alloc_copy_start_indices(compat_matrix_start_indices);
-  auto device_compat_matrix_dims = alloc_copy_compat_matrix_dims(idx_lists);
 
-  //  const int row_size = src_lists.size();
-  uint64_t first_combo{};
-  const uint64_t num_combos{100'000'000u};
-  auto device_results = alloc_results(num_combos);
-
-  int n{};
-  std::cerr << " launching get_compat_combos_kernel " << n << " for ["
-            << first_combo << ", " << num_combos << "]" << std::endl;
-
+  // run get_compat_combos kernels
   auto gcc0 = high_resolution_clock::now();
-  run_get_compat_combos_kernel(first_combo, num_combos, device_compat_matrices,
-    device_compat_matrix_start_indices, device_compat_matrix_dims,
-    compat_matrix_start_indices.size(), device_results);
-
-  // temp
-  cudaStreamSynchronize(cudaStreamPerThread);
-
+  auto result_indices = run_get_compat_combos_task(device_compat_matrices,
+    device_compat_matrix_start_indices, make_list_sizes(idx_lists));
   auto gcc1 = high_resolution_clock::now();
   auto gcc_dur = duration_cast<milliseconds>(gcc1 - gcc0).count();
+  std::cerr << " get_compat_combos kernels complete (" << result_indices.size()
+            << ") - " << gcc_dur << "ms" << std::endl;
 
-  std::cerr << " completed "
-            // << num_iter << " iters "
-            // << " of " << num_rows << " rows, total " << total_rows  << " rows
-            << " - " << gcc_dur << "ms" << std::endl;
-
-  std::vector<result_t> results(num_combos);
-  auto cr0 = high_resolution_clock::now();
-  copy_results(results, device_results, cudaStreamPerThread);
-  auto hits = std::accumulate(
-    results.begin(), results.end(), 0, [](int total, result_t result) {
-      if (result) {
-        ++total;
-      }
-      return total;
-    });
-  auto cr1 = high_resolution_clock::now();
-  auto cr_dur = duration_cast<milliseconds>(cr1 - cr0).count();
-  std::cerr << " copied results, hits(" << hits << ")"
-            << " - " << cr_dur << "ms" << std::endl;
-
+#if defined(HOST_SIDE_COMPARISON)
+  // host-side compat check for debugging/comparison
+  // TODO: throw this accumulator into host_show_num_compat.
   const auto max_combos = std::accumulate(idx_lists.begin(),
     idx_lists.end(), (uint64_t)1, [](uint64_t total, const IndexList& idx_list) {
       // TODO: multiply_with_overflow_check
       total *= idx_list.size();
       return total;
     });
-  auto num_actual_combos = std::min(num_combos * 40, max_combos - first_combo);
-
-  // debugging, for now at least
-  host_show_num_compat_combos(first_combo, num_actual_combos,
-    host_compat_matrices, make_matrix_dims(idx_lists),
-    make_list_sizes(idx_lists));
+  auto host_compat_matrices = get_compat_matrices(src_lists, idx_lists);
+  host_show_num_compat_combos(
+    0, max_combos, host_compat_matrices, make_list_sizes(idx_lists));
+#endif
 
   XorSourceList xorSourceList{};
-
-  /*
-    SourceCRefList sourceCRefList =
-      getCompatibleXorSources(*indexList, src_lists);
-    if (sourceCRefList.empty()) continue;
-    XorSourceList mergedSources = mergeCompatibleXorSources(sourceCRefList);
-    if (mergedSources.empty()) continue;
-    xorSourceList.emplace_back(std::move(mergedSources.back()));
-  }
-  auto peco1 = high_resolution_clock::now();
-  [[maybe_unused]] auto d_peco =
-    duration_cast<milliseconds>(peco1 - peco0).count();
-#if 1 || defined(PRECOMPUTE_LOGGING)
-  std::cerr << " native peco loop: " << d_peco << "ms"
-            << ", combos: " << combos << ", compatible: " << compatible
-            << ", get_compat_merge: " << get_compat_merge
-            << ", merged: " << merged
-            << ", XorSources: " << xorSourceList.size() << std::endl;
-#endif
-  */
-
   return xorSourceList;
 }
 

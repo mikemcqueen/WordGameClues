@@ -41,15 +41,11 @@ int run_list_pair_compat_kernel(const SourceCompatibilityData* device_sources1,
   const index_t* device_indices2, unsigned num_indices2,
   result_t* device_compat_results);
 
-int run_get_compat_combos_kernel(unsigned first_combo, unsigned max_combos,
-  const result_t* device_compat_matrices, const index_t* device_compat_matrix_start_indices,
-  MatrixDim* device_compat_matrix_dims, unsigned num_compat_matrices,
+int run_get_compat_combos_kernel(uint64_t first_combo, uint64_t num_combos,
+  const result_t* device_compat_matrices,
+  const index_t* device_compat_matrix_start_indices,
+  unsigned num_compat_matrices, const index_t* device_list_sizes,
   result_t* device_results);
-
-int run_merge_kernel(cudaStream_t stream, int threads_per_block,
-  const SourceCompatibilityData* device_sources,
-  const index_t* device_list_start_indices, const index_t* device_flat_indices,
-  unsigned row_size, unsigned num_rows, merge_result_t* device_results);
 
 }  // namespace cm
 

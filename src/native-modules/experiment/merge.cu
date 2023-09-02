@@ -33,34 +33,44 @@ __global__ void list_pair_compat_kernel(
   }
 }
 
-__global__ void get_compat_combos_kernel(unsigned first_combo, unsigned max_combos,
-  const result_t* compat_matrices,
-  const index_t* compat_matrix_start_indices,
-  MatrixDim* compat_matrix_dims, unsigned num_compat_matrices,
-  result_t* results) {
+__global__ void get_compat_combos_kernel(uint64_t first_combo,
+  uint64_t num_combos, const result_t* compat_matrices,
+  const index_t* compat_matrix_start_indices, unsigned num_compat_matrices,
+  const index_t* list_sizes, result_t* results) {
   //
+  /*
+  __shared__ uint64_t max_combos;
+  if (!threadIdx.x) {
+    max_combos = 1;
+    for (unsigned i{}; i < num_compat_matrices; ++i) {
+      // TODO: multiply_with_overflow_check
+      max_combos *= list_sizes[i];
+    };
+  }
+  __syncthreads();
+  num_combos = std::min(num_combos, max_combos - first_combo);
+  */
   const unsigned threads_per_grid = gridDim.x * blockDim.x;
   const unsigned thread_idx = blockIdx.x * blockDim.x + threadIdx.x;
-  for (unsigned idx{thread_idx}; idx < max_combos; idx += threads_per_grid) {
-    index_t offset_indices[kMaxMatrices];
-    auto tmp_idx{idx};
-    for (int m{(int)num_compat_matrices - 1}; m >= 0; --m) {
-      auto matrix_size = compat_matrix_dims[m].rows * compat_matrix_dims[m].columns;
-      offset_indices[m] = tmp_idx % matrix_size;
-      tmp_idx /= matrix_size;
+  for (uint64_t idx{thread_idx}; idx < num_combos; idx += threads_per_grid) {
+    index_t row_indices[kMaxMatrices];
+    auto tmp_idx{first_combo + idx};
+    for (int i{(int)num_compat_matrices - 1}; i >= 0; --i) {
+      auto list_size = list_sizes[i];
+      row_indices[i] = tmp_idx % list_size;
+      tmp_idx /= list_size;
     }
-    bool compatible = true;
-    for (unsigned m{}; m < num_compat_matrices; ++m) {
-      auto result =
-        compat_matrices[compat_matrix_start_indices[m] + offset_indices[m]];
-      //if (!compat_matrices[compat_matrix_start_indices[m] + offset_indices[m]]) {
-      if (!result) {
-        compatible = false;
-        break;
+    bool compat = true;
+    for (size_t i{}, n{}; compat && (i < num_compat_matrices - 1); ++i) {
+      for (size_t j{i + 1}; j < num_compat_matrices; ++j, ++n) {
+        auto offset = row_indices[i] * list_sizes[j] + row_indices[j];
+        if (!compat_matrices[compat_matrix_start_indices[n] + offset]) {
+          compat = false;
+          break;
+        }
       }
-      assert(result == 1);
     }
-    results[idx] = compatible ? 1 : 0;
+    results[idx] = compat ? 1 : 0;
   }
 }
 
@@ -179,10 +189,10 @@ int run_list_pair_compat_kernel(const SourceCompatibilityData* device_sources1,
   return 0;
 }
 
-int run_get_compat_combos_kernel(unsigned first_combo, unsigned max_combos,
+int run_get_compat_combos_kernel(uint64_t first_combo, uint64_t num_combos,
   const result_t* device_compat_matrices,
   const index_t* device_compat_matrix_start_indices,
-  MatrixDim* device_compat_matrix_dims, unsigned num_compat_matrices,
+  unsigned num_compat_matrices, const index_t* device_list_sizes,
   result_t* device_results) {
   //
   assert((num_compat_matrices <= kMaxMatrices)
@@ -200,9 +210,9 @@ int run_get_compat_combos_kernel(unsigned first_combo, unsigned max_combos,
   cudaStream_t stream = cudaStreamPerThread;
   cudaStreamSynchronize(cudaStreamPerThread);
   get_compat_combos_kernel<<<grid_dim, block_dim, shared_bytes, stream>>>(
-    first_combo, max_combos, device_compat_matrices,
-    device_compat_matrix_start_indices, device_compat_matrix_dims,
-    num_compat_matrices, device_results);
+    first_combo, num_combos, device_compat_matrices,
+    device_compat_matrix_start_indices, num_compat_matrices, device_list_sizes,
+    device_results);
   return 0;
 }
 

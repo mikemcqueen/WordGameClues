@@ -1,3 +1,17 @@
+* WHEN MERGE EXCEEDS UINT64_T: when I get to this point, which will likely
+  result from too many --xor args being specified (although could also happen
+  from too manysources of a fewer # of --xor args), I can break down the set
+  of --xor args into separate chunks, incremented separately (with separate
+  indices). for example, I have an array of 8 matrices, I can make that two
+  arrays of 4 matrices. the first array will be 0,0,0,0 for a long time, and
+  I can just iterate on the 2nd array until it fills up, then increment first
+  array to 0,0,0,1 and do second again.  given that I will probably end up
+  "chunking" this for kernels anyway due to result set size, I could probably
+  chunk-run until array 2 reaches capacity, then "increment" array 1 indices
+  on CPU, copy them back over to GPU, and run more chunks. It's not *clear*
+  that having an all-GPU solution would be a big win, in other words, due to
+  result-set size limitations.
+
 * running multiple list_pair_compat kernels in merge stage seems unnecessary;
   i could make that kernel more loopy and handle all list pairs in one call.
   low priority though, as it finishes the current impl in under 25ms.
