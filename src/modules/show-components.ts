@@ -24,6 +24,7 @@ import * as ClueList from '../types/clue-list';
 import * as ClueManager from './clue-manager';
 import * as NameCount from '../types/name-count';
 import * as PreCompute from './cm-precompute';
+import * as Source from './source';
 
 ///////////
 
@@ -144,7 +145,14 @@ const getCountListArrays = (nameList: string[], pcResult: PreCompute.Result,
     let invalid: any[] = [];
 
     let hash = {};
-    for (const xorSource of pcResult.data!.useSourceLists.xor) {
+
+    // TODO: might be able to get this to work if i can pass a flag to precompute to
+    // conditionally return xorsources, which may work for show-components use case.
+    // maybe.
+    Assert(!"show components broken atm");
+    let xorSource: Source.Data = options.poop;
+    for (;;) {
+    //for (const xorSource of pcResult.data!.useSourceLists.xor) {
         const countList = NameCount.listToCountList(xorSource.ncList);
         // for --verbose, we could allow this:
         const hashKey = countList.toString();
@@ -221,6 +229,7 @@ const show = (options: any): any => {
             quiet: options.quiet,
             ignoreErrors: options.ignoreErrors
         };
+        // TODO: uh, this probably going to break soon
         const pcResult = PreCompute.preCompute(2, ClueManager.getNumPrimarySources(), args);
         const result = getCountListArrays(nameList, pcResult, options);
         showCountLists(nameList, result, options);

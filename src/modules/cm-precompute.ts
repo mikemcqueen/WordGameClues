@@ -52,13 +52,13 @@ interface OrArgData {
 }
 type OrArgDataList = OrArgData[];
 
-interface UseSourceLists {
-    xor: XorSourceList;
-    orArgDataList: OrArgDataList;
+interface UseSourceListSizes {
+    xor: number;
+//    orArgDataList: OrArgDataList;
 }
 
 export interface Data {
-    useSourceLists: UseSourceLists;
+//    useSourceLists: UseSourceLists;
     sourceListMap: Map<string, Source.AnyData[]>;
 }
 
@@ -83,12 +83,14 @@ const isSingleNumericDigit = (arg: string): boolean => {
     return (arg.length === 1) && (arg[0] >= '0') && (arg[0] <= '9');
 };
 
+/*
 const emptyUseSourceLists = (): UseSourceLists => {
     return {
         xor: [],
         orArgDataList: []
     };
 };
+*/
 
 //////////
 
@@ -449,16 +451,19 @@ const dumpNcDataLists = (ncDataLists: NCDataList[],
 }
 
 const buildUseSourceListsFromNcData = (sourceListMap: Map<string, Source.AnyData[]>,
-    args: any): UseSourceLists =>
+    args: any): void /*UseSourceLists*/ =>
 {
     // XOR first
     if (0) dumpNcDataLists(args.allXorNcDataLists, sourceListMap);
     // TODO: setSourceListMap() ? extra call, extra overhead, i suppose?
-    let xorSourceList: XorSourceList = NativeComboMaker.mergeCompatibleXorSourceCombinations(
+    /*let xorSourceList: XorSourceList = */
+    NativeComboMaker.mergeCompatibleXorSourceCombinations(
         args.allXorNcDataLists, Array.from(sourceListMap.entries())); // TODO? [...sourceListMap.entries()]
     args.allXorNcDataLists = undefined;
+    /*
     if (0) debugXorResults(xorSourceList);
     setPrimarySrcBits(xorSourceList);
+    */
 
     // OR next
     let or0 = new Date();
@@ -477,14 +482,16 @@ const buildUseSourceListsFromNcData = (sourceListMap: Map<string, Source.AnyData
     // no remaining XOR-compatible sourceLists.
     //TODO: markAllANDCompatibleOrSources(xorSourceList, orSourceList);
 
+    /* TODO: C++
     let mark0 = new Date();
     markAllXorCompatibleOrSources(xorSourceList, orArgDataList);
     let mdur = new Duration(mark0, new Date()).milliseconds;
     console.error(` mark - ${PrettyMs(mdur)}`);
+    */
 
     NativeComboMaker.setOrArgDataList(orArgDataList);
 
-    return { xor: xorSourceList, orArgDataList: orArgDataList };
+    //return { xor: xorSourceList, orArgDataList: orArgDataList };
 };
 
 export const preCompute = (first: number, last: number, args: any): Result => {
@@ -502,16 +509,20 @@ export const preCompute = (first: number, last: number, args: any): Result => {
         ` - ${PrettyMs(d2)}`);
     if (args.or && listIsEmpty(args.allOrNcDataLists)) return { success: false };
     
+    // TODO: hard-coded
     const sourceListMap = buildKnownNcSourceListMap(2, 35, args);
 
     const build3 = new Date();
-    const useSourceLists = buildUseSourceListsFromNcData(sourceListMap, args);
+    /*const useSourceLists =*/
+    // TODO: const sizes = 
+    buildUseSourceListsFromNcData(sourceListMap, args);
     const d3 = new Duration(build3, new Date()).milliseconds;
     //console.error(` buildUseSourceListsFromNcData, xor(${useSourceLists.xor.length})` +
     //` - ${PrettyMs(d3)}`);
-    if (args.xor && listIsEmpty(useSourceLists.xor)) return { success: false };
+    // TODO: sizes
+    //if (args.xor && listIsEmpty(useSourceLists.xor)) return { success: false };
 
     const d = new Duration(begin, new Date()).milliseconds;
     console.error(`--Precompute - ${PrettyMs(d)}`);
-    return { success: true, data: { useSourceLists, sourceListMap } };
+    return { success: true, data: { /*useSourceLists,*/ sourceListMap } };
 };

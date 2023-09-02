@@ -444,7 +444,8 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
 
   //--
 
-  return cm::wrap(env, cm::PCD.xorSourceList);
+  //  return cm::wrap(env, cm::PCD.xorSourceList);
+  return Number::New(env, cm::PCD.xorSourceList.size());
 }
 
 /*
@@ -512,7 +513,7 @@ Value setOrArgs(const CallbackInfo& info) {
   std::cerr << " copy or_args (" << cm::PCD.orArgList.size() << ")"
             << " - " << d_t << "ms" << std::endl;
 
-  return env.Null();
+  return Number::New(env, sources_count_pair.second);
 }
 
 //

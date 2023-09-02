@@ -1,3 +1,5 @@
+* markAllCompatibleOrSources in c++.
+
 * Optimizing merge/get_compat_combos. 200M combos currently, and no streams.
   Low reward atm, but eventually might make sense.
   * 200M kernel finishes in ~35ms, which DOES NOT give us enough time to do
