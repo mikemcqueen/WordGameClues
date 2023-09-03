@@ -13,7 +13,7 @@
 #include "candidates.h"
 #include "filter-types.h"
 
-//#define STREAM_LOG
+#define LOGGING
 
 namespace {
 
@@ -211,7 +211,7 @@ void run_xor_kernel(StreamData& stream, int threads_per_block,
     PCD.num_or_sources, stream.device_source_indices, device_list_start_indices,
     device_results, stream.stream_idx);
 
-#if 0 || defined(STREAM_LOG)
+#if 1 || defined(LOGGING)
   std::cerr << "stream " << stream.stream_idx
             << " started with " << grid_size << " blocks"
             << " of " << block_size << " threads"
@@ -370,7 +370,7 @@ int run_filter_task(StreamSwarm& streams, int threads_per_block,
       if (!stream.fillSourceIndices(idx_states)) {
         continue;
       }
-#if 0
+#if defined(LOGGING)
       std::cerr << "stream " << stream.stream_idx
                 << " source_indices: " << stream.source_indices.size()
                 << ", ready: " << stream.num_ready(idx_states)
@@ -392,13 +392,13 @@ int run_filter_task(StreamSwarm& streams, int threads_per_block,
       idx_states.update(stream.source_indices, results, stream.stream_idx);
     total_compat += num_compat;
 
-#if 0
+#if defined(LOGGING)
     auto num_actual_compat = std::accumulate(results.begin(), results.end(), 0,
       [](int sum, result_t r) { return r ? sum + 1 : sum; });
     std::cerr << " stream " << stream.stream_idx
               << " compat results: " << num_compat
               << ", total: " << total_compat
-              << ", actual: " << num_actual_compat
+              << ", actual: " << num_actual_compat << " - " << d_kernel << "ms"
               << std::endl;
 #endif
   }
@@ -442,7 +442,7 @@ std::unordered_set<std::string> filter_task(
   stride = std::min((int)src_lists.size(), stride);
   StreamSwarm streams(num_streams, stride);
 
-#if 0
+#if defined(LOGGING)
   std::cerr << "sourcelists: " << src_lists.size() << ", streams: " << num_streams
             << ", stride: " << stride << std::endl;
 #endif
