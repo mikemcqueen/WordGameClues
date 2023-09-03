@@ -119,16 +119,17 @@ __device__ bool is_source_xor_or_compatible(
     store(&is_or_compat, false);
   }
   // for each xor_source (one thread per xor_source)
-  for (unsigned xor_chunk{}; xor_chunk * blockDim.x < num_xor_sources;
-       ++xor_chunk) {
+  //  for (unsigned xor_chunk{}; xor_chunk * blockDim.x < num_xor_sources;
+  //       ++xor_chunk) {
+  for (unsigned xor_idx{threadIdx.x}; xor_idx < num_xor_sources;
+       xor_idx += blockDim.x) {
     __syncthreads();
-    const auto xor_idx = xor_chunk * blockDim.x + threadIdx.x;
-    if (xor_idx < num_xor_sources) {
-      if (source.isXorCompatibleWith(xor_sources[xor_idx])) {
-        // TODO: Do I need volatile when read/writing shrd mem?
-        is_xor_compat = true;
-      }
+    //const auto xor_idx = xor_chunk * blockDim.x + threadIdx.x;
+    //if (xor_idx < num_xor_sources) {
+    if (source.isXorCompatibleWith(xor_sources[xor_idx])) {
+      is_xor_compat = true;
     }
+    //}
     __syncthreads();
     // if source is not XOR compatible with any --xor sources
     if (!is_xor_compat) {
