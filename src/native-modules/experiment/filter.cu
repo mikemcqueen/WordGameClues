@@ -118,18 +118,26 @@ __device__ bool is_source_xor_or_compatible(
     store(&is_xor_compat, false);
     store(&is_or_compat, false);
   }
+  // NOTE: chunk-indexing in the manner used here is necessary for
+  //   syncthreads() to work, at least on SM_6 hardware (GTX1060),
+  //   where *all threads* in the block must execute the synchthreads
+  //   call. In later architectures, those restrictions may be relaxed,
+  //   but possibly only for "completely exited (the kernel)" threads
+  //   which wouldn't be relevant here anyway (because we're in a
+  //   function called from within a loop in parent kernel.
+  // Therefore, the following is not an equivalent replacement:
+  // for (unsigned xor_idx{threadIdx.x}; xor_idx < num_xor_sources;
+  //   xor_idx += blockDim.x) {
   // for each xor_source (one thread per xor_source)
-  //  for (unsigned xor_chunk{}; xor_chunk * blockDim.x < num_xor_sources;
-  //       ++xor_chunk) {
-  for (unsigned xor_idx{threadIdx.x}; xor_idx < num_xor_sources;
-       xor_idx += blockDim.x) {
+  for (unsigned xor_chunk{}; xor_chunk * blockDim.x < num_xor_sources;
+       ++xor_chunk) {
     __syncthreads();
-    //const auto xor_idx = xor_chunk * blockDim.x + threadIdx.x;
-    //if (xor_idx < num_xor_sources) {
-    if (source.isXorCompatibleWith(xor_sources[xor_idx])) {
-      is_xor_compat = true;
+    const auto xor_idx = xor_chunk * blockDim.x + threadIdx.x;
+    if (xor_idx < num_xor_sources) {
+      if (source.isXorCompatibleWith(xor_sources[xor_idx])) {
+        is_xor_compat = true;
+      }
     }
-    //}
     __syncthreads();
     // if source is not XOR compatible with any --xor sources
     if (!is_xor_compat) {
@@ -143,7 +151,7 @@ __device__ bool is_source_xor_or_compatible(
         is_or_compat = true;
       }
       __syncthreads();
-      //if (!load(&is_or_compat)) { // unnecessary load due to __sync
+      // if (!load(&is_or_compat)) { // unnecessary load due to __sync
       if (!is_or_compat) {
         if (!threadIdx.x) {
           // reset is_xor_compat. sync will happen at loop entrance.
@@ -152,10 +160,10 @@ __device__ bool is_source_xor_or_compatible(
         continue;
       }
     }
-    return true;
-  }
+      return true;
+      }
   return false;
-}
+  }
 
 __global__ void xor_kernel_new(
   const SourceCompatibilityData* __restrict__ sources,
