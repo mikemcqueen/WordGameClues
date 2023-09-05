@@ -12,6 +12,7 @@
 #include "candidates.h"
 #include "dump.h"
 #include "wrap.h"
+#include "filter-types.h"
 #include "merge.h"
 
 namespace {
@@ -426,16 +427,23 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   // NOTE that when I ressurect this I should be indexing via the
   // sorted (index) list generated above
   if (cm::PCD.xorSourceList.size()) {
-#if 0
+#if 1
     auto svi0 = high_resolution_clock::now();
 
+    // for if/when i want to sort xor sources, which is probably a dumb idea.
+    auto xorSourceIndices = []() {
+      std::vector<int> v;
+      v.resize(cm::PCD.xorSourceList.size());
+      iota(v.begin(), v.end(), 0);
+      return v;
+    }();
     cm::PCD.sentenceVariationIndices =
-      std::move(cm::buildSentenceVariationIndices(cm::PCD.xorSourceList,
-        cm::PCD.xorSourceIndices));
+      std::move(cm::buildSentenceVariationIndices(
+        cm::PCD.xorSourceList, xorSourceIndices));
     cm::PCD.device_sentenceVariationIndices =
       cm::cuda_allocCopySentenceVariationIndices(
         cm::PCD.sentenceVariationIndices);
-    
+
     auto svi1 = high_resolution_clock::now();
     auto d_svi = duration_cast<milliseconds>(svi1 - svi0).count();
     std::cerr << " variation indices - " << d_svi << "ms" << std::endl;

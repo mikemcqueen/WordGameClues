@@ -593,8 +593,10 @@ namespace device {
   struct VariationIndices {
     int* device_data;      // one chunk of allocated data; other pointers below
                            // point inside this chunk. only this gets freed.
-    int* sourceIndices;    // -1 terminated for each variation
-    int* variationOffsets; // offsets into sourceIndices
+    int* src_indices;
+    int* num_src_indices;
+
+    int* variation_offsets;  // offsets into sourceIndices
     int num_variations;
   };
 };
