@@ -1,6 +1,37 @@
+* have a stream keep track of how many times it's been run, and/or a total
+  count of the number of indices it's processed, then total all of them at
+  the end, so i show: num streams executed (M), num indices processed (N)
+
+* Hmm the previous (below) comment got me thinking. If a "source" doesn't
+  have a variation for a particular sentence, I don't think there's any need
+  to compare it to all the xor_sources that also have no variation for that
+  sentence, is there? I think I should be able to restrict it to comparing
+  only hose sentences *that actually have a variation*. Some legacy clue issue
+  emight come to light here though. Maybe I just hardcode it at s < 5 for now.
+  * So I tried hardcoding it at s < 5 and the results were wrong. So I'm
+    thinking there is some magical coincidental property happening here, where,
+    somehow, due to sheer volume of xor_sources i'm comparing against (which
+    does involve duplicates), I am effectiveliy comparing against *every*
+    xor_source. Seems really weird if that's true, but that's the only
+    explanation I have at the moment, and also explains why the below comment
+    is true. I think I am just getting lucky that all merged xor.req sources
+    contain a lot of s1-s4 sources, and that if I used only an --xor source
+    that contained only s5-s9 sources, I wouldn't get any results.
+    NOTE: this problem all goes away when I implement the "only check the
+    variation with fewest number of sources" (hopeful) optimization, which
+    is described 3 paragraphs below.
+
+* It's not at all clear to me how I am handling "legacy" variations at the
+  moment, in filter. Like, if a source has a legacy primary clue for a
+  particular sentence, am I even calling isXorCompatibleWith on it, with
+  anything? This is specific to the variationIndices implementation (I think).
+  Somehow I'm getting the same result count both with and without variation
+  indices, so it stands to reason I'm doing something right (??). Either that,
+  or something wrong in both cases.
+
 * VariationIndices: Explain how there are xor_sources that use variation 0
-  (which is really variation -1, i.e. no variation, right?) I think this means
-  "some xor_sources contain no primary source from that sentence."
+  (which is really variation -1, i.e. no variation, right?) I think (hope) this
+  means "some xor_sources contain no primary source from that sentence."
 
 * VariationIndices: Even though the total number of xor_src variation indices 
   for a particular source, across all sentences, may exceed the total number
@@ -15,6 +46,22 @@
   fully thought it through, but it's worth testing.
   * Also: if any sentence variations result in 0 matches, we can short circuit
     the search for any other variation matches.
+  * So I need to think about this a little more, but I'm now thinking, in my
+    late night tired state, that I *only* need to test vs. the xor_sources
+    represented by a source's sentence variation with the fewest number of
+    indices. There's either a match, or not. Success, or failure. No sorting
+    or looping required.
+    Update: upon further reflection, I think I need to take the sum of
+    variation 0 (sources that contain no clue for that variation), and
+    variation N (sources that match that variation). 
+    
+  * If the above is true, I think we may need to special-case the condition
+    where a source has *no variations* across all sentences. In which case,
+    we just test vs. every xor source I guess. Probably no sense writing
+    lots special code to handle a condition that will go away after all clues
+    are converted to sentences.
+  * Maybe I could get away with just copying an array of "all incides", e.g.
+    from iota, to device memory for this special case.
 
 * markAllCompatibleOrSources in c++.
 

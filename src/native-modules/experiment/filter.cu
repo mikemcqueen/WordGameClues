@@ -7,8 +7,10 @@
 #include <limits>
 #include <numeric>
 #include <optional>
+#include <span>
 #include <thread>
 #include <tuple>
+#include <utility> // pair
 #include <cuda_runtime.h>
 #include "candidates.h"
 #include "filter-types.h"
@@ -104,7 +106,7 @@ __device__ bool is_source_or_compatibile(const SourceCompatibilityData& source,
   return false;
 }
 
-__device__ __forceinline__ std::optional<index_t> get_variation_idx(
+__device__ /*__forceinline__*/ std::optional<index_t> get_variation_idx(
   const SourceCompatibilityData& source, index_t flat_idx,
   const device::VariationIndices* __restrict__ variation_indices) {
   //
@@ -117,7 +119,7 @@ __device__ __forceinline__ std::optional<index_t> get_variation_idx(
     const auto num_indices = vi.num_src_indices[variation];
     if (flat_idx < num_indices) {
       return std::make_optional(
-        vi.device_data[vi.variation_offsets[variation] + flat_idx]);
+        vi.src_indices[vi.variation_offsets[variation] + flat_idx]);
     }
     flat_idx -= num_indices;
   }
@@ -125,6 +127,7 @@ __device__ __forceinline__ std::optional<index_t> get_variation_idx(
   return std::nullopt;
 }
 
+// Test if a source is XOR -and- OR compatible with supplied xor/or sources.
 __device__ bool is_source_xor_or_compatible(
   const SourceCompatibilityData& source,
   const SourceCompatibilityData* __restrict__ xor_sources,
@@ -141,16 +144,16 @@ __device__ bool is_source_xor_or_compatible(
     store(&is_xor_compat, false);
     store(&is_or_compat, false);
   }
-  // NOTE: chunk-indexing in the manner used here is necessary for
-  //   syncthreads() to work, at least on SM_6 hardware (GTX1060),
-  //   where *all threads* in the block must execute the synchthreads
-  //   call. In later architectures, those restrictions may be relaxed,
-  //   but possibly only for "completely exited (the kernel)" threads
-  //   which wouldn't be relevant here anyway (because we're in a
-  //   function called from within a loop in a parent kernel).
+  // NOTE: chunk-indexing in the manner used here is necessary for syncthreads()
+  //   to work, at least on SM_6 hardware (GTX1060), where *all threads* in the
+  //   block must execute the synchthreads() call. In later architectures, those
+  //   restrictions may be relaxed, but possibly only for "completely exited
+  //   (the kernel)" threads, which wouldn't be relevant here anyway (because
+  //   we're in a function called from within a loop in a parent kernel).
   // Therefore, the following is not an equivalent replacement:
   // for (unsigned xor_idx{threadIdx.x}; xor_idx < num_xor_sources;
   //   xor_idx += blockDim.x) {
+  //
   // for each xor_source (one thread per xor_source)
   for (unsigned xor_chunk{}; xor_chunk * blockDim.x < num_xor_sources;
        ++xor_chunk) {
@@ -221,7 +224,8 @@ __device__ void print_variation_indices(
 // (share the same variation of) each sentence variation for the supplied
 // source.
 // This is the wrong way to do it, I should be checking each sentence variation
-// separately in order of # of compatible indices, but debugging for now.
+// separately in order of # of xor_source indices with that variation, but
+// experimenting for now.
 __device__ std::optional<unsigned> get_num_variation_indices(
   const SourceCompatibilityData& source,
   const device::VariationIndices* __restrict__ variation_indices) {
@@ -234,12 +238,56 @@ __device__ std::optional<unsigned> get_num_variation_indices(
       continue;
     }
     const auto num_src_indices = vi.num_src_indices[variation];
+    // This looks wrong, but somehow works for current xor.req values.
+    // I suspect the correct thing to do, if there are no matching xor_sources
+    // for a particular sentence variation, that we need to fall back to those
+    // xor_sources which have *no* variation for this sentence - variation 0.
     if (variation && !num_src_indices) {
       return std::nullopt;
     }
     num_indices += num_src_indices;
   }
   return std::make_optional(num_indices);
+}
+
+  /*
+struct Indices {
+  index_t* indices;
+  index_t num_indices;
+};
+using IndexSpanPair = std::pair<std::span<index_t>>;
+  */
+
+__device__ bool get_fewest_variation_indices(
+  const SourceCompatibilityData& source,
+  const device::VariationIndices* __restrict__ variation_indices,
+  IndexSpanPair& src_idx_span_pair){
+  //
+  int fewest_indices{std::numeric_limits<int>::max()};
+  int sentence_with_fewest{-1};
+  for (int s{}; s < kNumSentences; ++s) {
+    const auto& vi = variation_indices[s];
+    // skip sources with no variation for this sentence
+    if (!vi.num_variations) {
+      continue;
+    }
+    const auto variation = source.usedSources.variations[s] + 1;
+    const auto num_indices =
+      vi.num_src_indices[0] + vi.num_src_indices[variation];
+    if (num_indices < fewest_indices) {
+      fewest_indices = num_indices;
+      sentence_with_fewest = s;
+    }
+  }
+  // I haven't considered this case. Punt until it fires.
+  assert(sentence_with_fewest > -1);
+  const auto variation =
+    source.usedSources.variations[sentence_with_fewest] + 1;
+  const auto& vi = variation_indices[sentence_with_fewest];
+  src_idx_span_pair =
+    std::make_pair(vi.get_src_index_span(0), vi.get_src_index_span(variation));
+
+  return true;
 }
 
 __global__ void xor_kernel_new(
@@ -269,7 +317,7 @@ __global__ void xor_kernel_new(
     auto& result = results[src_idx.listIndex];
     auto opt_num_variation_indices =
       get_num_variation_indices(source, variation_indices);
-#if 1
+#if 0
     if (!threadIdx.x && !stream_idx && opt_num_variation_indices.has_value()) {
       printf("block %d num_variation_indices: %d\n", blockIdx.x,
         opt_num_variation_indices.value());

@@ -582,18 +582,26 @@ namespace device {
 using VariationIndicesList = std::vector<std::vector<uint32_t>>;
 // one variationIndicesLists per sentence
 using SentenceVariationIndices = std::array<VariationIndicesList, kNumSentences>;
+using IndexSpanPair = std::pair<std::span<uint32_t>, std::span<uint32_t>>;
 
 // on-device version of above
 namespace device {
-  struct VariationIndices {
-    uint32_t* device_data;       // one chunk of allocated data; other pointers below
-                                 // point inside this chunk. only this gets freed.
-    uint32_t* src_indices;
-    uint32_t* num_src_indices;
 
-    uint32_t* variation_offsets; // offsets into sourceIndices
-    uint32_t num_variations;
-  };
+struct VariationIndices {
+  uint32_t* device_data;  // one chunk of allocated data; other pointers below
+                          // point inside this chunk. only this gets freed.
+  uint32_t* src_indices;
+  uint32_t* num_src_indices;
+
+  uint32_t* variation_offsets;  // offsets into sourceIndices
+  uint32_t num_variations;
+
+  std::span<uint32_t> get_src_index_span(int variation) const {
+    return {
+      &src_indices[variation_offsets[variation]], num_src_indices[variation]};
+  }
+};
+
 };
 
 struct PreComputedData {
