@@ -1,5 +1,6 @@
 * VariationIndices: Explain how there are xor_sources that use variation 0
-  (which is really variation -1, i.e. no variation, right?)
+  (which is really variation -1, i.e. no variation, right?) I think this means
+  "some xor_sources contain no primary source from that sentence."
 
 * VariationIndices: Even though the total number of xor_src variation indices 
   for a particular source, across all sentences, may exceed the total number
@@ -36,7 +37,7 @@
   indices). for example, I have an array of 8 matrices, I can make that two
   arrays of 4 matrices. the first array will be 0,0,0,0 for a long time, and
   I can just iterate on the 2nd array until it fills up, then increment first
-  array to 0,0,0,1 and do second again.  given that I will probably end up
+  array to 0,0,0,1 and process second again. given that I will probably end up
   "chunking" this for kernels anyway due to result set size, I could probably
   chunk-run until array 2 reaches capacity, then "increment" array 1 indices
   on CPU, copy them back over to GPU, and run more chunks. It's not *clear*
@@ -74,6 +75,11 @@
   * Note that this wrap-back-to-JS is disabled now. As a result -t --fast is
     broken, but it's better to fix that another way (or convert to c++) than
     deal with the insanely long wrap times.
+  * Note also that since I'm not passing back to JS, the necessity of all the
+    ncList/primaryNameSrcList stuff on the C++ side comes into question. I
+    suspect it may be needed for something, but I haven't actually confirmed.
+    I do know that having to convert a SourceList to a SourceCompatibilityList
+    prior to copying to device memory is a consequence I'd like to get rid of.
 
 * tricky situation that should be fixed (and in general, beyond this specific
   tricky instance). blue is a synonym of navy in clues 1.  we later go on to
@@ -128,7 +134,7 @@
 * so there is a problem with "ignore":true clues which depend on clues in "sentences"
   that don't support the ignore flag. this problem will go away when all clues
   are converted to sentences, presumably, but it's giving incorrect results
-  as it stands (hobbit,home appear in valid combinations for with xor.req,
+  as it stands (hobbit,home appear in valid combinations with xor.req,
   for example, when they should be "used" by "eye").
 
 * -t 20,s or 24,s are valid, shouldn't be. looks like restrictSameClueNumber
@@ -137,7 +143,7 @@
     into the uniquePrimaryClueNames list.
   * so one idea is we could justa call Validator.validateSources(validateAll: false)
     for any supplyed -t (or --xor, --or, etc) combo. If it doesn't pass
-    validator, then, duh, it's nto valid. The problem with this is if I want
+    validator, then, duh, it's not valid. The problem with this is if I want
     to support name:count syntax: Validator doesn't (currently) support it.
   * Maybe the crash on bad combos is something I can live with for now.
 
@@ -178,6 +184,8 @@ clues3.json:  { "name": "old",             "src": "new,not" },
      the inverse, or something like that, which may help.
      NOTE: I don't think filtering matters right now . It only affects native
      peco-loop timing which is currently fast.
+     NOTE: I've looked at this and I think I'm testing every combo, nothing
+     further to optimize.
   2) I think there is potential for a filtering step in here somewhere, where,
      for example, I look at all of the NameSrc results for a particular useNC,
      and see what they have in common. I'm just spitballing, but something
