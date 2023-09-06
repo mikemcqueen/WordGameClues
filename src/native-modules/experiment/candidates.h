@@ -18,21 +18,9 @@ namespace cm {
     IndexComboListMap indexComboListMap;
   };
 
-  //
-
   auto addCandidate(int sum, const std::string& combo, int index) -> int;
   auto addCandidate(int sum, std::string&& combo,
     cm::SourceCompatibilityList&& compatList) -> int;
-
-  [[nodiscard]] SourceCompatibilityData* cuda_allocCopyXorSources(
-    const XorSourceList& xorSourceList);
-
-  [[nodiscard]] std::pair<device::OrSourceData*, unsigned>
-  cuda_allocCopyOrSources(const OrArgList& orArgList);
-
-  [[nodiscard]] auto cuda_allocCopySentenceVariationIndices(
-    const SentenceVariationIndices& sentenceVariationIndices)
-    -> device::VariationIndices*;
 
   void filterCandidates(
     int sum, int threads_per_block, int streams, int stride, int iters);
@@ -41,8 +29,6 @@ namespace cm {
 
   using filter_result_t = std::unordered_set<std::string>;
   filter_result_t get_filter_result();
-
-  //
 
   inline std::unordered_map<int, OneSumCandidateData> allSumsCandidateData{};
 } // namespace cm

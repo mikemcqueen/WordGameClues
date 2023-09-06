@@ -12,7 +12,7 @@
 #include "candidates.h"
 #include "dump.h"
 #include "wrap.h"
-#include "filter-types.h"
+#include "filter.h"
 #include "merge.h"
 
 namespace {
@@ -432,9 +432,9 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
 
     // for if/when i want to sort xor sources, which is probably a dumb idea.
     auto xorSourceIndices = []() {
-      std::vector<int> v;
+      cm::IndexList v;
       v.resize(cm::PCD.xorSourceList.size());
-      iota(v.begin(), v.end(), 0);
+      iota(v.begin(), v.end(), (cm::index_t)0);
       return v;
     }();
     cm::PCD.sentenceVariationIndices =
@@ -443,6 +443,9 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
     cm::PCD.device_sentenceVariationIndices =
       cm::cuda_allocCopySentenceVariationIndices(
         cm::PCD.sentenceVariationIndices);
+    // TODO: temporary until all clues are converted to sentences
+    cm::PCD.device_xor_src_indices =
+      cm::cuda_allocCopyXorSourceIndices(xorSourceIndices);
 
     auto svi1 = high_resolution_clock::now();
     auto d_svi = duration_cast<milliseconds>(svi1 - svi0).count();

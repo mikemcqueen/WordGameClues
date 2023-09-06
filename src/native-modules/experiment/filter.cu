@@ -106,33 +106,22 @@ __device__ bool is_source_or_compatibile(const SourceCompatibilityData& source,
   return false;
 }
 
-__device__ /*__forceinline__*/ std::optional<index_t> get_variation_idx(
-  const SourceCompatibilityData& source, index_t flat_idx,
-  const device::VariationIndices* __restrict__ variation_indices) {
+__device__ index_t get_variation_index(
+  index_t flat_idx, const IndexSpanPair& idx_spans) {
   //
-  for (int s{}; s < kNumSentences; ++s) {
-    const auto variation = source.usedSources.variations[s] + 1;
-    const auto& vi = variation_indices[s];
-    if (!vi.num_variations) {
-      return std::nullopt;
-    }
-    const auto num_indices = vi.num_src_indices[variation];
-    if (flat_idx < num_indices) {
-      return std::make_optional(
-        vi.src_indices[vi.variation_offsets[variation] + flat_idx]);
-    }
-    flat_idx -= num_indices;
+  if (flat_idx < idx_spans.first.size()) {
+    return idx_spans.first[flat_idx];
   }
-  assert(0);
-  return std::nullopt;
+  flat_idx -= idx_spans.first.size();
+  assert(flat_idx < idx_spans.second.size());
+  return idx_spans.second[flat_idx];
 }
 
 // Test if a source is XOR -and- OR compatible with supplied xor/or sources.
 __device__ bool is_source_xor_or_compatible(
   const SourceCompatibilityData& source,
   const SourceCompatibilityData* __restrict__ xor_sources,
-  const unsigned num_xor_sources,
-  const device::VariationIndices* __restrict__ variation_indices,
+  const IndexSpanPair& idx_spans,
   const unsigned num_or_args,
   const device::OrSourceData* __restrict__ or_sources,
   const unsigned num_or_sources) {
@@ -155,26 +144,22 @@ __device__ bool is_source_xor_or_compatible(
   //   xor_idx += blockDim.x) {
   //
   // for each xor_source (one thread per xor_source)
-  for (unsigned xor_chunk{}; xor_chunk * blockDim.x < num_xor_sources;
-       ++xor_chunk) {
+  const auto num_indices = idx_spans.first.size() + idx_spans.second.size();
+  for (unsigned idx_chunk{}; idx_chunk * blockDim.x < num_indices;
+       ++idx_chunk) {
     __syncthreads();
-    // "flat" index
-    const auto xor_idx = xor_chunk * blockDim.x + threadIdx.x;
-    if (xor_idx < num_xor_sources) {
-      // "actual" index (considering only variation indices)
-      const auto opt_variation_idx =
-        get_variation_idx(source, xor_idx, variation_indices);
-      if (opt_variation_idx.has_value()) {
+    // "flat" index, i.e. not yet indexed into appropriate idx_spans array
+    const auto flat_idx = idx_chunk * blockDim.x + threadIdx.x;
+    if (flat_idx < num_indices) {
+      // "actual" index
+      const auto xor_src_idx = get_variation_index(flat_idx, idx_spans);
 #if 0
-        if (!threadIdx.x && !blockIdx.x) {
-          printf("xor_idx: %d, variation_idx: %d\n", xor_idx,
-            opt_variation_idx.value());
-        }
+      if (!threadIdx.x && !blockIdx.x) {
+        printf("flat_idx: %d, xor_idx: %d\n", flat_idx, xor_src_idx);
+      }
 #endif
-        if (source.isXorCompatibleWith(
-              xor_sources[opt_variation_idx.value()])) {
-          is_xor_compat = true;
-        }
+      if (source.isXorCompatibleWith(xor_sources[xor_src_idx])) {
+        is_xor_compat = true;
       }
     }
     __syncthreads();
@@ -220,74 +205,79 @@ __device__ void print_variation_indices(
   variation_indices_shown = true;
 }
 
-// This returns the total number of xor_src indices that are compatible with
-// (share the same variation of) each sentence variation for the supplied
-// source.
-// This is the wrong way to do it, I should be checking each sentence variation
-// separately in order of # of xor_source indices with that variation, but
-// experimenting for now.
-__device__ std::optional<unsigned> get_num_variation_indices(
-  const SourceCompatibilityData& source,
-  const device::VariationIndices* __restrict__ variation_indices) {
-  //
-  unsigned num_indices{};
-  for (int s{}; s < kNumSentences; ++s) {
-    const auto variation = source.usedSources.variations[s] + 1;
-    const auto& vi = variation_indices[s];
-    if (!vi.num_variations) {
-      continue;
-    }
-    const auto num_src_indices = vi.num_src_indices[variation];
-    // This looks wrong, but somehow works for current xor.req values.
-    // I suspect the correct thing to do, if there are no matching xor_sources
-    // for a particular sentence variation, that we need to fall back to those
-    // xor_sources which have *no* variation for this sentence - variation 0.
-    if (variation && !num_src_indices) {
-      return std::nullopt;
-    }
-    num_indices += num_src_indices;
-  }
-  return std::make_optional(num_indices);
-}
-
-  /*
-struct Indices {
-  index_t* indices;
-  index_t num_indices;
-};
-using IndexSpanPair = std::pair<std::span<index_t>>;
-  */
-
-__device__ bool get_fewest_variation_indices(
+__device__ bool get_smallest_src_index_spans(
   const SourceCompatibilityData& source,
   const device::VariationIndices* __restrict__ variation_indices,
-  IndexSpanPair& src_idx_span_pair){
+  IndexSpanPair& idx_spans) {
   //
   int fewest_indices{std::numeric_limits<int>::max()};
   int sentence_with_fewest{-1};
   for (int s{}; s < kNumSentences; ++s) {
     const auto& vi = variation_indices[s];
-    // skip sources with no variation for this sentence
+    // skip sentences for which there are no xor_sources with a primary clue
+    // (or it could be a legacy clue)
+    // TODO: it is concievable that there may be variation count of "1"
+    // for xor_sources that contain no primary clues from a particular sentence.
+    // I should be sure to eliminate that possibility, as it is unnecessary
+    // memory usage and will double search time.
     if (!vi.num_variations) {
       continue;
     }
     const auto variation = source.usedSources.variations[s] + 1;
+    // skip sources that have no primary clue from this sentence
+    if (!variation) {
+      continue;
+    }
     const auto num_indices =
       vi.num_src_indices[0] + vi.num_src_indices[variation];
     if (num_indices < fewest_indices) {
       fewest_indices = num_indices;
       sentence_with_fewest = s;
+      if (!num_indices) {
+        break;
+      }
     }
   }
-  // I haven't considered this case. Punt until it fires.
-  assert(sentence_with_fewest > -1);
-  const auto variation =
-    source.usedSources.variations[sentence_with_fewest] + 1;
-  const auto& vi = variation_indices[sentence_with_fewest];
-  src_idx_span_pair =
-    std::make_pair(vi.get_src_index_span(0), vi.get_src_index_span(variation));
-
+  if (!fewest_indices) {
+    return false;
+  }
+  if (sentence_with_fewest > -1) {
+    const auto variation =
+      source.usedSources.variations[sentence_with_fewest] + 1;
+    const auto& vi = variation_indices[sentence_with_fewest];
+    idx_spans = std::make_pair(
+      vi.get_src_index_span(0), vi.get_src_index_span(variation));
+  } else {
+    // TODO: this conditional is only required until all clues converted to
+    // sentences. same with the xor_src_indices in other overload.
+    idx_spans = std::make_pair(IndexSpan{}, IndexSpan{});
+  }
   return true;
+}
+
+__device__ IndexSpanPair get_smallest_src_index_spans(
+  const SourceCompatibilityData& source,
+  const device::VariationIndices* __restrict__ variation_indices,
+  // TODO: the following only required until all clues converted to sentences
+  const index_t* __restrict__ xor_src_indices,
+  unsigned num_xor_src_indices) {
+  //
+  // The logic here is a bit weird, because we must differentiate between
+  // "this source contains no variations" (source contains only legacy clues:
+  // fallback to using all xor_src_indices), and "the number of matching
+  // xor_sources for this source's smallest sentence variation is zero" (skip
+  // the is_xor_compatible loop for this source).
+  // TODO: After all clues are converted to sentences, this can be simplified.
+  IndexSpanPair isp;
+  const auto has_variation_match =
+    get_smallest_src_index_spans(source, variation_indices, isp);
+  if (!has_variation_match) {
+    isp = std::make_pair(IndexSpan{}, IndexSpan{});
+  } else if (!isp.first.size() && !isp.second.size()) {
+    isp = std::make_pair(
+      std::span{xor_src_indices, num_xor_src_indices}, IndexSpan{});
+  }
+  return isp;
 }
 
 __global__ void xor_kernel_new(
@@ -295,6 +285,8 @@ __global__ void xor_kernel_new(
   const unsigned num_sources,
   const SourceCompatibilityData* __restrict__ xor_sources,
   const unsigned num_xor_sources,
+  // TODO: only required until all clues converted to sentences
+  const index_t* all_xor_src_indices,
   const device::VariationIndices* __restrict__ variation_indices,
   const unsigned num_or_args,
   const device::OrSourceData* __restrict__ or_sources,
@@ -315,20 +307,20 @@ __global__ void xor_kernel_new(
       list_start_indices[src_idx.listIndex] + src_idx.index;
     auto& source = sources[flat_index];
     auto& result = results[src_idx.listIndex];
-    auto opt_num_variation_indices =
-      get_num_variation_indices(source, variation_indices);
+    auto idx_spans = get_smallest_src_index_spans(
+      source, variation_indices, all_xor_src_indices, num_xor_sources);
 #if 0
-    if (!threadIdx.x && !stream_idx && opt_num_variation_indices.has_value()) {
-      printf("block %d num_variation_indices: %d\n", blockIdx.x,
-        opt_num_variation_indices.value());
+    if (!threadIdx.x && !stream_idx) {
+      printf("block %d, first: %d, second: %d, total: %d\n", blockIdx.x,
+        (int)idx_spans.first.size(), (int)idx_spans.second.size(),
+        (int)(idx_spans.first.size() + idx_spans.second.size()));
     }
 #endif
     __syncthreads();
-    if (!opt_num_variation_indices.has_value()) {
+    if (!(idx_spans.first.size() + idx_spans.second.size())) {
       continue;
     }
-    if (is_source_xor_or_compatible(source, xor_sources,
-          opt_num_variation_indices.value(), variation_indices, num_or_args,
+    if (is_source_xor_or_compatible(source, xor_sources, idx_spans, num_or_args,
           or_sources, num_or_sources)) {
       if (!threadIdx.x) {
         // TODO: store probably not necessary
@@ -368,10 +360,10 @@ void run_xor_kernel(StreamData& stream, int threads_per_block,
   }
   xor_kernel_new<<<grid_dim, block_dim, shared_bytes, stream.cuda_stream>>>(
     device_sources, stream.source_indices.size(), PCD.device_xorSources,
-    PCD.xorSourceList.size(), PCD.device_sentenceVariationIndices,
-    PCD.orArgList.size(), PCD.device_or_sources, PCD.num_or_sources,
-    stream.device_source_indices, device_list_start_indices, device_results,
-    stream.stream_idx);
+    PCD.xorSourceList.size(), PCD.device_xor_src_indices,
+    PCD.device_sentenceVariationIndices, PCD.orArgList.size(),
+    PCD.device_or_sources, PCD.num_or_sources, stream.device_source_indices,
+    device_list_start_indices, device_results, stream.stream_idx);
 
   //  err = cudaStreamSynchronize(stream.cuda_stream);
   //  assert(err == cudaSuccess);
@@ -810,11 +802,27 @@ cuda_allocCopyOrSources(const OrArgList& orArgList) {
     cudaMemcpyHostToDevice, cudaStreamPerThread);
   assert(err == cudaSuccess);
 
-  // just to be sure, due to lifetime problems of host-side memory
+  // just to be sure, due to lifetime problems of local host-side memory
   err = cudaStreamSynchronize(cudaStreamPerThread);
   assert(err == cudaSuccess);
-
   return device_variation_indices;
+}
+
+// TODO: only required until all clues are converted to sentences
+[[nodiscard]] index_t* cuda_allocCopyXorSourceIndices(
+  const std::vector<index_t> xor_src_indices) {
+  //
+  cudaError_t err = cudaSuccess;
+  const auto indices_bytes = xor_src_indices.size() * sizeof(index_t);
+  index_t* device_xor_src_indices;
+  err = cudaMallocAsync(
+    (void**)&device_xor_src_indices, indices_bytes, cudaStreamPerThread);
+  assert(err == cudaSuccess);
+
+  err = cudaMemcpyAsync(device_xor_src_indices, xor_src_indices.data(),
+    indices_bytes, cudaMemcpyHostToDevice, cudaStreamPerThread);
+  assert(err == cudaSuccess);
+  return device_xor_src_indices;
 }
 
 }  // namespace cm

@@ -508,7 +508,7 @@ namespace {
 } // anon namespace
   
 auto buildSentenceVariationIndices(const XorSourceList& xorSourceList,
-  const std::vector<int>& xorSourceIndices) -> SentenceVariationIndices
+  const std::vector<uint32_t>& xorSourceIndices) -> SentenceVariationIndices
 {
   auto sentenceVariationIndices = SentenceVariationIndices{};
   for (size_t src_index = 0; src_index < xorSourceList.size(); ++src_index) {

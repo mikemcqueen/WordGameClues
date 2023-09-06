@@ -1,6 +1,26 @@
+* can i sort sources within each device_sources list, in order of the smallest
+  xor_sources IndexSpanPair they will test against? like, could I store
+  candidates in an ordered set, with smallest IndexSpanPair combined size as
+  the comparator function? or, is a candidate a sourcelist already? or just a
+  single source?
+
+* what does "ready: 0" mean for filter? I'm calling the filter what seems like
+  an unnecessary amount of times with ready:0 when running -c15,15 -x2
+
+*  in filter.cu:  get_smallest_src_index_spans
+  // TODO: it is concievable that there may be variation count of "1"
+  // for xor_sources that contain no primary clues from a particular sentence.
+  // I should be sure to eliminate that possibility, as it is unnecessary
+  // memory usage and will double search time.
+
 * have a stream keep track of how many times it's been run, and/or a total
   count of the number of indices it's processed, then total all of them at
   the end, so i show: num streams executed (M), num indices processed (N)
+
+* fix the fucked up header file bullshit for filter.
+* strip out non-kernel shit to filter-support.cpp
+* consider stripping some types out of combo_maker.h into separate files.
+* PreComputeData probably needs to go do it's own thing. Some form of singleton.
 
 * Hmm the previous (below) comment got me thinking. If a "source" doesn't
   have a variation for a particular sentence, I don't think there's any need

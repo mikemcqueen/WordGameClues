@@ -11,6 +11,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+//#include "filter-types.h"
 
 #define USE_MMEBITSET 1
 
@@ -407,7 +408,7 @@ struct SourceCompatibilityData {
 
   LegacySourceBits legacySourceBits;
   UsedSources usedSources;
-  };  // SourceCompatibilityData
+};  // SourceCompatibilityData
 using SourceCompatibilityList = std::vector<SourceCompatibilityData>;
 
 struct NameCount;
@@ -582,7 +583,9 @@ namespace device {
 using VariationIndicesList = std::vector<std::vector<uint32_t>>;
 // one variationIndicesLists per sentence
 using SentenceVariationIndices = std::array<VariationIndicesList, kNumSentences>;
-using IndexSpanPair = std::pair<std::span<uint32_t>, std::span<uint32_t>>;
+
+using IndexSpan = std::span<const uint32_t>;
+using IndexSpanPair = std::pair<IndexSpan, IndexSpan>;
 
 // on-device version of above
 namespace device {
@@ -596,13 +599,13 @@ struct VariationIndices {
   uint32_t* variation_offsets;  // offsets into sourceIndices
   uint32_t num_variations;
 
-  std::span<uint32_t> get_src_index_span(int variation) const {
+  constexpr std::span<uint32_t> get_src_index_span(int variation) const {
     return {
       &src_indices[variation_offsets[variation]], num_src_indices[variation]};
   }
 };
 
-};
+} // namespace device
 
 struct PreComputedData {
   XorSourceList xorSourceList;
@@ -614,6 +617,8 @@ struct PreComputedData {
   SourceListMap sourceListMap;
   SentenceVariationIndices sentenceVariationIndices;
   device::VariationIndices* device_sentenceVariationIndices{nullptr};
+  // TODO: temporary until all clues are converted to sentences
+  uint32_t* device_xor_src_indices;
 };
 
 struct MergedSources : SourceCompatibilityData {
@@ -665,7 +670,7 @@ XorSourceList mergeCompatibleXorSourceCombinations(
   const std::vector<SourceList>& sourceLists);
 
 auto buildSentenceVariationIndices(const XorSourceList& xorSourceList,
-  const std::vector<int>& xorSourceIndices) -> SentenceVariationIndices;
+  const std::vector<uint32_t>& xorSourceIndices) -> SentenceVariationIndices;
 
 void mergeUsedSourcesInPlace(UsedSources& to, const UsedSources& from);
 
@@ -684,7 +689,7 @@ inline std::vector<SourceCompatibilityData> makeCompatibleSources(
   return compat_sources;
 }
 
-// globals
+// globals - hehe HAHA HOHO
 
 inline PerfData isany_perf{};
 inline PreComputedData PCD;
@@ -753,6 +758,7 @@ struct hash<cm::SourceCompatibilityData> {
     return seed;
   }
 };
+
 } // namespace std
 
 #endif // INCLUDE_COMBO_MAKER_H
