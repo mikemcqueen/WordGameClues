@@ -104,11 +104,34 @@ __device__ bool is_source_or_compatibile(const SourceCompatibilityData& source,
   return false;
 }
 
+__device__ __forceinline__ std::optional<index_t> get_variation_idx(
+  const SourceCompatibilityData& source, index_t flat_idx,
+  const device::VariationIndices* __restrict__ variation_indices) {
+  //
+  for (int s{}; s < kNumSentences; ++s) {
+    const auto variation = source.usedSources.variations[s] + 1;
+    const auto& vi = variation_indices[s];
+    if (!vi.num_variations) {
+      return std::nullopt;
+    }
+    const auto num_indices = vi.num_src_indices[variation];
+    if (flat_idx < num_indices) {
+      return std::make_optional(
+        vi.device_data[vi.variation_offsets[variation] + flat_idx]);
+    }
+    flat_idx -= num_indices;
+  }
+  assert(0);
+  return std::nullopt;
+}
+
 __device__ bool is_source_xor_or_compatible(
   const SourceCompatibilityData& source,
-  const SourceCompatibilityData* xor_sources,
-  const unsigned num_xor_sources, const unsigned num_or_args,
-  const device::OrSourceData* or_sources,
+  const SourceCompatibilityData* __restrict__ xor_sources,
+  const unsigned num_xor_sources,
+  const device::VariationIndices* __restrict__ variation_indices,
+  const unsigned num_or_args,
+  const device::OrSourceData* __restrict__ or_sources,
   const unsigned num_or_sources) {
   //
   __shared__ bool is_xor_compat;
@@ -132,10 +155,23 @@ __device__ bool is_source_xor_or_compatible(
   for (unsigned xor_chunk{}; xor_chunk * blockDim.x < num_xor_sources;
        ++xor_chunk) {
     __syncthreads();
+    // "flat" index
     const auto xor_idx = xor_chunk * blockDim.x + threadIdx.x;
     if (xor_idx < num_xor_sources) {
-      if (source.isXorCompatibleWith(xor_sources[xor_idx])) {
-        is_xor_compat = true;
+      // "actual" index (considering only variation indices)
+      const auto opt_variation_idx =
+        get_variation_idx(source, xor_idx, variation_indices);
+      if (opt_variation_idx.has_value()) {
+#if 0
+        if (!threadIdx.x && !blockIdx.x) {
+          printf("xor_idx: %d, variation_idx: %d\n", xor_idx,
+            opt_variation_idx.value());
+        }
+#endif
+        if (source.isXorCompatibleWith(
+              xor_sources[opt_variation_idx.value()])) {
+          is_xor_compat = true;
+        }
       }
     }
     __syncthreads();
@@ -151,7 +187,6 @@ __device__ bool is_source_xor_or_compatible(
         is_or_compat = true;
       }
       __syncthreads();
-      // if (!load(&is_or_compat)) { // unnecessary load due to __sync
       if (!is_or_compat) {
         if (!threadIdx.x) {
           // reset is_xor_compat. sync will happen at loop entrance.
@@ -165,17 +200,66 @@ __device__ bool is_source_xor_or_compatible(
   return false;
 }
 
+__device__ bool variation_indices_shown = false;
+
+__device__ void print_variation_indices(
+  const device::VariationIndices* __restrict__ variation_indices) {
+  //
+  if (variation_indices_shown) return;
+  printf("device:\n");
+  for (int s{}; s < kNumSentences; ++s) {
+    const auto& vi = variation_indices[s];
+    for (index_t v{}; v < vi.num_variations; ++v) {
+      const auto n = vi.num_src_indices[v];
+      printf("sentence %d, variation %d, indices: %d\n", s, v, n);
+    }
+  }
+  variation_indices_shown = true;
+}
+
+// This returns the total number of xor_src indices that are compatible with
+// (share the same variation of) each sentence variation for the supplied
+// source.
+// This is the wrong way to do it, I should be checking each sentence variation
+// separately in order of # of compatible indices, but debugging for now.
+__device__ std::optional<unsigned> get_num_variation_indices(
+  const SourceCompatibilityData& source,
+  const device::VariationIndices* __restrict__ variation_indices) {
+  //
+  unsigned num_indices{};
+  for (int s{}; s < kNumSentences; ++s) {
+    const auto variation = source.usedSources.variations[s] + 1;
+    const auto& vi = variation_indices[s];
+    if (!vi.num_variations) {
+      continue;
+    }
+    const auto num_src_indices = vi.num_src_indices[variation];
+    if (variation && !num_src_indices) {
+      return std::nullopt;
+    }
+    num_indices += num_src_indices;
+  }
+  return std::make_optional(num_indices);
+}
+
 __global__ void xor_kernel_new(
-  const SourceCompatibilityData* sources,
+  const SourceCompatibilityData* __restrict__ sources,
   const unsigned num_sources,
-  const SourceCompatibilityData* xor_sources,
+  const SourceCompatibilityData* __restrict__ xor_sources,
   const unsigned num_xor_sources,
-  const device::VariationIndices* variation_indices,
+  const device::VariationIndices* __restrict__ variation_indices,
   const unsigned num_or_args,
-  const device::OrSourceData* or_sources,
-  const unsigned num_or_sources, const SourceIndex* source_indices,
-  const index_t* list_start_indices, result_t* results,
-  int stream_idx) {
+  const device::OrSourceData* __restrict__ or_sources,
+  const unsigned num_or_sources, const SourceIndex* __restrict__ source_indices,
+  const index_t* __restrict__ list_start_indices,
+  result_t* __restrict__ results, int stream_idx) {
+
+#if 0
+  if (!threadIdx.x && !blockIdx.x && !stream_idx) {
+    print_variation_indices(variation_indices);
+  }
+#endif
+
   // for each source (one block per source)
   for (unsigned idx{blockIdx.x}; idx < num_sources; idx += gridDim.x) {
     const auto src_idx = source_indices[idx];
@@ -183,12 +267,23 @@ __global__ void xor_kernel_new(
       list_start_indices[src_idx.listIndex] + src_idx.index;
     auto& source = sources[flat_index];
     auto& result = results[src_idx.listIndex];
-
+    auto opt_num_variation_indices =
+      get_num_variation_indices(source, variation_indices);
+#if 1
+    if (!threadIdx.x && !stream_idx && opt_num_variation_indices.has_value()) {
+      printf("block %d num_variation_indices: %d\n", blockIdx.x,
+        opt_num_variation_indices.value());
+    }
+#endif
     __syncthreads();
-    if (is_source_xor_or_compatible(source, xor_sources, num_xor_sources,
-          num_or_args, or_sources, num_or_sources)) {
-      // check_source(source, or_args);
+    if (!opt_num_variation_indices.has_value()) {
+      continue;
+    }
+    if (is_source_xor_or_compatible(source, xor_sources,
+          opt_num_variation_indices.value(), variation_indices, num_or_args,
+          or_sources, num_or_sources)) {
       if (!threadIdx.x) {
+        // TODO: store probably not necessary
         store(&result, (result_t)1);
       }
     }
@@ -215,13 +310,23 @@ void run_xor_kernel(StreamData& stream, int threads_per_block,
   stream.start_time = std::chrono::high_resolution_clock::now();
   dim3 grid_dim(grid_size);
   dim3 block_dim(block_size);
-  cudaStreamSynchronize(cudaStreamPerThread);
+  // TODO: probably this donesn't belong here. we should call it once in
+  // run_task (with cudaStreamPerThread), and maybe here with
+  // stream.cuda_stream. probably maybe.
+  cudaError_t err = cudaStreamSynchronize(cudaStreamPerThread);
+  if (err != cudaSuccess) {
+    fprintf(stdout, "sync before kernel, error: %s", cudaGetErrorString(err));
+    assert((err == cudaSuccess) && "sync before kernel");
+  }
   xor_kernel_new<<<grid_dim, block_dim, shared_bytes, stream.cuda_stream>>>(
     device_sources, stream.source_indices.size(), PCD.device_xorSources,
     PCD.xorSourceList.size(), PCD.device_sentenceVariationIndices,
     PCD.orArgList.size(), PCD.device_or_sources, PCD.num_or_sources,
     stream.device_source_indices, device_list_start_indices, device_results,
     stream.stream_idx);
+
+  //  err = cudaStreamSynchronize(stream.cuda_stream);
+  //  assert(err == cudaSuccess);
 
 #if 1 || defined(LOGGING)
   std::cerr << "stream " << stream.stream_idx
@@ -591,8 +696,8 @@ cuda_allocCopyOrSources(const OrArgList& orArgList) {
       (countIndices(variation_indices) + (2 * variation_indices.size()))
       * sizeof(index_t);
     auto& deviceVariationIndices = deviceVariationIndicesArray.at(s);
-    err = cudaMalloc(
-      (void**)&deviceVariationIndices.device_data, device_data_bytes);
+    err = cudaMallocAsync((void**)&deviceVariationIndices.device_data,
+      device_data_bytes, cudaStreamPerThread);
     assert(err == cudaSuccess);
 
     // const static int terminator = -1;
@@ -604,19 +709,24 @@ cuda_allocCopyOrSources(const OrArgList& orArgList) {
     deviceVariationIndices.src_indices =
       &deviceVariationIndices.device_data[num_variations * 2];
     size_t offset{};
+    int v{};
     for (const auto& indices : variation_indices) {
       variation_offsets.push_back(offset);
       num_src_indices.push_back(indices.size());
-      // NOTE: Async. I'm going to need to preserve sentenceVariationIndices
-      // until copy is complete - (kernel execution/synchronize?)
+      std::cout << "sentence " << s << ", variation " << v++
+                << ", indices: " << indices.size() << std::endl;
+      // NOTE: Async. I'm going to need to preserve
+      // sentenceVariationIndices until copy is complete - (kernel
+      // execution/synchronize?)
       const auto indices_bytes = indices.size() * sizeof(index_t);
       err = cudaMemcpyAsync(&deviceVariationIndices.src_indices[offset],
-        indices.data(), indices_bytes, cudaMemcpyHostToDevice);
+        indices.data(), indices_bytes, cudaMemcpyHostToDevice,
+        cudaStreamPerThread);
       assert(err == cudaSuccess);
       offset += indices.size();
 #if 0
       err = cudaMemcpyAsync(&deviceVariationIndices.src_indices[offset],
-        &terminator, sizeof(terminator), cudaMemcpyHostToDevice);
+        &terminator, sizeof(terminator), cudaMemcpyHostToDevice, cudaStreamPerThread);
       assert(err == cudaSuccess);
       offset += 1;
 #endif
@@ -626,14 +736,16 @@ cuda_allocCopyOrSources(const OrArgList& orArgList) {
       deviceVariationIndices.device_data;
     const auto offsets_bytes = variation_offsets.size() * sizeof(index_t);
     err = cudaMemcpyAsync(deviceVariationIndices.variation_offsets,
-      variation_offsets.data(), offsets_bytes, cudaMemcpyHostToDevice);
+      variation_offsets.data(), offsets_bytes, cudaMemcpyHostToDevice,
+      cudaStreamPerThread);
     assert(err == cudaSuccess);
     // copy num src indices
     deviceVariationIndices.num_src_indices =
       &deviceVariationIndices.device_data[num_variations];
     const auto num_src_indices_bytes = num_src_indices.size() * sizeof(index_t);
     err = cudaMemcpyAsync(deviceVariationIndices.num_src_indices,
-      num_src_indices.data(), num_src_indices_bytes, cudaMemcpyHostToDevice);
+      num_src_indices.data(), num_src_indices_bytes, cudaMemcpyHostToDevice,
+      cudaStreamPerThread);
     assert(err == cudaSuccess);
   }
   //  const auto sentenceVariationIndices_bytes =
@@ -641,12 +753,17 @@ cuda_allocCopyOrSources(const OrArgList& orArgList) {
   const auto variation_indices_bytes =
     kNumSentences * sizeof(device::VariationIndices);
   device::VariationIndices* device_variation_indices;
-  err = cudaMalloc((void**)&device_variation_indices, variation_indices_bytes);
+  err = cudaMallocAsync((void**)&device_variation_indices,
+    variation_indices_bytes, cudaStreamPerThread);
   assert(err == cudaSuccess);
 
-  err =
-    cudaMemcpyAsync(device_variation_indices, deviceVariationIndicesArray.data(),
-      variation_indices_bytes, cudaMemcpyHostToDevice);
+  err = cudaMemcpyAsync(device_variation_indices,
+    deviceVariationIndicesArray.data(), variation_indices_bytes,
+    cudaMemcpyHostToDevice, cudaStreamPerThread);
+  assert(err == cudaSuccess);
+
+  // just to be sure, due to lifetime problems of host-side memory
+  err = cudaStreamSynchronize(cudaStreamPerThread);
   assert(err == cudaSuccess);
 
   return device_variation_indices;

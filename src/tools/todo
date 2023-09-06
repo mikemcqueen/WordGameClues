@@ -1,3 +1,20 @@
+* VariationIndices: Explain how there are xor_sources that use variation 0
+  (which is really variation -1, i.e. no variation, right?)
+
+* VariationIndices: Even though the total number of xor_src variation indices 
+  for a particular source, across all sentences, may exceed the total number
+  of xor_sources (thus *not* being an optimization), I have a suspicion that
+  we can break out of the loop if any set of indices represented by a single
+  variation has no matches. For example, if a source uses variation 2 of
+  sentence 3, and there are no compatible xor_sources for that variation of
+  that sentence, we're done - there is no need to compare xor_sources of
+  the variations for other sentences of that source. Ideally, we could sort
+  the sentences by "variation indices count", and test them in order of
+  smallest to largest. This might just be hopium talking, because I haven't
+  fully thought it through, but it's worth testing.
+  * Also: if any sentence variations result in 0 matches, we can short circuit
+    the search for any other variation matches.
+
 * markAllCompatibleOrSources in c++.
 
 * Optimizing merge/get_compat_combos. 200M combos currently, and no streams.
@@ -14,7 +31,7 @@
 
 * WHEN MERGE EXCEEDS UINT64_T: when I get to this point, which will likely
   result from too many --xor args being specified (although could also happen
-  from too manysources of a fewer # of --xor args), I can break down the set
+  from too many sources of a fewer # of --xor args), I can break down the set
   of --xor args into separate chunks, incremented separately (with separate
   indices). for example, I have an array of 8 matrices, I can make that two
   arrays of 4 matrices. the first array will be 0,0,0,0 for a long time, and
@@ -54,6 +71,9 @@
   SOURCEBITS* on the add-on side (I think). So is the *ONLY* reason I am
   maintaining ncLists on the node side, is to use them as the "wire protocol"
   for Node<->Addon communication of sourceBits!?
+  * Note that this wrap-back-to-JS is disabled now. As a result -t --fast is
+    broken, but it's better to fix that another way (or convert to c++) than
+    deal with the insanely long wrap times.
 
 * tricky situation that should be fixed (and in general, beyond this specific
   tricky instance). blue is a synonym of navy in clues 1.  we later go on to

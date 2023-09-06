@@ -55,11 +55,6 @@ namespace Source {
 } // namespace Source
 
 using LegacySourceBits = bitset<kMaxLegacySources>;
-#if 0
-using LegacySources = std::array<int8_t, kMaxLegacySources>;
-// 32 bytes per sentence * 9 sentences = 2304? bits, 288 bytes, 36? 64-bit words
-using Sources = std::array<int8_t, kMaxUsedSources>;
-#endif
 
 struct UsedSources {
   using VariationIndex_t = int16_t;
@@ -274,7 +269,7 @@ public:
 
   SourceBits bits{};
   Variations variations = make_array<VariationIndex_t, kNumSentences>(-1);
- };  // UsedSources
+};  // UsedSources
 
 struct SourceCompatibilityData {
   SourceCompatibilityData() = default;
@@ -584,20 +579,20 @@ namespace device {
 // which share the same per-sentence variation.
 // One list of indices per variation, plus '-1' (no) variation.
 // indices to outer vector are offset by 1; variation -1 is index 0.
-using VariationIndicesList = std::vector<std::vector<int>>;
+using VariationIndicesList = std::vector<std::vector<uint32_t>>;
 // one variationIndicesLists per sentence
 using SentenceVariationIndices = std::array<VariationIndicesList, kNumSentences>;
 
 // on-device version of above
 namespace device {
   struct VariationIndices {
-    int* device_data;      // one chunk of allocated data; other pointers below
-                           // point inside this chunk. only this gets freed.
-    int* src_indices;
-    int* num_src_indices;
+    uint32_t* device_data;       // one chunk of allocated data; other pointers below
+                                 // point inside this chunk. only this gets freed.
+    uint32_t* src_indices;
+    uint32_t* num_src_indices;
 
-    int* variation_offsets;  // offsets into sourceIndices
-    int num_variations;
+    uint32_t* variation_offsets; // offsets into sourceIndices
+    uint32_t num_variations;
   };
 };
 

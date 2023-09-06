@@ -152,19 +152,42 @@ template <typename T> auto sum_sizes(const std::vector<T>& vecs) {
   return sum;
 }
 
+void add_compat_sources(
+  std::vector<SourceCompatibilityData>& compat_sources,
+  const SourceList& src_list) {
+  //
+  for (const auto& src : src_list) {
+    compat_sources.push_back(src);
+  }
+}
+
 auto alloc_copy_src_lists(
   const std::vector<SourceList>& src_lists, size_t* num_bytes = nullptr) {
   // alloc sources
   const cudaStream_t stream = cudaStreamPerThread;
   cudaError_t err = cudaSuccess;
-  auto sources_bytes = sum_sizes(src_lists) * sizeof(SourceCompatibilityData);
+  const auto num_sources = sum_sizes(src_lists);
+  const auto sources_bytes = num_sources * sizeof(SourceCompatibilityData);
+  std::cerr << "  allocating device_sources (" << sources_bytes << " bytes)"
+            << std::endl;
   SourceCompatibilityData* device_sources;
   err = cudaMallocAsync((void**)&device_sources, sources_bytes, stream);
+  std::cerr << "  allocate complete" << std::endl;
   assert((err == cudaSuccess) && "merge alloc sources");
 
   // copy sources
-  size_t index{};
+  std::vector<SourceCompatibilityData> src_compat_list;
+  src_compat_list.reserve(num_sources);
+  //size_t index{};
+  std::cerr << "  building src_compat_lists..." << std::endl;
   for (const auto& src_list : src_lists) {
+    // this is somewhat braindead. perhaps I could only marshal the
+    // SourceCompatibiltyData when passed from JavaScript? since I
+    // no longer need to round-trip it back to JavaScript?
+    // Alternatively, build one gimungous array and blast it over
+    // in one memcopy.
+    add_compat_sources(src_compat_list, src_list);
+    /*
     auto compat_sources = makeCompatibleSources(src_list);
     err = cudaMemcpyAsync(&device_sources[index], compat_sources.data(),
       compat_sources.size() * sizeof(SourceCompatibilityData),
@@ -174,6 +197,14 @@ auto alloc_copy_src_lists(
       throw std::runtime_error("merge copy sources");
     }
     index += src_list.size();
+    */
+  }
+  std::cerr << "  copying src_compat_lists..." << std::endl;
+  err = cudaMemcpyAsync(device_sources, src_compat_list.data(), sources_bytes,
+    cudaMemcpyHostToDevice, stream);
+  if (err != cudaSuccess) {
+    fprintf(stdout, "merge copy sources, error: %s", cudaGetErrorString(err));
+    throw std::runtime_error("merge copy sources");
   }
   if (num_bytes) {
     *num_bytes = sources_bytes;
@@ -603,7 +634,6 @@ auto cuda_mergeCompatibleXorSourceCombinations(
     return {};
   }
 
-  std::cerr << " copying data to device...";
   auto cdd0 = high_resolution_clock::now();
 
   size_t total_bytes_allocated{};
@@ -611,6 +641,7 @@ auto cuda_mergeCompatibleXorSourceCombinations(
   size_t num_bytes{};
   // alloc/copy source lists and generate start indices
   // TODO: free
+  std::cerr << " copying src_lists to device..." << std::endl;
   auto device_src_lists = alloc_copy_src_lists(src_lists, &num_bytes);
   total_bytes_allocated += num_bytes;
   total_bytes_copied += num_bytes;
@@ -618,12 +649,14 @@ auto cuda_mergeCompatibleXorSourceCombinations(
 
   // alloc/copy index lists and generate start indices
   // TODO: free
+  std::cerr << " copying idx_lists to device..." << std::endl;
   auto device_idx_lists = alloc_copy_idx_lists(idx_lists, &num_bytes);
   total_bytes_allocated += num_bytes;
   total_bytes_copied += num_bytes;
   auto idx_list_start_indices = make_start_indices(idx_lists);
 
   // alloc compatibility result matrices and generate start indices
+  std::cerr << " allocating compat_matrics on device..." << std::endl;
   size_t num_compat_matrix_bytes{};
   // TODO: free
   auto device_compat_matrices =
@@ -633,10 +666,11 @@ auto cuda_mergeCompatibleXorSourceCombinations(
     make_compat_matrix_start_indices(idx_lists);
 
   // sync if we want accurate timing
-  cudaStreamSynchronize(cudaStreamPerThread);
+  cudaError_t err  = cudaStreamSynchronize(cudaStreamPerThread);
+  assert(err == cudaSuccess);
   auto cdd1 = high_resolution_clock::now();
   auto cdd_dur = duration_cast<milliseconds>(cdd1 - cdd0).count();
-  std::cerr << " complete"  << " - " << cdd_dur << "ms"<< std::endl;
+  std::cerr << " complete - " << cdd_dur << "ms" << std::endl;
   std::cerr << "  allocated: " << total_bytes_allocated
             << ", copied: " << total_bytes_copied << std::endl;
 
@@ -655,7 +689,8 @@ auto cuda_mergeCompatibleXorSourceCombinations(
   });
 
   // sync if we want accurate timing
-  cudaStreamSynchronize(cudaStreamPerThread);
+  err = cudaStreamSynchronize(cudaStreamPerThread);
+  assert(err == cudaSuccess);
   auto lp1 = high_resolution_clock::now();
   auto lp_dur = duration_cast<milliseconds>(lp1 - lp0).count();
   std::cerr << " list_pair_compat_kernels complete - " << lp_dur << "ms" << std::endl;
