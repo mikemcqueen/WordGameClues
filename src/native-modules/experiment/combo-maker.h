@@ -11,7 +11,11 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-//#include "filter-types.h"
+
+// move these maybe
+#include <span>
+#include <utility>
+
 
 #define USE_MMEBITSET 1
 

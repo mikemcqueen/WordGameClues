@@ -1,11 +1,12 @@
-#ifndef include_wrap_h
-#define include_wrap_h
+#ifndef INCLUDE_WRAP_H
+#define INCLUDE_WRAP_H
 
 #include <unordered_set>
 #include <vector>
 #include <napi.h>
 #include "combo-maker.h"
 #include "candidates.h"
+#include "filter-types.h"
 
 namespace cm {
   Napi::Object wrap(Napi::Env& env, const NameCount& nc); 
@@ -27,4 +28,4 @@ namespace cm {
   Napi::Array wrap(Napi::Env& env, const filter_result_t& filter_result);
 } // namespace cm
 
-#endif // include_wrap_h
+#endif  // INCLUDE_WRAP_H

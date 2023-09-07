@@ -587,7 +587,7 @@ Value filterCandidatesForSum(const CallbackInfo& info) {
   auto streams = info[2].As<Number>().Int32Value();
   auto stride = info[3].As<Number>().Int32Value();
   auto iters = info[4].As<Number>().Int32Value();
-  cm::filterCandidates(sum, threads_per_block, streams, stride, iters);
+  cm::filterCandidatesCuda(sum, threads_per_block, streams, stride, iters);
   return env.Null();
 }
 

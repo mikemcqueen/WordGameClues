@@ -11,34 +11,12 @@
 
 namespace cm {
 
+using filter_result_t = std::unordered_set<std::string>;
+
 using result_t = uint8_t;
 
 using index_t = uint32_t;
 using IndexList = std::vector<index_t>;
-
-  /*
-using IndexSpan = std::span<const uint32_t>;
-using IndexSpanPair = std::pair<IndexSpan, IndexSpan>;
-
-namespace device {
-
-struct VariationIndices {
-  uint32_t* device_data;  // one chunk of allocated data; other pointers below
-                          // point inside this chunk. only this gets freed.
-  uint32_t* src_indices;
-  uint32_t* num_src_indices;
-
-  uint32_t* variation_offsets;  // offsets into sourceIndices
-  uint32_t num_variations;
-
-  constexpr std::span<uint32_t> get_src_index_span(int variation) const {
-    return {
-      &src_indices[variation_offsets[variation]], num_src_indices[variation]};
-  }
-};
-
-}  // namespace device
-  */
 
 struct SourceIndex {
   index_t listIndex{};

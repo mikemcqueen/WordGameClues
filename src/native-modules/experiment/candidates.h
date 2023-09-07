@@ -24,11 +24,6 @@ namespace cm {
 
   void filterCandidates(
     int sum, int threads_per_block, int streams, int stride, int iters);
-  void filterCandidatesCuda(
-    int sum, int threads_per_block, int streams, int stride, int iters);
-
-  using filter_result_t = std::unordered_set<std::string>;
-  filter_result_t get_filter_result();
 
   inline std::unordered_map<int, OneSumCandidateData> allSumsCandidateData{};
 } // namespace cm
