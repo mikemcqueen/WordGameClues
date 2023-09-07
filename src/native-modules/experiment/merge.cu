@@ -1,7 +1,7 @@
 #include <chrono>
 #include <iostream>
 #include <cuda_runtime.h>
-#include "filter-types.h" // index_t, StreamSwarm, should generalize header
+#include "filter-types.h"
 #include "merge.h"
 #include "peco.h"
 #include "combo-maker.h"
@@ -12,6 +12,15 @@ using namespace cm;
 
 constexpr auto kMaxMatrices = 10u;
 
+// Given two arrays of sources, test xor compatibility of all combinations
+// of two sources (pairs), containing one source from each list.
+//
+// Indices are used because only a subset (as specified by indicee arrays)
+// of each source array is actually considered.
+//
+// compat_results can be thought of as a matrix, with with sources1.size()
+// rows and sources2.size() columns.
+//
 __global__ void list_pair_compat_kernel(
   const SourceCompatibilityData* sources1,
   const SourceCompatibilityData* sources2,
@@ -33,23 +42,16 @@ __global__ void list_pair_compat_kernel(
   }
 }
 
+// Given N compatibility matrices, representing the results of comparing every
+// pair of sources arrays (via list_pair_compat_kernel), find all N-tuple
+// combinations of compatible results, representing combinations of compatible
+// sources to be merged.
+//
 __global__ void get_compat_combos_kernel(uint64_t first_combo,
   uint64_t num_combos, const result_t* compat_matrices,
   const index_t* compat_matrix_start_indices, unsigned num_compat_matrices,
   const index_t* list_sizes, result_t* results) {
   //
-  /*
-  __shared__ uint64_t max_combos;
-  if (!threadIdx.x) {
-    max_combos = 1;
-    for (unsigned i{}; i < num_compat_matrices; ++i) {
-      // TODO: multiply_with_overflow_check
-      max_combos *= list_sizes[i];
-    };
-  }
-  __syncthreads();
-  num_combos = std::min(num_combos, max_combos - first_combo);
-  */
   const unsigned threads_per_grid = gridDim.x * blockDim.x;
   const unsigned thread_idx = blockIdx.x * blockDim.x + threadIdx.x;
   for (uint64_t idx{thread_idx}; idx < num_combos; idx += threads_per_grid) {
@@ -95,75 +97,9 @@ __device__ void get_combo_index(unsigned idx, unsigned row_size,
   result.elem2_idx = result.elem1_idx + r + 1;
 }
 
-__global__ void merge_kernel(const SourceCompatibilityData* sources,
-  const index_t* list_start_indices, const index_t* flat_indices,
-  unsigned row_size, unsigned num_rows, merge_result_t* results) {
-  //
-  const unsigned threads_per_grid = gridDim.x * blockDim.x;
-  const unsigned combos_per_row = row_size * (row_size - 1) / 2;  // nC2 formula
-  const unsigned num_combos = num_rows * combos_per_row;
-  const unsigned thread_idx = blockIdx.x * blockDim.x + threadIdx.x;
-  const unsigned result_idx = thread_idx / combos_per_row;
-  if (!(thread_idx % combos_per_row)) {
-    results[result_idx] = 0;
-  }
-  __syncthreads();
-
-  // hack
-  //  int i{};
-
-  for (unsigned idx{}; idx < num_combos; idx += threads_per_grid) {
-    ComboIndex combo_index;
-    get_combo_index(idx, row_size, combos_per_row, combo_index);
-    const index_t* row = &flat_indices[combo_index.row_idx * row_size];
-    const auto& src1 = sources[list_start_indices[combo_index.elem1_idx]
-                               + row[combo_index.elem1_idx]];
-    const auto& src2 = sources[list_start_indices[combo_index.elem2_idx]
-                               + row[combo_index.elem2_idx]];
-    if (src1.isXorCompatibleWith(src2)) {
-      // i++;
-      atomicAdd(&results[result_idx], 1);
-    }
-  }
-  // TODO: parallel reduce all finished rows within this block
-}
-
 }  // namespace
 
 namespace cm {
-
-int run_merge_kernel(cudaStream_t stream, int threads_per_block,
-  const SourceCompatibilityData* device_sources,
-  const index_t* device_list_start_indices, const index_t* device_flat_indices,
-  unsigned row_size, unsigned num_rows, merge_result_t* device_results) {
-  //
-  int num_sm;
-  cudaDeviceGetAttribute(&num_sm, cudaDevAttrMultiProcessorCount, 0);
-  auto threads_per_sm = 2048;
-  auto block_size = threads_per_block ? threads_per_block : 1024;
-  auto blocks_per_sm = threads_per_sm / block_size;
-  // assert(blocks_per_sm * block_size == threads_per_sm);
-  auto grid_size = num_sm * blocks_per_sm;  // aka blocks per grid
-  auto shared_bytes = 0;
-
-  //  stream.is_running = true;
-  //  stream.sequence_num = StreamData::next_sequence_num();
-  //  stream.start_time = std::chrono::high_resolution_clock::now();
-  dim3 grid_dim(grid_size);
-  dim3 block_dim(block_size);
-  cudaStreamSynchronize(cudaStreamPerThread);
-  merge_kernel<<<grid_dim, block_dim, shared_bytes, stream>>>(device_sources,
-    device_list_start_indices, device_flat_indices, row_size, num_rows,
-    device_results);
-
-#if 1 || defined(STREAM_LOG)
-  std::cerr << "stream " << 0
-            << " started with " << grid_size << " blocks"
-            << " of " << block_size << " threads"
-            << std::endl;
-#endif
-  return 0;
-}
 
 int run_list_pair_compat_kernel(const SourceCompatibilityData* device_sources1,
   const SourceCompatibilityData* device_sources2,

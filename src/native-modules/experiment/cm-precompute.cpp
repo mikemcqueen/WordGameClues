@@ -197,7 +197,7 @@ auto mergeAllCompatibleSources(const NameCountList& ncList,
   return sourceList;
 }
 
-auto buildSourceListsForUseNcData(const vector<NCDataList>& useNcDataLists,
+auto buildSourceListsForUseNcData(const std::vector<NCDataList>& useNcDataLists,
   const SourceListMap& sourceListMap) -> std::vector<SourceList>
 {
   // possible optimization:
@@ -419,7 +419,7 @@ std::string vec_to_string(const vector<int>& v) {
 }
 */
 
-auto vec_product(const vector<int>& v) {
+auto vec_product(const std::vector<int>& v) {
   int64_t result{1};
   for (auto i : v) {
     result *= i;

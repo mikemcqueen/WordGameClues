@@ -15,7 +15,7 @@
 #include "candidates.h"
 #include "filter.h"
 
-#define LOGGING
+//#define LOGGING
 
 namespace {
 
@@ -139,9 +139,11 @@ __device__ bool is_source_xor_or_compatible(
   //   restrictions may be relaxed, but possibly only for "completely exited
   //   (the kernel)" threads, which wouldn't be relevant here anyway (because
   //   we're in a function called from within a loop in a parent kernel).
-  // Therefore, the following is not an equivalent replacement:
-  // for (unsigned xor_idx{threadIdx.x}; xor_idx < num_xor_sources;
-  //   xor_idx += blockDim.x) {
+  //
+  //   Therefore, the following is not an equivalent replacement:
+  //
+  //   for (unsigned flat_idx{threadIdx.x}; flat_idx < num_xor_sources;
+  //      flat_idx += blockDim.x) {
   //
   // for each xor_source (one thread per xor_source)
   const auto num_indices = idx_spans.first.size() + idx_spans.second.size();
@@ -216,7 +218,7 @@ __device__ bool get_smallest_src_index_spans(
     const auto& vi = variation_indices[s];
     // skip sentences for which there are no xor_sources with a primary clue
     // (or it could be a legacy clue)
-    // TODO: it is concievable that there may be variation count of "1"
+    // TODO: it is conceivable that there may be variation count of "1"
     // for xor_sources that contain no primary clues from a particular sentence.
     // I should be sure to eliminate that possibility, as it is unnecessary
     // memory usage and will double search time.
@@ -330,14 +332,6 @@ __global__ void xor_kernel_new(
   }
 }
 
-// TODO: stream.get_results()? just to call out to free function?  maybe
-/*
-auto getKernelResults(StreamData& stream, result_t* device_results) {
-  return copy_device_results(
-    device_results, stream.num_src_lists, stream.stream);
-}
-*/
-
 auto flat_index(
   const SourceCompatibilityLists& sources, const SourceIndex src_idx) {
   uint32_t flat{};
@@ -399,9 +393,7 @@ void run_xor_kernel(StreamData& stream, int threads_per_block,
   stream.start_time = std::chrono::high_resolution_clock::now();
   dim3 grid_dim(grid_size);
   dim3 block_dim(block_size);
-  // TODO: probably this donesn't belong here. we should call it once in
-  // run_task (with cudaStreamPerThread), and maybe here with
-  // stream.cuda_stream. probably maybe.
+  // ensure any async alloc/copies are complete on thread stream
   cudaError_t err = cudaStreamSynchronize(cudaStreamPerThread);
   if (err != cudaSuccess) {
     fprintf(stdout, "sync before kernel, error: %s", cudaGetErrorString(err));
@@ -414,9 +406,6 @@ void run_xor_kernel(StreamData& stream, int threads_per_block,
     PCD.device_or_sources, PCD.num_or_sources, stream.device_source_indices,
     device_list_start_indices, device_results, stream.stream_idx);
 
-  //  err = cudaStreamSynchronize(stream.cuda_stream);
-  //  assert(err == cudaSuccess);
-
 #if 1 || defined(LOGGING)
   std::cerr << "stream " << stream.stream_idx
             << " started with " << grid_size << " blocks"
@@ -426,4 +415,4 @@ void run_xor_kernel(StreamData& stream, int threads_per_block,
 #endif
 }
 
-}
+}  // namespace cm

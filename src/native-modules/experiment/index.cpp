@@ -7,7 +7,6 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include "greeting.h"
 #include "combo-maker.h"
 #include "candidates.h"
 #include "dump.h"
@@ -31,27 +30,6 @@ std::vector<std::string> makeStringList(Env& env, const Array& jsList) {
   }
   return list;
 }
-
-/*
-cm::UsedSources makeUsedSources(Env& env, const Array& jsList) {
-  cm::UsedSources usedSources{};
-  for (auto i = 0u; i < usedSources.size(); ++i) {
-    std::int32_t value = 0;
-    if (i < jsList.Length()) {
-      if (!jsList[i].IsNumber() && !jsList[i].IsUndefined()) {
-        TypeError::New(env, "makeUsedSources: non-(number or undefined) element")
-          .ThrowAsJavaScriptException();
-        return {};
-      }
-      if (jsList[i].IsNumber()) {
-        value = jsList[i].As<Number>().Int32Value();
-      }
-    }
-    usedSources[i] = value;
-  }
-  return usedSources;
-}
-*/
 
 cm::NameCount makeNameCount(Env& env, const Object& jsObject) {
   auto jsName = jsObject.Get("name");
@@ -151,7 +129,6 @@ cm::NCDataList makeNcDataList(Env& env, const Array& jsList) {
 }
 
 std::vector<cm::NCDataList> makeNcDataLists(Env& env, const Array& jsList) {
-  //
   std::vector<cm::NCDataList> lists;  
   for (auto i = 0u; i < jsList.Length(); ++i) {
     if (!jsList[i].IsArray()) {
@@ -181,7 +158,6 @@ cm::SourceListMap makeSourceListMap(Env& env, const Array& jsList) {
     }
     const auto key = tuple[0u].As<String>().Utf8Value();
     auto sourceList = makeSourceList(env, tuple[1u].As<Array>());
-    //cm::debugSourceList(sourceList, "makeSourceListMap");
     map.emplace(std::move(key), std::move(sourceList));
   }
   return map;
@@ -199,18 +175,6 @@ cm::SourceCompatibilityData makeSourceCompatData(
     compatData.addSource(count);
   }
   return compatData;
-#if 0
-  auto primaryNameSrcList =
-    makeNameCountList(env, jsPrimaryNameSrcList.As<Array>());
-  auto legacySrcBits =
-    cm::NameCount::listToLegacySourceBits(primaryNameSrcList);
-  auto usedSources = cm::NameCount::listToUsedSources(primaryNameSrcList);
-#if 1
-  usedSources.assert_valid();
-#endif
-  return cm::SourceCompatibilityData(
-    std::move(legacySrcBits), std::move(usedSources));
-#endif
 }
 
 // FromSourceList
@@ -253,26 +217,6 @@ cm::SourceCompatibilityList makeSourceCompatibilityList(
   }
   return sourceCompatList;
 }
-
-/*
-cm::SourceCompatDeviceList makeSourceCompatDeviceList(Env& env,
-  const Array& jsList)
-{
-  cm::SourceCompatDeviceList sourceCompatList{};
-  for (auto i = 0u; i < jsList.Length(); ++i) {
-    if (!jsList[i].IsObject()) {
-      TypeError::New(env, "makePmrSourceCompatDeviceList: non-object element")
-        .ThrowAsJavaScriptException();
-      return {};
-    }
-    auto jsSourceList = jsList[i].As<Object>().Get("sourceList").As<Array>();
-    cm::SourceCompatibilityData compatData =
-      makeSourceCompatibilityData(env, jsSourceList);
-    sourceCompatList.emplace_back(std::move(compatData));
-  }
-  return sourceCompatList;
-}
-*/
 
 cm::OrSourceData makeOrSource(Env& env, const Object& jsObject) {
   cm::OrSourceData orSource;
@@ -319,38 +263,6 @@ cm::OrArgList makeOrArgList(Env& env, const Array& jsList) {
   return orArgList;
 }
 
-/*
-Value buildSourceListsForUseNcData(const CallbackInfo& info) {
-  Env env = info.Env();
-  if (!info[0].IsArray() || !info[1].IsArray()) {
-      TypeError::New(env, "buildSourceListsForUseNcData: non-array parameter")
-        .ThrowAsJavaScriptException();
-      return env.Null();
-  }
-  auto ncDataLists = makeNcDataLists(env, info[0].As<Array>());
-  //dump(ncDataLists);
-  //std::cout << "------------" << std::endl;
-  auto sourceListMap = makeSourceListMap(env, info[1].As<Array>());
-  //dump(sourceListMap);
-  cm::buildSourceListsForUseNcData(ncDataLists, sourceListMap);
-  return env.Null();
-}
-*/
-
-/*
-Value mergeAllCompatibleSources(const CallbackInfo& info) {
-  Env env = info.Env();
-  if (!info[0].IsArray()) {
-      TypeError::New(env, "mergeAllCompatibleSources: non-array parameter")
-        .ThrowAsJavaScriptException();
-      return env.Null();
-  }
-  auto ncList = makeNameCountList(env, info[0].As<Array>());
-  auto mergedSourcesList = cm::mergeAllCompatibleSources(ncList, cm::PCD.sourceListMap);
-  return cm::wrap(env, mergedSourcesList);
-}
-*/
-
 //
 // mergeCompatibleXorSourceCombinations
 //
@@ -386,7 +298,7 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
     duration_cast<milliseconds>(build1 - build0).count();
   std::cerr << " native build - " << d_build << "ms" << std::endl;
 
-#if 1
+#if 0
   for (const auto& src_list: sourceLists) {
     cm::assert_valid(src_list);
   }
@@ -424,10 +336,7 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
 
   //--
 
-  // NOTE that when I ressurect this I should be indexing via the
-  // sorted (index) list generated above
   if (cm::PCD.xorSourceList.size()) {
-#if 1
     auto svi0 = high_resolution_clock::now();
 
     // for if/when i want to sort xor sources, which is probably a dumb idea.
@@ -450,7 +359,6 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
     auto svi1 = high_resolution_clock::now();
     auto d_svi = duration_cast<milliseconds>(svi1 - svi0).count();
     std::cerr << " variation indices - " << d_svi << "ms" << std::endl;
-#endif
   }
 
   //--
@@ -458,23 +366,6 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   //  return cm::wrap(env, cm::PCD.xorSourceList);
   return Number::New(env, cm::PCD.xorSourceList.size());
 }
-
-/*
-//
-// isAnySourceCompatibleWithUseSources
-//
-Value isAnySourceCompatibleWithUseSources(const CallbackInfo& info) {
-  Env env = info.Env();
-  if (!info[0].IsArray()) {
-    TypeError::New(env, "isAnySourceCompatibleWithUseSources: non-array parameter")
-      .ThrowAsJavaScriptException();
-    return env.Null();
-  }
-  const auto compatList = makeSourceCompatibilityList(env, info[0].As<Array>());
-  const bool compatible = cm::isAnySourceCompatibleWithUseSources(compatList);
-  return Boolean::New(env, compatible);
-}
-*/
 
 Value addCandidateForSum(const CallbackInfo& info) {
   Env env = info.Env();
@@ -501,7 +392,7 @@ Value addCandidateForSum(const CallbackInfo& info) {
 //
 // setOrArgDataList
 //
-Value setOrArgs(const CallbackInfo& info) {
+Value setOrArgDataList(const CallbackInfo& info) {
   using namespace std::chrono;
   Env env = info.Env();
   if (!info[0].IsArray()) {
@@ -525,14 +416,6 @@ Value setOrArgs(const CallbackInfo& info) {
             << " - " << d_t << "ms" << std::endl;
 
   return Number::New(env, sources_count_pair.second);
-}
-
-//
-// getIsAnyPerfData
-//
-Value getIsAnyPerfData(const CallbackInfo& info) {
-  Env env = info.Env();
-  return cm::wrap(env, cm::isany_perf);
 }
 
 auto getCandidateStats(int sum) {
@@ -602,16 +485,9 @@ Value getResult(const CallbackInfo& info) {
 
 //
 Object Init(Env env, Object exports) {
-  //  exports["buildSourceListsForUseNcData"] = Function::New(env,
-  //  buildSourceListsForUseNcData); exports["mergeAllCompatibleSources"] =
-  //  Function::New(env, mergeAllCompatibleSources);
-
-  //  exports["isAnySourceCompatibleWithUseSources"] = Function::New(env,
-  //  isAnySourceCompatibleWithUseSources);
   exports["mergeCompatibleXorSourceCombinations"] =
     Function::New(env, mergeCompatibleXorSourceCombinations);
-  exports["setOrArgDataList"] = Function::New(env, setOrArgs);
-  exports["getIsAnyPerfData"] = Function::New(env, getIsAnyPerfData);
+  exports["setOrArgDataList"] = Function::New(env, setOrArgDataList);
   exports["addCandidateForSum"] = Function::New(env, addCandidateForSum);
   exports["getCandidateStatsForSum"] =
     Function::New(env, getCandidateStatsForSum);

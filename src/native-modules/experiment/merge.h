@@ -5,7 +5,7 @@
 #include <cuda_runtime.h>
 #include "peco.h"
 #include "combo-maker.h"
-#include "filter-types.h"
+#include "cuda-types.h"
 
 namespace cm {
 
@@ -26,10 +26,9 @@ int getNumEmptySublists(const std::vector<SourceList>& sourceLists);
 bool filterAllXorIncompatibleIndices(Peco::IndexListVector& indexLists,
   const std::vector<SourceList>& sourceLists);
 
+// TODO: util.h
 int list_size(const Peco::IndexList& indexList);
-
 int64_t vec_product(const std::vector<size_t>& v);
-
 std::string vec_to_string(const std::vector<size_t>& v);
 
 auto cuda_mergeCompatibleXorSourceCombinations(

@@ -8,9 +8,8 @@
     "sources": [
       "candidates.cpp",
       "cm-precompute.cpp",
-      "greeting.cpp",
-      "index.cpp",
       "filter-support.cpp",
+      "index.cpp",
       "merge-support.cpp",
       "wrap.cpp"
     ],

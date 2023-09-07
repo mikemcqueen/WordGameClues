@@ -11,21 +11,9 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-
-// move these maybe
-#include <span>
-#include <utility>
-
-
-#define USE_MMEBITSET 1
-
-#if USE_MMEBITSET
+#include "cuda-types.h"
 #include "mmebitset.h"
-using mme::bitset;
-#else
-#include <bitset>
-using std::bitset;
-#endif
+//using mme::bitset;
 
 namespace cm {
 
@@ -51,20 +39,14 @@ namespace Source {
   constexpr inline auto getSource(int src) noexcept { return src % 1'000'000; }
   constexpr inline auto getVariation(int src) noexcept { return getSource(src) / 100; }
   constexpr inline auto getIndex(int src) noexcept { return getSource(src) % 100; }
-#if 0 // unused
-  constexpr inline auto getFirstIndex(int sentence) {
-    assert(sentence > 0);
-    return (sentence - 1) * kMaxUsedSourcesPerSentence;
-  }
-#endif
-} // namespace Source
+}  // namespace Source
 
-using LegacySourceBits = bitset<kMaxLegacySources>;
+using LegacySourceBits = mme::bitset<kMaxLegacySources>;
 
 struct UsedSources {
   using VariationIndex_t = int16_t;
   // 32 bits per sentence * 9 sentences = 1152 bits, 144 bytes, 18 64-bit words
-  using SourceBits = bitset<kMaxSourcesPerSentence * kNumSentences>;
+  using SourceBits = mme::bitset<kMaxSourcesPerSentence * kNumSentences>;
   using Variations = std::array<VariationIndex_t, kNumSentences>;
 
   constexpr static auto getFirstBitIndex(int sentence) {
@@ -150,33 +132,6 @@ public:
     return true;
   }
 
-#ifdef __CUDA_ARCH__
-  constexpr auto isXorCompatibleWith(
-    const UsedSources& other, uint32_t* other_src_bits) const {
-    // compare bits (gpu shared memory)
-    if (getBits().shared_intersects(other_src_bits)) {
-      return false;
-    }
-    // compare variations
-    if (!allVariationsMatch(variations, other.variations)) {
-      return false;
-    }
-    return true;
-  }
-#endif
-
-  /*
-  // TODO: private
-  void addSource(int src) {
-    auto sentence = Source::getSentence(src);
-    int first = Source::getFirstSourceIndex(sentence);
-    int offset{};
-    while (sources[first + offset] != -1) ++offset;
-    assert(offset < kMaxUsedSourcesPerSentence);
-    sources[first + offset] = Sources::getIndex(src);
-  }
-  */
-
   void addSource(int src) {
     auto sentence = Source::getSentence(src);
     assert(sentence > 0);
@@ -206,12 +161,14 @@ public:
   }
 
   auto copyMerge(const UsedSources& other) const {
-    UsedSources result{ *this }; // copy
+    UsedSources result{*this};  // copy
     result.mergeInPlace(other);
     return result;
   }
 
-  constexpr void dump(bool device = false, char* buf = nullptr, char* smolbuf = nullptr) const {
+  constexpr void dump(
+    bool device = false, char* buf = nullptr, char* smolbuf = nullptr) const {
+    //
     char big_buf[256];
     char smol_buf[32];
     if (!buf) buf = big_buf;
@@ -306,16 +263,6 @@ struct SourceCompatibilityData {
     return usedSources.isXorCompatibleWith(other.usedSources, check_variations);
   }
 
-#ifdef __CUDA_ARCH__
-  constexpr auto isXorCompatibleWith(const SourceCompatibilityData& other,
-    uint32_t* other_src_bits, uint32_t* other_legacy_src_bits) const {
-    if (legacySourceBits.shared_intersects(other_legacy_src_bits)) {
-      return false;
-    }
-    return usedSources.isXorCompatibleWith(other.usedSources, other_src_bits);
-  }
-#endif
-
   constexpr auto isAndCompatibleWith(
     const SourceCompatibilityData& other, bool check_variations = true) const {
     if (!legacySourceBits.is_subset_of(other.legacySourceBits))
@@ -324,7 +271,7 @@ struct SourceCompatibilityData {
   }
 
   // OR == XOR || AND
-  // Another optimizatoin is that rather than testing Xor + And
+  // Another optimization is that rather than testing Xor + And
   // separately, we have new bitset function something like
   // "is_disjoint_from_or_subset_of()" which I think covers
   // both cases.  "disjoint_from" is just the oppposite of
@@ -584,26 +531,23 @@ namespace device {
 // which share the same per-sentence variation.
 // One list of indices per variation, plus '-1' (no) variation.
 // indices to outer vector are offset by 1; variation -1 is index 0.
-using VariationIndicesList = std::vector<std::vector<uint32_t>>;
+using VariationIndicesList = std::vector<std::vector<index_t>>;
 // one variationIndicesLists per sentence
 using SentenceVariationIndices = std::array<VariationIndicesList, kNumSentences>;
-
-using IndexSpan = std::span<const uint32_t>;
-using IndexSpanPair = std::pair<IndexSpan, IndexSpan>;
 
 // on-device version of above
 namespace device {
 
 struct VariationIndices {
-  uint32_t* device_data;  // one chunk of allocated data; other pointers below
-                          // point inside this chunk. only this gets freed.
-  uint32_t* src_indices;
-  uint32_t* num_src_indices;
+  index_t* device_data;  // one chunk of allocated data; other pointers below
+                         // point inside this chunk. only this gets freed.
+  index_t* src_indices;
+  index_t* num_src_indices;
 
-  uint32_t* variation_offsets;  // offsets into sourceIndices
-  uint32_t num_variations;
+  index_t* variation_offsets;  // offsets into sourceIndices
+  index_t num_variations;
 
-  constexpr std::span<uint32_t> get_src_index_span(int variation) const {
+  constexpr std::span<index_t> get_src_index_span(int variation) const {
     return {
       &src_indices[variation_offsets[variation]], num_src_indices[variation]};
   }
@@ -622,7 +566,7 @@ struct PreComputedData {
   SentenceVariationIndices sentenceVariationIndices;
   device::VariationIndices* device_sentenceVariationIndices{nullptr};
   // TODO: temporary until all clues are converted to sentences
-  uint32_t* device_xor_src_indices;
+  index_t* device_xor_src_indices;
 };
 
 struct MergedSources : SourceCompatibilityData {
@@ -674,7 +618,7 @@ XorSourceList mergeCompatibleXorSourceCombinations(
   const std::vector<SourceList>& sourceLists);
 
 auto buildSentenceVariationIndices(const XorSourceList& xorSourceList,
-  const std::vector<uint32_t>& xorSourceIndices) -> SentenceVariationIndices;
+  const std::vector<index_t>& xorSourceIndices) -> SentenceVariationIndices;
 
 void mergeUsedSourcesInPlace(UsedSources& to, const UsedSources& from);
 

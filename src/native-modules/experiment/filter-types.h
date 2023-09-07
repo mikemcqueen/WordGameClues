@@ -7,16 +7,12 @@
 #include <optional>
 #include <vector>
 #include <cuda_runtime.h>
+#include "cuda-types.h"
 #include "candidates.h"
 
 namespace cm {
 
 using filter_result_t = std::unordered_set<std::string>;
-
-using result_t = uint8_t;
-
-using index_t = uint32_t;
-using IndexList = std::vector<index_t>;
 
 struct SourceIndex {
   index_t listIndex{};
