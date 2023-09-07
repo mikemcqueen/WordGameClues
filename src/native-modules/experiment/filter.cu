@@ -406,11 +406,10 @@ void run_xor_kernel(StreamData& stream, int threads_per_block,
     PCD.device_or_sources, PCD.num_or_sources, stream.device_source_indices,
     device_list_start_indices, device_results, stream.stream_idx);
 
-#if 1 || defined(LOGGING)
+#if defined(LOGGING)
   std::cerr << "stream " << stream.stream_idx
             << " started with " << grid_size << " blocks"
             << " of " << block_size << " threads"
-          //<< " starting, sequence: " << stream.sequence_num
             << std::endl;
 #endif
 }

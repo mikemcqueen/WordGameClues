@@ -135,7 +135,7 @@ int run_filter_task(StreamSwarm& streams, int threads_per_block,
       idx_states.update(stream.source_indices, results, stream.stream_idx);
     total_compat += num_compat;
 
-#if defined(LOGGING)
+#if 1 || defined(LOGGING)
     auto num_actual_compat = std::accumulate(results.begin(), results.end(), 0,
       [](int sum, result_t r) { return r ? sum + 1 : sum; });
     std::cerr << " stream " << stream.stream_idx
