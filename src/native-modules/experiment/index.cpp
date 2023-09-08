@@ -459,8 +459,8 @@ Value getCandidateStatsForSum(const CallbackInfo& info) {
 Value filterCandidatesForSum(const CallbackInfo& info) {
   Env env = info.Env();
   if (!info[0].IsNumber() || !info[1].IsNumber() || !info[2].IsNumber()
-      || !info[3].IsNumber() || !info[4].IsNumber()) {
-    TypeError::New(env, "fitlerCandidatesForSum: non-number parameter")
+      || !info[3].IsNumber() || !info[4].IsNumber() || !info[5].IsBoolean()) {
+    TypeError::New(env, "fitlerCandidatesForSum: invalid parameter type")
       .ThrowAsJavaScriptException();
     return env.Null();
   }
@@ -470,7 +470,9 @@ Value filterCandidatesForSum(const CallbackInfo& info) {
   auto streams = info[2].As<Number>().Int32Value();
   auto stride = info[3].As<Number>().Int32Value();
   auto iters = info[4].As<Number>().Int32Value();
-  cm::filterCandidatesCuda(sum, threads_per_block, streams, stride, iters);
+  auto synchronous = info[5].As<Boolean>().Value();
+  cm::filterCandidatesCuda(
+    sum, threads_per_block, streams, stride, iters, synchronous);
   return env.Null();
 }
 

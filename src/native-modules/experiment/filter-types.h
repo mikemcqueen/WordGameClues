@@ -12,6 +12,12 @@
 
 namespace cm {
 
+// globals
+
+inline std::vector<SourceCompatibilityData> incompatible_sources;
+
+// types
+
 using filter_result_t = std::unordered_set<std::string>;
 
 struct SourceIndex {
@@ -29,6 +35,25 @@ struct SourceIndex {
   }
 };
 
+// functions ??
+
+inline const auto& get_src(const std::vector<SourceCompatibilityList>& src_lists,
+  SourceIndex src_idx) {
+  return src_lists.at(src_idx.listIndex).at(src_idx.index);
+}
+
+inline bool is_compatible_src(const SourceCompatibilityData& src) {
+  //, const SourceCompatibilityList& incompatible_sources) const {
+  for (const auto& bad_src : incompatible_sources) {
+    if (bad_src.isAndCompatibleWith(src)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// more types! yay!
+
 struct IndexStates {
   enum class State {
     ready,
@@ -39,6 +64,10 @@ struct IndexStates {
   struct Data {
     constexpr auto ready_state() const {
       return state == State::ready;
+    }
+
+    constexpr auto is_compatible() const {
+      return state == State::compatible;
     }
 
     void reset() {
@@ -63,8 +92,13 @@ struct IndexStates {
   }
 
   void reset() {
+    for (auto& data: list) {
+      data.reset();
+    }
+    /*
     std::for_each(
       list.begin(), list.end(), [](Data& data) mutable { data.reset(); });
+    */
     next_fill_idx = 0;
     done = false;
   }
@@ -109,11 +143,10 @@ struct IndexStates {
     for (size_t i{}; i < src_indices.size(); ++i) {
       const auto src_idx = src_indices.at(i);
       auto& idx_state = list.at(src_idx.listIndex);
-      const auto result = results.at(src_idx.listIndex);
       if (!idx_state.ready_state()) {
         continue;
       }
-      if (result > 0) {
+      if (results.at(src_idx.listIndex)) {
         idx_state.state = State::compatible;
         ++num_compatible;
       } else if (src_idx.index == list_sizes.at(src_idx.listIndex) - 1) {
@@ -160,11 +193,30 @@ struct IndexStates {
     return fill_idx;
   }
 
+  void mark_compatible(const IndexList& list_indices) {
+    for (auto idx : list_indices) {
+      list.at(idx).state = State::compatible;
+    }
+  }
+
+  void dump_compatible() {
+    int count{};
+    for (size_t i{}; i < list.size(); ++i) {
+      if (list.at(i).state == State::compatible) {
+        std::cout << i << ",";
+        if (!(++count % 10)) {
+          std::cout << std::endl;
+        }
+      }
+    }
+    std::cout << std::endl << "total: " << count << std::endl;
+  }
+
   bool done{false};
-  index_t next_fill_idx{0};
+  index_t next_fill_idx{};
   std::vector<Data> list;
-  std::vector<uint32_t> list_start_indices;
-  std::vector<uint32_t> list_sizes;
+  std::vector<index_t> list_start_indices;
+  std::vector<index_t> list_sizes;
 };  // struct IndexStates
 
 //////////
@@ -196,21 +248,28 @@ public:
     return indexStates.num_compatible(0, num_list_indices);
   }
 
-  auto fillSourceIndices(IndexStates& idx_states, int max_idx) {
+  auto fillSourceIndices(IndexStates& idx_states, int max_idx,
+    const std::vector<SourceCompatibilityList>& src_lists) {
+    //
     source_indices.resize(idx_states.done ? 0 : max_idx);
     for (int idx{}; !idx_states.done && (idx < max_idx);) {
       size_t num_skipped_idx{};  // how many idx were skipped in a row
       // this loop logic is funky and brittle, but intentional
-      for (auto list_idx = idx_states.get_next_fill_idx(); /* empty */;
-           list_idx = idx_states.get_next_fill_idx()) {
+      // TODO: replace empty with: !idx_states.done && (idx < max_idx)
+      // and remove breaks
+      for (auto list_idx = idx_states.get_next_fill_idx();
+           /* empty */; list_idx = idx_states.get_next_fill_idx()) {
         const auto opt_src_idx = idx_states.get_and_increment_index(list_idx);
         if (opt_src_idx.has_value()) {
           const auto src_idx = opt_src_idx.value();
           assert(src_idx.listIndex == list_idx);
+          num_skipped_idx = 0;
+          if (!is_compatible_src(get_src(src_lists, src_idx))) {
+            continue;
+          }
           source_indices.at(idx++) = src_idx;
           if (idx >= max_idx)
             break;
-          num_skipped_idx = 0;
         } else if (++num_skipped_idx >= idx_states.num_lists()) {
           // we've skipped over the entire list (with index overlap)
           // and haven't consumed any indices. nothing left to do.
@@ -221,20 +280,22 @@ public:
       }
     }
 #if 0
-    std::cerr << "ending next_fill_idx: " << idx_states.next_fill_idx << std::endl;
-    std::cerr << "stream " << stream_idx
-              << " filled " << source_indices.size()
-              << " of " << max_idx
-              << ", first = " << (source_indices.empty() ? -1 : (int)source_indices.front().listIndex)
-              << ", last = " << (source_indices.empty() ? -1 : (int)source_indices.back().listIndex)
-              << ", done: " << std::boolalpha << idx_states.done
+    std::cerr << "ending next_fill_idx: " << idx_states.next_fill_idx
               << std::endl;
+    std::cerr
+      << "stream " << stream_idx << " filled " << source_indices.size()
+      << " of " << max_idx << ", first = "
+      << (source_indices.empty() ? -1 : (int)source_indices.front().listIndex)
+      << ", last = "
+      << (source_indices.empty() ? -1 : (int)source_indices.back().listIndex)
+      << ", done: " << std::boolalpha << idx_states.done << std::endl;
 #endif
     return !source_indices.empty();
   }
 
-  bool fillSourceIndices(IndexStates& idx_states) {
-    return fillSourceIndices(idx_states, num_list_indices);
+  bool fillSourceIndices(IndexStates& idx_states,
+    const std::vector<SourceCompatibilityList>& src_lists) {
+    return fillSourceIndices(idx_states, num_list_indices, src_lists);
   }
 
   void allocCopy([[maybe_unused]] const IndexStates& idx_states) {

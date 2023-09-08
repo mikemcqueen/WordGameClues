@@ -99,6 +99,7 @@ void copy_device_results(std::vector<result_t>& results,
 }
 
 int run_filter_task(StreamSwarm& streams, int threads_per_block,
+  const std::vector<SourceCompatibilityList>& src_lists,
   IndexStates& idx_states, const SourceCompatibilityData* device_sources,
   result_t* device_results, const index_t* device_list_start_indices,
   std::vector<result_t>& results) {
@@ -109,7 +110,7 @@ int run_filter_task(StreamSwarm& streams, int threads_per_block,
   while (streams.get_next_available(current_stream)) {
     auto& stream = streams.at(current_stream);
     if (!stream.is_running) {
-      if (!stream.fillSourceIndices(idx_states)) {
+      if (!stream.fillSourceIndices(idx_states, src_lists)) {
         continue;
       }
 #if defined(LOGGING)
@@ -148,6 +149,20 @@ int run_filter_task(StreamSwarm& streams, int threads_per_block,
   return total_compat;
 }
 
+auto add_incompatible_sources(const IndexStates& idx_states,
+  const std::vector<SourceCompatibilityList>& src_lists) {
+  int count{};
+  for (const auto& data : idx_states.list) {
+    if (!data.is_compatible()) {
+      for (const auto& src : src_lists.at(data.sourceIndex.listIndex)) {
+        incompatible_sources.push_back(src);
+        ++count;
+      }
+    }
+  }
+  return count;
+}
+
 std::unordered_set<std::string> get_compat_combos(
   const std::vector<result_t>& results,
   const OneSumCandidateData& candidate_data) {
@@ -164,8 +179,8 @@ std::unordered_set<std::string> get_compat_combos(
   return compat_combos;
 }
 
-std::unordered_set<std::string> filter_task(
-  int sum, int threads_per_block, int num_streams, int stride, int iters) {
+std::unordered_set<std::string> filter_task(int sum, int threads_per_block,
+  int num_streams, int stride, int iters, bool synchronous = false) {
   //
   num_streams = num_streams ? num_streams : 3;
   stride = stride ? stride : 1024;
@@ -173,7 +188,7 @@ std::unordered_set<std::string> filter_task(
 
   using namespace std::chrono;
   [[maybe_unused]] cudaError_t err = cudaSuccess;
-  err = cudaDeviceSetLimit(cudaLimitPrintfFifoSize, 7'500'000);
+  //err = cudaDeviceSetLimit(cudaLimitPrintfFifoSize, 7'500'000);
 
   const auto& candidate_data = allSumsCandidateData.find(sum)->second;
   const auto& src_lists = candidate_data.sourceCompatLists;
@@ -193,11 +208,13 @@ std::unordered_set<std::string> filter_task(
   for(int i{}; i < iters; ++i) {
     streams.reset();
     idx_states.reset();
+    //idx_states.mark_compatible(compat_15_15);
     zeroResults(device_results, src_lists.size(), cudaStreamPerThread);
     auto t0 = high_resolution_clock::now();
 
-    auto total_compat = run_filter_task(streams, threads_per_block, idx_states,
-      device_sources, device_results, device_list_start_indices, results);
+    auto total_compat =
+      run_filter_task(streams, threads_per_block, src_lists, idx_states,
+        device_sources, device_results, device_list_start_indices, results);
 
     auto t1 = high_resolution_clock::now();
     auto d_total = duration_cast<milliseconds>(t1 - t0).count();
@@ -205,8 +222,12 @@ std::unordered_set<std::string> filter_task(
     if (iters > 1) {
       std::cerr << " iter: " << i;
     }
-    std::cerr << " total compat: " << total_compat << " of " << src_lists.size()
-              << " - " << d_total << "ms" << std::endl;
+    std::cerr << " total compat: " << total_compat << " of " << src_lists.size();
+    if (synchronous) {
+      auto num_incompat = add_incompatible_sources(idx_states, src_lists);
+      std::cerr << " (" << num_incompat << " incompatible)";
+    }
+    std::cerr << " - " << d_total << "ms" << std::endl;
   }
 
 #if 0
@@ -229,16 +250,62 @@ auto countIndices(const VariationIndicesList& variationIndices) {
     });
 }
 
+auto debug_build_compat_lists(int sum) {
+  std::vector<IndexList> compat_lists;
+  const auto& candidate_data = allSumsCandidateData.find(sum)->second;
+  const auto& src_lists = candidate_data.sourceCompatLists;
+  for (size_t i{}; i < src_lists.size(); ++i) {
+    const auto sz = src_lists.at(i).size();
+    if (sz >= compat_lists.size()) {
+      compat_lists.resize(sz + 1);
+    }
+    compat_lists.at(sz).push_back(i);
+  }
+  return compat_lists;
+}
+
+void debug_dump_compat_lists(const std::vector<IndexList>& compat_lists) {
+  for (size_t i{}; i < compat_lists.size(); ++i) {
+    const auto& idx_list = compat_lists.at(i);
+    if (idx_list.empty()) {
+      continue;
+    }
+    std::cout << "size: " << i << ", count: " << idx_list.size() << std::endl;
+  }
+}
+
+void dump_src_list(const SourceCompatibilityList& src_list) {
+  for (const auto& src : src_list) {
+    src.dump();
+  }
+}
+
 }  // anonymous namespace
-
-
 
 namespace cm {
 
-void filterCandidatesCuda(
-  int sum, int threads_per_block, int num_streams, int stride, int iters) {
-  add_filter_future(std::async(std::launch::async, filter_task, sum,
-    threads_per_block, num_streams, stride, iters));
+void filterCandidatesCuda(int sum, int threads_per_block, int num_streams,
+  int stride, int iters, bool synchronous) {
+  //
+#if 0
+  auto compat_lists = debug_build_compat_lists(sum);
+  debug_dump_compat_lists(compat_lists);
+
+  const auto& candidate_data = allSumsCandidateData.find(sum)->second;
+  auto big_list_idx = compat_lists.back().front();
+  std::cout << "list: " << big_list_idx << std::endl;
+  const auto& src_list = candidate_data.sourceCompatLists.at(big_list_idx);
+  dump_src_list(src_list);
+#endif
+
+  if (synchronous) {
+    std::promise<std::unordered_set<std::string>> p;
+    p.set_value(filter_task(sum, threads_per_block, num_streams, stride, iters, true));
+    add_filter_future(p.get_future());
+  } else {
+    add_filter_future(std::async(std::launch::async, filter_task, sum,
+      threads_per_block, num_streams, stride, iters, false));
+  }
 }
 
 filter_result_t get_filter_result() {

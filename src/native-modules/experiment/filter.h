@@ -7,8 +7,10 @@
 
 namespace cm {
 
-void filterCandidatesCuda(
-  int sum, int threads_per_block, int num_streams, int stride, int iters);
+// functions
+
+void filterCandidatesCuda(int sum, int threads_per_block, int num_streams,
+  int stride, int iters, bool synchronous);
 
 void run_xor_kernel(StreamData& stream, int threads_per_block,
   const SourceCompatibilityData* device_sources, result_t* device_results,

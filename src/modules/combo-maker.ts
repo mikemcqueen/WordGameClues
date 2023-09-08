@@ -408,18 +408,26 @@ const getCombosForUseNcLists = (sum: number, max: number, pcd: PreCompute.Data,
         process.stderr.write('.');
     }
     NativeComboMaker.filterCandidatesForSum(sum, args.tpb, args.streams,
-      args.stride, args.iters);
+      args.stride, args.iters, args.synchronous);
     return combos;
 };
 
-export const makeCombosForSum = (sum: number, max: number, args: any): string[] => {
+export const makeCombosForSum = (sum: number, args: any,
+  synchronous: boolean = false): string[] =>
+{
     if (_.isUndefined(args.maxResults)) {
         args.maxResults = 50000;
         // TODO: whereever this is actually enforced:
         // console.error(`Enforcing max results: ${args.maxResults}`);
     }
-    // TODO move this a layer or two out; use "validateArgs" 
-    return getCombosForUseNcLists(sum, max, PCD, args);
+    args.synchronous = synchronous;
+    // TODO: Fix this abomination
+    args.sum = sum;
+    let max = args.max;
+    args.max = Math.min(args.max, args.sum);
+    let result = getCombosForUseNcLists(sum, max, PCD, args);
+    args.max = max;
+    return result;
 };
 
 const parallel_makeCombosForRange = (first: number, last: number, args: any): any => {
@@ -506,16 +514,13 @@ export const makeCombos = (args: any): any => {
         const result = PreCompute.preCompute(first, last, args);
         if (result.success) {
             PCD = result.data!;
+            // seed "incompatible sources" with 2-clue sources to make all
+            // subsequent sums faster. but, synchronously.
+            makeCombosForSum(2, args, true);
+            if (first == 2) ++first;
             for (let sum = first; sum <= last; ++sum) {
-                // TODO: Fix this abomination
-                args.sum = sum;
-                let max = args.max;
-                args.max = Math.min(args.max, args.sum);
                 // TODO: return # of combos filtered due to note name match
-                /*const comboList = */makeCombosForSum(sum, args.max, args);
-                args.max = max;
-                //total += comboList.length;
-                //ClueManager.filter(comboList, sum, totals);
+                makeCombosForSum(sum, args);
             }
             const comboList = NativeComboMaker.getResult();
             total += comboList.length;

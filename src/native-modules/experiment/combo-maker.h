@@ -179,7 +179,7 @@ public:
     if (device) {
       printf("sources:");
     } else {
-      std::cerr << "sources:";
+      std::cout << "sources:";
     }
     for (auto s{1}; s <= kNumSentences; ++s) {
       if (getVariation(s) > -1) {
@@ -187,28 +187,28 @@ public:
           if (device) {
             printf("\n");
           } else {
-            std::cerr << std::endl;
+            std::cout << std::endl;
           }
           first = false;
         }
         if (device) {
           printf("  s%d v%d:", s, getVariation(s));
         } else {
-          std::cerr << "  s" << s << " v" << getVariation(s) << ":";
+          std::cout << "  s" << s << " v" << getVariation(s) << ":";
         }
         for (int i{}; i < kMaxSourcesPerSentence; ++i) {
           if (bits.test((s - 1) * kMaxSourcesPerSentence + i)) {
             if (device) {
               printf(" %d", i);
             } else {
-              std::cerr << " " << i;
+              std::cout << " " << i;
             }
           }
         }
         if (device) {
             printf("\n");
         } else {
-          std::cerr << std::endl;
+          std::cout << std::endl;
         }
       }
     }
@@ -216,7 +216,7 @@ public:
       if (device) {
         printf(" none\n");
       } else {
-        std::cerr << " none" << std::endl;
+        std::cout << " none" << std::endl;
       }
     }
   }
@@ -319,14 +319,14 @@ struct SourceCompatibilityData {
       if (device) {
         sprintf(buf, "%s\n", header);
       } else {
-        std::cerr << header << std::endl;
+        std::cout << header << std::endl;
       }
     }
     usedSources.dump(device);
     if (device) {
       printf("legacy sources:");
     } else {
-      std::cerr << "legacy sources:";
+      std::cout << "legacy sources:";
     }
     auto any{false};
     for (int i{}; i < kMaxLegacySources; ++i) {
@@ -334,7 +334,7 @@ struct SourceCompatibilityData {
         if (device) {
           printf(" %d", i);
         } else {
-          std::cerr << " " << i;
+          std::cout << " " << i;
         }
         any = true;
       }
@@ -343,13 +343,13 @@ struct SourceCompatibilityData {
       if (device) {
         printf(" none");
       } else {
-        std::cerr << " none";
+        std::cout << " none";
       }
     }
     if (device) {
       printf("\n");
     } else {
-      std::cerr << std::endl;
+      std::cout << std::endl;
     }
   }
 

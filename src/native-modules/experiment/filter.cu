@@ -218,10 +218,6 @@ __device__ bool get_smallest_src_index_spans(
     const auto& vi = variation_indices[s];
     // skip sentences for which there are no xor_sources with a primary clue
     // (or it could be a legacy clue)
-    // TODO: it is conceivable that there may be variation count of "1"
-    // for xor_sources that contain no primary clues from a particular sentence.
-    // I should be sure to eliminate that possibility, as it is unnecessary
-    // memory usage and will double search time.
     if (!vi.num_variations) {
       continue;
     }

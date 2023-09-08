@@ -1,33 +1,32 @@
 * can i sort sources within each device_sources list, in order of the smallest
   xor_sources IndexSpanPair they will test against? like, could I store
-  candidates in an ordered set, with smallest IndexSpanPair combined size as
-  the comparator function? or, is a candidate a sourcelist already? or just a
-  single source?
+  candidates in an ordered set, with a test for the smallest IndexSpanPair
+  combined size in the comparator function? or, is a candidate a sourcelist
+  already? or just a single source?
 
 * what does "ready: 0" mean for filter? I'm calling the filter what seems like
   an unnecessary amount of times with ready:0 when running -c15,15 -x2
-
-* in filter.cu:  get_smallest_src_index_spans
-  TODO: it is concievable that there may be variation count of "1"
-  for xor_sources that contain no primary clues from a particular sentence.
-  I should be sure to eliminate that possibility, as it is unnecessary
-  memory usage and will double search time.
 
 * have a stream keep track of how many times it's been run, and/or a total
   count of the number of indices it's processed, then total all of them at
   the end, so i show: num streams executed (M), num indices processed (N)
 
+**************************************************************************
 * how about I actually compare new code results with old code results?
   like, cuda-xor. but I need to remove the xorSourceList wrapping from that.
   once that's done, I can remove a big paragraph below about wrapping.
+**************************************************************************
 
-* move index_t/result_t stuff to cuda-types.h?
-* fix the fucked up header file bullshit for filter. DONE? partially at least
 * consider stripping some types out of combo_maker.h into separate files.
 * PreComputeData probably needs to go do it's own thing. Some form of singleton.
+* .cu dependencies
+
+**************************************************************************
 * i have count(), countIndices(), and sum_sizes() and I think they all do the
   same thing.  maybe a util.h?  sum_vector_sizes()/sum_container_sizes()?
-
+  add vec_product, vec_to_string, etc.
+**************************************************************************
+  
 * markAllCompatibleOrSources in c++.
 
 * Optimizing merge/get_compat_combos. 200M combos currently, and no streams.
@@ -92,6 +91,10 @@
     suspect it may be needed for something, but I haven't actually confirmed.
     I do know that having to convert a SourceList to a SourceCompatibilityList
     prior to copying to device memory is a consequence I'd like to get rid of.
+
+* i'm not really sure what the point of having a whole separate confederate
+  variation is. it seems unnecessary, a performance pessimization, and in
+  general problematic.
 
 * tricky situation that should be fixed (and in general, beyond this specific
   tricky instance). blue is a synonym of navy in clues 1.  we later go on to
@@ -187,10 +190,10 @@ clues3.json:  { "name": "old",             "src": "new,not" },
   of combinations to explode. It's funny that it didn't actually change the
   output, but that's probably due to the xor.req's I used. There is something
   to investigate here and a couple of potential fixes for this:
-  0) Investigate: am I ensuring that the sentence words + all components
+  * Investigate: am I ensuring that the sentence words + all components
      form a **unique** list? Should be in Sentence.getUniqueComponentNames
      or something.
-  1) I think I can do a 2nd pass of index filtering. Iirc, the order of
+  * I think I can do a 2nd pass of index filtering. Iirc, the order of
      filtering matters, and while I currently do something like "remove items
      from list B that are incompatible with items in list A", I don't do
      the inverse, or something like that, which may help.
@@ -198,7 +201,7 @@ clues3.json:  { "name": "old",             "src": "new,not" },
      peco-loop timing which is currently fast.
      NOTE: I've looked at this and I think I'm testing every combo, nothing
      further to optimize.
-  2) I think there is potential for a filtering step in here somewhere, where,
+  * I think there is potential for a filtering step in here somewhere, where,
      for example, I look at all of the NameSrc results for a particular useNC,
      and see what they have in common. I'm just spitballing, but something
      like "well all NcDataCombinations for this NC have *this* and *that*
@@ -226,13 +229,6 @@ clues3.json:  { "name": "old",             "src": "new,not" },
   to C++. I don't think just porting mergeCompatibleSources3 and dependencies
   alone will do much as each call is short so the overhead of the call isn't
   worth it, but there are a million (literally) calls.
-
-* Precompute is a tiny bit slower now. Maybe because I'm doing too much
-  copying in mergeAllCompatibleSources/XorSources? Any way to put a
-  stop to that? Like the optimization idea I might have in a comment there,
-  using something like a new CombinedSourceRefs data type.
-  Also the "copyOnMerge" logic I use in mergeCompatibleSources3 might be
-  of some help here.
 
 ** the below was a pre-cuda optimization idea
 * from notepad:  on elimination: this should only be relevant to combo-making.
