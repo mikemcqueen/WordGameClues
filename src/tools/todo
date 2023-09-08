@@ -29,6 +29,9 @@
   
 * markAllCompatibleOrSources in c++.
 
+* get rid of std::async? have 1 thread waiting on queue, executing filters,
+  and main thread just adds execute requests to queue?
+
 * Optimizing merge/get_compat_combos. 200M combos currently, and no streams.
   Low reward atm, but eventually might make sense.
   * 200M kernel finishes in ~35ms, which DOES NOT give us enough time to do
