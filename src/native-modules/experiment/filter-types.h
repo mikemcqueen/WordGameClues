@@ -5,6 +5,7 @@
 #include <chrono>
 #include <iostream>
 #include <optional>
+#include <thread>
 #include <vector>
 #include <cuda_runtime.h>
 #include "cuda-types.h"
@@ -35,11 +36,11 @@ struct SourceIndex {
   }
 };
 
-// functions ??
+// functions
 
-inline const auto& get_src(const std::vector<SourceCompatibilityList>& src_lists,
-  SourceIndex src_idx) {
-  return src_lists.at(src_idx.listIndex).at(src_idx.index);
+inline const auto& get_src(
+  const CandidateList& candidates, SourceIndex src_idx) {
+  return candidates.at(src_idx.listIndex).src_list_cref.get().at(src_idx.index);
 }
 
 inline bool is_compatible_src(const SourceCompatibilityData& src) {
@@ -54,7 +55,8 @@ inline bool is_compatible_src(const SourceCompatibilityData& src) {
 
 // more types! yay!
 
-struct IndexStates {
+class IndexStates {
+public:
   enum class State {
     ready,
     compatible,
@@ -80,14 +82,16 @@ struct IndexStates {
   };
 
   IndexStates() = delete;
-  IndexStates(const SourceCompatibilityLists& sources) {
-    list.resize(sources.size());  // i.e. "num_sourcelists"
-    std::for_each(list.begin(), list.end(),
-      [idx = 0](Data& data) mutable { data.sourceIndex.listIndex = idx++; });
-    for (index_t list_start_index{}; const auto& sourceList : sources) {
-      list_sizes.push_back(sourceList.size());
+  IndexStates(const CandidateList& candidates) {
+    list.resize(candidates.size());
+    for (index_t idx{}; auto& data : list) {
+      data.sourceIndex.listIndex = idx++;
+    }
+    for (index_t list_start_index{}; const auto& candidate : candidates) {
+      auto num_sources{(index_t)candidate.src_list_cref.get().size()};
+      list_sizes.push_back(num_sources);
       list_start_indices.push_back(list_start_index);
-      list_start_index += (index_t)sourceList.size();
+      list_start_index += num_sources;
     }
   }
 
@@ -95,10 +99,6 @@ struct IndexStates {
     for (auto& data: list) {
       data.reset();
     }
-    /*
-    std::for_each(
-      list.begin(), list.end(), [](Data& data) mutable { data.reset(); });
-    */
     next_fill_idx = 0;
     done = false;
   }
@@ -137,7 +137,6 @@ struct IndexStates {
     const std::vector<result_t>& results,
     [[maybe_unused]] int stream_idx)  // for logging
   {
-    constexpr static const bool logging = false;
     int num_compatible{};
     int num_done{};
     for (size_t i{}; i < src_indices.size(); ++i) {
@@ -156,7 +155,7 @@ struct IndexStates {
         ++num_done;
       }
     }
-    if (logging) {
+    if constexpr (0) {
       std::cerr << "stream " << stream_idx
                 << " update, total: " << src_indices.size()
                 << ", compat: " << num_compatible
@@ -217,7 +216,7 @@ struct IndexStates {
   std::vector<Data> list;
   std::vector<index_t> list_start_indices;
   std::vector<index_t> list_sizes;
-};  // struct IndexStates
+};  // class IndexStates
 
 //////////
 
@@ -248,8 +247,8 @@ public:
     return indexStates.num_compatible(0, num_list_indices);
   }
 
-  auto fillSourceIndices(IndexStates& idx_states, int max_idx,
-    const std::vector<SourceCompatibilityList>& src_lists) {
+  auto fillSourceIndices(
+    IndexStates& idx_states, int max_idx, const CandidateList& candidates) {
     //
     source_indices.resize(idx_states.done ? 0 : max_idx);
     for (int idx{}; !idx_states.done && (idx < max_idx);) {
@@ -264,7 +263,7 @@ public:
           const auto src_idx = opt_src_idx.value();
           assert(src_idx.listIndex == list_idx);
           num_skipped_idx = 0;
-          if (!is_compatible_src(get_src(src_lists, src_idx))) {
+          if (!is_compatible_src(get_src(candidates, src_idx))) {
             continue;
           }
           source_indices.at(idx++) = src_idx;
@@ -293,9 +292,9 @@ public:
     return !source_indices.empty();
   }
 
-  bool fillSourceIndices(IndexStates& idx_states,
-    const std::vector<SourceCompatibilityList>& src_lists) {
-    return fillSourceIndices(idx_states, num_list_indices, src_lists);
+  bool fillSourceIndices(
+    IndexStates& idx_states, const CandidateList& candidates) {
+    return fillSourceIndices(idx_states, num_list_indices, candidates);
   }
 
   void allocCopy([[maybe_unused]] const IndexStates& idx_states) {

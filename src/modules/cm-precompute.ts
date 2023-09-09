@@ -453,24 +453,19 @@ const dumpNcDataLists = (ncDataLists: NCDataList[],
 const buildUseSourceListsFromNcData = (sourceListMap: Map<string, Source.AnyData[]>,
     args: any): void /*UseSourceLists*/ =>
 {
-    // XOR first
     if (0) dumpNcDataLists(args.allXorNcDataLists, sourceListMap);
-    // TODO: setSourceListMap() ? extra call, extra overhead, i suppose?
-    /*let xorSourceList: XorSourceList = */
+
+    // XOR first
     NativeComboMaker.mergeCompatibleXorSourceCombinations(
         args.allXorNcDataLists, Array.from(sourceListMap.entries())); // TODO? [...sourceListMap.entries()]
     args.allXorNcDataLists = undefined;
-    /*
-    if (0) debugXorResults(xorSourceList);
-    setPrimarySrcBits(xorSourceList);
-    */
 
     // OR next
     let or0 = new Date();
     let orArgDataList = buildOrArgDataList(buildSourceListsForUseNcData(
         args.allOrNcDataLists, sourceListMap));
-    let odur = new Duration(or0, new Date()).milliseconds;
-    console.error(` orArgDataList(${orArgDataList.length}) - ${PrettyMs(odur)}`);
+    let or_dur = new Duration(or0, new Date()).milliseconds;
+    console.error(` orArgDataList(${orArgDataList.length}) - ${PrettyMs(or_dur)}`);
 
     // Thoughts on AND compatibility of OrSources:
     // Just because (one sourceList of) an OrSource is AND compatible with an
@@ -485,8 +480,8 @@ const buildUseSourceListsFromNcData = (sourceListMap: Map<string, Source.AnyData
     /* TODO: C++
     let mark0 = new Date();
     markAllXorCompatibleOrSources(xorSourceList, orArgDataList);
-    let mdur = new Duration(mark0, new Date()).milliseconds;
-    console.error(` mark - ${PrettyMs(mdur)}`);
+    let mark_dur = new Duration(mark0, new Date()).milliseconds;
+    console.error(` mark - ${PrettyMs(mark_dur)}`);
     */
 
     NativeComboMaker.setOrArgDataList(orArgDataList);

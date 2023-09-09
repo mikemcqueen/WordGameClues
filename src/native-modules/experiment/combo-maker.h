@@ -306,6 +306,12 @@ struct SourceCompatibilityData {
     usedSources.mergeInPlace(other.usedSources);
   }
 
+  auto copyMerge(const SourceCompatibilityData& other) const {
+    auto src_copy{*this};
+    src_copy.mergeInPlace(other);
+    return src_copy;
+  }
+
   constexpr void dump(const char* header = nullptr, bool device = false,
     char* buf = nullptr, char* smolbuf = nullptr) const
   {
@@ -360,7 +366,10 @@ struct SourceCompatibilityData {
   LegacySourceBits legacySourceBits;
   UsedSources usedSources;
 };  // SourceCompatibilityData
+
 using SourceCompatibilityList = std::vector<SourceCompatibilityData>;
+using SourceCompatibilityDataCRef = std::reference_wrapper<const SourceCompatibilityData>;
+using SourceCompatibilityCRefList = std::vector<SourceCompatibilityDataCRef>;
 
 struct NameCount;
 using NameCountList = std::vector<NameCount>;
@@ -380,11 +389,30 @@ struct NameCount {
     return buf;
   }
 
+  static std::vector<std::string> listToNameList(const NameCountList& list) {
+    std::vector<std::string> names;
+    for (auto it = list.cbegin(); it != list.cend(); ++it) {
+      names.emplace_back(it->name);
+    }
+    return names;
+  }
+
+  static std::string listToString(const std::vector<std::string>& list) {
+    char buf[1280] = { 0 };
+    for (auto it = list.cbegin(); it != list.cend(); ++it) {
+      std::strcat(buf, it->c_str());
+      if ((it + 1) != list.cend()) { // TODO std::next() ?
+        std::strcat(buf, ",");
+      }
+    }
+    return buf;
+  }
+
   static std::string listToString(const NameCountList& list) {
     char buf[1280] = { 0 };
     for (auto it = list.cbegin(); it != list.cend(); ++it) {
       std::strcat(buf, it->toString().c_str());
-      if ((it + 1) != list.cend()) {
+      if ((it + 1) != list.cend()) { // TODO std::next() ?
         std::strcat(buf, ",");
       }
     }

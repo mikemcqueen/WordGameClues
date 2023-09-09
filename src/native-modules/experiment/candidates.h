@@ -1,31 +1,51 @@
 #ifndef INCLUDE_CANDIDATES_H
 #define INCLUDE_CANDIDATES_H
 
-#include <future>
+#include <functional>
 #include <unordered_map>
-#include <utility>
+//#include <utility>
+#include <set>
+#include <string>
 #include <vector>
 #include "combo-maker.h"
 
 namespace cm {
-  using SourceCompatibilityLists = std::vector<SourceCompatibilityList>;
 
-  // TODO: map is dumb. use vector. ComboLists
-  using IndexComboListMap = std::unordered_map<int, std::set<std::string>>;
+// types
 
-  struct OneSumCandidateData {
-    SourceCompatibilityLists sourceCompatLists;
-    IndexComboListMap indexComboListMap;
-  };
+using SourceCompatibilityLists = std::vector<SourceCompatibilityList>;
+// TODO: map is dumb. use vector. ComboLists
+//using IndexComboListMap = std::unordered_map<int, std::set<std::string>>;
 
-  auto addCandidate(int sum, const std::string& combo, int index) -> int;
-  auto addCandidate(int sum, std::string&& combo,
-    cm::SourceCompatibilityList&& compatList) -> int;
+struct CandidateData {
+  std::reference_wrapper<const SourceCompatibilityList> src_list_cref;
+  std::set<std::string> combos;  // TODO: why is this a set vs. unordered_set?
+};
 
-  void filterCandidates(
-    int sum, int threads_per_block, int streams, int stride, int iters);
+using CandidateList = std::vector<CandidateData>;
 
-  inline std::unordered_map<int, OneSumCandidateData> allSumsCandidateData{};
-} // namespace cm
+/*
+struct OneSumCandidateData {
+  SourceCompatibilityLists sourceCompatLists;
+  IndexComboListMap indexComboListMap;
+};
+*/
+  
+// functions
+
+void consider_candidate(const NameCountList& ncList, int sum);
+
+int add_candidate(int sum, const std::string&& combo, int index);
+int add_candidate(
+  int sum, std::string&& combo, SourceCompatibilityList&& src_list);
+
+void filterCandidates(
+  int sum, int threads_per_block, int streams, int stride, int iters);
+
+// globals
+
+inline std::unordered_map<int, CandidateList> allSumsCandidateData{};
+
+}  // namespace cm
 
 #endif // INCLUDE_CANDIDATES_H

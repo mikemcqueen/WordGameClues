@@ -34,7 +34,7 @@ import * as NameCount from '../types/name-count';
 import * as PreCompute from './cm-precompute';
 import * as Sentence from '../types/sentence';
 import * as Source from './source';
-import * as Synonym from './synonym';
+//import * as Synonym from './synonym';
 
 import { ValidateResult } from './validator';
 
@@ -61,13 +61,6 @@ interface CandidateStats {
 
 interface StringAnyMap {
     [key: string]: any;
-}
-
-type CountArray = Int32Array;
-
-interface CountArrayAndSize {
-    array: CountArray;
-    size: number;
 }
 
 interface OptionalCloneOnMerge {
@@ -182,46 +175,21 @@ const getCompatibleSourcesMergeData = (mergedSourcesList: MergedSourcesList,
     return result;
 };
 
-//let ms_111 = 0;
-
-const mergeSourcesInMergeData = (mergedSourcesList: MergedSourcesList,
-    mergeData: MergeData[], flag?: number): MergedSourcesList =>
-{
-    /* does nothing.
-    if ((mergeData.length === 1) && (mergeData[0].sourceList.length === 1)) {
-        ++ms_111;
-        const data = mergeData[0];
-        if (!data.mergedSources.cloneOnMerge) {
-            const mergedSources = mergeSourceInPlace(data.mergedSources, data.sourceList[0]);
-            return (mergedSourcesList.length === 1) ? mergedSourcesList : [mergedSources];
-        } else {
-            return [mergeSource(data.mergedSources, data.sourceList[0])];
-        }
-    }
-    */
+const mergeSourcesInMergeData = (mergeData: MergeData[]): MergedSourcesList => {
     let result: MergedSourcesList = [];
     // TODO: since indexing isn't used below, i could use for..of
     for (let i = 0; i < mergeData.length; ++i) {
         let data = mergeData[i];
         for (let j = 0; j < data.sourceList.length; j++) {
             const source = data.sourceList[j];
-            /* does nothing
-            // if this is the last source to be merged with this mergedSources
-            if ((j === data.sourceList.length - 1) && !data.mergedSources.cloneOnMerge) {
-                // merge in place
-                result.push(mergeSourceInPlace(data.mergedSources, source));
-            } else {
-            */
-            // else copy/merge
             result.push(mergeSource(data.mergedSources, source));
-            //}
         }
     }
     return result;
 }
 
 const mergeAllCompatibleSources3 = (ncList: NameCount.List,
-    sourceListMap: Map<string, Source.AnyData[]>, flag?: number): MergedSourcesList =>
+    sourceListMap: Map<string, Source.AnyData[]>): MergedSourcesList =>
 {
     // because **maybe** broken for > 2
     Assert(ncList.length <= 2, `${ncList} length > 2 (${ncList.length})`);
@@ -236,7 +204,7 @@ const mergeAllCompatibleSources3 = (ncList: NameCount.List,
         if (listIsEmpty(mergeData)) {
             return [];
         }
-        mergedSourcesList = mergeSourcesInMergeData(mergedSourcesList, mergeData, flag);
+        mergedSourcesList = mergeSourcesInMergeData(mergeData);
     }
     return mergedSourcesList;
 };
@@ -266,7 +234,7 @@ export interface FirstNextResult {
 // clue index, which are (non-uniquely) added to the uniqueNameList first.
 // This is done to support ignore/skip properties, which only exist on legacy
 // clues, but the same properties don't exist on every instance of the same
-// named legacy clue. We needed to differentiate between the various isntances
+// named legacy clue. We needed to differentiate between the various instances
 // of:  ace, hero, north
 const skip = (clueCount: number, clueIndex: number): boolean => {
     if (clueCount !== 1) return false;
@@ -283,23 +251,21 @@ export const next = (countList: number[], clueIndices: number[]): FirstNextResul
             return { done: true };
         }
         let ncList: NameCount.List = [];    // e.g. [ { name: "pollock", count: 2 }, { name: "jackson", count: 4 } ]
-        let nameList: string[] = [];        // e.g. [ "pollock", "jackson" ]
+        let nameList: string[] = [];
         if (countList.every((count, index) => {
             if (skip(count, clueIndices[index])) return false;
             let name = ClueManager.getUniqueClueName(count, clueIndices[index]);
-            if (nameList.length) {
+            if (ncList.length) {
                 // because we are only comparing to nameList[0]
-                Assert((nameList.length < 2) && "logic broken");
+                Assert((ncList.length < 2) && "logic broken");
                 // no duplicate names allowed
-                if (nameList[0] === name) return false;
+                if (ncList[0].name === name) return false;
             }
-            nameList.push(name);
             // TODO: ncList.push({ name, count });
+            nameList.push(name);
             ncList.push(NameCount.makeNew(name, count));
             return true; // every.continue;
         })) {
-            // TODO: what if I could delay sorting until compatibility was established
-            //nameList.sort();
             NameCount.sortList(ncList);
             return { done: false, ncList, nameList };
         }
@@ -323,7 +289,7 @@ export const first = (countList: number[], clueIndices: number[]): FirstNextResu
 //   synonymMinMax
 //
 const getCombosForUseNcLists = (sum: number, max: number, pcd: PreCompute.Data,
-    args: any): string[] =>
+    args: any): void =>
 {
     let hash: StringAnyMap = {};
     let combos: string[] = [];
@@ -342,6 +308,7 @@ const getCombosForUseNcLists = (sum: number, max: number, pcd: PreCompute.Data,
     // to that sum, such as [ [1, 3], [2, 2] ]
     let countListArray: number[][] = Peco.makeNew({ sum, max }).getCombinations(); 
 
+    let candidateCount = 0;
     // for each countList
     countListArray.forEach((countList: number[]) => {
         comboCount += 1;
@@ -362,6 +329,9 @@ const getCombosForUseNcLists = (sum: number, max: number, pcd: PreCompute.Data,
             } else {
                 firstIter = false;
             }
+           NativeComboMaker.considerCandidate(result.ncList!, sum);
+/*
+// TODO: vv- move this part to c++
             const key: string = NameCount.listToString(result.ncList!);
             let mergedSourcesList: MergedSourcesList = [];
             if (!hash[key]) {
@@ -382,6 +352,9 @@ const getCombosForUseNcLists = (sum: number, max: number, pcd: PreCompute.Data,
             const listOrIndex = (hash[key].index === undefined) ?
                 mergedSourcesList : hash[key].index;
             hash[key].index = NativeComboMaker.addCandidateForSum(sum, combo, listOrIndex);
+            candidateCount++;
+// ^^- move this part to c++
+*/
         }
         totalVariations += numVariations;
     });
@@ -398,22 +371,22 @@ const getCombosForUseNcLists = (sum: number, max: number, pcd: PreCompute.Data,
             ` no-merge(${numMergeIncompatible}) no-use(${numUseIncompatible})` +
             ` actual(${totalVariations - numCacheHits - numUseIncompatible})` +
             ` - ${duration}ms `);
+/*
         const cs = NativeComboMaker.getCandidateStatsForSum(sum);
         console.error(`  sourceLists(${cs.sourceLists})` +
             `, totalSources(${cs.totalSources})` +
             `, comboMapIndices(${cs.comboMapIndices})` +
             `, totalCombos(${cs.totalCombos})`);
-        
+*/
     } else {
         process.stderr.write('.');
     }
     NativeComboMaker.filterCandidatesForSum(sum, args.tpb, args.streams,
       args.stride, args.iters, args.synchronous);
-    return combos;
 };
 
 export const makeCombosForSum = (sum: number, args: any,
-  synchronous: boolean = false): string[] =>
+  synchronous: boolean = false): void =>
 {
     if (_.isUndefined(args.maxResults)) {
         args.maxResults = 50000;
@@ -425,9 +398,8 @@ export const makeCombosForSum = (sum: number, args: any,
     args.sum = sum;
     let max = args.max;
     args.max = Math.min(args.max, args.sum);
-    let result = getCombosForUseNcLists(sum, max, PCD, args);
+    getCombosForUseNcLists(sum, max, PCD, args);
     args.max = max;
-    return result;
 };
 
 const parallel_makeCombosForRange = (first: number, last: number, args: any): any => {
@@ -439,13 +411,13 @@ const parallel_makeCombosForRange = (first: number, last: number, args: any): an
             sum,
             max: (args.max > sum) ? sum : args.max,
             xor: args.xor,
-            xormm: args.xormm,
+            //xormm: args.xormm,
             or: args.or,
             fast: args.fast,
             load_max: ClueManager.getNumPrimarySources(),
-            parallel: true,
-            use_syns: args.use_syns,
-            synonymMinMax: args.synonymMinMax
+            parallel: true
+            //,puse_syns: args.use_syns
+            //,synonymMinMax: args.synonymMinMax
         }));
 
     let cpus = OS.cpus().length;

@@ -1,3 +1,24 @@
+* incompatible_sources: could be CRefs?
+
+* for first NC, get sourcelist from sourceListMap, this is the "merged"
+  sourcelist.
+  for subsequent NCs, for each source in sourcelist, test if it's compatible
+  with each source in merged sourcelist. now we have a merged sourcelist, and
+  a list of compatible sources for *each* source in merged sourcelist.
+  * how to do this in the most performant way? not sure. but if it's on the
+    order of a second or more CUDA is the way to go, when we get to the point
+    of squeezing out the last second (which probably won't happen).
+  * so probably just repeated vector-building. maybe i can set a copyOnMerge
+    flag to true, to avoid the first sourcelist copy, then reset it after
+    the first merge, from whereon we can mergeInPlace.
+  * and of course, I don't need the sourceList in mergedSources. mergedSources
+    is just a SourceCompatibilityList now. (still need sourceList in mergeData
+    if I preserve that data structure).
+
+* move buildSourceListMap to c++?  save ~3s + unwrap time (4s?) from PreCompute.
+
+* investigate loadClues time. It's going to get worse I bet.
+
 * can i sort sources within each device_sources list, in order of the smallest
   xor_sources IndexSpanPair they will test against? like, could I store
   candidates in an ordered set, with a test for the smallest IndexSpanPair
