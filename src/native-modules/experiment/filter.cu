@@ -155,11 +155,6 @@ __device__ bool is_source_xor_or_compatible(
     if (flat_idx < num_indices) {
       // "actual" index
       const auto xor_src_idx = get_variation_index(flat_idx, idx_spans);
-#if 0
-      if (!threadIdx.x && !blockIdx.x) {
-        printf("flat_idx: %d, xor_idx: %d\n", flat_idx, xor_src_idx);
-      }
-#endif
       if (source.isXorCompatibleWith(xor_sources[xor_src_idx])) {
         is_xor_compat = true;
       }
@@ -348,11 +343,10 @@ void check(
       flat_index(sources, src_idx));
     auto& source = sources.at(list_index).at(index);
     source.dump(buf);
-    //int compat_index{-1};
     auto compat = isSourceXORCompatibleWithAnyXorSource(
       source, PCD.xorSourceList.data(), PCD.xorSourceList.size());
     std::cerr << "compat: " << compat
-              << std::endl;  //<< " (" << compat_index << ")"
+              << std::endl;
   }
 }
 

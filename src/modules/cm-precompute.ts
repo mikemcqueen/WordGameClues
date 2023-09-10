@@ -58,7 +58,6 @@ interface UseSourceListSizes {
 }
 
 export interface Data {
-//    useSourceLists: UseSourceLists;
     sourceListMap: Map<string, Source.AnyData[]>;
 }
 
@@ -82,15 +81,6 @@ const listIsEmpty = (list: any[]): boolean => {
 const isSingleNumericDigit = (arg: string): boolean => {
     return (arg.length === 1) && (arg[0] >= '0') && (arg[0] <= '9');
 };
-
-/*
-const emptyUseSourceLists = (): UseSourceLists => {
-    return {
-        xor: [],
-        orArgDataList: []
-    };
-};
-*/
 
 //////////
 
@@ -269,17 +259,6 @@ const listCandidateCount = (ncList: NameCount.List): number => {
     return count;
 }
 
-/*
-const debug = (s1: Source.Data, s2: Source.Data): void => {
-    let c1 = listCandidateCount(s1.primaryNameSrcList);
-    let c2 = listCandidateCount(s2.primaryNameSrcList);
-    if (((c1 > 0) && (c2 > 0)) || (c1 > 1) || (c2 > 1)) {
-        console.error(`merging: ${NameCount.listToCountList(s1.primaryNameSrcList)}` +
-            ` with ${NameCount.listToCountList(s2.primaryNameSrcList)}`);
-    }
-}
-*/
-
 // TODO: move to Source?
 const mergeSources = (source1: Source.Data, source2: Source.Data):
     Source.Data =>
@@ -289,29 +268,6 @@ const mergeSources = (source1: Source.Data, source2: Source.Data):
     const sourceBits = CountBits.or(source1.sourceBits, source2.sourceBits);
     const usedSources = Source.mergeUsedSources(source1.usedSources, source2.usedSources);
     const ncList = [...source1.ncList, ...source2.ncList];
-    /*
-    if (lazy) {
-        Assert(ncList.length === 2, `ncList.length(${ncList.length})`);
-        source1 = source1 as Source.LazyData;
-        source2 = source2 as Source.LazyData;
-        const result: Source.LazyData = {
-            primaryNameSrcList,
-            sourceBits,
-            usedSources,
-            ncList,
-            //synonymCounts: Clue.PropertyCounts.merge(
-            //  getSynonymCountsForValidateResult(source1.validateResults[0]),
-            //  getSynonymCountsForValidateResult(source2.validateResults[0])),
-            validateResults: [
-                (source1 as Source.LazyData).validateResults[0],
-                (source2 as Source.LazyData).validateResults[0]
-            ]
-        };
-        return result;
-    }
-    source1 = source1 as Source.Data;
-    source2 = source2 as Source.Data;
-    */
     return {
         primaryNameSrcList,
         sourceBits,
@@ -451,13 +407,13 @@ const dumpNcDataLists = (ncDataLists: NCDataList[],
 }
 
 const buildUseSourceListsFromNcData = (sourceListMap: Map<string, Source.AnyData[]>,
-    args: any): void /*UseSourceLists*/ =>
+    args: any): void =>
 {
     if (0) dumpNcDataLists(args.allXorNcDataLists, sourceListMap);
 
     // XOR first
     NativeComboMaker.mergeCompatibleXorSourceCombinations(
-        args.allXorNcDataLists, Array.from(sourceListMap.entries())); // TODO? [...sourceListMap.entries()]
+        args.allXorNcDataLists, Array.from(sourceListMap.entries()));
     args.allXorNcDataLists = undefined;
 
     // OR next
@@ -485,16 +441,12 @@ const buildUseSourceListsFromNcData = (sourceListMap: Map<string, Source.AnyData
     */
 
     NativeComboMaker.setOrArgDataList(orArgDataList);
-
-    //return { xor: xorSourceList, orArgDataList: orArgDataList };
 };
 
 export const preCompute = (first: number, last: number, args: any): Result => {
     const begin = new Date();
     args.allXorNcDataLists = args.xor ? buildAllUseNcDataLists(args.xor) : [ [] ];
     const d1 = new Duration(begin, new Date()).milliseconds;
-    //console.error(` buildAllXorNcDataLists(${args.allXorNcDataLists.length})` +
-    //  ` - ${PrettyMs(d1)}`);
     if (args.xor && listIsEmpty(args.allXorNcDataLists)) return { success: false };
 
     const build2 = new Date();
@@ -504,20 +456,17 @@ export const preCompute = (first: number, last: number, args: any): Result => {
         ` - ${PrettyMs(d2)}`);
     if (args.or && listIsEmpty(args.allOrNcDataLists)) return { success: false };
     
-    // TODO: hard-coded
+    // TODO: hard-coded (?). move to C++.
     const sourceListMap = buildKnownNcSourceListMap(2, 35, args);
 
     const build3 = new Date();
-    /*const useSourceLists =*/
     // TODO: const sizes = 
     buildUseSourceListsFromNcData(sourceListMap, args);
     const d3 = new Duration(build3, new Date()).milliseconds;
-    //console.error(` buildUseSourceListsFromNcData, xor(${useSourceLists.xor.length})` +
-    //` - ${PrettyMs(d3)}`);
     // TODO: sizes
     //if (args.xor && listIsEmpty(useSourceLists.xor)) return { success: false };
 
     const d = new Duration(begin, new Date()).milliseconds;
     console.error(`--Precompute - ${PrettyMs(d)}`);
-    return { success: true, data: { /*useSourceLists,*/ sourceListMap } };
+    return { success: true, data: { sourceListMap } };
 };

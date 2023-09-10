@@ -216,7 +216,6 @@ std::unordered_set<std::string> filter_task(int sum, int threads_per_block,
   for(int i{}; i < iters; ++i) {
     streams.reset();
     idx_states.reset();
-    //idx_states.mark_compatible(compat_15_15);
     zeroResults(device_results, candidates.size(), cudaStreamPerThread);
     auto t0 = high_resolution_clock::now();
 
@@ -417,12 +416,9 @@ cuda_allocCopyOrSources(const OrArgList& orArgList) {
     deviceVariationIndices.src_indices =
       &deviceVariationIndices.device_data[num_variations * 2];
     size_t offset{};
-    int v{};
     for (const auto& indices : variation_indices) {
       variation_offsets.push_back(offset);
       num_src_indices.push_back(indices.size());
-      std::cout << "sentence " << s << ", variation " << v++
-                << ", indices: " << indices.size() << std::endl;
       // NOTE: Async. I'm going to need to preserve
       // sentenceVariationIndices until copy is complete - (kernel
       // execution/synchronize?)
@@ -456,8 +452,6 @@ cuda_allocCopyOrSources(const OrArgList& orArgList) {
       cudaStreamPerThread);
     assert(err == cudaSuccess);
   }
-  //  const auto sentenceVariationIndices_bytes =
-  //    kNumSentences * sizeof(device::VariationIndices);
   const auto variation_indices_bytes =
     kNumSentences * sizeof(device::VariationIndices);
   device::VariationIndices* device_variation_indices;
@@ -470,6 +464,7 @@ cuda_allocCopyOrSources(const OrArgList& orArgList) {
     cudaMemcpyHostToDevice, cudaStreamPerThread);
   assert(err == cudaSuccess);
 
+  // TODO: be nice to get rid of this
   // just to be sure, due to lifetime problems of local host-side memory
   err = cudaStreamSynchronize(cudaStreamPerThread);
   assert(err == cudaSuccess);

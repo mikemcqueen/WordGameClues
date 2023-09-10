@@ -34,7 +34,6 @@ import * as NameCount from '../types/name-count';
 import * as PreCompute from './cm-precompute';
 import * as Sentence from '../types/sentence';
 import * as Source from './source';
-//import * as Synonym from './synonym';
 
 import { ValidateResult } from './validator';
 
@@ -59,16 +58,9 @@ interface CandidateStats {
     totalCombos: number;
 }
 
-interface StringAnyMap {
-    [key: string]: any;
-}
-
 interface OptionalCloneOnMerge {
     cloneOnMerge?: boolean;
 }
-
-type MergedSources = Source.ListContainer & Source.CompatibilityData & OptionalCloneOnMerge;
-type MergedSourcesList = MergedSources[];
 
 let PCD: PreCompute.Data;
 
@@ -99,116 +91,6 @@ const listIsEmpty = (list: any[]): boolean => {
     return list.length === 0;
 };
 
-/*
-const listGetNumEmptySublists = (listOfLists: any[][]) => {
-    let numEmpty = 0;
-    for (let list of listOfLists) {
-        if (listIsEmpty(list)) ++numEmpty;
-    }
-    return numEmpty;
-};
-*/
-
-let ms_copy = 0;
-let ms_inplace = 0;
-let ms_comp = 0;
-let ms_compat = 0;
-
-const mergeSourceInPlace = (mergedSources: MergedSources,
-    source: Source.Data): MergedSources =>
-{
-    ++ms_inplace;
-    CountBits.orInPlace(mergedSources.sourceBits, source.sourceBits);
-    Source.mergeUsedSourcesInPlace(mergedSources.usedSources, source.usedSources);
-    mergedSources.sourceList.push(source);
-    return mergedSources;
-}
-
-const mergeSource = (mergedSources: MergedSources, source: Source.Data):
-    MergedSources =>
-{
-    ++ms_copy;
-    return {
-        //CountBits.or(mergedSources.sourceBits, source.sourceBits),
-        sourceBits: mergedSources.sourceBits.clone().union(source.sourceBits),
-        usedSources: Source.mergeUsedSources(mergedSources.usedSources, source.usedSources),
-        sourceList: [...mergedSources.sourceList, source]
-    };
-};
-
-const makeMergedSourcesList = (sourceList: Source.List) : MergedSourcesList => {
-    let result: MergedSourcesList = [];
-    for (const source of sourceList) {
-        result.push({
-            // CountBits.makeFrom(source.sourceBits),
-            sourceBits: source.sourceBits, // .clone(),
-            usedSources: source.usedSources, // Source.cloneUsedSources(source.usedSources),
-            sourceList: [source],
-            cloneOnMerge: true
-        });
-    }
-    return result;
-};
-
-interface MergeData {
-    mergedSources: MergedSources;
-    sourceList: Source.List;
-}
-
-const getCompatibleSourcesMergeData = (mergedSourcesList: MergedSourcesList,
-    sourceList: Source.List): MergeData[] =>
-{
-    let result: MergeData[] = [];
-    for (let mergedSources of mergedSourcesList) {
-        let mergeData: MergeData = { mergedSources, sourceList: [] };
-        for (const source of sourceList) {
-            ++ms_comp;
-            if (Source.isXorCompatible(mergedSources, source)) {
-                ++ms_compat;
-                mergeData.sourceList.push(source);
-            }
-        }
-        if (!listIsEmpty(mergeData.sourceList)) {
-            result.push(mergeData);
-        }
-    }
-    return result;
-};
-
-const mergeSourcesInMergeData = (mergeData: MergeData[]): MergedSourcesList => {
-    let result: MergedSourcesList = [];
-    // TODO: since indexing isn't used below, i could use for..of
-    for (let i = 0; i < mergeData.length; ++i) {
-        let data = mergeData[i];
-        for (let j = 0; j < data.sourceList.length; j++) {
-            const source = data.sourceList[j];
-            result.push(mergeSource(data.mergedSources, source));
-        }
-    }
-    return result;
-}
-
-const mergeAllCompatibleSources3 = (ncList: NameCount.List,
-    sourceListMap: Map<string, Source.AnyData[]>): MergedSourcesList =>
-{
-    // because **maybe** broken for > 2
-    Assert(ncList.length <= 2, `${ncList} length > 2 (${ncList.length})`);
-    let mergedSourcesList: MergedSourcesList = [];
-    for (let nc of ncList) {
-        const sources = sourceListMap.get(NameCount.toString(nc)) as Source.List;
-        if (listIsEmpty(mergedSourcesList)) {
-            mergedSourcesList = makeMergedSourcesList(sources);
-            continue;
-        }
-        const mergeData = getCompatibleSourcesMergeData(mergedSourcesList, sources);
-        if (listIsEmpty(mergeData)) {
-            return [];
-        }
-        mergedSourcesList = mergeSourcesInMergeData(mergeData);
-    }
-    return mergedSourcesList;
-};
-
 const nextIndex = (countList: number[], clueIndices: number[]): boolean => {
     // increment last index
     let index = clueIndices.length - 1;
@@ -227,7 +109,6 @@ const nextIndex = (countList: number[], clueIndices: number[]): boolean => {
 export interface FirstNextResult {
     done: boolean;
     ncList?: NameCount.List;
-    nameList?: string[];
 }
 
 // "clueIndex" here is actually "uniqueNameIndex". except if it's a legacy
@@ -251,23 +132,21 @@ export const next = (countList: number[], clueIndices: number[]): FirstNextResul
             return { done: true };
         }
         let ncList: NameCount.List = [];    // e.g. [ { name: "pollock", count: 2 }, { name: "jackson", count: 4 } ]
-        let nameList: string[] = [];
         if (countList.every((count, index) => {
             if (skip(count, clueIndices[index])) return false;
             let name = ClueManager.getUniqueClueName(count, clueIndices[index]);
             if (ncList.length) {
-                // because we are only comparing to nameList[0]
+                // because we are only comparing to ncList[0].name
                 Assert((ncList.length < 2) && "logic broken");
                 // no duplicate names allowed
                 if (ncList[0].name === name) return false;
             }
             // TODO: ncList.push({ name, count });
-            nameList.push(name);
             ncList.push(NameCount.makeNew(name, count));
             return true; // every.continue;
         })) {
             NameCount.sortList(ncList);
-            return { done: false, ncList, nameList };
+            return { done: false, ncList };
         }
     }
 };
@@ -291,14 +170,8 @@ export const first = (countList: number[], clueIndices: number[]): FirstNextResu
 const getCombosForUseNcLists = (sum: number, max: number, pcd: PreCompute.Data,
     args: any): void =>
 {
-    let hash: StringAnyMap = {};
-    let combos: string[] = [];
-
     let comboCount = 0;
     let totalVariations = 0;
-    let numCacheHits = 0;
-    let numMergeIncompatible = 0;
-    let numUseIncompatible = 0;
     
     const MILLY = 1000000n;
     const start = process.hrtime.bigint();
@@ -330,47 +203,17 @@ const getCombosForUseNcLists = (sum: number, max: number, pcd: PreCompute.Data,
                 firstIter = false;
             }
            NativeComboMaker.considerCandidate(result.ncList!, sum);
-/*
-// TODO: vv- move this part to c++
-            const key: string = NameCount.listToString(result.ncList!);
-            let mergedSourcesList: MergedSourcesList = [];
-            if (!hash[key]) {
-                mergedSourcesList = mergeAllCompatibleSources3(result.ncList!, pcd.sourceListMap);
-                if (listIsEmpty(mergedSourcesList)) {
-                    ++numMergeIncompatible;
-                }
-                hash[key] = { mergedSourcesList };
-            } else {
-                mergedSourcesList = hash[key].mergedSourcesList;
-                numCacheHits += 1;
-            }
-
-            // failed to find any compatible combos
-            if (listIsEmpty(mergedSourcesList)) continue;
-            
-            const combo = result.nameList!.sort().toString();
-            const listOrIndex = (hash[key].index === undefined) ?
-                mergedSourcesList : hash[key].index;
-            hash[key].index = NativeComboMaker.addCandidateForSum(sum, combo, listOrIndex);
-            candidateCount++;
-// ^^- move this part to c++
-*/
         }
         totalVariations += numVariations;
     });
 
     let duration = (process.hrtime.bigint() - start) / MILLY;
     Debug(`sum(${sum}) combos(${comboCount}) variations(${totalVariations})` +
-        ` cacheHits(${numCacheHits}) merge-incompatible(${numMergeIncompatible})` +
-        ` use-incompatible(${numUseIncompatible})` +
-        ` actual(${totalVariations - numCacheHits - numUseIncompatible}) ${duration}ms`);
+        ` -${duration}ms`);
 
     if (args.verbose) {
         console.error(`sum(${sum}) combos(${comboCount})` +
-            ` variations(${totalVariations}) cacheHits(${numCacheHits})` +
-            ` no-merge(${numMergeIncompatible}) no-use(${numUseIncompatible})` +
-            ` actual(${totalVariations - numCacheHits - numUseIncompatible})` +
-            ` - ${duration}ms `);
+            ` variations(${totalVariations}) - ${duration}ms `);
 /*
         const cs = NativeComboMaker.getCandidateStatsForSum(sum);
         console.error(`  sourceLists(${cs.sourceLists})` +
@@ -504,9 +347,6 @@ export const makeCombos = (args: any): any => {
             `, reject(${totals.reject}), dupes(${totals.duplicate})` +
             ` - ${PrettyMs(d)}`);
         if (1) {
-            console.error(`merge: copy(${ms_copy}), inplace(${ms_inplace})` +
-                `, comp(${ms_comp}), compat(${ms_compat})`);
-                //, ms_111(${ms_111})
             /*
             const isany: PerfData = NativeComboMaker.getIsAnyPerfData();
             console.error(`isAny: calls(${isany.calls})` +

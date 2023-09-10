@@ -1,19 +1,6 @@
-* incompatible_sources: could be CRefs?
+* fix lifetime issue requiring sync in cuda_allocCopySentenceVariationIndices(
 
-* for first NC, get sourcelist from sourceListMap, this is the "merged"
-  sourcelist.
-  for subsequent NCs, for each source in sourcelist, test if it's compatible
-  with each source in merged sourcelist. now we have a merged sourcelist, and
-  a list of compatible sources for *each* source in merged sourcelist.
-  * how to do this in the most performant way? not sure. but if it's on the
-    order of a second or more CUDA is the way to go, when we get to the point
-    of squeezing out the last second (which probably won't happen).
-  * so probably just repeated vector-building. maybe i can set a copyOnMerge
-    flag to true, to avoid the first sourcelist copy, then reset it after
-    the first merge, from whereon we can mergeInPlace.
-  * and of course, I don't need the sourceList in mergedSources. mergedSources
-    is just a SourceCompatibilityList now. (still need sourceList in mergeData
-    if I preserve that data structure).
+* incompatible_sources: could be CRefs?
 
 * move buildSourceListMap to c++?  save ~3s + unwrap time (4s?) from PreCompute.
 
@@ -43,12 +30,13 @@
 * .cu dependencies
 
 **************************************************************************
-* i have count(), countIndices(), and sum_sizes() and I think they all do the
-  same thing.  maybe a util.h?  sum_vector_sizes()/sum_container_sizes()?
+* i have count(), countIndices(), and sum_sizes() and I think they all do 
+  the same thing or close to it.  maybe a util.h?
+  sum_vector_sizes()/sum_container_sizes()?
   add vec_product, vec_to_string, etc.
 **************************************************************************
   
-* markAllCompatibleOrSources in c++.
+* markAllCompatibleOrSources in c++. is this marking used?
 
 * get rid of std::async? have 1 thread waiting on queue, executing filters,
   and main thread just adds execute requests to queue?
@@ -98,8 +86,7 @@
   we're going to hit the bug again when sourceListMap and allXorNcDataLists
   aren't in sync.
 
-* so it's not the only question that matters, but it seems like a big question,
-  why am I passing primaryNameSrcList and ncList of XorSources back to node?
+* why am I passing primaryNameSrcList and ncList of XorSources back to node?
   Sure I use them to generate sourceBits and usedSources, but are they used
   for anything else? I'm probably merging them and shit, but why, what do I
   do with it all when I'm done? I have a feeling, that I am passing the NcLists

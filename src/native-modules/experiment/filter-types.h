@@ -252,12 +252,12 @@ public:
     //
     source_indices.resize(idx_states.done ? 0 : max_idx);
     for (int idx{}; !idx_states.done && (idx < max_idx);) {
-      size_t num_skipped_idx{};  // how many idx were skipped in a row
-      // this loop logic is funky and brittle, but intentional
-      // TODO: replace empty with: !idx_states.done && (idx < max_idx)
-      // and remove breaks
+      // tiny optimization available here with more complicated logic on following
+      // "list" wrapping and going past original.
+      size_t num_skipped_idx{};  // # of idx skipped (!has_value()) in a row
       for (auto list_idx = idx_states.get_next_fill_idx();
-           /* empty */; list_idx = idx_states.get_next_fill_idx()) {
+           !idx_states.done && (idx < max_idx);
+           list_idx = idx_states.get_next_fill_idx()) {
         const auto opt_src_idx = idx_states.get_and_increment_index(list_idx);
         if (opt_src_idx.has_value()) {
           const auto src_idx = opt_src_idx.value();
@@ -267,14 +267,11 @@ public:
             continue;
           }
           source_indices.at(idx++) = src_idx;
-          if (idx >= max_idx)
-            break;
         } else if (++num_skipped_idx >= idx_states.num_lists()) {
           // we've skipped over the entire list (with index overlap)
           // and haven't consumed any indices. nothing left to do.
           idx_states.done = true;
           source_indices.resize(idx);
-          break;
         }
       }
     }
@@ -332,15 +329,14 @@ public:
               << std::endl;
   }
 
-  //  int num_src_lists;  // total # of sourcelists (== # of device_results)
-                      // TODO: doesn't belong here
+  // TODO: doesn't belong here
   int num_list_indices;
   int stream_idx{-1};
   int sequence_num{};
   bool is_running{false};  // is running (true until results retrieved)
   bool has_run{false};     // has run at least once
-  SourceIndex* device_source_indices{nullptr};  // in
-  cudaStream_t cuda_stream{nullptr};
+  SourceIndex* device_source_indices{};
+  cudaStream_t cuda_stream{};
   std::vector<SourceIndex> source_indices;  // hasWorkRemaining = (size() > 0)
   hr_time_point_t start_time;
 };  // struct StreamData

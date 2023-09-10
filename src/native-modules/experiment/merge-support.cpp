@@ -178,7 +178,6 @@ auto alloc_copy_src_lists(
   // copy sources
   std::vector<SourceCompatibilityData> src_compat_list;
   src_compat_list.reserve(num_sources);
-  //size_t index{};
   std::cerr << "  building src_compat_lists..." << std::endl;
   for (const auto& src_list : src_lists) {
     // this is somewhat braindead. perhaps I could only marshal the
@@ -187,17 +186,6 @@ auto alloc_copy_src_lists(
     // Alternatively, build one gimungous array and blast it over
     // in one memcopy.
     add_compat_sources(src_compat_list, src_list);
-    /*
-    auto compat_sources = makeCompatibleSources(src_list);
-    err = cudaMemcpyAsync(&device_sources[index], compat_sources.data(),
-      compat_sources.size() * sizeof(SourceCompatibilityData),
-      cudaMemcpyHostToDevice, stream);
-    if (err != cudaSuccess) {
-      fprintf(stdout, "merge copy sources, error: %s", cudaGetErrorString(err));
-      throw std::runtime_error("merge copy sources");
-    }
-    index += src_list.size();
-    */
   }
   std::cerr << "  copying src_compat_lists..." << std::endl;
   err = cudaMemcpyAsync(device_sources, src_compat_list.data(), sources_bytes,
