@@ -493,12 +493,14 @@ export const loadAllClues = function (args: any): void {
     } else {
         throw new Error('numPrimarySources not initialized without src="auto"');
     }
-
+    const pp0 = new Date();
     for (let count = 2; count <= State.numPrimarySources; ++count) {
         let clueList: ClueList.Compound = loadClueList(count);
         State.clueListArray[count] = clueList;
         addKnownCompoundClues(clueList, count, args);
     }
+    const pp_dur = new Duration(pp0, new Date()).milliseconds;
+    console.error(`addCompound - ${PrettyMs(pp_dur)}`);
     State.loaded = true;
 };
 
@@ -511,7 +513,7 @@ const getRejectFilename = function (count: number): string {
 
 const initSrcBitsInAllResults = (results: ValidateResult[]): void => {
     for (let result of results) {
-        Assert(NameCount.listHasCompatibleSources(result.nameSrcList));
+        //Assert(NameCount.listHasCompatibleSources(result.nameSrcList));
         result.sourceBits = CountBits.makeFrom(Sentence.legacySrcList(result.nameSrcList));
         result.usedSources = Source.getUsedSources(result.nameSrcList);
     }
@@ -1408,7 +1410,6 @@ export const getCountListArrays = (nameCsv: string, options: any): any => {
 
     for (const clueCountList of resultList) {
         const sum = clueCountList.reduce((a, b) => a + b);
-        const start = new Date();
         let uniqueCounts = _.uniqBy(clueCountList, _.toNumber); // or just _.uniq ?
         let ncListStr = clueCountList.map((count, index) => NameCount.makeNew(nameList[index], count)).toString();
         let result: ValidateSourcesResult = invalidHash[ncListStr];

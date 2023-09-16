@@ -3,8 +3,21 @@
 * incompatible_sources: could be CRefs?
 
 * move buildSourceListMap to c++?  save ~3s + unwrap time (4s?) from PreCompute.
+  * gonna require moving ClueManger.knownSourceMaps data to c++
 
 * investigate loadClues time. It's going to get worse I bet.
+  * -1s by removing extra unnecessary compatibilty check in initSrcBits.
+  * we're currently loading, then, validating, then initialize src bits.
+    what if we loaded, and initialized src bits in the validator? wouldn't
+    that make validation faster?
+  * If I had to guess i'd say Validator.isValidResult is a bottleneck here
+    (profiling just loadClues could probably confirm this). It calls a function
+    that calls _.uniqBy(), a known very slow function.
+  * Even just replacing that with populating a Set() and comparing to expected
+    size I bet would chop off a significant chunk of time.
+  * But if we're going to do that, why not just build the set dynamically as
+    we build the expected result?
+  * And then, if we're goint to build a set, why not just populate a bitfield?
 
 * can i sort sources within each device_sources list, in order of the smallest
   xor_sources IndexSpanPair they will test against? like, could I store
@@ -40,6 +53,11 @@
 
 * get rid of std::async? have 1 thread waiting on queue, executing filters,
   and main thread just adds execute requests to queue?
+  * async, while a sloppy approach, does appear to be reasonably performant.
+    so, the goal here would be to play with more advanced thread management
+    such as a single worker thread and a locking queue, and maybe some other
+    synchronization primitives, just for the sake of using them. performance
+    may or may not be any better.
 
 * Optimizing merge/get_compat_combos. 200M combos currently, and no streams.
   Low reward atm, but eventually might make sense.

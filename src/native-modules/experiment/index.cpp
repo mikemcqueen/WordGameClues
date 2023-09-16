@@ -511,7 +511,6 @@ Object Init(Env env, Object exports) {
     Function::New(env, mergeCompatibleXorSourceCombinations);
   exports["setOrArgDataList"] = Function::New(env, setOrArgDataList);
   exports["considerCandidate"] = Function::New(env, considerCandidate);
-  //  exports["addCandidateForSum"] = Function::New(env, addCandidateForSum);
   //  exports["getCandidateStatsForSum"] = Function::New(env, getCandidateStatsForSum);
   exports["filterCandidatesForSum"] =
     Function::New(env, filterCandidatesForSum);

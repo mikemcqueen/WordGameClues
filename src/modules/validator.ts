@@ -9,7 +9,6 @@ import _ from 'lodash'; // import statement to signal that we are a "module"
 const Peco        = require('../../modules/peco');
 const ResultMap   = require('../../types/result-map');
 
-//const ClueManager = require('./clue-manager');
 const Assert      = require('assert');
 const Debug       = require('debug')('validator');
 const Expect      = require('should/as-function');
