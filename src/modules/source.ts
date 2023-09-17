@@ -32,7 +32,7 @@ type UsedSourceSet = Set<number>;
 export type UsedSources = UsedSourceSet[];
 
 export interface CompatibilityData {
-    sourceBits: CountBits.Type;
+//    sourceBits: CountBits.Type;
     usedSources: UsedSources;
 }
 export type Data = Base & CompatibilityData;
@@ -73,9 +73,11 @@ export const isXorCompatible = (first: CompatibilityData,
     second: CompatibilityData): boolean =>
 {
     // compare legacy source bits
+/*
     if (CountBits.intersects(first.sourceBits, second.sourceBits)) {
 	return false;
     }
+*/
     // compare sentence-based sources
     for (let i = 1; i < 10 /* cough */; ++i) {
         // i.e. "if there are no sentence-based sources"
@@ -215,13 +217,13 @@ export const mergeUsedSources = (first: UsedSources, second: UsedSources):
 export const makeData = (nc: NameCount.Type, validateResult: ValidateResult):
     Data =>
 {
-    Assert(validateResult.sourceBits && validateResult.usedSources,
+    Assert(/*validateResult.sourceBits && */validateResult.usedSources,
         `makeData(): ${NameCount.toString(nc)}`);
     Assert(NameCount.listHasCompatibleSources(validateResult.nameSrcList),
         `makeData(): ${NameCount.toString(nc)}`);
     return {
 	primaryNameSrcList: validateResult.nameSrcList,
-	sourceBits: validateResult.sourceBits,
+	//sourceBits: validateResult.sourceBits,
 	//usedSources: validateResult.usedSources, //TODO?
 	usedSources: getUsedSources(validateResult.nameSrcList),
         ncList: [nc]

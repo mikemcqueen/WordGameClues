@@ -7,12 +7,12 @@
         {
             "type": "node",
             "request": "launch",
-            "name": "clues -t",
+            "name": "nodejs -t",
             "skipFiles": [
                 "<node_internals>/**"
             ],
             "program": "${workspaceFolder}/src/tools/clues.js",
-            "args": [ "-pf.72", "-z2", "-t", "vacuum", "-v" ]
+            "args": [ "-pf.72", "-t", "lincoln", "-v" ]
         },
         {
             "type": "node",
@@ -34,18 +34,18 @@
         {
             "type": "cppdbg",
             "request": "launch",
-            "name": "cppdbg 2,2 xor 21",
+            "name": "cppdbg -t",
             "program": "/usr/local/bin/node",
             "cwd": "${workspaceFolder}/src/tools",
-            "args": [ "clues.js", "-pf.72", "-c2,2", "-x2", "--xor", "21", "-v" ]
+            "args": [ "clues.js", "-pf.72", "-t", "lincoln", "-v" ]
         },
         {
             "type": "cppdbg",
             "request": "launch",
-            "name": "Debug cm no --xor",
+            "name": "cppdbg 2,2 no --xor",
             "program": "/usr/local/bin/node",
             "cwd": "${workspaceFolder}/src/tools",
-            "args": [ "clues.js", "-pf.72", "-c3,3", "-x2", "-v" ]
+            "args": [ "clues.js", "-pf.72", "-c2,2", "-x2", "-v" ]
         },
         {
             "type": "cppdbg",

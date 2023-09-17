@@ -38,7 +38,7 @@ interface ValidateResultData {
     ncList: NameCount.List;
     nameSrcList: NameCount.List;
     resultMap: any;
-    sourceBits?: CountBits.Type;
+    //sourceBits?: CountBits.Type;
     usedSources?: Source.UsedSources;
     nameSrcCsv?: string; // TODO: remove; old-validator uses it, stop using old-validator
 }

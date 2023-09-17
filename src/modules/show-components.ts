@@ -143,16 +143,14 @@ const getCountListArrays = (nameList: string[], pcResult: PreCompute.Result,
     let known: any[] = [];
     let clues: any[] = [];
     let invalid: any[] = [];
-
+    let nameListStr: string = nameList.toString();
     let hash = {};
 
     // TODO: might be able to get this to work if i can pass a flag to precompute to
     // conditionally return xorsources, which may work for show-components use case.
     // maybe.
-    Assert(!"show components broken atm");
-    let xorSource: Source.Data = options.poop;
-    for (;;) {
-    //for (const xorSource of pcResult.data!.useSourceLists.xor) {
+    //Assert(!"show components broken atm");
+    for (const xorSource of pcResult.data!.xor) {
         const countList = NameCount.listToCountList(xorSource.ncList);
         // for --verbose, we could allow this:
         const hashKey = countList.toString();
@@ -160,11 +158,11 @@ const getCountListArrays = (nameList: string[], pcResult: PreCompute.Result,
         hash[hashKey] = true;
         let ncListStr = countList.map((count, index) => NameCount.makeNew(nameList[index], count)).toString();
         /*
-          // TODO: in order to support his, we'd need to pass a flag to PreCompute to
-          // tell it to preserve the filtered incompatible combinations, or manually
-          // walk through all ClueManager.knownSourceMaps looking for a sourceCsv combo,
-          // and displaying those that *aren'* in the xor list. the latter should be done
-          // in a separate loop probably, not in this loop.
+        // TODO: in order to support his, we'd need to pass a flag to PreCompute to
+        // tell it to preserve the filtered incompatible combinations, or manually
+        // walk through all ClueManager.knownSourceMaps looking for a sourceCsv combo,
+        // and displaying those that *aren't* in the xor list. the latter should be done
+        // in a separate loop probably, not in this loop.
         if (!result.success) {
             //console.log(`invalid: ${nameList}  CL ${clueCountList}  x ${x} sum ${sum}  validateAll=${validateAll}`);
             invalid.push(clueCountList);
@@ -192,16 +190,28 @@ const getCountListArrays = (nameList: string[], pcResult: PreCompute.Result,
                 console.log('well, nothing');
             }
         } else {
-            let sourceData = ClueManager.getKnownSourceMap(sum)[nameList.toString()];
-            if (sourceData) {
-                known.push({
-                    countList,
-                    nameList: (sourceData.clues as ClueList.Compound).map(clue => clue.name)
-                });
+            const sourceMap = ClueManager.getKnownSourceMap(sum);
+            let is_known = false;
+            if (!sourceMap) {
+                console.error(`!sourceMap(${sum}), nameList: ${nameListStr}` +
+                    ` xorSource.ncList: ${NameCount.listToString(xorSource.ncList)}`);
             } else {
+                let sourceData = sourceMap[nameListStr];
+                if (sourceData) {
+                    known.push({
+                        countList,
+                        nameList: (sourceData.clues as ClueList.Compound).map(clue => clue.name)
+                    });
+                    is_known = true;
+                }
+            }
+            if (!is_known) {
                 valid.push(countList);
             }
-            if (addRemoveSet) addRemoveSet.add(sum);
+            if ((options.add && (sum <= options.addMaxSum))
+                  || (options.remove && (sum >= options.removeMinSum))) {
+                addRemoveSet.add(sum);
+            }
         }
     }
     return { valid, known, invalid, clues, addRemoveSet };
@@ -216,6 +226,12 @@ const show = (options: any): any => {
 
     // TODO: move buildAllUseNcDataLists to clue-manager?  currently in combo-maker
 
+    if (options.add) {
+        options.addMaxSum = ClueManager.getNumPrimarySources();
+    }
+    if (options.remove) {
+        options.removeMinSum = 0;
+    }
     options.fast = true; // force fast
     console.log(`test: ${options.test}, fast=${options.fast}`);
 
@@ -225,17 +241,17 @@ const show = (options: any): any => {
         //       is called from so many places.
         const args = {
             xor: nameList,
+            xor_wrap: true, // wrap xorSources on return from c++ plugin
             max: 2,
             quiet: options.quiet,
             ignoreErrors: options.ignoreErrors
         };
-        // TODO: uh, this probably going to break soon
         const pcResult = PreCompute.preCompute(2, ClueManager.getNumPrimarySources(), args);
         const result = getCountListArrays(nameList, pcResult, options);
         showCountLists(nameList, result, options);
         // TODO: return something for valid_combos()
-        // TODO: support addRemoveOrReject
-        process.exit(0);
+        //process.exit(0);
+        return 0;
     } else {
         return slow_show(nameList, options);
     }

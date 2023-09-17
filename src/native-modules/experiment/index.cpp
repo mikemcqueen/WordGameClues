@@ -269,9 +269,9 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   using namespace std::chrono;
 
   Env env = info.Env();
-  if (!info[0].IsArray() || !info[1].IsArray()) {
+  if (!info[0].IsArray() || !info[1].IsArray() || !info[2].IsBoolean()) {
       TypeError::New(env,
-        "mergeCompatibleXorSourceCombinations: non-array parameter")
+        "mergeCompatibleXorSourceCombinations: invalid parameter")
         .ThrowAsJavaScriptException();
       return env.Null();
   }
@@ -280,6 +280,8 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   auto ncDataLists = makeNcDataLists(env, info[0].As<Array>());
   PCD.sourceListMap =
     std::move(makeSourceListMap(env, info[1].As<Array>()));
+  auto xor_wrap = info[2].As<Boolean>();
+
   auto unwrap1 = high_resolution_clock::now();
   [[maybe_unused]] auto d_unwrap = 
     duration_cast<milliseconds>(unwrap1 - unwrap0).count();
@@ -362,7 +364,9 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
 
   //--
 
-  //  return wrap(env, PCD.xorSourceList);
+  if (xor_wrap) {
+    return wrap(env, PCD.xorSourceList);
+  }
   return Number::New(env, PCD.xorSourceList.size());
 }
 

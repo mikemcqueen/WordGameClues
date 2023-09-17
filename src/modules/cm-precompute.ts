@@ -58,6 +58,7 @@ interface UseSourceListSizes {
 }
 
 export interface Data {
+    xor: XorSourceList;
     sourceListMap: Map<string, Source.AnyData[]>;
 }
 
@@ -153,11 +154,39 @@ const combinationsToNcDataLists = (combinationNcLists: NameCount.List[]):
         combinationNcDataList(ncListIndexes, combinationNcLists));
 };
 
-const buildAllUseNcDataLists = (useArgsList: string[]): NCDataList[] => {
+// it's really questionable whether we want to be summing the NC counts or taking
+// the largest individual NC "count" value. haven't fully thought through all the
+// use cases
+const largestNcDataCountSum = (ncDataList: NCDataList): [number, NameCount.List] => {
+    let largest = 0;
+    let ncList: NameCount.List = [];
+    for (let ncData of ncDataList) {
+        const biggest = ncData.ncList.reduce((sum, nc) => sum + nc.count, 0); // biggest sum
+        /*
+        const biggest = ncData.ncList.reduce((big, nc) => { // biggest individual NC
+            if (nc.count > big) big = nc.count;
+            return big;
+        }, 0);
+        */
+        if (biggest > largest) {
+            largest = biggest;
+            ncList = ncData.ncList;
+        }
+    }
+    return [largest, ncList];
+}
+
+const buildAllUseNcDataLists = (useArgsList: string[], maxSum: number): NCDataList[] => {
     const combinationNcLists = getCombinationNcLists(useArgsList);
     const ncDataLists = combinationsToNcDataLists(combinationNcLists)
-    return ncDataLists;
-    //.filter((ncDataList: NCDataList) => sumOfNcDataListCounts(ncDataList) <= maxSum);
+    return ncDataLists.filter((ncDataList: NCDataList) => {
+        const [largest, ncList] = largestNcDataCountSum(ncDataList);
+        if (largest > maxSum) {
+            // NOTE this doesn't display the largest ncList
+            console.error(`skipping ${largest}, ${NameCount.listToString(ncList)}`);
+        }
+        return largest <= maxSum;
+    });
 };
 
 //////////
@@ -213,7 +242,6 @@ const fillKnownNcSourceListMapForSum = (map: Map<string, Source.AnyData[]>,
         }
         */
         let result = ComboMaker.first(countList, sourceIndices);
-        //if (result.done) return; // continue;
         let firstIter = true;
         while (!result.done) {
             if (firstIter) {
@@ -244,8 +272,10 @@ const buildKnownNcSourceListMap = (first: number, last: number,
 // TODO: move to Source.initAllCompatibilityData(sourceList), initCompatibilityData(source)
 const setPrimarySrcBits = (sourceList: Source.List): void => {
     for (let source of sourceList) {
+        /*
         source.sourceBits = CountBits.makeFrom(
             Sentence.legacySrcList(source.primaryNameSrcList));
+        */
         source.usedSources = Source.getUsedSources(source.primaryNameSrcList);
     }
 };
@@ -265,12 +295,12 @@ const mergeSources = (source1: Source.Data, source2: Source.Data):
 {
     //debug(source1, source2);
     const primaryNameSrcList = [...source1.primaryNameSrcList, ...source2.primaryNameSrcList];
-    const sourceBits = CountBits.or(source1.sourceBits, source2.sourceBits);
+    //const sourceBits = CountBits.or(source1.sourceBits, source2.sourceBits);
     const usedSources = Source.mergeUsedSources(source1.usedSources, source2.usedSources);
     const ncList = [...source1.ncList, ...source2.ncList];
     return {
         primaryNameSrcList,
-        sourceBits,
+        //sourceBits,
         usedSources,
         ncList
     };
@@ -406,14 +436,13 @@ const dumpNcDataLists = (ncDataLists: NCDataList[],
     }
 }
 
-const buildUseSourceListsFromNcData = (sourceListMap: Map<string, Source.AnyData[]>,
-    args: any): void =>
+const buildUseSourceListsFromNcData = (sourceListMap: Map<string,
+    Source.AnyData[]>, args: any): XorSourceList =>
 {
-    if (0) dumpNcDataLists(args.allXorNcDataLists, sourceListMap);
-
     // XOR first
-    NativeComboMaker.mergeCompatibleXorSourceCombinations(
-        args.allXorNcDataLists, Array.from(sourceListMap.entries()));
+    const xorSources = NativeComboMaker.mergeCompatibleXorSourceCombinations(
+        args.allXorNcDataLists, Array.from(sourceListMap.entries()),
+        args.xor_wrap || false);
     args.allXorNcDataLists = undefined;
 
     // OR next
@@ -439,34 +468,37 @@ const buildUseSourceListsFromNcData = (sourceListMap: Map<string, Source.AnyData
     let mark_dur = new Duration(mark0, new Date()).milliseconds;
     console.error(` mark - ${PrettyMs(mark_dur)}`);
     */
-
     NativeComboMaker.setOrArgDataList(orArgDataList);
+    return xorSources;
 };
 
 export const preCompute = (first: number, last: number, args: any): Result => {
+    // maximum sum for a single --xor, --or
+    const maxSum = ClueManager.getNumPrimarySources() - 1;
+    // maximum sum for all --xor, --or, combined
+
     const begin = new Date();
-    args.allXorNcDataLists = args.xor ? buildAllUseNcDataLists(args.xor) : [ [] ];
+    args.allXorNcDataLists = args.xor ? buildAllUseNcDataLists(args.xor, maxSum) : [ [] ];
     const d1 = new Duration(begin, new Date()).milliseconds;
     if (args.xor && listIsEmpty(args.allXorNcDataLists)) return { success: false };
 
     const build2 = new Date();
-    args.allOrNcDataLists = args.or ? buildAllUseNcDataLists(args.or) : [ [] ];
+    args.allOrNcDataLists = args.or ? buildAllUseNcDataLists(args.or, maxSum) : [ [] ];
     const d2 = new Duration(build2, new Date()).milliseconds;
     console.error(` buildAllOrNcDataLists(${args.allOrNcDataLists.length})` +
         ` - ${PrettyMs(d2)}`);
     if (args.or && listIsEmpty(args.allOrNcDataLists)) return { success: false };
     
-    // TODO: hard-coded (?). move to C++.
-    const sourceListMap = buildKnownNcSourceListMap(2, 35, args);
+    // TODO: move to C++.
+    let sourceListMap = buildKnownNcSourceListMap(2, 75, args);
 
     const build3 = new Date();
-    // TODO: const sizes = 
-    buildUseSourceListsFromNcData(sourceListMap, args);
+    const xorSources = buildUseSourceListsFromNcData(sourceListMap, args);
     const d3 = new Duration(build3, new Date()).milliseconds;
     // TODO: sizes
     //if (args.xor && listIsEmpty(useSourceLists.xor)) return { success: false };
 
     const d = new Duration(begin, new Date()).milliseconds;
     console.error(`--Precompute - ${PrettyMs(d)}`);
-    return { success: true, data: { sourceListMap } };
+    return { success: true, data: { xor: xorSources, sourceListMap } };
 };

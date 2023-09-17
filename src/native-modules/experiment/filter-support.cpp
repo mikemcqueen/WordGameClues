@@ -13,6 +13,14 @@ using namespace cm;
 
 static std::vector<std::future<filter_result_t>> filter_futures_;
 
+void checkCudaError(cudaStream_t stream, const char* str) {
+  auto err = cudaDeviceSynchronize();
+  if (err != cudaSuccess) {
+    fprintf(stderr, "checkError %s: %s", str, cudaGetErrorString(err));
+    assert(0);
+  }
+}
+
 void add_filter_future(std::future<filter_result_t>&& filter_future) {
   filter_futures_.emplace_back(std::move(filter_future));
 }

@@ -44,12 +44,6 @@ type NcResultData = {
     list: ValidateResult[];
 };
 
-/*
-type CandidatesMap = {
-    [key: number]: Sentence.Candidate[];
-};
-*/
-
 type ClueMap = Record<string, string[]>;
 type SourceMap = Record<string, SourceData>;
 type NcResultMap = Record<string, NcResultData>;
@@ -175,8 +169,10 @@ export const getUniqueClueNameCount = (clueCount: number) => {
     if (clueCount === 1) {
         return State.uniquePrimaryClueNames.length;
     }
+    const list = getClueList(clueCount);
+    //if (!list) console.error(`no cluelist @ ${clueCount}`);
     // for now. could do better
-    return getClueList(clueCount).length;
+    return (list && list.length) || 0;
 }
 
 export const getUniqueClueName = (clueCount: number, nameIndex: number) => {
@@ -485,9 +481,8 @@ export const loadAllClues = function (args: any): void {
     let primaryClueList: ClueList.Primary = loadClueList(1) as ClueList.Primary;
     if (primaryClueList[0].src === 'auto') {
         let numPrimarySources;
-        // should autosource should the sentence list?
-        [primaryClueList, numPrimarySources/*, sentences*/] = autoSource(primaryClueList, args);
-        State.numPrimarySources = numPrimarySources; // TODO: wrongish
+        [primaryClueList, numPrimarySources] = autoSource(primaryClueList, args);
+        State.numPrimarySources = 30; // TODO: wrongish
         // if using -t, add primary variations to uniqueNames
         primaryClueListPostProcessing(primaryClueList, args.addVariations);
     } else {
@@ -514,7 +509,7 @@ const getRejectFilename = function (count: number): string {
 const initSrcBitsInAllResults = (results: ValidateResult[]): void => {
     for (let result of results) {
         //Assert(NameCount.listHasCompatibleSources(result.nameSrcList));
-        result.sourceBits = CountBits.makeFrom(Sentence.legacySrcList(result.nameSrcList));
+        //result.sourceBits = CountBits.makeFrom(Sentence.legacySrcList(result.nameSrcList));
         result.usedSources = Source.getUsedSources(result.nameSrcList);
     }
 };
@@ -846,8 +841,6 @@ let primaryNcListToNameSrcSets = function (ncList: NameCount.List): Set<string>[
     }).getCombinations()
         .reduce((result: Set<string>[], indexList: number[]) => {
             let set = new Set<string>();
-            //indexList.forEach((value, index) =>
-            //  set.add(NameCount.makeNew(ncList[index].name, srcLists[index][value])));
             indexList.forEach((value, index) =>
                 set.add(NameCount.makeCanonicalName(ncList[index].name,
                   _.toNumber(srcLists[index][value]))));
@@ -925,7 +918,7 @@ const singleEntry = (nc: NameCount.Type, source: string): SourceData => {
             {
                 ncList: [nc],
                 nameSrcList,
-                sourceBits: CountBits.makeFrom(Sentence.legacySrcList(nameSrcList)),
+                //sourceBits: CountBits.makeFrom(Sentence.legacySrcList(nameSrcList)),
                 usedSources: Source.getUsedSources(nameSrcList),
                 // TODO: these two shouldn't be here.
                 resultMap: undefined
@@ -1384,6 +1377,7 @@ export const fast_getCountListArrays = (nameCsv: string, options: any): any[] =>
 let invalidHash: any = {}; // hax
 
 export const getCountListArrays = (nameCsv: string, options: any): any => {
+    Assert(0 && "don't use this function i think");
     const validateAll = options.any ? false : true;
     const nameList = nameCsv.split(',').sort();
     Debug(`++getCountListArrays(${nameList})`);
