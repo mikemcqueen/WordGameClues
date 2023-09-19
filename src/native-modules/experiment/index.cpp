@@ -65,26 +65,15 @@ SourceData makeSourceData(Env& env, const Object& jsSourceData) {
       .ThrowAsJavaScriptException();
     return {};
   }
-  auto jsNcList = jsSourceData.Get("ncList");
-  if (!jsNcList.IsArray()) {
-    TypeError::New(env, "makeSourceData: ncList is not an array")
-      .ThrowAsJavaScriptException();
-    return {};
-  }
   // TODO: declare SourceData result; assign result.xxx = std::move(yyy);;
   // return result (no move-all-params constructor required)
   auto primaryNameSrcList =
     makeNameCountList(env, jsPrimaryNameSrcList.As<Array>());
-  auto primarySrcBits =
-    NameCount::listToLegacySourceBits(primaryNameSrcList);
   auto usedSources = NameCount::listToUsedSources(primaryNameSrcList);
 #if 0
   usedSources.assert_valid();
 #endif
-  auto ncList = makeNameCountList(env, jsNcList.As<Array>());
-  return SourceData(std::move(primaryNameSrcList),
-    std::move(primarySrcBits),
-    std::move(usedSources), std::move(ncList));
+  return {std::move(primaryNameSrcList), std::move(usedSources)};
 }
 
 SourceList makeSourceList(Env& env, const Array& jsList) {

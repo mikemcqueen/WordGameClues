@@ -34,7 +34,7 @@ interface StringBoolMap {
     [key: string]: boolean; // for now; eventually maybe array of string (sorted primary nameSrcCsv)
 }
 
-type XorSource = Source.Data;
+type XorSource = Source.XorSource;
 export type XorSourceList = XorSource[];
 
 interface OrSourceData {
@@ -272,10 +272,6 @@ const buildKnownNcSourceListMap = (first: number, last: number,
 // TODO: move to Source.initAllCompatibilityData(sourceList), initCompatibilityData(source)
 const setPrimarySrcBits = (sourceList: Source.List): void => {
     for (let source of sourceList) {
-        /*
-        source.sourceBits = CountBits.makeFrom(
-            Sentence.legacySrcList(source.primaryNameSrcList));
-        */
         source.usedSources = Source.getUsedSources(source.primaryNameSrcList);
     }
 };
@@ -293,14 +289,11 @@ const listCandidateCount = (ncList: NameCount.List): number => {
 const mergeSources = (source1: Source.Data, source2: Source.Data):
     Source.Data =>
 {
-    //debug(source1, source2);
     const primaryNameSrcList = [...source1.primaryNameSrcList, ...source2.primaryNameSrcList];
-    //const sourceBits = CountBits.or(source1.sourceBits, source2.sourceBits);
     const usedSources = Source.mergeUsedSources(source1.usedSources, source2.usedSources);
     const ncList = [...source1.ncList, ...source2.ncList];
     return {
         primaryNameSrcList,
-        //sourceBits,
         usedSources,
         ncList
     };
@@ -415,15 +408,6 @@ const markAllXorCompatibleOrSources = (xorSourceList: XorSource[],
     }
 };
 
-const debugXorResults = (xorResults: XorSourceList) => {
-    for (let xorResult of xorResults) {
-        if (listCandidateCount(xorResult.primaryNameSrcList) > 1) {
-            console.log(`${NameCount.listToString(xorResult.ncList)}:` +
-                ` ${NameCount.listToString(xorResult.primaryNameSrcList)}`);
-        }
-    }
-}
-
 const dumpNcDataLists = (ncDataLists: NCDataList[],
     sourceListMap: Map<string, Source.AnyData[]>): void =>
 {
@@ -440,7 +424,7 @@ const buildUseSourceListsFromNcData = (sourceListMap: Map<string,
     Source.AnyData[]>, args: any): XorSourceList =>
 {
     // XOR first
-    const xorSources = NativeComboMaker.mergeCompatibleXorSourceCombinations(
+    const xorSources: XorSourceList = NativeComboMaker.mergeCompatibleXorSourceCombinations(
         args.allXorNcDataLists, Array.from(sourceListMap.entries()),
         args.xor_wrap || false);
     args.allXorNcDataLists = undefined;

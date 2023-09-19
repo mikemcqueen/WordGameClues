@@ -31,7 +31,6 @@ Array wrap(Env& env, const std::vector<std::string>& strList) {
 Object wrap(Env& env, const XorSource& xorSource) {
   Object jsObj = Object::New(env);
   jsObj.Set("primaryNameSrcList", wrap(env, xorSource.primaryNameSrcList));
-  jsObj.Set("ncList", wrap(env, xorSource.ncList));
   return jsObj;
 }
 
@@ -59,7 +58,7 @@ Array wrap(Env& env, const XorSourceList& xorSourceList) {
   return jsList;
 }
 
-Napi::Object wrap(Napi::Env& env, const PerfData& perf) {
+Object wrap(Env& env, const PerfData& perf) {
   Object jsObj = Object::New(env);
   jsObj.Set("calls", Number::New(env, perf.calls));
   jsObj.Set("comps", Number::New(env, perf.comps));
@@ -71,7 +70,7 @@ Napi::Object wrap(Napi::Env& env, const PerfData& perf) {
   return jsObj;
 }
 
-Napi::Object wrap(Napi::Env& env, const CandidateStats& cs) {
+Object wrap(Env& env, const CandidateStats& cs) {
   Object jsObj = Object::New(env);
   jsObj.Set("sum", Number::New(env, cs.sum));
   jsObj.Set("sourceLists", Number::New(env, cs.sourceLists));
@@ -90,58 +89,5 @@ Array wrap(Env& env, const filter_result_t& filter_result) {
   }
   return jsList;
 }
-
-#if 0
-Object wrap(Env& env, const SourceData& source) {
-  Object jsObj = Object::New(env);
-  jsObj.Set("primaryNameSrcList", wrap(env, xorSource.primaryNameSrcList));
-  jsObj.Set("ncList", wrap(env, xorSource.ncList));
-  return jsObj;
-  auto jsObj = wrap(env, (const SourceBase&)source);
-  jsObj.Set("sourceNcCsvList", wrap(env, source.sourceNcCsvList));
-  return jsObj;
-}
-
-Array wrap(Env& env, const SourceList& sourceList) {
-  Array jsList = Array::New(env, sourceList.size());
-  for (size_t i{}; i < sourceList.size(); ++i) {
-    jsList.Set(i, wrap(env, sourceList[i]));
-  }
-  return jsList;
-}
-
-Object wrapMergedSource(Env& env, const SourceCRefList& sourceCRefList) {
-  Object jsObj = Object::New(env);
-  Array jsPnsl = Array::New(env);
-  Array jsNcl = Array::New(env);
-  //Array jsSncl = Array::New(env);
-  for (const auto sourceCRef : sourceCRefList) {
-    const auto& source = sourceCRef.get();
-    for (const auto& nc : source.primaryNameSrcList) {
-      jsPnsl.Set(jsPnsl.Length(), wrap(env, nc));
-    }
-    for (const auto& nc : source.ncList) {
-      jsNcl.Set(jsNcl.Length(), wrap(env, nc));
-    }
-    /*
-    for (const auto& str : source.sourceNcCsvList) {
-      jsSncl.Set(jsSncl.Length(), String::New(env, str));
-    }
-    */
-  }
-  jsObj.Set("primaryNameSrcList", jsPnsl);
-  jsObj.Set("ncList", jsNcl);
-  //jsObj.Set("sourceNcCsvList", jsSncl);
-  return jsObj;
-}
-
-Array wrap(Env& env, const MergedSourcesList& mergedSourcesList) {
-  Array jsList = Array::New(env, mergedSourcesList.size());
-  for (size_t i{}; i < mergedSourcesList.size(); ++i) {
-    jsList.Set(i, wrapMergedSource(env, mergedSourcesList[i].sourceCRefList));
-  }
-  return jsList;
-}
-#endif
 
 } // namespace cm

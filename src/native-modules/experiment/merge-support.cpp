@@ -535,22 +535,16 @@ XorSource merge_sources(const std::vector<index_t>& src_indices,
   // start with an XorSource here initialized to sourceList[0] values
   // and merge-in-place all the subsequent elements? could even be a
   // SourceData member function.
-  // TODO: Also, why am I not just |='ing legacySrcBits in the loop?
   NameCountList primaryNameSrcList{};
-  NameCountList ncList{};
   UsedSources usedSources{};
   for (size_t i{}; i < src_indices.size(); ++i) {
     const auto& src = src_lists.at(i).at(src_indices.at(i));
     const auto& pnsl = src.primaryNameSrcList;
     primaryNameSrcList.insert(primaryNameSrcList.end(), pnsl.begin(), pnsl.end()); // copy (by design?)
-    const auto& ncl = src.ncList;
-    ncList.insert(ncList.end(), ncl.begin(), ncl.end());                           // copy (by design?)
     usedSources.mergeInPlace(src.usedSources);
   }
   assert(!primaryNameSrcList.empty() && "empty primaryNameSrcList");
-  return XorSource{std::move(primaryNameSrcList),
-    std::move(NameCount::listToLegacySourceBits(primaryNameSrcList)),
-    std::move(usedSources), std::move(ncList)};
+  return XorSource{std::move(primaryNameSrcList), std::move(usedSources)};
 }
 
 auto host_merge(const std::vector<SourceList>& src_lists,

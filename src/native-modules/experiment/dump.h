@@ -35,10 +35,6 @@ inline void dump(const cm::SourceData& sd, std::string_view spaces) {
   std::cout << spaces << '{' << std::endl;
   std::cout << spaces << indent << "primaryNameSrcList: ";
   dump(sd.primaryNameSrcList, std::string(spaces).append(indent), false);
-  //std::cout << spaces << indent << "sourceNcCsvList: ";
-  //dump(sd.sourceNcCsvList, std::string(spaces).append(indent), false);
-  std::cout << spaces << indent << "ncList: ";
-  dump(sd.ncList, std::string(spaces).append(indent), false);
   std::cout << spaces << '}' << std::endl;
 }
 

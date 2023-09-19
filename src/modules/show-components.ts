@@ -52,18 +52,19 @@ const getCountListArrays = (nameList: string[], pcResult: PreCompute.Result,
     let hash = {};
 
     for (const xorSource of pcResult.data!.xor) {
-        const countList = NameCount.listToCountList(xorSource.ncList);
+        // TODO broken
+        const countList: number[] = []; // NameCount.listToCountList(xorSource.ncList);
         // for --verbose, we could allow this:
         const hashKey = countList.toString();
         if (hash[hashKey]) continue;
         hash[hashKey] = true;
         let ncListStr = countList.map((count, index) => NameCount.makeNew(nameList[index], count)).toString();
-        /*
-        // TODO: in order to support his, we'd need to pass a flag to PreCompute to
+        // TODO: in order to support this, we'd need to pass a flag to PreCompute to
         // tell it to preserve the filtered incompatible combinations, or manually
         // walk through all ClueManager.knownSourceMaps looking for a sourceCsv combo,
         // and displaying those that *aren't* in the xor list. the latter should be done
         // in a separate loop probably, not in this loop.
+        /*
         if (!result.success) {
             //console.log(`invalid: ${nameList}  CL ${clueCountList}  x ${x} sum ${sum}  validateAll=${validateAll}`);
             invalid.push(clueCountList);
@@ -94,8 +95,8 @@ const getCountListArrays = (nameList: string[], pcResult: PreCompute.Result,
             const sourceMap = ClueManager.getKnownSourceMap(sum);
             let is_known = false;
             if (!sourceMap) {
-                console.error(`!sourceMap(${sum}), nameList: ${nameListStr}` +
-                    ` xorSource.ncList: ${NameCount.listToString(xorSource.ncList)}`);
+                console.error(`!sourceMap(${sum}), nameList: ${nameListStr}`);
+                //  + ` xorSource.ncList: ${NameCount.listToString(xorSource.ncList)}`);
             } else {
                 let sourceData = sourceMap[nameListStr];
                 if (sourceData) {

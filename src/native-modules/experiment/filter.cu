@@ -42,26 +42,6 @@ __device__ __host__ auto isSourceXORCompatibleWithAnyXorSource(
   return compatible;
 }
 
-#if 0
-__device__ bool first = true;
-
-__device__ void check_source(
-  const SourceCompatibilityData& source, const device::OrSourceData* or_sources) {
-  //
-  if (source.usedSources.hasVariation(3)
-      && (source.usedSources.getVariation(3) == 0)
-      && source.usedSources.getBits().test(UsedSources::getFirstBitIndex(3))
-      && source.legacySourceBits.test(1)) {
-    printf("---match---\n");
-    source.dump(nullptr, true);
-    const auto& or_src = or_args[0].or_sources[0].source;
-    bool xor_compat = source.isXorCompatibleWith(or_src);
-    bool and_compat = source.isAndCompatibleWith(or_src);
-    printf("xor: %d, and: %d\n", xor_compat, and_compat);
-  }
-}
-#endif
-
 __device__ bool is_source_or_compatibile(const SourceCompatibilityData& source,
   const unsigned num_or_args,
   const device::OrSourceData* __restrict__ or_sources,

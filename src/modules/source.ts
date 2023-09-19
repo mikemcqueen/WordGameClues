@@ -26,10 +26,15 @@ const kMaxSourcesPerSentence = 32;
 
 //////////
 
-interface Base {
+interface PrimaryNameSrcListContainer {
     primaryNameSrcList: NameCount.List;
+}
+
+interface NcListContainer {
     ncList: NameCount.List;
 }
+
+type Base = PrimaryNameSrcListContainer & NcListContainer;
 
 type Variations = Int16Array;
 export interface UsedSources {
@@ -38,11 +43,13 @@ export interface UsedSources {
 }
 
 export interface CompatibilityData {
-//    sourceBits: CountBits.Type;
     usedSources: UsedSources;
 }
 export type Data = Base & CompatibilityData;
 export type List = Data[];
+
+export type XorSource = PrimaryNameSrcListContainer & CompatibilityData;
+export type XorSourceList = XorSource[];
 
 interface ValidateResultsContainer {
     validateResults: ValidateResult[];
@@ -119,19 +126,6 @@ const allVariationsMatch = (v1: Variations, v2: Variations): boolean => {
     return true;
 }
 
-/*
-  constexpr auto isXorCompatibleWith(
-    const UsedSources& other, bool check_variations = true) const {
-    // compare bits
-    if (getBits().intersects(other.getBits()))
-      return false;
-    // compare variations
-    if (check_variations && !allVariationsMatch(variations, other.variations))
-      return false;
-    return true;
-  }
-*/
-
 export const isXorCompatible = (first: CompatibilityData,
     second: CompatibilityData, check_variations: boolean = true): boolean =>
 {
@@ -149,7 +143,7 @@ export const isXorCompatible = (first: CompatibilityData,
 export const isXorCompatibleWithAnySource = (source: CompatibilityData,
     sourceList: CompatibilityData[]): boolean =>
 {
-    let compatible = sourceList.length === 0; //listIsEmpty(sourceList); // empty list == compatible
+    let compatible = sourceList.length === 0;
     for (let otherSource of sourceList) {
         compatible = isXorCompatible(source, otherSource);
         if (compatible) break;
@@ -158,29 +152,6 @@ export const isXorCompatibleWithAnySource = (source: CompatibilityData,
 };
 
 //////////
-
-/*
-  void addSource(int src) {
-    auto sentence = Source::getSentence(src);
-    assert(sentence > 0);
-    auto variation = Source::getVariation(src);
-    if (hasVariation(sentence) && (getVariation(sentence) != variation)) {
-      std::cerr << "variation(" << sentence << "), this: "
-                << getVariation(sentence) << ", src: " << variation
-                << std::endl;
-      assert(false && "addSource() variation mismatch");
-    }
-    assert(Source::getIndex(src) < kMaxSourcesPerSentence);
-
-    // variation
-    setVariation(sentence, variation);
-
-    // bits
-    auto bit_pos = Source::getIndex(src) + getFirstBitIndex(sentence);
-    assert(!bits.test(bit_pos));
-    bits.set(bit_pos);
-}
-*/
 
 const getVariation = (usedSources: UsedSources, sentence: number): number => {
     return usedSources.variations[sentence - 1];
@@ -229,32 +200,6 @@ export const getUsedSources = (nameSrcList: NameCount.List):
     return result;
 }
 
-/* UNUSED i think
-export const cloneUsedSources = (from: UsedSources): UsedSources => {
-    let result: UsedSources = emptyUsedSources();
-    for (let i = 1; i < 10; ++i) {
-	if (from[i] !== undefined) {
-	    result[i] = new Set<number>(from[i]);
-        }
-    }
-    return result;
-}
-*/
-
-/*
-  void addVariations(const UsedSources& other) {
-    for (int sentence{ 1 }; sentence <= kNumSentences; ++sentence) {
-      if (!other.hasVariation(sentence)) continue;
-      // ensure variations for this sentence are compatible
-      if (hasVariation(sentence)) {
-        assert(getVariation(sentence) == other.getVariation(sentence));
-      } else {
-        setVariation(sentence, other.getVariation(sentence));
-      }
-    }
-  }
-*/
-
 const addVariations = (to: UsedSources, from: UsedSources): void => {
     for (let sentence = 1; sentence <= kNumSentences; ++sentence) {
         if (!hasVariation(from, sentence)) continue;
@@ -287,15 +232,14 @@ export const mergeUsedSources = (first: UsedSources, second: UsedSources):
 export const makeData = (nc: NameCount.Type, validateResult: ValidateResult):
     Data =>
 {
-/*
+    /*
     Assert(validateResult.usedSources, `makeData(): ${NameCount.toString(nc)}`);
     Assert(NameCount.listHasCompatibleSources(validateResult.nameSrcList),
         `makeData(): ${NameCount.toString(nc)}`);
-*/
+    */
     return {
 	primaryNameSrcList: validateResult.nameSrcList,
         ncList: [nc],
 	usedSources: validateResult.usedSources
-	//usedSources: getUsedSources(validateResult.nameSrcList)
     };
 };

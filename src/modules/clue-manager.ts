@@ -20,7 +20,6 @@ const PrettyMs       = require('pretty-ms');
 
 const Stringify2 = require('stringify-object');
 const stringify = require('javascript-stringify').stringify;
-//let Stringify = stringify;
 
 import * as NameCount from '../types/name-count';
 import * as Clue from '../types/clue';
@@ -47,7 +46,6 @@ type NcResultData = {
 type ClueMap = Record<string, string[]>;
 type SourceMap = Record<string, SourceData>;
 type NcResultMap = Record<string, NcResultData>;
-//type NameVariationMap = Record<string, string[]>;
 
 export type AllCandidates = Sentence.CandidatesContainer[];
 export interface AllCandidatesContainer {
@@ -509,7 +507,6 @@ const getRejectFilename = function (count: number): string {
 const initSrcBitsInAllResults = (results: ValidateResult[]): void => {
     for (let result of results) {
         //Assert(NameCount.listHasCompatibleSources(result.nameSrcList));
-        //result.sourceBits = CountBits.makeFrom(Sentence.legacySrcList(result.nameSrcList));
         result.usedSources = Source.getUsedSources(result.nameSrcList);
     }
 };
@@ -918,11 +915,9 @@ const singleEntry = (nc: NameCount.Type, source: string): SourceData => {
             {
                 ncList: [nc],
                 nameSrcList,
-                //sourceBits: CountBits.makeFrom(Sentence.legacySrcList(nameSrcList)),
                 usedSources: Source.getUsedSources(nameSrcList),
-                // TODO: these two shouldn't be here.
+                // TODO: this shouldn't be here.
                 resultMap: undefined
-                //,allCandidates: []
             }
         ]
     };
