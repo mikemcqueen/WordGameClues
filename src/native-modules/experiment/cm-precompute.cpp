@@ -16,125 +16,8 @@
 #include "merge.h"
 
 namespace cm {
-/*
-auto getCandidateCount(const SourceData& source) {
-  auto count = 0;
-  for (const auto& nameSrc : source.primaryNameSrcList) {
-    if (Source::isCandidate(nameSrc.count)) {
-      ++count;
-    }
-  }
-  return count;
-}
 
-auto hasConflictingCandidates(const SourceData& source) {
-  if (getCandidateCount(source) < 2) return false;
-  UsedSources usedSources{};
-  std::cerr << "-----" << endl;
-  for (const auto& nameSrc : source.primaryNameSrcList) {
-    if (nameSrc.count < 1'000'000) continue;
-    auto sentence = nameSrc.count / 1'000'000;
-    auto variation = (nameSrc.count % 1'000'000);
-    std::cerr << sentence << "," << variation << ":" << nameSrc.count << std::endl;
-    if (!usedSources[sentence].empty() && (usedSources[sentence].find(variation) != usedSources[sentence].end())) {
-      std::cerr << "true" << endl;
-      return true;
-    }
-    usedSources[sentence].insert(variation);
-  }
-  std::cerr << "false" << endl;
-  return false;
-}
-
-auto getCandidateCount(const SourceList& sourceList) {
-  auto count = 0;
-  for (const auto& source : sourceList) {
-    count += getCandidateCount(source);
-  }
-  return count;
-}
-
-auto getCandidateCount(const SourceCRefList& sourceCRefList) {
-  auto count = 0;
-  for (const auto sourceRef : sourceCRefList) {
-    count += getCandidateCount(sourceRef.get());
-  }
-  return count;
-}
-
-void debugSource(const SourceData& source, std::string_view sv) {
-  if (getCandidateCount(source) < 2) return;
-  std::cerr << sv << ": " << NameCount::listToString(source.primaryNameSrcList) << std::endl;
-}
-
-void debugAddSourceToList(const SourceData& source,
-  const SourceList& sourceList)
-{
-  if (getCandidateCount(source) + getCandidateCount(sourceList) < 2) return;
-  std::string sources{};
-  for (const auto& other : sourceList) {
-    if (getCandidateCount(other)) {
-      if (!sources.empty()) sources += " - ";
-      sources += NameCount::listToString(other.primaryNameSrcList);
-    }
-  }
-  std::cerr << "adding " << NameCount::listToString(source.primaryNameSrcList)
-            <<" to " << sources << endl;
-}
-
-void debugAddSourceToList(const SourceData& source,
-  const SourceCRefList& sourceCRefList)
-{
-  if (getCandidateCount(source) + getCandidateCount(sourceCRefList) < 2) return;
-  std::string sources{};
-  for (const auto sourceCRef : sourceCRefList) {
-    if (getCandidateCount(sourceCRef)) {
-      if (!sources.empty()) sources += " - ";
-      sources += NameCount::listToString(sourceCRef.get().primaryNameSrcList);
-    }
-  }
-  // try:
-  //std::cerr << "adding " << std::to_string(source.primaryNameSrcList) << 
-  std::cerr << "adding " << NameCount::listToString(source.primaryNameSrcList)
-            <<" to " << sources << std::endl;
-}
-
-void debugSourceList(const SourceCRefList& sourceCRefList, std::string_view sv) {
-  auto first = true;
-  for (const auto sourceCRef : sourceCRefList) {
-    if (!hasConflictingCandidates(sourceCRef.get())) continue;
-    if (first) {
-      std::cerr << sv << ":" << std::endl;
-      first = false;
-    }
-    std::cerr << "  " << NameCount::listToString(sourceCRef.get().primaryNameSrcList) << std::endl;
-  }
-}
-
-void debugSourceList(const SourceList& sourceList, std::string_view sv) {
-  auto first = true;
-  for (const auto& source : sourceList) {
-    if (!hasConflictingCandidates(source)) continue;
-    if (first) {
-      std::cerr << sv << ":" << std::endl;
-      first = false;
-    }
-    std::cerr << "  " << NameCount::listToString(source.primaryNameSrcList) << std::endl;
-  }
-}
-
-void debugMergedSource(const SourceData& mergedSource, const SourceData& source1,
-  const SourceData& source2)
-{
-  auto candidates = getCandidateCount(mergedSource);
-  if (candidates > 1) {
-    std::cerr << "candidates(" << candidates << "),"
-              << " merged " << NameCount::listToString(source1.primaryNameSrcList)
-              << " with " << NameCount::listToString(source2.primaryNameSrcList)
-              << std::endl;
-  }
-}
-*/
+namespace {
 
 const SourceList& getSourceList(const NameCountList& ncList,
   const SourceListMap& sourceListMap)
@@ -150,8 +33,6 @@ auto mergeSources(const SourceData& source1, const SourceData& source2) {
   result.ncList = std::move(NameCount::listMerge(source1.ncList, source2.ncList));
   result.legacySourceBits =
     std::move(source1.legacySourceBits | source2.legacySourceBits);
-  // might be faster here to call NameCount::listToLegacySources(result.ncList)
-  //result.legacySources = std::move(source1.copyMerge(source2.legacySources));
   result.usedSources =
     std::move(source1.usedSources.copyMerge(source2.usedSources));
   return result;
@@ -164,7 +45,7 @@ auto mergeCompatibleSourceLists(const SourceList& sourceList1,
   for (const auto& source1 : sourceList1) {
     for (const auto& source2 : sourceList2) {
       if (source1.isXorCompatibleWith(source2)) {
-        result.emplace_back(std::move(mergeSources(source1, source2)));
+        result.emplace_back(mergeSources(source1, source2));
       }
     }
   }
@@ -179,13 +60,13 @@ auto mergeAllCompatibleSources(const NameCountList& ncList,
   // because **maybe** broken for > 2 below
   assert(ncList.size() <= 2 && "ncList.length > 2");
   constexpr auto log = false;
-  if (log) {
+  if constexpr (log) {
     std::cerr << "nc[0]: " << ncList[0].toString() << std::endl;
   }
   // TODO: find smallest sourcelist to copy first, then skip merge in loop?
   SourceList sourceList{ sourceListMap.at(ncList[0].toString()) }; // copy
   for (auto i = 1u; i < ncList.size(); ++i) {
-    if (log) {
+    if constexpr (log) {
       std::cerr << " nc[" << i << "]: " << ncList[1].toString() << std::endl;
     }
     const auto& nextSourceList = sourceListMap.at(ncList[i].toString());
@@ -196,6 +77,8 @@ auto mergeAllCompatibleSources(const NameCountList& ncList,
   }
   return sourceList;
 }
+
+}  // namespace
 
 auto buildSourceListsForUseNcData(const std::vector<NCDataList>& useNcDataLists,
   const SourceListMap& sourceListMap) -> std::vector<SourceList>
@@ -218,7 +101,7 @@ auto buildSourceListsForUseNcData(const std::vector<NCDataList>& useNcDataLists,
   std::vector<HashMap> hashList(size);
   std::vector<SourceList> sourceLists(size);
   for (const auto& ncDataList : useNcDataLists) {
-    for (auto i = 0u; i < ncDataList.size(); ++i) {
+    for (size_t i{}; i < ncDataList.size(); ++i) {
       // for size == 2: return by value; could return reference to static local in a pinch
       auto sourceList = mergeAllCompatibleSources(ncDataList[i].ncList, sourceListMap);
       //const auto& sourceList = getSourceList(ncDataList[i].ncList, sourceListMap);
@@ -345,7 +228,6 @@ auto set_to_string(const std::set<uint32_t>& s) {
   }
   return r;
 }
-*/
 
 int64_t get_compat_merge = 0;
 
@@ -401,7 +283,6 @@ XorSourceList mergeCompatibleXorSources(const SourceCRefList& sourceList) {
   return result;
 }
 
-/*
 auto list_size(const Peco::IndexList& indexList) {
   int size = 0;
   std::for_each(indexList.cbegin(), indexList.cend(),
@@ -417,7 +298,6 @@ std::string vec_to_string(const vector<int>& v) {
   }
   return result;
 }
-*/
 
 auto vec_product(const std::vector<int>& v) {
   int64_t result{1};
@@ -485,31 +365,33 @@ auto mergeCompatibleXorSourceCombinations(
 
   return xorSourceList;
 }
+*/
 
 //////////
 
 namespace {
-  void dumpSentenceVariationIndices(
-    const SentenceVariationIndices& sentenceVariationIndices)
-  {
-    for (int s{}; s < kNumSentences; ++s) {
-      const auto& variationIndicesList = sentenceVariationIndices.at(s);
-      if (!variationIndicesList.empty()) {
-        std::cerr << "S" << s << ": variations(" << variationIndicesList.size()
-                  << ")" << std::endl;
-        for (int v{}; v < (int)variationIndicesList.size(); ++v) {
-          const auto& indices = variationIndicesList.at(v);
-          std::cerr << "  v" << v - 1 << ": indices(" << indices.size() << ")"
-                    << std::endl;
-        }
+
+void dumpSentenceVariationIndices(
+  const SentenceVariationIndices& sentenceVariationIndices) {
+  for (int s{}; s < kNumSentences; ++s) {
+    const auto& variationIndicesList = sentenceVariationIndices.at(s);
+    if (!variationIndicesList.empty()) {
+      std::cerr << "S" << s << ": variations(" << variationIndicesList.size()
+                << ")" << std::endl;
+      for (int v{}; v < (int)variationIndicesList.size(); ++v) {
+        const auto& indices = variationIndicesList.at(v);
+        std::cerr << "  v" << v - 1 << ": indices(" << indices.size() << ")"
+                  << std::endl;
       }
     }
   }
-} // anon namespace
-  
+}
+
+}  // namespace
+
 auto buildSentenceVariationIndices(const XorSourceList& xorSourceList,
-  const std::vector<uint32_t>& xorSourceIndices) -> SentenceVariationIndices
-{
+  const std::vector<uint32_t>& xorSourceIndices) -> SentenceVariationIndices {
+  //
   auto sentenceVariationIndices = SentenceVariationIndices{};
   for (size_t src_index = 0; src_index < xorSourceList.size(); ++src_index) {
     std::array<int, kNumSentences> variations =
@@ -558,4 +440,4 @@ auto buildSentenceVariationIndices(const XorSourceList& xorSourceList,
   return sentenceVariationIndices;
 }
 
-} // namespace cm
+}  // namespace cm

@@ -41,8 +41,8 @@ auto make_merge_list(const SourceCompatibilityList& merged_src_list,
       }
     }
     if (!compat_src_list.empty()) {
-      merge_list.push_back(
-        MergeData{merged_src, std::move(compat_src_list)});
+      merge_list.push_back(MergeData{merged_src, std::move(compat_src_list)});
+      //merge_list.emplace_back(merged_src, std::move(compat_src_list));
     }
   }
   return merge_list;

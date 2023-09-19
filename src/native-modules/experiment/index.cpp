@@ -71,12 +71,6 @@ SourceData makeSourceData(Env& env, const Object& jsSourceData) {
       .ThrowAsJavaScriptException();
     return {};
   }
-  auto jsUsedSources = jsSourceData.Get("usedSources");
-  if (!jsUsedSources.IsArray()) {
-    TypeError::New(env, "makeSourceData: usedSources is not an array")
-      .ThrowAsJavaScriptException();
-    return {};
-  }
   // TODO: declare SourceData result; assign result.xxx = std::move(yyy);;
   // return result (no move-all-params constructor required)
   auto primaryNameSrcList =
@@ -89,7 +83,8 @@ SourceData makeSourceData(Env& env, const Object& jsSourceData) {
 #endif
   auto ncList = makeNameCountList(env, jsNcList.As<Array>());
   return SourceData(std::move(primaryNameSrcList),
-    std::move(primarySrcBits), std::move(usedSources), std::move(ncList));
+    std::move(primarySrcBits),
+    std::move(usedSources), std::move(ncList));
 }
 
 SourceList makeSourceList(Env& env, const Array& jsList) {

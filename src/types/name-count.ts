@@ -152,6 +152,8 @@ export function sortList (ncList: List): List {
     return ncList;
 }
 
+
+/*
 export const listHasCompatibleSources = (nameSrcList: List):
     boolean =>
 {
@@ -168,6 +170,7 @@ export const listHasCompatibleSources = (nameSrcList: List):
     }
     return true;
 }
+*/
 
 //
 

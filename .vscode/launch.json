@@ -17,18 +17,17 @@
         {
             "type": "node",
             "request": "launch",
-            "name": "nodejs 2,2 xor 21",
+            "name": "nodejs 2,2 xor",
             "skipFiles": [
                 "<node_internals>/**"
             ],
             "localRoot": "${workspaceFolder}",
             "program": "${workspaceFolder}/src/tools/clues.js",
-            "args": [ "clues.js", "-pf.72", "-c2,2", "-x2",
+            "args": [ "clues.js", "-pf.72", "-c2,2", "-x2", "-v"
 //                "--xor", "us 50",
-//                "--xor", "koa",
+                "--xor", "koa",
                 "--xor", "21",
 //                "--xor", "currant",
-                "-v"
             ]
         },
         {
@@ -58,14 +57,14 @@
         {
             "type": "cppdbg",
             "request": "launch",
-            "name": "cppdbg xor.req",
+            "name": "cppdbg xor",
             "program": "/usr/local/bin/node",
             "cwd": "${workspaceFolder}/src/tools",
             "args": [ "clues.js", "-pf.72", "-c2,2", "-x2",
 //                "--xor", "us 50",
                 "--xor", "koa",
                 "--xor", "21",
-                "--xor", "currant",
+//                "--xor", "currant",
                 "-v"
             ]
         }

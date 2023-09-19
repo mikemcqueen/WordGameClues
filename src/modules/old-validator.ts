@@ -19,6 +19,7 @@ import * as Clue from '../types/clue';
 import * as ClueList from '../types/clue-list';
 import * as ClueManager from './clue-manager';
 import * as NameCount from '../types/name-count';
+import * as Source from './source';
 import * as Validator from './validator';
     
 // TODO: options.xp
@@ -178,7 +179,7 @@ let buildValidateResult = (nameSrcList: NameCount.List, args: CompatibleResultAr
             nameSrcList
         }).ensureUniquePrimaryLists(),
 	//,allCandidates: []
-	//,usedSources: []
+	usedSources: Source.emptyUsedSources()
     };
 };
 

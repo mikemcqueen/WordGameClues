@@ -18,8 +18,8 @@ constexpr auto kMaxMatrices = 10u;
 // Indices are used because only a subset (as specified by indicee arrays)
 // of each source array is actually considered.
 //
-// compat_results can be thought of as a matrix, with with sources1.size()
-// rows and sources2.size() columns.
+// compat_results can be thought of as a matrix, with withh num_src1_indices
+// rows and num_src2_indices columns.
 //
 __global__ void list_pair_compat_kernel(
   const SourceCompatibilityData* sources1,
@@ -27,11 +27,12 @@ __global__ void list_pair_compat_kernel(
   const index_t* src1_indices, unsigned num_src1_indices,
   const index_t* src2_indices, unsigned num_src2_indices,
   result_t* compat_results) {
-  // for each source (one block per source)
+  // for each source1 (one block per row)
   for (unsigned idx1{blockIdx.x}; idx1 < num_src1_indices; idx1 += gridDim.x) {
     const auto src1_idx = src1_indices[idx1];
     const auto& src1 = sources1[src1_idx];
 
+    // for each source2 (one thread per column)
     for (unsigned idx2{threadIdx.x}; idx2 < num_src2_indices;
          idx2 += blockDim.x) {
       const auto src2_idx = src2_indices[idx2];
@@ -43,9 +44,9 @@ __global__ void list_pair_compat_kernel(
 }
 
 // Given N compatibility matrices, representing the results of comparing every
-// pair of sources arrays (via list_pair_compat_kernel), find all N-tuple
-// combinations of compatible results, representing combinations of compatible
-// sources to be merged.
+// pair of sources arrays (via list_pair_compat_kernel), find all N-tuples of
+// of compatible results, representing combinations of compatible sources to
+// be merged.
 //
 __global__ void get_compat_combos_kernel(uint64_t first_combo,
   uint64_t num_combos, const result_t* compat_matrices,

@@ -14,6 +14,10 @@ export let set = (cb: any, num: number) : void => {
     cb.add(num);
 }
 
+export let test = (cb: any, num: number) : boolean => {
+    return cb.has(num);
+}
+
 export let setMany = (cb: Type, nums: number[]) : void => {
     for (let num of nums) {
 	cb.add(num);

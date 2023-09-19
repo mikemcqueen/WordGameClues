@@ -13,7 +13,6 @@
 #include <vector>
 #include "cuda-types.h"
 #include "mmebitset.h"
-//using mme::bitset;
 
 namespace cm {
 
@@ -156,7 +155,7 @@ public:
   auto mergeInPlace(const UsedSources& other) {
     // merge bits
     getBits() |= other.getBits();
-    // merge variation. haxoid. should be separate function.
+    // merge variations.
     addVariations(other);
   }
 
@@ -242,16 +241,16 @@ struct SourceCompatibilityData {
   SourceCompatibilityData& operator=(SourceCompatibilityData&&) = default;
 
   // copy components
-  SourceCompatibilityData(
-    const LegacySourceBits& legacySourceBits, const UsedSources& usedSources)
-      : legacySourceBits(legacySourceBits),
+  SourceCompatibilityData(const LegacySourceBits& legacySourceBits,
+    const UsedSources& usedSources)
+      :  legacySourceBits(legacySourceBits),
         usedSources(usedSources) {
   }
 
   // move components
   SourceCompatibilityData(
     LegacySourceBits&& legacySourceBits, UsedSources&& usedSources)
-      : legacySourceBits(std::move(legacySourceBits)),
+      :  legacySourceBits(std::move(legacySourceBits)),
         usedSources(std::move(usedSources)) {
   }
 
@@ -265,8 +264,9 @@ struct SourceCompatibilityData {
 
   constexpr auto isAndCompatibleWith(
     const SourceCompatibilityData& other, bool check_variations = true) const {
-    if (!legacySourceBits.is_subset_of(other.legacySourceBits))
+    if (!legacySourceBits.is_subset_of(other.legacySourceBits)) {
       return false;
+    }
     return usedSources.isAndCompatibleWith(other.usedSources, check_variations);
   }
 
@@ -292,6 +292,7 @@ struct SourceCompatibilityData {
 
   void addSource(int src) {
     if (cm::Source::isLegacy(src)) {
+      assert(0 && "add legacy");
       assert(!legacySourceBits.test(src));
       legacySourceBits.set(src);
     } else {
@@ -329,6 +330,7 @@ struct SourceCompatibilityData {
       }
     }
     usedSources.dump(device);
+    /*
     if (device) {
       printf("legacy sources:");
     } else {
@@ -352,6 +354,7 @@ struct SourceCompatibilityData {
         std::cout << " none";
       }
     }
+    */
     if (device) {
       printf("\n");
     } else {
@@ -368,8 +371,9 @@ struct SourceCompatibilityData {
 };  // SourceCompatibilityData
 
 using SourceCompatibilityList = std::vector<SourceCompatibilityData>;
-using SourceCompatibilityDataCRef = std::reference_wrapper<const SourceCompatibilityData>;
-using SourceCompatibilityCRefList = std::vector<SourceCompatibilityDataCRef>;
+using SourceCompatibilityDataCRef = std::reference_wrapper<const
+SourceCompatibilityData>; using SourceCompatibilityCRefList =
+std::vector<SourceCompatibilityDataCRef>;
 
 struct NameCount;
 using NameCountList = std::vector<NameCount>;
@@ -483,7 +487,8 @@ struct SourceData : SourceCompatibilityData {
     LegacySourceBits&& legacySourceBits, UsedSources&& usedSources,
     NameCountList&& ncList)
       : SourceCompatibilityData(
-        std::move(legacySourceBits), std::move(usedSources)),
+        std::move(legacySourceBits),
+        std::move(usedSources)),
         primaryNameSrcList(std::move(primaryNameSrcList)),
         ncList(std::move(ncList)) {
   }
@@ -500,12 +505,14 @@ struct SourceData : SourceCompatibilityData {
 
 /*
 struct SourceData : SourceBase {
-  //std::vector<std::string> sourceNcCsvList; // TODO: I don't think this is even used anymore
+  //std::vector<std::string> sourceNcCsvList; // TODO: I don't think this is
+even used anymore
   // synonymCounts
 
   SourceData() = default;
   SourceData(NameCountList&& primaryNameSrcList, SourceBits&& primarySrcBits,
-      UsedSources&& usedSources, NameCountList&& ncList): //, std::vector<std::string>&& sourceNcCsvList) :
+      UsedSources&& usedSources, NameCountList&& ncList): //,
+std::vector<std::string>&& sourceNcCsvList) :
     SourceBase(std::move(primaryNameSrcList), std::move(primarySrcBits),
       std::move(usedSources), std::move(ncList))
       //,sourceNcCsvList(std::move(sourceNcCsvList))
@@ -518,18 +525,18 @@ struct SourceData : SourceBase {
 };
 */
 
-using SourceList = std::vector<SourceData>;
-using SourceListMap = std::unordered_map<std::string, SourceList>;
-using SourceCRef = std::reference_wrapper<const SourceData>;
-using SourceCRefList = std::vector<SourceCRef>;
+    using SourceList = std::vector<SourceData>;
+    using SourceListMap = std::unordered_map<std::string, SourceList>;
+    using SourceCRef = std::reference_wrapper<const SourceData>;
+    using SourceCRefList = std::vector<SourceCRef>;
 
-using XorSource = SourceData;
-using XorSourceList = std::vector<XorSource>;
+    using XorSource = SourceData;
+    using XorSourceList = std::vector<XorSource>;
 
-struct OrSourceData {
-  SourceCompatibilityData source;
-  bool xorCompatible = false;
-  bool andCompatible = false;
+    struct OrSourceData {
+      SourceCompatibilityData source;
+      bool xorCompatible = false;
+      bool andCompatible = false;
 };
 using OrSourceList = std::vector<OrSourceData>;
 
@@ -606,7 +613,7 @@ struct MergedSources : SourceCompatibilityData {
 
   // copy from SourceData
   MergedSources(const SourceData& source)
-      : SourceCompatibilityData(source.legacySourceBits, source.usedSources),
+    : SourceCompatibilityData(source.legacySourceBits, source.usedSources),
         sourceCRefList(SourceCRefList{SourceCRef{source}}) {
   }
 
@@ -690,7 +697,7 @@ struct equal_to<cm::UsedSources> {
     const cm::UsedSources& rhs) const noexcept
   {
     if (lhs.getBits() != rhs.getBits()) return false;
-    for (auto i = 0u; i < lhs.variations.size(); ++i) {
+    for (size_t i{}; i < lhs.variations.size(); ++i) {
       if (lhs.variations[i] != rhs.variations[i]) return false;
     }
     return true;

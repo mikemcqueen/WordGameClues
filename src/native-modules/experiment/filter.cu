@@ -133,9 +133,9 @@ __device__ bool is_source_xor_or_compatible(
     store(&is_xor_compat, false);
     store(&is_or_compat, false);
   }
-  // NOTE: chunk-indexing in the manner used here is necessary for syncthreads()
-  //   to work, at least on SM_6 hardware (GTX1060), where *all threads* in the
-  //   block must execute the synchthreads() call. In later architectures, those
+  // NOTE: chunk-indexing as used here is necessary for syncthreads() to work
+  //   at least on SM_6 hardware (GTX1060), where *all threads* in the block
+  //   must execute the synchthreads() call. In later architectures, those
   //   restrictions may be relaxed, but possibly only for "completely exited
   //   (the kernel)" threads, which wouldn't be relevant here anyway (because
   //   we're in a function called from within a loop in a parent kernel).

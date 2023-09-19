@@ -1,12 +1,14 @@
 //
 // show-components.js
 //
+// "-t" support.
+//
+// Lots of dead unused code in here, generally a mess.
+//
 
 'use strict';
 
 import _ from 'lodash'; // import statement to signal that we are a "module"
-
-//const Validator   = require('../dist/modules/validator');
 
 const Assert      = require('assert');
 const Debug       = require('debug')('show-components');
@@ -35,103 +37,6 @@ function Stringify (val) {
     }, " ");
 }
 
-//
-// TODO: not actually using nameList here except for output? i guess that's ok?
-function getSourceClues (source, countList, nameList) {
-//    console.log(`getSourceClues source: ${source}, countList: [${countList}], nameList: [${nameList}]`);
-
-    const count = countList.reduce((sum, count) => sum + count, 0);
-    const srcMap = ClueManager.getKnownSourceMap(count);
-    const results = srcMap[source] ? srcMap[source].results : undefined; // TODO: ?.results
-    if (!results) {
-        let sourceList = source.split(',');
-        let s = '';
-        sourceList.forEach((source, index) => {
-            //
-            // 1. this code is so hard to understand i think it was written by an stoned autistic retard
-            // 2. [source] is wrong at least for primary clue case, need actual list of sources.
-            //
-            s += getClueSources(source, countList[index], [source]);
-            console.error(s);
-        });
-        console.error('---');
-        return s;
-        // for each name in namelist, get propertyCount(s) of knownSrcMap[count][source]
-    }
-    return `${nameList.join(' - ')}`;
-}
-
-//
-//
-function getClueSources (name, count, nameList) {
-    const srcMap = ClueManager.getKnownSourceMap(count);
-    return nameList.map(source => {
-        /*
-        if (count === 1) {
-            const clue = _.find(ClueManager.getClueList(count), { name, src: source });
-            const counts = clue.propertyCounts.synonym;
-            source += ` : syn total(${counts.total}) primary(${counts.primary})`;
-        } else {
-            const results = srcMap[source].results;
-            const countsList = results.map(result =>
-                ClueManager.recursiveGetCluePropertyCount({ name, count }, result.resultMap.internal_map,
-                                                          Clue.PropertyName.Synonym));
-            // TODO: duplicated in getSourceClues
-            const totals = countsList.map(tp => tp.total);
-            const primarys = countsList.map(tp => tp.primary);
-            source += ` : syn total(${totals}) primary(${primarys})`;
-        }
-        */
-        return source;
-    }).join(' - ');
-}
-
-// this is really challenging to understand without types.
-//
-function showCountListArray (name, countListArray, text, hasNameList = false) {
-    for (const elem of countListArray) {
-        const countList = hasNameList ? elem.countList : elem;
-        let sources = '';
-        if (name) {
-            if (countList.length > 1) {
-                // -t name1,name2[,name3,...] (multiple names; name == nameCsv here)
-                sources += getSourceClues(name, countList, elem.nameList); // 
-            } else {
-                // -t name (one name only)
-                sources += getClueSources(name, countList[0], elem.nameList);
-            }
-        }
-        console.log(`${countList} ${text} ${sources}`);
-    }
-}
-
-const showXorResults = (xorResults: PreCompute.XorSourceList, options: any): void => {
-    let hash = {};
-    for (let xorResult of xorResults) {
-        /*
-        if (options.verbose) {
-            console.log(`${NameCount.listToString(xorResult.ncList)}:` +
-                ` ${NameCount.listToString(xorResult.primaryNameSrcList)}`);
-            continue;
-        }
-        */
-        const nameCsv = NameCount.listToNameList(xorResult.ncList).toString();
-        const countCsv = NameCount.listToCountList(xorResult.ncList).toString();
-        if (!_.has(hash, countCsv)) {
-            hash[countCsv] = new Set<string>();
-        }
-        let set = hash[countCsv];
-        if (!set.has(nameCsv)) {
-            console.error(`hash: adding ${nameCsv}`);
-            set.add(nameCsv);
-        }
-    }
-    //if (options.verbose) return;
-    for (let key of Object.keys(hash)) {
-        console.log(`${key} PRESENT as ${[...hash[key].values()].join(' - ')}`);
-    }
-}
-
 const getCountListArrays = (nameList: string[], pcResult: PreCompute.Result,
     options: any): any =>
 {
@@ -146,10 +51,6 @@ const getCountListArrays = (nameList: string[], pcResult: PreCompute.Result,
     let nameListStr: string = nameList.toString();
     let hash = {};
 
-    // TODO: might be able to get this to work if i can pass a flag to precompute to
-    // conditionally return xorsources, which may work for show-components use case.
-    // maybe.
-    //Assert(!"show components broken atm");
     for (const xorSource of pcResult.data!.xor) {
         const countList = NameCount.listToCountList(xorSource.ncList);
         // for --verbose, we could allow this:
@@ -217,6 +118,73 @@ const getCountListArrays = (nameList: string[], pcResult: PreCompute.Result,
     return { valid, known, invalid, clues, addRemoveSet };
 };
 
+function getClueSources (nameList) {
+    return nameList.join(' - ');
+}
+
+function getSourceClues (source, countList, nameList) {
+    const count = countList.reduce((sum, count) => sum + count, 0);
+    const srcMap = ClueManager.getKnownSourceMap(count);
+    const results = srcMap[source] ? srcMap[source].results : undefined; // TODO: ?.results
+    if (!results) {
+        let sourceList = source.split(',');
+        let s = '';
+        sourceList.forEach((source, index) => {
+            // [source] is wrong at least for primary clue case, need actual list of sources.
+            s += getClueSources([source]);
+            console.error(s);
+        });
+        console.error('---');
+        return s;
+    }
+    return getClueSources(nameList);
+}
+
+function showCountListArray (name, countListArray, text, hasNameList = false) {
+    for (const elem of countListArray) {
+        const countList = hasNameList ? elem.countList : elem;
+        let sources = '';
+        if (name) {
+            if (countList.length > 1) {
+                // -t name1,name2[,name3,...] (multiple names; name == nameCsv here)
+                sources += getSourceClues(name, countList, elem.nameList); // 
+            } else {
+                // -t name (one name only)
+                sources += getClueSources(elem.nameList);
+            }
+        }
+        console.log(`${countList} ${text} ${sources}`);
+    }
+}
+
+const showCountLists = (nameList: string[], result: any, options: any): any => {
+    //showCountListArray(null, result.rejects, 'REJECTED');
+    showCountListArray(null, result.invalid, 'INVALID');
+    showCountListArray(nameList.toString(), result.known, 'PRESENT as', true);
+    showCountListArray(nameList.toString(), result.clues, 'PRESENT as clue with source:', true);
+    showCountListArray(null, result.valid, 'VALID');
+
+    // TODO: extract this to helper function, maybe in clue-manager
+    // NOTE: explicit undefined check here is necessary
+    const save = _.isUndefined(options.save) ? true : options.save;
+    // good lord this function call is something else
+    const count = ClueManager.addRemoveOrReject({
+        add:      options.add,
+        remove:   options.remove,
+        property: options.property,
+        reject:   options.reject,
+        isKnown:  !_.isEmpty(result.known),
+        isReject: !_.isEmpty(result.reject)
+    }, nameList, result.addRemoveSet, {
+        save,
+        max: options.max ? Number(options.max) : 0
+    });
+    if (options.add || options.remove) {
+        console.log(`${options.add ? "added" : "removed"} ${count} clues`);
+    }
+    return Object.assign(result, { added: count });
+};
+
 const show = (options: any): any => {
     Expect(options).is.an.Object();
     Expect(options.test).is.a.String();
@@ -265,34 +233,6 @@ const slow_show = (nameList: string[], options: any) => {
         return null;
     }
     return showCountLists(nameList, result, options);
-};
-
-const showCountLists = (nameList: string[], result: any, options: any): any => {
-    //showCountListArray(null, result.rejects, 'REJECTED');
-    showCountListArray(null, result.invalid, 'INVALID');
-    showCountListArray(nameList.toString(), result.known, 'PRESENT as', true);
-    showCountListArray(nameList.toString(), result.clues, 'PRESENT as clue with source:', true);
-    showCountListArray(null, result.valid, 'VALID');
-
-    // TODO: extract this to helper function, maybe in clue-manager
-    // NOTE: explicit undefined check here is necessary
-    const save = _.isUndefined(options.save) ? true : options.save;
-    // good lord this function call is something else
-    const count = ClueManager.addRemoveOrReject({
-        add:      options.add,
-        remove:   options.remove,
-        property: options.property,
-        reject:   options.reject,
-        isKnown:  !_.isEmpty(result.known),
-        isReject: !_.isEmpty(result.reject)
-    }, nameList, result.addRemoveSet, {
-        save,
-        max: options.max ? Number(options.max) : 0
-    });
-    if (options.add || options.remove) {
-        console.log(`${options.add ? "added" : "removed"} ${count} clues`);
-    }
-    return Object.assign(result, { added: count });
 };
 
 function addOrRemove (args, nameList, countSet, options) {

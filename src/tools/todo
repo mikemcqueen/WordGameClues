@@ -1,3 +1,12 @@
+* why isn't nameListMap printed for sentence9
+
+* TWO things:
+  * synonyms need to be global. probably all of them. global hash map.
+    this will reduce load time and merge time. not 100% sure how to go about
+    implementing thouhg. but should figure it out.
+  * does host_merge actually need primaryNameSrcList, ncList anymore?
+    probably yes for the -t case? maybe no for -c case.
+
 * can i build the knownNcSourceListMap during loadClues?
 
 * no --xor == no filter call?  it's crashing due to empty xor data probably

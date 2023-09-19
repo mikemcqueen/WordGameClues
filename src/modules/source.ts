@@ -21,6 +21,9 @@ import * as Sentence from '../types/sentence';
 
 import { ValidateResult } from './validator';
 
+const kNumSentences = 9;
+const kMaxSourcesPerSentence = 32;
+
 //////////
 
 interface Base {
@@ -28,8 +31,11 @@ interface Base {
     ncList: NameCount.List;
 }
 
-type UsedSourceSet = Set<number>;
-export type UsedSources = UsedSourceSet[];
+type Variations = Int16Array;
+export interface UsedSources {
+    bits: CountBits.Type;
+    variations: Variations;
+}
 
 export interface CompatibilityData {
 //    sourceBits: CountBits.Type;
@@ -50,6 +56,17 @@ export interface ListContainer {
 
 //////////
 
+export const emptyUsedSources = (): UsedSources => {
+    let usedSources: UsedSources = {
+        bits: CountBits.makeNew(),
+        variations: new Int16Array(kNumSentences)
+    };
+    for (let i = 0; i < kNumSentences; ++i) {
+        usedSources.variations[i] = -1;
+    }
+    return usedSources;
+}
+
 export const isCandidate = (src: number): boolean => {
     return src >= 1_000_000;
 };
@@ -59,48 +76,72 @@ export const getCandidateSentence = (src: number): number => {
     return Math.floor(src / 1_000_000);
 };
 
+/*
 const getCandidateSource = (src: number): number => {
     Assert(isCandidate(src));
     return src % 1_000_000;
 }
+*/
 
-const getVariation = (src: number): number => {
-    // no isCandidate check, since this is (could be) already the % 1_000_00 value
+const getCandidateVariation = (src: number): number => {
+    // no isCandidate check, since this is (could be) already the % 1_000_000 value
     return Math.floor((src % 1_000_000) / 100);
 }
 
-export const isXorCompatible = (first: CompatibilityData,
-    second: CompatibilityData): boolean =>
-{
-    // compare legacy source bits
+const getIndex = (src: number): number => {
+    // no isCandidate check, since this is (could be) already the % 1_000_000 value
+    return Math.floor((src % 1_000_000) % 100);
+}
+
+const getFirstBitIndex = (sentence: number): number => {
+    Assert(sentence > 0);
+    return (sentence - 1) * kMaxSourcesPerSentence;
+}
+
 /*
-    if (CountBits.intersects(first.sourceBits, second.sourceBits)) {
-	return false;
+  constexpr static auto allVariationsMatch(
+    const Variations& v1, const Variations& v2) {
+    for (size_t i{}; i < v1.size(); ++i) {
+      if ((v1[i] > -1) && (v2[i] > -1) && (v1[i] != v2[i])) {
+        return false;
+      }
     }
+    return true;
+  }
 */
-    // compare sentence-based sources
-    for (let i = 1; i < 10 /* cough */; ++i) {
-        // i.e. "if there are no sentence-based sources"
-	if ((first.usedSources[i] === undefined) ||
-	    (second.usedSources[i] === undefined))
-	{
-	    continue; // one or both undefined, is compatible
-	}
-        // magickk extract first element from a set
-	const [firstElem] = first.usedSources[i];
-	const [secondElem] = second.usedSources[i];
-	if (getVariation(firstElem) !== getVariation(secondElem)) {
-	    return false; // variation incompatibility
-	}
-        // Not using CountBits here because the impact of the optimzation is
-        // relatively small. At the time of this comment all the JS code
-        // accounts for 18s out of 18m for .xor.req.
-        // (code is *a* *lot* faster now, this is worth taking another a look at)
-	for (let firstSrc of first.usedSources[i]) {
-	    if (second.usedSources[i].has(firstSrc)) {
-		return false; // index incompatibility
-	    }
-	}
+
+const allVariationsMatch = (v1: Variations, v2: Variations): boolean => {
+    for (let i = 0; i < v1.length; ++i) {
+      if ((v1[i] > -1) && (v2[i] > -1) && (v1[i] != v2[i])) {
+        return false;
+      }
+    }
+    return true;
+}
+
+/*
+  constexpr auto isXorCompatibleWith(
+    const UsedSources& other, bool check_variations = true) const {
+    // compare bits
+    if (getBits().intersects(other.getBits()))
+      return false;
+    // compare variations
+    if (check_variations && !allVariationsMatch(variations, other.variations))
+      return false;
+    return true;
+  }
+*/
+
+export const isXorCompatible = (first: CompatibilityData,
+    second: CompatibilityData, check_variations: boolean = true): boolean =>
+{
+    if (CountBits.intersects(first.usedSources.bits, second.usedSources.bits)) {
+        return false;
+    }
+    if (check_variations &&
+        !allVariationsMatch(first.usedSources.variations, second.usedSources.variations))
+    {
+        return false;
     }
     return true;
 }
@@ -118,114 +159,143 @@ export const isXorCompatibleWithAnySource = (source: CompatibilityData,
 
 //////////
 
-// return false if source is incompatible, true otherwise
+/*
+  void addSource(int src) {
+    auto sentence = Source::getSentence(src);
+    assert(sentence > 0);
+    auto variation = Source::getVariation(src);
+    if (hasVariation(sentence) && (getVariation(sentence) != variation)) {
+      std::cerr << "variation(" << sentence << "), this: "
+                << getVariation(sentence) << ", src: " << variation
+                << std::endl;
+      assert(false && "addSource() variation mismatch");
+    }
+    assert(Source::getIndex(src) < kMaxSourcesPerSentence);
+
+    // variation
+    setVariation(sentence, variation);
+
+    // bits
+    auto bit_pos = Source::getIndex(src) + getFirstBitIndex(sentence);
+    assert(!bits.test(bit_pos));
+    bits.set(bit_pos);
+}
+*/
+
+const getVariation = (usedSources: UsedSources, sentence: number): number => {
+    return usedSources.variations[sentence - 1];
+}
+
+const hasVariation = (usedSources: UsedSources, sentence: number): boolean => {
+    return getVariation(usedSources, sentence) > -1;
+}
+
+const setVariation = (usedSources: UsedSources, sentence: number, variation: number): void => {
+    usedSources.variations[sentence - 1] = variation;
+}
+
+// if source is incompatible, throw execption, or return false if nothrow is true.
+// return true if compatible
 export const addUsedSource = (usedSources: UsedSources, src: number, nothrow = false):
     boolean =>
 {
-    if (!isCandidate(src)) return true;
     const sentence = getCandidateSentence(src);
-    if (usedSources[sentence] === undefined) {
-	usedSources[sentence] = new Set<number>();
+    const variation = getCandidateVariation(src);
+    if (hasVariation(usedSources, sentence) && (getVariation(usedSources, sentence) !== variation)) {
+        if (nothrow) return false;
+        console.error(`variation(${sentence}), this: ${getVariation(usedSources, sentence)}` +
+            `, src: ${variation}`);
+        Assert(!"variation mismatch");
     }
-    let set = usedSources[sentence];
-    const source = getCandidateSource(src);
-    // defensive incompatible variation index check
-    if (set.size) {
-	// trick to get first elem from set.
-	const [anyElem] = set;
-	if (getVariation(anyElem) !== getVariation(source)) {
-            if (nothrow) return false;
-	    console.error(`oopsie ${anyElem} (${getVariation(anyElem)})` +
-		`, ${source} (${getVariation(source)})`);
-	    throw new Error(`oopsie`);
-	}
-	if (set.has(source)) {
-	    if (nothrow) return false;
-	    console.error(`poopsie ${source}, [${[...set]}]`);
-	    throw new Error(`poopsie`);
-	}
+    const index = getIndex(src);
+    Assert(index < kMaxSourcesPerSentence);
+    
+    setVariation(usedSources, sentence, variation);
+
+    const bit_pos = index + getFirstBitIndex(sentence);
+    if (CountBits.test(usedSources.bits, bit_pos)) {
+        if (nothrow) return false;
+        Assert(!"incompatible bits");
     }
-    set.add(source);
+    CountBits.set(usedSources.bits, bit_pos);
     return true;
 }
 
 export const getUsedSources = (nameSrcList: NameCount.List):
     UsedSources =>
 {
-    let result: UsedSources = [];
-    nameSrcList.filter(nameSrc => isCandidate(nameSrc.count))
-	.forEach(nameSrc => addUsedSource(result, nameSrc.count));
+    let result: UsedSources = emptyUsedSources();
+    nameSrcList.forEach(nameSrc => addUsedSource(result, nameSrc.count));
     return result;
 }
 
-const addAll = (set: Set<number>, values: number[]): void => {
-    for (let value of values) {
-        set.add(value);
-    }
-}
-
+/* UNUSED i think
 export const cloneUsedSources = (from: UsedSources): UsedSources => {
-    let result: UsedSources = [];
-    for (let i = 1; i < 10 /* cough */; ++i) {
+    let result: UsedSources = emptyUsedSources();
+    for (let i = 1; i < 10; ++i) {
 	if (from[i] !== undefined) {
 	    result[i] = new Set<number>(from[i]);
         }
     }
     return result;
 }
+*/
+
+/*
+  void addVariations(const UsedSources& other) {
+    for (int sentence{ 1 }; sentence <= kNumSentences; ++sentence) {
+      if (!other.hasVariation(sentence)) continue;
+      // ensure variations for this sentence are compatible
+      if (hasVariation(sentence)) {
+        assert(getVariation(sentence) == other.getVariation(sentence));
+      } else {
+        setVariation(sentence, other.getVariation(sentence));
+      }
+    }
+  }
+*/
+
+const addVariations = (to: UsedSources, from: UsedSources): void => {
+    for (let sentence = 1; sentence <= kNumSentences; ++sentence) {
+        if (!hasVariation(from, sentence)) continue;
+        if (hasVariation(to, sentence)) {
+            Assert(getVariation(to, sentence) == getVariation(from, sentence));
+        } else {
+            setVariation(to, sentence, getVariation(from, sentence));
+        }
+    }
+}
 
 export const mergeUsedSourcesInPlace = (to: UsedSources, from: UsedSources):
     void =>
 {
-    for (let i = 1; i < 10 /* cough */; ++i) {
-	const to_undef = to[i] === undefined;
-        const from_undef = from[i] === undefined;
-        if (to_undef && from_undef) continue;
-        if (to_undef) {
-            to[i] = new Set<number>();
-        }
-        const to_size = to[i].size;
-        if (!from_undef) {
-            addAll(to[i], [...from[i]]);
-        }
-        Assert(to[i].size === (to_size + (from[i]?.size || 0)));
-    }
+    // merge bits
+    CountBits.orInPlace(to.bits, from.bits);
+    // merge variations
+    addVariations(to, from);
 }
 
 export const mergeUsedSources = (first: UsedSources, second: UsedSources):
     UsedSources =>
 {
-    let result: UsedSources = [];
-    for (let i = 1; i < 10 /* cough */; ++i) {
-	if ((first[i] === undefined) && (second[i] === undefined)) continue;
-	const firstValues = (first[i] !== undefined) ? [...first[i]] : [];
-	const secondValues = (second[i] !== undefined) ? [...second[i]] : [];
-	//result[i] = new Set([...firstValues, ...secondValues]);
-	let set = new Set<number>();
-        addAll(set, firstValues)
-        addAll(set, secondValues);
-        result[i] = set;
-        if (result[i].size !== ((first[i]?.size || 0) + (second[i]?.size || 0))) {
-            console.error(`result[${i}]: ${result[i].size} != ${first[i]?.size || 0} + ${second[i]?.size || 0}`);
-            console.error(`  first: [${firstValues}], second: [${secondValues}]`);
-            Assert(false);
-        }
-    }
+    let result: UsedSources = emptyUsedSources();
+    mergeUsedSourcesInPlace(result, first);
+    mergeUsedSourcesInPlace(result, second);
     return result;
 }
 
 export const makeData = (nc: NameCount.Type, validateResult: ValidateResult):
     Data =>
 {
-    Assert(/*validateResult.sourceBits && */validateResult.usedSources,
-        `makeData(): ${NameCount.toString(nc)}`);
+/*
+    Assert(validateResult.usedSources, `makeData(): ${NameCount.toString(nc)}`);
     Assert(NameCount.listHasCompatibleSources(validateResult.nameSrcList),
         `makeData(): ${NameCount.toString(nc)}`);
+*/
     return {
 	primaryNameSrcList: validateResult.nameSrcList,
-	//sourceBits: validateResult.sourceBits,
-	//usedSources: validateResult.usedSources, //TODO?
-	usedSources: getUsedSources(validateResult.nameSrcList),
-        ncList: [nc]
+        ncList: [nc],
+	usedSources: validateResult.usedSources
+	//usedSources: getUsedSources(validateResult.nameSrcList)
     };
 };

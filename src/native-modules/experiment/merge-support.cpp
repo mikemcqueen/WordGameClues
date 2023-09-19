@@ -73,7 +73,7 @@ std::vector<IndexList> get_compatible_indices(
   bool valid = filterAllXorIncompatibleIndices(idx_lists, src_lists);
   lengths.clear();
   for (const auto& il : idx_lists) {
-    lengths.push_back(std::distance(il.begin(), il.end())); // list_size(il));
+    lengths.push_back(std::distance(il.begin(), il.end()));
   }
   std::cerr << "  filtered lengths: " << vec_to_string(lengths)
             << ", product: " << multiply_with_overflow_check(lengths)
@@ -708,7 +708,14 @@ auto cuda_mergeCompatibleXorSourceCombinations(
     get_compat_matrices(src_lists, idx_lists), list_sizes);
 #endif
 
+  std::cerr << " starting host_merge..." << std::endl;
+  auto hm0 = high_resolution_clock::now();
   auto xorSourceList = host_merge(src_lists, idx_lists, combo_indices);
+  auto hm1 = high_resolution_clock::now();
+  auto hm_dur = duration_cast<milliseconds>(hm1 - hm0).count();
+  std::cerr << " host_merge complete (" << xorSourceList.size()
+            << ") - " << hm_dur << "ms" << std::endl;
+
   return xorSourceList;
 }
 
