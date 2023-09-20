@@ -1,88 +1,66 @@
 {
-  "targets": [{
-    "target_name": "experiment",
-    "cflags_cc": [ "-fPIC -std=c++20 -Wno-unused-function" ],
-    "cflags!": [ "-fno-exceptions" ],
-    "cflags_cc!": [ "-fno-exceptions" ],
-    "ldflags": [ "-Wl,-rpath,/usr/local/cuda/targets/x86_64-linux/lib" ],
-    "sources": [
-      "candidates.cpp",
-      "cm-precompute.cpp",
-      "filter-support.cpp",
-      "index.cpp",
-      "merge-support.cpp",
-      "wrap.cpp"
+  'targets': [{
+    'target_name': 'experiment',
+    'cflags_cc': [ '-fPIC -std=c++20 -Wno-unused-function' ],
+    'cflags!': [ '-fno-exceptions' ],
+    'cflags_cc!': [ '-fno-exceptions' ],
+    'ldflags': [ '-Wl,-rpath,/usr/local/cuda/targets/x86_64-linux/lib' ],
+    'sources': [
+      'candidates.cpp',
+      'cm-precompute.cpp',
+      'filter-support.cpp',
+      'index.cpp',
+      'merge-support.cpp',
+      'wrap.cpp'
     ],
-    "include_dirs": [
-      "<!@(node -p \"require('node-addon-api').include\")",
-      "/usr/local/cuda/include"
+    'include_dirs': [
+      '<!@(node -p \'require("node-addon-api").include\')',
+      '/usr/local/cuda/include'
     ],
-    "library_dirs": [
+    'library_dirs': [
       '/usr/local/cuda/lib64'
     ],
-    "libraries": [ '-lcudart', '-lcudadevrt' ],
-    "dependencies": [ "merge", "filter" ],
-    "defines": [ "NAPI_CPP_EXCEPTIONS" ]
+    'libraries': [ '-lcudart', '-lcudadevrt' ],
+    'dependencies': [ 'kernels' ],
+    'defines': [ 'NAPI_CPP_EXCEPTIONS' ]
   },
   {
-    "target_name": "filter",
-    "type": "static_library",
-    "sources": [ "filter.cu" ],
-    "include_dirs": [
+    'target_name': 'kernels',
+    'type': 'static_library',
+    'sources': [
+       'merge.cu',
+       'filter.cu'
     ],
-    "rules": [{
+    'rules': [{
       'extension': 'cu',           
       'inputs': [ '<(RULE_INPUT_PATH)' ],
-      'rule_name': 'cuda on linux',
-      'message': 'compile and device link cuda file on linux',
+      'rule_name': 'CUDA static lib',
+      'message': 'CUDA static lib',
       'outputs': [
-        '<(INTERMEDIATE_DIR)/<(RULE_INPUT_ROOT).o',
-        '<(INTERMEDIATE_DIR)/<(RULE_INPUT_ROOT)_link.o'
+        '<(SHARED_INTERMEDIATE_DIR)/<(RULE_INPUT_ROOT).o',
+        '<(SHARED_INTERMEDIATE_DIR)/<(RULE_INPUT_ROOT)_dlink.o'
        ],
       'process_outputs_as_sources': 1,
-      'action': [
-        'bash', 'nvcc.sh', '<@(_outputs)', '--expt-relaxed-constexpr',
-        '-Xcompiler', '-fPIC',
-        '-Xcompiler', '-Wall', '-Xcompiler', '-Wextra',
-        #'-Xcompiler', '-pedantic', #'-Werror', '-W' # shit i couldn't get working
-        '-Xcudafe', '--diag_suppress=declared_but_not_referenced',
-        '-O3', '-dopt=on',
-        '-Xptxas=-v',
-        #'-g', # debug
-        '-lineinfo',
-        #'-DCUDA_FORCE_CDP1_IF_SUPPORTED',
-        '-std=c++20', '-dc', '<@(_inputs)'
-      ]
-    }]
+      'action': []
+    }],
+    'dependencies': [ 'build_kernels' ]
   },
   {
-    "target_name": "merge",
-    "type": "static_library",
-    "sources": [ "merge.cu" ],
-    "include_dirs": [
+    'target_name': 'build_kernels',
+    'type': 'none',
+    'sources': [
+        'filter.cu',
+        'merge.cu'
     ],
-    "rules": [{
+    'rules': [{
       'extension': 'cu',           
       'inputs': [ '<(RULE_INPUT_PATH)' ],
-      'rule_name': 'cuda on linux',
-      'message': 'compile and device link cuda file on linux',
-      'outputs': [
-        '<(INTERMEDIATE_DIR)/<(RULE_INPUT_ROOT).o',
-        '<(INTERMEDIATE_DIR)/<(RULE_INPUT_ROOT)_link.o'
-       ],
-      'process_outputs_as_sources': 1,
+      'rule_name': 'compile CUDA on linux',
+      'message': 'compile and device link CUDA file on linux',
+      'outputs': [ '<(RULE_INPUT_ROOT)_dummy_output' ],
       'action': [
-        'bash', 'nvcc.sh', '<@(_outputs)', '--expt-relaxed-constexpr',
-        '-Xcompiler', '-fPIC',
-        '-Xcompiler', '-Wall', '-Xcompiler', '-Wextra',
-        #'-Xcompiler', '-pedantic', #'-Werror', '-W' # shit i couldn't get working
-        '-Xcudafe', '--diag_suppress=declared_but_not_referenced',
-        '-O3', '-dopt=on',
-        '-Xptxas=-v',
-        #'-g', # debug
-        '-lineinfo',
-        #'-DCUDA_FORCE_CDP1_IF_SUPPORTED',
-        '-std=c++20', '-dc', '<@(_inputs)'
+          'env', 'DIR=<(SHARED_INTERMEDIATE_DIR)', 'FILE=<(RULE_INPUT_ROOT)',
+          'make', '-f', 'kernel.mk'
       ]
     }]
   }]
