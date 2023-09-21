@@ -506,18 +506,23 @@ struct VariationIndices {
 
 struct PreComputedData {
   std::vector<SourceList> xor_src_lists;
-  std::vector<uint64_t> compat_xor_src_indices;
-  XorSourceList xorSourceList;
-  std::vector<int> xorSourceIndices;
-  SourceCompatibilityData* device_xorSources{nullptr};
-  OrArgList orArgList;
-  device::OrSourceData* device_or_sources{nullptr}; 
-  unsigned num_or_sources;  // # of device_or_sources
+  // TODO: need device_xor_src_lists + device_xor_src_list_start_indices
+  std::vector<uint64_t> compat_indices;
+  uint64_t* device_compat_indices;
+  unsigned num_compat_indices{};
+  //  XorSourceList xorSourceList;
+  //std::vector<int> xorSourceIndices;
+  //SourceCompatibilityData* device_xorSources{nullptr};
+  //OrArgList orArgList;
+  unsigned num_or_args{};
+  device::OrSourceData* device_or_sources{}; 
+  unsigned num_or_sources{};  // # of device_or_sources
   SourceListMap sourceListMap;
-  SentenceVariationIndices sentenceVariationIndices;
-  device::VariationIndices* device_sentenceVariationIndices{nullptr};
+  //  SentenceVariationIndices sentenceVariationIndices;
+  device::VariationIndices* device_variation_indices{};
+  unsigned num_nariation_indices{};
   // TODO: temporary until all clues are converted to sentences
-  index_t* device_xor_src_indices;
+  //  index_t* device_legacy_xor_src_indices;
 };
 
 struct MergedSources : SourceCompatibilityData {

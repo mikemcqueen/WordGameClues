@@ -209,7 +209,7 @@ const show = (options: any): any => {
         //       is called from so many places.
         const args = {
             xor: nameList,
-            xor_wrap: true, // wrap xorSources on return from c++ plugin
+            merge_only: true, // wrap xorSources on return from Native.merge()
             max: 2,
             quiet: options.quiet,
             ignoreErrors: options.ignoreErrors

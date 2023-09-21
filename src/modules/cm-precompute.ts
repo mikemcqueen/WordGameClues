@@ -423,9 +423,14 @@ const buildUseSourceListsFromNcData = (sourceListMap: Map<string,
     // XOR first
     const xorSources: Source.List = NativeComboMaker.mergeCompatibleXorSourceCombinations(
         args.allXorNcDataLists, Array.from(sourceListMap.entries()),
-        args.xor_wrap || false);
+        args.merge_only || false);
+    if (listIsEmpty(xorSources) || args.merge_only) {
+        return xorSources;
+    }
+    //**
+    // Everything below is only for filter use case (-c and not -t).
+    //**
     args.allXorNcDataLists = undefined;
-
     // OR next
     let or0 = new Date();
     let orArgDataList = buildOrArgDataList(buildSourceListsForUseNcData(
@@ -449,7 +454,7 @@ const buildUseSourceListsFromNcData = (sourceListMap: Map<string,
     let mark_dur = new Duration(mark0, new Date()).milliseconds;
     console.error(` mark - ${PrettyMs(mark_dur)}`);
     */
-    NativeComboMaker.setOrArgDataList(orArgDataList);
+    NativeComboMaker.filterPreparation(orArgDataList);
     return xorSources;
 };
 
@@ -476,8 +481,8 @@ export const preCompute = (first: number, last: number, args: any): Result => {
     const build3 = new Date();
     const xorSources = buildUseSourceListsFromNcData(sourceListMap, args);
     const d3 = new Duration(build3, new Date()).milliseconds;
-    // TODO: sizes
-    //if (args.xor && listIsEmpty(useSourceLists.xor)) return { success: false };
+    // TODO: sizes?
+    if (args.xor && listIsEmpty(xorSources)) return { success: false };
 
     const d = new Duration(begin, new Date()).milliseconds;
     console.error(`--Precompute - ${PrettyMs(d)}`);

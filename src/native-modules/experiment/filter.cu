@@ -312,6 +312,7 @@ auto flat_index(
   return flat + src_idx.index;
 }
 
+#if 0
 void check(
   const SourceCompatibilityLists& sources, index_t list_index, index_t index) {
   constexpr const auto logging = true;
@@ -338,6 +339,7 @@ void dump_xor(int index) {
   snprintf(buf, sizeof(buf), "xor: device(%d) host(%d)", index, host_index);
   src.dump(buf);
 }
+#endif
 
 }  // namespace
 
@@ -354,9 +356,9 @@ void run_xor_kernel(StreamData& stream, int threads_per_block,
   auto blocks_per_sm = threads_per_sm / block_size;
   // assert(blocks_per_sm * block_size == threads_per_sm);
   auto grid_size = num_sm * blocks_per_sm;  // aka blocks per grid
-  auto shared_bytes = PCD.orArgList.size() * sizeof(result_t);
+  auto shared_bytes = PCD.num_or_args * sizeof(result_t);
   // enforce assumption in is_source_or_compatible()
-  assert(PCD.orArgList.size() < block_size);
+  assert(PCD.num_or_args < block_size);
 
   stream.is_running = true;
   stream.sequence_num = StreamData::next_sequence_num();
@@ -370,10 +372,12 @@ void run_xor_kernel(StreamData& stream, int threads_per_block,
     assert((err == cudaSuccess) && "sync before kernel");
   }
   xor_kernel_new<<<grid_dim, block_dim, shared_bytes, stream.cuda_stream>>>(
-    device_sources, stream.source_indices.size(), PCD.device_xorSources,
-    PCD.xorSourceList.size(), PCD.device_xor_src_indices,
-    PCD.device_sentenceVariationIndices, PCD.orArgList.size(),
-    PCD.device_or_sources, PCD.num_or_sources, stream.device_source_indices,
+    device_sources, stream.source_indices.size(),
+    nullptr, // PCD.device_xorSources,
+    1,  // PCD.xorSourceList.size(),
+    nullptr, // PCD.device_legacy_xor_src_indices,
+    PCD.device_variation_indices, PCD.num_or_args,
+     PCD.device_or_sources, PCD.num_or_sources, stream.device_source_indices,
     device_list_start_indices, device_results, stream.stream_idx);
 
 #if defined(LOGGING)

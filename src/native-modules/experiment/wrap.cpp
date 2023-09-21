@@ -52,7 +52,7 @@ Array wrap(Env& env, const XorSourceList& xorSourceList) {
 
   auto t1 = high_resolution_clock::now();
   auto d_wrap = duration_cast<milliseconds>(t1 - t0).count();
-  std::cerr << " done(" << cm::PCD.xorSourceList.size() << ")"
+  std::cerr << " done(" << xorSourceList.size() << ")"
             << " - " << d_wrap << "ms" << std::endl;
 
   return jsList;

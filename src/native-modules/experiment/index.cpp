@@ -273,7 +273,9 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   auto ncDataLists = makeNcDataLists(env, info[0].As<Array>());
   PCD.sourceListMap =
     std::move(makeSourceListMap(env, info[1].As<Array>()));
-  auto xor_wrap = info[2].As<Boolean>();
+  // merge_only means "-t" mode, in which case no filter kernel will be called,
+  // so we don't need to do additional work/copy additional device data
+  auto merge_only = info[2].As<Boolean>();
 
   auto unwrap1 = high_resolution_clock::now();
   [[maybe_unused]] auto d_unwrap = 
@@ -284,6 +286,7 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
     
   auto build0 = high_resolution_clock::now();
 
+  // TODO: I'm not convinced this data to hang around on host side.
   PCD.xor_src_lists =
     std::move(buildSourceListsForUseNcData(ncDataLists, PCD.sourceListMap));
 
@@ -298,69 +301,101 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   }
 #endif
 
-  if (PCD.xor_src_lists.size() > 1) {
+  XorSourceList merge_only_xor_src_list;
+  if (!merge_only || (PCD.xor_src_lists.size() > 1)) {
+    // TODO: support for single-list compat indices
     auto idx_lists = get_compatible_indices(PCD.xor_src_lists);
     if (!idx_lists.empty()) {
-      PCD.compat_xor_src_indices = std::move(
-        cuda_get_compat_xor_src_indices(PCD.xor_src_lists, idx_lists));
-      // TODO: there is a potential failure case here probably
-      PCD.xorSourceList = std::move(merge_xor_sources(
-        PCD.xor_src_lists, idx_lists, PCD.compat_xor_src_indices));
-#if 0
-        assert_valid(PCD.xorSourceList);
-#endif
+      auto compat_indices =
+        cuda_get_compat_xor_src_indices(PCD.xor_src_lists, idx_lists);
+      assert(idx_lists.size() == compat_indices.size());
+      if (merge_only) {
+        // merge-only with multiple xor args uses compat indices for the sole
+        // purpose of generating an xor_src_list.
+        merge_only_xor_src_list = std::move(
+          merge_xor_sources(PCD.xor_src_lists, idx_lists, compat_indices));
+      } else {
+        // filter will copy compat indices to device memory in a subsequent
+        // call, though it *could* be done here to save a bit of host memory.
+        PCD.compat_indices = std::move(compat_indices);
+      }
+    }
+    if (!merge_only) {
+      // filter returns number of compatible indices
+      return Number::New(env, idx_lists.size());
     }
   } else if (PCD.xor_src_lists.size() == 1) {
-    PCD.xorSourceList = std::move(PCD.xor_src_lists.back());
+    merge_only_xor_src_list = std::move(PCD.xor_src_lists.back());
   }
+  // merge-only returns xor_src_lsit
+  return wrap(env, merge_only_xor_src_list);
+}
 
-  if (!PCD.xorSourceList.empty()) {
-    //-- device xor sources
+void prepare_filter_indices() {
+  using namespace std::chrono;
+  assert(!PCD.compat_indices.empty());
 
-    auto xs0 = high_resolution_clock::now();
+  auto svi0 = high_resolution_clock::now();
 
-    // TODO: probably need to copy idx_lists to device memory instead
-    PCD.device_xorSources = cuda_allocCopyXorSources(PCD.xorSourceList);
+#if TODO
+   PCD.device_compat_indices =
+    std::move(cuda_alloc_copy_compat_indices(PCD.compat_indices));
+     PCD.compat_indices = PCD.compat_indices.size();
+#endif
 
-    auto xs1 = high_resolution_clock::now();
-    auto d_xs = duration_cast<milliseconds>(xs1 - xs0).count();
-    std::cerr << " copy xor sources to device (" << PCD.xorSourceList.size()
-              << ") - " << d_xs << "ms" << std::endl;
+  // for if/when i want to sort xor sources, which is probably a dumb idea.
+  /*
+  auto xorSourceIndices = []() {
+    IndexList v;
+    v.resize(PCD.xorSourceList.size());
+    iota(v.begin(), v.end(), (index_t)0);
+    return v;
+  }();
+  */
+#if TODO
+  auto variation_indices = buildSentenceVariationIndices(PCD.xorSourceList);
+  PCD.device_variation_indices =
+    cuda_allocCopySentenceVariationIndices(variation_indices);
+#endif
 
-    //-- device sentence variation indices
+  // TODO: temporary until all clues are converted to sentences
+  // PCD.device_legacy_xor_src_indices =
+  //    cuda_allocCopyXorSourceIndices(xorSourceIndices);
 
-    auto svi0 = high_resolution_clock::now();
+  auto svi1 = high_resolution_clock::now();
+  auto d_svi = duration_cast<milliseconds>(svi1 - svi0).count();
+  std::cerr << " prepare filter indices - " << d_svi << "ms" << std::endl;
+}
 
-    // for if/when i want to sort xor sources, which is probably a dumb idea.
-    auto xorSourceIndices = []() {
-      IndexList v;
-      v.resize(PCD.xorSourceList.size());
-      iota(v.begin(), v.end(), (index_t)0);
-      return v;
-    }();
-    PCD.sentenceVariationIndices =
-      std::move(buildSentenceVariationIndices(
-        PCD.xorSourceList, xorSourceIndices));
-    PCD.device_sentenceVariationIndices =
-      cuda_allocCopySentenceVariationIndices(
-        PCD.sentenceVariationIndices);
-    // TODO: temporary until all clues are converted to sentences
-    PCD.device_xor_src_indices =
-      cuda_allocCopyXorSourceIndices(xorSourceIndices);
-
-    auto svi1 = high_resolution_clock::now();
-    auto d_svi = duration_cast<milliseconds>(svi1 - svi0).count();
-    std::cerr << " variation indices - " << d_svi << "ms" << std::endl;
+//
+// filterPreparation
+//
+Value filterPreparation(const CallbackInfo& info) {
+  using namespace std::chrono;
+  Env env = info.Env();
+  if (!info[0].IsArray()) {
+      TypeError::New(env, "filterPreparation: non-array parameter")
+        .ThrowAsJavaScriptException();
+      return env.Null();
   }
+  auto t0 = high_resolution_clock::now();
 
-  //--
+  // TODO: needed beyond the scope of this function?
+  auto orArgList = makeOrArgList(env, info[0].As<Array>());
+  PCD.num_or_args = orArgList.size();
+  auto sources_count_pair = cuda_allocCopyOrSources(orArgList);
+  PCD.device_or_sources = sources_count_pair.first;
+  PCD.num_or_sources = sources_count_pair.second;
 
-  if (xor_wrap) {
-    // TODO: merge_xor_sources(PCD.xor_src_lists, idx_lists,
-    // PCD.compat_xor_src_indices);
-    return wrap(env, PCD.xorSourceList);
-  }
-  return Number::New(env, PCD.xorSourceList.size());
+  prepare_filter_indices();
+
+  auto t1 = high_resolution_clock::now();
+  auto d_t = duration_cast<milliseconds>(t1 - t0).count();
+  std::cerr << " filter preparation, --or args(" << PCD.num_or_args << ")"
+            << ", sources(" << PCD.num_or_sources << ") - " << d_t << "ms"
+            << std::endl;
+
+  return Number::New(env, sources_count_pair.second);
 }
 
 // considerCandidate
@@ -377,62 +412,7 @@ Value considerCandidate(const CallbackInfo& info) {
   consider_candidate(ncList, sum);
   return env.Null();
 }
-
-// addCandidateForSum
-#if 0
-Value addCandidateForSum(const CallbackInfo& info) {
-  Env env = info.Env();
-  if (!info[0].IsNumber() || !info[1].IsString()
-      || !(info[2].IsArray() || info[2].IsNumber())) {
-    TypeError::New(env, "addCandidateForSum: invalid parameter type")
-      .ThrowAsJavaScriptException();
-    return env.Null();
-  }
-  const auto sum = info[0].As<Number>().Int32Value();
-  assert(sum >= 2);
-  auto combo = info[1].As<String>().Utf8Value();
-  int index{};
-  if (info[2].IsArray()) {
-    auto compatList = makeSourceCompatibilityListFromMergedSourcesList(
-      env, info[2].As<Array>());
-    index = addCandidate(sum, std::move(combo), std::move(compatList));
-  } else {
-    index = info[2].As<Number>().Int32Value();
-    addCandidate(sum, combo, index);
-  }
-  return Number::New(env, index);
-}
-#endif
   
-//
-// setOrArgDataList
-//
-Value setOrArgDataList(const CallbackInfo& info) {
-  using namespace std::chrono;
-  Env env = info.Env();
-  if (!info[0].IsArray()) {
-      TypeError::New(env, "setOrArgs: non-array parameter")
-        .ThrowAsJavaScriptException();
-      return env.Null();
-  }
-  PCD.orArgList = makeOrArgList(env, info[0].As<Array>());
-
-  //--
-
-  auto t0 = high_resolution_clock::now();
-
-  auto sources_count_pair = cuda_allocCopyOrSources(PCD.orArgList);
-  PCD.device_or_sources = sources_count_pair.first;
-  PCD.num_or_sources = sources_count_pair.second;
-
-  auto t1 = high_resolution_clock::now();
-  auto d_t = duration_cast<milliseconds>(t1 - t0).count();
-  std::cerr << " copy or_args (" << PCD.orArgList.size() << ")"
-            << " - " << d_t << "ms" << std::endl;
-
-  return Number::New(env, sources_count_pair.second);
-}
-
 #if 0
 auto getCandidateStats(int sum) {
   CandidateStats cs;
@@ -506,7 +486,7 @@ Value getResult(const CallbackInfo& info) {
 Object Init(Env env, Object exports) {
   exports["mergeCompatibleXorSourceCombinations"] =
     Function::New(env, mergeCompatibleXorSourceCombinations);
-  exports["setOrArgDataList"] = Function::New(env, setOrArgDataList);
+  exports["filterPreparation"] = Function::New(env, filterPreparation);
   exports["considerCandidate"] = Function::New(env, considerCandidate);
   //  exports["getCandidateStatsForSum"] = Function::New(env, getCandidateStatsForSum);
   exports["filterCandidatesForSum"] =
