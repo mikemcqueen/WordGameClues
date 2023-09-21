@@ -34,7 +34,7 @@
     'rules': [{
       'extension': 'cu',           
       'inputs': [ '<(RULE_INPUT_PATH)' ],
-      'rule_name': 'CUDA static lib',
+      'rule_name': 'kernel lib',
       'message': 'CUDA static lib',
       'outputs': [
         '<(SHARED_INTERMEDIATE_DIR)/<(RULE_INPUT_ROOT).o',
@@ -55,12 +55,12 @@
     'rules': [{
       'extension': 'cu',           
       'inputs': [ '<(RULE_INPUT_PATH)' ],
-      'rule_name': 'compile CUDA on linux',
+      'rule_name': 'compile kernel',
       'message': 'compile and device link CUDA file on linux',
       'outputs': [ '<(RULE_INPUT_ROOT)_dummy_output' ],
       'action': [
           'env', 'DIR=<(SHARED_INTERMEDIATE_DIR)', 'FILE=<(RULE_INPUT_ROOT)',
-          'make', '-f', 'kernel.mk'
+          'make', '-sf', 'kernel.mk'
       ]
     }]
   }]
