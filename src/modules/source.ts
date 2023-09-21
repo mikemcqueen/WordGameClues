@@ -26,15 +26,10 @@ const kMaxSourcesPerSentence = 32;
 
 //////////
 
-interface PrimaryNameSrcListContainer {
+interface Base {
     primaryNameSrcList: NameCount.List;
-}
-
-interface NcListContainer {
     ncList: NameCount.List;
 }
-
-type Base = PrimaryNameSrcListContainer & NcListContainer;
 
 type Variations = Int16Array;
 export interface UsedSources {
@@ -47,9 +42,6 @@ export interface CompatibilityData {
 }
 export type Data = Base & CompatibilityData;
 export type List = Data[];
-
-export type XorSource = PrimaryNameSrcListContainer & CompatibilityData;
-export type XorSourceList = XorSource[];
 
 interface ValidateResultsContainer {
     validateResults: ValidateResult[];

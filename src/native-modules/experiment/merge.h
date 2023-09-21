@@ -31,9 +31,6 @@ int list_size(const Peco::IndexList& indexList);
 int64_t vec_product(const std::vector<size_t>& v);
 std::string vec_to_string(const std::vector<size_t>& v);
 
-auto cuda_mergeCompatibleXorSourceCombinations(
-  const std::vector<SourceList>& sourceLists) -> XorSourceList;
-
 int run_list_pair_compat_kernel(const SourceCompatibilityData* device_sources1,
   const SourceCompatibilityData* device_sources2,
   const index_t* device_indices1, unsigned num_indices1,
@@ -45,6 +42,16 @@ int run_get_compat_combos_kernel(uint64_t first_combo, uint64_t num_combos,
   const index_t* device_compat_matrix_start_indices,
   unsigned num_compat_matrices, const index_t* device_list_sizes,
   result_t* device_results);
+
+auto cuda_get_compat_xor_src_indices(const std::vector<SourceList>& sourceLists,
+  const std::vector<IndexList>& idx_lists) -> std::vector<uint64_t>;
+
+auto get_compatible_indices(const std::vector<SourceList>& src_lists)
+  -> std::vector<IndexList>;
+
+auto merge_xor_sources(const std::vector<SourceList>& src_lists,
+  const std::vector<IndexList>& idx_lists,
+  const std::vector<uint64_t>& combo_indices) -> XorSourceList;
 
 }  // namespace cm
 

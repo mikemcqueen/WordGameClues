@@ -34,9 +34,6 @@ interface StringBoolMap {
     [key: string]: boolean; // for now; eventually maybe array of string (sorted primary nameSrcCsv)
 }
 
-type XorSource = Source.XorSource;
-export type XorSourceList = XorSource[];
-
 interface OrSourceData {
     source: Source.Data;
     xorCompatible: boolean;
@@ -58,7 +55,7 @@ interface UseSourceListSizes {
 }
 
 export interface Data {
-    xor: XorSourceList;
+    xor: Source.List;
     sourceListMap: Map<string, Source.AnyData[]>;
 }
 
@@ -396,7 +393,7 @@ const buildOrArgDataList = (sourceLists: Source.List[]): OrArgDataList => {
 
 // Given a list of XorSources, and a list of OrSources, TODO
 //
-const markAllXorCompatibleOrSources = (xorSourceList: XorSource[],
+const markAllXorCompatibleOrSources = (xorSourceList: Source.List,
     orArgDataList: OrArgDataList): void =>
 {
     for (let orArgData of orArgDataList) {
@@ -421,10 +418,10 @@ const dumpNcDataLists = (ncDataLists: NCDataList[],
 }
 
 const buildUseSourceListsFromNcData = (sourceListMap: Map<string,
-    Source.AnyData[]>, args: any): XorSourceList =>
+    Source.AnyData[]>, args: any): Source.List =>
 {
     // XOR first
-    const xorSources: XorSourceList = NativeComboMaker.mergeCompatibleXorSourceCombinations(
+    const xorSources: Source.List = NativeComboMaker.mergeCompatibleXorSourceCombinations(
         args.allXorNcDataLists, Array.from(sourceListMap.entries()),
         args.xor_wrap || false);
     args.allXorNcDataLists = undefined;

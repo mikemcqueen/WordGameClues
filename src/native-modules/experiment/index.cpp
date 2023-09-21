@@ -65,15 +65,24 @@ SourceData makeSourceData(Env& env, const Object& jsSourceData) {
       .ThrowAsJavaScriptException();
     return {};
   }
+  auto jsNcList = jsSourceData.Get("ncList");
+  if (!jsNcList.IsArray()) {
+    TypeError::New(env, "makeSourceData: ncList is not an array")
+      .ThrowAsJavaScriptException();
+    return {};
+  }
   // TODO: declare SourceData result; assign result.xxx = std::move(yyy);;
   // return result (no move-all-params constructor required)
   auto primaryNameSrcList =
     makeNameCountList(env, jsPrimaryNameSrcList.As<Array>());
+  auto ncList =
+    makeNameCountList(env, jsNcList.As<Array>());
   auto usedSources = NameCount::listToUsedSources(primaryNameSrcList);
 #if 0
   usedSources.assert_valid();
 #endif
-  return {std::move(primaryNameSrcList), std::move(usedSources)};
+  return {
+    std::move(primaryNameSrcList), std::move(ncList), std::move(usedSources)};
 }
 
 SourceList makeSourceList(Env& env, const Array& jsList) {
@@ -269,59 +278,57 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   auto unwrap1 = high_resolution_clock::now();
   [[maybe_unused]] auto d_unwrap = 
     duration_cast<milliseconds>(unwrap1 - unwrap0).count();
-  //std::cerr << " native unwrap - " << d_unwrap << "ms" << std::endl;
+  std::cerr << " build src_list_map - " << d_unwrap << "ms" << std::endl;
 
   //--
     
   auto build0 = high_resolution_clock::now();
 
-  std::vector<SourceList> sourceLists =
-    buildSourceListsForUseNcData(ncDataLists, PCD.sourceListMap);
+  PCD.xor_src_lists =
+    std::move(buildSourceListsForUseNcData(ncDataLists, PCD.sourceListMap));
 
   auto build1 = high_resolution_clock::now();
   [[maybe_unused]] auto d_build =
     duration_cast<milliseconds>(build1 - build0).count();
-  std::cerr << " native build - " << d_build << "ms" << std::endl;
+  std::cerr << " build xor_src_lists - " << d_build << "ms" << std::endl;
 
 #if 0
-  for (const auto& src_list: sourceLists) {
+  for (const auto& src_list: PCD.xor_src_lists) {
     assert_valid(src_list);
   }
 #endif
 
-  //--
-
-  if (sourceLists.size() > 1) {
-    auto merge0 = high_resolution_clock::now();
-    
-    PCD.xorSourceList =
-      std::move(cuda_mergeCompatibleXorSourceCombinations(sourceLists));
+  if (PCD.xor_src_lists.size() > 1) {
+    auto idx_lists = get_compatible_indices(PCD.xor_src_lists);
+    if (!idx_lists.empty()) {
+      PCD.compat_xor_src_indices = std::move(
+        cuda_get_compat_xor_src_indices(PCD.xor_src_lists, idx_lists));
+      // TODO: there is a potential failure case here probably
+      PCD.xorSourceList = std::move(merge_xor_sources(
+        PCD.xor_src_lists, idx_lists, PCD.compat_xor_src_indices));
 #if 0
-    assert_valid(PCD.xorSourceList);
+        assert_valid(PCD.xorSourceList);
 #endif
-    
-    auto merge1 = high_resolution_clock::now();
-    auto d_merge = duration_cast<milliseconds>(merge1 - merge0).count();
-    std::cerr << " native merge - " << d_merge << "ms" << std::endl;
-  } else if (sourceLists.size() == 1) {
-    PCD.xorSourceList = std::move(sourceLists.back());
+    }
+  } else if (PCD.xor_src_lists.size() == 1) {
+    PCD.xorSourceList = std::move(PCD.xor_src_lists.back());
   }
 
-  //--
+  if (!PCD.xorSourceList.empty()) {
+    //-- device xor sources
 
-  auto xs0 = high_resolution_clock::now();
+    auto xs0 = high_resolution_clock::now();
 
-  PCD.device_xorSources = cuda_allocCopyXorSources(
-    PCD.xorSourceList);
+    // TODO: probably need to copy idx_lists to device memory instead
+    PCD.device_xorSources = cuda_allocCopyXorSources(PCD.xorSourceList);
 
-  auto xs1 = high_resolution_clock::now();
-  auto d_xs = duration_cast<milliseconds>(xs1 - xs0).count();
-  std::cerr << " copy xor sources to device (" << PCD.xorSourceList.size() << ")"
-            << " - " << d_xs << "ms" << std::endl;
+    auto xs1 = high_resolution_clock::now();
+    auto d_xs = duration_cast<milliseconds>(xs1 - xs0).count();
+    std::cerr << " copy xor sources to device (" << PCD.xorSourceList.size()
+              << ") - " << d_xs << "ms" << std::endl;
 
-  //--
+    //-- device sentence variation indices
 
-  if (PCD.xorSourceList.size()) {
     auto svi0 = high_resolution_clock::now();
 
     // for if/when i want to sort xor sources, which is probably a dumb idea.
@@ -349,6 +356,8 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   //--
 
   if (xor_wrap) {
+    // TODO: merge_xor_sources(PCD.xor_src_lists, idx_lists,
+    // PCD.compat_xor_src_indices);
     return wrap(env, PCD.xorSourceList);
   }
   return Number::New(env, PCD.xorSourceList.size());

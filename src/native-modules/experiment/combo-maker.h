@@ -422,9 +422,11 @@ using NCDataList = std::vector<NCData>;
 
 struct SourceData : SourceCompatibilityData {
   SourceData() = default;
-  SourceData(NameCountList&& primaryNameSrcList, UsedSources&& usedSources)
+  SourceData(NameCountList&& primaryNameSrcList, NameCountList&& ncList,
+    UsedSources&& usedSources)
       : SourceCompatibilityData(std::move(usedSources)),
-        primaryNameSrcList(std::move(primaryNameSrcList)) {
+        primaryNameSrcList(std::move(primaryNameSrcList)),
+        ncList(std::move(ncList)) {
   }
 
   // copy assign allowed for now for precompute.mergeAllCompatibleXorSources
@@ -434,6 +436,7 @@ struct SourceData : SourceCompatibilityData {
   SourceData& operator=(SourceData&&) = default;
 
   NameCountList primaryNameSrcList;
+  NameCountList ncList;
 };
 
 using SourceList = std::vector<SourceData>;
@@ -502,6 +505,8 @@ struct VariationIndices {
 } // namespace device
 
 struct PreComputedData {
+  std::vector<SourceList> xor_src_lists;
+  std::vector<uint64_t> compat_xor_src_indices;
   XorSourceList xorSourceList;
   std::vector<int> xorSourceIndices;
   SourceCompatibilityData* device_xorSources{nullptr};

@@ -52,8 +52,7 @@ const getCountListArrays = (nameList: string[], pcResult: PreCompute.Result,
     let hash = {};
 
     for (const xorSource of pcResult.data!.xor) {
-        // TODO broken
-        const countList: number[] = []; // NameCount.listToCountList(xorSource.ncList);
+        const countList = NameCount.listToCountList(xorSource.ncList);
         // for --verbose, we could allow this:
         const hashKey = countList.toString();
         if (hash[hashKey]) continue;

@@ -1,3 +1,6 @@
+* i'm allocating device_xor_src_indices for.. merge? or filter. and apparently
+  i don't need to anymore now that all clues are in sentences.
+
 * why isn't nameListMap printed for sentence9
 
 * TWO things:

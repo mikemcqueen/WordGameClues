@@ -31,13 +31,14 @@ Array wrap(Env& env, const std::vector<std::string>& strList) {
 Object wrap(Env& env, const XorSource& xorSource) {
   Object jsObj = Object::New(env);
   jsObj.Set("primaryNameSrcList", wrap(env, xorSource.primaryNameSrcList));
+  jsObj.Set("ncList", wrap(env, xorSource.ncList));
   return jsObj;
 }
 
 Array wrap(Env& env, const XorSourceList& xorSourceList) {
   using namespace std::chrono;
 
-  std::cerr << "  wrapping xor sources";
+  std::cerr << " wrapping xor sources";
 
   auto t0 = high_resolution_clock::now();
 
@@ -51,7 +52,6 @@ Array wrap(Env& env, const XorSourceList& xorSourceList) {
 
   auto t1 = high_resolution_clock::now();
   auto d_wrap = duration_cast<milliseconds>(t1 - t0).count();
-
   std::cerr << " done(" << cm::PCD.xorSourceList.size() << ")"
             << " - " << d_wrap << "ms" << std::endl;
 
