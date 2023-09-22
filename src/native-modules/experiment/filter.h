@@ -18,6 +18,9 @@ void run_xor_kernel(StreamData& stream, int threads_per_block,
 
 filter_result_t get_filter_result();
 
+[[nodiscard]] SourceCompatibilityData* cuda_allocCopyXorSources(
+  const XorSourceList& xorSourceList);
+
 [[nodiscard]] std::pair<device::OrSourceData*, unsigned>
 cuda_allocCopyOrSources(const OrArgList& orArgList);
 

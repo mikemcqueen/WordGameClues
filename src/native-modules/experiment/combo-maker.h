@@ -476,11 +476,12 @@ namespace device {
   */
 }
 
+// TODO comment
 // These are precomputed on xorSourceList, to identify only those sources
 // which share the same per-sentence variation.
 // One list of indices per variation, plus '-1' (no) variation.
 // indices to outer vector are offset by 1; variation -1 is index 0.
-using VariationIndicesList = std::vector<std::vector<index_t>>;
+using VariationIndicesList = std::vector<ComboIndexList>;
 // one variationIndicesLists per sentence
 using SentenceVariationIndices = std::array<VariationIndicesList, kNumSentences>;
 
@@ -488,32 +489,45 @@ using SentenceVariationIndices = std::array<VariationIndicesList, kNumSentences>
 namespace device {
 
 struct VariationIndices {
-  index_t* device_data;  // one chunk of allocated data; other pointers below
-                         // point inside this chunk. only this gets freed.
-  index_t* src_indices;
-  index_t* num_src_indices;
-
-  index_t* variation_offsets;  // offsets into sourceIndices
+  combo_index_t* device_data;  // one chunk of allocated data; other pointers
+                               //  below point inside this chunk.
+  combo_index_t* combo_indices;
+  index_t* num_combo_indices;  // per variation
+  index_t* variation_offsets;  // offsets into combo_indices
   index_t num_variations;
 
-  constexpr std::span<index_t> get_src_index_span(int variation) const {
-    return {
-      &src_indices[variation_offsets[variation]], num_src_indices[variation]};
+  constexpr ComboIndexSpan get_index_span(int variation) const {
+    return {&combo_indices[variation_offsets[variation]],
+      num_combo_indices[variation]};
   }
 };
 
 } // namespace device
 
+  /*
 struct PreComputedData {
   std::vector<SourceList> xor_src_lists;
+
+  SourceCompatibilityData* device_src_lists;
+  index_t* device_src_list_start_indices;
+
+  index_t* device_idx_lists;
+  index_t* device_idx_list_start_indices;
+
   // TODO: need device_xor_src_lists + device_xor_src_list_start_indices
-  std::vector<uint64_t> compat_indices;
-  uint64_t* device_compat_indices;
+  std::vector<IndexList> compat_idx_lists;
+  ComboIndexList combo_indices;
+  combo_index_t* device_combo_indices;
   unsigned num_compat_indices{};
-  //  XorSourceList xorSourceList;
-  //std::vector<int> xorSourceIndices;
-  //SourceCompatibilityData* device_xorSources{nullptr};
-  //OrArgList orArgList;
+
+  // TODO: remove below
+  XorSourceList xorSourceList;
+  SourceCompatibilityData* device_xorSources{};
+  index_t* device_legacy_xor_src_indices;
+  std::vector<int> xorSourceIndices;
+  // TODO: remove above
+  
+  // OrArgList orArgList;
   unsigned num_or_args{};
   device::OrSourceData* device_or_sources{}; 
   unsigned num_or_sources{};  // # of device_or_sources
@@ -521,9 +535,8 @@ struct PreComputedData {
   //  SentenceVariationIndices sentenceVariationIndices;
   device::VariationIndices* device_variation_indices{};
   unsigned num_nariation_indices{};
-  // TODO: temporary until all clues are converted to sentences
-  //  index_t* device_legacy_xor_src_indices;
 };
+  */
 
 struct MergedSources : SourceCompatibilityData {
   MergedSources() = default;
@@ -555,6 +568,7 @@ struct PerfData {
   int full;        // # of full range calls; eventually this should = calls - ss_attempt
 };
 
+
 struct CandidateStats {
   int sum;
   int sourceLists;
@@ -565,18 +579,20 @@ struct CandidateStats {
 
 // functions
 
+/*
 void debugSourceList(const SourceList& sourceList, std::string_view sv);
-
-auto buildSourceListsForUseNcData(const std::vector<NCDataList>& useNcDataLists,
-  const SourceListMap& sourceListMap) -> std::vector<SourceList>;
 
 XorSourceList mergeCompatibleXorSourceCombinations(
   const std::vector<SourceList>& sourceLists);
+
+auto buildSourceListsForUseNcData(const std::vector<NCDataList>& useNcDataLists,
+  const SourceListMap& sourceListMap) -> std::vector<SourceList>;
 
 auto buildSentenceVariationIndices(const XorSourceList& xorSourceList,
   const std::vector<index_t>& xorSourceIndices) -> SentenceVariationIndices;
 
 void mergeUsedSourcesInPlace(UsedSources& to, const UsedSources& from);
+*/
 
 inline constexpr void assert_valid(const SourceList& src_list) {
   for (const auto& src: src_list) {
@@ -596,7 +612,7 @@ inline std::vector<SourceCompatibilityData> makeCompatibleSources(
 // globals - hehe HAHA HOHO
 
 inline PerfData isany_perf{};
-inline PreComputedData PCD;
+  //inline PreComputedData PCD;
 
 } // namespace cm
 

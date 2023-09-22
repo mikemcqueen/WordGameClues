@@ -8,11 +8,14 @@
 #include <unordered_map>
 #include <vector>
 #include "combo-maker.h"
+#include "cm-precompute.h"
 #include "candidates.h"
 #include "dump.h"
 #include "wrap.h"
 #include "filter.h"
 #include "merge.h"
+#include "merge-filter-data.h"
+#include "merge-filter-common.h"
 
 namespace {
 
@@ -271,7 +274,7 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
 
   auto unwrap0 = high_resolution_clock::now();
   auto ncDataLists = makeNcDataLists(env, info[0].As<Array>());
-  PCD.sourceListMap =
+  MFD.sourceListMap =
     std::move(makeSourceListMap(env, info[1].As<Array>()));
   // merge_only means "-t" mode, in which case no filter kernel will be called,
   // so we don't need to do additional work/copy additional device data
@@ -287,8 +290,8 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   auto build0 = high_resolution_clock::now();
 
   // TODO: I'm not convinced this data to hang around on host side.
-  PCD.xor_src_lists =
-    std::move(buildSourceListsForUseNcData(ncDataLists, PCD.sourceListMap));
+  MFD.xor_src_lists =
+    std::move(buildSourceListsForUseNcData(ncDataLists, MFD.sourceListMap));
 
   auto build1 = high_resolution_clock::now();
   [[maybe_unused]] auto d_build =
@@ -296,71 +299,87 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   std::cerr << " build xor_src_lists - " << d_build << "ms" << std::endl;
 
 #if 0
-  for (const auto& src_list: PCD.xor_src_lists) {
+  for (const auto& src_list: MFD.xor_src_lists) {
     assert_valid(src_list);
   }
 #endif
 
   XorSourceList merge_only_xor_src_list;
-  if (!merge_only || (PCD.xor_src_lists.size() > 1)) {
+  if (!merge_only || (MFD.xor_src_lists.size() > 1)) {
     // TODO: support for single-list compat indices
-    auto idx_lists = get_compatible_indices(PCD.xor_src_lists);
-    if (!idx_lists.empty()) {
-      auto compat_indices =
-        cuda_get_compat_xor_src_indices(PCD.xor_src_lists, idx_lists);
-      assert(idx_lists.size() == compat_indices.size());
+    auto compat_idx_lists = get_compatible_indices(MFD.xor_src_lists);
+    if (!compat_idx_lists.empty()) {
+      auto combo_indices =
+        cuda_get_compat_xor_src_indices(MFD.xor_src_lists, compat_idx_lists);
       if (merge_only) {
-        // merge-only with multiple xor args uses compat indices for the sole
-        // purpose of generating an xor_src_list.
-        merge_only_xor_src_list = std::move(
-          merge_xor_sources(PCD.xor_src_lists, idx_lists, compat_indices));
+        // merge-only with multiple xor args uses compat index lists and combo
+        // indices for the sole purpose of generating an xor_src_list.
+        merge_only_xor_src_list = std::move(merge_xor_sources(
+          MFD.xor_src_lists, compat_idx_lists, combo_indices));
       } else {
-        // filter will copy compat indices to device memory in a subsequent
-        // call, though it *could* be done here to save a bit of host memory.
-        PCD.compat_indices = std::move(compat_indices);
+        // filter will need them both later
+        MFD.compat_idx_lists = std::move(compat_idx_lists);
+        MFD.combo_indices = std::move(combo_indices);
       }
     }
-    if (!merge_only) {
-      // filter returns number of compatible indices
-      return Number::New(env, idx_lists.size());
-    }
-  } else if (PCD.xor_src_lists.size() == 1) {
-    merge_only_xor_src_list = std::move(PCD.xor_src_lists.back());
+  } else if (MFD.xor_src_lists.size() == 1) {
+    merge_only_xor_src_list = std::move(MFD.xor_src_lists.back());
   }
-  // merge-only returns xor_src_lsit
-  return wrap(env, merge_only_xor_src_list);
+  if (merge_only) {
+    // merge-only returns wrapped xor_src_list
+    return wrap(env, merge_only_xor_src_list);
+  }
+  // TEMPORARY
+  //  MFD.xorSourceList = std::move(merge_only_xor_src_list);
+  // filter returns number of compatible indices
+  return Number::New(env, (uint32_t)MFD.combo_indices.size());
 }
 
 void prepare_filter_indices() {
   using namespace std::chrono;
-  assert(!PCD.compat_indices.empty());
-
+  assert(!MFD.combo_indices.empty());
   auto svi0 = high_resolution_clock::now();
 
+  auto src_list_start_indices = make_start_indices(MFD.xor_src_lists);
+  MFD.device_src_list_start_indices =
+    alloc_copy_start_indices(src_list_start_indices);
+  auto idx_list_start_indices = make_start_indices(MFD.compat_idx_lists);
+  MFD.device_idx_list_start_indices =
+    alloc_copy_start_indices(idx_list_start_indices);
+
 #if TODO
-   PCD.device_compat_indices =
-    std::move(cuda_alloc_copy_compat_indices(PCD.compat_indices));
-     PCD.compat_indices = PCD.compat_indices.size();
+  // TEMPORARY>>
+  auto unsorted = []() {
+    std::vector<int> v;
+    v.resize(cm::MFD.xorSourceList.size());
+    iota(v.begin(), v.end(), 0);
+    return v;
+  }();
+  MFD.xorSourceIndices = std::move(unsorted);
+  MFD.device_xorSources = cuda_allocCopyXorSources(MFD.xorSourceList);
+  /*
+  MFD.device_legacy_xor_src_indices =
+    cuda_allocCopyXorSourceIndices(MFD.xorSourceIndices);
+  */
+  // <<TEMPORARY
+  MFD.device_combo_indices =
+    std::move(cuda_alloc_copy_combo_indices(MFD.combo_indices));
+  MFD.combo_indices = MFD.combo_indices.size();
 #endif
 
   // for if/when i want to sort xor sources, which is probably a dumb idea.
   /*
   auto xorSourceIndices = []() {
     IndexList v;
-    v.resize(PCD.xorSourceList.size());
+    v.resize(MFD.xorSourceList.size());
     iota(v.begin(), v.end(), (index_t)0);
     return v;
   }();
   */
-#if TODO
-  auto variation_indices = buildSentenceVariationIndices(PCD.xorSourceList);
-  PCD.device_variation_indices =
+  auto variation_indices = buildSentenceVariationIndices(
+    MFD.xor_src_lists, MFD.compat_idx_lists, MFD.combo_indices);
+  MFD.device_variation_indices =
     cuda_allocCopySentenceVariationIndices(variation_indices);
-#endif
-
-  // TODO: temporary until all clues are converted to sentences
-  // PCD.device_legacy_xor_src_indices =
-  //    cuda_allocCopyXorSourceIndices(xorSourceIndices);
 
   auto svi1 = high_resolution_clock::now();
   auto d_svi = duration_cast<milliseconds>(svi1 - svi0).count();
@@ -382,17 +401,17 @@ Value filterPreparation(const CallbackInfo& info) {
 
   // TODO: needed beyond the scope of this function?
   auto orArgList = makeOrArgList(env, info[0].As<Array>());
-  PCD.num_or_args = orArgList.size();
+  MFD.num_or_args = orArgList.size();
   auto sources_count_pair = cuda_allocCopyOrSources(orArgList);
-  PCD.device_or_sources = sources_count_pair.first;
-  PCD.num_or_sources = sources_count_pair.second;
+  MFD.device_or_sources = sources_count_pair.first;
+  MFD.num_or_sources = sources_count_pair.second;
 
   prepare_filter_indices();
 
   auto t1 = high_resolution_clock::now();
   auto d_t = duration_cast<milliseconds>(t1 - t0).count();
-  std::cerr << " filter preparation, --or args(" << PCD.num_or_args << ")"
-            << ", sources(" << PCD.num_or_sources << ") - " << d_t << "ms"
+  std::cerr << " filter preparation, --or args(" << MFD.num_or_args << ")"
+            << ", sources(" << MFD.num_or_sources << ") - " << d_t << "ms"
             << std::endl;
 
   return Number::New(env, sources_count_pair.second);

@@ -51,22 +51,22 @@ __global__ void list_pair_compat_kernel(
 __global__ void get_compat_combos_kernel(uint64_t first_combo,
   uint64_t num_combos, const result_t* compat_matrices,
   const index_t* compat_matrix_start_indices, unsigned num_compat_matrices,
-  const index_t* list_sizes, result_t* results) {
+  const index_t* idx_list_sizes, result_t* results) {
   //
   const unsigned threads_per_grid = gridDim.x * blockDim.x;
   const unsigned thread_idx = blockIdx.x * blockDim.x + threadIdx.x;
   for (uint64_t idx{thread_idx}; idx < num_combos; idx += threads_per_grid) {
     index_t row_indices[kMaxMatrices];
-    auto tmp_idx{first_combo + idx};
+    auto combo_idx{first_combo + idx};
     for (int i{(int)num_compat_matrices - 1}; i >= 0; --i) {
-      auto list_size = list_sizes[i];
-      row_indices[i] = tmp_idx % list_size;
-      tmp_idx /= list_size;
+      const auto idx_list_size = idx_list_sizes[i];
+      row_indices[i] = combo_idx % idx_list_size;
+      combo_idx /= idx_list_size;
     }
     bool compat = true;
     for (size_t i{}, n{}; compat && (i < num_compat_matrices - 1); ++i) {
       for (size_t j{i + 1}; j < num_compat_matrices; ++j, ++n) {
-        auto offset = row_indices[i] * list_sizes[j] + row_indices[j];
+        auto offset = row_indices[i] * idx_list_sizes[j] + row_indices[j];
         if (!compat_matrices[compat_matrix_start_indices[n] + offset]) {
           compat = false;
           break;
@@ -129,7 +129,7 @@ int run_list_pair_compat_kernel(const SourceCompatibilityData* device_sources1,
 int run_get_compat_combos_kernel(uint64_t first_combo, uint64_t num_combos,
   const result_t* device_compat_matrices,
   const index_t* device_compat_matrix_start_indices,
-  unsigned num_compat_matrices, const index_t* device_list_sizes,
+  unsigned num_compat_matrices, const index_t* device_idx_list_sizes,
   result_t* device_results) {
   //
   assert((num_compat_matrices <= kMaxMatrices)
@@ -148,8 +148,8 @@ int run_get_compat_combos_kernel(uint64_t first_combo, uint64_t num_combos,
   cudaStreamSynchronize(cudaStreamPerThread);
   get_compat_combos_kernel<<<grid_dim, block_dim, shared_bytes, stream>>>(
     first_combo, num_combos, device_compat_matrices,
-    device_compat_matrix_start_indices, num_compat_matrices, device_list_sizes,
-    device_results);
+    device_compat_matrix_start_indices, num_compat_matrices,
+    device_idx_list_sizes, device_results);
   return 0;
 }
 

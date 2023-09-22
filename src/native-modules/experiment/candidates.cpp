@@ -6,6 +6,7 @@
 #include <unordered_map>
 #include "combo-maker.h"
 #include "candidates.h"
+#include "merge-filter-data.h"
 
 namespace {
 
@@ -112,7 +113,7 @@ void consider_candidate(const NameCountList& ncList, int sum) {
   if (candidate_repo.find(key) == candidate_repo.end()) {
     CandidateRepoValue repo_value;
     repo_value.merged_src_list =
-      std::move(merge_all_compatible_sources(ncList, PCD.sourceListMap));
+      std::move(merge_all_compatible_sources(ncList, MFD.sourceListMap));
     candidate_repo.emplace(std::make_pair(key, std::move(repo_value)));
   }
   auto& repo_value = candidate_repo.find(key)->second;

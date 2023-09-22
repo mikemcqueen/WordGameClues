@@ -8,12 +8,14 @@
 namespace cm {
 
 using result_t = uint8_t;
-
 using index_t = uint32_t;
-using IndexList = std::vector<index_t>;
+using combo_index_t = uint64_t;
 
-using IndexSpan = std::span<const index_t>;
-using IndexSpanPair = std::pair<IndexSpan, IndexSpan>;
+using IndexList = std::vector<index_t>;
+using ComboIndexList = std::vector<combo_index_t>;
+
+using ComboIndexSpan = std::span<const combo_index_t>;
+using ComboIndexSpanPair = std::pair<ComboIndexSpan, ComboIndexSpan>;
 
 }  // namespace cm
 

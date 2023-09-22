@@ -5,6 +5,8 @@
 #include <vector>
 #include <cuda_runtime.h>
 #include "filter.h"
+#include "merge-filter-common.h"
+#include "merge-filter-data.h"
 #include "candidates.h"
 
 namespace {
@@ -25,19 +27,12 @@ void add_filter_future(std::future<filter_result_t>&& filter_future) {
   filter_futures_.emplace_back(std::move(filter_future));
 }
 
-auto count(const CandidateList& candidates) {
-  size_t num{};
-  for (const auto& candidate : candidates) {
-    num += candidate.src_list_cref.get().size();
-  }
-  return num;
-}
-
 auto* allocCopySources(const CandidateList& candidates) {
   // alloc sources
   const cudaStream_t stream = cudaStreamPerThread;
   cudaError_t err = cudaSuccess;
-  auto sources_bytes = count(candidates) * sizeof(SourceCompatibilityData);
+  auto sources_bytes =
+    count_candidates(candidates) * sizeof(SourceCompatibilityData);
   SourceCompatibilityData* device_sources;
   err = cudaMallocAsync((void**)&device_sources, sources_bytes, stream);
   assert((err == cudaSuccess) && "alloc sources");
@@ -297,7 +292,7 @@ void dump_src_list(const SourceCompatibilityList& src_list) {
   }
 }
 
-}  // anonymous namespace
+}  // namespace
 
 namespace cm {
 
@@ -399,64 +394,56 @@ cuda_allocCopyOrSources(const OrArgList& orArgList) {
 [[nodiscard]] auto cuda_allocCopySentenceVariationIndices(
   const SentenceVariationIndices& sentenceVariationIndices)
   -> device::VariationIndices* {
-  //
+  // assumption made throughout
+  static_assert(sizeof(combo_index_t) == sizeof(index_t) * 2);
   cudaError_t err = cudaSuccess;
   using DeviceVariationIndicesArray =
     std::array<device::VariationIndices, kNumSentences>;
-  DeviceVariationIndicesArray deviceVariationIndicesArray;
+  DeviceVariationIndicesArray device_indices_array;
   for (int s{}; s < kNumSentences; ++s) {
     auto& variation_indices = sentenceVariationIndices.at(s);
-    // 2 * size to account for leading variation_offsets and num_src_indices
+    const auto num_variations{variation_indices.size()};
+    // clever: n * sizeof(combo_index_t) == 2 * n * sizeof(index_t)
     const auto device_data_bytes =
-      (countIndices(variation_indices) + (2 * variation_indices.size()))
-      * sizeof(index_t);
-    auto& deviceVariationIndices = deviceVariationIndicesArray.at(s);
-    err = cudaMallocAsync((void**)&deviceVariationIndices.device_data,
+      (countIndices(variation_indices) + num_variations)
+      * sizeof(combo_index_t);
+    auto& device_indices = device_indices_array.at(s);
+    err = cudaMallocAsync((void**)&device_indices.device_data,
       device_data_bytes, cudaStreamPerThread);
     assert(err == cudaSuccess);
 
-    // const static int terminator = -1;
+    device_indices.num_variations = num_variations;
+    // copy combo indices first, populating offsets and num_combo_indices
+    device_indices.combo_indices = &device_indices.device_data[num_variations];
     std::vector<index_t> variation_offsets;
-    std::vector<index_t> num_src_indices;
-    const auto num_variations{variation_indices.size()};
-    deviceVariationIndices.num_variations = num_variations;
-    // copy src indices first, populating offsets and num_src_indices
-    deviceVariationIndices.src_indices =
-      &deviceVariationIndices.device_data[num_variations * 2];
+    std::vector<index_t> num_combo_indices;
     size_t offset{};
-    for (const auto& indices : variation_indices) {
+    for (const auto& combo_indices : variation_indices) {
       variation_offsets.push_back(offset);
-      num_src_indices.push_back(indices.size());
+      num_combo_indices.push_back(combo_indices.size());
       // NOTE: Async. I'm going to need to preserve
       // sentenceVariationIndices until copy is complete - (kernel
       // execution/synchronize?)
-      const auto indices_bytes = indices.size() * sizeof(index_t);
-      err = cudaMemcpyAsync(&deviceVariationIndices.src_indices[offset],
-        indices.data(), indices_bytes, cudaMemcpyHostToDevice,
+      const auto indices_bytes = combo_indices.size() * sizeof(combo_index_t);
+      err = cudaMemcpyAsync(&device_indices.combo_indices[offset],
+        combo_indices.data(), indices_bytes, cudaMemcpyHostToDevice,
         cudaStreamPerThread);
       assert(err == cudaSuccess);
-      offset += indices.size();
-#if 0
-      err = cudaMemcpyAsync(&deviceVariationIndices.src_indices[offset],
-        &terminator, sizeof(terminator), cudaMemcpyHostToDevice, cudaStreamPerThread);
-      assert(err == cudaSuccess);
-      offset += 1;
-#endif
+      offset += combo_indices.size();
     }
     // copy variation offsets
-    deviceVariationIndices.variation_offsets =
-      deviceVariationIndices.device_data;
+    device_indices.variation_offsets = (index_t*)device_indices.device_data;
     const auto offsets_bytes = variation_offsets.size() * sizeof(index_t);
-    err = cudaMemcpyAsync(deviceVariationIndices.variation_offsets,
+    err = cudaMemcpyAsync(device_indices.variation_offsets,
       variation_offsets.data(), offsets_bytes, cudaMemcpyHostToDevice,
       cudaStreamPerThread);
     assert(err == cudaSuccess);
-    // copy num src indices
-    deviceVariationIndices.num_src_indices =
-      &deviceVariationIndices.device_data[num_variations];
-    const auto num_src_indices_bytes = num_src_indices.size() * sizeof(index_t);
-    err = cudaMemcpyAsync(deviceVariationIndices.num_src_indices,
-      num_src_indices.data(), num_src_indices_bytes, cudaMemcpyHostToDevice,
+    // copy num combo indices
+    device_indices.num_combo_indices =
+      &((index_t*)device_indices.device_data)[num_variations];
+    const auto num_indices_bytes = num_combo_indices.size() * sizeof(index_t);
+    err = cudaMemcpyAsync(device_indices.num_combo_indices,
+      num_combo_indices.data(), num_indices_bytes, cudaMemcpyHostToDevice,
       cudaStreamPerThread);
     assert(err == cudaSuccess);
   }
@@ -468,17 +455,19 @@ cuda_allocCopyOrSources(const OrArgList& orArgList) {
   assert(err == cudaSuccess);
 
   err = cudaMemcpyAsync(device_variation_indices,
-    deviceVariationIndicesArray.data(), variation_indices_bytes,
+    device_indices_array.data(), variation_indices_bytes,
     cudaMemcpyHostToDevice, cudaStreamPerThread);
   assert(err == cudaSuccess);
 
   // TODO: be nice to get rid of this
   // just to be sure, due to lifetime problems of local host-side memory
+  // solution: cram stuff into MFD
   err = cudaStreamSynchronize(cudaStreamPerThread);
   assert(err == cudaSuccess);
   return device_variation_indices;
 }
 
+#if 0
 // TODO: only required until all clues are converted to sentences
 [[nodiscard]] index_t* cuda_allocCopyXorSourceIndices(
   const std::vector<index_t> xor_src_indices) {
@@ -495,5 +484,6 @@ cuda_allocCopyOrSources(const OrArgList& orArgList) {
   assert(err == cudaSuccess);
   return device_xor_src_indices;
 }
+#endif
 
 }  // namespace cm

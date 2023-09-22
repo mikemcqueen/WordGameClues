@@ -165,32 +165,41 @@ void dumpSentenceVariationIndices(
 
 }  // namespace
 
-auto buildSentenceVariationIndices(const XorSourceList& xorSourceList,
-  const std::vector<uint32_t>& xorSourceIndices) -> SentenceVariationIndices {
+auto buildSentenceVariationIndices(const std::vector<SourceList>& xor_src_lists,
+  const std::vector<IndexList>& compat_idx_lists,
+  const std::vector<uint64_t>& compat_indices) -> SentenceVariationIndices {
   //
   auto sentenceVariationIndices = SentenceVariationIndices{};
-  for (size_t src_index = 0; src_index < xorSourceList.size(); ++src_index) {
+  for (size_t i = 0; i < compat_indices.size(); ++i) {
     std::array<int, kNumSentences> variations =
       { -1, -1, -1, -1, -1, -1, -1, -1, -1 };
-    const auto& source = xorSourceList.at(xorSourceIndices.at(src_index));
-    for (const auto& nc : source.primaryNameSrcList) {
-      using namespace Source;
-      if (isCandidate(nc.count)) {
+
+    auto combo_idx = compat_indices.at(i);
+    for (int j{(int)compat_idx_lists.size() - 1}; j >= 0; --j) {
+      const auto& idx_list = compat_idx_lists.at(j);
+      auto src_idx = idx_list.at(combo_idx % idx_list.size());
+      combo_idx /= idx_list.size();
+      for (const auto& nc :
+        xor_src_lists.at(j).at(src_idx).primaryNameSrcList) {
+        using namespace Source;
+        assert(isCandidate(nc.count));
         auto sentence = getSentence(nc.count) - 1;
         auto variation = getVariation(nc.count);
-        // could sanity check compare equal if not -1 here
+        // sanity check
+        assert((variations.at(sentence) < 0)
+               || (variations.at(sentence) == variation));
         variations.at(sentence) = variation;
       }
     }
     for (int s{}; s < kNumSentences; ++s) {
       auto& variationIndicesList = sentenceVariationIndices.at(s);
-      const size_t variation_index = variations.at(s) + 1;
-      if (variationIndicesList.size() <= variation_index) {
-        variationIndicesList.resize(variation_index + 1);
+      const size_t variation_idx = variations.at(s) + 1;
+      if (variationIndicesList.size() <= variation_idx) {
+        variationIndicesList.resize(variation_idx + 1);
       }
-      variationIndicesList.at(variation_index).push_back(src_index);
+      variationIndicesList.at(variation_idx).push_back(compat_indices.at(i));
     }
-  }
+}
   // Some sentences may contain no variations across all xorSources.
   // At least, this is true in the current case when not all sentences use
   // variations. TODO: TBD if this is still true after all sentences have

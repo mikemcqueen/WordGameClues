@@ -23,6 +23,14 @@ using CandidateList = std::vector<CandidateData>;
 
 // functions
 
+inline auto count_candidates(const CandidateList& candidates) {
+  size_t num{};
+  for (const auto& candidate : candidates) {
+    num += candidate.src_list_cref.get().size();
+  }
+  return num;
+}
+
 void consider_candidate(const NameCountList& ncList, int sum);
 
 void filterCandidates(

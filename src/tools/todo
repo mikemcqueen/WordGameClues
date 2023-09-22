@@ -1,14 +1,33 @@
-* i'm allocating device_xor_src_indices for.. merge? or filter. and apparently
-  i don't need to anymore now that all clues are in sentences.
+* I think 20 (or even 15) is a reasonable upper limit for primary source count for any
+  individual used source (--xor, --or) or any cm-generated source. I should probably
+  hard-code it and also implement a command-line override switch.
+  --max-sources/-m ? 
+
+*  merge_support: uint64_t num_combos{200'000'000}; // hard-coded chunk size
+   should probably (eventually) figure out:
+   - hardcoded:
+   - GD = goal duration (ms) per chunk (e.g. 50ms)
+   - CS = combos per SM that can be done in GD (e.g. 20M)
+   - MB = max bytes, to limit on-device memory (e.g. 1GB) 
+   - calculated:
+   - MC = max combos that can be done in GD: (CS * num_sm), (e.g. 200M for 10sm, 1B for 50sm)
+   * I may also want to eventually divide MB by StreamCount and use multiple streams.
+* Optimizing merge/get_compat_combos. 200M combos currently, and no streams.
+  Low reward atm, but eventually might make sense.
+  * 200M kernel finishes in ~35ms, which DOES NOT give us enough time to do
+    all the things we want, when interleaving streams:
+    * copy results from device (~10ms)
+    * iterate results and append indices to "hit indices" list. (~135ms)
+    * mayyybe do some source-merging on CPU. not sure. very possibly though,
+      given that the #of hits is a overall a very small (??ms)
+  * it seems like a decent sized chunk of device memory to alloc/copy, esp
+    if there are multiple streams (x2, x3 that amount).
 
 * why isn't nameListMap printed for sentence9
 
-* TWO things:
-  * synonyms need to be global. probably all of them. global hash map.
-    this will reduce load time and merge time. not 100% sure how to go about
-    implementing thouhg. but should figure it out.
-  * does host_merge actually need primaryNameSrcList, ncList anymore?
-    probably yes for the -t case? maybe no for -c case.
+* synonyms need to be global. probably all of them. global hash map.
+  this will reduce load time and merge time. not 100% sure how to go about
+  implementing thouhg. but should figure it out.
 
 * can i build the knownNcSourceListMap during loadClues?
 
@@ -43,18 +62,6 @@
   * gonna require moving ClueManger.knownSourceMaps data to c++
 
 * investigate loadClues time. It's going to get worse I bet.
-  * -1s by removing extra unnecessary compatibilty check in initSrcBits.
-  * we're currently loading, then, validating, then initialize src bits.
-    what if we loaded, and initialized src bits in the validator? wouldn't
-    that make validation faster?
-  * If I had to guess i'd say Validator.isValidResult is a bottleneck here
-    (profiling just loadClues could probably confirm this). It calls a function
-    that calls _.uniqBy(), a known very slow function.
-  * Even just replacing that with populating a Set() and comparing to expected
-    size I bet would chop off a significant chunk of time.
-  * But if we're going to do that, why not just build the set dynamically as
-    we build the expected result?
-  * And then, if we're goint to build a set, why not just populate a bitfield?
 
 * can i sort sources within each device_sources list, in order of the smallest
   xor_sources IndexSpanPair they will test against? like, could I store
@@ -95,18 +102,6 @@
     such as a single worker thread and a locking queue, and maybe some other
     synchronization primitives, just for the sake of using them. performance
     may or may not be any better.
-
-* Optimizing merge/get_compat_combos. 200M combos currently, and no streams.
-  Low reward atm, but eventually might make sense.
-  * 200M kernel finishes in ~35ms, which DOES NOT give us enough time to do
-    all the things we want, when interleaving streams:
-    * copy results from device (~10ms)
-    * iterate results and append indices to "hit indices" list. (~135ms)
-    * mayyybe do some source-merging on CPU. not sure. very possibly though,
-      given that the #of hits is a overall a very small (??ms)
-  * it seems like a decent sized chunk of device memory to alloc/copy, esp
-    if there are multiple streams (x2, x3 that amount).
-
 
 * WHEN MERGE EXCEEDS UINT64_T: when I get to this point, which will likely
   result from too many --xor args being specified (although could also happen
