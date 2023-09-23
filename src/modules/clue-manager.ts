@@ -266,7 +266,9 @@ export const loadClueList = (count: number,
 };
 
 const loadSentence = (num: number, args: any): number => {
-    console.error(`loading sentence ${num}`);
+    if (args.verbose) {
+        console.error(`loading sentence ${num}`);
+    }
     let maxClues = 0;// TODO
     State.sentences[num] = Sentence.load(State.dir, num);
     return maxClues;
@@ -419,7 +421,7 @@ const initUniquePrimaryClueNames = (primaryClueList: ClueList.Primary,
 }
 
 const primaryClueListPostProcessing = (primaryClueList: ClueList.Primary,
-    addVariations: boolean): void =>
+    args: any): void =>
 {
     // todo: got this backwards
     const sentences: Sentence.Type[] = State.sentences;
@@ -442,16 +444,21 @@ const primaryClueListPostProcessing = (primaryClueList: ClueList.Primary,
     let uniqueComponentNames = new Set<string>();
     for (let i = 1; i < sentences.length; ++i) {
         const sentence = sentences[i];
-        Assert(sentence, `sentence(${i})`);
+        // just info, but i want it output to stderr
+        if (args.verbose) {
+            console.error(`sentence ${i}:`);
+        }
+        Assert(sentence, `sentence ${i}:`);
         const names = Sentence.getUniqueComponentNames(sentence);
         names.forEach(name => uniqueComponentNames.add(name));
-        const container = Sentence.buildAllCandidates(sentence, variations);
+        const container = Sentence.buildAllCandidates(sentence, variations, args);
         State.allCandidates[i] = container;
-        // just info, but i want it output to stderr
-        console.error(`sentence ${i}, names: ${names.size}, variations: ${container.candidates.length}`);
+        if (args.verbose) {
+            console.error(` names: ${names.size}, variations: ${container.candidates.length}`);
+        }
     }
     State.uniquePrimaryClueNames = initUniquePrimaryClueNames(primaryClueList,
-      uniqueComponentNames, addVariations ? sentences : undefined);
+      uniqueComponentNames, args.addVariations ? sentences : undefined);
     State.variations = variations;
     State.sentences = sentences;
     // Call addKnownPrimaryClues() last, after candidates are built
@@ -476,7 +483,7 @@ export const loadAllClues = function (args: any): void {
     }
     primaryClueList = autoSource(primaryClueList, args);
     // if using -t, add primary variations to uniqueNames
-    primaryClueListPostProcessing(primaryClueList, args.addVariations);
+    primaryClueListPostProcessing(primaryClueList, args);
     const pp0 = new Date();
     for (let count = 2; count <= args.max_sources; ++count) {
         let clueList: ClueList.Compound = loadClueList(count);
@@ -484,7 +491,9 @@ export const loadAllClues = function (args: any): void {
         addKnownCompoundClues(clueList, count, args);
     }
     const pp_dur = new Duration(pp0, new Date()).milliseconds;
-    console.error(`addCompound max(${args.max_sources}) - ${PrettyMs(pp_dur)}`);
+    if (args.verbose) {
+        console.error(`addCompound max(${args.max_sources}) - ${PrettyMs(pp_dur)}`);
+    }
     State.loaded = true;
 };
 

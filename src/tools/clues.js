@@ -114,6 +114,7 @@ const loadClues = (clues, max, options) => {
         max_sources: options.max_sources,
         useSentences: true,
         quiet: options.quiet,
+        verbose: options.verbose,
         ignoreErrors: options.ignoreErrors,
         fast: !options.slow,
         addVariations: !!options.test,
@@ -327,8 +328,8 @@ async function main () {
     options.removeAllInvalid = Boolean(options['remove-all-invalid']);
     let showKnownArg = options['show-known'];
     options.copy_from = options['copy-from'];
-    console.error(`max-sources(${options['max-sources']})`);
     options.max_sources = _.toNumber(options['max-sources'] || 20);
+    console.error(`max_sources(${options.max_sources})`);
     options.maxArg = _.toNumber(options.max || 0);  // TODO: make this not used
     let maxArg = _.toNumber(options.max || 2);
     if (!options.count) {
@@ -390,8 +391,8 @@ async function main () {
     console.error(`loadClues(${PrettyMs(loadMillis)})`);
     setLogging(false); //options.verbose);
 
-    console.error(`merge_nclc: ${Validator.merge_nclc}`);
-//    process.exit(0);
+    //console.error(`merge_nclc: ${Validator.merge_nclc}`);
+    //process.exit(0);
 
     options.notebook = options.notebook || Note.getWorksheetName(clueSource);
 

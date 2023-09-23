@@ -214,15 +214,13 @@ const getCombosForUseNcLists = (sum: number, max: number, pcd: PreCompute.Data,
     if (args.verbose) {
         console.error(`sum(${sum}) combos(${comboCount})` +
             ` variations(${totalVariations}) - ${duration}ms `);
-/*
+        /*
         const cs = NativeComboMaker.getCandidateStatsForSum(sum);
         console.error(`  sourceLists(${cs.sourceLists})` +
             `, totalSources(${cs.totalSources})` +
             `, comboMapIndices(${cs.comboMapIndices})` +
             `, totalCombos(${cs.totalCombos})`);
-*/
-    } else {
-        process.stderr.write('.');
+        */
     }
     NativeComboMaker.filterCandidatesForSum(sum, args.tpb, args.streams,
       args.stride, args.iters, args.synchronous);
@@ -342,7 +340,6 @@ export const makeCombos = (args: any): any => {
             ClueManager.filter(comboList, 0, totals);
         }
         let d = new Duration(begin, new Date()).milliseconds;
-        if (!args.verbose) console.error('');
         console.error(`--combos, total(${total}), known(${totals.known})` +
             `, reject(${totals.reject}), dupes(${totals.duplicate})` +
             ` - ${PrettyMs(d)}`);

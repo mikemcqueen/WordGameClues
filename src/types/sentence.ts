@@ -374,18 +374,17 @@ const buildNameIndicesMap = (candidates: Candidate[]): NameIndicesMap =>
     return map;
 };
 
-export const buildAllCandidates = (sentence: Type, variations: Variations):
+export const buildAllCandidates = (sentence: Type, variations: Variations, args: any):
     CandidatesContainer =>
 {
-    let log = true;
     let candidates: Candidate[] = [];
     let src = 1_000_000 * sentence.num; // up to 10000 variations of up to 100 names
     // TODO: similar logic to getUniqueComponentNames() which is unfortunate
     const sortedText = stripAndSort(sentence.text);
     for (const combo of sentence.combinations) {
         const nameListMap = buildCandidateNameListMap(combo.split(' '), sentence.components);
-        if (log) {
-            console.error(`nameListMap(${nameListMap.size}) :`);
+        if (args.verbose) {
+            console.error(` nameListMap(${nameListMap.size}) :`);
             for (let list of nameListMap.values()) {
                 console.error(`  ${list}`);
             }
