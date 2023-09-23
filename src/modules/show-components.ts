@@ -187,7 +187,19 @@ const showCountLists = (nameList: string[], result: any, options: any): any => {
     return Object.assign(result, { added: count });
 };
 
-const show = (options: any): any => {
+
+const slow_show = (nameList: string[], options: any) => {
+    Assert(0 && "slow_show broken; consider removing");
+    const nameCsv = nameList.toString();
+    const result = []; // = ClueManager.getCountListArrays(nameCsv, options);
+    if (!result) {
+        console.log('No matches');
+        return null;
+    }
+    return showCountLists(nameList, result, options);
+};
+
+export const show = (options: any): any => {
     Expect(options).is.an.Object();
     Expect(options.test).is.a.String();
     if (options.reject) {
@@ -225,16 +237,6 @@ const show = (options: any): any => {
     } else {
         return slow_show(nameList, options);
     }
-};
-
-const slow_show = (nameList: string[], options: any) => {
-    const nameCsv = nameList.toString();
-    const result = ClueManager.getCountListArrays(nameCsv, options);
-    if (!result) {
-        console.log('No matches');
-        return null;
-    }
-    return showCountLists(nameList, result, options);
 };
 
 function addOrRemove (args, nameList, countSet, options) {
@@ -426,35 +428,17 @@ function showNcLists (ncLists) {
     }
 }
 
-//
+////////
 
-function validate (filename, options: any = {}) {
-    const lines = readlines(filename);
-    if (options.combos) {
-        validate_combos(lines, options);
-    } else {
-        validate_sources(lines, options);
+function readlines(filename): string[] {
+    const path = Path.normalize(`${Path.dirname(module.filename)}/tools/${filename}`);
+    const readLines = new Readlines(filename);
+    let lines: string[] = [];
+    let line;
+    while ((line = readLines.next()) !== false) {
+        lines.push(line.toString().trim());
     }
-}
-
-function validate_combos(lines, options): void {
-    const combos: string[] = [];
-    let input = lines;
-    for (;;) {
-        Timing(``);
-        const raw_combo_list = all_combos(input, lines);
-        Timing(`all_combos (${raw_combo_list.length})`);
-        if (_.isEmpty(raw_combo_list)) break;
-        Debug(`raw: ${typeof(raw_combo_list)}, len: ${raw_combo_list.length}: ${raw_combo_list}`);
-        let valid_combo_list = valid_combos(raw_combo_list);
-        if (_.isEmpty(valid_combo_list)) break; 
-        Timing(`valid combos (${valid_combo_list.length})`);
-        combos.push(...valid_combo_list);
-        input = valid_combo_list;
-    }
-    combos.forEach(combo => {
-        console.log(`${combo}`);
-    });
+    return lines;
 }
 
 function valid_combos(combo_list: string[], options: any = {}): string[] {
@@ -501,27 +485,39 @@ function all_combos(input_list: string[], word_list: string[]): string[] {
 
 function validate_sources(lines, options) {
     for (const line of lines) {
-        const result = ClueManager.getCountListArrays(line, options);
+        const result: any = {}; // ClueManager.getCountListArrays(line, options);
         if (!result || !result.valid) {
             console.log(`${line} ${!result ? 'doesnt exist??' : result.invalid ? 'invalid' : 'rejected'}`);
         }
     }
 }
 
-function readlines(filename): string[] {
-    const path = Path.normalize(`${Path.dirname(module.filename)}/tools/${filename}`);
-    const readLines = new Readlines(filename);
-    let lines: string[] = [];
-    let line;
-    while ((line = readLines.next()) !== false) {
-        lines.push(line.toString().trim());
+function validate_combos(lines, options): void {
+    const combos: string[] = [];
+    let input = lines;
+    for (;;) {
+        Timing(``);
+        const raw_combo_list = all_combos(input, lines);
+        Timing(`all_combos (${raw_combo_list.length})`);
+        if (_.isEmpty(raw_combo_list)) break;
+        Debug(`raw: ${typeof(raw_combo_list)}, len: ${raw_combo_list.length}: ${raw_combo_list}`);
+        let valid_combo_list = valid_combos(raw_combo_list);
+        if (_.isEmpty(valid_combo_list)) break; 
+        Timing(`valid combos (${valid_combo_list.length})`);
+        combos.push(...valid_combo_list);
+        input = valid_combo_list;
     }
-    return lines;
+    combos.forEach(combo => {
+        console.log(`${combo}`);
+    });
 }
 
-//
-
-module.exports = {
-    show,
-    validate
-};
+export function validate (filename, options: any = {}) {
+    Assert(0 && "validate broken, don't use ClueManager.getCountListArrays");
+    const lines = readlines(filename);
+    if (options.combos) {
+        validate_combos(lines, options);
+    } else {
+        validate_sources(lines, options);
+    }
+}

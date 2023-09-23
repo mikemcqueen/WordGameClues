@@ -440,9 +440,9 @@ const primaryClueListPostProcessing = (primaryClueList: ClueList.Primary,
     // Generate unique *component* names (no name variations)
     // Build all candidates using name variations
     let uniqueComponentNames = new Set<string>();
-    for (let i = 0; i < sentences.length; ++i) {
+    for (let i = 1; i < sentences.length; ++i) {
         const sentence = sentences[i];
-        if (!sentence) continue;
+        Assert(sentence, `sentence(${i})`);
         const names = Sentence.getUniqueComponentNames(sentence);
         names.forEach(name => uniqueComponentNames.add(name));
         const container = Sentence.buildAllCandidates(sentence, variations);
@@ -642,8 +642,7 @@ const addKnownCompoundClues = (clueList: ClueList.Compound, clueCount: number,
 {
     Assert(clueCount > 1);
     // this is currently only callable once per clueCount.
-    Assert(!getKnownClueMap(clueCount));
-    Assert(!getKnownSourceMap(clueCount));
+    Assert(!getKnownClueMap(clueCount) && !getKnownSourceMap(clueCount));
 
     State.knownClueMapArray[clueCount] = {};
     State.knownSourceMapArray[clueCount] = {};
@@ -1270,7 +1269,7 @@ const getListOfPrimaryNameSrcLists = (ncList: NameCount.List):
             const entry = item.entry;
             Assert(entry && entry.results && _.isArray(entry.results) &&
                 _.isEmpty(entry.results), `${entry}`);
-                // && !_.isEmpty(item.sources));
+            //unused: && !_.isEmpty(item.sources));
             return entry.results.map((result: ValidateResult) => result.nameSrcList);
         });
         listOfPrimaryNameSrcLists.push(primaryNameSrcLists);
@@ -1359,6 +1358,9 @@ export const fast_getCountListArrays = (nameCsv: string, options: any): any[] =>
 //
 // Document what this does.
 //
+// TODO: unused. and, maybe never need to look at this again. but consider
+// replacing with version implemented in show-components if so.
+// there's also a fast_ version, which may not need to exist.
 
 let invalidHash: any = {}; // hax
 
@@ -1443,155 +1445,3 @@ export const getCountListArrays = (nameCsv: string, options: any): any => {
     }
     return { valid, known, rejects, invalid, clues, addRemoveSet };
 };
-
-// haxy.  Consider: Extends Clue.Compound + count: number
-interface ClueIndex extends NameCount.Type {
-    source: string;  // csv of names, or primary source #
-}
-
-interface RecursiveNode extends ClueIndex {
-    recurse: boolean;
-}
-
-const getClue = (clueIndex: ClueIndex): Clue.Any => {
-    const list = getClueList(clueIndex.count);
-    // TODO:consider "restrict fields" to name/src if extend Clue.Compound
-    let clue: Clue.Any = _.find(list, { name: clueIndex.name, src: clueIndex.source }) as Clue.Any;
-    if (clue) return clue;
-    
-    console.error(`no clue for ${clueIndex.name}:${clueIndex.count} as ${clueIndex.source}(${typeof clueIndex.source})`);
-    // TODO:consider "restrict fields" to name if extend Clue.Compound
-    clue = _.find(list, { name: clueIndex.name }) as Clue.Any;
-    if (clue) console.error(`  found ${clueIndex.name} in ${clueIndex.count} as ${Stringify(clue)}`);
-    throw new Error(`no clue`);
-};
-
-//
-// key types:
-//   if value is non-array object value-type
-// A.  if key has more than one subkey, source is sortedSubKeyNames
-//   - else key has only one subkey,
-//     - confirm subkey value type is array
-// B.    if key is non-primary, source is splitSubkeyNames
-// C.    else key is primary, sources is val[key][0].split(',')[1].toNumber();
-//   else array value-type
-// D.  array value type, add one node for each value[0].split(',') name:_.toNumber(src) entry, no subkeys
-
-//{
-// A.
-//  'jack:3': {             // non-array value type, more than one subkey, source is sortedSubKeyNames, recurse
-// B:
-//    'card:2': {           // non-array value type, one subkey, key is non-primary, source is splitSubkeyNames, recurse
-// D:
-//  'bird:1,red:1': [   // array value type: add one node for each value[0].split(',') name:_.toNumber(src) entry, no recurse
-//    'bird:2,red:8'
-//  ]
-//    },
-// C:                       
-//    'face:1': {           // non-array value type, one subkey, key is primary, sources is val[key][0].split(':')[1].toNumber(), no recurse
-//  'face:1': [
-//    'face:10'
-//  ]
-//    }
-//  }
-//}
-//
-//{
-// D:
-//  'face:1': [
-//    'face:10'
-//  ]
-//}
-//
-export let recursiveGetCluePropertyCount = function (
-    nc: NameCount.Type | null,
-    resultMap: any, // object | string[] | NameCount.Type[] ? probably fix resultMap before attempting this.
-    propertyName: Clue.PropertyName.Any,
-    top: boolean = true): Clue.PropertyCounts.Type
-{
-    const loggy = 0;
-    if (top && loggy) console.log(`${Stringify(resultMap)}`);
-
-    const keys: string[] = Object.keys(resultMap);
-    let nodes: RecursiveNode[] = _.flatMap(keys, key => {
-        // TODO: BUG:: key may be a ncCsv
-        let val: any = resultMap[key];
-        Assert(_.isObject(val), `Mystery key: ${key}`);
-        // A,B,C: non-array object value type
-        if (!_.isArray(val)) {
-            let nc = NameCount.makeNew(key);
-            let source: string;
-            let subkeys: string[] = Object.keys(val);
-            let recurse = true;
-            if (subkeys.length > 1) {
-                // A: more than one subkey
-                source = NameCount.nameListFromStrList(subkeys).sort().toString();
-            } else { // only one subkey
-                if (nc.count !== 1) {
-                    // B. non-primary key
-                    source = NameCount.nameListFromCsv(subkeys[0]).toString();
-                } else {
-                    // C. primary key
-                    // first array element
-                    // ugly. TS requiring it. typify resultmap to fix.
-                    let ncList= (val as Record<string, NameCount.List>)[key];
-                    source = `${ncList[0].count}`;
-                    recurse = false;
-                }
-            }
-            return { name: nc.name, count: nc.count, source, recurse };
-        } else {
-            // D: array value type 
-            // first array element
-            let csv = val[0].toString();
-            let list = NameCount.makeListFromCsv(csv);
-            return list.map(sourceNc => {
-                return {
-                    name: sourceNc.name,
-                    count: 1,
-                    source: `${sourceNc.count}`,
-                    recurse: false
-                };
-            });
-        }
-    });
-    // in the case of e.g., -t night, the above code only considers the components of night,
-    // but not night:N itself. that's represented by 'nc' here. nc.count *should never* be 1,
-    // as it's unnecessary to call this function if it is.
-    if (nc) {
-        Assert(nc.count !== 1);
-        nodes.push({
-            name: nc.name,
-            count: nc.count,
-            source: NameCount.nameListFromStrList(keys).sort().toString(),
-            recurse: false
-        });
-    }
-    let counts = Clue.PropertyCounts.empty();
-    for (let node of nodes) {
-        if (loggy) console.log(Stringify(node));
-        const clue = getClue(node);
-        // primary clues only: add pre-computed propertyCount data to total, if it exists
-        if (Clue.isPrimary(clue)) {
-            clue.propertyCounts && Clue.PropertyCounts.add(counts, clue.propertyCounts[propertyName]);
-        } else {
-            Assert(node.count > 1);
-            // compound clue: there is no propertyCount data, so just add the count (1 or 0)
-            // of the properties on the clue itself
-            Clue.PropertyCounts.add(counts, Clue.PropertyCounts.getCounts(clue, propertyName));
-        }
-        if (loggy) {
-            if (clue[propertyName]) {
-                console.log(`^^${propertyName}! total${counts.total} primary(${counts.primary}`);
-            } else {
-                console.log(`${Clue.toJSON(clue)}, clue[${propertyName}]=${clue[propertyName]}`);
-            }
-        }
-        if (node.recurse) {
-            let val = resultMap[NameCount.makeCanonicalName(node.name, node.count)];
-            Clue.PropertyCounts.add(counts, recursiveGetCluePropertyCount(null, val, propertyName, false));
-        }
-    }
-    return counts;
-};
-
