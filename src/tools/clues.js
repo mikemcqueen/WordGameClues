@@ -69,7 +69,8 @@ const CmdLineOptions = Opt.create(_.concat(Clues.Options, [
     ['t', 'test=SOURCE[,SOURCE,...]',          'test the specified source list, e.g. blue,fish' ],
     ['',  'add=NAME',                          '  add compound clue NAME=SOURCE; use with --test' ],
     ['',  'remove=NAME',                       '  remove compound clue NAME=SOURCE; use with --test' ],
-    ['',  'property=PROP',                     '    add PROP:true, or remove PROP from existing compound clues matching NAME=SOURCE; use with --test --add/--remove' ],
+    ['',  'property=PROP',                     '    add PROP:true, or remove PROP from existing compound clues' +
+                                                  ' matching NAME=SOURCE; use with --test --add/--remove' ],
     ['',  'reject',                            '  add combination to reject list; use with --test' ],
     ['',  'fast',                              '  use fast method' ],
     ['',  'validate',                          '  treat SOURCE as filename, validate all source lists in file'],
@@ -78,8 +79,9 @@ const CmdLineOptions = Opt.create(_.concat(Clues.Options, [
     ['',  'allow-used',                        '  allow used clues in clue combo generation' ],
     ['',  'any',                               '  any match (uh, probably should not use this)'],
     ['',  'production',                        'use production note store'],
-    ['',  'sentence',                          'load clues from sentence files (that have source="sentence" property)' ],
     ['',  'sort-all-clues',                    'sort all clue data files by src'],
+    ['m', 'max-sources=COUNT',                 'enforce COUUNT max primary sources for a single clue;' +
+                                               ' impacts clue loading, combo generation'],
     ['R', 'remove-all-invalid',                'remove all invalid (validation error) clues'],
     ['z', 'flags=OPTION+',                     'flags: 2=ignoreErrors' ],
     ['v', 'verbose',                           'more output'],
@@ -104,16 +106,17 @@ function usage (msg) {
     process.exit(-1);
 }
 
-function loadClues (clues, max, options) {
+const loadClues = (clues, max, options) => {
     log('loading all clues...');
     ClueManager.loadAllClues({
         clues,
         max,
+        max_sources: options.max_sources,
         useSentences: true,
         quiet: options.quiet,
         ignoreErrors: options.ignoreErrors,
         fast: !options.slow,
-        addVariations: (options.test !== undefined),
+        addVariations: !!options.test,
         validateAll: true,
         removeAllInvalid: options.removeAllInvalid
     });
@@ -206,8 +209,7 @@ function copyClues (fromType, options = {}) {
     const dir = fromType.baseDir;
     let total = 0;
     let copied = 0;
-    let max = options.max ? options.max : 20;
-    for (let count = 2; count < max; ++count) {
+    for (let count = 2; count < options.max_sources; ++count) {
         let list;
         try {
             list = ClueManager.loadClueList(count, { dir });
@@ -315,7 +317,6 @@ async function main () {
     const options = opt.options;
 
     // TODO: get rid of this, just pass Opt.options around
-    let maxArg = _.toNumber(options.max);
     let useClueList = options.use;
     let showSourcesClueName = options['show-sources'];
     let altSourcesArg = options['alt-sources'];
@@ -326,18 +327,19 @@ async function main () {
     options.removeAllInvalid = Boolean(options['remove-all-invalid']);
     let showKnownArg = options['show-known'];
     options.copy_from = options['copy-from'];
-    options.maxArg = maxArg;
-    if (!maxArg) maxArg = 2; // TODO: default values in opt
+    console.error(`max-sources(${options['max-sources']})`);
+    options.max_sources = _.toNumber(options['max-sources'] || 20);
+    options.maxArg = _.toNumber(options.max || 0);  // TODO: make this not used
+    let maxArg = _.toNumber(options.max || 2);
     if (!options.count) {
         needCount = true;
-
         if (showSourcesClueName ||
             altSourcesArg ||
             allAltSourcesFlag ||
             showKnownArg ||
             useClueList ||
             options.test ||
-        options.copy_from ||
+            options.copy_from ||
             options['sort-all-clues'])
         {
             needCount = false;
@@ -365,7 +367,7 @@ async function main () {
     }
 
     let clueSource = Clues.getByOptions(options);
-    let load_max = clueSource.clueCount;
+    let load_max = options.max_sources;
 
     if (options['sort-all-clues']) {
         sortAllClues(clueSource, load_max);
@@ -387,6 +389,9 @@ async function main () {
     let loadMillis = new Duration(loadBegin, new Date()).milliseconds;
     console.error(`loadClues(${PrettyMs(loadMillis)})`);
     setLogging(false); //options.verbose);
+
+    console.error(`merge_nclc: ${Validator.merge_nclc}`);
+//    process.exit(0);
 
     options.notebook = options.notebook || Note.getWorksheetName(clueSource);
 
@@ -453,8 +458,9 @@ async function main () {
             xor:     options.xor,
             //and:     options.and,
             parallel: options.parallel,
-            verbose: options.verbose,
-            quiet: options.quiet,
+            verbose:  options.verbose,
+            quiet:    options.quiet,
+            max_sources: options.max_sources,
             tpb: options.tpb ? Number(options.tpb) : 0,
             streams: options.streams ? Number(options.streams) : 0,
             stride: options.stride ? Number(options.stride) : 0,

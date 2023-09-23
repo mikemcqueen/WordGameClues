@@ -40,10 +40,12 @@ function Stringify (val) {
 const getCountListArrays = (nameList: string[], pcResult: PreCompute.Result,
     options: any): any =>
 {
-    let addRemoveSet;
+    let addRemoveSet: Set<number> = new Set<number>();
+    /*
     if (options.add || options.remove) {
-        addRemoveSet = new Set();
+        addRemoveSet = new Set<number>();
     }
+    */
     let valid: any[] = [];
     let known: any[] = [];
     let clues: any[] = [];
@@ -191,11 +193,8 @@ const show = (options: any): any => {
     if (options.reject) {
         Expect(options.add).is.undefined();
     }
-
-    // TODO: move buildAllUseNcDataLists to clue-manager?  currently in combo-maker
-
     if (options.add) {
-        options.addMaxSum = ClueManager.getNumPrimarySources();
+        options.addMaxSum = 30;
     }
     if (options.remove) {
         options.removeMinSum = 0;
@@ -207,18 +206,21 @@ const show = (options: any): any => {
     if (options.fast) {
         // TODO: maybe all of this belongs in ClueManager. Because getCountListArrays()
         //       is called from so many places.
-        const args = {
+        const pc_args = {
             xor: nameList,
             merge_only: true, // wrap xorSources on return from Native.merge()
             max: 2,
+            max_sources: options.max_sources,
             quiet: options.quiet,
             ignoreErrors: options.ignoreErrors
         };
-        const pcResult = PreCompute.preCompute(2, ClueManager.getNumPrimarySources(), args);
-        const result = getCountListArrays(nameList, pcResult, options);
-        showCountLists(nameList, result, options);
-        // TODO: return something for valid_combos()
-        //process.exit(0);
+        const pcResult = PreCompute.preCompute(2, options.max_sources, pc_args);
+        if (pcResult.success) {
+            const result = getCountListArrays(nameList, pcResult, options);
+            showCountLists(nameList, result, options);
+        } else {
+            console.error(`Precompute failed.`);
+        }
         return 0;
     } else {
         return slow_show(nameList, options);

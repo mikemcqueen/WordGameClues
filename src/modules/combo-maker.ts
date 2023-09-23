@@ -257,7 +257,7 @@ const parallel_makeCombosForRange = (first: number, last: number, args: any): an
             //xormm: args.xormm,
             or: args.or,
             fast: args.fast,
-            load_max: ClueManager.getNumPrimarySources(),
+            load_max: ClueManager.getMaxClues(),
             parallel: true
             //,puse_syns: args.use_syns
             //,synonymMinMax: args.synonymMinMax

@@ -289,7 +289,8 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
     
   auto build0 = high_resolution_clock::now();
 
-  // TODO: I'm not convinced this data to hang around on host side.
+  // TODO: I'm not convinced this data needs to hang around on host side.
+  // maybe for async copy?
   MFD.xor_src_lists =
     std::move(buildSourceListsForUseNcData(ncDataLists, MFD.sourceListMap));
 
@@ -304,6 +305,7 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   }
 #endif
 
+  //--
   XorSourceList merge_only_xor_src_list;
   if (!merge_only || (MFD.xor_src_lists.size() > 1)) {
     // TODO: support for single-list compat indices
@@ -329,8 +331,6 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
     // merge-only returns wrapped xor_src_list
     return wrap(env, merge_only_xor_src_list);
   }
-  // TEMPORARY
-  //  MFD.xorSourceList = std::move(merge_only_xor_src_list);
   // filter returns number of compatible indices
   return Number::New(env, (uint32_t)MFD.combo_indices.size());
 }
@@ -346,36 +346,6 @@ void prepare_filter_indices() {
   auto idx_list_start_indices = make_start_indices(MFD.compat_idx_lists);
   MFD.device_idx_list_start_indices =
     alloc_copy_start_indices(idx_list_start_indices);
-
-#if TODO
-  // TEMPORARY>>
-  auto unsorted = []() {
-    std::vector<int> v;
-    v.resize(cm::MFD.xorSourceList.size());
-    iota(v.begin(), v.end(), 0);
-    return v;
-  }();
-  MFD.xorSourceIndices = std::move(unsorted);
-  MFD.device_xorSources = cuda_allocCopyXorSources(MFD.xorSourceList);
-  /*
-  MFD.device_legacy_xor_src_indices =
-    cuda_allocCopyXorSourceIndices(MFD.xorSourceIndices);
-  */
-  // <<TEMPORARY
-  MFD.device_combo_indices =
-    std::move(cuda_alloc_copy_combo_indices(MFD.combo_indices));
-  MFD.combo_indices = MFD.combo_indices.size();
-#endif
-
-  // for if/when i want to sort xor sources, which is probably a dumb idea.
-  /*
-  auto xorSourceIndices = []() {
-    IndexList v;
-    v.resize(MFD.xorSourceList.size());
-    iota(v.begin(), v.end(), (index_t)0);
-    return v;
-  }();
-  */
   auto variation_indices = buildSentenceVariationIndices(
     MFD.xor_src_lists, MFD.compat_idx_lists, MFD.combo_indices);
   MFD.device_variation_indices =

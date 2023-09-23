@@ -55,6 +55,9 @@ auto filterXorIncompatibleIndices(Peco::IndexListVector& index_lists,
 bool filterAllXorIncompatibleIndices(Peco::IndexListVector& idx_lists,
   const std::vector<SourceList>& src_lists)
 {
+  using namespace std::chrono;
+  auto t0 = high_resolution_clock::now();
+
   if (idx_lists.size() < 2u) return true;
   for (size_t first{}; first < idx_lists.size(); ++first) {
     for (size_t second{}; second < idx_lists.size(); ++second) {
@@ -65,6 +68,10 @@ bool filterAllXorIncompatibleIndices(Peco::IndexListVector& idx_lists,
       }
     }
   }
+  auto t1 = high_resolution_clock::now();
+  auto t_dur = duration_cast<milliseconds>(t1 - t0).count();
+  std::cerr << "  filter incompatible - " << t_dur << "ms" << std::endl;
+
   return true;
 }
 
@@ -508,7 +515,7 @@ auto cuda_get_compat_xor_src_indices(const std::vector<SourceList>& src_lists,
   assert(!src_lists.empty() && !idx_lists.empty()
          && !getNumEmptySublists(src_lists) && "cuda_merge: invalid param");
 
-  auto cdd0 = high_resolution_clock::now();
+  auto t0 = high_resolution_clock::now();
   size_t total_bytes_allocated{};
   size_t total_bytes_copied{};
   size_t num_bytes{};
@@ -541,9 +548,9 @@ auto cuda_get_compat_xor_src_indices(const std::vector<SourceList>& src_lists,
     // sync if we want accurate timing
     cudaError_t err = cudaStreamSynchronize(cudaStreamPerThread);
     assert(err == cudaSuccess);
-    auto cdd1 = high_resolution_clock::now();
-    auto cdd_dur = duration_cast<milliseconds>(cdd1 - cdd0).count();
-    std::cerr << " copy complete - " << cdd_dur << "ms" << std::endl;
+    auto t1 = high_resolution_clock::now();
+    auto t_dur = duration_cast<milliseconds>(t1 - t0).count();
+    std::cerr << "  copy complete - " << t_dur << "ms" << std::endl;
     std::cerr << "  allocated: " << total_bytes_allocated
               << ", copied: " << total_bytes_copied << std::endl;
   }
@@ -553,7 +560,7 @@ auto cuda_get_compat_xor_src_indices(const std::vector<SourceList>& src_lists,
   //  the only unnecessary capture here is src_lists
   for_each_list_pair(idx_lists, [&](size_t i, size_t j, size_t n) {
     if constexpr (0) {
-      std::cerr << " launching list_pair_compat_kernel " << n << " for [" << i
+      std::cerr << "  launching list_pair_compat_kernel " << n << " for [" << i
                 << ", " << j << "]" << std::endl;
     }
     run_list_pair_compat_kernel(
@@ -571,7 +578,7 @@ auto cuda_get_compat_xor_src_indices(const std::vector<SourceList>& src_lists,
     assert(err == cudaSuccess);
     auto lp1 = high_resolution_clock::now();
     auto lp_dur = duration_cast<milliseconds>(lp1 - lp0).count();
-    std::cerr << " list_pair_compat_kernels complete - " << lp_dur << "ms"
+    std::cerr << "  list_pair_compat_kernels complete - " << lp_dur << "ms"
               << std::endl;
   }
 
@@ -596,6 +603,10 @@ auto cuda_get_compat_xor_src_indices(const std::vector<SourceList>& src_lists,
   auto gcc_dur = duration_cast<milliseconds>(gcc1 - gcc0).count();
   std::cerr << "  get_compat_combos kernels complete (" << combo_indices.size()
             << ") - " << gcc_dur << "ms" << std::endl;
+
+  auto t1 = high_resolution_clock::now();
+  auto t_dur = duration_cast<milliseconds>(t1 - t0).count();
+  std::cerr << " cuda_get_compat_xor_src_indices - " << t_dur << "ms" << std::endl;
 
 #if defined(HOST_SIDE_COMPARISON)
   // host-side compat combo counter for debugging/comparison. slow.

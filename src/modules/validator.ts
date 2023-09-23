@@ -120,34 +120,6 @@ type VSFlags = {
     fast: boolean|undefined;
 }
 
-/*
-// part of restrictToSameClueNumber logic
-//
-const hasRestrictedPrimaryClueNumber = (nameSrc: NameCount.Type):
-    boolean =>
-{
-    let clue = ClueManager.getPrimaryClue(nameSrc);
-    return Boolean(clue?.restrictToSameClueNumber);
-};
-
-// part of restrictToSameClueNumber logic
-// precondition: hasRestrictedPrimaryClueNumber(nameSrc) === true
-const getRestrictedPrimaryClueNumber = (nameSrc: NameCount.Type):
-    number =>
-{
-    return ClueManager.getPrimaryClue(nameSrc)!.num;
-};
-
-// part of restrictToSameClueNumber logic
-//
-let allHaveSameClueNumber = (nameSrcList: NameCount.List, clueNumber: number):
-    boolean =>
-{
-    return nameSrcList.every(nameSrc =>
-        ClueManager.getPrimaryClue(nameSrc)?.num === clueNumber);
-};
-*/
-
 //
 //
 const getAllSourcesForPrimaryClueName = (name: string,
@@ -203,9 +175,12 @@ interface MergeNcListComboResult {
     validateResult?: ValidateResult;
 }
 
+export let merge_nclc = 0;
+
 const mergeNcListCombo = (ncList: NameCount.List, indexList: number[]):
     MergeNcListComboResult =>
 {
+    ++merge_nclc;
     let validateResult = emptyValidateResult();
     // indexList value is either an index into a resultMap.list (compound clue)
     // or a primary source (primary clue)
@@ -214,7 +189,6 @@ const mergeNcListCombo = (ncList: NameCount.List, indexList: number[]):
         if (nc.count > 1) { // compound clue
             const listIndex = indexList[i];
             const ncResult = ClueManager.getNcResultMap(nc.count)[nc.toString()].list[listIndex];
-            //if (!addUsedSourcesFromNameSrcList(validateResult.usedSources, ncResult.nameSrcList)) {
             if (!Source.isXorCompatible(validateResult, ncResult)) {
                 return { success: false };
             }
@@ -230,22 +204,6 @@ const mergeNcListCombo = (ncList: NameCount.List, indexList: number[]):
     }
     return { success: true, validateResult };
 };
-
-/*
-const isValidResult = (data: ValidateResultData): boolean => {
-    Assert(NameCount.listHasCompatibleSources(data.nameSrcList));
-    return true;
-};
-
-// not necessary in some better world
-const toValidateResult = (buildResult: BuildResultData): ValidateResult => {
-    return {
-        ncList : buildResult.ncList,
-        nameSrcList: buildResult.nameSrcList,
-        resultMap : buildResult.resultMap
-    };
-};
-*/
 
 type MergeNcListResultsArgs = VSFlags;
 
@@ -267,9 +225,7 @@ const mergeNcListResults = (ncListToMerge: NameCount.List,
         .getCombinations()
         .map((indexList: number[]) => mergeNcListCombo(ncListToMerge, indexList))
         .filter((mergeResult: MergeNcListComboResult) => mergeResult.success)
-//        .filter((mergeResult: MergeNcListComboResult) => isValidResult(mergeResult.validateResult!))
         .map((mergeResult: MergeNcListComboResult) => mergeResult.validateResult!)
-//        .map((data: ValidateResultData) => toValidateResult(data));
     return { success: !_.isEmpty(resultList), list: resultList };
 };
 
@@ -400,7 +356,7 @@ let validateSourcesForNameCountLists = (clueName: string|undefined, nameList: st
 export const validateSources = (clueName: string|undefined, args: any):
     ValidateSourcesResult =>
 {
-    Debug('++validateSources(${clueName}' +
+    Debug(`++validateSources(${clueName})` +
           `${indentNewline()}  nameList(${args.nameList.length}): ${args.nameList}` +
           `, sum(${args.sum})` +
           `, count(${args.count})` +

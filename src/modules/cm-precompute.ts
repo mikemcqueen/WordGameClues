@@ -176,14 +176,19 @@ const largestNcDataCountSum = (ncDataList: NCDataList): [number, NameCount.List]
 const buildAllUseNcDataLists = (useArgsList: string[], maxSum: number): NCDataList[] => {
     const combinationNcLists = getCombinationNcLists(useArgsList);
     const ncDataLists = combinationsToNcDataLists(combinationNcLists)
-    return ncDataLists.filter((ncDataList: NCDataList) => {
+    let begin = new Date();
+    let r = ncDataLists.filter((ncDataList: NCDataList) => {
         const [largest, ncList] = largestNcDataCountSum(ncDataList);
         if (largest > maxSum) {
             // NOTE this doesn't display the largest ncList
-            console.error(`skipping ${largest}, ${NameCount.listToString(ncList)}`);
+            //console.error(`skipping ${largest}, ${NameCount.listToString(ncList)}`);
         }
         return largest <= maxSum;
     });
+    let d = new Duration(begin, new Date()).milliseconds;
+    console.error(` buildAllUseNc max(${maxSum}) - ${PrettyMs(d)}`);
+
+    return r;
 };
 
 //////////
@@ -459,9 +464,7 @@ const buildUseSourceListsFromNcData = (sourceListMap: Map<string,
 };
 
 export const preCompute = (first: number, last: number, args: any): Result => {
-    // maximum sum for a single --xor, --or
-    const maxSum = ClueManager.getNumPrimarySources() - 1;
-    // maximum sum for all --xor, --or, combined
+    const maxSum = args.max_sources - 1;
 
     const begin = new Date();
     args.allXorNcDataLists = args.xor ? buildAllUseNcDataLists(args.xor, maxSum) : [ [] ];

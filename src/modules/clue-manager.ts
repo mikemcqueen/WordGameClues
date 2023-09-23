@@ -75,12 +75,12 @@ type InternalStateBase = {
     logLevel: number;
     
     maxClues: number;
-    numPrimarySources: number;
+//    numPrimarySources: number;
 }
 
 type InternalState = InternalStateBase & AllCandidatesContainer;
 
-let initialState = (): InternalState => {
+const initialState = (): InternalState => {
     return {
         clueListArray: [],
         knownClueMapArray: [],
@@ -105,8 +105,6 @@ let initialState = (): InternalState => {
         logLevel: 0,
         
         maxClues: 0,
-        numPrimarySources: 0,
-
         allCandidates: []
     };
 }
@@ -115,7 +113,7 @@ let State: InternalState = initialState();
 
 export let isLoaded = (): boolean => { return State.loaded; }
 export function getMaxClues (): number { return State.maxClues; }
-export function getNumPrimarySources(): number { return State.numPrimarySources; }
+//export function getNumPrimarySources(): number { return State.numPrimarySources; }
 export function setLogging (onOff: boolean): void { State.logging = onOff; }
 
 export function getClueList (index: number): ClueList.Any {// Compound {
@@ -274,8 +272,7 @@ const loadSentence = (num: number, args: any): number => {
     return maxClues;
 };
 
-const autoSource = (clueList: ClueList.Primary, args: any):
-    [ClueList.Primary, number] =>
+const autoSource = (clueList: ClueList.Primary, args: any): ClueList.Primary =>
 {
     let source = 0;
     let clueNumber = 0;
@@ -288,11 +285,8 @@ const autoSource = (clueList: ClueList.Primary, args: any):
         // clue.num check must happen before clue.ignore check
         if (clue.num) {
             clueNumber = Number(clue.num);
-            const isSentence: boolean = args.useSentences && (clue.source === "sentence");
-            if (isSentence) {
-                loadSentence(clueNumber, args);
-            }
-            skipThisClue = isSentence;
+            loadSentence(clueNumber, args);
+            skipThisClue = true;
         }
         if (skipThisClue) continue;
         if (clue.ignore) {
@@ -326,7 +320,7 @@ const autoSource = (clueList: ClueList.Primary, args: any):
     // to bigger numbers, making this output untenable
     Debug(`autoSource: ${source} primary clues, ` +
         `${actualClues.reduce((srcList: string[], clue: Clue.Primary) => { srcList.push(clue.src || "undefined"); return srcList; }, [])}`);
-    return [actualClues, source];
+    return actualClues;
 };
 
 const addPrimaryNameSrcToMap = (name: string, src: string): void => { // TODO: src: number?
@@ -474,26 +468,23 @@ export const loadAllClues = function (args: any): void {
     if (args.ignoreErrors) {
         State.ignoreLoadErrors = true;
     }
-    State.maxClues = args.max; // args.clues.clueCount;
+    State.maxClues = args.max;
 
     let primaryClueList: ClueList.Primary = loadClueList(1) as ClueList.Primary;
-    if (primaryClueList[0].src === 'auto') {
-        let numPrimarySources;
-        [primaryClueList, numPrimarySources] = autoSource(primaryClueList, args);
-        State.numPrimarySources = 30; // TODO: wrongish
-        // if using -t, add primary variations to uniqueNames
-        primaryClueListPostProcessing(primaryClueList, args.addVariations);
-    } else {
-        throw new Error('numPrimarySources not initialized without src="auto"');
+    if (primaryClueList[0].src !== 'auto') {
+        throw new Error('something something src="auto"');
     }
+    primaryClueList = autoSource(primaryClueList, args);
+    // if using -t, add primary variations to uniqueNames
+    primaryClueListPostProcessing(primaryClueList, args.addVariations);
     const pp0 = new Date();
-    for (let count = 2; count <= State.numPrimarySources; ++count) {
+    for (let count = 2; count <= args.max_sources; ++count) {
         let clueList: ClueList.Compound = loadClueList(count);
         State.clueListArray[count] = clueList;
         addKnownCompoundClues(clueList, count, args);
     }
     const pp_dur = new Duration(pp0, new Date()).milliseconds;
-    console.error(`addCompound - ${PrettyMs(pp_dur)}`);
+    console.error(`addCompound max(${args.max_sources}) - ${PrettyMs(pp_dur)}`);
     State.loaded = true;
 };
 
@@ -983,7 +974,7 @@ const getClueCountListArray = (nameList: string[]): CountList[] => {
     // each count list contains the clueMapArray indexes in which
     // each name appears
     let countListArray: CountList[] = Array(_.size(nameList)).fill(0).map(_ => []);
-    for (let count = 1; count <= State.maxClues; ++count) {
+    for (let count = 1; count <= getMaxClues(); ++count) {
         let map = State.knownClueMapArray[count];
         nameList.forEach((name, index) => {
             if (_.has(map, name)) {
@@ -1002,7 +993,7 @@ const getValidCounts = (nameList: string[], countListArray: any): number[] => {
     let reject = false;
     Peco.makeNew({
         listArray: countListArray,
-        max:       State.maxClues
+        max:       getMaxClues()
     }).getCombinations()
         .forEach((clueCountList: number[]) => {
             Debug(`nameList: ${nameList}, clueCountList: ${clueCountList}`);
@@ -1121,7 +1112,7 @@ const removeClueForCounts = (countSet: Set<number>, name: string, src: string,
 const getKnownClueIndexLists = (nameList: string[]): CountList[] => {
     let countListArray: CountList[] = Array(_.size(nameList)).fill(0).map(_ => []);
     // TODO: is maxClues correct here
-    for (let count = 1; count <= State.maxClues; ++count) {
+    for (let count = 1; count <= getMaxClues(); ++count) {
         const map = State.knownClueMapArray[count];
         if (!_.isUndefined(map)) {
             nameList.forEach((name, index) => {
