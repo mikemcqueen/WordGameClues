@@ -125,10 +125,13 @@ type VSFlags = {
 const getAllSourcesForPrimaryClueName = (name: string,
     allCandidates = ClueManager.getAllCandidates()): number[] =>
 {
+    let sources: number[] = [];
+    /*
     let clueList = ClueManager.getClueList(1) as ClueList.Primary;
     // add legacy clue sources
-    let sources: number[] = clueList.filter((clue: Clue.Primary) => clue.name === name)
+    sources = clueList.filter((clue: Clue.Primary) => clue.name === name)
         .map(clue => Number(clue.src));
+    */
     // add candidates clue sources
     allCandidates
         .filter((container: Sentence.CandidatesContainer) =>

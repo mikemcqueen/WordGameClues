@@ -60,8 +60,6 @@ const CmdLineOptions = Opt.create(_.concat(Clues.Options, [
     ['',  'allow-dupe-source',                 '  allow duplicate sources'],
     ['',  'merge-style',                       '  merge-style, no validation except for immediate sources'],
     ['',  'remaining',                         '  only word combos not present in any named note'],
-    ['i', 'primary-sources=SOURCE[,SOURCE,...]','limit results to the specified primary SOURCE(s)'],
-    ['',  'inverse',                           '  or the inverse of those source(s); use with -i'],
     ['k', 'show-known',                        'show compatible known clues; -u <clue> required' ],
     ['',  'csv',                               '  output in search-term csv format' ],
     ['',  'files',                             '  output in result file full-path format' ],
@@ -441,13 +439,6 @@ async function main () {
         Debug(`from: ${from.baseDir}`);
         copyClues(from, options);
     } else if (options.count) {
-        /*
-        let sources = options['primary-sources'];
-        if (options.inverse) {
-            sources = ClueManager.getInversePrimarySources(sources.split(',')).join(',');
-            console.log(`inverse sources: ${sources}`);
-        }
-        */
         return combo_maker({
             sum:     options.count,
             max:     maxArg,

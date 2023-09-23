@@ -21,10 +21,11 @@ const PrettyMs       = require('pretty-ms');
 const Stringify2 = require('stringify-object');
 const stringify = require('javascript-stringify').stringify;
 
-import * as NameCount from '../types/name-count';
 import * as Clue from '../types/clue';
 import * as ClueList from '../types/clue-list';
 import * as CountBits from '../types/count-bits-fastbitset';
+import * as MinMax from '../types/min-max';
+import * as NameCount from '../types/name-count';
 import * as Sentence from '../types/sentence';
 import * as Source from './source';
 import type { ValidateResult, ValidateSourcesResult } from './validator';
@@ -107,7 +108,7 @@ const initialState = (): InternalState => {
         maxClues: 0,
         allCandidates: []
     };
-}
+};
 
 let State: InternalState = initialState();
 
@@ -117,6 +118,7 @@ export function getMaxClues (): number { return State.maxClues; }
 export function setLogging (onOff: boolean): void { State.logging = onOff; }
 
 export function getClueList (index: number): ClueList.Any {// Compound {
+    Assert(index > 1, "cluelist(1) is bogus");
     return State.clueListArray[index];
 }
 
@@ -148,8 +150,9 @@ export const getCandidatesContainer = (sentence: number):
     Sentence.CandidatesContainer =>
 {
     return State.allCandidates[sentence];
-}
+};
 
+/*
 export const copyAllCandidates = (allCandidates: AllCandidates
     = State.allCandidates): AllCandidates =>
 {
@@ -160,6 +163,7 @@ export const copyAllCandidates = (allCandidates: AllCandidates
     }
     return result;
 }
+*/
 
 export const getUniqueClueNameCount = (clueCount: number) => {
     if (clueCount === 1) {
@@ -169,7 +173,7 @@ export const getUniqueClueNameCount = (clueCount: number) => {
     //if (!list) console.error(`no cluelist @ ${clueCount}`);
     // for now. could do better
     return (list && list.length) || 0;
-}
+};
 
 export const getUniqueClueName = (clueCount: number, nameIndex: number) => {
     if (clueCount === 1) {
@@ -177,7 +181,7 @@ export const getUniqueClueName = (clueCount: number, nameIndex: number) => {
     }
     // for now. could do better
     return getClueList(clueCount)[nameIndex].name;
-}
+};
 
 //
 
@@ -221,7 +225,7 @@ const anyCandidateHasClueName = (name: string, allCandidates: AllCandidates
         }
     }
     return false;
-}
+};
 
 export const isKnownNc = (nc: NameCount.Type): boolean => {
     // for legacy primary, and all compound clues
@@ -233,7 +237,7 @@ export const isKnownNc = (nc: NameCount.Type): boolean => {
         return anyCandidateHasClueName(nc.name);
     }
     return false;
-}
+};
 
 interface SaveClueListOptions {
     dir : string;
@@ -274,58 +278,15 @@ const loadSentence = (num: number, args: any): number => {
     return maxClues;
 };
 
-const autoSource = (clueList: ClueList.Primary, args: any): ClueList.Primary =>
-{
-    let source = 0;
-    let clueNumber = 0;
-    let ignoredClues: ClueList.Primary = [];
-    let actualClues: ClueList.Primary = [];
-    let firstClueWithSrc: Clue.Primary | undefined = undefined;
-    let skipThisClue = false;
-
+const autoSource = (clueList: ClueList.Primary, args: any): void => {
     for (let clue of clueList) {
-        // clue.num check must happen before clue.ignore check
         if (clue.num) {
-            clueNumber = Number(clue.num);
-            loadSentence(clueNumber, args);
-            skipThisClue = true;
+            loadSentence(_.toNumber(clue.num), args);
         }
-        if (skipThisClue) continue;
-        if (clue.ignore) {
-            if (clue.name) {
-                // setting clue.src = clue.name is a hack for property count
-                // propagation from dependent to parent ignored clues
-                clue.src = clue.name; 
-                ignoredClues.push(clue);
-            }
-            continue;
-        }
-        const isSameSrc = clue.src === "same";
-        if (isSameSrc) {
-            // propagate the .source field from the first clue with a specific
-            // src to all subsequent clues with the "same" src.
-            if (clue.source) {
-                throw new Error(`${clue.name}.src="same" has source="${clue.source}"`);
-            }
-            clue.source = firstClueWithSrc!.source;
-        } else {
-            source += 1;
-            // save the first clue with a specific src, to enable .source field
-            // propagation to subsequent clues with "same" src, above.
-            firstClueWithSrc = clue;
-        }
-        clue.src = `${source}`;
-        clue.num = clueNumber;
-        actualClues.push(clue);
     }
-    // TODO: doesn't include sentences.  and sources are about to change
-    // to bigger numbers, making this output untenable
-    Debug(`autoSource: ${source} primary clues, ` +
-        `${actualClues.reduce((srcList: string[], clue: Clue.Primary) => { srcList.push(clue.src || "undefined"); return srcList; }, [])}`);
-    return actualClues;
 };
 
-const addPrimaryNameSrcToMap = (name: string, src: string): void => { // TODO: src: number?
+const addPrimaryNameSrcToMap = (name: string, src: string): void => {
     const clueMap = getKnownClueMap(1);
     if (!_.has(clueMap, name)) {
         clueMap[name] = [];
@@ -341,14 +302,10 @@ const addPrimaryClueAndVariationsToMap = (clue: Clue.Primary,
     for (let nameVariation of nameVariations) {
         addPrimaryNameSrcToMap(nameVariation, clue.src);
     }
-}
+};
 
-const addKnownPrimaryClues = (clueList: ClueList.Primary): void => {
-    let clueMap = State.knownClueMapArray[1] = {};
-    // legacy clues
-    clueList.filter(clue => !clue.ignore)
-        .forEach(clue => addPrimaryNameSrcToMap(clue.name, clue.src));
-    // candidates clues
+const addKnownPrimaryClues = (): void => {
+    State.knownClueMapArray[1] = {};
     for (let container of getAllCandidates()) {
         if (!container) continue;
         for (let candidate of container.candidates) {
@@ -361,19 +318,12 @@ const addKnownPrimaryClues = (clueList: ClueList.Primary): void => {
     }
 };
 
-const addUniqueName = (toList: string[], name: string, 
-    hash: Set<string>, addAlways?: boolean): void =>
-{
-    let isUnique = !hash.has(name);
-    // always add unique name to hash
-    if (isUnique) {
+const addUniqueName = (toList: string[], name: string, hash: Set<string>): void => {
+    if (!hash.has(name)) {
         hash.add(name);
-    }
-    // add name to list if unique, or for legacy (addAlways) names
-    if (addAlways || isUnique) {
         toList.push(name);
     }
-}
+};
 
 const addUniqueVariationNames = (toList: string[],
     variations: Sentence.VariationMap, hash: Set<string>): void =>
@@ -383,18 +333,13 @@ const addUniqueVariationNames = (toList: string[],
             addUniqueName(toList, name, hash);
         }
     }
-}
+};
 
-const initUniquePrimaryClueNames = (primaryClueList: ClueList.Primary,
-    uniqueComponentNames: Set<string>, sentences?: Sentence.Type[]): string[] =>
+const initUniquePrimaryClueNames = (uniqueComponentNames: Set<string>,
+    sentences?: Sentence.Type[]): string[] =>
 {
     let result: string[] = [];
     let hash = new Set<string>();
-    // add from legacy cluelist
-    for (let clue of primaryClueList) {
-        // true = always add name to list
-        addUniqueName(result, clue.name, hash, true);
-    }
     // add unique component names from sentences
     for (let name of uniqueComponentNames.values()) {
         addUniqueName(result, name, hash);
@@ -418,20 +363,25 @@ const initUniquePrimaryClueNames = (primaryClueList: ClueList.Primary,
         }
     }
     return result;
-}
+};
 
-const primaryClueListPostProcessing = (primaryClueList: ClueList.Primary,
-    args: any): void =>
-{
-    // todo: got this backwards
+const showMinMaxLengths = (): void => {
+    let minMaxTotal = MinMax.init(0);
+    let minMaxSentence = MinMax.init();
+    for (let container of getAllCandidates()) {
+        if (!container) continue;
+        MinMax.update(minMaxSentence, container.minMaxLengths.max);
+        MinMax.add(minMaxTotal, container.minMaxLengths);
+    }
+    console.error(`clues: min(${minMaxTotal.min}), max(${minMaxTotal.max})` +
+        `, longest(${minMaxSentence.max})`);
+};
+
+const primaryClueListPostProcessing = (args: any): void => {
+    // TODO: got this backwards
     const sentences: Sentence.Type[] = State.sentences;
-    State.clueListArray[1] = primaryClueList;
 
-    // NOTE: order is important here
-
-    // Add all variations for all sentences to State.variations before building
-    // candidates. Candidates depend on variations, so we want a complete of set
-    // of variations before building any candidates.
+    // Add all variations for all sentences before building candidates.
     let variations = Sentence.emptyVariations();
     for (let sentence of sentences) {
         if (!sentence) continue;
@@ -440,7 +390,7 @@ const primaryClueListPostProcessing = (primaryClueList: ClueList.Primary,
 
     // 2nd pass through sentences
     // Generate unique *component* names (no name variations)
-    // Build all candidates using name variations
+    // Build and populate State.allCandidates using name variations
     let uniqueComponentNames = new Set<string>();
     for (let i = 1; i < sentences.length; ++i) {
         const sentence = sentences[i];
@@ -457,13 +407,14 @@ const primaryClueListPostProcessing = (primaryClueList: ClueList.Primary,
             console.error(` names: ${names.size}, variations: ${container.candidates.length}`);
         }
     }
-    State.uniquePrimaryClueNames = initUniquePrimaryClueNames(primaryClueList,
-      uniqueComponentNames, args.addVariations ? sentences : undefined);
+    State.uniquePrimaryClueNames = initUniquePrimaryClueNames(uniqueComponentNames,
+        args.addVariations ? sentences : undefined);
     State.variations = variations;
     State.sentences = sentences;
-    // Call addKnownPrimaryClues() last, after candidates are built
-    addKnownPrimaryClues(primaryClueList);
-}
+    // Call addKnownPrimaryClues() last, after State.allCandidates is populated
+    addKnownPrimaryClues();
+    showMinMaxLengths();
+};
 
 // args:
 //  baseDir:  base directory (meta, synth)
@@ -481,9 +432,9 @@ export const loadAllClues = function (args: any): void {
     if (primaryClueList[0].src !== 'auto') {
         throw new Error('something something src="auto"');
     }
-    primaryClueList = autoSource(primaryClueList, args);
+    autoSource(primaryClueList, args);
     // if using -t, add primary variations to uniqueNames
-    primaryClueListPostProcessing(primaryClueList, args);
+    primaryClueListPostProcessing(args);
     const pp0 = new Date();
     for (let count = 2; count <= args.max_sources; ++count) {
         let clueList: ClueList.Compound = loadClueList(count);
@@ -692,7 +643,7 @@ let saveClues = function (counts: number|number[]): void {
     counts = counts as number[];
     Debug(`saving clueLists ${counts}`);
     for (const count of counts) {
-        saveClueList(State.clueListArray[count], count);
+        saveClueList(getClueList(count), count);
         Debug(`saved clueList ${count}, length: ${State.clueListArray[count].length}`);
     }
 };
@@ -717,7 +668,7 @@ let removeClue = function (count: number, clue: Clue.Compound,
     // sort src
     clue.src = clue.src.split(',').sort().toString();
     if (force || removeKnownClue(count, clue.name, clue.src, nothrow)) {
-        _.remove(State.clueListArray[count], function (elem: Clue.Compound) {
+        _.remove(getClueList(count), function (elem: Clue.Compound) {
             return (elem.name === clue.name) && (elem.src === clue.src);
         });
         if (save) {
@@ -796,6 +747,13 @@ export let getCountListForName = (name: string): CountList => {
     return countList;
 };
 
+/*
+let primaryNcToSrcList = function (nc: NameCount.Type): string[] {
+    if (nc.count !== 1) throw new Error(`nc.count must be 1 (${nc})`);
+    const source = State.knownClueMapArray[1][nc.name];
+    return (_.isArray(source) ? source : [source]) as string[];
+};
+
 // TODO this is failing with ncList.length > 1
 let primaryNcListToNameSrcLists = function (ncList: NameCount.List): NameCount.List[] {
     let log = 0 && (ncList.length > 1); // nameSrcLists.length > 1) {
@@ -851,12 +809,6 @@ let primaryNcListToNameSrcSets = function (ncList: NameCount.List): Set<string>[
     return nameSrcSets;
 };
 
-let primaryNcToSrcList = function (nc: NameCount.Type): string[] {
-    if (nc.count !== 1) throw new Error(`nc.count must be 1 (${nc})`);
-    const source = State.knownClueMapArray[1][nc.name];
-    return (_.isArray(source) ? source : [source]) as string[];
-};
-
 let makeSrcNameListArray = function (nc: NameCount.Type): string[][] {
     let srcNameListArray: string[][] = [];
     getKnownClueMap(nc.count)[nc.name].forEach(src => {
@@ -864,6 +816,7 @@ let makeSrcNameListArray = function (nc: NameCount.Type): string[][] {
     });
     return srcNameListArray;
 };
+*/
 
 export interface FilterResult {
     map: any;
@@ -879,7 +832,7 @@ export const emptyFilterResult = (): FilterResult => {
         reject: 0,
         duplicate: 0
     };
-}
+};
 
 export const filter = (srcCsvList: string[], clueCount: number, result: FilterResult):
     FilterResult =>
@@ -930,7 +883,7 @@ const singleEntry = (nc: NameCount.Type, source: string): SourceData => {
 export const getKnownSourceMapEntries = (nc: NameCount.Type,
     andSources = false, args: any = {}): any[] =>
 {
-    const clueMap = State.knownClueMapArray[nc.count];
+    const clueMap = getKnownClueMap(nc.count);
     if (!clueMap) throw new Error(`No clueMap at ${nc.count}`);
     const sourcesList = clueMap[nc.name];
     if (!sourcesList) {
@@ -976,83 +929,6 @@ const getKnownClues = (nameList: string|string[]): Record<string, Clue.Any[]> =>
 
 export const getKnownClueNames = (nameList: string | string[]): string[] => {
     return Object.keys(getKnownClues(nameList));
-};
-
-const getClueCountListArray = (nameList: string[]): CountList[] => {
-    // each count list contains the clueMapArray indexes in which
-    // each name appears
-    let countListArray: CountList[] = Array(_.size(nameList)).fill(0).map(_ => []);
-    for (let count = 1; count <= getMaxClues(); ++count) {
-        let map = State.knownClueMapArray[count];
-        nameList.forEach((name, index) => {
-            if (_.has(map, name)) {
-                countListArray[index].push(count);
-            }
-        });
-    }
-    return countListArray;
-};
-
-const getValidCounts = (nameList: string[], countListArray: any): number[] => {
-    if ((nameList.length === 1) || isRejectSource(nameList)) return [];
-
-    let addCountSet = new Set<number>();
-    let known = false;
-    let reject = false;
-    Peco.makeNew({
-        listArray: countListArray,
-        max:       getMaxClues()
-    }).getCombinations()
-        .forEach((clueCountList: number[]) => {
-            Debug(`nameList: ${nameList}, clueCountList: ${clueCountList}`);
-            let sum = clueCountList.reduce((a, b) => a + b);
-            // why was I passing validateAll: true here, shouldn't a single
-            // validation suffice?
-            if (Validator.validateSources(undefined, {
-                sum:         sum,
-                nameList:    nameList,
-                count:       nameList.length,
-                validateAll: false
-            }).success) {
-                addCountSet.add(sum);
-            }
-        });
-    return Array.from(addCountSet);
-};
-
-const getCountList = (nameOrList: string|string[]): CountList => {
-    return _.isString(nameOrList)
-        ? getCountListForName(nameOrList as string)
-        : getValidCounts(nameOrList as string[], getClueCountListArray(nameOrList as string[]));
-};
-
-// used by Validator.getRestrictedPrimaryClueNumber
-//
-export const getPrimaryClue = (nameSrc: NameCount.Type): Clue.Primary|undefined => {
-    const match = getClueList(1).find(clue => 
-        clue.name === nameSrc.name && _.toNumber(clue.src) === nameSrc.count);
-    //if (!match) throw new Error(`can't find clue: ${nameSrc}`);
-    return match ? match as Clue.Primary : undefined;
-};
-
-const getPrimarySources = (): string[] => {
-    let primarySources: string[] = [];
-    let hash: any = {};
-    for (const clue of getClueList(1)) {
-        if (_.has(hash, clue.src)) continue;
-        primarySources.push(clue.src);
-        hash[clue.src] = true;
-    }
-    return primarySources;
-};
-
-export const getInversePrimarySources = (sources: string[]): string[] => {
-    let inverseSources: string[] = [];
-    for (const src of getPrimarySources()) {
-        if (_.includes(sources, src)) continue;
-        inverseSources.push(src);
-    }
-    return inverseSources;
 };
 
 const addClueForCounts = (countSet: Set<number>, name: string, src: string,
@@ -1121,7 +997,7 @@ const getKnownClueIndexLists = (nameList: string[]): CountList[] => {
     let countListArray: CountList[] = Array(_.size(nameList)).fill(0).map(_ => []);
     // TODO: is maxClues correct here
     for (let count = 1; count <= getMaxClues(); ++count) {
-        const map = State.knownClueMapArray[count];
+        const map = getKnownClueMap(count);
         if (!_.isUndefined(map)) {
             nameList.forEach((name, index) => {
                 if (_.has(map, name)) {

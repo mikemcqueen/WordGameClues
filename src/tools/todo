@@ -1,8 +1,3 @@
-* I think 20 (or even 15) is a reasonable upper limit for primary source count for any
-  individual used source (--xor, --or) or any cm-generated source. I should probably
-  hard-code it and also implement a command-line override switch.
-  --max-sources/-m ? 
-
 *  merge_support: uint64_t num_combos{200'000'000}; // hard-coded chunk size
    should probably (eventually) figure out:
    - hardcoded:
@@ -23,8 +18,6 @@
   * it seems like a decent sized chunk of device memory to alloc/copy, esp
     if there are multiple streams (x2, x3 that amount).
 
-* why isn't nameListMap printed for sentence9
-
 * synonyms need to be global. probably all of them. global hash map.
   this will reduce load time and merge time. not 100% sure how to go about
   implementing thouhg. but should figure it out.
@@ -34,25 +27,6 @@
 * no --xor == no filter call?  it's crashing due to empty xor data probably
   (but probably shouldn't even be called)
   what about --or with no --xor? bet that's fun. probably should fail (or fix).
-
-* HACK: 35 passed to buildKnownNcSourceListMap, in cm-precompute.ts.
-  The problem here is that we have no defined upper-bound on how many primary
-  sources a single "clue" or "useSource" could represent. 21 for example,
-  which is a rather long one (san juan hill buffalo soldier), goes up to
-  30 currently.
-  When we call buildAllUseNcDataLists("21"), it is (apparently) unbounded -
-  it'll find all occurances of 21.
-  When we call buildKnownNcSourceListMap, we could also be unbounded, but
-  that would require knowing the longest variation for each sentence, and
-  adding them up, I think.
-  For practical purposes, 35 seems like a reasonable stopping point at this time.
-  However, we really should enforce this in buildAllUseNcDataLists(), otherwise
-  we're going to hit the bug again when sourceListMap and allXorNcDataLists
-  aren't in sync.
-* it's really questionable whether we want to be summing the NC counts or taking
-  the largest NC "count" value. haven't fully thought through all the use cases.
-* enforce --add maxsum (ClueManager.getNumPrimarySources())
-  * done. now calculate maxSum 
 
 * fix lifetime issue requiring sync in cuda_allocCopySentenceVariationIndices(
 
@@ -121,23 +95,6 @@
   i could make that kernel more loopy and handle all list pairs in one call.
   low priority though, as it finishes the current impl in under 25ms.
 
-* why am I passing primaryNameSrcList and ncList of XorSources back to node?
-  Sure I use them to generate sourceBits and usedSources, but are they used
-  for anything else? I'm probably merging them and shit, but why, what do I
-  do with it all when I'm done? I have a feeling, that I am passing the NcLists
-  to Native.addCandidate() as well, from where it is *ONLY USED TO GENERATE
-  SOURCEBITS* on the add-on side (I think). So is the *ONLY* reason I am
-  maintaining ncLists on the node side, is to use them as the "wire protocol"
-  for Node<->Addon communication of sourceBits!?
-  * Note that this wrap-back-to-JS is disabled now. As a result -t --fast is
-    broken, but it's better to fix that another way (or convert to c++) than
-    deal with the insanely long wrap times.
-  * Note also that since I'm not passing back to JS, the necessity of all the
-    ncList/primaryNameSrcList stuff on the C++ side comes into question. I
-    suspect it may be needed for something, but I haven't actually confirmed.
-    I do know that having to convert a SourceList to a SourceCompatibilityList
-    prior to copying to device memory is a consequence I'd like to get rid of.
-
 * i'm not really sure what the point of having a whole separate confederate
   variation is. it seems unnecessary, a performance pessimization, and in
   general problematic.
@@ -152,6 +109,13 @@
   attached to that primary synonym "blue", somehow. when --add'ing, check and
   fail if --add'ed word matches any primary "origin" words.
 
+* similarly, validateSources(name) -- enforce everywhere, for below
+  validatesources is apparently happy with old:3=not:1,not:1,old:1
+  which is wrong because:
+   this is like that weird case with "bird" being the "name" of a clue that had
+   "bird" as a source, and that should be disallowed.
+   clues3.json:  { "name": "old",             "src": "new,not" },
+
 * I may have figured out what that NO_DUPLICATES thing in peco was all
   about. in cm-precompute.ts fillKnownNcSourceListMapForSum, with sum=2
   we apparently iterate over all 1,1 combinations, including duplicates
@@ -162,21 +126,12 @@
 * additional thoughts on optimizaiton:
  - only call addCandidate every 1000+ candidates. maintain a list and
    bulk push them.
- - there's some "i didnt do this coz it's 18s out of 18m" comment in
-   combo-maker.ts that I could look into. related to using CountBits
-   I think.
- - also copyOnMerge logic in mergeAllSources might be worthwhile to
-   look into
 
 * candidates.comboListMap should be a vector. It's not even strictly
   necessary anymore.
 
 * NCData/List -> NcListContainer
 
-* output max variation count and max source count (per sentence) at load.
-* fail if max sources > 127 for now
-
-* usesourcebits -> implement andCompatible
 * eventually bits per sentence could be based on max sources per sentence
   (uniqueNameCount) and usedSources bitset size is the sum, rather than
   being a fixed size (128*9)
@@ -188,41 +143,9 @@
   do a syn lookup? maybe "anagram" could be generalized? kinda nice to
   have each "rule" encapsulated as a separate variation entry type.
 
-* -t full support, including --add, will be necessary (might be working now)
-
 * "addon-mode" module return string "Debug" or "Release" for setting addon path
 
-* so there is a problem with "ignore":true clues which depend on clues in "sentences"
-  that don't support the ignore flag. this problem will go away when all clues
-  are converted to sentences, presumably, but it's giving incorrect results
-  as it stands (hobbit,home appear in valid combinations with xor.req,
-  for example, when they should be "used" by "eye").
-
-* -t 20,s or 24,s are valid, shouldn't be. looks like restrictSameClueNumber
-  is broke.
-  * now it crashes. after putting in support for non-unique legacy clue names
-    into the uniquePrimaryClueNames list.
-  * so one idea is we could justa call Validator.validateSources(validateAll: false)
-    for any supplyed -t (or --xor, --or, etc) combo. If it doesn't pass
-    validator, then, duh, it's not valid. The problem with this is if I want
-    to support name:count syntax: Validator doesn't (currently) support it.
-  * Maybe the crash on bad combos is something I can live with for now.
-
 * NameCount.listHasCompatibleSources looks unnecessary, or weird, or both
-
-* so, ClueManager.getClueList(1) is the culprit. In every case, I need
-  to review what I am doing with the list when I call it with 1.
-
-* validateSources(name) -- enforce everywhere, for (2) below
-
-validatesources is apparently happy with old:3=not:1,not:1,old:1
-which is wrong because:
-1) FIXED: two nots from two different variations of sentence three. i though i checked
-   for and prevented this with the "candidates" thing somewhere
-2) TODO: this is like that weird case with "bird" being the "name" of a clue that had
-   "bird" as a source, and that should be disallowed.
-   
-clues3.json:  { "name": "old",             "src": "new,not" },
 
 
 * OPTIMIZITIONS:
@@ -259,17 +182,6 @@ clues3.json:  { "name": "old",             "src": "new,not" },
      i'll be screwed without some GPU processing, at which point any data
      optimizations will be kind of moot. we'll find out once all clues are
      converted to sentences.
-
-* I think opportunity for optimization is running out in mergecompatible. 
-  One last thing to try is somehow having mergecompatLists (and perhaps
-  getMergeData) take either a MergedSourcesList or a Source.List. Then
-  we'd need a variation of mergeSources took either as the first arg as well.
-
-* so If I really want to speed up combo-maker further, probably I should
-  port the whole getCombosForUseNcLists function and dependences (first/next)
-  to C++. I don't think just porting mergeCompatibleSources3 and dependencies
-  alone will do much as each call is short so the overhead of the call isn't
-  worth it, but there are a million (literally) calls.
 
 ** the below was a pre-cuda optimization idea
 * from notepad:  on elimination: this should only be relevant to combo-making.

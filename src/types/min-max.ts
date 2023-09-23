@@ -4,8 +4,8 @@
 
 'use strict';
 
-import _ from 'lodash'; // TODO: need a smaller dummy import
-const Assert      = require('assert');
+import _ from 'lodash';
+const Assert = require('assert');
 
 export interface Type {
     min: number;
@@ -22,11 +22,26 @@ function initValue(value: number|string, fallbackValue?: number): number {
     return numberValue;
 }
 
-export function init(min: number|string, max: number|string,
-                     fallbackMin?: number, fallbackMax?: number): Type
+export function init(min: number|string = 1000000000, max: number|string = 0,
+    fallbackMin?: number, fallbackMax?: number): Type
 {
     return {
         min: initValue(min, fallbackMin),
         max: initValue(max, fallbackMax)
     };
 }
+
+export const update = (minMax: Type, value: number): void => {
+    if (value < minMax.min) {
+        minMax.min = value;
+    }
+    if (value > minMax.max) {
+        minMax.max = value;
+    }
+}
+
+export const add = (to: Type, from: Type): void => {
+    to.min += from.min;
+    to.max += from.max
+}
+

@@ -239,6 +239,20 @@ export const show = (options: any): any => {
     }
 };
 
+//////// all below probably should be removed.
+
+function get_clue_names (options: any) {
+    let result: string[] = [];
+    if (options.count_lo) {
+        //console.log(`get_clue_names: lo(${options.count_lo}) hi(${options.count_hi})`);
+        for (let count = options.count_lo; count <= options.count_hi; count += 1) {
+            result.push(...ClueManager.getClueList(count).map(clue => clue.name));
+        }
+        result = _.uniq(result);
+    }
+    return result;
+}
+
 function addOrRemove (args, nameList, countSet, options) {
     if (!options.add && !options.remove) return;
     const save = _.isUndefined(options.save) ? true : options.save;
@@ -290,6 +304,23 @@ function buildSubListFromIndexList (nameList: string[], indexList: number[]):
     return subList;
 }
 
+function addValidResults (validResults, validResultList, options) {
+    validResultList.forEach(result => {
+        Expect(result.valid).is.ok();
+        let names = result.ncList.slice(options.slice_index).map(nc => nc.name).sort().toString();
+        if (!_.has(validResults, names)) {
+            validResults[names] = [];
+        }
+        validResults[names].push(result);
+        //console.log(`${result.ncList} : VALID (${result.sum}): ${result.compatibleNameSrcList} `);
+    });
+}
+
+function display_valid_results (validResults) {
+    console.error('++display');
+    Object.keys(validResults).forEach(key => console.log(key));
+}
+
 // I don't know what the hell is going on here.
 // I tried to get --or work with -t or something?
 // And it made me jump through some extra hoops here?
@@ -333,6 +364,7 @@ function flunky (nameList, /*allOrNcDataList,*/ options) {
 }
 
 function fast_combo_wrapper (nameList, /*allOrNcDataList,*/ options) {
+    Assert(0, "broken abomination");
     console.error('fast_combo_wrapper');
     console.error(`--or: ${Stringify(options.or)}`);
     if (options.or) {
@@ -347,34 +379,8 @@ function fast_combo_wrapper (nameList, /*allOrNcDataList,*/ options) {
     }
 }
 
-function get_clue_names (options: any) {
-    let result: string[] = [];
-    if (options.count_lo) {
-        //console.log(`get_clue_names: lo(${options.count_lo}) hi(${options.count_hi})`);
-        for (let count = options.count_lo; count <= options.count_hi; count += 1) {
-            result.push(...ClueManager.getClueList(count).map(clue => clue.name));
-        }
-        result = _.uniq(result);
-    }
-    return result;
-}
-
-function fast_combos (nameList, options) {
-    let counts = new Set();
-    fast_combos_list(nameList, options)
-        .forEach(result => {
-            let message = 'invalid';
-            if (result.valid) {
-                message = `VALID (${result.sum}) ${result.compatibleNameSrcList} `
-                    + `REMAIN(${result.inversePrimarySources.length}): ${result.inversePrimarySources}`;
-                counts.add(result.sum);
-            }
-            console.log(`${result.ncList} ${message}`);
-        });
-    return counts;
-}
-
 function fast_combos_list (nameList, options) {
+    Assert(0, "broken, ClueManager.getInversePrimarySources() removed");
     const ncLists = ClueManager.buildNcListsFromNameList(nameList);
     if (_.isEmpty(ncLists)) {
         if (!options.quiet) {
@@ -394,7 +400,8 @@ function fast_combos_list (nameList, options) {
         result.ncList = ncLists[index];
         if (result.valid) {
             result.sum = ncLists[index].reduce((sum, nc) => sum + nc.count, 0);
-            result.inversePrimarySources = ClueManager.getInversePrimarySources(result.compatibleNameSrcList.map(ns => `${ns.count}`));
+            result.inversePrimarySources = [];
+            // = ClueManager.getInversePrimarySources(result.compatibleNameSrcList.map(ns => `${ns.count}`));
             add = true;
         } else if (!options.skip_invalid) {
             add = true;
@@ -405,21 +412,19 @@ function fast_combos_list (nameList, options) {
     }, []);
 }
 
-function addValidResults (validResults, validResultList, options) {
-    validResultList.forEach(result => {
-        Expect(result.valid).is.ok();
-        let names = result.ncList.slice(options.slice_index).map(nc => nc.name).sort().toString();
-        if (!_.has(validResults, names)) {
-            validResults[names] = [];
-        }
-        validResults[names].push(result);
-        //console.log(`${result.ncList} : VALID (${result.sum}): ${result.compatibleNameSrcList} `);
-    });
-}
-
-function display_valid_results (validResults) {
-    console.error('++display');
-    Object.keys(validResults).forEach(key => console.log(key));
+function fast_combos (nameList, options) {
+    let counts = new Set();
+    fast_combos_list(nameList, options)
+        .forEach(result => {
+            let message = 'invalid';
+            if (result.valid) {
+                message = `VALID (${result.sum}) ${result.compatibleNameSrcList} `
+                    + `REMAIN(${result.inversePrimarySources.length}): ${result.inversePrimarySources}`;
+                counts.add(result.sum);
+            }
+            console.log(`${result.ncList} ${message}`);
+        });
+    return counts;
 }
 
 function showNcLists (ncLists) {

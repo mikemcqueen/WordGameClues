@@ -118,6 +118,7 @@ export interface FirstNextResult {
 // named legacy clue. We needed to differentiate between the various instances
 // of:  ace, hero, north
 const skip = (clueCount: number, clueIndex: number): boolean => {
+    Assert(0, "ClueManager.getClueList(1) is bogus");
     if (clueCount !== 1) return false;
     const clueList = ClueManager.getClueList(clueCount)
     // only legacy clue indices are currently skippable
@@ -133,7 +134,7 @@ export const next = (countList: number[], clueIndices: number[]): FirstNextResul
         }
         let ncList: NameCount.List = [];    // e.g. [ { name: "pollock", count: 2 }, { name: "jackson", count: 4 } ]
         if (countList.every((count, index) => {
-            if (skip(count, clueIndices[index])) return false;
+            //if (skip(count, clueIndices[index])) return false;
             let name = ClueManager.getUniqueClueName(count, clueIndices[index]);
             if (ncList.length) {
                 // because we are only comparing to ncList[0].name

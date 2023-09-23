@@ -12,6 +12,7 @@ const Stringify = require('stringify-object');
 
 import * as Clue from './clue';
 import * as ClueList from './clue-list';
+import * as MinMax from '../types/min-max';
 import * as NameCount from './name-count';
 import * as Source from '../modules/source';
 
@@ -52,6 +53,7 @@ export interface CandidatesContainer {
     candidates: Candidate[];
     // Map a clue "name" to all of the candidates (via indices) that contain it
     nameIndicesMap: NameIndicesMap;
+    minMaxLengths: MinMax.Type;
 }
 
 //////////
@@ -74,6 +76,7 @@ const emptyCandidatesContainer = (): CandidatesContainer => {
 };
 */
 
+/*
 const copyStringToNumbersMap = (fromMap: StringToNumbersMap): StringToNumbersMap => {
     let toMap = {};
     for (let key of Object.keys(fromMap)) {
@@ -98,6 +101,7 @@ export const copyCandidatesContainer = (container: CandidatesContainer):
         nameIndicesMap: copyStringToNumbersMap(container.nameIndicesMap)
     };
 };
+*/
 
 export const getCandidateSourcesForName = (container: CandidatesContainer,
     name: string): number[] =>
@@ -130,6 +134,10 @@ const sortString = (str: string): string => {
 // TODO: all three of these loops below could be 1 function that takes a strip/sort
 // function param
 const validateCombinations = (sentence: Type): boolean => {
+    if (!sentence.combinations) {
+        console.error(`sentence {sentence.num} missing 'combinations'`);
+        return false;
+    }
     const sortedText = stripAndSort(sentence.text);
     for (let combo of sentence.combinations) {
         if (sortedText != stripAndSort(combo)) {
@@ -142,6 +150,25 @@ const validateCombinations = (sentence: Type): boolean => {
 };
 
 const validateVariations = (sentence: Type): boolean => {
+    let valid = true;
+    if (!sentence.components) {
+        console.error(`sentence ${sentence.num} missing 'components'`);
+        valid = false;
+    }
+    if (!sentence.anagrams) {
+        console.error(`sentence ${sentence.num} missing 'anagrams'`);
+        valid = false;
+    }
+    if (!sentence.synonyms) {
+        console.error(`sentence ${sentence.num} missing 'synonyms'`);
+        valid = false;
+    }
+    if (!sentence.homophones) {
+        console.error(`sentence ${sentence.num} missing 'homophones'`);
+        valid = false;
+    }
+    if (!valid) return false;
+
     for (let key of Object.keys(sentence.components)) {
         const sortedText = stripAndSort(key);
         for (let component of sentence.components[key]) {
@@ -162,25 +189,11 @@ const validateVariations = (sentence: Type): boolean => {
             }
         }
     }
-    if (!sentence.anagrams) {
-        // TODO: confirm they are actually anagrams
-        console.error(`sentence ${sentence.num} missing 'anagrams'`);
-        return false;
-    }
-    if (!sentence.synonyms) {
-        console.error(`sentence ${sentence.num} missing 'synonyms'`);
-        return false;
-    }
-    if (!sentence.homophones) {
-        console.error(`sentence ${sentence.num} missing 'homophones'`);
-        return false;
-    }
     return true;
 };
 
 const validate = (sentence: Type): boolean => {
-    return validateCombinations(sentence)
-        && validateVariations(sentence);
+    return validateCombinations(sentence) && validateVariations(sentence);
 };
 
 const makeFrom = (filename: string): Type => {
@@ -189,11 +202,9 @@ const makeFrom = (filename: string): Type => {
         const json = Fs.readFileSync(filename, 'utf8');
         sentence = JSON.parse(json);
         if (!validate(sentence)) {
-            //console.error(validate.errors);
-            throw new Error(`invalid json`);
+            throw new Error(`invalid sentence`);
         }
-    }
-    catch(e) {
+    } catch(e) {
         throw new Error(`${filename}, ${e}`);
     }
     return sentence;
@@ -203,7 +214,7 @@ const getFilename = (dir: string, count: number): string => {
     return Path.format({ dir, base: `sentence${count}.json` });
 };
 
-export let load = (dir: string, num: number): Type => {
+export const load = (dir: string, num: number): Type => {
     return makeFrom(getFilename(dir, num));
 };
 
@@ -216,7 +227,7 @@ const listsEqual = (a: string[], b: string[]): boolean => {
         if (a[i] !== b[i]) return false;
     }
     return true;
-}
+};
 
 const addVariations = (toVariations: VariationMap,
     fromVariations: VariationMap): void =>
@@ -240,18 +251,15 @@ const addVariations = (toVariations: VariationMap,
     }
 };
 
-export const addAllVariations = (variations: Variations,
-    sentence: Type): void =>
-{
+export const addAllVariations = (variations: Variations, sentence: Type): void => {
     addVariations(variations.anagrams, sentence.anagrams);
     addVariations(variations.synonyms, sentence.synonyms);
     addVariations(variations.homophones, sentence.homophones);
 };
 
 // domestically engineered version
-// TODO: this could return a set. or an array. like [...result.values()]
-//       the map is useful during construction but unnecessary for the
-//       consumer.
+// TODO: this could return a set, or an array like [...result.values()]. the
+//       map is useful during construction but unnecessary for the consumer.
 const buildCandidateNameListMap = (combinationWords: string[],
     components: VariationMap, startIndex = 0,
     results = new Map<string, string[]>()): Map<string, string[]> => 
@@ -378,6 +386,7 @@ export const buildAllCandidates = (sentence: Type, variations: Variations, args:
     CandidatesContainer =>
 {
     let candidates: Candidate[] = [];
+    let minMaxLengths = MinMax.init();
     let src = 1_000_000 * sentence.num; // up to 10000 variations of up to 100 names
     // TODO: similar logic to getUniqueComponentNames() which is unfortunate
     const sortedText = stripAndSort(sentence.text);
@@ -390,6 +399,7 @@ export const buildAllCandidates = (sentence: Type, variations: Variations, args:
             }
         }
         for (let nameList of nameListMap.values()) {
+            // TODO: is this even possible given the validation we do on load?
             if (sortedText !== joinAndSort(nameList)) {
                 throw new Error(`sentence '${sentence.text}' != nameList '${nameList}'`);
             }
@@ -398,12 +408,14 @@ export const buildAllCandidates = (sentence: Type, variations: Variations, args:
                 clues,
                 nameSourcesMap: buildNameSourcesMap(clues, variations)
             });
+            MinMax.update(minMaxLengths, clues.length);
             src += 100;
         }
     }
     return {
         candidates,
-        nameIndicesMap: buildNameIndicesMap(candidates)
+        nameIndicesMap: buildNameIndicesMap(candidates),
+        minMaxLengths
     };
 };
 
@@ -418,9 +430,4 @@ export const getUniqueComponentNames = (sentence: Type): Set<string> => {
         }
     }
     return result;
-}
-
-export const legacySrcList = (nameSrcList: NameCount.List): number[] => {
-    return nameSrcList.map(nc => nc.count).filter(src => !Source.isCandidate(src));
-}
-
+};
