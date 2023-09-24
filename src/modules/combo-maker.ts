@@ -106,11 +106,6 @@ const nextIndex = (countList: number[], clueIndices: number[]): boolean => {
     return true;
 };
 
-export interface FirstNextResult {
-    done: boolean;
-    ncList?: NameCount.List;
-}
-
 // "clueIndex" here is actually "uniqueNameIndex". except if it's a legacy
 // clue index, which are (non-uniquely) added to the uniqueNameList first.
 // This is done to support ignore/skip properties, which only exist on legacy
@@ -125,6 +120,11 @@ const skip = (clueCount: number, clueIndex: number): boolean => {
     if (clueIndex >= clueList.length) return false;
     const clue = clueList[clueIndex];
     return Boolean(clue.ignore || clue.skip);
+}
+
+export interface FirstNextResult {
+    done: boolean;
+    ncList?: NameCount.List;
 }
 
 export const next = (countList: number[], clueIndices: number[]): FirstNextResult => {

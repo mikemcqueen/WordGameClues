@@ -6,9 +6,6 @@
 
 import _ from 'lodash';
 
-// dumb but whatever
-import * as Source from '../modules/source';
-
 //
 //
 
@@ -58,25 +55,17 @@ function NameCount_t (name: string, count?: number, index?: number) {
     }
 }
 
-//
-
 export function count (nc: NameCount): number {
     return nc.count;
 }
-
-//
 
 export function makeListFromCsv (csv: string): NameCount[] {
     return listFromStrList(csv.split(','));
 }
 
-//
-
 export function nameListFromCsv (csv: string): string[] {
     return nameListFromStrList(csv.split(','));
 }
-
-//
 
 export function listFromStrList (strList: string[]): List {
     return strList.map(ncStr => new NameCount_t(ncStr));
@@ -92,13 +81,9 @@ export function nameListFromStrList (strList: string[]): string[] {
     return listFromStrList(strList).map(nc => nc.name);
 }
 
-//
-
 export function listToNameList (ncList: List): string[] {
     return ncList.map(nc => nc.name);
 }
-
-//
 
 export function listToCountList (ncList: List): number[] {
     return ncList.map((nc: Type) => nc.count);
@@ -108,8 +93,6 @@ export let listCountSum = (ncList: List): number => {
     return ncList.reduce((sum: number, nc: Type) => { return sum + nc.count; }, 0);
 }
 
-//
-
 export function listAddCountsToSet (ncList: List, set: Set<number>): boolean {
     for (let nc of ncList) {
         if (set.has(nc.count)) return false;
@@ -117,8 +100,6 @@ export function listAddCountsToSet (ncList: List, set: Set<number>): boolean {
     }
     return true;
 }
-
-//
 
 export function makeCanonicalName (name: string, count: number, index?: number): string {
     let s = name;
@@ -152,28 +133,6 @@ export function sortList (ncList: List): List {
     return ncList;
 }
 
-
-/*
-export const listHasCompatibleSources = (nameSrcList: List):
-    boolean =>
-{
-    // TODO: uniqBy da debil
-    if (_.uniqBy(nameSrcList, count).length !== nameSrcList.length) {
-        return false;
-    }
-    // TODO: sloww probably, also requiring sentence is dumb
-    try {
-        Source.getUsedSources(nameSrcList);
-    } catch(e) {
-        //console.error('***incompatible usedSources***');
-        return false;
-    }
-    return true;
-}
-*/
-
-//
-
 function listToJSON (ncList: List) {
     let s: string;
 
@@ -190,13 +149,10 @@ function listToJSON (ncList: List) {
     return s;
 }
 
-//
-
 export function listContains (ncListContains: List, nc: NameCount) {
     return _.find(ncListContains, ['name', nc.name, 'count', nc.count]);
 }
 
-//
     
 export function listContainsAll (ncListContains: List, ncList: List) {
     return ncList.every(nc => {
@@ -219,30 +175,19 @@ export function toString (nc: NameCount): string {
 
 NameCount_t.prototype.toString = function(): string {
     return makeCanonicalName(this.name, this.count, this.index);
-//    this.cachedCanonicalName = this.cashedCanonicalName || 
-//    return this.cachedCanonicalName;
 };
-
-//
-//
 
 NameCount_t.prototype.setIndex = function(index: number) {
     this.index = index;
 };
 
-//
-
 NameCount_t.prototype.equals = function(nc: NameCount) {
     return (nc.count === this.count) && (nc.name === this.name);
-}
-
-//
+};
 
 let toJSON = function (nc: NameCount): NameCount {
     return { name: `"${nc.name}"`, count: nc.count };
 };
-
-//
 
 NameCount_t.prototype.logList = function (list: List) {
     let str: string = '';

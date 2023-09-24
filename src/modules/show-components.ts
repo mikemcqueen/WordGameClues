@@ -94,21 +94,18 @@ const getCountListArrays = (nameList: string[], pcResult: PreCompute.Result,
             }
         } else {
             const sourceMap = ClueManager.getKnownSourceMap(sum);
-            let is_known = false;
             if (!sourceMap) {
                 console.error(`!sourceMap(${sum}), nameList: ${nameListStr}`);
                 //  + ` xorSource.ncList: ${NameCount.listToString(xorSource.ncList)}`);
-            } else {
-                let sourceData = sourceMap[nameListStr];
-                if (sourceData) {
-                    known.push({
-                        countList,
-                        nameList: (sourceData.clues as ClueList.Compound).map(clue => clue.name)
-                    });
-                    is_known = true;
-                }
+                continue;
             }
-            if (!is_known) {
+            let sourceData = sourceMap[nameListStr];
+            if (sourceData) {
+                known.push({
+                    countList,
+                    nameList: (sourceData.clues as ClueList.Compound).map(clue => clue.name)
+                });
+            } else {
                 valid.push(countList);
             }
             if ((options.add && (sum <= options.addMaxSum))

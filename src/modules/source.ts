@@ -97,21 +97,32 @@ const getFirstBitIndex = (sentence: number): number => {
     return (sentence - 1) * kMaxSourcesPerSentence;
 }
 
-/*
-  constexpr static auto allVariationsMatch(
-    const Variations& v1, const Variations& v2) {
-    for (size_t i{}; i < v1.size(); ++i) {
-      if ((v1[i] > -1) && (v2[i] > -1) && (v1[i] != v2[i])) {
-        return false;
-      }
+const allVariationsEqual = (v1: Variations, v2: Variations): boolean => {
+    for (let i = 0; i < v1.length; ++i) {
+        if (v1[i] !== v2[i]) {
+            return false;
+        }
     }
     return true;
-  }
-*/
+}
 
-const allVariationsMatch = (v1: Variations, v2: Variations): boolean => {
+export const isEqual = (first: CompatibilityData,
+    second: CompatibilityData): boolean =>
+{
+    if (!CountBits.equals(first.usedSources.bits, second.usedSources.bits)) {
+        return false;
+    }
+    if (!allVariationsEqual(first.usedSources.variations,
+        second.usedSources.variations))
+    {
+        return false;
+    }
+    return true;
+}
+
+const allVariationsXorCompatible = (v1: Variations, v2: Variations): boolean => {
     for (let i = 0; i < v1.length; ++i) {
-      if ((v1[i] > -1) && (v2[i] > -1) && (v1[i] != v2[i])) {
+      if ((v1[i] > -1) && (v2[i] > -1) && (v1[i] !== v2[i])) {
         return false;
       }
     }
@@ -124,8 +135,8 @@ export const isXorCompatible = (first: CompatibilityData,
     if (CountBits.intersects(first.usedSources.bits, second.usedSources.bits)) {
         return false;
     }
-    if (check_variations &&
-        !allVariationsMatch(first.usedSources.variations, second.usedSources.variations))
+    if (check_variations && !allVariationsXorCompatible(
+        first.usedSources.variations, second.usedSources.variations))
     {
         return false;
     }

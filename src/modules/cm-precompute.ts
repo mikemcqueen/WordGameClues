@@ -479,7 +479,7 @@ export const preCompute = (first: number, last: number, args: any): Result => {
     if (args.or && listIsEmpty(args.allOrNcDataLists)) return { success: false };
     
     // TODO: move to C++.
-    let sourceListMap = buildKnownNcSourceListMap(2, 75, args);
+    let sourceListMap = buildKnownNcSourceListMap(2, args.max_sources, args);
 
     const build3 = new Date();
     const xorSources = buildUseSourceListsFromNcData(sourceListMap, args);

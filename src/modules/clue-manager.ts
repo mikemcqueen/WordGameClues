@@ -42,6 +42,7 @@ export type SourceData = {
 
 type NcResultData = {
     list: ValidateResult[];
+    set: Set<string>;
 };
 
 type ClueMap = Record<string, string[]>;
@@ -455,17 +456,6 @@ const getRejectFilename = function (count: number): string {
     });
 };
 
-const initSrcBitsInAllResults = (results: ValidateResult[]): void => {
-    for (let result of results) {
-        //Assert(NameCount.listHasCompatibleSources(result.nameSrcList));
-        result.usedSources = Source.getUsedSources(result.nameSrcList);
-    }
-};
-
-const massageValidateResults = (nc: NameCount.Type, results: ValidateResult[]): void => {
-    initSrcBitsInAllResults(results);
-};
-
 const findConflicts = (set: Set<string>, nameSrcList: NameCount.List) : boolean => {
     for (let ncCsv of set.values()) {
         const ncList = NameCount.makeListFromCsv(ncCsv);
@@ -493,46 +483,40 @@ const findConflicts = (set: Set<string>, nameSrcList: NameCount.List) : boolean 
 // TODO: return dstList, spread push @ caller
 // well, that might be tricky because I initialize map from dstList.
 //
-let appendUniqueResults = (dstList: ValidateResult[], ncStr: string, 
-    srcList: ValidateResult[], args: any) : void => 
+let appendUniqueResults = (ncResult: NcResultData, ncStr: string, 
+    fromResults: ValidateResult[], args: any) : void => 
 {
-    let hash = new Map<string, Set<string>>();
-    for (let source of dstList) {
-        const key = NameCount.listToCountList(source.nameSrcList).toString();
-        if (!hash.has(key)) hash.set(key, new Set<string>());
-        hash.get(key)!.add(NameCount.listToString(source.nameSrcList));
-    }
-    for (let source of srcList) {
-        source.nameSrcList = _.sortBy(source.nameSrcList, NameCount.count);
-        const key = NameCount.listToCountList(source.nameSrcList).toString();
-        const value = NameCount.listToString(source.nameSrcList);
-        if (hash.has(key)) {
-            const set = hash.get(key)!;
-            if (set.has(value)) continue; // strict duplicate
-            if (findConflicts(set, source.nameSrcList)) {
-                console.error(`nc: ${ncStr}`);
-                console.error(`  set: [${[...set.values()]}]`);
-                console.error(`  key: ${key}, value: ${value}`);
-                console.error(`  nameSrcList: [${NameCount.listToString(source.nameSrcList)}`);
-                if (!args.ignoreErrors) {
-                    throw new Error(`${ncStr} has conflicting sources, probably a data bug.`);
-                }
-            }
-        } else {
-            let set = new Set<string>();
-            set.add(value);
-            hash.set(key, set);
+    for (let result of fromResults) {
+        const key = NameCount.listToCountList(result.nameSrcList).sort().join(',');
+        if (ncResult.set.has(key)) {
+            continue;
         }
-        dstList.push(source);
+        ncResult.set.add(key);
+        ncResult.list.push(result);
     }
+};
+
+const addResultsToNcResultMap = (results: ValidateResult[], name: string,
+    count: number, args: any) =>
+{
+    let ncResultMap = getNcResultMap(count);
+    if (!ncResultMap) {
+        ncResultMap = State.ncResultMaps[count] = {};
+    }
+    const ncStr = NameCount.makeCanonicalName(name, count);
+    if (!ncResultMap[ncStr]) {
+        ncResultMap[ncStr] = {
+            list: [],
+            set: new Set<string>()
+        };
+    }
+    appendUniqueResults(ncResultMap[ncStr], ncStr, results, args);
 };
 
 // Should rename this, as it doesn't actually add a clue.
 // validateCompoundClueAndUpdateState()
 // 
-let addCompoundClue = (clue: Clue.Compound, count: number, args: any):
-    boolean =>
-{
+let addCompoundClue = (clue: Clue.Compound, count: number, args: any): boolean => {
     let nameList = clue.src.split(',').sort();
     let srcMap = getKnownSourceMap(count);
     let srcKey = nameList.toString();
@@ -549,7 +533,6 @@ let addCompoundClue = (clue: Clue.Compound, count: number, args: any):
         });
         // this is where the magic happens
         if (vsResult.success && args.validateAll) {
-            massageValidateResults({ name: clue.name, count }, vsResult.list!);
             srcMap[srcKey] = {
                 clues: [],
                 results: vsResult.list!
@@ -559,16 +542,7 @@ let addCompoundClue = (clue: Clue.Compound, count: number, args: any):
         vsResult.list = srcMap[srcKey].results;
     }
     if (vsResult.success && args.validateAll) {
-        let ncResultMap = getNcResultMap(count);
-        if (!ncResultMap) {
-            ncResultMap = State.ncResultMaps[count] = {};
-        }
-        // TODO: makeCanonicalName
-        let ncStr = NameCount.makeNew(clue.name, count).toString();
-        if (!ncResultMap[ncStr]) {
-            ncResultMap[ncStr] = { list: [] };
-        }
-        appendUniqueResults(ncResultMap[ncStr].list, ncStr, vsResult.list!, args);
+        addResultsToNcResultMap(vsResult.list!, clue.name, count, args);
         (srcMap[srcKey].clues as ClueList.Compound).push(clue);
     }
     // NOTE: added above, commented below

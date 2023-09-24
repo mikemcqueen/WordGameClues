@@ -39,3 +39,7 @@ export let orInPlace = (cb1: Type, cb2: Type): Type => {
 export let intersects = (cb1: Type, cb2: Type) : boolean => {
     return cb1.intersects(cb2);
 }
+
+export let equals = (cb1: Type, cb2: Type) : boolean => {
+    return cb1.equals(cb2);
+}

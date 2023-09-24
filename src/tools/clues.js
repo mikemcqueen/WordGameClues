@@ -389,8 +389,8 @@ async function main () {
     console.error(`loadClues(${PrettyMs(loadMillis)})`);
     setLogging(false); //options.verbose);
 
-    //console.error(`merge_nclc: ${Validator.merge_nclc}`);
-    //process.exit(0);
+//    console.error(`merge_nclc: ${Validator.merge_nclc}`);
+//    process.exit(0);
 
     options.notebook = options.notebook || Note.getWorksheetName(clueSource);
 

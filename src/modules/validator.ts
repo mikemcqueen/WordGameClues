@@ -162,7 +162,7 @@ const addCompoundNc = (to: ValidateResultData, nc: NameCount.Type,
 {
     to.ncList.push(...result.ncList);
     to.nameSrcList.push(...result.nameSrcList);
-    to.resultMap.addNcMapSource(nc, result.resultMap);
+//    to.resultMap.addNcMapSource(nc, result.resultMap);
 };
 
 const addPrimaryNameSrc = (to: ValidateResultData, nameSrc: NameCount.Type,
@@ -170,7 +170,7 @@ const addPrimaryNameSrc = (to: ValidateResultData, nameSrc: NameCount.Type,
 {
     to.ncList.push(nc || NameCount.makeNew(nameSrc.name, 1));
     to.nameSrcList.push(nameSrc);
-    to.resultMap.addPrimarySource(nameSrc);
+//    to.resultMap.addPrimarySource(nameSrc);
 };
 
 interface MergeNcListComboResult {
@@ -272,6 +272,7 @@ let validateSourcesForNameCount = (clueName: string|undefined, srcName: string,
         if (args.fast && args.validateAll) {
             result = mergeNcListResults(ncList, args);
         } else {
+            Assert(0, "was curious if this was used, didn't think it was (it shouldn't be)");
             result = OldValidator.checkUniqueSources(ncList, args);
             Debug(`checkUniqueSources --- ${result.success ? 'success!' : 'failure'}`);
         }
