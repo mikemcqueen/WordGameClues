@@ -9,7 +9,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-#include "combo-maker.h"
+#include "cm-precompute.h"
 #include "peco.h"
 #include "merge.h"
 

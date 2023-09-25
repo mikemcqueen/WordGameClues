@@ -4,6 +4,7 @@
 #include <utility>
 #include <vector>
 #include "filter-types.h"
+#include "merge-filter-data.h"
 
 namespace cm {
 
@@ -30,14 +31,6 @@ cuda_allocCopyOrSources(const OrArgList& orArgList);
 [[nodiscard]] auto cuda_allocCopySentenceVariationIndices(
   const SentenceVariationIndices& sentenceVariationIndices)
   -> device::VariationIndices*;
-
-#if 0
-[[nodiscard]] SourceCompatibilityData* cuda_allocCopyXorSources(
-  const XorSourceList& xorSourceList);
-
-[[nodiscard]] index_t* cuda_allocCopyXorSourceIndices(
-  const std::vector<index_t> xorSourceIndices);
-#endif
 
 }  // namespace cm
 

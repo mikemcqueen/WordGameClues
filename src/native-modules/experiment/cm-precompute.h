@@ -1,10 +1,15 @@
 #ifndef INCLUDE_CM_PRECOMPUTE_H
 #define INCLUDE_CM_PRECOMPUTE_H
 
+#include <unordered_map>
+#include <unordered_set>
+#include <string>
 #include <vector>
 #include "combo-maker.h"
 
 namespace cm {
+
+// functions
 
 auto buildSourceListsForUseNcData(const std::vector<NCDataList>& useNcDataLists,
   const SourceListMap& sourceListMap) -> std::vector<SourceList>;

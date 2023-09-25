@@ -28,32 +28,36 @@ Array wrap(Env& env, const std::vector<std::string>& strList) {
   return jsList;
 }
 
-Object wrap(Env& env, const XorSource& xorSource) {
+Object wrap(Env& env, const XorSource& xorSource,
+  std::string_view primaryNameSrcList /* = "primaryNameSrcList" */) {
+  //
   Object jsObj = Object::New(env);
-  jsObj.Set("primaryNameSrcList", wrap(env, xorSource.primaryNameSrcList));
+  jsObj.Set(primaryNameSrcList.data(), wrap(env, xorSource.primaryNameSrcList));
   jsObj.Set("ncList", wrap(env, xorSource.ncList));
   return jsObj;
 }
 
-Array wrap(Env& env, const XorSourceList& xorSourceList) {
+Array wrap(Env& env, const XorSourceList& xorSourceList,
+  std::string_view primaryNameSrcList /* = "primaryNameSrcList" */) {
   using namespace std::chrono;
 
-  std::cerr << " wrapping xor sources";
-
-  auto t0 = high_resolution_clock::now();
+  // std::cerr << " wrapping xor sources";
+  //auto t0 = high_resolution_clock::now();
 
   Array jsList = Array::New(env, xorSourceList.size());
   for (size_t i{}; i < xorSourceList.size(); ++i) {
-    jsList.Set(i, wrap(env, xorSourceList[i]));
+    jsList.Set(i, wrap(env, xorSourceList[i], primaryNameSrcList));
+    /*
     if (i && !(i % 100'000)) {
       std::cerr << ".";
     }
+    */
   }
 
-  auto t1 = high_resolution_clock::now();
-  auto d_wrap = duration_cast<milliseconds>(t1 - t0).count();
-  std::cerr << " done(" << xorSourceList.size() << ")"
-            << " - " << d_wrap << "ms" << std::endl;
+  //auto t1 = high_resolution_clock::now();
+  //auto d_wrap = duration_cast<milliseconds>(t1 - t0).count();
+  // std::cerr << " done(" << xorSourceList.size() << ")"
+  //<< " - " << d_wrap << "ms" << std::endl;
 
   return jsList;
 }

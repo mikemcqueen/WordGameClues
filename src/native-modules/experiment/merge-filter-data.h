@@ -6,6 +6,36 @@
 
 namespace cm {
 
+namespace device {  // on-device data structures
+
+struct OrSourceData {
+  SourceCompatibilityData source;
+  unsigned or_arg_idx;
+};
+
+/*
+struct OrArgData {
+  OrSourceData* or_sources;
+  unsigned num_or_sources;
+};
+*/
+
+struct VariationIndices {
+  combo_index_t* device_data;  // one chunk of allocated data; other pointers
+                               //  below point inside this chunk.
+  combo_index_t* combo_indices;
+  index_t* num_combo_indices;  // per variation
+  index_t* variation_offsets;  // offsets into combo_indices
+  index_t num_variations;
+
+  constexpr ComboIndexSpan get_index_span(int variation) const {
+    return {&combo_indices[variation_offsets[variation]],
+      num_combo_indices[variation]};
+  }
+};
+
+}  // namespace device
+
 struct MergeFilterData {
   /* merge + filter */
 
@@ -27,15 +57,6 @@ struct MergeFilterData {
 
   device::VariationIndices* device_variation_indices{};
   unsigned num_nariation_indices{};
-
-#if 0
-  // TEMPORARY>>
-  XorSourceList xorSourceList;
-  SourceCompatibilityData* device_xorSources{};
-  index_t* device_legacy_xor_src_indices{};
-  std::vector<int> xorSourceIndices;
-  // <<TEMPORARY
-#endif  
 
   // OrArgList orArgList;
   unsigned num_or_args{};

@@ -12,6 +12,7 @@ const ResultMap   = require('../../types/result-map');
 const Assert      = require('assert');
 const Debug       = require('debug')('validator');
 const Expect      = require('should/as-function');
+const Native      = require('../../../build/experiment.node');
 const stringify   = require('javascript-stringify').stringify;
 const Stringify2  = require('stringify-object');
 const Timing      = require('debug')('timing');
@@ -37,7 +38,7 @@ function Stringify(val: any) {
 interface ValidateResultData {
     ncList: NameCount.List;
     nameSrcList: NameCount.List;
-    resultMap: any;
+    resultMap?: any;
     nameSrcCsv?: string; // TODO: remove; old-validator uses it, stop using old-validator
 }
 
@@ -157,26 +158,24 @@ const addUsedSourcesFromNameSrcList = (usedSources: Source.UsedSources,
         Source.addUsedSource(usedSources, nameSrc.count, true));
 }
 
-const addCompoundNc = (to: ValidateResultData, nc: NameCount.Type,
-    result: ValidateResultData): void =>
-{
+const addCompoundNc = (to: ValidateResultData, result: ValidateResultData): void => {
     to.ncList.push(...result.ncList);
     to.nameSrcList.push(...result.nameSrcList);
-//    to.resultMap.addNcMapSource(nc, result.resultMap);
 };
 
-const addPrimaryNameSrc = (to: ValidateResultData, nameSrc: NameCount.Type,
-    nc?: NameCount.Type): void =>
+const addPrimaryNameSrc = (to: ValidateResultData, nc: NameCount.Type,
+    nameSrc: NameCount.Type): void =>
 {
-    to.ncList.push(nc || NameCount.makeNew(nameSrc.name, 1));
+    to.ncList.push(nc); // || NameCount.makeNew(nameSrc.name, 1));
     to.nameSrcList.push(nameSrc);
-//    to.resultMap.addPrimarySource(nameSrc);
 };
 
 interface MergeNcListComboResult {
     success: boolean;
     validateResult?: ValidateResult;
 }
+
+type NativeMergeResult = ValidateResult | null;
 
 export let merge_nclc = 0;
 
@@ -191,12 +190,13 @@ const mergeNcListCombo = (ncList: NameCount.List, indexList: number[]):
         const nc = ncList[i];
         if (nc.count > 1) { // compound clue
             const listIndex = indexList[i];
+            //const ncResult = ClueManager.getNcResultMap(nc.count)[nc.toString()].list[listIndex];
             const ncResult = ClueManager.getNcResultMap(nc.count)[nc.toString()].list[listIndex];
             if (!Source.isXorCompatible(validateResult, ncResult)) {
                 return { success: false };
             }
             Source.mergeUsedSourcesInPlace(validateResult.usedSources, ncResult.usedSources);
-            addCompoundNc(validateResult, nc, ncResult);
+            addCompoundNc(validateResult, ncResult);
         } else { // primary clue
             const primarySrc = indexList[i];
             if (!Source.addUsedSource(validateResult.usedSources, primarySrc, true)) {
@@ -210,28 +210,56 @@ const mergeNcListCombo = (ncList: NameCount.List, indexList: number[]):
 
 type MergeNcListResultsArgs = VSFlags;
 
+export let native_merge_nclc = 0;
+export let native_get_num_ncr = 0;
+export let merge_nclr = 0;
+
 const mergeNcListResults = (ncListToMerge: NameCount.List,
     args: MergeNcListResultsArgs): ValidateSourcesResult =>
 {
+    ++merge_nclr;
     let listArray: number[][] = ncListToMerge.map(nc => {
         if (nc.count === 1) {
             // TODO: optimization: these could be cached. i'm not sure it'd
             // matter too much.
             return getAllSourcesForPrimaryClueName(nc.name);
         } else {
-            const ncResultMap = ClueManager.getNcResultMap(nc.count);
-            return [...Array(ncResultMap[nc.toString()].list.length).keys()]
-                .map(_.toNumber);
+            ++native_get_num_ncr;
+            //const count = ClueManager.getNcResultMap(nc.count)[nc.toString()].list.length;
+            const count = Native.getNumNcResults(nc);
+            return [...Array(count).keys()].map(_.toNumber);
         }
     });
+
+    /*
+    let resultList: ValidateResult[] =
+        Native.mergeAllNcListCombinations(ncListToMerge, listArray);
+    */
+
     let resultList: ValidateResult[] = Peco.makeNew({ listArray })
         .getCombinations()
+        //
         .map((indexList: number[]) => mergeNcListCombo(ncListToMerge, indexList))
         .filter((mergeResult: MergeNcListComboResult) => mergeResult.success)
-        .map((mergeResult: MergeNcListComboResult) => mergeResult.validateResult!)
+        .map((mergeResult: MergeNcListComboResult) => mergeResult.validateResult!);
+        /*
+        .map((indexList: number[]) => {
+            ++native_merge_nclc;
+            return Native.mergeNcListCombo(ncListToMerge, indexList);
+        })
+        .filter((mergeResult: NativeMergeResult) => !!mergeResult);
+
+    resultList.forEach((result: ValidateResult) => {
+        result.usedSources = Source.emptyUsedSources();
+            result.nameSrcList.forEach((nameSrc: NameCount.Type) => {
+                Source.addUsedSource(result.usedSources, nameSrc.count);
+        });
+    });
+    */
     return { success: !_.isEmpty(resultList), list: resultList };
 };
 
+/*
 let test = (ncList: NameCount.List, args: any): ValidateSourcesResult => {
     // can remove this.
     if (!ncList.every(nc => {
@@ -241,6 +269,7 @@ let test = (ncList: NameCount.List, args: any): ValidateSourcesResult => {
     })) throw new Error('no result list');
     return mergeNcListResults(ncList, args);
 };
+*/
 
 type VSForNameCountArgs = NameListContainer & CountListContainer
     & NcListContainer & VSFlags;

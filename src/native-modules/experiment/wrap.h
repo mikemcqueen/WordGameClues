@@ -2,6 +2,7 @@
 #define INCLUDE_WRAP_H
 
 #include <unordered_set>
+#include <string_view>
 #include <vector>
 #include <napi.h>
 #include "combo-maker.h"
@@ -10,10 +11,12 @@
 
 namespace cm {
   Napi::Object wrap(Napi::Env& env, const NameCount& nc); 
-  Napi::Array wrap(Napi::Env& env, const std::vector<NameCount>& ncList); 
+  Napi::Array wrap(Napi::Env& env, const std::vector<NameCount>& ncList);
 
-  Napi::Object wrap(Napi::Env& env, const XorSource& xorSource);
-  Napi::Array wrap(Napi::Env& env, const XorSourceList& xorSourceList);
+  Napi::Object wrap(Napi::Env& env, const XorSource& xorSource,
+    std::string_view primaryNameSrcList = "primaryNameSrcList");
+  Napi::Array wrap(Napi::Env& env, const XorSourceList& xorSourceList,
+    std::string_view primaryNameSrcList = "primaryNameSrcList");
 
 #if 0
   Napi::Object wrap(Napi::Env& env, const SourceData& source);

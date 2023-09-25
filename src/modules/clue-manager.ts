@@ -10,16 +10,15 @@ const Log            = require('../../modules/log')('clue-manager');
 const Peco           = require('../../modules/peco');
 const Clues          = require('../../modules/clue-types');
 
-const Assert = require('assert');
-const Validator      = require('./validator');
+const Assert         = require('assert');
 const Debug          = require('debug')('clue-manager');
 const Duration       = require('duration');
-const Expect         = require('should/as-function');
-const Path           = require('path');
-const PrettyMs       = require('pretty-ms');
-
+const Native     = require('../../../build/experiment.node');
+const Path       = require('path');
+const PrettyMs   = require('pretty-ms');
 const Stringify2 = require('stringify-object');
-const stringify = require('javascript-stringify').stringify;
+const stringify  = require('javascript-stringify').stringify;
+const Validator  = require('./validator');
 
 import * as Clue from '../types/clue';
 import * as ClueList from '../types/clue-list';
@@ -546,7 +545,8 @@ let addCompoundClue = (clue: Clue.Compound, count: number, args: any): boolean =
         vsResult.list = srcMap[srcKey].results;
     }
     if (vsResult.success && args.validateAll) {
-        addResultsToNcResultMap(vsResult.list!, clue.name, count, args);
+        //addResultsToNcResultMap(vsResult.list!, clue.name, count, args);
+        Native.appendNcResults({ name: clue.name, count }, vsResult.list!);
         (srcMap[srcKey].clues as ClueList.Compound).push(clue);
     }
     // NOTE: added above, commented below
@@ -663,7 +663,6 @@ let addReject = function (srcNameList: string|string[], save = false): boolean {
     }
     srcNameList = srcNameList as string[];
     let count = _.size(srcNameList);
-    //Expect(count).is.above(1); // at.least(2);
     if (addRejectSource(srcNameList)) {
         State.rejectListArray[count].push({
             src: _.toString(srcNameList)
@@ -681,7 +680,6 @@ let addRejectSource = function (srcNameList: string|string[]): boolean {
         srcNameList = (srcNameList as string).split(',');
     }
     srcNameList = srcNameList as string[];
-    //Expect(srcNameList).is.an.Array().and.not.empty();
     srcNameList.sort();
     log('addRejectSource: ' + srcNameList);
 
@@ -986,10 +984,6 @@ const getKnownClueIndexLists = (nameList: string[]): CountList[] => {
             console.log('missing known cluemap #' + count);
         }
     }
-    // verify that all names were found
-    nameList.forEach((name, index) => {
-        //Expect(countListArray[index]).is.ok();
-    });
     return countListArray;
 };
 

@@ -7,20 +7,48 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include "candidates.h"
 #include "combo-maker.h"
 #include "cm-precompute.h"
-#include "candidates.h"
 #include "dump.h"
-#include "wrap.h"
 #include "filter.h"
 #include "merge.h"
-#include "merge-filter-data.h"
 #include "merge-filter-common.h"
+#include "merge-filter-data.h"
+#include "validator.h"
+#include "wrap.h"
 
 namespace {
 
 using namespace Napi;
 using namespace cm;
+using namespace validator;
+
+IndexList makeIndexList(Env& env, const Array& jsList) {
+  IndexList idx_list{};
+  for (auto i = 0u; i < jsList.Length(); ++i) {
+    if (!jsList[i].IsNumber()) {
+      TypeError::New(env, "makeIndexList: non-number element")
+        .ThrowAsJavaScriptException();
+      return {};
+    }
+    idx_list.emplace_back(jsList[i].As<Number>().Uint32Value());
+  }
+  return idx_list;
+}
+
+Peco::IndexList makePecoIndexList(Env& env, const Array& jsList) {
+  Peco::IndexList idx_list{};
+  for (auto i = (int)jsList.Length() - 1; i >= 0; --i) {
+    if (!jsList[i].IsNumber()) {
+      TypeError::New(env, "makeIndexList: non-number element")
+        .ThrowAsJavaScriptException();
+      return {};
+    }
+    idx_list.emplace_front(jsList[i].As<Number>().Uint32Value());
+  }
+  return idx_list;
+}
 
 std::vector<std::string> makeStringList(Env& env, const Array& jsList) {
   std::vector<std::string> list{};
@@ -61,8 +89,10 @@ NameCountList makeNameCountList(Env& env, const Array& jsList) {
   return ncList;
 }
 
-SourceData makeSourceData(Env& env, const Object& jsSourceData) {
-  auto jsPrimaryNameSrcList = jsSourceData.Get("primaryNameSrcList");
+SourceData makeSourceData(Env& env, const Object& jsSourceData,
+  std::string_view nameSrcList = "primaryNameSrcList") {
+  //
+  auto jsPrimaryNameSrcList = jsSourceData.Get(nameSrcList.data());
   if (!jsPrimaryNameSrcList.IsArray()) {
     TypeError::New(env, "makeSourceData: primaryNameSrcList is not an array")
       .ThrowAsJavaScriptException();
@@ -88,7 +118,9 @@ SourceData makeSourceData(Env& env, const Object& jsSourceData) {
     std::move(primaryNameSrcList), std::move(ncList), std::move(usedSources)};
 }
 
-SourceList makeSourceList(Env& env, const Array& jsList) {
+SourceList makeSourceList(Env& env, const Array& jsList,
+  std::string_view nameSrcList = "primaryNameSrcList") {
+  //
   SourceList sourceList{};
   for (auto i = 0u; i < jsList.Length(); ++i) {
     if (!jsList[i].IsObject()) {
@@ -97,7 +129,7 @@ SourceList makeSourceList(Env& env, const Array& jsList) {
       return {};
     }
     sourceList.emplace_back(
-      std::move(makeSourceData(env, jsList[i].As<Object>())));
+      std::move(makeSourceData(env, jsList[i].As<Object>(), nameSrcList)));
   }
   return sourceList;
 }
@@ -470,7 +502,78 @@ Value getResult(const CallbackInfo& info) {
 }
 
 //
+//
+//
+
+Value getNumNcResults(const CallbackInfo& info) {
+  Env env = info.Env();
+  if (!info[0].IsObject()) {
+    TypeError::New(env, "getNumNcResults: invalid parameter type")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+  auto nc = makeNameCount(env, info[0].As<Object>());
+  return Number::New(env, validator::getNumNcResults(nc));
+}
+
+Value appendNcResults(const CallbackInfo& info) {
+  Env env = info.Env();
+  if (!info[0].IsObject() || !info[1].IsArray()) {
+    TypeError::New(env, "appendNcResults: invalid parameter type")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+  auto nc = makeNameCount(env, info[0].As<Object>());
+  auto src_list = makeSourceList(env, info[1].As<Array>(), "nameSrcList");
+  validator::appendNcResults(nc, src_list);
+  return env.Null();
+}
+
+Value mergeNcListCombo(const CallbackInfo& info) {
+  Env env = info.Env();
+  if (!info[0].IsArray() || !info[1].IsArray()) {
+    TypeError::New(env, "mergeNcListCombo: invalid parameter type")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+  auto nc_list = makeNameCountList(env, info[0].As<Array>());
+  auto idx_list = makeIndexList(env, info[1].As<Array>());
+
+  auto opt_src = validator::mergeNcListCombo(nc_list, idx_list);
+  if (opt_src.has_value()) {
+    return cm::wrap(env, opt_src.value(), "nameSrcList");
+  }
+
+  return env.Null();
+}
+
+Value mergeAllNcListCombinations(const CallbackInfo& info) {
+  Env env = info.Env();
+  if (!info[0].IsArray() || !info[1].IsArray()) {
+    TypeError::New(env, "mergeAllNcListCombinations: invalid parameter type")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+  auto nc_list = makeNameCountList(env, info[0].As<Array>());
+  const auto& js_idx_lists = info[1].As<Array>();
+  Peco::IndexListVector idx_lists;
+  idx_lists.reserve(js_idx_lists.Length());
+  for (size_t i{}; i < js_idx_lists.Length(); ++i) {
+    if (!js_idx_lists[i].IsArray()) {
+      TypeError::New(env, "mergeAllNcListCombinations: non-array element")
+        .ThrowAsJavaScriptException();
+      return {};
+    }
+    idx_lists.emplace_back(makePecoIndexList(env, js_idx_lists[i].As<Array>()));
+  }
+  auto results = validator::mergeAllNcListCombinations(nc_list, std::move(idx_lists));
+  return cm::wrap(env, results, "nameSrcList");
+}
+
+//
 Object Init(Env env, Object exports) {
+  // combo-maker
+  //
   exports["mergeCompatibleXorSourceCombinations"] =
     Function::New(env, mergeCompatibleXorSourceCombinations);
   exports["filterPreparation"] = Function::New(env, filterPreparation);
@@ -479,6 +582,13 @@ Object Init(Env env, Object exports) {
   exports["filterCandidatesForSum"] =
     Function::New(env, filterCandidatesForSum);
   exports["getResult"] = Function::New(env, getResult);
+
+  // validator
+  //
+  exports["getNumNcResults"] = Function::New(env, getNumNcResults);
+  exports["appendNcResults"] = Function::New(env, appendNcResults);
+  exports["mergeNcListCombo"] = Function::New(env, mergeNcListCombo);
+  exports["mergeAllNcListCombinations"] = Function::New(env, mergeAllNcListCombinations);
 
   return exports;
 }

@@ -36,7 +36,7 @@
             "name": "cppdbg -t",
             "program": "/usr/local/bin/node",
             "cwd": "${workspaceFolder}/src/tools",
-            "args": [ "clues.js", "-pf.72", "-t", "lincoln", "-v" ]
+            "args": [ "clues.js", "-pf.72", "-t", "lincoln"  ]
         },
         {
             "type": "cppdbg",

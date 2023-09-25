@@ -127,11 +127,14 @@ public:
     return true;
   }
 
-  void addSource(int src) {
+  bool addSource(int src, bool nothrow = false) {
     auto sentence = Source::getSentence(src);
     assert(sentence > 0);
     auto variation = Source::getVariation(src);
     if (hasVariation(sentence) && (getVariation(sentence) != variation)) {
+      if (nothrow) {
+        return false;
+      }
       std::cerr << "variation(" << sentence << "), this: "
                 << getVariation(sentence) << ", src: " << variation
                 << std::endl;
@@ -144,8 +147,14 @@ public:
 
     // bits
     auto bit_pos = Source::getIndex(src) + getFirstBitIndex(sentence);
-    assert(!bits.test(bit_pos));
+    if (bits.test(bit_pos)) {
+      if (nothrow) {
+        return false;
+      }
+      assert(0 && "addSource: bit already set");
+    }
     bits.set(bit_pos);
+    return true;
   }
 
   auto mergeInPlace(const UsedSources& other) {
@@ -276,8 +285,8 @@ struct SourceCompatibilityData {
            || isAndCompatibleWith(other, false);
   }
 
-  void addSource(int src) {
-    usedSources.addSource(src);
+  bool addSource(int src, bool nothrow = false) {
+    return usedSources.addSource(src, nothrow);
   }
 
   void mergeInPlace(const SourceCompatibilityData& other) {
@@ -330,6 +339,7 @@ struct NameCount;
 using NameCountList = std::vector<NameCount>;
 
 struct NameCount {
+  /*
   NameCount(std::string&& name, int count) :
     name(std::move(name)), count(count) {}
   NameCount() = default;
@@ -337,6 +347,7 @@ struct NameCount {
   NameCount& operator=(const NameCount&) = default;
   NameCount(NameCount&&) = default;
   NameCount& operator=(NameCount&&) = default;
+  */
 
   std::string toString() const {
     char buf[128] = { 0 };
@@ -435,6 +446,26 @@ struct SourceData : SourceCompatibilityData {
   SourceData(SourceData&&) = default;
   SourceData& operator=(SourceData&&) = default;
 
+  bool addCompoundSource(const SourceData& src) {
+    if (!isXorCompatibleWith(src)) {
+      return false;
+    }
+    mergeInPlace(src);
+    primaryNameSrcList.insert(primaryNameSrcList.end(),
+      src.primaryNameSrcList.begin(), src.primaryNameSrcList.end());
+    ncList.insert(ncList.end(), src.ncList.begin(), src.ncList.end());
+    return true;
+  }
+
+  bool addPrimaryNameSrc(const NameCount& nc, int primary_src) {
+    if (!addSource(primary_src, true)) {
+      return false;
+    }
+    primaryNameSrcList.emplace_back(NameCount{nc.name, primary_src});
+    ncList.emplace_back(nc);
+    return true;
+  }
+
   NameCountList primaryNameSrcList;
   NameCountList ncList;
 };
@@ -462,20 +493,6 @@ struct OrArgData {
 };
 using OrArgList = std::vector<OrArgData>;
 
-namespace device {
-  struct OrSourceData {
-    SourceCompatibilityData source;
-    unsigned or_arg_idx;
-  };
-
-  /*
-  struct OrArgData {
-    OrSourceData* or_sources;
-    unsigned num_or_sources;
-  };
-  */
-}
-
 // TODO comment
 // These are precomputed on xorSourceList, to identify only those sources
 // which share the same per-sentence variation.
@@ -484,59 +501,6 @@ namespace device {
 using VariationIndicesList = std::vector<ComboIndexList>;
 // one variationIndicesLists per sentence
 using SentenceVariationIndices = std::array<VariationIndicesList, kNumSentences>;
-
-// on-device version of above
-namespace device {
-
-struct VariationIndices {
-  combo_index_t* device_data;  // one chunk of allocated data; other pointers
-                               //  below point inside this chunk.
-  combo_index_t* combo_indices;
-  index_t* num_combo_indices;  // per variation
-  index_t* variation_offsets;  // offsets into combo_indices
-  index_t num_variations;
-
-  constexpr ComboIndexSpan get_index_span(int variation) const {
-    return {&combo_indices[variation_offsets[variation]],
-      num_combo_indices[variation]};
-  }
-};
-
-} // namespace device
-
-  /*
-struct PreComputedData {
-  std::vector<SourceList> xor_src_lists;
-
-  SourceCompatibilityData* device_src_lists;
-  index_t* device_src_list_start_indices;
-
-  index_t* device_idx_lists;
-  index_t* device_idx_list_start_indices;
-
-  // TODO: need device_xor_src_lists + device_xor_src_list_start_indices
-  std::vector<IndexList> compat_idx_lists;
-  ComboIndexList combo_indices;
-  combo_index_t* device_combo_indices;
-  unsigned num_compat_indices{};
-
-  // TODO: remove below
-  XorSourceList xorSourceList;
-  SourceCompatibilityData* device_xorSources{};
-  index_t* device_legacy_xor_src_indices;
-  std::vector<int> xorSourceIndices;
-  // TODO: remove above
-  
-  // OrArgList orArgList;
-  unsigned num_or_args{};
-  device::OrSourceData* device_or_sources{}; 
-  unsigned num_or_sources{};  // # of device_or_sources
-  SourceListMap sourceListMap;
-  //  SentenceVariationIndices sentenceVariationIndices;
-  device::VariationIndices* device_variation_indices{};
-  unsigned num_nariation_indices{};
-};
-  */
 
 struct MergedSources : SourceCompatibilityData {
   MergedSources() = default;
@@ -578,21 +542,6 @@ struct CandidateStats {
 };
 
 // functions
-
-/*
-void debugSourceList(const SourceList& sourceList, std::string_view sv);
-
-XorSourceList mergeCompatibleXorSourceCombinations(
-  const std::vector<SourceList>& sourceLists);
-
-auto buildSourceListsForUseNcData(const std::vector<NCDataList>& useNcDataLists,
-  const SourceListMap& sourceListMap) -> std::vector<SourceList>;
-
-auto buildSentenceVariationIndices(const XorSourceList& xorSourceList,
-  const std::vector<index_t>& xorSourceIndices) -> SentenceVariationIndices;
-
-void mergeUsedSourcesInPlace(UsedSources& to, const UsedSources& from);
-*/
 
 inline constexpr void assert_valid(const SourceList& src_list) {
   for (const auto& src: src_list) {

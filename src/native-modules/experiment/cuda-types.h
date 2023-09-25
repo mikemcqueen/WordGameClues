@@ -2,6 +2,7 @@
 #define INCLUDE_CUDA_TYPES_H
 
 #include <span>
+#include <cstdint>
 #include <utility>
 #include <vector>
 

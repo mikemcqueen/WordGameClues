@@ -11,7 +11,7 @@ const ResultMap   = require('../../types/result-map');
 const Peco        = require('../../modules/peco');
 const Log         = require('../../modules/log')('combo-maker');
 const My          = require('../../modules/util');
-const NativeComboMaker = require('../../../build/Release/experiment.node');
+const NativeComboMaker = require('../../../build/experiment.node');
 //const NativeComboMaker = require('../../../build/Debug/experiment.node');
 
 const Assert      = require('assert');
@@ -35,7 +35,7 @@ import * as PreCompute from './cm-precompute';
 import * as Sentence from '../types/sentence';
 import * as Source from './source';
 
-import { ValidateResult } from './validator';
+//import { ValidateResult } from './validator';
 
 // TODO: import from somewhere. also defined in clue-manager
 const DATA_DIR =  Path.normalize(`${Path.dirname(module.filename)}/../../../data/`);

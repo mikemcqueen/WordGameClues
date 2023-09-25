@@ -1,6 +1,18 @@
 {
   'targets': [{
     'target_name': 'experiment',
+    'type': 'none',
+    'dependencies': [ 'build_experiment' ],
+    'actions': [{
+      'action_name': 'copy_plugin',
+      'inputs': [ '<(PRODUCT_DIR)/experiment.node' ],
+      'outputs': [ '<(PRODUCT_DIR)/..' ],
+      'action': [ 'sh', '-c', 'cp <(_inputs) <(_outputs)' ]
+    }]
+  },
+  {
+    'target_name': 'build_experiment',
+    'product_name': 'experiment',
     'cflags_cc': [ '-fPIC -std=c++20 -Wno-unused-function' ],
     'cflags!': [ '-fno-exceptions' ],
     'cflags_cc!': [ '-fno-exceptions' ],
@@ -11,6 +23,7 @@
       'filter-support.cpp',
       'index.cpp',
       'merge-support.cpp',
+      'validator.cpp',
       'wrap.cpp'
     ],
     'include_dirs': [
@@ -33,9 +46,9 @@
     ],
     'rules': [{
       'extension': 'cu',           
-      'inputs': [ '<(RULE_INPUT_PATH)' ],
       'rule_name': 'kernel lib',
       'message': 'CUDA static lib',
+      'inputs': [ '<(RULE_INPUT_PATH)' ],
       'outputs': [
         '<(SHARED_INTERMEDIATE_DIR)/<(RULE_INPUT_ROOT).o',
         '<(SHARED_INTERMEDIATE_DIR)/<(RULE_INPUT_ROOT)_dlink.o'
@@ -54,9 +67,9 @@
     ],
     'rules': [{
       'extension': 'cu',           
-      'inputs': [ '<(RULE_INPUT_PATH)' ],
       'rule_name': 'compile kernel',
       'message': 'compile and device link CUDA file on linux',
+      'inputs': [ '<(RULE_INPUT_PATH)' ],
       'outputs': [ '<(RULE_INPUT_ROOT)_dummy_output' ],
       'action': [
           'env', 'DIR=<(SHARED_INTERMEDIATE_DIR)', 'FILE=<(RULE_INPUT_ROOT)',

@@ -1,8 +1,3 @@
-
-* reverse-validate components, syns, ans, homs, make sure the keys of these objects
-  actually exist in one of the variations? After the variations have been generated,
-  in case they're a syn/an/hom of a component variation, for example.
-
 * NATIVE-VALIDATOR branch
   * move combo-maker first/next to c++. this will require copying ClueManager.UniqueClueNames
     to C++ as well. not sure if there is any other use for them other than by
@@ -12,6 +7,10 @@
     i think we do need that map in JS still tho, so would need to copy it back if so.
   * the other part is knownSourceMapEntries. This entire map could probabliy be in c++,
     even the API to look up an entry.
+
+* reverse-validate components, syns, ans, homs, make sure the keys of these objects
+  actually exist in one of the variations? After the variations have been generated,
+  in case they're a syn/an/hom of a component variation, for example.
 
 *  merge_support: uint64_t num_combos{200'000'000}; // hard-coded chunk size
    should probably (eventually) figure out:
