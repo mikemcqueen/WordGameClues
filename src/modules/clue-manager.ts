@@ -1181,9 +1181,9 @@ const getCompatiblePrimaryNameSrcList = (listOfListOfPrimaryNameSrcLists: any[])
 // use case, that does not use Validator (and hence is faster).
 // Since that time, I pretty significantly optimized the Validator. So maybe we can go back
 // to using the old one (have to supply fast:true or default to fast).
-// The problem with not using the old one, is I need to replicate enforcement of the
-// "restrictToSameClueNumber" flag for primary NameSrcs. Not an unachievable task necessarily,
-// but there is definitely some benefit to having that logic in only one spot.
+// There uused to be a problem with not using the old one, in that I needed to replicate
+// enforcement of the "restrictToSameClueNumber" flag for primary NameSrcs. That no longer
+// holds as we've no longer got legacy clues.
 // Or I suppose I could just throw a "validateSources()" call into the "fast" method and
 // that might be a good compromise (have to supply fast:true or default to fast).
 //
