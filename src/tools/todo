@@ -1,11 +1,12 @@
-* move ncResultMap to c++.
-  * Native.getNumNcResults(nc) -> ncResultMap[ncStr].list.length
-  * Native.appendNcResult(nc, results)
-  * then I can move mergeNcListCombo/Source.addCompoundNc/Source.addPrimaryNameSrc to c++.
-    and i should already have UsedSources.MergeInPlace?
 
-* move combo-maker first/next to c++. this will require copying ClueManager.UniqueClueNames
-  to C++ as well. not sure if there is any other use for them other than by combo-maker (check it).
+* reverse-validate components, syns, ans, homs, make sure the keys of these objects
+  actually exist in one of the variations? After the variations have been generated,
+  in case they're a syn/an/hom of a component variation, for example.
+
+* NATIVE-VALIDATOR branch
+  * move combo-maker first/next to c++. this will require copying ClueManager.UniqueClueNames
+    to C++ as well. not sure if there is any other use for them other than by
+    combo-maker (check it).
   * mark when done
   * this will in turn allow us to move most of precompute.buildKnownNcSourceListMap to c++.
     i think we do need that map in JS still tho, so would need to copy it back if so.
@@ -46,11 +47,6 @@
 
 * incompatible_sources: could be CRefs?
 
-* move buildSourceListMap to c++?  save ~3s + unwrap time (4s?) from PreCompute.
-  * gonna require moving ClueManger.knownSourceMaps data to c++
-
-* investigate loadClues time. It's going to get worse I bet.
-
 * can i sort sources within each device_sources list, in order of the smallest
   xor_sources IndexSpanPair they will test against? like, could I store
   candidates in an ordered set, with a test for the smallest IndexSpanPair
@@ -72,7 +68,6 @@
 
 * consider stripping some types out of combo_maker.h into separate files.
 * PreComputeData probably needs to go do it's own thing. Some form of singleton.
-* .cu dependencies
 
 **************************************************************************
 * i have count(), countIndices(), and sum_sizes() and I think they all do 

@@ -99,7 +99,6 @@ auto buildSourceListsForUseNcData(const std::vector<NCDataList>& useNcDataLists,
     for (size_t i{}; i < ncDataList.size(); ++i) {
       // for size == 2: return by value; could return reference to static local in a pinch
       auto sourceList = mergeAllCompatibleSources(ncDataList[i].ncList, sourceListMap);
-      //const auto& sourceList = getSourceList(ncDataList[i].ncList, sourceListMap);
       total += sourceList.size();
       for (const auto& source : sourceList) {
         // TODO: NOT GOOD ENOUUGH. still need a set of strings in value type.

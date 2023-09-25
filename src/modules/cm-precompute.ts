@@ -88,7 +88,10 @@ const ncAsKnownNcList = (nc: NameCount.Type): NameCount.List => {
 
 const getKnownNcListForName = (name: string): NameCount.List => {
     const countList = ClueManager.getCountListForName(name);
-    Assert(!_.isEmpty(countList), `not a valid clue name: '${name}'`);
+    if (_.isEmpty(countList)) {
+        console.error(`not a valid clue name: '${name}'`);
+        process.exit(-1);
+    }
     return countList.map(count => ({ name, count }));
 };
 

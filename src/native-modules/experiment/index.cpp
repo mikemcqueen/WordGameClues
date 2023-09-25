@@ -271,20 +271,18 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
         .ThrowAsJavaScriptException();
       return env.Null();
   }
-
-  auto unwrap0 = high_resolution_clock::now();
   auto ncDataLists = makeNcDataLists(env, info[0].As<Array>());
+
+  auto slm0 = high_resolution_clock::now();
   MFD.sourceListMap =
     std::move(makeSourceListMap(env, info[1].As<Array>()));
   // merge_only means "-t" mode, in which case no filter kernel will be called,
   // so we don't need to do additional work/copy additional device data
+  auto slm1 = high_resolution_clock::now();
+  auto slm_dur = duration_cast<milliseconds>(slm1 - slm0).count();
+  std::cerr << " build src_list_map - " << slm_dur << "ms" << std::endl;
+
   auto merge_only = info[2].As<Boolean>();
-
-  auto unwrap1 = high_resolution_clock::now();
-  [[maybe_unused]] auto d_unwrap = 
-    duration_cast<milliseconds>(unwrap1 - unwrap0).count();
-  std::cerr << " build src_list_map - " << d_unwrap << "ms" << std::endl;
-
   //--
     
   auto build0 = high_resolution_clock::now();
