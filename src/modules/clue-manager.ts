@@ -417,6 +417,8 @@ const primaryClueListPostProcessing = (args: any): void => {
     showMinMaxLengths();
 };
 
+let total_sources = 0;
+
 // args:
 //  baseDir:  base directory (meta, synth)
 //  ignoreErrors:
@@ -444,7 +446,8 @@ export const loadAllClues = function (args: any): void {
     }
     const pp_dur = new Duration(pp0, new Date()).milliseconds;
     if (args.verbose) {
-        console.error(`addCompound max(${args.max_sources}) - ${PrettyMs(pp_dur)}`);
+        console.error(`addCompound max(${args.max_sources})` +
+            `, total_sources(${total_sources}) - ${PrettyMs(pp_dur)}`);
     }
     State.loaded = true;
 };
@@ -533,6 +536,7 @@ let addCompoundClue = (clue: Clue.Compound, count: number, args: any): boolean =
         });
         // this is where the magic happens
         if (vsResult.success && args.validateAll) {
+            total_sources += vsResult.list!.length;
             srcMap[srcKey] = {
                 clues: [],
                 results: vsResult.list!
