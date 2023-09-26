@@ -476,16 +476,17 @@ export const loadAllClues = function (args: any): void {
     autoSource(primaryClueList, args);
     // if using -t, add primary variations to uniqueNames
     primaryClueListPostProcessing(args);
-    const pp0 = new Date();
+    const t0 = new Date();
     for (let count = 2; count <= args.max_sources; ++count) {
         let clueList: ClueList.Compound = loadClueList(count);
         State.clueListArray[count] = clueList;
         addKnownCompoundClues(clueList, count, args);
+        Native.setCompoundClueNames(count, _.keys(getKnownClueMap(count)));
     }
-    const pp_dur = new Duration(pp0, new Date()).milliseconds;
+    const t_dur = new Duration(t0, new Date()).milliseconds;
     if (args.verbose) {
         console.error(`addCompound max(${args.max_sources})` +
-            `, total_sources(${total_sources}) - ${PrettyMs(pp_dur)}`);
+            `, total_sources(${total_sources}) - ${PrettyMs(t_dur)}`);
     }
     State.loaded = true;
 };

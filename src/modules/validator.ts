@@ -65,7 +65,7 @@ const emptyValidateResult = (): ValidateResult => {
     return {
         ncList: [],
         nameSrcList: [],
-        resultMap: ResultMap.makeNew(),
+        //resultMap: ResultMap.makeNew(),
         usedSources: Source.emptyUsedSources()
     };
 };
@@ -92,10 +92,10 @@ let copyAddNcList = (ncList: NameCount.List, name: string, count: number): NameC
     return newNcList;
 }
 
-let chop = (list: any, removeValue: any): any => {
+let chop_copy = (list: any, removeValue: any): any[] => {
     let copy: any[] = [];
     list.forEach((value: any) => {
-        if (value == removeValue) {
+        if (value === removeValue) {
             removeValue = undefined;
         } else {
             copy.push(value);
@@ -278,6 +278,7 @@ let validateSourcesForNameCount = (clueName: string|undefined, srcName: string,
         // in the clueList[count]. (at least as many entries as there are
         // copies of name in ncList)
         // SEE ALSO: copyAddNcList()
+        // NOTE: this should be fixable with some effort if it ever fires.
         console.error(`  duplicate nc, ${srcName}:{srcCount}`);
         return { success: false }; // fail
     }
@@ -303,9 +304,9 @@ let validateSourcesForNameCount = (clueName: string|undefined, srcName: string,
     
     // nameList.length > 1, remove current name & count,
     // and validate remaining
-    Debug(` calling validateSourcesForNameCountLists recursively, ncList: ${ncList}`);
-    let rvsResult = validateSourcesForNameCountLists(clueName,
-        chop(args.nameList, srcName), chop(args.countList, srcCount), {
+    Debug(` calling validateSourcesForNameAndCountLists recursively, ncList: ${ncList}`);
+    let rvsResult = validateSourcesForNameAndCountLists(clueName,
+        chop_copy(args.nameList, srcName), chop_copy(args.countList, srcCount), {
             ncList,
             fast: args.fast,
             validateAll: args.validateAll
@@ -314,9 +315,9 @@ let validateSourcesForNameCount = (clueName: string|undefined, srcName: string,
         Debug('--validateSourcesForNameCount: validateSourcesForNameCountLists failed');
         return rvsResult;
     }
-    // does this achieve anything? modifies args.ncList.
-    // TODO: probably need to remove why that matters.
-    // TODO2: use _clone() until then
+    // does this achieve anything? modifies args.ncList. answer: probably.
+    // TODO: probably need to remove why that matters. answer: maybe.
+    // TODO: use slice() (or clone()?)
     args.ncList.length = 0;
     ncList.forEach(nc => args.ncList.push(nc));
     Debug(`--validateSourcesForNameCount, add ${srcName}:${srcCount}` +
@@ -326,7 +327,7 @@ let validateSourcesForNameCount = (clueName: string|undefined, srcName: string,
 
 type VSForNameCountListsArgs = NcListContainer & VSFlags;
 
-let validateSourcesForNameCountLists = (clueName: string|undefined, nameList: string[],
+let validateSourcesForNameAndCountLists = (clueName: string|undefined, nameList: string[],
     countList: number[], args: VSForNameCountListsArgs):
     ValidateSourcesResult =>
 {
@@ -340,7 +341,7 @@ let validateSourcesForNameCountLists = (clueName: string|undefined, nameList: st
 
     let resultList: ValidateResult[] = [];
     const name = nameList[0];
-    // could do this test earlier, like in calling function, check entire name list.
+    // TODO: could do this test earlier, like in calling function, check entire name list.
     if (name === clueName) {
         return { success: false, list: undefined };
     }
@@ -387,22 +388,27 @@ export const validateSources = (clueName: string|undefined, args: any):
     let success = false;
     let resultList: ValidateResult[] = [];
     Peco.makeNew({
-        sum:     args.sum,
-        count:   args.count,
-        max:     args.max,
-        quiet:   args.quiet
+        sum:   args.sum,
+        count: args.count,
+        max:   args.max
     }).getCombinations().some((countList: number[]) => {
-        let rvsResult = validateSourcesForNameCountLists(clueName, args.nameList, countList, {
+        /*
+        let rvsResult = validateSourcesForNameAndCountLists(clueName,
+          args.nameList, countList, {
             ncList: [],
             fast: args.fast,
             validateAll: args.validateAll
         });
-        if (rvsResult.success) {
+        let sourceList = rvsResult.success ? rvsResult.list : [];
+        */
+        let sourceList = Native.validateSourcesForNameAndCountLists(clueName,
+            args.nameList, countList, []);
+        if (sourceList.length) {
             Debug('validateSources: VALIDATE SUCCESS!');
-            if (rvsResult.list) {
-                // TODO: return empty array, get rid of .success
-                resultList.push(...rvsResult.list);
-            }
+            //if (rvsResult.list) {
+            // TODO: return empty array, get rid of .success
+            resultList.push(...sourceList);
+            //}
             success = true;
             if (!args.validateAll) return true; // found a match; some.exit
             Debug('validateSources: validateAll set, continuing...');

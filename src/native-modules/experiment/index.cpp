@@ -25,6 +25,19 @@ using namespace Napi;
 using namespace cm;
 using namespace validator;
 
+std::vector<int> makeIntList(Env& env, const Array& jsList) {
+  std::vector<int> int_list{};
+  for (auto i = 0u; i < jsList.Length(); ++i) {
+    if (!jsList[i].IsNumber()) {
+      TypeError::New(env, "makeIntList: non-number element")
+        .ThrowAsJavaScriptException();
+      return {};
+    }
+    int_list.emplace_back(jsList[i].As<Number>().Int32Value());
+  }
+  return int_list;
+}
+
 IndexList makeIndexList(Env& env, const Array& jsList) {
   IndexList idx_list{};
   for (auto i = 0u; i < jsList.Length(); ++i) {
@@ -295,7 +308,7 @@ OrArgList makeOrArgList(Env& env, const Array& jsList) {
 // Clue-manager
 //
 
-// _.keys(nameSourcesMap), values_lists(nameSourcesMap))
+// _.keys(nameSourcesMap), values_lists(nameSourcesMap)
 Value setPrimaryClueNameSourcesMap(const CallbackInfo& info) {
   Env env = info.Env();
   if (!info[0].IsArray() || !info[1].IsArray()) {
@@ -320,7 +333,8 @@ Value setPrimaryClueNameSourcesMap(const CallbackInfo& info) {
     }
     idx_lists.emplace_back(makeIndexList(env, js_idx_lists[i].As<Array>()));
   }
-  clue_manager::buildNameSourcesMap(name_list, idx_lists);
+  using namespace clue_manager;
+  clue_manager::setPrimaryClueNameSourcesMap(buildNameSourcesMap(name_list, idx_lists));
 
   auto t1 = high_resolution_clock::now();
   [[maybe_unused]] auto t_dur = duration_cast<milliseconds>(t1 - t0).count();
@@ -328,6 +342,23 @@ Value setPrimaryClueNameSourcesMap(const CallbackInfo& info) {
 
   return env.Null();
 }
+
+// _.keys(clueMap[count])
+Value setCompoundClueNames(const CallbackInfo& info) {
+  Env env = info.Env();
+  if (!info[0].IsNumber() || !info[1].IsArray()) {
+    TypeError::New(env, "setCompoundClueNames: invalid parameter type")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+  // arg0
+  auto count = info[0].As<Number>().Int32Value();
+  // arg1
+  auto name_list = makeStringList(env, info[1].As<Array>());
+  clue_manager::setCompoundClueNames(count, name_list);
+  return env.Null();
+}
+
 
 //
 // Validator
@@ -369,7 +400,7 @@ Value mergeNcListCombo(const CallbackInfo& info) {
 
   auto opt_src = validator::mergeNcListCombo(nc_list, idx_list);
   if (opt_src.has_value()) {
-    return cm::wrap(env, opt_src.value(), "nameSrcList");
+    return wrap(env, opt_src.value(), "nameSrcList");
   }
 
   return env.Null();
@@ -406,7 +437,7 @@ Value mergeAllNcListCombinations(const CallbackInfo& info) {
   [[maybe_unused]] auto t_dur = duration_cast<milliseconds>(t1 - t0).count();
   // std::cerr << "  validator.mergeNcListCombinations - " << t_dur << "ms" << std::endl;
 
-  return cm::wrap(env, results, "nameSrcList");
+  return wrap(env, results, "nameSrcList");
 }
 
 Value mergeNcListResults(const CallbackInfo& info) {
@@ -419,9 +450,32 @@ Value mergeNcListResults(const CallbackInfo& info) {
   // arg 0
   auto nc_list = makeNameCountList(env, info[0].As<Array>());
   auto results = validator::mergeNcListResults(nc_list);
-  return cm::wrap(env, results, "nameSrcList");
+  return wrap(env, results, "nameSrcList");
 }
 
+Value validateSourcesForNameAndCountLists(const CallbackInfo& info) {
+  Env env = info.Env();
+  if (!info[0].IsString() || !info[1].IsArray() || !info[2].IsArray()
+      || !info[3].IsArray()) {
+    TypeError::New(
+      env, "validateSourcesForNameAndCountLists: invalid parameter type")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+  // arg 0
+  auto clue_name = info[0].As<String>().Utf8Value();
+  // arg 1
+  auto name_list = makeStringList(env, info[1].As<Array>());
+  // arg 2
+  auto count_list = makeIntList(env, info[2].As<Array>());
+  // arg 3
+  auto nc_list = makeNameCountList(env, info[3].As<Array>());
+
+  auto src_list = validator::validateSourcesForNameAndCountLists(
+    clue_name, name_list, count_list, nc_list);
+  return wrap(env, src_list, "nameSrcList");
+}
+  
 //
 // Combo-maker
 //
@@ -565,43 +619,6 @@ Value considerCandidate(const CallbackInfo& info) {
   return env.Null();
 }
   
-#if 0
-auto getCandidateStats(int sum) {
-  CandidateStats cs;
-  cs.sum = sum;
-  const auto& cd = allSumsCandidateData.find(sum)->second;
-  cs.sourceLists = (int)cd.sourceCompatLists.size();
-  cs.totalSources = std::accumulate(cd.sourceCompatLists.cbegin(),
-    cd.sourceCompatLists.cend(), 0, [](int sum, const auto& scl) {
-      sum += (int)scl.size();
-      return sum;
-    });
-  cs.comboMapIndices = (int)cd.indexComboListMap.size();
-  cs.totalCombos = std::accumulate(cd.indexComboListMap.cbegin(),
-    cd.indexComboListMap.cend(), 0, [](int sum, const auto& kv) -> int {
-      sum += kv.second.size();
-      return sum;
-    });
-  return cs;
-}
-
-//
-// getCandidateStatsForSum
-//
-Value getCandidateStatsForSum(const CallbackInfo& info) {
-  Env env = info.Env();
-  if (!info[0].IsNumber()) {
-      TypeError::New(env, "getCandidateStatsForSum: non-number parameter")
-        .ThrowAsJavaScriptException();
-      return env.Null();
-  }
-  auto sum = info[0].As<Number>().Int32Value();
-  assert(sum >= 2);
-  auto candidateStats = getCandidateStats(sum);
-  return wrap(env, candidateStats);
-}
-#endif
-
 //
 // filterCandidatesForSum
 //
@@ -639,6 +656,7 @@ Object Init(Env env, Object exports) {
   //
   // clue-manager
   exports["setPrimaryClueNameSourcesMap"] = Function::New(env, setPrimaryClueNameSourcesMap);
+  exports["setCompoundClueNames"] = Function::New(env, setCompoundClueNames);
 
   // validator
   //
@@ -646,7 +664,10 @@ Object Init(Env env, Object exports) {
   exports["appendNcResults"] = Function::New(env, appendNcResults);
   exports["mergeNcListCombo"] = Function::New(env, mergeNcListCombo);
   exports["mergeNcListResults"] = Function::New(env, mergeNcListResults);
-  exports["mergeAllNcListCombinations"] = Function::New(env, mergeAllNcListCombinations);
+  exports["mergeAllNcListCombinations"] =
+    Function::New(env, mergeAllNcListCombinations);
+  exports["validateSourcesForNameAndCountLists"] =
+    Function::New(env, validateSourcesForNameAndCountLists);
 
   // combo-maker
   //
@@ -654,7 +675,6 @@ Object Init(Env env, Object exports) {
     Function::New(env, mergeCompatibleXorSourceCombinations);
   exports["filterPreparation"] = Function::New(env, filterPreparation);
   exports["considerCandidate"] = Function::New(env, considerCandidate);
-  //  exports["getCandidateStatsForSum"] = Function::New(env, getCandidateStatsForSum);
   exports["filterCandidatesForSum"] =
     Function::New(env, filterCandidatesForSum);
   exports["getResult"] = Function::New(env, getResult);

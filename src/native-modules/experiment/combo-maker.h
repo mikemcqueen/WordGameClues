@@ -407,6 +407,7 @@ struct NameCount {
   static auto listToUsedSources(const NameCountList& list) {
     UsedSources usedSources{};
     for (const auto& nc : list) {
+      // TDOO: assert this is true
       if (Source::isCandidate(nc.count)) {
         usedSources.addSource(nc.count);
       }
@@ -414,12 +415,23 @@ struct NameCount {
     return usedSources;
   }
 
-  static auto listMerge(const NameCountList& list1,
-    const NameCountList& list2)
-  {
-    auto result = list1; // copy (ok)
+  static auto listMerge(
+    const NameCountList& list1, const NameCountList& list2) {
+    //
+    auto result = list1;                                     // copy (ok)
     result.insert(result.end(), list2.begin(), list2.end()); // copy (ok)
     return result;
+  }
+
+  static auto listContains(
+    const NameCountList& list, const std::string& name, int count) {
+    //
+    for (const auto& nc : list) {
+      if ((nc.name == name) && (nc.count == count)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   std::string name;

@@ -20,6 +20,11 @@ struct NcResultData {
 };
 using NcResultMap = std::unordered_map<std::string, NcResultData>;
 
+struct VSForNameAndCountListsArgs {
+  NameCountList& nc_list;
+  bool validate_all;
+};
+
 // functions
 
 auto getNumNcResults(const NameCount& nc) -> int;
@@ -34,6 +39,17 @@ auto mergeAllNcListCombinations(const NameCountList& nc_list,
 
 auto mergeNcListResults(const NameCountList& nc_list) -> SourceList;
 
+/*
+auto validateSourcesForNameCount(const std::string& clue_name,
+  const std::string& src_name, int src_count, VSForNameCountArgs& args)
+  -> SourceList;
+*/
+
+auto validateSourcesForNameAndCountLists(const std::string& clue_name,
+  const std::vector<std::string>& name_list, std::vector<int> count_list,
+  NameCountList& nc_list) -> SourceList;
+//  const VSForNameAndCountListsArgs& args) -> SourceList;
+
 };  // namespace validator
 
-#endif
+#endif  // INCLUDE_VALIDATOR_H
