@@ -1,6 +1,8 @@
 // validator.cpp
 
 #include <vector>
+#include "clue-manager.h"
+#include "peco.h"
 #include "validator.h"
 
 using namespace cm;
@@ -10,40 +12,6 @@ namespace validator {
 namespace {
 
 std::vector<NcResultMap> ncResultMaps;
-
-/*
-let appendUniqueResults = (ncResult: NcResultData, ncStr: string, 
-    fromResults: ValidateResult[], args: any) : void => 
-{
-    for (let result of fromResults) {
-        const key = NameCount.listToCountList(result.nameSrcList).sort().join(',');
-        if (ncResult.set.has(key)) {
-            continue;
-        }
-        ncResult.set.add(key);
-        ncResult.list.push(result);
-    }
-};
-*/
-
-/*
-const addResultsToNcResultMap = (results: ValidateResult[], name: string,
-    count: number, args: any) =>
-{
-    let ncResultMap = getNcResultMap(count);
-    if (!ncResultMap) {
-        ncResultMap = State.ncResultMaps[count] = {};
-    }
-    const ncStr = NameCount.makeCanonicalName(name, count);
-    if (!ncResultMap[ncStr]) {
-        ncResultMap[ncStr] = {
-            list: [],
-            set: new Set<string>()
-        };
-    }
-    appendUniqueResults(ncResultMap[ncStr], ncStr, results, args);
-};
-*/
 
 NcResultData& getNcResult(const NameCount& nc) {
   if ((int)ncResultMaps.size() <= nc.count) {
@@ -60,12 +28,44 @@ NcResultData& getNcResult(const NameCount& nc) {
   return it->second;
 }
 
+
+/*
+mergeNcListResults(ncListToMerge);
+let listArray: number[][] = ncListToMerge.map(nc => {
+    if (nc.count === 1) {
+        // TODO: optimization: these could be cached. i'm not sure it'd
+        // matter too much.
+        return getAllSourcesForPrimaryClueName(nc.name);
+    } else {
+        ++native_get_num_ncr;
+        //const count =
+ClueManager.getNcResultMap(nc.count)[nc.toString()].list.length; const count =
+Native.getNumNcResults(nc); return [...Array(count).keys()].map(_.toNumber);
+    }
+});
+*/
+
+auto buildNcSourceIndexLists(const NameCountList& nc_list) {
+  Peco::IndexListVector idx_lists;
+  for (const auto& nc : nc_list) {
+    if (nc.count == 1) {
+      idx_lists.emplace_back(Peco::make_index_list(
+        clue_manager::getSourcesForPrimaryClueName(nc.name)));
+    } else {
+      idx_lists.emplace_back(Peco::make_index_list(getNumNcResults(nc)));
+    }
+  }
+  return idx_lists;
+}
+
 }  // namespace
 
+// TODO: move to clue-manager
 auto getNumNcResults(const NameCount& nc) -> int {
   return getNcResult(nc).src_list.size();
 }
 
+// TODO: move to clue-manager
 void appendNcResults(const NameCount& nc, SourceList& src_list) {
   auto& nc_result = getNcResult(nc);
   for (auto& src: src_list) {
@@ -76,36 +76,6 @@ void appendNcResults(const NameCount& nc, SourceList& src_list) {
     }
   }
 }
-
-/*
-const mergeNcListCombo = (ncList: NameCount.List, indexList: number[]):
-    MergeNcListComboResult =>
-{
-    ++merge_nclc;
-    let validateResult = emptyValidateResult();
-    // indexList value is either an index into a resultMap.list (compound clue)
-    // or a primary source (primary clue)
-    for (let i = 0; i < indexList.length; ++i) {
-        const nc = ncList[i];
-        if (nc.count > 1) { // compound clue
-            const listIndex = indexList[i];
-            const ncResult = ClueManager.getNcResultMap(nc.count)[nc.toString()].list[listIndex];
-            if (!Source.isXorCompatible(validateResult, ncResult)) {
-                return { success: false };
-            }
-            Source.mergeUsedSourcesInPlace(validateResult.usedSources, ncResult.usedSources);
-            addCompoundNc(validateResult, nc, ncResult);
-        } else { // primary clue
-            const primarySrc = indexList[i];
-            if (!Source.addUsedSource(validateResult.usedSources, primarySrc, true)) {
-                return { success: false };
-            }
-            addPrimaryNameSrc(validateResult, NameCount.makeNew(nc.name, primarySrc), nc);
-        }
-    }
-    return { success: true, validateResult };
-};
-*/
 
 auto mergeNcListCombo(const NameCountList& nc_list, const IndexList& idx_list)
   -> std::optional<SourceData> {
@@ -126,16 +96,6 @@ auto mergeNcListCombo(const NameCountList& nc_list, const IndexList& idx_list)
   return std::make_optional(src);
 }
 
-/*
-  let resultList: ValidateResult[] = Peco.makeNew({ listArray })
-      .getCombinations()
-      .map((indexList: number[]) => {
-          ++native_merge_nclc;
-          return Native.mergeNcListCombo(ncListToMerge, indexList);
-      })
-      .filter((mergeResult: NativeMergeResult) => !!mergeResult);
-*/
-
 auto mergeAllNcListCombinations(const NameCountList& nc_list,
   Peco::IndexListVector&& idx_lists) -> SourceList {
   //
@@ -151,4 +111,10 @@ auto mergeAllNcListCombinations(const NameCountList& nc_list,
   return src_list;
 }
 
+auto mergeNcListResults(const NameCountList& nc_list) -> SourceList {
+  auto idx_lists = buildNcSourceIndexLists(nc_list);
+  return mergeAllNcListCombinations(nc_list, std::move(idx_lists));
+}
+
 }  // namespace validator
+

@@ -32,6 +32,8 @@ auto mergeNcListCombo(const NameCountList& nc_list,
 auto mergeAllNcListCombinations(const NameCountList& nc_list,
   Peco::IndexListVector&& idx_lists) -> SourceList;
 
+auto mergeNcListResults(const NameCountList& nc_list) -> SourceList;
+
 };  // namespace validator
 
 #endif

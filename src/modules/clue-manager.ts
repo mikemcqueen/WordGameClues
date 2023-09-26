@@ -377,6 +377,44 @@ const showMinMaxLengths = (): void => {
         `, longest(${minMaxSentence.max})`);
 };
 
+const buildPrimaryClueNameSourcesMap = (allCandidates = getAllCandidates()):
+    Sentence.NameSourcesMap =>
+{
+    let nameSourcesMap: Sentence.NameSourcesMap = {};
+    // add candidates clue sources
+    for (let container of allCandidates) {
+        if (!container) continue;
+        let keys = _.keys(container.nameIndicesMap);
+        for (let name of keys) {
+            if (!nameSourcesMap.hasOwnProperty(name)) {
+                nameSourcesMap[name] = new Set<number>();
+            }
+            let sources = nameSourcesMap[name];
+            // add all sources for name to sources list
+            const indices = container.nameIndicesMap[name];
+            for (let index of indices) {
+                const candidate = container.candidates[index];
+                Assert(candidate && _.has(candidate.nameSourcesMap, name));
+                const candidate_sources = candidate.nameSourcesMap[name];
+                Assert(!_.isEmpty(candidate_sources));
+                for (let src of candidate_sources) {
+                    sources.add(src);
+                }
+            }
+        }
+    }
+    return nameSourcesMap;
+};
+
+const values_lists = (nameSourcesMap: Sentence.NameSourcesMap): number[][] => {
+    return _.values(nameSourcesMap).map(src_set => [...src_set.values()]);
+};
+
+const cacheAllPrimaryClueSources = (): void => {
+    let nameSourcesMap = buildPrimaryClueNameSourcesMap();
+    Native.setPrimaryClueNameSourcesMap(_.keys(nameSourcesMap), values_lists(nameSourcesMap));
+};
+
 const primaryClueListPostProcessing = (args: any): void => {
     // TODO: got this backwards
     const sentences: Sentence.Type[] = State.sentences;
@@ -414,6 +452,7 @@ const primaryClueListPostProcessing = (args: any): void => {
     // Call addKnownPrimaryClues() last, after State.allCandidates is populated
     addKnownPrimaryClues();
     showMinMaxLengths();
+    cacheAllPrimaryClueSources();
 };
 
 let total_sources = 0;
@@ -554,6 +593,8 @@ let addCompoundClue = (clue: Clue.Compound, count: number, args: any): boolean =
     // should probably be inside above if block. maybe need to split
     // out validateAll as well, i'm not sure what the "not validateAll"
     // use case is anymore. (or what .clues is use for, for that matter).
+    // The question is, is this appropriate for successful but non
+    // validate-all scenarios, such as copy-from?  maybe.
     //(srcMap[srcKey].clues as ClueList.Compound).push(clue);
     return vsResult.success;
 };

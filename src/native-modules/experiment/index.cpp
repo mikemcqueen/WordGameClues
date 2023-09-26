@@ -8,6 +8,7 @@
 #include <unordered_map>
 #include <vector>
 #include "candidates.h"
+#include "clue-manager.h"
 #include "combo-maker.h"
 #include "cm-precompute.h"
 #include "dump.h"
@@ -291,8 +292,140 @@ OrArgList makeOrArgList(Env& env, const Array& jsList) {
 }
 
 //
-// mergeCompatibleXorSourceCombinations
+// Clue-manager
 //
+
+// _.keys(nameSourcesMap), values_lists(nameSourcesMap))
+Value setPrimaryClueNameSourcesMap(const CallbackInfo& info) {
+  Env env = info.Env();
+  if (!info[0].IsArray() || !info[1].IsArray()) {
+    TypeError::New(env, "setPrimaryClueNameSourcesMap: invalid parameter type")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+  using namespace std::chrono;
+  auto t0 = high_resolution_clock::now();
+
+  // arg0
+  auto name_list = makeStringList(env, info[0].As<Array>());
+  // arg1
+  const auto& js_idx_lists = info[1].As<Array>();
+  std::vector<IndexList> idx_lists;
+  idx_lists.reserve(js_idx_lists.Length());
+  for (size_t i{}; i < js_idx_lists.Length(); ++i) {
+    if (!js_idx_lists[i].IsArray()) {
+      TypeError::New(env, "setPrimaryClueNameSourcesMap: non-array element")
+        .ThrowAsJavaScriptException();
+      return {};
+    }
+    idx_lists.emplace_back(makeIndexList(env, js_idx_lists[i].As<Array>()));
+  }
+  clue_manager::buildNameSourcesMap(name_list, idx_lists);
+
+  auto t1 = high_resolution_clock::now();
+  [[maybe_unused]] auto t_dur = duration_cast<milliseconds>(t1 - t0).count();
+  std::cerr << " setPrimaryClueNameSourcesMap - " << t_dur << "ms" << std::endl;
+
+  return env.Null();
+}
+
+//
+// Validator
+//
+
+Value getNumNcResults(const CallbackInfo& info) {
+  Env env = info.Env();
+  if (!info[0].IsObject()) {
+    TypeError::New(env, "getNumNcResults: invalid parameter type")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+  auto nc = makeNameCount(env, info[0].As<Object>());
+  return Number::New(env, validator::getNumNcResults(nc));
+}
+
+Value appendNcResults(const CallbackInfo& info) {
+  Env env = info.Env();
+  if (!info[0].IsObject() || !info[1].IsArray()) {
+    TypeError::New(env, "appendNcResults: invalid parameter type")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+  auto nc = makeNameCount(env, info[0].As<Object>());
+  auto src_list = makeSourceList(env, info[1].As<Array>(), "nameSrcList");
+  validator::appendNcResults(nc, src_list);
+  return env.Null();
+}
+
+Value mergeNcListCombo(const CallbackInfo& info) {
+  Env env = info.Env();
+  if (!info[0].IsArray() || !info[1].IsArray()) {
+    TypeError::New(env, "mergeNcListCombo: invalid parameter type")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+  auto nc_list = makeNameCountList(env, info[0].As<Array>());
+  auto idx_list = makeIndexList(env, info[1].As<Array>());
+
+  auto opt_src = validator::mergeNcListCombo(nc_list, idx_list);
+  if (opt_src.has_value()) {
+    return cm::wrap(env, opt_src.value(), "nameSrcList");
+  }
+
+  return env.Null();
+}
+
+Value mergeAllNcListCombinations(const CallbackInfo& info) {
+  Env env = info.Env();
+  if (!info[0].IsArray() || !info[1].IsArray()) {
+    TypeError::New(env, "mergeAllNcListCombinations: invalid parameter type")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+  using namespace std::chrono;
+  auto t0 = high_resolution_clock::now();
+
+  // arg 0
+  auto nc_list = makeNameCountList(env, info[0].As<Array>());
+
+  // arg 1
+  const auto& js_idx_lists = info[1].As<Array>();
+  Peco::IndexListVector idx_lists;
+  idx_lists.reserve(js_idx_lists.Length());
+  for (size_t i{}; i < js_idx_lists.Length(); ++i) {
+    if (!js_idx_lists[i].IsArray()) {
+      TypeError::New(env, "mergeAllNcListCombinations: non-array element")
+        .ThrowAsJavaScriptException();
+      return {};
+    }
+    idx_lists.emplace_back(makePecoIndexList(env, js_idx_lists[i].As<Array>()));
+  }
+  auto results = validator::mergeAllNcListCombinations(nc_list, std::move(idx_lists));
+
+  auto t1 = high_resolution_clock::now();
+  [[maybe_unused]] auto t_dur = duration_cast<milliseconds>(t1 - t0).count();
+  // std::cerr << "  validator.mergeNcListCombinations - " << t_dur << "ms" << std::endl;
+
+  return cm::wrap(env, results, "nameSrcList");
+}
+
+Value mergeNcListResults(const CallbackInfo& info) {
+  Env env = info.Env();
+  if (!info[0].IsArray()) {
+    TypeError::New(env, "mergeNcListResults: invalid parameter type")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+  // arg 0
+  auto nc_list = makeNameCountList(env, info[0].As<Array>());
+  auto results = validator::mergeNcListResults(nc_list);
+  return cm::wrap(env, results, "nameSrcList");
+}
+
+//
+// Combo-maker
+//
+
 Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   using namespace std::chrono;
 
@@ -502,76 +635,19 @@ Value getResult(const CallbackInfo& info) {
 }
 
 //
-//
-//
-
-Value getNumNcResults(const CallbackInfo& info) {
-  Env env = info.Env();
-  if (!info[0].IsObject()) {
-    TypeError::New(env, "getNumNcResults: invalid parameter type")
-      .ThrowAsJavaScriptException();
-    return env.Null();
-  }
-  auto nc = makeNameCount(env, info[0].As<Object>());
-  return Number::New(env, validator::getNumNcResults(nc));
-}
-
-Value appendNcResults(const CallbackInfo& info) {
-  Env env = info.Env();
-  if (!info[0].IsObject() || !info[1].IsArray()) {
-    TypeError::New(env, "appendNcResults: invalid parameter type")
-      .ThrowAsJavaScriptException();
-    return env.Null();
-  }
-  auto nc = makeNameCount(env, info[0].As<Object>());
-  auto src_list = makeSourceList(env, info[1].As<Array>(), "nameSrcList");
-  validator::appendNcResults(nc, src_list);
-  return env.Null();
-}
-
-Value mergeNcListCombo(const CallbackInfo& info) {
-  Env env = info.Env();
-  if (!info[0].IsArray() || !info[1].IsArray()) {
-    TypeError::New(env, "mergeNcListCombo: invalid parameter type")
-      .ThrowAsJavaScriptException();
-    return env.Null();
-  }
-  auto nc_list = makeNameCountList(env, info[0].As<Array>());
-  auto idx_list = makeIndexList(env, info[1].As<Array>());
-
-  auto opt_src = validator::mergeNcListCombo(nc_list, idx_list);
-  if (opt_src.has_value()) {
-    return cm::wrap(env, opt_src.value(), "nameSrcList");
-  }
-
-  return env.Null();
-}
-
-Value mergeAllNcListCombinations(const CallbackInfo& info) {
-  Env env = info.Env();
-  if (!info[0].IsArray() || !info[1].IsArray()) {
-    TypeError::New(env, "mergeAllNcListCombinations: invalid parameter type")
-      .ThrowAsJavaScriptException();
-    return env.Null();
-  }
-  auto nc_list = makeNameCountList(env, info[0].As<Array>());
-  const auto& js_idx_lists = info[1].As<Array>();
-  Peco::IndexListVector idx_lists;
-  idx_lists.reserve(js_idx_lists.Length());
-  for (size_t i{}; i < js_idx_lists.Length(); ++i) {
-    if (!js_idx_lists[i].IsArray()) {
-      TypeError::New(env, "mergeAllNcListCombinations: non-array element")
-        .ThrowAsJavaScriptException();
-      return {};
-    }
-    idx_lists.emplace_back(makePecoIndexList(env, js_idx_lists[i].As<Array>()));
-  }
-  auto results = validator::mergeAllNcListCombinations(nc_list, std::move(idx_lists));
-  return cm::wrap(env, results, "nameSrcList");
-}
-
-//
 Object Init(Env env, Object exports) {
+  //
+  // clue-manager
+  exports["setPrimaryClueNameSourcesMap"] = Function::New(env, setPrimaryClueNameSourcesMap);
+
+  // validator
+  //
+  exports["getNumNcResults"] = Function::New(env, getNumNcResults);
+  exports["appendNcResults"] = Function::New(env, appendNcResults);
+  exports["mergeNcListCombo"] = Function::New(env, mergeNcListCombo);
+  exports["mergeNcListResults"] = Function::New(env, mergeNcListResults);
+  exports["mergeAllNcListCombinations"] = Function::New(env, mergeAllNcListCombinations);
+
   // combo-maker
   //
   exports["mergeCompatibleXorSourceCombinations"] =
@@ -582,13 +658,6 @@ Object Init(Env env, Object exports) {
   exports["filterCandidatesForSum"] =
     Function::New(env, filterCandidatesForSum);
   exports["getResult"] = Function::New(env, getResult);
-
-  // validator
-  //
-  exports["getNumNcResults"] = Function::New(env, getNumNcResults);
-  exports["appendNcResults"] = Function::New(env, appendNcResults);
-  exports["mergeNcListCombo"] = Function::New(env, mergeNcListCombo);
-  exports["mergeAllNcListCombinations"] = Function::New(env, mergeAllNcListCombinations);
 
   return exports;
 }

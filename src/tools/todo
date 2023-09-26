@@ -4,21 +4,14 @@
   * DONE - Native.appendNcResult(nc, results)
   * DONE - then I can move mergeNcListCombo/Source.addCompoundNc/Source.addPrimaryNameSrc
     to c++. and i should already have UsedSources.MergeInPlace?
-  * well I did this all, but it was slow, because 600k native calls and I don't
-    know how many src_list wraps back.
-    so I converted one more function, mergeNcListResults(), and it was still slow,
-    because wrapping again, but also unwrapping pretty big chunks, though fewer
-    native calls - 800 or so - some of which had wraps taking hundreds of ms.
-    so, left a commit message in native-validator branch explaining some of this.    
+
+  * populate knownSourceMapEntries in C++ based on flags to validator.
 
   * move combo-maker first/next to c++. this will require copying ClueManager.UniqueClueNames
     to C++ as well. not sure if there is any other use for them other than by
     combo-maker (check it).
   * mark when done
   * this will in turn allow us to move most of precompute.buildKnownNcSourceListMap to c++.
-    i think we do need that map in JS still tho, so would need to copy it back if so.
-  * the other part is knownSourceMapEntries. This entire map could probabliy be in c++,
-    even the API to look up an entry.
 
 * reverse-validate components, syns, ans, homs, make sure the keys of these objects
   actually exist in one of the variations? After the variations have been generated,

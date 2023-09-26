@@ -127,12 +127,6 @@ const getAllSourcesForPrimaryClueName = (name: string,
     allCandidates = ClueManager.getAllCandidates()): number[] =>
 {
     let sources: number[] = [];
-    /*
-    let clueList = ClueManager.getClueList(1) as ClueList.Primary;
-    // add legacy clue sources
-    sources = clueList.filter((clue: Clue.Primary) => clue.name === name)
-        .map(clue => Number(clue.src));
-    */
     // add candidates clue sources
     allCandidates
         .filter((container: Sentence.CandidatesContainer) =>
@@ -149,7 +143,7 @@ const getAllSourcesForPrimaryClueName = (name: string,
         });
     if (_.isEmpty(sources)) throw new Error(`can't find: ${name}`);
     return sources;
-}
+};
 
 const addUsedSourcesFromNameSrcList = (usedSources: Source.UsedSources,
     nameSrcList: NameCount.List): boolean =>
@@ -190,7 +184,7 @@ const mergeNcListCombo = (ncList: NameCount.List, indexList: number[]):
         const nc = ncList[i];
         if (nc.count > 1) { // compound clue
             const listIndex = indexList[i];
-            //const ncResult = ClueManager.getNcResultMap(nc.count)[nc.toString()].list[listIndex];
+            //const ncResult = Native.somethingsomething
             const ncResult = ClueManager.getNcResultMap(nc.count)[nc.toString()].list[listIndex];
             if (!Source.isXorCompatible(validateResult, ncResult)) {
                 return { success: false };
@@ -208,6 +202,10 @@ const mergeNcListCombo = (ncList: NameCount.List, indexList: number[]):
     return { success: true, validateResult };
 };
 
+const list_sizes = (lists: any[][]): number[][] => {
+    return lists.map(list => [ list.length ]);
+};
+
 type MergeNcListResultsArgs = VSFlags;
 
 export let native_merge_nclc = 0;
@@ -218,6 +216,9 @@ const mergeNcListResults = (ncListToMerge: NameCount.List,
     args: MergeNcListResultsArgs): ValidateSourcesResult =>
 {
     ++merge_nclr;
+    let resultList: ValidateResult[] = Native.mergeNcListResults(ncListToMerge);
+    
+    /*
     let listArray: number[][] = ncListToMerge.map(nc => {
         if (nc.count === 1) {
             // TODO: optimization: these could be cached. i'm not sure it'd
@@ -231,23 +232,24 @@ const mergeNcListResults = (ncListToMerge: NameCount.List,
         }
     });
 
-    /*
+    //console.error(`${stringify(list_sizes(listArray))}`);
+
+    ///* NATIVE
     let resultList: ValidateResult[] =
         Native.mergeAllNcListCombinations(ncListToMerge, listArray);
-    */
 
     let resultList: ValidateResult[] = Peco.makeNew({ listArray })
         .getCombinations()
-        //
-        .map((indexList: number[]) => mergeNcListCombo(ncListToMerge, indexList))
-        .filter((mergeResult: MergeNcListComboResult) => mergeResult.success)
-        .map((mergeResult: MergeNcListComboResult) => mergeResult.validateResult!);
-        /*
+        //.map((indexList: number[]) => mergeNcListCombo(ncListToMerge, indexList))
+        //.filter((mergeResult: MergeNcListComboResult) => mergeResult.success)
+        //.map((mergeResult: MergeNcListComboResult) => mergeResult.validateResult!);
+        ///* NATIVE
         .map((indexList: number[]) => {
             ++native_merge_nclc;
             return Native.mergeNcListCombo(ncListToMerge, indexList);
         })
         .filter((mergeResult: NativeMergeResult) => !!mergeResult);
+    */
 
     resultList.forEach((result: ValidateResult) => {
         result.usedSources = Source.emptyUsedSources();
@@ -255,21 +257,8 @@ const mergeNcListResults = (ncListToMerge: NameCount.List,
                 Source.addUsedSource(result.usedSources, nameSrc.count);
         });
     });
-    */
     return { success: !_.isEmpty(resultList), list: resultList };
 };
-
-/*
-let test = (ncList: NameCount.List, args: any): ValidateSourcesResult => {
-    // can remove this.
-    if (!ncList.every(nc => {
-        let ncResultMap = ClueManager.getNcResultMap(nc.count);
-        let ncStr = nc.toString();
-        return (nc.count === 1) || (ncResultMap[ncStr] && ncResultMap[ncStr].list);
-    })) throw new Error('no result list');
-    return mergeNcListResults(ncList, args);
-};
-*/
 
 type VSForNameCountArgs = NameListContainer & CountListContainer
     & NcListContainer & VSFlags;
@@ -289,7 +278,7 @@ let validateSourcesForNameCount = (clueName: string|undefined, srcName: string,
         // in the clueList[count]. (at least as many entries as there are
         // copies of name in ncList)
         // SEE ALSO: copyAddNcList()
-        Debug(`  duplicate nc, ${srcName}:{srcCount}`);
+        console.error(`  duplicate nc, ${srcName}:{srcCount}`);
         return { success: false }; // fail
     }
     Debug(`  added nc ${srcName}:${srcCount}, ncList.length: ${ncList.length}`);

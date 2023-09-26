@@ -39,7 +39,7 @@ type StringToNumbersMap = {
     [key: string]: Set<number>;
 };
 
-type NameSourcesMap = StringToNumbersMap;
+export type NameSourcesMap = StringToNumbersMap;
 
 // run-time only, not part of schema
 interface Candidate {

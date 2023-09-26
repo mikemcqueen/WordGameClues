@@ -19,6 +19,7 @@
     'ldflags': [ '-Wl,-rpath,/usr/local/cuda/targets/x86_64-linux/lib' ],
     'sources': [
       'candidates.cpp',
+      'clue-manager.cpp',
       'cm-precompute.cpp',
       'filter-support.cpp',
       'index.cpp',

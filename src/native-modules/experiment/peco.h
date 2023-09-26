@@ -2,10 +2,12 @@
 #define include_peco_h
 
 #include <algorithm>
-#include <numeric>
-#include <vector>
-#include <forward_list>
 #include <cassert>
+#include <cstdint>
+#include <forward_list>
+#include <numeric>
+#include <ranges>
+#include <vector>
 
 class Peco {
 public:
@@ -45,7 +47,7 @@ public:
   // these static methods actually made sense to be in this class at one point,
   // but I think they're kinda standalone at this point and don't really belong
   // here
-  static IndexListVector initial_indices(const std::vector<size_t>& lengths) {
+  static /*IndexListVector*/ auto initial_indices(const std::vector<size_t>& lengths) {
     IndexListVector indexLists;
     indexLists.resize(lengths.size());
     for (size_t i{}; i < indexLists.size(); ++i) {
@@ -54,7 +56,7 @@ public:
     return indexLists;
   }
 
-  static std::vector<IndexVector> to_vectors(const IndexListVector& idx_lists) {
+  static /*std::vector<IndexVector>*/auto to_vectors(const IndexListVector& idx_lists) {
     std::vector<IndexVector> idx_vectors(idx_lists.size());
     for (size_t i{}; i < idx_lists.size(); ++i) {
       const auto& idx_list = idx_lists.at(i);
@@ -63,6 +65,20 @@ public:
       std::copy(idx_list.begin(), idx_list.end(), idx_vector.begin());
     }
     return idx_vectors;
+  }
+
+  static auto make_index_list(const IndexVector& idx_vec) {
+    IndexList idx_list;
+    for (auto i : idx_vec | std::views::reverse) {
+      idx_list.emplace_front(i);
+    }
+    return idx_list;
+  }
+
+  static auto make_index_list(size_t size) {
+    IndexList idx_list;
+    initialize_list(idx_list, size);
+    return idx_list;
   }
 
 private:
@@ -84,7 +100,7 @@ private:
 
   static void initialize_list(IndexList& indexList, int size) {
     indexList.clear();
-    for (int i{ size - 1 }; i >= 0; --i) {
+    for (int i{size - 1}; i >= 0; --i) {
       indexList.emplace_front(i);
     }
   }
