@@ -17,7 +17,6 @@ const GetOpt = require('node-getopt')
         ['p' , 'permutations'         , 'permutations flag' ],
     ]).bindHelp();
 
-
 function main() {
     let sum;
     let count;
@@ -28,7 +27,6 @@ function main() {
     let list;
     let listArray;
     let verbose;
-
 
     let Opt = GetOpt.parseSystem();
     if (Opt.argv.length < 1) {
@@ -52,7 +50,6 @@ function main() {
     if (verbose) {
         Peco.logging = true;
     }
-
     if (!list && !count && !max) {
         console.log('need count or max if no list');
         return 1;
@@ -61,26 +58,20 @@ function main() {
         console.log('need count with list');
         return 1;
     }
-
     if (list && (list.length < 2)) {
         console.log('need to specify at least two -l lists');
         return 1;
     }
-
-
     console.log('sum: ' + sum + ', count: ' + count + 
                 ', max: ' + max + ', perm: ' + permFlag +
                 ', require: ' + require +
                 ', exclude: ' + exclude);
-
-    
     if (require) {
         require.forEach((num, index) => { require[index] = Number(num); });
     }
     if (exclude) {
         exclude.forEach((num, index) => { exclude[index] = Number(num); });
     }
-    
     if (list) {
         console.log(`list: ${Stringify(list)}`);
         listArray = makeListArray(list);

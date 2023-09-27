@@ -359,6 +359,20 @@ Value setCompoundClueNames(const CallbackInfo& info) {
   return env.Null();
 }
 
+// count, nameCsv
+Value isKnownSourceMapEntry(const CallbackInfo& info) {
+  Env env = info.Env();
+  if (!info[0].IsNumber() || !info[1].IsString()) {
+    TypeError::New(env, "isKnownSourceMapEntry: invalid parameter type")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+  // arg0
+  auto count = info[0].As<Number>().Int32Value();
+  // arg1
+  auto key = info[1].As<String>().Utf8Value();
+  return Boolean::New(env, clue_manager::is_known_source_map_entry(count, key));
+}
 
 //
 // Validator
@@ -372,7 +386,7 @@ Value getNumNcResults(const CallbackInfo& info) {
     return env.Null();
   }
   auto nc = makeNameCount(env, info[0].As<Object>());
-  return Number::New(env, validator::getNumNcResults(nc));
+  return Number::New(env, clue_manager::getNumNcResults(nc));
 }
 
 Value appendNcResults(const CallbackInfo& info) {
@@ -384,10 +398,24 @@ Value appendNcResults(const CallbackInfo& info) {
   }
   auto nc = makeNameCount(env, info[0].As<Object>());
   auto src_list = makeSourceList(env, info[1].As<Array>(), "nameSrcList");
-  validator::appendNcResults(nc, src_list);
+  clue_manager::appendNcResults(nc, src_list);
   return env.Null();
 }
 
+Value appendNcResultsFromSourceMap(const CallbackInfo& info) {
+  Env env = info.Env();
+  if (!info[0].IsObject() || !info[1].IsString()) {
+    TypeError::New(env, "appendNcResultsFromSrcMap: invalid parameter type")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+  auto nc = makeNameCount(env, info[0].As<Object>());
+  auto src_key = info[1].As<String>().Utf8Value();
+  auto num_appended = clue_manager::appendNcResultsFromSourceMap(nc, src_key);
+  return Number::New(env, num_appended);
+}
+
+/*
 Value mergeNcListCombo(const CallbackInfo& info) {
   Env env = info.Env();
   if (!info[0].IsArray() || !info[1].IsArray()) {
@@ -475,7 +503,36 @@ Value validateSourcesForNameAndCountLists(const CallbackInfo& info) {
     clue_name, name_list, count_list, nc_list);
   return wrap(env, src_list, "nameSrcList");
 }
-  
+*/
+
+Value validateSources(const CallbackInfo& info) {
+  Env env = info.Env();
+  if (!info[0].IsString() || !info[1].IsArray() || !info[2].IsNumber()
+      || !info[3].IsBoolean()) {
+    TypeError::New(
+      env, "validateSources: invalid parameter type")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+  // arg 0
+  auto clue_name = info[0].As<String>().Utf8Value();
+  // arg 1
+  auto src_names = makeStringList(env, info[1].As<Array>());
+  // arg 2
+  auto sum = info[2].As<Number>().Int32Value();
+  // arg 3
+  auto validate_all = info[3].As<Boolean>();
+
+  auto src_list =
+    validator::validateSources(clue_name, src_names, sum, validate_all);
+  auto empty_src_list = src_list.empty();
+  if (validate_all && !empty_src_list) {
+    clue_manager::init_known_source_map_entry(
+      sum, src_names, std::move(src_list));
+  }
+  return Boolean::New(env, !empty_src_list);
+}
+
 //
 // Combo-maker
 //
@@ -485,10 +542,10 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
 
   Env env = info.Env();
   if (!info[0].IsArray() || !info[1].IsArray() || !info[2].IsBoolean()) {
-      TypeError::New(env,
-        "mergeCompatibleXorSourceCombinations: invalid parameter")
-        .ThrowAsJavaScriptException();
-      return env.Null();
+    TypeError::New(
+      env, "mergeCompatibleXorSourceCombinations: invalid parameter")
+      .ThrowAsJavaScriptException();
+    return env.Null();
   }
   auto ncDataLists = makeNcDataLists(env, info[0].As<Array>());
 
@@ -655,19 +712,22 @@ Value getResult(const CallbackInfo& info) {
 Object Init(Env env, Object exports) {
   //
   // clue-manager
+  exports["getNumNcResults"] = Function::New(env, getNumNcResults);
+  exports["appendNcResults"] = Function::New(env, appendNcResults);
   exports["setPrimaryClueNameSourcesMap"] = Function::New(env, setPrimaryClueNameSourcesMap);
   exports["setCompoundClueNames"] = Function::New(env, setCompoundClueNames);
+  exports["isKnownSourceMapEntry"] = Function::New(env, isKnownSourceMapEntry);
 
   // validator
   //
-  exports["getNumNcResults"] = Function::New(env, getNumNcResults);
-  exports["appendNcResults"] = Function::New(env, appendNcResults);
+  exports["appendNcResultsFromSourceMap"] = Function::New(env, appendNcResultsFromSourceMap);
+  /*
   exports["mergeNcListCombo"] = Function::New(env, mergeNcListCombo);
   exports["mergeNcListResults"] = Function::New(env, mergeNcListResults);
-  exports["mergeAllNcListCombinations"] =
-    Function::New(env, mergeAllNcListCombinations);
-  exports["validateSourcesForNameAndCountLists"] =
-    Function::New(env, validateSourcesForNameAndCountLists);
+  exports["mergeAllNcListCombinations"] = Function::New(env, mergeAllNcListCombinations);
+  exports["validateSourcesForNameAndCountLists"] = Function::New(env, validateSourcesForNameAndCountLists);
+  */
+  exports["validateSources"] = Function::New(env, validateSources);
 
   // combo-maker
   //

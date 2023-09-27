@@ -7,7 +7,7 @@
 #include <vector>
 #include "peco.h"
 
-namespace cm {
+namespace util {
 
 inline int list_size(const Peco::IndexList& indexList) {
   // TODO: use std::distance?
@@ -46,6 +46,37 @@ R multiply_with_overflow_check(const std::vector<T>& values) {
   return total;
 }
 
-}  // namespace cm
+template <typename T>
+typename std::vector<T>::const_iterator move_append(
+  std::vector<T>& dst, std::vector<T>&& src) {
+  //
+  typename std::vector<T>::const_iterator result;
+  if (dst.empty()) {
+    dst = std::move(src);
+    result = std::cbegin(dst);
+  } else {
+    result = dst.insert(std::end(dst), std::make_move_iterator(std::begin(src)),
+      std::make_move_iterator(std::end(src)));
+  }
+  src.clear();
+  //src.shrink_to_fit();
+  return result;
+}
+
+inline std::string join(
+  const std::vector<std::string>& strings, const std::string& delim) {
+  if (strings.empty()) {
+    return {};
+  }
+  if (strings.size() == 1u) {
+    return strings.front();
+  }
+  return std::accumulate(std::next(strings.begin()), strings.end(), strings.front(),
+    [delim](const std::string& acc, const std::string& elem) {
+      return acc + delim + elem;
+    });
+}
+
+}  // namespace util
 
 #endif // INCLUDE_UTIL_H

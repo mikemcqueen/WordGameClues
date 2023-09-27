@@ -148,7 +148,7 @@ auto alloc_copy_src_lists(
   // alloc sources
   const cudaStream_t stream = cudaStreamPerThread;
   cudaError_t err = cudaSuccess;
-  const auto num_sources = sum_sizes(src_lists);
+  const auto num_sources = util::sum_sizes(src_lists);
   const auto sources_bytes = num_sources * sizeof(SourceCompatibilityData);
   std::cerr << "  allocating device_sources (" << sources_bytes << " bytes)"
             << std::endl;
@@ -188,7 +188,7 @@ auto alloc_copy_idx_lists(
   // alloc indices
   const cudaStream_t stream = cudaStreamPerThread;
   cudaError_t err = cudaSuccess;
-  auto indices_bytes = sum_sizes(idx_lists) * sizeof(index_t);
+  auto indices_bytes = util::sum_sizes(idx_lists) * sizeof(index_t);
   index_t* device_indices;
   err = cudaMallocAsync((void**)&device_indices, indices_bytes, stream);
   assert((err == cudaSuccess) && "merge alloc idx lists");
@@ -423,7 +423,7 @@ auto run_get_compat_combos_task(const result_t* device_compat_matrices,
   using namespace std::chrono;
   uint64_t first_combo{};
   uint64_t num_combos{600'000'000}; // chunk size
-  const uint64_t max_combos{multiply_with_overflow_check(idx_list_sizes)};
+  const uint64_t max_combos{util::multiply_with_overflow_check(idx_list_sizes)};
   // TODO: free
   auto device_results = alloc_results(num_combos);
   std::vector<result_t> host_results(num_combos);
@@ -628,8 +628,8 @@ auto get_compatible_indices(const std::vector<SourceList>& src_lists)
   for (const auto& sl : src_lists) {
     lengths.push_back(sl.size());
   }
-  std::cerr << "  initial lengths: " << vec_to_string(lengths)
-            << ", product: " << multiply_with_overflow_check(lengths)
+  std::cerr << "  initial lengths: " << util::vec_to_string(lengths)
+            << ", product: " << util::multiply_with_overflow_check(lengths)
             << std::endl;
   auto idx_lists = Peco::initial_indices(lengths);
   bool valid = filterAllXorIncompatibleIndices(idx_lists, src_lists);
@@ -637,8 +637,8 @@ auto get_compatible_indices(const std::vector<SourceList>& src_lists)
   for (const auto& il : idx_lists) {
     lengths.push_back(std::distance(il.begin(), il.end()));
   }
-  std::cerr << "  filtered lengths: " << vec_to_string(lengths)
-            << ", product: " << multiply_with_overflow_check(lengths)
+  std::cerr << "  filtered lengths: " << util::vec_to_string(lengths)
+            << ", product: " << util::multiply_with_overflow_check(lengths)
             << ", valid: " << std::boolalpha << valid << std::endl;
   // "valid" means all resulting index lists have non-zero length
   if (!valid) {

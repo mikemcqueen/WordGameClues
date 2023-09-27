@@ -199,9 +199,11 @@ const buildAllUseNcDataLists = (useArgsList: string[], maxSum: number): NCDataLi
 const getSourceList = (nc: NameCount.Type, args: any): Source.List => {
     const sourceList: Source.List = [];
     ClueManager.getKnownSourceMapEntries(nc, false, args)
-        .forEach((sourceData: ClueManager.SourceData) => {
+        .forEach((sourceData: ClueManager.SourceMapValue) => {
+/*TODO?
             sourceList.push(...sourceData.results
                 .map((result: ValidateResult) => Source.makeData(nc, result)));
+*/
         });
     return sourceList;
 };

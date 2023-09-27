@@ -124,7 +124,9 @@ function getClueSources (nameList) {
 function getSourceClues (source, countList, nameList) {
     const count = countList.reduce((sum, count) => sum + count, 0);
     const srcMap = ClueManager.getKnownSourceMap(count);
-    const results = srcMap[source] ? srcMap[source].results : undefined; // TODO: ?.results
+    Assert(!"getSourceClues broken");
+    // TODO:
+    const results = false; // srcMap[source] ? srcMap[source].results : undefined;
     if (!results) {
         let sourceList = source.split(',');
         let s = '';

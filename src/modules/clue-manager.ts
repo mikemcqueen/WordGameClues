@@ -34,9 +34,9 @@ const REJECTS_DIR  = 'rejects';
 
 type CountList = number[];
 
-export type SourceData = {
+export type SourceMapValue = {
     clues: ClueList.Any;
-    results: ValidateResult[];
+//    results: ValidateResult[];
 };
 
 type NcResultData = {
@@ -45,7 +45,7 @@ type NcResultData = {
 };
 
 type ClueMap = Record<string, string[]>;
-type SourceMap = Record<string, SourceData>;
+type SourceMap = Record<string, SourceMapValue>;
 type NcResultMap = Record<string, NcResultData>;
 
 export type AllCandidates = Sentence.CandidatesContainer[];
@@ -56,7 +56,7 @@ export interface AllCandidatesContainer {
 type InternalStateBase = {
     clueListArray: ClueList.Any[];    // the JSON "known" clue files in an array
     knownClueMapArray: ClueMap[];     // map clue name to clue src
-    knownSourceMapArray: SourceMap[]; // map sourceCsv to SourceData
+    knownSourceMapArray: SourceMap[]; // map sourceCsv to SourceMapValue
     ncResultMaps: NcResultMap[];      // map known NCs to result list
 
     variations: Sentence.Variations;  // "global" variations aggregated from all sentences
@@ -114,7 +114,6 @@ let State: InternalState = initialState();
 
 export let isLoaded = (): boolean => { return State.loaded; }
 export function getMaxClues (): number { return State.maxClues; }
-//export function getNumPrimarySources(): number { return State.numPrimarySources; }
 export function setLogging (onOff: boolean): void { State.logging = onOff; }
 
 export function getClueList (index: number): ClueList.Any {// Compound {
@@ -151,19 +150,6 @@ export const getCandidatesContainer = (sentence: number):
 {
     return State.allCandidates[sentence];
 };
-
-/*
-export const copyAllCandidates = (allCandidates: AllCandidates
-    = State.allCandidates): AllCandidates =>
-{
-    let result: AllCandidates = [];
-    for (let [index, container] of allCandidates.entries()) {
-        if (!container) continue;
-        result[index] = Sentence.copyCandidatesContainer(container);
-    }
-    return result;
-}
-*/
 
 export const getUniqueClueNameCount = (clueCount: number) => {
     if (clueCount === 1) {
@@ -562,10 +548,16 @@ let addCompoundClue = (clue: Clue.Compound, count: number, args: any): boolean =
     let nameList = clue.src.split(',').sort();
     let srcMap = getKnownSourceMap(count);
     let srcKey = nameList.toString();
+
+    //console.log(`${srcKey}:${count}`);
+
     // new sources need to be validated
-    let vsResult : ValidateSourcesResult = { success: true };
-    if (!_.has(srcMap, srcKey)) {
+    //    let vsResult : ValidateSourcesResult = { success: true };
+    let vs_result = true;
+    //if (!_.has(srcMap, srcKey)) {
+    if (!Native.isKnownSourceMapEntry(count, srcKey)) {
         Debug(`## validating Known compound clue: ${srcKey}:${count}`);
+        /*
         vsResult = Validator.validateSources(clue.name, {
             sum: count,
             nameList,
@@ -573,20 +565,27 @@ let addCompoundClue = (clue: Clue.Compound, count: number, args: any): boolean =
             fast: args.fast,
             validateAll: args.validateAll
         });
+        */
+        vs_result = Native.validateSources(clue.name, nameList, count,
+            args.validateAll);
+
         // this is where the magic happens
-        if (vsResult.success && args.validateAll) {
-            total_sources += vsResult.list!.length;
+        if (vs_result && args.validateAll) {
+            //total_sources += vsResult.list!.length;
             srcMap[srcKey] = {
                 clues: [],
-                results: vsResult.list!
             };
         }
-    } else if (args.validateAll) {
+    }
+    /*
+    else if (args.validateAll) {
         vsResult.list = srcMap[srcKey].results;
     }
-    if (vsResult.success && args.validateAll) {
+    */
+    if (vs_result && args.validateAll) {
         //addResultsToNcResultMap(vsResult.list!, clue.name, count, args);
-        Native.appendNcResults({ name: clue.name, count }, vsResult.list!);
+        //Native.appendNcResults({ name: clue.name, count }, vsResult.list!);
+        Native.appendNcResultsFromSourceMap({name : clue.name, count}, srcKey);
         (srcMap[srcKey].clues as ClueList.Compound).push(clue);
     }
     // NOTE: added above, commented below
@@ -597,7 +596,7 @@ let addCompoundClue = (clue: Clue.Compound, count: number, args: any): boolean =
     // The question is, is this appropriate for successful but non
     // validate-all scenarios, such as copy-from?  maybe.
     //(srcMap[srcKey].clues as ClueList.Compound).push(clue);
-    return vsResult.success;
+    return vs_result;
 };
 
 const addKnownClue = (count: number, name: string, source: string,
@@ -877,10 +876,11 @@ export const filter = (srcCsvList: string[], clueCount: number, result: FilterRe
 };
 
 // TODO: return type.
-const singleEntry = (nc: NameCount.Type, source: string): SourceData => {
+const singleEntry = (nc: NameCount.Type, source: string): SourceMapValue => {
     let nameSrcList: NameCount.List = [NameCount.makeNew(nc.name, Number(source))];
     return {
         clues: [],
+/* TODO?
         results: [            
             {
                 ncList: [nc],
@@ -890,17 +890,21 @@ const singleEntry = (nc: NameCount.Type, source: string): SourceData => {
                 resultMap: undefined
             }
         ]
+*/
     };
 };
 
 // returns:
-// array of SourceData
+// array of SourceMapValue
 //   --or--
-// array of { entry: SourceData, sources: string }
+// array of { entry: SourceMapValue, sources: string }
 // 
 export const getKnownSourceMapEntries = (nc: NameCount.Type,
     andSources = false, args: any = {}): any[] =>
 {
+    Assert(!"getKnownSourceMapEntries() broken");
+    return [];
+/*
     const clueMap = getKnownClueMap(nc.count);
     if (!clueMap) throw new Error(`No clueMap at ${nc.count}`);
     const sourcesList = clueMap[nc.name];
@@ -921,6 +925,7 @@ export const getKnownSourceMapEntries = (nc: NameCount.Type,
                 : getKnownSourceMap(nc.count)[sources];
             return andSources ? { entry, sources } : entry;
         }); 
+*/
 };
 
 //
@@ -1330,7 +1335,7 @@ export const getCountListArrays = (nameCsv: string, options: any): any => {
                 clues.push({ countList: clueCountList, nameList: srcList });
             }
         } else {
-            let any: SourceData = getKnownSourceMap(sum)[nameList.toString()];
+            let any: SourceMapValue = getKnownSourceMap(sum)[nameList.toString()];
             if (any) {
                 known.push({
                     countList: clueCountList,
