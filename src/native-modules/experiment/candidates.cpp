@@ -4,8 +4,9 @@
 #include <chrono>
 #include <optional>
 #include <unordered_map>
-#include "combo-maker.h"
 #include "candidates.h"
+#include "clue-manager.h"
+#include "combo-maker.h"
 #include "merge-filter-data.h"
 
 namespace {
@@ -16,7 +17,7 @@ using namespace cm;
 
 struct MergeData {
   SourceCompatibilityData merged_src;
-  SourceCRefList src_cref_list;
+  SourceCompatibilityCRefList src_cref_list;
 };
 
 struct CandidateRepoValue {
@@ -30,20 +31,52 @@ std::unordered_map<std::string, CandidateRepoValue> candidate_repo;
 
 // functions
 
+/*
+const getSourceList = (nc: NameCount.Type, args: any): Source.List => {
+    const sourceList: Source.List = [];
+TODO?
+    ClueManager.getKnownSourceMapEntries(nc, false, args)
+        .forEach((sourceData: ClueManager.SourceMapValue) => {
+            sourceList.push(...sourceData.results
+                .map((result: ValidateResult) => Source.makeData(nc, result)));
+        });
+
+return sourceList;
+};
+*/
+
+auto get_src_compat_list(const NameCount& nc) {
+  SourceCompatibilityList src_list;
+  clue_manager::for_each_nc_source(
+    nc, [&src_list](const SourceCompatibilityData& src) {
+      src_list.emplace_back(src);
+    });  // comment
+  return src_list;
+}
+
+auto get_src_compat_cref_list(const NameCount& nc) {
+  SourceCompatibilityCRefList src_cref_list;
+  clue_manager::for_each_nc_source(
+    nc, [&src_cref_list](const SourceCompatibilityData& src) {
+      src_cref_list.emplace_back(std::cref(src));
+    });
+  return src_cref_list;
+}
+
 auto make_merge_list(const SourceCompatibilityList& merged_src_list,
-  const SourceList& src_list) {
+  const SourceCompatibilityCRefList& src_cref_list) {
   //
   std::vector<MergeData> merge_list;
   for (const auto& merged_src : merged_src_list) {
-    SourceCRefList compat_src_list;
-    for (const auto& src : src_list) {
-      if (merged_src.isXorCompatibleWith(src)) {
-        compat_src_list.emplace_back(std::cref(src));
+    SourceCompatibilityCRefList compat_src_cref_list;
+    for (const auto& src_cref : src_cref_list) {
+      if (merged_src.isXorCompatibleWith(src_cref.get())) {
+        compat_src_cref_list.emplace_back(src_cref);
       }
     }
-    if (!compat_src_list.empty()) {
-      merge_list.push_back(MergeData{merged_src, std::move(compat_src_list)});
-      //merge_list.emplace_back(merged_src, std::move(compat_src_list));
+    if (!compat_src_cref_list.empty()) {
+      //merge_list.push_back(MergeData{merged_src, std::move(compat_src_cref_list)});
+      merge_list.emplace_back(merged_src, std::move(compat_src_cref_list));
     }
   }
   return merge_list;
@@ -61,19 +94,21 @@ auto make_merged_src_list(const std::vector<MergeData>& merge_list) {
 }
 
 SourceCompatibilityList merge_all_compatible_sources(
-  const NameCountList& ncList, const SourceListMap& src_list_map) {
+  const NameCountList& ncList) {  // , const SourceListMap& src_list_map) {
   //
   assert(ncList.size() <= 2 && "ncList.size() > 2");
   SourceCompatibilityList merged_src_list;
   for (const auto& nc : ncList) {
-    const auto& src_list = src_list_map.find(nc.toString())->second;
+    // const auto& src_list = src_list_map.find(nc.toString())->second;
     if (merged_src_list.empty()) {
-      merged_src_list.assign(src_list.begin(), src_list.end()); // deep copy of elements
+      merged_src_list = std::move(get_src_compat_list(nc));
+      //merged_src_list.assign(src_list.begin(), src_list.end());
       continue;
     }
     // TODO: optimization opportunity. Walk through loop building merge_lists
     // first. If any are empty, bail. After all succeed, do actual merges.
-    const auto merge_list = make_merge_list(merged_src_list, src_list);
+    const auto& src_cref_list = get_src_compat_cref_list(nc);
+    const auto merge_list = make_merge_list(merged_src_list, src_cref_list);
     if (merge_list.empty()) {
       return {};
     }
@@ -91,8 +126,7 @@ auto add_candidate(int sum, const std::string&& combo, int index) -> int {
 int add_candidate(int sum, std::string&& combo,
   std::reference_wrapper<const SourceCompatibilityList> src_list_cref) {
   //
-  if (auto it = allSumsCandidateData.find(sum);
-      it == allSumsCandidateData.end()) {
+  if (!allSumsCandidateData.contains(sum)) {
     allSumsCandidateData.emplace(std::make_pair(sum, CandidateList{}));
   }
   std::set<std::string> combos{};
@@ -110,10 +144,10 @@ namespace cm {
 
 void consider_candidate(const NameCountList& ncList, int sum) {
   auto key = NameCount::listToString(ncList);
-  if (candidate_repo.find(key) == candidate_repo.end()) {
+  if (!candidate_repo.contains(key)) {
     CandidateRepoValue repo_value;
     repo_value.merged_src_list =
-      std::move(merge_all_compatible_sources(ncList, MFD.sourceListMap));
+      std::move(merge_all_compatible_sources(ncList)); // , MFD.sourceListMap));
     candidate_repo.emplace(std::make_pair(key, std::move(repo_value)));
   }
   auto& repo_value = candidate_repo.find(key)->second;

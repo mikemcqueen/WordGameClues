@@ -15,7 +15,7 @@ public:
   using IndexVector = std::vector<index_t>;
   using IndexList = std::forward_list<index_t>;
   using IndexListVector = std::vector<IndexList>;
-  // TODO: const?
+  // TODO: std::optional
   using take_type = IndexVector*;
 
   Peco() = delete;
@@ -47,16 +47,18 @@ public:
   // these static methods actually made sense to be in this class at one point,
   // but I think they're kinda standalone at this point and don't really belong
   // here
-  static /*IndexListVector*/ auto initial_indices(const std::vector<size_t>& lengths) {
-    IndexListVector indexLists;
-    indexLists.resize(lengths.size());
-    for (size_t i{}; i < indexLists.size(); ++i) {
-      initialize_list(indexLists[i], lengths[i]);
+  template <typename T>
+  // TODO: requires integral_type
+  static auto initial_indices(const std::vector<T>& lengths) {
+    IndexListVector idx_lists;
+    idx_lists.resize(lengths.size());
+    for (size_t i{}; i < idx_lists.size(); ++i) {
+      initialize_list(idx_lists[i], lengths[i]);
     }
-    return indexLists;
+    return idx_lists;
   }
 
-  static /*std::vector<IndexVector>*/auto to_vectors(const IndexListVector& idx_lists) {
+  static auto to_vectors(const IndexListVector& idx_lists) {
     std::vector<IndexVector> idx_vectors(idx_lists.size());
     for (size_t i{}; i < idx_lists.size(); ++i) {
       const auto& idx_list = idx_lists.at(i);
@@ -81,6 +83,14 @@ public:
     return idx_list;
   }
 
+  // TODO: add 'max' param, loop over it
+  static auto make_addends(int sum, int count) {
+    std::vector<std::vector<int>> result;
+    std::vector<int> current;
+    make_addends_helper(sum, count, 1, current, result);
+    return result;
+  }
+
 private:
   take_type take() {
     if (done_) return nullptr;
@@ -98,10 +108,27 @@ private:
     }
   }
 
-  static void initialize_list(IndexList& indexList, int size) {
-    indexList.clear();
-    for (int i{size - 1}; i >= 0; --i) {
-      indexList.emplace_front(i);
+  template <typename T>
+  // TODO: requires integral_type
+  static void initialize_list(IndexList& idx_list, T size) {
+    idx_list.clear();
+    for (int i{(int)size - 1}; i >= 0; --i) {
+      idx_list.emplace_front(i);
+    }
+  }
+
+  static void make_addends_helper(int sum, int count, int start,
+    std::vector<int>& current, std::vector<std::vector<int>>& result) {
+    if (!count) {
+      if (!sum) {
+        result.push_back(current);
+      }
+      return;
+    }
+    for (auto i = start; i <= sum; ++i) {
+      current.push_back(i);
+      make_addends_helper(sum - i, count - 1, i, current, result);
+      current.pop_back();  // backtrack
     }
   }
 

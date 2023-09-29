@@ -36,7 +36,7 @@ type CountList = number[];
 
 export type SourceMapValue = {
     clues: ClueList.Any;
-//    results: ValidateResult[];
+    //results: ValidateResult[];
 };
 
 type NcResultData = {
@@ -55,7 +55,7 @@ export interface AllCandidatesContainer {
 
 type InternalStateBase = {
     clueListArray: ClueList.Any[];    // the JSON "known" clue files in an array
-    knownClueMapArray: ClueMap[];     // map clue name to clue src
+    knownClueMapArray: ClueMap[];     // map clue name to list of clue sourceCsvs
     knownSourceMapArray: SourceMap[]; // map sourceCsv to SourceMapValue
     ncResultMaps: NcResultMap[];      // map known NCs to result list
 
@@ -398,7 +398,7 @@ const values_lists = (nameSourcesMap: Sentence.NameSourcesMap): number[][] => {
 
 const cacheAllPrimaryClueSources = (): void => {
     let nameSourcesMap = buildPrimaryClueNameSourcesMap();
-    Native.setPrimaryClueNameSourcesMap(_.keys(nameSourcesMap), values_lists(nameSourcesMap));
+    Native.setPrimaryNameSrcIndicesMap(_.keys(nameSourcesMap), values_lists(nameSourcesMap));
 };
 
 const primaryClueListPostProcessing = (args: any): void => {
@@ -467,7 +467,7 @@ export const loadAllClues = function (args: any): void {
         let clueList: ClueList.Compound = loadClueList(count);
         State.clueListArray[count] = clueList;
         addKnownCompoundClues(clueList, count, args);
-        Native.setCompoundClueNames(count, _.keys(getKnownClueMap(count)));
+        Native.setCompoundClueNameSourcesMap(count, _.entries(getKnownClueMap(count)));
     }
     const t_dur = new Duration(t0, new Date()).milliseconds;
     if (args.verbose) {
@@ -547,16 +547,16 @@ const addResultsToNcResultMap = (results: ValidateResult[], name: string,
 let addCompoundClue = (clue: Clue.Compound, count: number, args: any): boolean => {
     let nameList = clue.src.split(',').sort();
     let srcMap = getKnownSourceMap(count);
-    let srcKey = nameList.toString();
+    let srcCsv = nameList.toString();
 
-    //console.log(`${srcKey}:${count}`);
+    //console.log(`${srcCsv}:${count}`);
 
     // new sources need to be validated
     //    let vsResult : ValidateSourcesResult = { success: true };
     let vs_result = true;
-    //if (!_.has(srcMap, srcKey)) {
-    if (!Native.isKnownSourceMapEntry(count, srcKey)) {
-        Debug(`## validating Known compound clue: ${srcKey}:${count}`);
+    //if (!_.has(srcMap, srcCsv)) {
+    if (!Native.isKnownSourceMapEntry(count, srcCsv)) {
+        Debug(`## validating Known compound clue: ${srcCsv}:${count}`);
         /*
         vsResult = Validator.validateSources(clue.name, {
             sum: count,
@@ -572,21 +572,21 @@ let addCompoundClue = (clue: Clue.Compound, count: number, args: any): boolean =
         // this is where the magic happens
         if (vs_result && args.validateAll) {
             //total_sources += vsResult.list!.length;
-            srcMap[srcKey] = {
+            srcMap[srcCsv] = {
                 clues: [],
             };
         }
     }
     /*
     else if (args.validateAll) {
-        vsResult.list = srcMap[srcKey].results;
+        vsResult.list = srcMap[srcCsv].results;
     }
     */
     if (vs_result && args.validateAll) {
         //addResultsToNcResultMap(vsResult.list!, clue.name, count, args);
         //Native.appendNcResults({ name: clue.name, count }, vsResult.list!);
-        Native.appendNcResultsFromSourceMap({name : clue.name, count}, srcKey);
-        (srcMap[srcKey].clues as ClueList.Compound).push(clue);
+        Native.populateNcSourcesFromKnownSource({name : clue.name, count}, srcCsv);
+        (srcMap[srcCsv].clues as ClueList.Compound).push(clue);
     }
     // NOTE: added above, commented below
     // TODO: I don't understand why I'm doing this in failure case.

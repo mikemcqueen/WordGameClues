@@ -38,8 +38,7 @@ auto filterXorIncompatibleIndices(Peco::IndexListVector& index_lists,
   //
   Peco::IndexList& first_list = index_lists[first_list_idx];
   for (auto it_first = first_list.before_begin();
-    std::next(it_first) != first_list.end(); /* nothing */)
-  {
+       std::next(it_first) != first_list.end();) {
     const auto& first_src = src_lists[first_list_idx][*std::next(it_first)];
     bool any_compat = anyCompatibleXorSources(
       first_src, index_lists[second_list_idx], src_lists[second_list_idx]);
@@ -58,12 +57,13 @@ bool filterAllXorIncompatibleIndices(Peco::IndexListVector& idx_lists,
   using namespace std::chrono;
   auto t0 = high_resolution_clock::now();
 
-  if (idx_lists.size() < 2u) return true;
+  if (idx_lists.size() < 2u)
+    return true;
   for (size_t first{}; first < idx_lists.size(); ++first) {
     for (size_t second{}; second < idx_lists.size(); ++second) {
-      if (first == second) continue;
-      if (!filterXorIncompatibleIndices(
-            idx_lists, first, second, src_lists)) {
+      if (first == second)
+        continue;
+      if (!filterXorIncompatibleIndices(idx_lists, first, second, src_lists)) {
         return false;
       }
     }
@@ -89,17 +89,22 @@ auto get_flat_indices(Peco& peco, int num_combinations, bool first = false) {
   return flat_indices;
 }
 
-void dump_flat_indices(const std::vector<index_t>& flat_indices, size_t row_size) {
+void dump_flat_indices(
+  const std::vector<index_t>& flat_indices, size_t row_size) {
+  //
   for (size_t i{}; i < flat_indices.size(); i += row_size) {
     for (size_t j{}; j < row_size; ++j) {
-      if (j) std::cerr << ", ";
+      if (j)
+        std::cerr << ", ";
       std::cerr << flat_indices[i + j];
     }
     std::cerr << std::endl;
   }
 }
 
-void zero_results(merge_result_t* results, size_t num_results, cudaStream_t stream) {
+void zero_results(
+  merge_result_t* results, size_t num_results, cudaStream_t stream) {
+  //
   cudaError_t err = cudaSuccess;
   auto results_bytes = num_results * sizeof(merge_result_t);
   err = cudaMemsetAsync(results, 0, results_bytes, stream);
@@ -430,9 +435,8 @@ auto run_get_compat_combos_task(const result_t* device_compat_matrices,
   std::vector<uint64_t> result_indices;
   for (int n{};; ++n, first_combo += num_combos) {
     num_combos = std::min(num_combos, max_combos - first_combo);
-    if (!num_combos) {
+    if (!num_combos)
       break;
-    }
     if constexpr (logging) {
       std::cerr << " launching get_compat_combos_kernel " << n << " for ["
                 << first_combo << ", " << first_combo + num_combos << "]"
@@ -606,7 +610,8 @@ auto cuda_get_compat_xor_src_indices(const std::vector<SourceList>& src_lists,
 
   auto t1 = high_resolution_clock::now();
   auto t_dur = duration_cast<milliseconds>(t1 - t0).count();
-  std::cerr << " cuda_get_compat_xor_src_indices - " << t_dur << "ms" << std::endl;
+  std::cerr << " cuda_get_compat_xor_src_indices - " << t_dur << "ms"
+            << std::endl;
 
 #if defined(HOST_SIDE_COMPARISON)
   // host-side compat combo counter for debugging/comparison. slow.

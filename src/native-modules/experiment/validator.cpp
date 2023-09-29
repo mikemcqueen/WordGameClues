@@ -17,11 +17,11 @@ auto buildNcSourceIndexLists(const NameCountList& nc_list) {
   Peco::IndexListVector idx_lists;
   for (const auto& nc : nc_list) {
     if (nc.count == 1) {
-      idx_lists.emplace_back(Peco::make_index_list(
-        clue_manager::getSourcesForPrimaryClueName(nc.name)));
+      idx_lists.emplace_back(
+        Peco::make_index_list(clue_manager::getPrimaryClueSrcIndices(nc.name)));
     } else {
       idx_lists.emplace_back(
-        Peco::make_index_list(clue_manager::getNumNcResults(nc)));
+        Peco::make_index_list(clue_manager::get_num_nc_sources(nc)));
     }
   }
   return idx_lists;
@@ -36,9 +36,8 @@ auto mergeNcListCombo(const NameCountList& nc_list, const IndexList& idx_list)
   for (size_t i{}; i < idx_list.size(); ++i) {
     const auto& nc = nc_list.at(i);
     if (nc.count > 1) {
-      const auto& known_nc_src =
-        clue_manager::get_known_nc_source(nc, idx_list.at(i));
-      if (!src.addCompoundSource(known_nc_src)) {
+      const auto& nc_src = clue_manager::get_nc_src_list(nc).at(idx_list.at(i));
+      if (!src.addCompoundSource(nc_src)) {
         return std::nullopt;
       }
     } else if (!src.addPrimaryNameSrc(nc, idx_list.at(i))) {
@@ -217,28 +216,6 @@ export const validateSources = (clueName: string|undefined, args: any):
 };
 */
 
-void get_addends_helper(int sum, int count, int start,
-  std::vector<int>& current, std::vector<std::vector<int>>& result) {
-  if (!count) {
-    if (!sum) {
-      result.push_back(current);
-    }
-    return;
-  }
-  for (auto i = start; i <= sum; ++i) {
-    current.push_back(i);
-    get_addends_helper(sum - i, count - 1, i, current, result);
-    current.pop_back();  // backtrack
-  }
-}
-
-std::vector<std::vector<int>> get_addends(int sum, int count) {
-    std::vector<int> current;
-    std::vector<std::vector<int>> result;
-    get_addends_helper(sum, count, 1, current, result);
-    return result;
-}
-
 void display_addends(int sum, const std::vector<std::vector<int>>& addends) {
   std::cout << "sum: " << sum << std::endl;
   for (const auto& combination : addends) {
@@ -254,7 +231,7 @@ auto validateSources(const std::string& clue_name,
   -> SourceList {
   //
   SourceList results;
-  const auto addends = get_addends(sum, src_names.size());
+  const auto addends = Peco::make_addends(sum, src_names.size());
   //display_addends(sum, addends);
   for (const auto& count_list : addends) {
     NameCountList nc_list;

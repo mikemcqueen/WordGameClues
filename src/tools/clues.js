@@ -441,6 +441,7 @@ async function main () {
         Debug(`from: ${from.baseDir}`);
         copyClues(from, options);
     } else if (options.count) {
+        // this is dumb. just pass options.
         return combo_maker({
             sum:     options.count,
             max:     maxArg,
@@ -454,6 +455,7 @@ async function main () {
             parallel: options.parallel,
             verbose:  options.verbose,
             quiet:    options.quiet,
+            ignoreErrors: options.ignoreErrors,
             max_sources: options.max_sources,
             tpb: options.tpb ? Number(options.tpb) : 0,
             streams: options.streams ? Number(options.streams) : 0,

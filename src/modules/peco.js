@@ -40,7 +40,7 @@ function makeNew(args) {
 //
 // -or-
 //
-//  sum       
+//  sum
 //    count     create lists of this length
 //      -or-
 //    max       create lists of max length
@@ -51,9 +51,9 @@ function makeNew(args) {
 
 function Peco(args) {
     if (LOGGING) {
-        this.log('Peco: sum: '+ args.sum +','  + typeof args.sum +
-                 ', max: ' + args.max+','+ typeof args.max + 
-                 ', count: ' + args.count +','+ typeof args.count +
+        this.log('Peco: sum: '+ args.sum + ','  + typeof args.sum +
+                 ', max: ' + args.max+ ',' + typeof args.max + 
+                 ', count: ' + args.count + ',' + typeof args.count +
                  ', require: ' + args.require +
                  ', exclude: ' + args.exclude +
 		 `, listArray: ${args.listArray ? args.listArray.length : args.listArray}`);
@@ -76,8 +76,7 @@ function Peco(args) {
 	if (_.isEmpty(this.listArray)) {
             throw new Error('Peco: empty listArray');
 	}
-    }
-    else {
+    } else {
         if (!this.sum) {
             throw new Error('Peco: must specify sum > 0 (' + args.sum +
                             '), or addends: ' + args.listArray);

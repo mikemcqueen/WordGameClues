@@ -168,9 +168,7 @@ export const first = (countList: number[], clueIndices: number[]): FirstNextResu
 // args:
 //   synonymMinMax
 //
-const getCombosForUseNcLists = (sum: number, max: number, pcd: PreCompute.Data,
-    args: any): void =>
-{
+const getCombosForUseNcLists = (sum: number, max: number, args: any): void => {
     let comboCount = 0;
     let totalVariations = 0;
     
@@ -240,7 +238,7 @@ export const makeCombosForSum = (sum: number, args: any,
     args.sum = sum;
     let max = args.max;
     args.max = Math.min(args.max, args.sum);
-    getCombosForUseNcLists(sum, max, PCD, args);
+    getCombosForUseNcLists(sum, max, args);
     args.max = max;
 };
 

@@ -9,6 +9,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+#include "clue-manager.h"
 #include "cm-precompute.h"
 #include "peco.h"
 #include "merge.h"
@@ -17,13 +18,15 @@ namespace cm {
 
 namespace {
 
+/*
 const SourceList& getSourceList(const NameCountList& ncList,
   const SourceListMap& sourceListMap)
 {
   assert((ncList.size() == 1) && "not implemented, but could be easily");
   return sourceListMap.at(ncList[0].toString());
 }
-
+*/
+  
 auto mergeSources(const SourceData& source1, const SourceData& source2) {
   SourceData result{};
   result.primaryNameSrcList = std::move(NameCount::listMerge(
@@ -33,14 +36,14 @@ auto mergeSources(const SourceData& source1, const SourceData& source2) {
   return result;
 }
 
-auto mergeCompatibleSourceLists(const SourceList& sourceList1,
-  const SourceList& sourceList2)
-{
+auto mergeCompatibleSourceLists(
+  const SourceList& src_list, const SourceCRefList& src_cref_list) {
+  //
   SourceList result{};
-  for (const auto& source1 : sourceList1) {
-    for (const auto& source2 : sourceList2) {
-      if (source1.isXorCompatibleWith(source2)) {
-        result.emplace_back(mergeSources(source1, source2));
+  for (const auto& src : src_list) {
+    for (const auto& src_cref : src_cref_list) {
+      if (src.isXorCompatibleWith(src_cref.get())) {
+        result.emplace_back(mergeSources(src, src_cref.get()));
       }
     }
   }
@@ -49,9 +52,7 @@ auto mergeCompatibleSourceLists(const SourceList& sourceList1,
 
 // NOTE: for ncList.size() <= 2
 //
-auto mergeAllCompatibleSources(const NameCountList& ncList,
-  const SourceListMap& sourceListMap) -> SourceList
-{
+auto mergeAllCompatibleSources(const NameCountList& ncList) -> SourceList {
   // because **maybe** broken for > 2 below
   assert(ncList.size() <= 2 && "ncList.length > 2");
   constexpr auto log = false;
@@ -59,25 +60,25 @@ auto mergeAllCompatibleSources(const NameCountList& ncList,
     std::cerr << "nc[0]: " << ncList[0].toString() << std::endl;
   }
   // TODO: find smallest sourcelist to copy first, then skip merge in loop?
-  SourceList sourceList{ sourceListMap.at(ncList[0].toString()) }; // copy
+  SourceList src_list{clue_manager::make_src_list_for_nc(ncList[0])};  // copy
   for (auto i = 1u; i < ncList.size(); ++i) {
     if constexpr (log) {
-      std::cerr << " nc[" << i << "]: " << ncList[1].toString() << std::endl;
+      std::cerr << " nc[" << i << "]: " << ncList[i].toString() << std::endl;
     }
-    const auto& nextSourceList = sourceListMap.at(ncList[i].toString());
-    sourceList = std::move(mergeCompatibleSourceLists(sourceList, nextSourceList));
+    const auto& src_cref_list{
+      clue_manager::make_src_cref_list_for_nc(ncList[i])};
+    src_list = std::move(mergeCompatibleSourceLists(src_list, src_cref_list));
     // TODO BUG this is broken for > 2; should be something like:
     // if (sourceList.length !== ncIndex + 1) 
-    if (sourceList.empty()) break;
+    if (src_list.empty()) break;
   }
-  return sourceList;
+  return src_list;
 }
 
 }  // namespace
 
-auto buildSourceListsForUseNcData(const std::vector<NCDataList>& useNcDataLists,
-  const SourceListMap& sourceListMap) -> std::vector<SourceList>
-{
+auto buildSourceListsForUseNcData(const std::vector<NCDataList>& useNcDataLists)
+  -> std::vector<SourceList> {
   // possible optimization:
   // instead of constructing a new sourcelist in mergeAllCompatible,
   // we could have a new data structure like a SourceData but that
@@ -97,8 +98,8 @@ auto buildSourceListsForUseNcData(const std::vector<NCDataList>& useNcDataLists,
   std::vector<SourceList> sourceLists(size);
   for (const auto& ncDataList : useNcDataLists) {
     for (size_t i{}; i < ncDataList.size(); ++i) {
-      // for size == 2: return by value; could return reference to static local in a pinch
-      auto sourceList = mergeAllCompatibleSources(ncDataList[i].ncList, sourceListMap);
+      // for size == 2: return by value; or reference to static local in a pinch
+      auto sourceList = mergeAllCompatibleSources(ncDataList[i].ncList);
       total += sourceList.size();
       for (const auto& source : sourceList) {
         // TODO: NOT GOOD ENOUUGH. still need a set of strings in value type.

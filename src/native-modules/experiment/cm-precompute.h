@@ -11,8 +11,8 @@ namespace cm {
 
 // functions
 
-auto buildSourceListsForUseNcData(const std::vector<NCDataList>& useNcDataLists,
-  const SourceListMap& sourceListMap) -> std::vector<SourceList>;
+auto buildSourceListsForUseNcData(const std::vector<NCDataList>& useNcDataLists
+  /*,const SourceListMap& sourceListMap*/) -> std::vector<SourceList>;
 
 auto buildSentenceVariationIndices(const std::vector<SourceList>& xor_src_lists,
   const std::vector<IndexList>& compat_idx_lists,

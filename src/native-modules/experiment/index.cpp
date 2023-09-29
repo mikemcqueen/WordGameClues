@@ -22,6 +22,7 @@
 namespace {
 
 using namespace Napi;
+using namespace clue_manager;
 using namespace cm;
 using namespace validator;
 
@@ -184,7 +185,7 @@ std::vector<NCDataList> makeNcDataLists(Env& env, const Array& jsList) {
   return lists;
 }
 
-SourceListMap makeSourceListMap(Env& env, const Array& jsList) {
+SourceListMap makeNcSourceListMap(Env& env, const Array& jsList) {
   SourceListMap map{};
   for (auto i = 0u; i < jsList.Length(); ++i) {
     if (!jsList[i].IsArray()) {
@@ -199,9 +200,31 @@ SourceListMap makeSourceListMap(Env& env, const Array& jsList) {
         .ThrowAsJavaScriptException();
       return {};
     }
-    const auto key = tuple[0u].As<String>().Utf8Value();
+    const auto nc_str = tuple[0u].As<String>().Utf8Value();
     auto sourceList = makeSourceList(env, tuple[1u].As<Array>());
-    map.emplace(std::move(key), std::move(sourceList));
+    map.emplace(std::move(nc_str), std::move(sourceList));
+  }
+  return map;
+}
+
+NameSourcesMap makeNameSourcesMap(Env& env, const Array& jsList) {
+  NameSourcesMap map;
+  for (auto i = 0u; i < jsList.Length(); ++i) {
+    if (!jsList[i].IsArray()) {
+      TypeError::New(env, "makeNameSourcesMap: mapEntry is non-array type")
+        .ThrowAsJavaScriptException();
+      return {};
+    }
+    const auto tuple = jsList[i].As<Array>();
+    if (!tuple[0u].IsString() || !tuple[1u].IsArray()) {
+      TypeError::New(
+        env, "makeNameSourcesMap: invalid mapEntry key/value type")
+        .ThrowAsJavaScriptException();
+      return {};
+    }
+    const auto name = tuple[0u].As<String>().Utf8Value();
+    auto sources = makeStringList(env, tuple[1u].As<Array>());
+    map.emplace(std::move(name), std::move(sources));
   }
   return map;
 }
@@ -309,16 +332,13 @@ OrArgList makeOrArgList(Env& env, const Array& jsList) {
 //
 
 // _.keys(nameSourcesMap), values_lists(nameSourcesMap)
-Value setPrimaryClueNameSourcesMap(const CallbackInfo& info) {
+Value setPrimaryNameSrcIndicesMap(const CallbackInfo& info) {
   Env env = info.Env();
   if (!info[0].IsArray() || !info[1].IsArray()) {
     TypeError::New(env, "setPrimaryClueNameSourcesMap: invalid parameter type")
       .ThrowAsJavaScriptException();
     return env.Null();
   }
-  using namespace std::chrono;
-  auto t0 = high_resolution_clock::now();
-
   // arg0
   auto name_list = makeStringList(env, info[0].As<Array>());
   // arg1
@@ -334,15 +354,12 @@ Value setPrimaryClueNameSourcesMap(const CallbackInfo& info) {
     idx_lists.emplace_back(makeIndexList(env, js_idx_lists[i].As<Array>()));
   }
   using namespace clue_manager;
-  clue_manager::setPrimaryClueNameSourcesMap(buildNameSourcesMap(name_list, idx_lists));
-
-  auto t1 = high_resolution_clock::now();
-  [[maybe_unused]] auto t_dur = duration_cast<milliseconds>(t1 - t0).count();
-  std::cerr << " setPrimaryClueNameSourcesMap - " << t_dur << "ms" << std::endl;
-
+  clue_manager::setPrimaryNameSrcIndicesMap(
+    buildPrimaryNameSrcIndicesMap(name_list, idx_lists));
   return env.Null();
 }
 
+/*
 // _.keys(clueMap[count])
 Value setCompoundClueNames(const CallbackInfo& info) {
   Env env = info.Env();
@@ -358,6 +375,24 @@ Value setCompoundClueNames(const CallbackInfo& info) {
   clue_manager::setCompoundClueNames(count, name_list);
   return env.Null();
 }
+*/
+
+// count, _.entries(clueMap[count])
+Value setCompoundClueNameSourcesMap(const CallbackInfo& info) {
+  Env env = info.Env();
+  if (!info[0].IsNumber() || !info[1].IsArray()) {
+    TypeError::New(env, "setCompoundClueNames: invalid parameter type")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+  // arg0
+  auto count{info[0].As<Number>().Int32Value()};
+  // arg1
+  auto map{makeNameSourcesMap(env, info[1].As<Array>())};
+
+  clue_manager::setNameSourcesMap(count, std::move(map));
+  return env.Null();
+}
 
 // count, nameCsv
 Value isKnownSourceMapEntry(const CallbackInfo& info) {
@@ -370,8 +405,8 @@ Value isKnownSourceMapEntry(const CallbackInfo& info) {
   // arg0
   auto count = info[0].As<Number>().Int32Value();
   // arg1
-  auto key = info[1].As<String>().Utf8Value();
-  return Boolean::New(env, clue_manager::is_known_source_map_entry(count, key));
+  auto name_csv = info[1].As<String>().Utf8Value();
+  return Boolean::New(env, clue_manager::is_known_source_map_entry(count, name_csv));
 }
 
 //
@@ -386,9 +421,10 @@ Value getNumNcResults(const CallbackInfo& info) {
     return env.Null();
   }
   auto nc = makeNameCount(env, info[0].As<Object>());
-  return Number::New(env, clue_manager::getNumNcResults(nc));
+  return Number::New(env, clue_manager::get_num_nc_sources(nc));
 }
 
+/*
 Value appendNcResults(const CallbackInfo& info) {
   Env env = info.Env();
   if (!info[0].IsObject() || !info[1].IsArray()) {
@@ -398,20 +434,25 @@ Value appendNcResults(const CallbackInfo& info) {
   }
   auto nc = makeNameCount(env, info[0].As<Object>());
   auto src_list = makeSourceList(env, info[1].As<Array>(), "nameSrcList");
-  clue_manager::appendNcResults(nc, src_list);
+  clue_manager::append_nc_sources(nc, src_list);
   return env.Null();
 }
+*/
 
-Value appendNcResultsFromSourceMap(const CallbackInfo& info) {
+// nc, name_csv
+Value populateNcSourcesFromKnownSource(const CallbackInfo& info) {
   Env env = info.Env();
   if (!info[0].IsObject() || !info[1].IsString()) {
     TypeError::New(env, "appendNcResultsFromSrcMap: invalid parameter type")
       .ThrowAsJavaScriptException();
     return env.Null();
   }
+  // arg0
   auto nc = makeNameCount(env, info[0].As<Object>());
-  auto src_key = info[1].As<String>().Utf8Value();
-  auto num_appended = clue_manager::appendNcResultsFromSourceMap(nc, src_key);
+  // arg1
+  auto src_csv = info[1].As<String>().Utf8Value();
+
+  auto num_appended = clue_manager::append_nc_sources_from_known_source(nc, src_csv);
   return Number::New(env, num_appended);
 }
 
@@ -541,24 +582,29 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   using namespace std::chrono;
 
   Env env = info.Env();
-  if (!info[0].IsArray() || !info[1].IsArray() || !info[2].IsBoolean()) {
+  if (!info[0].IsArray() /*|| !info[1].IsArray()*/ || !info[1].IsBoolean()) {
     TypeError::New(
       env, "mergeCompatibleXorSourceCombinations: invalid parameter")
       .ThrowAsJavaScriptException();
     return env.Null();
   }
+  // arg0
   auto ncDataLists = makeNcDataLists(env, info[0].As<Array>());
 
+  /*
   auto slm0 = high_resolution_clock::now();
   MFD.sourceListMap =
-    std::move(makeSourceListMap(env, info[1].As<Array>()));
+    std::move(makeNcSourceListMap(env, info[1].As<Array>()));
   // merge_only means "-t" mode, in which case no filter kernel will be called,
   // so we don't need to do additional work/copy additional device data
   auto slm1 = high_resolution_clock::now();
   auto slm_dur = duration_cast<milliseconds>(slm1 - slm0).count();
   std::cerr << " build src_list_map - " << slm_dur << "ms" << std::endl;
+  */
 
-  auto merge_only = info[2].As<Boolean>();
+  //arg1
+  auto merge_only = info[1].As<Boolean>();
+
   //--
     
   auto build0 = high_resolution_clock::now();
@@ -566,7 +612,7 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   // TODO: I'm not convinced this data needs to hang around on host side.
   // maybe for async copy?
   MFD.xor_src_lists =
-    std::move(buildSourceListsForUseNcData(ncDataLists, MFD.sourceListMap));
+    std::move(buildSourceListsForUseNcData(ncDataLists/*, MFD.sourceListMap*/));
 
   auto build1 = high_resolution_clock::now();
   [[maybe_unused]] auto d_build =
@@ -713,14 +759,14 @@ Object Init(Env env, Object exports) {
   //
   // clue-manager
   exports["getNumNcResults"] = Function::New(env, getNumNcResults);
-  exports["appendNcResults"] = Function::New(env, appendNcResults);
-  exports["setPrimaryClueNameSourcesMap"] = Function::New(env, setPrimaryClueNameSourcesMap);
-  exports["setCompoundClueNames"] = Function::New(env, setCompoundClueNames);
+  exports["setPrimaryNameSrcIndicesMap"] = Function::New(env, setPrimaryNameSrcIndicesMap);
+  exports["setCompoundClueNameSourcesMap"] = Function::New(env, setCompoundClueNameSourcesMap);
   exports["isKnownSourceMapEntry"] = Function::New(env, isKnownSourceMapEntry);
+  exports["populateNcSourcesFromKnownSource"] =
+    Function::New(env, populateNcSourcesFromKnownSource);
 
   // validator
   //
-  exports["appendNcResultsFromSourceMap"] = Function::New(env, appendNcResultsFromSourceMap);
   /*
   exports["mergeNcListCombo"] = Function::New(env, mergeNcListCombo);
   exports["mergeNcListResults"] = Function::New(env, mergeNcListResults);

@@ -1,17 +1,4 @@
-* NATIVE-VALIDATOR branch
-  * DONE - move ncResultMap to c++.
-  * DONE - Native.getNumNcResults(nc) -> ncResultMap[ncStr].list.length
-  * DONE - Native.appendNcResult(nc, results)
-  * DONE - then I can move mergeNcListCombo/Source.addCompoundNc/Source.addPrimaryNameSrc
-    to c++. and i should already have UsedSources.MergeInPlace?
-
-  * populate knownSourceMapEntries in C++ based on flags to validator.
-
-  * move combo-maker first/next to c++. this will require copying ClueManager.UniqueClueNames
-    to C++ as well. not sure if there is any other use for them other than by
-    combo-maker (check it).
-  * mark when done
-  * this will in turn allow us to move most of precompute.buildKnownNcSourceListMap to c++.
+* hash/is_equal for NameCount, make (nc)knownSrcListMap key a NameCount
 
 * reverse-validate components, syns, ans, homs, make sure the keys of these objects
   actually exist in one of the variations? After the variations have been generated,

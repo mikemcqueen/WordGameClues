@@ -56,7 +56,7 @@ interface UseSourceListSizes {
 
 export interface Data {
     xor: Source.List;
-    sourceListMap: Map<string, Source.AnyData[]>;
+//    sourceListMap: Map<string, Source.AnyData[]>;
 }
 
 export interface Result {
@@ -196,14 +196,13 @@ const buildAllUseNcDataLists = (useArgsList: string[], maxSum: number): NCDataLi
 
 //////////
 
+/*
 const getSourceList = (nc: NameCount.Type, args: any): Source.List => {
     const sourceList: Source.List = [];
     ClueManager.getKnownSourceMapEntries(nc, false, args)
         .forEach((sourceData: ClueManager.SourceMapValue) => {
-/*TODO?
             sourceList.push(...sourceData.results
                 .map((result: ValidateResult) => Source.makeData(nc, result)));
-*/
         });
     return sourceList;
 };
@@ -240,14 +239,14 @@ const fillKnownNcSourceListMapForSum = (map: Map<string, Source.AnyData[]>,
     countListArray.forEach((countList: number[]) => {
         let sourceIndices: number[] = [];
 
-        /* compare if output is same for this:
-        for (let result = ComboMaker.first(countList, sourceIndices);
-             !result.done;
-             result = ComboMaker.next(countList, sourceIndices))
-        {
-            addNcListToSourceListMap(result.ncList!, map, args);
-        }
-        */
+        // compare if output is same for this:
+        //for (let result = ComboMaker.first(countList, sourceIndices);
+        //!result.done;
+        //result = ComboMaker.next(countList, sourceIndices))
+        //{
+        //addNcListToSourceListMap(result.ncList!, map, args);
+        //}
+        console.log(`max: ${max}, countList: ${countList}`);
         let result = ComboMaker.first(countList, sourceIndices);
         let firstIter = true;
         while (!result.done) {
@@ -275,6 +274,7 @@ const buildKnownNcSourceListMap = (first: number, last: number,
     console.error(` buildKnownNcSourceListMap(${map.size}) - ${PrettyMs(d)}`);
     return map;
 };
+*/
 
 // TODO: move to Source.initAllCompatibilityData(sourceList), initCompatibilityData(source)
 const setPrimarySrcBits = (sourceList: Source.List): void => {
@@ -427,26 +427,29 @@ const dumpNcDataLists = (ncDataLists: NCDataList[],
     }
 }
 
-const buildUseSourceListsFromNcData = (sourceListMap: Map<string,
-    Source.AnyData[]>, args: any): Source.List =>
+const buildUseSourceListsFromNcData = (/*sourceListMap: Map<string, Source.AnyData[]>,*/
+    args: any): Source.List =>
 {
     // XOR first
     const xorSources: Source.List = NativeComboMaker.mergeCompatibleXorSourceCombinations(
-        args.allXorNcDataLists, Array.from(sourceListMap.entries()),
-        args.merge_only || false);
+        args.allXorNcDataLists, args.merge_only || false);
+        /*Array.from(sourceListMap.entries()),*/
+    args.allXorNcDataLists = undefined;
     if (listIsEmpty(xorSources) || args.merge_only) {
         return xorSources;
     }
     //**
     // Everything below is only for filter use case (-c and not -t).
     //**
-    args.allXorNcDataLists = undefined;
     // OR next
+    let orArgDataList = [];
+    /* TODO: C++
     let or0 = new Date();
     let orArgDataList = buildOrArgDataList(buildSourceListsForUseNcData(
         args.allOrNcDataLists, sourceListMap));
     let or_dur = new Duration(or0, new Date()).milliseconds;
     console.error(` orArgDataList(${orArgDataList.length}) - ${PrettyMs(or_dur)}`);
+    */
 
     // Thoughts on AND compatibility of OrSources:
     // Just because (one sourceList of) an OrSource is AND compatible with an
@@ -484,15 +487,15 @@ export const preCompute = (first: number, last: number, args: any): Result => {
     if (args.or && listIsEmpty(args.allOrNcDataLists)) return { success: false };
     
     // TODO: move to C++.
-    let sourceListMap = buildKnownNcSourceListMap(2, args.max_sources, args);
+    let sourceListMap = {}; // buildKnownNcSourceListMap(2, args.max_sources, args);
 
     const build3 = new Date();
-    const xorSources = buildUseSourceListsFromNcData(sourceListMap, args);
+    const xorSources = buildUseSourceListsFromNcData(/*sourceListMap, */args);
     const d3 = new Duration(build3, new Date()).milliseconds;
     // TODO: sizes?
     if (args.xor && listIsEmpty(xorSources)) return { success: false };
 
     const d = new Duration(begin, new Date()).milliseconds;
     console.error(`--Precompute - ${PrettyMs(d)}`);
-    return { success: true, data: { xor: xorSources, sourceListMap } };
+    return { success: true, data: { xor: xorSources/*, sourceListMap*/ } };
 };

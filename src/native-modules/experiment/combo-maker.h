@@ -331,9 +331,9 @@ struct SourceCompatibilityData {
 };  // SourceCompatibilityData
 
 using SourceCompatibilityList = std::vector<SourceCompatibilityData>;
-using SourceCompatibilityDataCRef = std::reference_wrapper<const
-SourceCompatibilityData>; using SourceCompatibilityCRefList =
-std::vector<SourceCompatibilityDataCRef>;
+using SourceCompatibilityDataCRef =
+  std::reference_wrapper<const SourceCompatibilityData>;
+using SourceCompatibilityCRefList = std::vector<SourceCompatibilityDataCRef>;
 
 struct NameCount;
 using NameCountList = std::vector<NameCount>;
@@ -483,9 +483,11 @@ struct SourceData : SourceCompatibilityData {
 };
 
 using SourceList = std::vector<SourceData>;
-using SourceListMap = std::unordered_map<std::string, SourceList>;
 using SourceCRef = std::reference_wrapper<const SourceData>;
 using SourceCRefList = std::vector<SourceCRef>;
+using SourceListCRef = std::reference_wrapper<const SourceList>;
+using SourceListCRefList = std::vector<SourceListCRef>;
+using SourceListMap = std::unordered_map<std::string, SourceList>;
 
 using XorSource = SourceData;
 using XorSourceList = std::vector<XorSource>;
