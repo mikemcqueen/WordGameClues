@@ -45,7 +45,7 @@ auto mergeNcListCombo(const NameCountList& nc_list, const IndexList& idx_list)
     }
   }
   // TODO: return {src} ?
-  return std::make_optional(src);
+  return {src}; // std::make_optional(src);
 }
 
 auto mergeAllNcListCombinations(const NameCountList& nc_list,
@@ -143,8 +143,6 @@ auto validateSourcesForNameCount(const std::string& clue_name,
     chop_copy(args.name_list, name), chop_copy(args.count_list, count),
     nc_list);
   if (!src_list.empty()) {
-    // args.ncList.clear();
-    // nc_list.forEach(nc -> args.nc_list.emplace_back(std::move(nc)));
     args.nc_list = std::move(nc_list);
   }
   return src_list;
@@ -175,46 +173,6 @@ auto validateSourcesForNameAndCountLists(const std::string& clue_name,
   }
   return {};
 }
-
-/*
-export const validateSources = (clueName: string|undefined, args: any):
-    ValidateSourcesResult =>
-{
-    Debug(`++validateSources(${clueName})` +
-          `${indentNewline()}  nameList(${args.nameList.length}): ${args.nameList}` +
-          `, sum(${args.sum})` +
-          `, count(${args.count})` +
-          `, validateAll: ${args.validateAll}`);
-
-    let success = false;
-    let resultList: ValidateResult[] = [];
-    Peco.makeNew({
-        sum:   args.sum,
-        count: args.count,
-        max:   args.max
-    }).getCombinations().some((countList: number[]) => {
-        let sourceList = Native.validateSourcesForNameAndCountLists(clueName,
-            args.nameList, countList, []);
-        if (sourceList.length) {
-            Debug('validateSources: VALIDATE SUCCESS!');
-            //if (rvsResult.list) {
-            // TODO: return empty array, get rid of .success
-            resultList.push(...sourceList);
-            //}
-            success = true;
-            if (!args.validateAll) return true; // found a match; some.exit
-            Debug('validateSources: validateAll set, continuing...');
-        }
-        return false; // some.continue
-    });
-    Debug('--validateSources');
-
-    return {
-        success,
-        list: success ? resultList : undefined
-    };
-};
-*/
 
 void display_addends(int sum, const std::vector<std::vector<int>>& addends) {
   std::cout << "sum: " << sum << std::endl;

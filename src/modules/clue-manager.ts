@@ -214,13 +214,11 @@ const anyCandidateHasClueName = (name: string, allCandidates: AllCandidates
 };
 
 export const isKnownNc = (nc: NameCount.Type): boolean => {
-    // for legacy primary, and all compound clues
-    if (_.has(getKnownClueMap(nc.count), nc.name)) {
-        return true;
-    }
-    // special case for candidate primary clues in sentences
     if (nc.count === 1) {
         return anyCandidateHasClueName(nc.name);
+    }
+    else if (_.has(getKnownClueMap(nc.count), nc.name)) {
+        return true;
     }
     return false;
 };
@@ -370,7 +368,7 @@ const buildPrimaryClueNameSourcesMap = (allCandidates = getAllCandidates()):
     // add candidates clue sources
     for (let container of allCandidates) {
         if (!container) continue;
-        let keys = _.keys(container.nameIndicesMap);
+        const keys = _.keys(container.nameIndicesMap);
         for (let name of keys) {
             if (!nameSourcesMap.hasOwnProperty(name)) {
                 nameSourcesMap[name] = new Set<number>();
@@ -754,8 +752,10 @@ let isRejectSource = function (source: string | string[]): boolean {
 };
 
 export let getCountListForName = (name: string): CountList => {
-    let countList: CountList = [...Array(State.knownClueMapArray.length).keys()]
-        .filter(count => count && _.has(getKnownClueMap(count), name));
+    let countList: CountList = [...Array(State.knownClueMapArray.length).keys()];
+    countList = countList.filter((count: number) => {
+        return count && _.has(getKnownClueMap(count), name);
+    });
     if (_.isEmpty(countList) || (countList[0] !== 1)) {
         if (anyCandidateHasClueName(name)) {
             countList = [1, ...countList];
@@ -763,77 +763,6 @@ export let getCountListForName = (name: string): CountList => {
     }
     return countList;
 };
-
-/*
-let primaryNcToSrcList = function (nc: NameCount.Type): string[] {
-    if (nc.count !== 1) throw new Error(`nc.count must be 1 (${nc})`);
-    const source = State.knownClueMapArray[1][nc.name];
-    return (_.isArray(source) ? source : [source]) as string[];
-};
-
-// TODO this is failing with ncList.length > 1
-let primaryNcListToNameSrcLists = function (ncList: NameCount.List): NameCount.List[] {
-    let log = 0 && (ncList.length > 1); // nameSrcLists.length > 1) {
-    let srcLists = ncList.map(nc => primaryNcToSrcList(nc));
-    let indexLists = srcLists.map(srcList => [...Array(srcList.length).keys()]);  // e.g. [ [ 0 ], [ 0, 1 ], [ 0 ], [ 0 ] ]
-    let nameSrcLists: NameCount.List[] = Peco.makeNew({
-        listArray: indexLists,
-        max:        999 // TODO technically, clue-types[variety].max_clues
-    }).getCombinations()
-        // map indexList -> primaryNameSrcList
-        .map((indexList: number[]) => indexList.map((value, index) =>
-            NameCount.makeNew(ncList[index].name, _.toNumber(srcLists[index][value]))))
-        // filter out duplicate primary sources
-        .filter((nameSrcList: NameCount.List) =>
-            _.uniqBy(nameSrcList, NameCount.count).length === nameSrcList.length)
-        // sort by primary source (count).
-        //  TODO: couldn't i just do forEach(list => _.sortBy(list, xx)) ?
-        // (is sortBy sort-in-place list list.sort()?)
-        .map((nameSrcList: NameCount.List) =>
-            _.sortBy(nameSrcList, NameCount.count));
-
-    if (log) {
-        console.log(`    ncList: ${ncList}`);
-        console.log(`    nameSrcLists: ${nameSrcLists}`);
-        console.log(`    uniq: ${_.uniqBy(nameSrcLists, _.toString)}`);
-    }
-    return _.uniqBy(nameSrcLists, _.toString);
-};
-
-//
-
-let primaryNcListToNameSrcSets = function (ncList: NameCount.List): Set<string>[] {
-    let log = 0 && (ncList.length > 1); // nameSrcLists.length > 1) {
-    let srcLists = ncList.map(nc => primaryNcToSrcList(nc));
-    let indexLists = srcLists.map(srcList => [...Array(srcList.length).keys()]);  // e.g. [ [ 0 ], [ 0, 1 ], [ 0 ], [ 0 ] ]
-    let nameSrcSets: Set<string>[] = Peco.makeNew({
-        listArray: indexLists,
-        max:       2 // 999 // TODO? technically, clue-types[variety].max_clues
-    }).getCombinations()
-        .reduce((result: Set<string>[], indexList: number[]) => {
-            let set = new Set<string>();
-            indexList.forEach((value, index) =>
-                set.add(NameCount.makeCanonicalName(ncList[index].name,
-                  _.toNumber(srcLists[index][value]))));
-            if (set.size === indexList.length) {
-                result.push(set); // no duplicates
-            }
-            return result;
-        }, []);
-    // TODO: put in some code to check for dupes, to see if we're actually seeing
-    //       dupes. might slow down a little.
-    //return _.uniqBy(nameSrcLists, _.toString);
-    return nameSrcSets;
-};
-
-let makeSrcNameListArray = function (nc: NameCount.Type): string[][] {
-    let srcNameListArray: string[][] = [];
-    getKnownClueMap(nc.count)[nc.name].forEach(src => {
-        srcNameListArray.push(src.split(','));
-    });
-    return srcNameListArray;
-};
-*/
 
 export interface FilterResult {
     map: any;
@@ -1324,7 +1253,6 @@ export const getCountListArrays = (nameCsv: string, options: any): any => {
                 //let clueNameList = this.clueListArray[sum].map(clue => clue.name);
                 //if (clueNameList.includes(name)) {
                 //
-                
                 /*
                 this.clueListArray[sum].forEach(clue => {
                     if (clue.name === name) {

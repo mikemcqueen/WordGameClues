@@ -1,3 +1,5 @@
+* getUniqueClueNameCount -> Native.get_num_uniuque_clue_names
+
 * hash/is_equal for NameCount, make (nc)knownSrcListMap key a NameCount
 
 * reverse-validate components, syns, ans, homs, make sure the keys of these objects

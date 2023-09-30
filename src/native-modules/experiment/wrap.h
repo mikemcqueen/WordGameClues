@@ -13,22 +13,19 @@ namespace cm {
   Napi::Object wrap(Napi::Env& env, const NameCount& nc); 
   Napi::Array wrap(Napi::Env& env, const std::vector<NameCount>& ncList);
 
-  Napi::Object wrap(Napi::Env& env, const XorSource& xorSource,
-    std::string_view primaryNameSrcList = "primaryNameSrcList");
-  Napi::Array wrap(Napi::Env& env, const XorSourceList& xorSourceList,
-    std::string_view primaryNameSrcList = "primaryNameSrcList");
+  Napi::Object wrap(Napi::Env& env, const XorSource& xorSource);
+  Napi::Array wrap(Napi::Env& env, const XorSourceList& xorSourceList);
+
+  Napi::Array wrap(Napi::Env& env, const filter_result_t& filter_result);
 
 #if 0
   Napi::Object wrap(Napi::Env& env, const SourceData& source);
   Napi::Array wrap(Napi::Env& env, const SourceList& sourceList);
-  
   Napi::Array wrap(Napi::Env& env, const MergedSourcesList& mergedSourcesList);
 #endif
   
   Napi::Object wrap(Napi::Env& env, const PerfData& perf);
   Napi::Object wrap(Napi::Env& env, const CandidateStats& cs);
-
-  Napi::Array wrap(Napi::Env& env, const filter_result_t& filter_result);
 } // namespace cm
 
 #endif  // INCLUDE_WRAP_H

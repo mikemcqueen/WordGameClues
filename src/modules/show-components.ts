@@ -10,6 +10,9 @@
 
 import _ from 'lodash'; // import statement to signal that we are a "module"
 
+const Native      = require('../../../build/experiment.node');
+const Peco        = require('../../modules/peco');
+
 const Assert      = require('assert');
 const Debug       = require('debug')('show-components');
 const Expect      = require('should/as-function');
@@ -19,8 +22,6 @@ const stringify   = require('javascript-stringify').stringify;
 const Stringify2  = require('stringify-object');
 const Timing      = require('debug')('timing');
 
-const Peco        = require('../../modules/peco');
-
 import * as Clue from '../types/clue';
 import * as ClueList from '../types/clue-list';
 import * as ClueManager from './clue-manager';
@@ -29,6 +30,11 @@ import * as PreCompute from './cm-precompute';
 import * as Source from './source';
 
 ///////////
+
+interface CountListNameList {
+    countList: number[];
+    nameList: string[];
+}
 
 function Stringify (val) {
     return stringify(val, (value, indent, stringify) => {
@@ -46,10 +52,10 @@ const getCountListArrays = (nameList: string[], pcResult: PreCompute.Result,
         addRemoveSet = new Set<number>();
     }
     */
-    let valid: any[] = [];
-    let known: any[] = [];
-    let clues: any[] = [];
-    let invalid: any[] = [];
+    let valid: number[][] = [];
+    let known: CountListNameList[] = [];
+    let clues: CountListNameList[] = [];
+    let invalid: number[][] = [];
     let nameListStr: string = nameList.toString();
     let hash = {};
 
@@ -59,7 +65,6 @@ const getCountListArrays = (nameList: string[], pcResult: PreCompute.Result,
         const hashKey = countList.toString();
         if (hash[hashKey]) continue;
         hash[hashKey] = true;
-        let ncListStr = countList.map((count, index) => NameCount.makeNew(nameList[index], count)).toString();
         // TODO: in order to support this, we'd need to pass a flag to PreCompute to
         // tell it to preserve the filtered incompatible combinations, or manually
         // walk through all ClueManager.knownSourceMaps looking for a sourceCsv combo,
@@ -78,14 +83,14 @@ const getCountListArrays = (nameList: string[], pcResult: PreCompute.Result,
             // this is a bit awkward. I didn't want to write the code to handle
             // candidate clue lookup for ClueList(1) so I hacked it to look
             // at primaryNameSrcList.
-            if (sum > 1) {
+            if (sum === 1) {
+                srcList = xorSource.primaryNameSrcList
+                    .filter(nameSrc => nameSrc.name === name)
+                    .map(nameSrc => `${nameSrc.count}`);
+            } else {
                 srcList = ClueManager.getClueList(sum)
                     .filter(clue => clue.name === name)
                     .map(clue => clue.src);
-            } else {
-                 srcList = xorSource.primaryNameSrcList
-                     .filter(nameSrc => nameSrc.name === name)
-                     .map(nameSrc => `${nameSrc.count}`);
             }
             if (srcList.length) {
                 clues.push({ countList, nameList: srcList });
@@ -123,19 +128,15 @@ function getClueSources (nameList) {
 
 function getSourceClues (source, countList, nameList) {
     const count = countList.reduce((sum, count) => sum + count, 0);
-    const srcMap = ClueManager.getKnownSourceMap(count);
-    Assert(!"getSourceClues broken");
-    // TODO:
-    const results = false; // srcMap[source] ? srcMap[source].results : undefined;
-    if (!results) {
+    //const srcMap = ClueManager.getKnownSourceMap(count);
+    //const results = srcMap[source] ? srcMap[source].results : undefined;
+    if (!Native.isKnownSourceMapEntry(count, source)) {
         let sourceList = source.split(',');
         let s = '';
         sourceList.forEach((source, index) => {
             // [source] is wrong at least for primary clue case, need actual list of sources.
             s += getClueSources([source]);
-            console.error(s);
         });
-        console.error('---');
         return s;
     }
     return getClueSources(nameList);
@@ -190,7 +191,7 @@ const showCountLists = (nameList: string[], result: any, options: any): any => {
 const slow_show = (nameList: string[], options: any) => {
     Assert(0 && "slow_show broken; consider removing");
     const nameCsv = nameList.toString();
-    const result = []; // = ClueManager.getCountListArrays(nameCsv, options);
+    const result = []; // REPLACE: = ClueManager.getCountListArrays(nameCsv, options);
     if (!result) {
         console.log('No matches');
         return null;
@@ -215,11 +216,9 @@ export const show = (options: any): any => {
 
     const nameList = options.test.split(',').sort();
     if (options.fast) {
-        // TODO: maybe all of this belongs in ClueManager. Because getCountListArrays()
-        //       is called from so many places.
         const pc_args = {
             xor: nameList,
-            merge_only: true, // wrap xorSources on return from Native.merge()
+            merge_only: true, // flag: wrap xorSources on return from Native.merge()
             max: 2,
             max_sources: options.max_sources,
             quiet: options.quiet,
@@ -273,9 +272,7 @@ function getCompatiblePrimaryNameSrcList (listOfListOfPrimaryNameSrcLists) {
         max: listOfListOfPrimaryNameSrcLists.reduce((sum, listOfNameSrcLists) =>
             sum + listOfNameSrcLists.length, 0)
     }).getCombinations();
-
     //console.log(`${Stringify(comboLists)}`);
-
     for (const comboList of comboLists) {
         const nameSrcList = comboList.reduce((nameSrcList, comboListValue, comboListIndex) => {
             let nsList = listOfListOfPrimaryNameSrcLists[comboListIndex][comboListValue];
@@ -489,7 +486,7 @@ function all_combos(input_list: string[], word_list: string[]): string[] {
 
 function validate_sources(lines, options) {
     for (const line of lines) {
-        const result: any = {}; // ClueManager.getCountListArrays(line, options);
+        const result: any = {}; // REPLACE: ClueManager.getCountListArrays(line, options);
         if (!result || !result.valid) {
             console.log(`${line} ${!result ? 'doesnt exist??' : result.invalid ? 'invalid' : 'rejected'}`);
         }

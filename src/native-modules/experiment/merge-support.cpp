@@ -500,11 +500,11 @@ XorSource merge_sources(const std::vector<index_t>& src_indices,
     primaryNameSrcList.insert(
       primaryNameSrcList.end(), pnsl.begin(), pnsl.end());  // copy
     const auto& ncl = src.ncList;
-    ncList.insert(ncList.end(), ncl.begin(), ncl.end()); // copy
+    ncList.insert(ncList.end(), ncl.begin(), ncl.end());  // copy
     usedSources.mergeInPlace(src.usedSources);
   }
   assert(!primaryNameSrcList.empty() && !ncList.empty() && "empty ncList");
-  return XorSource{
+  return {
     std::move(primaryNameSrcList), std::move(ncList), std::move(usedSources)};
 }
 

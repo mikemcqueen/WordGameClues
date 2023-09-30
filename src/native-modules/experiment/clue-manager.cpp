@@ -31,8 +31,6 @@ std::vector<NcSourcesMap> ncSourcesMaps;
 // map primary clue_name -> idx_list 
 PrimaryNameSrcIndicesMap primaryNameSrcIndicesMap;
 
-// std::vector<std::unordered_set<std::string>> compoundClueNameSets;
-
 // map clue_name -> src_csv_list for each count (including primary)
 std::vector<NameSourcesMap> nameSourcesMaps;
 
@@ -41,7 +39,6 @@ std::vector<KnownSourceMap> knownSourceMaps;
 
 // populated on demand from primaryNameSrcIndicesMap/nameSrcMaps
 std::vector<StringCRefList> uniqueClueNames;
-
 
 //
 // functions
@@ -66,14 +63,14 @@ auto& get_nc_sources(const NameCount& nc) {
   return map.find(nc_str)->second;
 }
 
-  /*
+/*
 void for_each_nc_source(const cm::NameCount& nc, const auto& fn) {
   for (const auto& entry_cref : get_known_source_map_entries(nc)) {
     const auto& src_list = entry_cref.get().src_list;
     std::for_each(src_list.begin(), src_list.end(), fn);
   }
 }
-  */
+*/
 
 /*
 SourceData copy_src_as_nc(const SourceData& src, const NameCount& nc) {
@@ -118,13 +115,10 @@ void init_known_source_map_entry(
   // blow up when it happens.
   auto& map = get_known_source_map(count, true);
   auto [_, success] = map.emplace(src, std::move(src_list));
- //std::make_pair(src, std::move(src_list)));
   assert(success);
 }
 
-/*KnownSourceMapValue*/ auto& get_known_source_map_entry(
-  int count, const std::string& nc_str) {
-  //
+auto& get_known_source_map_entry(int count, const std::string& nc_str) {
   auto& map = get_known_source_map(count);
   auto it = map.find(nc_str);
   assert(it != map.end());
@@ -134,26 +128,6 @@ void init_known_source_map_entry(
 auto get_name_sources_map(int count) {
   return nameSourcesMaps.at(count - 1);
 }
-
-void populate_unique_clue_names(StringCRefList& names, int count) {
-  for (const auto& kv_pair : get_name_sources_map(count)) {
-    names.emplace_back(std::cref(kv_pair.first));
-  }
-}
-
-const auto& get_unique_clue_names(int count) {
-  const auto idx{count - 1};
-  if ((int)uniqueClueNames.size() <= idx) {
-    uniqueClueNames.resize(idx + 1);
-  }
-  auto& names = uniqueClueNames.at(idx);
-  if (names.empty()) {
-    populate_unique_clue_names(names, count);
-  }
-  return names;
-}
-
-//////////
 
 auto build_primary_name_sources_map(
   const PrimaryNameSrcIndicesMap& name_src_indices_map) {
@@ -168,6 +142,26 @@ auto build_primary_name_sources_map(
     name_sources_map.emplace(kv_pair.first, std::move(sources));
   }
   return name_sources_map;
+}
+
+//////////
+
+void populate_unique_clue_names(StringCRefList& name_cref_list, int count) {
+  for (const auto& [name, _] : get_name_sources_map(count)) {
+    name_cref_list.emplace_back(std::cref(name));
+  }
+}
+
+const auto& get_unique_clue_names(int count) {
+  const auto idx{count - 1};
+  if ((int)uniqueClueNames.size() <= idx) {
+    uniqueClueNames.resize(idx + 1);
+  }
+  auto& names = uniqueClueNames.at(idx);
+  if (names.empty()) {
+    populate_unique_clue_names(names, count);
+  }
+  return names;
 }
 
 }  // namespace
@@ -208,7 +202,7 @@ int append_nc_sources_from_known_source(
 
 auto make_src_list_for_nc(const NameCount& nc) -> cm::SourceList {
   SourceList src_list;
-  clue_manager::for_each_nc_source(nc, [&src_list](const SourceData& src) {
+  for_each_nc_source(nc, [&src_list](const SourceData& src) {
     src_list.emplace_back(src);
   });  // format
   return src_list;
@@ -216,26 +210,26 @@ auto make_src_list_for_nc(const NameCount& nc) -> cm::SourceList {
 
 auto make_src_cref_list_for_nc(const NameCount& nc) -> cm::SourceCRefList {
   SourceCRefList src_cref_list;
-  clue_manager::for_each_nc_source(nc, [&src_cref_list](const SourceData& src) {
+  for_each_nc_source(nc, [&src_cref_list](const SourceData& src) {
     src_cref_list.emplace_back(std::cref(src));
   });
   return src_cref_list;
 }
 
-  /*
+/*
 void populate_nc_sources_map(const cm::NameCountList& nc_list) {
-  for (const auto& nc: nc_list) {
-    auto& nc_sources_map = get_nc_sources_map(nc.count);
-    const auto nc_str = nc.toString();
-    if (!nc_sources_map.contains(nc_str)) {
-      const auto src_list = copy_src_list_for_nc(nc);
-      // JS code had option to ignore this (ignore load errors)
-      assert(!src_list.empty());
-      nc_sources_map.emplace(std::move(nc_str), std::move(src_list));
-    }
+for (const auto& nc: nc_list) {
+  auto& nc_sources_map = get_nc_sources_map(nc.count);
+  const auto nc_str = nc.toString();
+  if (!nc_sources_map.contains(nc_str)) {
+    const auto src_list = copy_src_list_for_nc(nc);
+    // JS code had option to ignore this (ignore load errors)
+    assert(!src_list.empty());
+    nc_sources_map.emplace(std::move(nc_str), std::move(src_list));
   }
 }
-  */
+}
+*/
 
 //
 // nameSourcesMaps
@@ -303,6 +297,16 @@ const IndexList& getPrimaryClueSrcIndices(const std::string& name) {
   return it->second;
 }
 
+//
+// knownSourceMaps
+//
+
+void init_known_source_map_entry(
+  int count, const std::vector<std::string>& name_list, SourceList&& src_list) {
+  //
+  init_known_source_map_entry(count, util::join(name_list, ","), std::move(src_list));
+}
+
 bool is_known_source_map_entry(int count, const std::string& src_csv) {
   const auto idx = count - 1;
   if ((int)knownSourceMaps.size() > idx) {
@@ -311,21 +315,16 @@ bool is_known_source_map_entry(int count, const std::string& src_csv) {
   return false;
 }
 
-void init_known_source_map_entry(
-  int count, const std::vector<std::string>& name_list, SourceList&& src_list) {
-  //
-  init_known_source_map_entry(count, util::join(name_list, ","), std::move(src_list));
-}
-
 auto get_known_source_map_entries(const NameCount& nc)
   -> std::vector<KnownSourceMapValueCRef> {
   //
-  std::vector<KnownSourceMapValueCRef> entries;
+  std::vector<KnownSourceMapValueCRef> cref_entries;
   const auto& name_sources_map = get_name_sources_map(nc.count);
   for (const auto& src_csv : name_sources_map.at(nc.name)) {
-    entries.emplace_back(std::cref(get_known_source_map_entry(nc.count, src_csv)));
+    cref_entries.emplace_back(
+      std::cref(get_known_source_map_entry(nc.count, src_csv)));
   }
-  return entries;
+  return cref_entries;
 }
 
 //

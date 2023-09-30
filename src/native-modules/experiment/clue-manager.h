@@ -55,7 +55,9 @@ void setPrimaryNameSrcIndicesMap(PrimaryNameSrcIndicesMap&& src_indices_map);
 
 void setNameSourcesMap(int count, NameSourcesMap&& name_sources_map);
 
-bool is_known_source_map_entry(int count, const std::string& key);
+// knownSourceMaps
+
+bool is_known_source_map_entry(int count, const std::string& src_csv);
 
 void init_known_source_map_entry(int count,
   const std::vector<std::string>& name_list, cm::SourceList&& src_list);

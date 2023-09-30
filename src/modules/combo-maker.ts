@@ -11,8 +11,7 @@ const ResultMap   = require('../../types/result-map');
 const Peco        = require('../../modules/peco');
 const Log         = require('../../modules/log')('combo-maker');
 const My          = require('../../modules/util');
-const NativeComboMaker = require('../../../build/experiment.node');
-//const NativeComboMaker = require('../../../build/Debug/experiment.node');
+const Native      = require('../../../build/experiment.node');
 
 const Assert      = require('assert');
 const Debug       = require('debug')('combo-maker');
@@ -34,8 +33,6 @@ import * as NameCount from '../types/name-count';
 import * as PreCompute from './cm-precompute';
 import * as Sentence from '../types/sentence';
 import * as Source from './source';
-
-//import { ValidateResult } from './validator';
 
 // TODO: import from somewhere. also defined in clue-manager
 const DATA_DIR =  Path.normalize(`${Path.dirname(module.filename)}/../../../data/`);
@@ -201,7 +198,7 @@ const getCombosForUseNcLists = (sum: number, max: number, args: any): void => {
             } else {
                 firstIter = false;
             }
-           NativeComboMaker.considerCandidate(result.ncList!, sum);
+           Native.considerCandidate(result.ncList!, sum);
         }
         totalVariations += numVariations;
     });
@@ -214,14 +211,14 @@ const getCombosForUseNcLists = (sum: number, max: number, args: any): void => {
         console.error(`sum(${sum}) combos(${comboCount})` +
             ` variations(${totalVariations}) - ${duration}ms `);
         /*
-        const cs = NativeComboMaker.getCandidateStatsForSum(sum);
+        const cs = Native.getCandidateStatsForSum(sum);
         console.error(`  sourceLists(${cs.sourceLists})` +
             `, totalSources(${cs.totalSources})` +
             `, comboMapIndices(${cs.comboMapIndices})` +
             `, totalCombos(${cs.totalCombos})`);
         */
     }
-    NativeComboMaker.filterCandidatesForSum(sum, args.tpb, args.streams,
+    Native.filterCandidatesForSum(sum, args.tpb, args.streams,
       args.stride, args.iters, args.synchronous);
 };
 
@@ -334,7 +331,7 @@ export const makeCombos = (args: any): any => {
                 // TODO: return # of combos filtered due to note name match
                 makeCombosForSum(sum, args);
             }
-            const comboList = NativeComboMaker.getResult();
+            const comboList = Native.getResult();
             total += comboList.length;
             ClueManager.filter(comboList, 0, totals);
         }
@@ -344,7 +341,7 @@ export const makeCombos = (args: any): any => {
             ` - ${PrettyMs(d)}`);
         if (1) {
             /*
-            const isany: PerfData = NativeComboMaker.getIsAnyPerfData();
+            const isany: PerfData = Native.getIsAnyPerfData();
             console.error(`isAny: calls(${isany.calls})` +
                 `, range_calls(${isany.range_calls}), full_range(${isany.full})` +
                 `, comps(${isany.comps}), compat(${isany.compat})` +

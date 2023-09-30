@@ -18,22 +18,13 @@ namespace cm {
 
 namespace {
 
-/*
-const SourceList& getSourceList(const NameCountList& ncList,
-  const SourceListMap& sourceListMap)
-{
-  assert((ncList.size() == 1) && "not implemented, but could be easily");
-  return sourceListMap.at(ncList[0].toString());
-}
-*/
-  
-auto mergeSources(const SourceData& source1, const SourceData& source2) {
-  SourceData result{};
-  result.primaryNameSrcList = std::move(NameCount::listMerge(
-    source1.primaryNameSrcList, source2.primaryNameSrcList));
-  result.usedSources =
-    std::move(source1.usedSources.copyMerge(source2.usedSources));
-  return result;
+SourceData mergeSources(const SourceData& source1, const SourceData& source2) {
+  auto primaryNameSrcList = NameCount::listMerge(
+    source1.primaryNameSrcList, source2.primaryNameSrcList);
+  auto ncList = NameCount::listMerge(source1.ncList, source2.ncList);
+  auto usedSources = source1.usedSources.copyMerge(source2.usedSources);
+  return {
+    std::move(primaryNameSrcList), std::move(ncList), std::move(usedSources)};
 }
 
 auto mergeCompatibleSourceLists(

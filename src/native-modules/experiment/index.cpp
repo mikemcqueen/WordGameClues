@@ -28,7 +28,7 @@ using namespace validator;
 
 std::vector<int> makeIntList(Env& env, const Array& jsList) {
   std::vector<int> int_list{};
-  for (auto i = 0u; i < jsList.Length(); ++i) {
+  for (size_t i{}; i < jsList.Length(); ++i) {
     if (!jsList[i].IsNumber()) {
       TypeError::New(env, "makeIntList: non-number element")
         .ThrowAsJavaScriptException();
@@ -41,7 +41,7 @@ std::vector<int> makeIntList(Env& env, const Array& jsList) {
 
 IndexList makeIndexList(Env& env, const Array& jsList) {
   IndexList idx_list{};
-  for (auto i = 0u; i < jsList.Length(); ++i) {
+  for (size_t i{}; i < jsList.Length(); ++i) {
     if (!jsList[i].IsNumber()) {
       TypeError::New(env, "makeIndexList: non-number element")
         .ThrowAsJavaScriptException();
@@ -52,6 +52,7 @@ IndexList makeIndexList(Env& env, const Array& jsList) {
   return idx_list;
 }
 
+  /*
 Peco::IndexList makePecoIndexList(Env& env, const Array& jsList) {
   Peco::IndexList idx_list{};
   for (auto i = (int)jsList.Length() - 1; i >= 0; --i) {
@@ -64,10 +65,11 @@ Peco::IndexList makePecoIndexList(Env& env, const Array& jsList) {
   }
   return idx_list;
 }
+  */
 
 std::vector<std::string> makeStringList(Env& env, const Array& jsList) {
   std::vector<std::string> list{};
-  for (auto i = 0u; i < jsList.Length(); ++i) {
+  for (size_t i{}; i < jsList.Length(); ++i) {
     if (!jsList[i].IsString()) {
       TypeError::New(env, "makeStringList: non-string element")
         .ThrowAsJavaScriptException();
@@ -93,7 +95,7 @@ NameCount makeNameCount(Env& env, const Object& jsObject) {
 
 NameCountList makeNameCountList(Env& env, const Array& jsList) {
   NameCountList ncList{};
-  for (auto i = 0u; i < jsList.Length(); ++i) {
+  for (size_t i{}; i < jsList.Length(); ++i) {
     if (!jsList[i].IsObject()) {
       TypeError::New(env, "makeNameCountList: non-object element")
         .ThrowAsJavaScriptException();
@@ -137,7 +139,7 @@ SourceList makeSourceList(Env& env, const Array& jsList,
   std::string_view nameSrcList = "primaryNameSrcList") {
   //
   SourceList sourceList{};
-  for (auto i = 0u; i < jsList.Length(); ++i) {
+  for (size_t i{}; i < jsList.Length(); ++i) {
     if (!jsList[i].IsObject()) {
       TypeError::New(env, "makeSourceList: non-object element")
         .ThrowAsJavaScriptException();
@@ -161,7 +163,7 @@ NCData makeNcData(Env& env, const Object& jsObject) {
 
 NCDataList makeNcDataList(Env& env, const Array& jsList) {
   NCDataList list;
-  for (auto i = 0u; i < jsList.Length(); ++i) {
+  for (size_t i{}; i < jsList.Length(); ++i) {
     if (!jsList[i].IsObject()) {
       TypeError::New(env, "makeNcDataList: element is non-object type")
         .ThrowAsJavaScriptException();
@@ -174,7 +176,7 @@ NCDataList makeNcDataList(Env& env, const Array& jsList) {
 
 std::vector<NCDataList> makeNcDataLists(Env& env, const Array& jsList) {
   std::vector<NCDataList> lists;  
-  for (auto i = 0u; i < jsList.Length(); ++i) {
+  for (size_t i{}; i < jsList.Length(); ++i) {
     if (!jsList[i].IsArray()) {
       TypeError::New(env, "makeNcDataLists: element is non-array type")
         .ThrowAsJavaScriptException();
@@ -185,9 +187,10 @@ std::vector<NCDataList> makeNcDataLists(Env& env, const Array& jsList) {
   return lists;
 }
 
+  /*
 SourceListMap makeNcSourceListMap(Env& env, const Array& jsList) {
   SourceListMap map{};
-  for (auto i = 0u; i < jsList.Length(); ++i) {
+  for (size_t i{}; i < jsList.Length(); ++i) {
     if (!jsList[i].IsArray()) {
       TypeError::New(env, "makeSourceListMap: mapEntry is non-array type")
         .ThrowAsJavaScriptException();
@@ -206,10 +209,11 @@ SourceListMap makeNcSourceListMap(Env& env, const Array& jsList) {
   }
   return map;
 }
+  */
 
 NameSourcesMap makeNameSourcesMap(Env& env, const Array& jsList) {
   NameSourcesMap map;
-  for (auto i = 0u; i < jsList.Length(); ++i) {
+  for (size_t i{}; i < jsList.Length(); ++i) {
     if (!jsList[i].IsArray()) {
       TypeError::New(env, "makeNameSourcesMap: mapEntry is non-array type")
         .ThrowAsJavaScriptException();
@@ -246,7 +250,7 @@ SourceCompatibilityData makeSourceCompatibilityDataFromSourceList(
   Env& env, const Array& jsSourceList) {
 
   SourceCompatibilityData compatData{};
-  for (auto i = 0u; i < jsSourceList.Length(); ++i) {
+  for (size_t i{}; i < jsSourceList.Length(); ++i) {
     if (!jsSourceList[i].IsObject()) {
       TypeError::New(env, "makeSourceCompatibilityData: non-object element")
         .ThrowAsJavaScriptException();
@@ -268,7 +272,7 @@ SourceCompatibilityList makeSourceCompatibilityListFromMergedSourcesList(
   Env& env, const Array& jsList) {
   //
   SourceCompatibilityList sourceCompatList{};
-  for (auto i = 0u; i < jsList.Length(); ++i) {
+  for (size_t i{}; i < jsList.Length(); ++i) {
     if (!jsList[i].IsObject()) {
       TypeError::New(env, "makeSourceCompatibiltyList: non-object element")
         .ThrowAsJavaScriptException();
@@ -293,7 +297,7 @@ OrSourceData makeOrSource(Env& env, const Object& jsObject) {
 
 OrSourceList makeOrSourceList(Env& env, const Array& jsList) {
   OrSourceList orSourceList{};
-  for (auto i = 0u; i < jsList.Length(); ++i) {
+  for (size_t i{}; i < jsList.Length(); ++i) {
     if (!jsList[i].IsObject()) {
       TypeError::New(env, "makeOrSourceList: non-object element")
         .ThrowAsJavaScriptException();
@@ -315,7 +319,7 @@ OrArgData makeOrArgData(Env& env, const Object& jsObject) {
 
 OrArgList makeOrArgList(Env& env, const Array& jsList) {
   OrArgList orArgList{};
-  for (auto i = 0u; i < jsList.Length(); ++i) {
+  for (size_t i{}; i < jsList.Length(); ++i) {
     if (!jsList[i].IsObject()) {
       TypeError::New(env, "makeOrArgDataList: non-object element")
         .ThrowAsJavaScriptException();
@@ -353,29 +357,12 @@ Value setPrimaryNameSrcIndicesMap(const CallbackInfo& info) {
     }
     idx_lists.emplace_back(makeIndexList(env, js_idx_lists[i].As<Array>()));
   }
+  // -- 
   using namespace clue_manager;
   clue_manager::setPrimaryNameSrcIndicesMap(
     buildPrimaryNameSrcIndicesMap(name_list, idx_lists));
   return env.Null();
 }
-
-/*
-// _.keys(clueMap[count])
-Value setCompoundClueNames(const CallbackInfo& info) {
-  Env env = info.Env();
-  if (!info[0].IsNumber() || !info[1].IsArray()) {
-    TypeError::New(env, "setCompoundClueNames: invalid parameter type")
-      .ThrowAsJavaScriptException();
-    return env.Null();
-  }
-  // arg0
-  auto count = info[0].As<Number>().Int32Value();
-  // arg1
-  auto name_list = makeStringList(env, info[1].As<Array>());
-  clue_manager::setCompoundClueNames(count, name_list);
-  return env.Null();
-}
-*/
 
 // count, _.entries(clueMap[count])
 Value setCompoundClueNameSourcesMap(const CallbackInfo& info) {
@@ -389,7 +376,7 @@ Value setCompoundClueNameSourcesMap(const CallbackInfo& info) {
   auto count{info[0].As<Number>().Int32Value()};
   // arg1
   auto map{makeNameSourcesMap(env, info[1].As<Array>())};
-
+  // -- 
   clue_manager::setNameSourcesMap(count, std::move(map));
   return env.Null();
 }
@@ -405,8 +392,9 @@ Value isKnownSourceMapEntry(const CallbackInfo& info) {
   // arg0
   auto count = info[0].As<Number>().Int32Value();
   // arg1
-  auto name_csv = info[1].As<String>().Utf8Value();
-  return Boolean::New(env, clue_manager::is_known_source_map_entry(count, name_csv));
+  auto src_csv = info[1].As<String>().Utf8Value();
+  // -- 
+  return Boolean::New(env, clue_manager::is_known_source_map_entry(count, src_csv));
 }
 
 //
@@ -424,21 +412,6 @@ Value getNumNcResults(const CallbackInfo& info) {
   return Number::New(env, clue_manager::get_num_nc_sources(nc));
 }
 
-/*
-Value appendNcResults(const CallbackInfo& info) {
-  Env env = info.Env();
-  if (!info[0].IsObject() || !info[1].IsArray()) {
-    TypeError::New(env, "appendNcResults: invalid parameter type")
-      .ThrowAsJavaScriptException();
-    return env.Null();
-  }
-  auto nc = makeNameCount(env, info[0].As<Object>());
-  auto src_list = makeSourceList(env, info[1].As<Array>(), "nameSrcList");
-  clue_manager::append_nc_sources(nc, src_list);
-  return env.Null();
-}
-*/
-
 // nc, name_csv
 Value populateNcSourcesFromKnownSource(const CallbackInfo& info) {
   Env env = info.Env();
@@ -452,99 +425,10 @@ Value populateNcSourcesFromKnownSource(const CallbackInfo& info) {
   // arg1
   auto src_csv = info[1].As<String>().Utf8Value();
 
-  auto num_appended = clue_manager::append_nc_sources_from_known_source(nc, src_csv);
+  auto num_appended =
+    clue_manager::append_nc_sources_from_known_source(nc, src_csv);
   return Number::New(env, num_appended);
 }
-
-/*
-Value mergeNcListCombo(const CallbackInfo& info) {
-  Env env = info.Env();
-  if (!info[0].IsArray() || !info[1].IsArray()) {
-    TypeError::New(env, "mergeNcListCombo: invalid parameter type")
-      .ThrowAsJavaScriptException();
-    return env.Null();
-  }
-  auto nc_list = makeNameCountList(env, info[0].As<Array>());
-  auto idx_list = makeIndexList(env, info[1].As<Array>());
-
-  auto opt_src = validator::mergeNcListCombo(nc_list, idx_list);
-  if (opt_src.has_value()) {
-    return wrap(env, opt_src.value(), "nameSrcList");
-  }
-
-  return env.Null();
-}
-
-Value mergeAllNcListCombinations(const CallbackInfo& info) {
-  Env env = info.Env();
-  if (!info[0].IsArray() || !info[1].IsArray()) {
-    TypeError::New(env, "mergeAllNcListCombinations: invalid parameter type")
-      .ThrowAsJavaScriptException();
-    return env.Null();
-  }
-  using namespace std::chrono;
-  auto t0 = high_resolution_clock::now();
-
-  // arg 0
-  auto nc_list = makeNameCountList(env, info[0].As<Array>());
-
-  // arg 1
-  const auto& js_idx_lists = info[1].As<Array>();
-  Peco::IndexListVector idx_lists;
-  idx_lists.reserve(js_idx_lists.Length());
-  for (size_t i{}; i < js_idx_lists.Length(); ++i) {
-    if (!js_idx_lists[i].IsArray()) {
-      TypeError::New(env, "mergeAllNcListCombinations: non-array element")
-        .ThrowAsJavaScriptException();
-      return {};
-    }
-    idx_lists.emplace_back(makePecoIndexList(env, js_idx_lists[i].As<Array>()));
-  }
-  auto results = validator::mergeAllNcListCombinations(nc_list, std::move(idx_lists));
-
-  auto t1 = high_resolution_clock::now();
-  [[maybe_unused]] auto t_dur = duration_cast<milliseconds>(t1 - t0).count();
-  // std::cerr << "  validator.mergeNcListCombinations - " << t_dur << "ms" << std::endl;
-
-  return wrap(env, results, "nameSrcList");
-}
-
-Value mergeNcListResults(const CallbackInfo& info) {
-  Env env = info.Env();
-  if (!info[0].IsArray()) {
-    TypeError::New(env, "mergeNcListResults: invalid parameter type")
-      .ThrowAsJavaScriptException();
-    return env.Null();
-  }
-  // arg 0
-  auto nc_list = makeNameCountList(env, info[0].As<Array>());
-  auto results = validator::mergeNcListResults(nc_list);
-  return wrap(env, results, "nameSrcList");
-}
-
-Value validateSourcesForNameAndCountLists(const CallbackInfo& info) {
-  Env env = info.Env();
-  if (!info[0].IsString() || !info[1].IsArray() || !info[2].IsArray()
-      || !info[3].IsArray()) {
-    TypeError::New(
-      env, "validateSourcesForNameAndCountLists: invalid parameter type")
-      .ThrowAsJavaScriptException();
-    return env.Null();
-  }
-  // arg 0
-  auto clue_name = info[0].As<String>().Utf8Value();
-  // arg 1
-  auto name_list = makeStringList(env, info[1].As<Array>());
-  // arg 2
-  auto count_list = makeIntList(env, info[2].As<Array>());
-  // arg 3
-  auto nc_list = makeNameCountList(env, info[3].As<Array>());
-
-  auto src_list = validator::validateSourcesForNameAndCountLists(
-    clue_name, name_list, count_list, nc_list);
-  return wrap(env, src_list, "nameSrcList");
-}
-*/
 
 Value validateSources(const CallbackInfo& info) {
   Env env = info.Env();
@@ -582,7 +466,7 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   using namespace std::chrono;
 
   Env env = info.Env();
-  if (!info[0].IsArray() /*|| !info[1].IsArray()*/ || !info[1].IsBoolean()) {
+  if (!info[0].IsArray() || !info[1].IsBoolean()) {
     TypeError::New(
       env, "mergeCompatibleXorSourceCombinations: invalid parameter")
       .ThrowAsJavaScriptException();
@@ -590,29 +474,14 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   }
   // arg0
   auto ncDataLists = makeNcDataLists(env, info[0].As<Array>());
-
-  /*
-  auto slm0 = high_resolution_clock::now();
-  MFD.sourceListMap =
-    std::move(makeNcSourceListMap(env, info[1].As<Array>()));
-  // merge_only means "-t" mode, in which case no filter kernel will be called,
-  // so we don't need to do additional work/copy additional device data
-  auto slm1 = high_resolution_clock::now();
-  auto slm_dur = duration_cast<milliseconds>(slm1 - slm0).count();
-  std::cerr << " build src_list_map - " << slm_dur << "ms" << std::endl;
-  */
-
   //arg1
   auto merge_only = info[1].As<Boolean>();
-
   //--
-    
   auto build0 = high_resolution_clock::now();
-
   // TODO: I'm not convinced this data needs to hang around on host side.
   // maybe for async copy?
   MFD.xor_src_lists =
-    std::move(buildSourceListsForUseNcData(ncDataLists/*, MFD.sourceListMap*/));
+    std::move(buildSourceListsForUseNcData(ncDataLists));
 
   auto build1 = high_resolution_clock::now();
   [[maybe_unused]] auto d_build =
@@ -767,12 +636,6 @@ Object Init(Env env, Object exports) {
 
   // validator
   //
-  /*
-  exports["mergeNcListCombo"] = Function::New(env, mergeNcListCombo);
-  exports["mergeNcListResults"] = Function::New(env, mergeNcListResults);
-  exports["mergeAllNcListCombinations"] = Function::New(env, mergeAllNcListCombinations);
-  exports["validateSourcesForNameAndCountLists"] = Function::New(env, validateSourcesForNameAndCountLists);
-  */
   exports["validateSources"] = Function::New(env, validateSources);
 
   // combo-maker

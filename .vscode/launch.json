@@ -12,7 +12,10 @@
                 "<node_internals>/**"
             ],
             "program": "${workspaceFolder}/src/tools/clues.js",
-            "args": [ "-pf.72", "-t", "lincoln", "-v" ]
+            "args": [ "-pf.72", "-t",
+                "apple"
+        //       ,"-v"
+            ]
         },
         {
             "type": "node",
@@ -36,7 +39,7 @@
             "name": "cppdbg -t",
             "program": "/usr/local/bin/node",
             "cwd": "${workspaceFolder}/src/tools",
-            "args": [ "clues.js", "-pf.72", "-t", "lincoln"  ]
+            "args": [ "clues.js", "-pf.72", "-t", "apple"  ]
         },
         {
             "type": "cppdbg",
