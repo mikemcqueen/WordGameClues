@@ -18,12 +18,6 @@ namespace cm {
 
   Napi::Array wrap(Napi::Env& env, const filter_result_t& filter_result);
 
-#if 0
-  Napi::Object wrap(Napi::Env& env, const SourceData& source);
-  Napi::Array wrap(Napi::Env& env, const SourceList& sourceList);
-  Napi::Array wrap(Napi::Env& env, const MergedSourcesList& mergedSourcesList);
-#endif
-  
   Napi::Object wrap(Napi::Env& env, const PerfData& perf);
   Napi::Object wrap(Napi::Env& env, const CandidateStats& cs);
 } // namespace cm

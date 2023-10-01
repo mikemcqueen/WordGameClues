@@ -24,8 +24,6 @@ import * as NameCount from '../types/name-count';
 import * as Sentence from '../types/sentence';
 import * as Source from './source';
 
-import { ValidateResult } from './validator';
-
 /////////
 
 interface StringBoolMap {
@@ -54,7 +52,6 @@ interface UseSourceListSizes {
 
 export interface Data {
     xor: Source.List;
-//    sourceListMap: Map<string, Source.AnyData[]>;
 }
 
 export interface Result {
@@ -200,78 +197,6 @@ const listCandidateCount = (ncList: NameCount.List): number => {
     return count;
 }
 
-// TODO: move to Source?
-const mergeSources = (source1: Source.Data, source2: Source.Data): Source.Data => {
-    const primaryNameSrcList = [...source1.primaryNameSrcList, ...source2.primaryNameSrcList];
-    const usedSources = Source.mergeUsedSources(source1.usedSources, source2.usedSources);
-    const ncList = [...source1.ncList, ...source2.ncList];
-    return {
-        primaryNameSrcList,
-        usedSources,
-        ncList
-    };
-};
-
-const mergeCompatibleSources = (source1: Source.Data, source2: Source.Data):
-    Source.List =>
-{
-    return Source.isXorCompatible(source1, source2)
-        ? [mergeSources(source1, source2)] : [];
-};
-
-const mergeCompatibleSourceLists = (sourceList1: Source.List,
-    sourceList2: Source.List): Source.List =>
-{
-    let result: Source.List = [];
-    for (const source1 of sourceList1) {
-        for (const source2 of sourceList2) {
-            result.push(...mergeCompatibleSources(source1, source2));
-        }
-    }
-    return result;
-};
-
-const mergeAllCompatibleSources = (ncList: NameCount.List,
-    sourceListMap: Map<string, Source.AnyData[]>): Source.AnyData[] =>
-{
-    // because **maybe** broken for > 2 below
-    Assert(ncList.length <= 2, `${ncList} length > 2 (${ncList.length})`);
-    // TODO: reduce (or some) here
-    let sourceList = sourceListMap.get(NameCount.toString(ncList[0])) as Source.AnyData[];
-    for (let ncIndex = 1; ncIndex < ncList.length; ++ncIndex) {
-        const nextSourceList: Source.AnyData[] =
-            sourceListMap.get(NameCount.toString(ncList[ncIndex])) as Source.AnyData[];
-        sourceList = mergeCompatibleSourceLists(sourceList, nextSourceList);
-        // TODO BUG this is broken for > 2; should be something like: if (sourceList.length !== ncIndex + 1) 
-        if (listIsEmpty(sourceList)) break;
-    }
-    return sourceList;
-};
-
-const buildSourceListsForUseNcData = (useNcDataLists: NCDataList[],
-    sourceListMap: Map<string, Source.AnyData[]>): Source.List[] =>
-{
-    let sourceLists: Source.List[] = [];
-    // TODO: This is to prevent duplicate sourceLists. I suppose I could
-    //       use a Set or Map, above?
-    let hashList: StringBoolMap[] = [];
-    for (let ncDataList of useNcDataLists) {
-        for (let [sourceListIndex, useNcData] of ncDataList.entries()) {
-            if (!sourceLists[sourceListIndex]) sourceLists.push([]);
-            if (!hashList[sourceListIndex]) hashList.push({});
-            const sourceList = mergeAllCompatibleSources(useNcData.ncList, sourceListMap) as Source.List;
-            for (let source of sourceList) {
-                let key = NameCount.listToString(_.sortBy(source.primaryNameSrcList, NameCount.count));
-                if (!hashList[sourceListIndex][key]) {
-                    sourceLists[sourceListIndex].push(source as Source.Data);
-                    hashList[sourceListIndex][key] = true;
-                }
-            }
-        }
-    }
-    return sourceLists;
-};
-
 const initOrSource = (source: Source.Data): OrSourceData => {
     return {
         source,
@@ -318,18 +243,6 @@ const markAllXorCompatibleOrSources = (xorSourceList: Source.List,
         }
     }
 };
-
-const dumpNcDataLists = (ncDataLists: NCDataList[],
-    sourceListMap: Map<string, Source.AnyData[]>): void =>
-{
-    console.error(` ncDataLists:`);
-    for (let ncDataList of ncDataLists) {
-        for (let ncData of ncDataList) {
-            let str = NameCount.listToString(ncData.ncList);
-            console.error(`  ${str}: ${sourceListMap.has(str)}`);
-        }
-    }
-}
 
 const buildUseSourceListsFromNcData = (args: any): Source.List => {
     // XOR first

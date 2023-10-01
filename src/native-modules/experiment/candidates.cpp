@@ -31,20 +31,6 @@ std::unordered_map<std::string, CandidateRepoValue> candidate_repo;
 
 // functions
 
-/*
-const getSourceList = (nc: NameCount.Type, args: any): Source.List => {
-    const sourceList: Source.List = [];
-TODO?
-    ClueManager.getKnownSourceMapEntries(nc, false, args)
-        .forEach((sourceData: ClueManager.SourceMapValue) => {
-            sourceList.push(...sourceData.results
-                .map((result: ValidateResult) => Source.makeData(nc, result)));
-        });
-
-return sourceList;
-};
-*/
-
 auto get_src_compat_list(const NameCount& nc) {
   SourceCompatibilityList src_list;
   clue_manager::for_each_nc_source(
@@ -94,15 +80,13 @@ auto make_merged_src_list(const std::vector<MergeData>& merge_list) {
 }
 
 SourceCompatibilityList merge_all_compatible_sources(
-  const NameCountList& ncList) {  // , const SourceListMap& src_list_map) {
+  const NameCountList& ncList) {
   //
   assert(ncList.size() <= 2 && "ncList.size() > 2");
   SourceCompatibilityList merged_src_list;
   for (const auto& nc : ncList) {
-    // const auto& src_list = src_list_map.find(nc.toString())->second;
     if (merged_src_list.empty()) {
       merged_src_list = std::move(get_src_compat_list(nc));
-      //merged_src_list.assign(src_list.begin(), src_list.end());
       continue;
     }
     // TODO: optimization opportunity. Walk through loop building merge_lists
@@ -147,7 +131,7 @@ void consider_candidate(const NameCountList& ncList, int sum) {
   if (!candidate_repo.contains(key)) {
     CandidateRepoValue repo_value;
     repo_value.merged_src_list =
-      std::move(merge_all_compatible_sources(ncList)); // , MFD.sourceListMap));
+      std::move(merge_all_compatible_sources(ncList));
     candidate_repo.emplace(std::make_pair(key, std::move(repo_value)));
   }
   auto& repo_value = candidate_repo.find(key)->second;

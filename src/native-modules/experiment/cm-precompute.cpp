@@ -115,9 +115,6 @@ auto buildSourceListsForUseNcData(const std::vector<NCDataList>& useNcDataLists)
           continue;
         }
         hashList[i][key] = StringSet{}; // std::move ?
-        //it = hashList[i].find(source.sourceBits);
-        //it->second.insert(key);
-        //debugSource(source, "source after mergeAll");
         sourceLists[i].emplace_back(std::move(source));
       }
     }
@@ -190,7 +187,7 @@ auto buildSentenceVariationIndices(const std::vector<SourceList>& xor_src_lists,
       }
       variationIndicesList.at(variation_idx).push_back(compat_indices.at(i));
     }
-}
+  }
   // Some sentences may contain no variations across all xorSources.
   // At least, this is true in the current case when not all sentences use
   // variations. TODO: TBD if this is still true after all sentences have

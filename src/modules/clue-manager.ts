@@ -18,7 +18,6 @@ const Path       = require('path');
 const PrettyMs   = require('pretty-ms');
 const Stringify2 = require('stringify-object');
 const stringify  = require('javascript-stringify').stringify;
-const Validator  = require('./validator');
 
 import * as Clue from '../types/clue';
 import * as ClueList from '../types/clue-list';
@@ -27,7 +26,6 @@ import * as MinMax from '../types/min-max';
 import * as NameCount from '../types/name-count';
 import * as Sentence from '../types/sentence';
 import * as Source from './source';
-import type { ValidateResult, ValidateSourcesResult } from './validator';
 
 const DATA_DIR     =  Path.normalize(`${Path.dirname(module.filename)}/../../../data/`);
 const REJECTS_DIR  = 'rejects';
@@ -36,17 +34,10 @@ type CountList = number[];
 
 export type SourceMapValue = {
     clues: ClueList.Any;
-    //results: ValidateResult[];
-};
-
-type NcResultData = {
-    list: ValidateResult[];
-    set: Set<string>;
 };
 
 type ClueMap = Record<string, string[]>;
 type SourceMap = Record<string, SourceMapValue>;
-type NcResultMap = Record<string, NcResultData>;
 
 export type AllCandidates = Sentence.CandidatesContainer[];
 export interface AllCandidatesContainer {
@@ -57,7 +48,6 @@ type InternalStateBase = {
     clueListArray: ClueList.Any[];    // the JSON "known" clue files in an array
     knownClueMapArray: ClueMap[];     // map clue name to list of clue sourceCsvs
     knownSourceMapArray: SourceMap[]; // map sourceCsv to SourceMapValue
-    ncResultMaps: NcResultMap[];      // map known NCs to result list
 
     variations: Sentence.Variations;  // "global" variations aggregated from all sentences
     sentences: Sentence.Type[];
@@ -76,7 +66,6 @@ type InternalStateBase = {
     logLevel: number;
     
     maxClues: number;
-//    numPrimarySources: number;
 }
 
 type InternalState = InternalStateBase & AllCandidatesContainer;
@@ -86,7 +75,6 @@ const initialState = (): InternalState => {
         clueListArray: [],
         knownClueMapArray: [],
         knownSourceMapArray: [],
-        ncResultMaps: [],
 
         sentences: [],
         variations: Sentence.emptyVariations(),
@@ -127,10 +115,6 @@ export function getKnownClueMap (count: number): ClueMap {
 
 export function getKnownSourceMap (count: number): SourceMap {
     return State.knownSourceMapArray[count];
-}
-
-export function getNcResultMap (count: number): NcResultMap {
-    return State.ncResultMaps[count];
 }
 
 export function getAllCandidates (): AllCandidates {
@@ -510,39 +494,6 @@ const findConflicts = (set: Set<string>, nameSrcList: NameCount.List) : boolean 
     return false;
 };
 
-// TODO: return dstList, spread push @ caller
-// well, that might be tricky because I initialize map from dstList.
-//
-let appendUniqueResults = (ncResult: NcResultData, ncStr: string, 
-    fromResults: ValidateResult[], args: any) : void => 
-{
-    for (let result of fromResults) {
-        const key = NameCount.listToCountList(result.nameSrcList).sort().join(',');
-        if (ncResult.set.has(key)) {
-            continue;
-        }
-        ncResult.set.add(key);
-        ncResult.list.push(result);
-    }
-};
-
-const addResultsToNcResultMap = (results: ValidateResult[], name: string,
-    count: number, args: any) =>
-{
-    let ncResultMap = getNcResultMap(count);
-    if (!ncResultMap) {
-        ncResultMap = State.ncResultMaps[count] = {};
-    }
-    const ncStr = NameCount.makeCanonicalName(name, count);
-    if (!ncResultMap[ncStr]) {
-        ncResultMap[ncStr] = {
-            list: [],
-            set: new Set<string>()
-        };
-    }
-    appendUniqueResults(ncResultMap[ncStr], ncStr, results, args);
-};
-
 // Should rename this, as it doesn't actually add a clue.
 // validateCompoundClueAndUpdateState()
 // 
@@ -550,54 +501,21 @@ let addCompoundClue = (clue: Clue.Compound, count: number, args: any): boolean =
     let nameList = clue.src.split(',').sort();
     let srcMap = getKnownSourceMap(count);
     let srcCsv = nameList.toString();
-
-    //console.log(`${srcCsv}:${count}`);
-
-    // new sources need to be validated
-    //    let vsResult : ValidateSourcesResult = { success: true };
     let vs_result = true;
-    //if (!_.has(srcMap, srcCsv)) {
+    // new sources need to be validated
     if (!Native.isKnownSourceMapEntry(count, srcCsv)) {
-        Debug(`## validating Known compound clue: ${srcCsv}:${count}`);
-        /*
-        vsResult = Validator.validateSources(clue.name, {
-            sum: count,
-            nameList,
-            count: nameList.length,
-            fast: args.fast,
-            validateAll: args.validateAll
-        });
-        */
         vs_result = Native.validateSources(clue.name, nameList, count,
             args.validateAll);
-
-        // this is where the magic happens
         if (vs_result && args.validateAll) {
-            //total_sources += vsResult.list!.length;
             srcMap[srcCsv] = {
                 clues: [],
             };
         }
     }
-    /*
-    else if (args.validateAll) {
-        vsResult.list = srcMap[srcCsv].results;
-    }
-    */
     if (vs_result && args.validateAll) {
-        //addResultsToNcResultMap(vsResult.list!, clue.name, count, args);
-        //Native.appendNcResults({ name: clue.name, count }, vsResult.list!);
         Native.populateNcSourcesFromKnownSource({name : clue.name, count}, srcCsv);
         (srcMap[srcCsv].clues as ClueList.Compound).push(clue);
     }
-    // NOTE: added above, commented below
-    // TODO: I don't understand why I'm doing this in failure case.
-    // should probably be inside above if block. maybe need to split
-    // out validateAll as well, i'm not sure what the "not validateAll"
-    // use case is anymore. (or what .clues is use for, for that matter).
-    // The question is, is this appropriate for successful but non
-    // validate-all scenarios, such as copy-from?  maybe.
-    //(srcMap[srcKey].clues as ClueList.Compound).push(clue);
     return vs_result;
 };
 
@@ -808,61 +726,6 @@ export const filter = (srcCsvList: string[], clueCount: number, result: FilterRe
     return result;
 };
 
-// TODO: return type.
-const singleEntry = (nc: NameCount.Type, source: string): SourceMapValue => {
-    let nameSrcList: NameCount.List = [NameCount.makeNew(nc.name, Number(source))];
-    return {
-        clues: [],
-/* TODO?
-        results: [            
-            {
-                ncList: [nc],
-                nameSrcList,
-                usedSources: Source.getUsedSources(nameSrcList),
-                // TODO: this shouldn't be here.
-                resultMap: undefined
-            }
-        ]
-*/
-    };
-};
-
-// returns:
-// array of SourceMapValue
-//   --or--
-// array of { entry: SourceMapValue, sources: string }
-// 
-export const getKnownSourceMapEntries = (nc: NameCount.Type,
-    andSources = false, args: any = {}): any[] =>
-{
-    Assert(!"getKnownSourceMapEntries() broken");
-    return [];
-/*
-    const clueMap = getKnownClueMap(nc.count);
-    if (!clueMap) throw new Error(`No clueMap at ${nc.count}`);
-    const sourcesList = clueMap[nc.name];
-    if (!sourcesList) {
-        if (!args.ignoreErrors) {
-            throw new Error(`No sourcesList at ${nc.name}:${nc.count}`);
-        }
-        if (!args.quiet) {
-            console.error(`No sourcesList at ${nc.name}:${nc.count}`);
-        }
-        return [];
-    }
-    return sourcesList
-        .map(sources => sources.split(',').sort().toString()) // sort sources
-        .map((sources, index) => {
-            const entry = (nc.count === 1)
-                ? singleEntry(nc, sourcesList[index])
-                : getKnownSourceMap(nc.count)[sources];
-            return andSources ? { entry, sources } : entry;
-        }); 
-*/
-};
-
-//
-
 const getKnownClues = (nameList: string|string[]): Record<string, Clue.Any[]> => {
     if (_.isString(nameList)) {
         nameList = (nameList as string).split(',');
@@ -1066,218 +929,3 @@ export const buildNcListsFromNameList = (nameList: string[]):
     return buildNcListsFromNameListAndCountLists(nameList, countLists);
 };
 
-const getListOfPrimaryNameSrcLists = (ncList: NameCount.List):
-    NameCount.List[] =>
-{
-    // TODO: can use reduce() here too 
-    let listOfPrimaryNameSrcLists: NameCount.List[] = [];
-    for (const nc of ncList) {
-        Assert(!_.isNaN(nc.count), `${nc}`); // this might be dumb. can a number be NaN?
-        let lastIndex = -1;
-        let entries;
-        for (;;) {
-            entries = getKnownSourceMapEntries(nc, true);
-            Assert(_.isArray(entries) && !_.isEmpty(entries), `${entries}`);
-            if (nc.count === 1) {
-                break; // TODO BUGG this might be wrong for multiple equivalent primary sources
-            }
-            let currIndex = -1;
-            entries.every((item, index) => {
-                if (item.entry) return true;
-                currIndex = index;
-                return false;
-            });
-            if (currIndex === -1) break;
-            Assert(currIndex !== lastIndex, `${currIndex}`);
-
-            // TODO BUGG skip this part for primary clues?
-            const sources = entries[currIndex].sources;
-            const clue = { name: nc.name, src: sources };
-            //addCompoundClue(clue, nc.count, { validateAll: true });
-            //
-            // TODO
-            //
-            // call addClue here too
-            //addClue(clue, nc.count)
-            lastIndex = currIndex;
-        }
-        // verify that no other entries are undefined
-        const primaryNameSrcLists = entries.flatMap((item, index) => {
-            const entry = item.entry;
-            Assert(entry && entry.results && _.isArray(entry.results) &&
-                _.isEmpty(entry.results), `${entry}`);
-            //unused: && !_.isEmpty(item.sources));
-            return entry.results.map((result: ValidateResult) => result.nameSrcList);
-        });
-        listOfPrimaryNameSrcLists.push(primaryNameSrcLists);
-    }
-    return listOfPrimaryNameSrcLists;
-};
-
-export const origbuildListsOfPrimaryNameSrcLists =(ncLists: NameCount.List[]):
-    any[] =>
-{
-    return ncLists.map(ncList => getListOfPrimaryNameSrcLists(ncList));
-};
-
-export const buildListsOfPrimaryNameSrcLists = (ncLists: NameCount.List[]):
-    any[] =>
-{
-    return ncLists.map(ncList => {
-        let result = getListOfPrimaryNameSrcLists(ncList);
-        if (!result[0][0]) {
-            throw new Error(`!result[0][0]: ${ncList}`);
-        }
-        return result;
-    });
-};
-
-const getCompatiblePrimaryNameSrcList = (listOfListOfPrimaryNameSrcLists: any[]):
-    any =>
-{
-    //console.log(`${Stringify(listOfListOfPrimaryNameSrcLists)}`);
-    const listArray = listOfListOfPrimaryNameSrcLists.map(listOfNameSrcLists =>
-        [...Array(listOfNameSrcLists.length).keys()]); // 0..nameSrcList.length
-    return Peco.makeNew({
-        listArray,
-        max: listOfListOfPrimaryNameSrcLists.reduce((sum, listOfNameSrcLists) => sum + listOfNameSrcLists.length, 0)
-    }).getCombinations().some((comboList: number[]) => {
-        const nameSrcList = comboList.reduce((nameSrcList, element, index) => {
-            let nsList = listOfListOfPrimaryNameSrcLists[index][element];
-            if (nsList) {
-                nameSrcList.push(...nsList);
-            } else {
-                console.log(`no nsList for index: ${index}, element: ${element}`);
-            }
-            return nameSrcList;
-        }, [] as NameCount.List);
-        const numUniq = _.uniqBy(nameSrcList, NameCount.count).length;
-        return (numUniq === nameSrcList.length) ? nameSrcList : undefined;
-    });
-};
-
-//
-// So it seems i added a "fast" version of getCountListArrays specifically for the copy-from
-// use case, that does not use Validator (and hence is faster).
-// Since that time, I pretty significantly optimized the Validator. So maybe we can go back
-// to using the old one (have to supply fast:true or default to fast).
-// There uused to be a problem with not using the old one, in that I needed to replicate
-// enforcement of the "restrictToSameClueNumber" flag for primary NameSrcs. That no longer
-// holds as we've no longer got legacy clues.
-// Or I suppose I could just throw a "validateSources()" call into the "fast" method and
-// that might be a good compromise (have to supply fast:true or default to fast).
-//
-export const fast_getCountListArrays = (nameCsv: string, options: any): any[] => {
-    const nameList = nameCsv.split(',').sort();
-    Debug(`fast_getCountListArrays for ${nameList}`);
-
-    /// TODO, check if existing sourcelist (knownSourceMapArray)
-
-    const ncLists = buildNcListsFromNameList(nameList);
-    if (_.isEmpty(ncLists)) {
-        console.log(`No ncLists for ${nameList}`);
-        return [];
-    }
-    return buildListsOfPrimaryNameSrcLists(ncLists)
-        .reduce((compatibleNcLists, listOfListOfPrimaryNameSrcLists, index) => {
-            const compatibleNameSrcList = getCompatiblePrimaryNameSrcList(listOfListOfPrimaryNameSrcLists);
-            console.log(`${ncLists[index]}  ${compatibleNameSrcList ? 'VALID' : 'invalid'}`);
-            if (compatibleNameSrcList) {
-                compatibleNcLists.push(ncLists[index]);
-            }
-            return compatibleNcLists;
-        }, []);
-};
-
-// getCountListArrays
-// 
-// Probably not the most unique function name possible.
-//
-// Document what this does.
-//
-// TODO: unused. and, maybe never need to look at this again. but consider
-// replacing with version implemented in show-components if so.
-// there's also a fast_ version, which may not need to exist.
-
-let invalidHash: any = {}; // hax
-
-export const getCountListArrays = (nameCsv: string, options: any): any => {
-    Assert(0 && "don't use this function i think");
-    const validateAll = options.any ? false : true;
-    const nameList = nameCsv.split(',').sort();
-    Debug(`++getCountListArrays(${nameList})`);
-
-    /// TODO, check if existing sourcelist (knownSourceMapArray)
-
-    const resultList = getAllCountListCombosForNameList(nameList);
-    if (_.isEmpty(resultList)) {
-        console.log(`No matches for ${nameList}`);
-        return null;
-    }
-
-    let addRemoveSet;
-    if (options.add || options.remove) {
-        addRemoveSet = new Set();
-    }
-    let valid: any[] = [];
-    let known: any[] = [];
-    let rejects: any[] = [];
-    let clues: any[] = [];
-    let invalid: any[] = [];
-
-    //console.log(`size ${resultList.length}`);
-
-    for (const clueCountList of resultList) {
-        const sum = clueCountList.reduce((a, b) => a + b);
-        let uniqueCounts = _.uniqBy(clueCountList, _.toNumber); // or just _.uniq ?
-        let ncListStr = clueCountList.map((count, index) => NameCount.makeNew(nameList[index], count)).toString();
-        let result: ValidateSourcesResult = invalidHash[ncListStr];
-        if (!result) {
-            result = Validator.validateSources(undefined, {
-                sum:         sum,
-                nameList:    nameList,
-                count:       nameList.length,
-                require:     uniqueCounts,
-                fast:        options.fast,
-                validateAll
-            });
-        }
-        invalidHash[ncListStr] = result;
-        
-        if (!result.success) {
-            invalid.push(clueCountList);
-        } else if (isRejectSource(nameList)) {
-            rejects.push(clueCountList);
-        } else if (nameList.length === 1) {
-            let name = nameList[0];
-            let srcList = State.clueListArray[sum]
-                .filter(clue => clue.name === name)
-                .map(clue => clue.src);
-            if (srcList.length > 0) {
-                //let clueNameList = this.clueListArray[sum].map(clue => clue.name);
-                //if (clueNameList.includes(name)) {
-                //
-                /*
-                this.clueListArray[sum].forEach(clue => {
-                    if (clue.name === name) {
-                        clueSrcList.push(`"${clue.src}"`);
-                    }
-                });
-                */
-                clues.push({ countList: clueCountList, nameList: srcList });
-            }
-        } else {
-            let any: SourceMapValue = getKnownSourceMap(sum)[nameList.toString()];
-            if (any) {
-                known.push({
-                    countList: clueCountList,
-                    nameList: (any.clues as ClueList.Compound).map(clue => clue.name)
-                });
-            } else {
-                valid.push(clueCountList);
-            }
-            if (addRemoveSet) addRemoveSet.add(sum);
-        }
-    }
-    return { valid, known, rejects, invalid, clues, addRemoveSet };
-};

@@ -128,8 +128,6 @@ function getClueSources (nameList) {
 
 function getSourceClues (source, countList, nameList) {
     const count = countList.reduce((sum, count) => sum + count, 0);
-    //const srcMap = ClueManager.getKnownSourceMap(count);
-    //const results = srcMap[source] ? srcMap[source].results : undefined;
     if (!Native.isKnownSourceMapEntry(count, source)) {
         let sourceList = source.split(',');
         let s = '';
@@ -263,20 +261,16 @@ function addOrRemove (args, nameList, countSet, options) {
 }
 
 function getCompatiblePrimaryNameSrcList (listOfListOfPrimaryNameSrcLists) {
-    //console.log(`${Stringify(listOfListOfPrimaryNameSrcLists)}`);
     const listArray = listOfListOfPrimaryNameSrcLists.map(listOfNameSrcLists =>
-        [...Array(listOfNameSrcLists.length).keys()]); // 0..nameSrcList.length
-    //console.log(`++++ ListArray\n${Stringify(listArray)}\n---- ListArray`);
+        [...Array(listOfNameSrcLists.length).keys()]); // 0..nameSrcList.length-1
     let comboLists = Peco.makeNew({
         listArray,
         max: listOfListOfPrimaryNameSrcLists.reduce((sum, listOfNameSrcLists) =>
             sum + listOfNameSrcLists.length, 0)
     }).getCombinations();
-    //console.log(`${Stringify(comboLists)}`);
     for (const comboList of comboLists) {
         const nameSrcList = comboList.reduce((nameSrcList, comboListValue, comboListIndex) => {
             let nsList = listOfListOfPrimaryNameSrcLists[comboListIndex][comboListValue];
-            //console.log(`nameSrcList: ${nameSrcList}, clValue ${comboListValue}, clIndex ${comboListIndex}, nsList: ${nsList}`);
             if (!nsList || !_.isArray(nsList)) {
                 console.log(`nsList: ${nsList}, value ${comboListValue} index ${comboListIndex} lolPnsl(${comboListIndex}):` +
                             ` ${Stringify(listOfListOfPrimaryNameSrcLists[comboListIndex])} nameSrcList ${Stringify(nameSrcList)}`);
@@ -286,7 +280,6 @@ function getCompatiblePrimaryNameSrcList (listOfListOfPrimaryNameSrcLists) {
             return nameSrcList;
         }, []);
         const uniqNameSrcList = _.uniqBy(nameSrcList, NameCount.count);
-        //console.log(`nameSrcList ${Stringify(nameSrcList)} len ${nameSrcList.length} uniqLen ${uniqNameSrcList.length}`);
         if (uniqNameSrcList.length === nameSrcList.length) return uniqNameSrcList;
     }
     return null;
@@ -315,112 +308,6 @@ function addValidResults (validResults, validResultList, options) {
 function display_valid_results (validResults) {
     console.error('++display');
     Object.keys(validResults).forEach(key => console.log(key));
-}
-
-// I don't know what the hell is going on here.
-// I tried to get --or work with -t or something?
-// And it made me jump through some extra hoops here?
-// The code doesn't appear to be working.
-function flunky (nameList, /*allOrNcDataList,*/ options) {
-    const validResults = {};
-    let clueNameList = [...get_clue_names(options), ...options.or];
-    const min = 2;
-    let max = clueNameList.length;
-    const indexList = [...Array(max).keys()]; // 0..max (-1?)
-    console.log(`maxArg: ${options.maxArg}`);
-    let maxIter = options.maxArg ? options.maxArg : max;
-    for (let count = maxIter; count >= min; --count) {
-        Timing(`wrapper count(${count})`);
-        const listArray = [...Array(count).keys()].map(_ => indexList);
-        let peco = Peco.makeNew({
-            listArray,
-            max: count * max
-        });
-        let comboCount = 0;
-        let comboList;
-        for (/*let */comboList = peco.firstCombination(); !_.isNull(comboList); comboList = peco.nextCombination()) {
-            comboCount++;
-            //console.log(`comboList: ${comboList}`); //***logging
-            //if (1) continue;
-            //if (_.uniq(comboList).length !== comboList.length) continue;
-            //console.log(comboList);
-            let subList = buildSubListFromIndexList(clueNameList, comboList);
-            let comboNameList = [...nameList, ...subList];
-            //console.log(`comboNameList: ${comboNameList}`);
-            let validResultList = fast_combos_list(comboNameList, Object.assign(
-                _.clone(options), { quiet: true, skip_invalid: true }));
-            addValidResults(validResults, validResultList, { slice_index: nameList.length });
-        }
-        Timing(`comboCount: ${comboCount}`);
-        
-        // Bigger idea: optional arg(s) to -t[COUNTLO[,COUNTHI]]
-        // build list of input clues from all clues of those counts
-    }
-    display_valid_results(validResults);
-}
-
-function fast_combo_wrapper (nameList, /*allOrNcDataList,*/ options) {
-    Assert(0, "broken abomination");
-    console.error('fast_combo_wrapper');
-    console.error(`--or: ${Stringify(options.or)}`);
-    if (options.or) {
-        flunky(nameList, options);
-    } else {
-        let counts = fast_combos(nameList, options);
-        addOrRemove ({
-            add:      options.add,
-            remove:   options.remove,
-            property: options.property
-        }, nameList, counts, options);
-    }
-}
-
-function fast_combos_list (nameList, options) {
-    Assert(0, "broken, ClueManager.getInversePrimarySources() removed");
-    const ncLists = ClueManager.buildNcListsFromNameList(nameList);
-    if (_.isEmpty(ncLists)) {
-        if (!options.quiet) {
-            console.log(`No ncLists for ${nameList}`);
-        }
-        //console.log(`nameList: ${nameList} - EMPTY`);
-        return [];
-    }
-    //console.log(`nameList: ${nameList}`);
-    //ncLists.forEach(ncList => console.log(`  ncList: ${ncList}`));
-    const lists = ClueManager.buildListsOfPrimaryNameSrcLists(ncLists);
-    return lists.reduce((resultList, listOfListOfPrimaryNameSrcLists, index) => {
-        let add = false;
-        let result: any = {};
-        result.compatibleNameSrcList = getCompatiblePrimaryNameSrcList(listOfListOfPrimaryNameSrcLists);
-        result.valid = Boolean(result.compatibleNameSrcList);
-        result.ncList = ncLists[index];
-        if (result.valid) {
-            result.sum = ncLists[index].reduce((sum, nc) => sum + nc.count, 0);
-            result.inversePrimarySources = [];
-            // = ClueManager.getInversePrimarySources(result.compatibleNameSrcList.map(ns => `${ns.count}`));
-            add = true;
-        } else if (!options.skip_invalid) {
-            add = true;
-        }
-        if (add) resultList.push(result);
-        //console.log(`${result.ncList} : ${result.valid ? 'VALID' : 'invalid'}`);
-        return resultList;
-    }, []);
-}
-
-function fast_combos (nameList, options) {
-    let counts = new Set();
-    fast_combos_list(nameList, options)
-        .forEach(result => {
-            let message = 'invalid';
-            if (result.valid) {
-                message = `VALID (${result.sum}) ${result.compatibleNameSrcList} `
-                    + `REMAIN(${result.inversePrimarySources.length}): ${result.inversePrimarySources}`;
-                counts.add(result.sum);
-            }
-            console.log(`${result.ncList} ${message}`);
-        });
-    return counts;
 }
 
 function showNcLists (ncLists) {

@@ -63,27 +63,6 @@ auto& get_nc_sources(const NameCount& nc) {
   return map.find(nc_str)->second;
 }
 
-/*
-void for_each_nc_source(const cm::NameCount& nc, const auto& fn) {
-  for (const auto& entry_cref : get_known_source_map_entries(nc)) {
-    const auto& src_list = entry_cref.get().src_list;
-    std::for_each(src_list.begin(), src_list.end(), fn);
-  }
-}
-*/
-
-/*
-auto copy_src_list_for_nc(const NameCount& nc) {
-  SourceList src_list;
-  for (const auto& entry_cref : get_known_source_map_entries(nc)) {
-    for (const auto& src : entry_cref.get().src_list) {
-      src_list.emplace_back(copy_src_as_nc(src, nc));
-    }
-  }
-  return src_list;
-}
-*/
-
 //////////
 
 auto& get_known_source_map(int count, bool force_create = false) {
@@ -164,19 +143,6 @@ auto get_num_nc_sources(const NameCount& nc) -> int {
   return get_nc_src_list(nc).size();
 }
 
-/*
-void append_nc_sources(const NameCount& nc, SourceList& src_list) {
-  auto& nc_sources = get_nc_sources(nc);
-  for (auto& src: src_list) {
-    if (!nc_sources.src_compat_set.contains(src)) {
-      // add to set *before* moving to list
-      nc_sources.src_compat_set.insert(src);
-      nc_sources.src_list.emplace_back(std::move(src));
-    }
-  }
-}
-*/
-  
 int append_nc_sources_from_known_source(
   const cm::NameCount& nc, const std::string& known_src_csv) {
   //
@@ -186,15 +152,6 @@ int append_nc_sources_from_known_source(
     src_map_entry.src_list.begin(), src_map_entry.src_list.end());
   return std::distance(
     src_map_entry.src_list.begin(), src_map_entry.src_list.end());
-}
-
-// look up an nc in ncSourcesMap, take the source at the specified index,
-// and replace the ncList to be a single-entry list with only 'nc'.
-auto copy_nc_src_as_nc(const NameCount& nc, index_t src_idx) -> SourceData {
-  auto nc_src = get_nc_src_list(nc).at(src_idx); // copy
-  NameCountList nc_list = { nc };
-  nc_src.ncList = std::move(nc_list);
-  return nc_src;
 }
 
 auto make_src_list_for_nc(const NameCount& nc) -> cm::SourceList {
@@ -212,21 +169,6 @@ auto make_src_cref_list_for_nc(const NameCount& nc) -> cm::SourceCRefList {
   });
   return src_cref_list;
 }
-
-/*
-void populate_nc_sources_map(const cm::NameCountList& nc_list) {
-for (const auto& nc: nc_list) {
-  auto& nc_sources_map = get_nc_sources_map(nc.count);
-  const auto nc_str = nc.toString();
-  if (!nc_sources_map.contains(nc_str)) {
-    const auto src_list = copy_src_list_for_nc(nc);
-    // JS code had option to ignore this (ignore load errors)
-    assert(!src_list.empty());
-    nc_sources_map.emplace(std::move(nc_str), std::move(src_list));
-  }
-}
-}
-*/
 
 //
 // nameSourcesMaps

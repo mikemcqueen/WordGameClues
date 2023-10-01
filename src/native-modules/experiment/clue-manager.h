@@ -35,10 +35,6 @@ auto get_nc_src_list(const cm::NameCount& nc) -> const cm::SourceList&;
 
 auto get_num_nc_sources(const cm::NameCount& nc) -> int;
 
-auto copy_nc_src_as_nc(const cm::NameCount& nc, cm::index_t src_idx) -> cm::SourceData;
-
-//void append_nc_sources(const cm::NameCount& nc, cm::SourceList& src_list);
-
 int append_nc_sources_from_known_source(
   const cm::NameCount& nc, const std::string& known_src_csv);
 

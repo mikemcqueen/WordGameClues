@@ -52,21 +52,6 @@ IndexList makeIndexList(Env& env, const Array& jsList) {
   return idx_list;
 }
 
-  /*
-Peco::IndexList makePecoIndexList(Env& env, const Array& jsList) {
-  Peco::IndexList idx_list{};
-  for (auto i = (int)jsList.Length() - 1; i >= 0; --i) {
-    if (!jsList[i].IsNumber()) {
-      TypeError::New(env, "makeIndexList: non-number element")
-        .ThrowAsJavaScriptException();
-      return {};
-    }
-    idx_list.emplace_front(jsList[i].As<Number>().Uint32Value());
-  }
-  return idx_list;
-}
-  */
-
 std::vector<std::string> makeStringList(Env& env, const Array& jsList) {
   std::vector<std::string> list{};
   for (size_t i{}; i < jsList.Length(); ++i) {
@@ -186,30 +171,6 @@ std::vector<NCDataList> makeNcDataLists(Env& env, const Array& jsList) {
   }
   return lists;
 }
-
-  /*
-SourceListMap makeNcSourceListMap(Env& env, const Array& jsList) {
-  SourceListMap map{};
-  for (size_t i{}; i < jsList.Length(); ++i) {
-    if (!jsList[i].IsArray()) {
-      TypeError::New(env, "makeSourceListMap: mapEntry is non-array type")
-        .ThrowAsJavaScriptException();
-      return {};
-    }
-    const auto tuple = jsList[i].As<Array>();
-    if (!tuple[0u].IsString() || !tuple[1u].IsArray()) {
-      TypeError::New(
-        env, "makeSourceListMap: invalid mapEntry key/value type")
-        .ThrowAsJavaScriptException();
-      return {};
-    }
-    const auto nc_str = tuple[0u].As<String>().Utf8Value();
-    auto sourceList = makeSourceList(env, tuple[1u].As<Array>());
-    map.emplace(std::move(nc_str), std::move(sourceList));
-  }
-  return map;
-}
-  */
 
 NameSourcesMap makeNameSourcesMap(Env& env, const Array& jsList) {
   NameSourcesMap map;

@@ -19,8 +19,6 @@ import * as CountBits from '../types/count-bits-fastbitset';
 import * as NameCount from '../types/name-count';
 import * as Sentence from '../types/sentence';
 
-import { ValidateResult } from './validator';
-
 const kNumSentences = 9;
 const kMaxSourcesPerSentence = 32;
 
@@ -43,11 +41,13 @@ export interface CompatibilityData {
 export type Data = Base & CompatibilityData;
 export type List = Data[];
 
+/*
 interface ValidateResultsContainer {
     validateResults: ValidateResult[];
 }
 export type LazyData = Base & CompatibilityData & ValidateResultsContainer;
 export type AnyData = LazyData | Data;
+*/
 
 export interface ListContainer {
     sourceList: List;
@@ -232,17 +232,17 @@ export const mergeUsedSources = (first: UsedSources, second: UsedSources):
     return result;
 }
 
+/*
 export const makeData = (nc: NameCount.Type, validateResult: ValidateResult):
     Data =>
 {
-    /*
     Assert(validateResult.usedSources, `makeData(): ${NameCount.toString(nc)}`);
     Assert(NameCount.listHasCompatibleSources(validateResult.nameSrcList),
         `makeData(): ${NameCount.toString(nc)}`);
-    */
     return {
 	primaryNameSrcList: validateResult.nameSrcList,
         ncList: [nc],
 	usedSources: validateResult.usedSources
     };
 };
+*/
