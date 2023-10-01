@@ -249,10 +249,10 @@ SourceCompatibilityList makeSourceCompatibilityListFromMergedSourcesList(
 
 OrSourceData makeOrSource(Env& env, const Object& jsObject) {
   OrSourceData orSource;
-  orSource.source = std::move(makeSourceCompatibilityDataFromSourceData(
+  orSource.src = std::move(makeSourceCompatibilityDataFromSourceData(
     env, jsObject["source"].As<Object>()));
-  orSource.xorCompatible = jsObject["xorCompatible"].As<Boolean>();
-  orSource.andCompatible = jsObject["andCompatible"].As<Boolean>();
+  orSource.xor_compat = jsObject["xorCompatible"].As<Boolean>();
+  orSource.and_compat = jsObject["andCompatible"].As<Boolean>();
   return orSource;
 }
 
@@ -272,9 +272,9 @@ OrSourceList makeOrSourceList(Env& env, const Array& jsList) {
 
 OrArgData makeOrArgData(Env& env, const Object& jsObject) {
   OrArgData orArgData{};
-  orArgData.orSourceList =
+  orArgData.or_src_list =
     std::move(makeOrSourceList(env, jsObject["orSourceList"].As<Array>()));
-  orArgData.compatible = jsObject["compatible"].As<Boolean>();
+  orArgData.compat = jsObject["compatible"].As<Boolean>();
   return orArgData;
 }
 
@@ -485,6 +485,52 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   return Number::New(env, (uint32_t)MFD.combo_indices.size());
 }
 
+Value setOrArgs(const CallbackInfo& info) {
+  using namespace std::chrono;
+
+  Env env = info.Env();
+  if (!info[0].IsArray()) {
+    TypeError::New(
+      env, "setOrArgs: invalid parameter")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+  // arg0
+  auto ncDataLists = makeNcDataLists(env, info[0].As<Array>());
+  //
+  auto build0 = high_resolution_clock::now();
+  // TODO: I'm not convinced this data needs to hang around on host side.
+  // maybe for async copy?
+  MFD.or_arg_list = buildOrArgList(buildSourceListsForUseNcData(ncDataLists));
+  MFD.num_or_args = MFD.or_arg_list.size();
+
+  // Thoughts on AND compatibility of OrSources:
+  // Just because (one sourceList of) an OrSource is AND compatible with an
+  // XorSource doesn't mean the OrSource is redundant and can be ignored
+  // (i.e., the container cannot be marked as "compatible.") We still need
+  // to check the possibility that any of the other XOR-but-not-AND-compatible
+  // sourceLists could be AND-compatible with the generated-combo sourceList.
+  // So, a container can be marked compatible if and only if there are no
+  // no remaining XOR-compatible sourceLists.
+  // TODO: markAllANDCompatibleOrSources(xorSourceList, orSourceList);
+
+  markAllXorCompatibleOrSources(
+    MFD.or_arg_list, MFD.xor_src_lists, MFD.compat_idx_lists, MFD.combo_indices);
+
+  auto [device_or_sources, num_or_sources] =
+    cuda_allocCopyOrSources(MFD.or_arg_list);
+  MFD.device_or_sources = device_or_sources;
+  MFD.num_or_sources = num_or_sources;
+
+  auto build1 = high_resolution_clock::now();
+  [[maybe_unused]] auto d_build =
+    duration_cast<milliseconds>(build1 - build0).count();
+  std::cerr << " build/mark/copy or_ args(" << MFD.num_or_args << ")"
+            << ", or_sources(" << MFD.num_or_sources << ") - " << d_build
+            << "ms" << std::endl;
+  return Number::New(env, num_or_sources);
+}
+
 void prepare_filter_indices() {
   using namespace std::chrono;
   assert(!MFD.combo_indices.empty());
@@ -512,29 +558,21 @@ void prepare_filter_indices() {
 Value filterPreparation(const CallbackInfo& info) {
   using namespace std::chrono;
   Env env = info.Env();
+  /*
   if (!info[0].IsArray()) {
       TypeError::New(env, "filterPreparation: non-array parameter")
         .ThrowAsJavaScriptException();
       return env.Null();
   }
+  */
   auto t0 = high_resolution_clock::now();
-
-  // TODO: needed beyond the scope of this function?
-  auto orArgList = makeOrArgList(env, info[0].As<Array>());
-  MFD.num_or_args = orArgList.size();
-  auto sources_count_pair = cuda_allocCopyOrSources(orArgList);
-  MFD.device_or_sources = sources_count_pair.first;
-  MFD.num_or_sources = sources_count_pair.second;
 
   prepare_filter_indices();
 
   auto t1 = high_resolution_clock::now();
   auto d_t = duration_cast<milliseconds>(t1 - t0).count();
-  std::cerr << " filter preparation, --or args(" << MFD.num_or_args << ")"
-            << ", sources(" << MFD.num_or_sources << ") - " << d_t << "ms"
-            << std::endl;
-
-  return Number::New(env, sources_count_pair.second);
+  std::cerr << " filter preparation - " << d_t << "ms" << std::endl;
+  return env.Null();
 }
 
 // considerCandidate
@@ -603,6 +641,7 @@ Object Init(Env env, Object exports) {
   //
   exports["mergeCompatibleXorSourceCombinations"] =
     Function::New(env, mergeCompatibleXorSourceCombinations);
+  exports["setOrArgs"] = Function::New(env, setOrArgs);
   exports["filterPreparation"] = Function::New(env, filterPreparation);
   exports["considerCandidate"] = Function::New(env, considerCandidate);
   exports["filterCandidatesForSum"] =

@@ -285,6 +285,16 @@ struct SourceCompatibilityData {
            || isAndCompatibleWith(other, false);
   }
 
+  bool isXorCompatibleWithAnySource(const auto& src_list) {
+    auto compat = src_list.empty();
+    for (const auto& src : src_list) {
+      compat = isXorCompatibleWith(src);
+      if (compat)
+        break;
+    }
+    return compat;
+  }
+
   bool addSource(int src, bool nothrow = false) {
     return usedSources.addSource(src, nothrow);
   }
@@ -493,17 +503,17 @@ using XorSource = SourceData;
 using XorSourceList = std::vector<XorSource>;
 
 struct OrSourceData {
-  SourceCompatibilityData source;
-  bool xorCompatible = false;
-  bool andCompatible = false;
+  SourceCompatibilityData src;
+  bool xor_compat{false};
+  bool and_compat{false};
 };
 using OrSourceList = std::vector<OrSourceData>;
 
 // One OrArgData contains all of the data for a single --or argument.
 //
 struct OrArgData {
-  OrSourceList orSourceList;
-  bool compatible{false};
+  OrSourceList or_src_list;
+  bool compat{false};
 };
 using OrArgList = std::vector<OrArgData>;
 

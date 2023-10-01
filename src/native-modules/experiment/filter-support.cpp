@@ -372,9 +372,9 @@ cuda_allocCopyOrSources(const OrArgList& orArgList) {
   std::vector<device::OrSourceData> or_sources;
   for (unsigned arg_idx{}; arg_idx < orArgList.size(); ++arg_idx) {
     const auto& or_arg = orArgList.at(arg_idx);
-    for (const auto& or_src: or_arg.orSourceList) {
-      if (or_src.xorCompatible) {
-        or_sources.emplace_back(device::OrSourceData{or_src.source, arg_idx});
+    for (const auto& or_src: or_arg.or_src_list) {
+      if (or_src.xor_compat) {
+        or_sources.emplace_back(device::OrSourceData{or_src.src, arg_idx});
       }
     }
   }

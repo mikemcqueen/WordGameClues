@@ -45,13 +45,8 @@ interface OrArgData {
 }
 type OrArgDataList = OrArgData[];
 
-interface UseSourceListSizes {
-    xor: number;
-//    orArgDataList: OrArgDataList;
-}
-
 export interface Data {
-    xor: Source.List;
+    xor: Source.List|number;
 }
 
 export interface Result {
@@ -69,10 +64,6 @@ type NCDataList = NCData[];
 
 const listIsEmpty = (list: any[]): boolean => {
     return list.length === 0;
-};
-
-const isSingleNumericDigit = (arg: string): boolean => {
-    return (arg.length === 1) && (arg[0] >= '0') && (arg[0] <= '9');
 };
 
 //////////
@@ -244,69 +235,33 @@ const markAllXorCompatibleOrSources = (xorSourceList: Source.List,
     }
 };
 
-const buildUseSourceListsFromNcData = (args: any): Source.List => {
-    // XOR first
-    const xorSources: Source.List = Native.mergeCompatibleXorSourceCombinations(
-        args.allXorNcDataLists, args.merge_only || false);
-    args.allXorNcDataLists = undefined;
-    if (listIsEmpty(xorSources) || args.merge_only) {
-        return xorSources;
-    }
-    //**
-    // Everything below is only for filter use case (-c and not -t).
-    //**
-    // OR next
-    let orArgDataList = [];
-    /* TODO: C++
-    let or0 = new Date();
-    let orArgDataList = buildOrArgDataList(buildSourceListsForUseNcData(
-        args.allOrNcDataLists, sourceListMap));
-    let or_dur = new Duration(or0, new Date()).milliseconds;
-    console.error(` orArgDataList(${orArgDataList.length}) - ${PrettyMs(or_dur)}`);
-    */
-
-    // Thoughts on AND compatibility of OrSources:
-    // Just because (one sourceList of) an OrSource is AND compatible with an
-    // XorSource doesn't mean the OrSource is redundant and can be ignored
-    // (i.e., the container cannot be marked as "compatible.") We still need
-    // to check the possibility that any of the other XOR-but-not-AND-compatible
-    // sourceLists could be AND-compatible with the generated-combo sourceList.
-    // So, a container can be marked compatible if and only if there are no
-    // no remaining XOR-compatible sourceLists.
-    //TODO: markAllANDCompatibleOrSources(xorSourceList, orSourceList);
-
-    /* TODO: C++
-    let mark0 = new Date();
-    markAllXorCompatibleOrSources(xorSourceList, orArgDataList);
-    let mark_dur = new Duration(mark0, new Date()).milliseconds;
-    console.error(` mark - ${PrettyMs(mark_dur)}`);
-    */
-    Native.filterPreparation(orArgDataList);
-    return xorSources;
-};
-
 export const preCompute = (first: number, last: number, args: any): Result => {
     const maxSum = args.max_sources - 1;
+    const merge_only = args.merge_only || false;
 
     const begin = new Date();
-    args.allXorNcDataLists = args.xor ? buildAllUseNcDataLists(args.xor, maxSum) : [ [] ];
-    const d1 = new Duration(begin, new Date()).milliseconds;
-    if (args.xor && listIsEmpty(args.allXorNcDataLists)) return { success: false };
+    // XOR first
+    const xorNcDataLists = args.xor ? buildAllUseNcDataLists(args.xor, maxSum) : [ [] ];
+    if (args.xor && listIsEmpty(xorNcDataLists)) return { success: false };
 
-    const build2 = new Date();
-    args.allOrNcDataLists = args.or ? buildAllUseNcDataLists(args.or, maxSum) : [ [] ];
-    const d2 = new Duration(build2, new Date()).milliseconds;
-    console.error(` buildAllOrNcDataLists(${args.allOrNcDataLists.length})` +
-        ` - ${PrettyMs(d2)}`);
-    if (args.or && listIsEmpty(args.allOrNcDataLists)) return { success: false };
-    
-    const build3 = new Date();
-    const xorSources = buildUseSourceListsFromNcData(args);
-    const d3 = new Duration(build3, new Date()).milliseconds;
-    // TODO: sizes?
-    if (args.xor && listIsEmpty(xorSources)) return { success: false };
+    const xorSourceListOrNumIndices: Source.List|number = 
+        Native.mergeCompatibleXorSourceCombinations(xorNcDataLists, merge_only);
+    if (merge_only) {
+        Assert(typeof(xorSourceListOrNumIndices) !== "number");
+        const xorSourceList = xorSourceListOrNumIndices as Source.List;
+        return args.xor && listIsEmpty(xorSourceList) ? { success: false } :
+            { success: true, data: { xor: xorSourceList } };
+    }
+    if (args.xor && (xorSourceListOrNumIndices === 0)) return { success: false };
+
+    // OR next
+    const orNcDataLists = args.or ? buildAllUseNcDataLists(args.or, maxSum) : [ [] ];
+    if (args.or && listIsEmpty(orNcDataLists)) return { success: false };
+
+    Native.setOrArgs(orNcDataLists);
+    Native.filterPreparation();
 
     const d = new Duration(begin, new Date()).milliseconds;
     console.error(`--Precompute - ${PrettyMs(d)}`);
-    return { success: true, data: { xor: xorSources } };
+    return { success: true, data: { xor: xorSourceListOrNumIndices } };
 };

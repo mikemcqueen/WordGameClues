@@ -1,3 +1,7 @@
+* I think there are a couple places where I'm not using or_src.xor_compat:
+  * somewhere in JS, which is commented, but maybe stale code now.
+  * in the filter kernel somewhere
+  
 * getUniqueClueNameCount -> Native.get_num_uniuque_clue_names
 
 * hash/is_equal for NameCount, make (nc)knownSrcListMap key a NameCount

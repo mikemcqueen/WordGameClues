@@ -21,6 +21,7 @@ namespace {
 SourceData mergeSources(const SourceData& source1, const SourceData& source2) {
   auto primaryNameSrcList = NameCount::listMerge(
     source1.primaryNameSrcList, source2.primaryNameSrcList);
+  // ncList merge probably not necessary
   auto ncList = NameCount::listMerge(source1.ncList, source2.ncList);
   auto usedSources = source1.usedSources.copyMerge(source2.usedSources);
   return {
@@ -64,6 +65,19 @@ auto mergeAllCompatibleSources(const NameCountList& ncList) -> SourceList {
     if (src_list.empty()) break;
   }
   return src_list;
+}
+
+bool every_combo_idx(combo_index_t combo_idx,
+  const std::vector<IndexList>& idx_lists, const auto& fn) {
+  //
+  for (int i{(int)idx_lists.size() - 1}; i >= 0; --i) {
+    const auto& idx_list = idx_lists.at(i);
+    auto src_idx = idx_list.at(combo_idx % idx_list.size());
+    if (!fn(i, src_idx))
+      return false;
+    combo_idx /= idx_list.size();
+  }
+  return true;
 }
 
 }  // namespace
@@ -131,6 +145,43 @@ auto buildSourceListsForUseNcData(const std::vector<NCDataList>& useNcDataLists)
   return sourceLists;
 }
 
+auto buildOrArg(SourceList& src_list) {
+  OrArgData or_arg;
+  for (auto&& src : src_list) {
+    or_arg.or_src_list.emplace_back(OrSourceData{ std::move(src) });
+  }
+  return or_arg;
+};
+
+auto buildOrArgList(std::vector<SourceList>&& or_src_list) -> OrArgList {
+  OrArgList or_arg_list;
+  for (auto& src_list : or_src_list) {
+    or_arg_list.emplace_back(buildOrArg(src_list));
+  }
+  return or_arg_list;
+}
+
+void markAllXorCompatibleOrSources(OrArgList& or_arg_list,
+  const std::vector<SourceList>& xor_src_lists,
+  const std::vector<IndexList>& compat_idx_lists,
+  const ComboIndexList& compat_indices) {
+  // whee nesting
+  for (auto& or_arg : or_arg_list) {
+    for (auto& or_src : or_arg.or_src_list) {
+      for (size_t i{}; i < compat_indices.size(); ++i) {
+        if (!every_combo_idx(compat_indices.at(i), compat_idx_lists,
+              [&src = or_src.src, &xor_src_lists](
+                index_t list_idx, index_t src_idx) {
+                return src.isXorCompatibleWith(
+                  xor_src_lists.at(list_idx).at(src_idx));
+              })) {
+          or_src.xor_compat = false;
+        }
+      }
+    }
+  }
+}
+
 //////////
 
 namespace {
@@ -155,30 +206,27 @@ void dumpSentenceVariationIndices(
 
 auto buildSentenceVariationIndices(const std::vector<SourceList>& xor_src_lists,
   const std::vector<IndexList>& compat_idx_lists,
-  const std::vector<uint64_t>& compat_indices) -> SentenceVariationIndices {
+  const ComboIndexList& compat_indices) -> SentenceVariationIndices {
   //
   auto sentenceVariationIndices = SentenceVariationIndices{};
   for (size_t i = 0; i < compat_indices.size(); ++i) {
-    std::array<int, kNumSentences> variations =
-      { -1, -1, -1, -1, -1, -1, -1, -1, -1 };
-
-    auto combo_idx = compat_indices.at(i);
-    for (int j{(int)compat_idx_lists.size() - 1}; j >= 0; --j) {
-      const auto& idx_list = compat_idx_lists.at(j);
-      auto src_idx = idx_list.at(combo_idx % idx_list.size());
-      combo_idx /= idx_list.size();
-      for (const auto& nc :
-        xor_src_lists.at(j).at(src_idx).primaryNameSrcList) {
-        using namespace Source;
-        assert(isCandidate(nc.count));
-        auto sentence = getSentence(nc.count) - 1;
-        auto variation = getVariation(nc.count);
-        // sanity check
-        assert((variations.at(sentence) < 0)
-               || (variations.at(sentence) == variation));
-        variations.at(sentence) = variation;
-      }
-    }
+    std::array<int, kNumSentences> variations = {
+      -1, -1, -1, -1, -1, -1, -1, -1, -1};
+    every_combo_idx(compat_indices.at(i), compat_idx_lists,
+      [&xor_src_lists, &variations](index_t list_idx, index_t src_idx) {
+        for (const auto& nc :
+          xor_src_lists.at(list_idx).at(src_idx).primaryNameSrcList) {
+          using namespace Source;
+          assert(isCandidate(nc.count));
+          auto sentence = getSentence(nc.count) - 1;
+          auto variation = getVariation(nc.count);
+          // sanity check
+          assert((variations.at(sentence) < 0)
+                 || (variations.at(sentence) == variation));
+          variations.at(sentence) = variation;
+        }
+        return true;
+      });
     for (int s{}; s < kNumSentences; ++s) {
       auto& variationIndicesList = sentenceVariationIndices.at(s);
       const size_t variation_idx = variations.at(s) + 1;
@@ -187,7 +235,7 @@ auto buildSentenceVariationIndices(const std::vector<SourceList>& xor_src_lists,
       }
       variationIndicesList.at(variation_idx).push_back(compat_indices.at(i));
     }
-  }
+}
   // Some sentences may contain no variations across all xorSources.
   // At least, this is true in the current case when not all sentences use
   // variations. TODO: TBD if this is still true after all sentences have
@@ -199,14 +247,13 @@ auto buildSentenceVariationIndices(const std::vector<SourceList>& xor_src_lists,
   // if a variationIndicesList is empty.
   // Depending on resolution of TBD above, the "empty" check may eventually
   // become redundant/unnecessary.
-  //for (auto& variationIndicesList : sentenceVariationIndices) {
+  // for (auto& variationIndicesList : sentenceVariationIndices) {
   std::for_each(sentenceVariationIndices.begin(),
-    sentenceVariationIndices.end(), [](auto& variationIndicesList)
-  {
-    if (variationIndicesList.size() == 1) {
-      variationIndicesList.clear();
-    }
-  });
+    sentenceVariationIndices.end(), [](auto& variationIndicesList) {
+      if (variationIndicesList.size() == 1) {
+        variationIndicesList.clear();
+      }
+    });
   if (0) {
     dumpSentenceVariationIndices(sentenceVariationIndices);
   }

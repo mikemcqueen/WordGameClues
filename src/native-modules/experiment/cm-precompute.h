@@ -11,13 +11,19 @@ namespace cm {
 
 // functions
 
-auto buildSourceListsForUseNcData(const std::vector<NCDataList>& useNcDataLists
-  /*,const SourceListMap& sourceListMap*/) -> std::vector<SourceList>;
+auto buildSourceListsForUseNcData(const std::vector<NCDataList>& useNcDataLists)
+  -> std::vector<SourceList>;
+
+auto buildOrArgList(std::vector<SourceList>&& or_src_lists) -> OrArgList;
+
+void markAllXorCompatibleOrSources(OrArgList& or_arg_list,
+  const std::vector<SourceList>& xor_src_lists,
+  const std::vector<IndexList>& compat_idx_lists,
+  const ComboIndexList& compat_indices);
 
 auto buildSentenceVariationIndices(const std::vector<SourceList>& xor_src_lists,
   const std::vector<IndexList>& compat_idx_lists,
-  const std::vector<uint64_t>& compat_indices) -> SentenceVariationIndices;
-
+  const ComboIndexList& compat_indices) -> SentenceVariationIndices;
 }
 
 #endif // INCLUDE_CM_PRECOMPUTE_H

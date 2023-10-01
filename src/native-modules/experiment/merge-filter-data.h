@@ -40,7 +40,6 @@ struct MergeFilterData {
   /* merge + filter */
 
   std::vector<SourceList> xor_src_lists;
-  SourceListMap sourceListMap;
 
   SourceCompatibilityData* device_src_lists{};
   index_t* device_idx_lists{};
@@ -57,12 +56,12 @@ struct MergeFilterData {
 
   device::VariationIndices* device_variation_indices{};
   unsigned num_nariation_indices{};
+  //  SentenceVariationIndices sentenceVariationIndices;
 
-  // OrArgList orArgList;
+  OrArgList or_arg_list;
   unsigned num_or_args{};
   device::OrSourceData* device_or_sources{}; 
   unsigned num_or_sources{};
-  //  SentenceVariationIndices sentenceVariationIndices;
 };
 
 inline MergeFilterData MFD;
