@@ -29,14 +29,15 @@ auto buildNcSourceIndexLists(const NameCountList& nc_list) {
 
 }  // namespace
 
-auto mergeNcListCombo(const NameCountList& nc_list, const IndexList& idx_list)
-  -> std::optional<SourceData> {
+auto mergeNcListCombo(const NameCountList& nc_list, const IndexList& idx_list,
+  const NameCount& as_nc) -> std::optional<SourceData> {
   //
   SourceData src;
   for (size_t i{}; i < idx_list.size(); ++i) {
     const auto& nc = nc_list.at(i);
     if (nc.count > 1) {
       const auto& nc_src = clue_manager::get_nc_src_list(nc).at(idx_list.at(i));
+      //auto nc_src = clue_manager::copy_nc_src_as_nc(nc, idx_list.at(i));
       if (!src.addCompoundSource(nc_src)) {
         return std::nullopt;
       }
@@ -44,18 +45,23 @@ auto mergeNcListCombo(const NameCountList& nc_list, const IndexList& idx_list)
       return std::nullopt;
     }
   }
-  // TODO: return {src} ?
-  return {src}; // std::make_optional(src);
+  NameCountList hax_nc_list = {as_nc};
+  src.ncList = std::move(hax_nc_list);
+  return {src};
 }
 
 auto mergeAllNcListCombinations(const NameCountList& nc_list,
-  Peco::IndexListVector&& idx_lists) -> SourceList {
+  Peco::IndexListVector&& idx_lists, const std::string& clue_name)
+  -> SourceList {
   //
   SourceList src_list;
+  auto count = std::accumulate(nc_list.begin(), nc_list.end(), 0,
+    [](int sum, const NameCount& nc) { return sum + nc.count; });
+  NameCount nc{clue_name, count};
   Peco peco(std::move(idx_lists));
   for (auto idx_list = peco.first_combination(); idx_list;
        idx_list = peco.next_combination()) {
-    auto opt_src = mergeNcListCombo(nc_list, *idx_list);
+    auto opt_src = mergeNcListCombo(nc_list, *idx_list, nc);
     if (opt_src.has_value()) {
       src_list.emplace_back(std::move(opt_src.value()));
     }
@@ -63,9 +69,11 @@ auto mergeAllNcListCombinations(const NameCountList& nc_list,
   return src_list;
 }
 
-auto mergeNcListResults(const NameCountList& nc_list) -> SourceList {
+auto mergeNcListResults(
+  const NameCountList& nc_list, const std::string& clue_name) -> SourceList {
+  //
   auto idx_lists = buildNcSourceIndexLists(nc_list);
-  return mergeAllNcListCombinations(nc_list, std::move(idx_lists));
+  return mergeAllNcListCombinations(nc_list, std::move(idx_lists), clue_name);
 }
 
 NameCountList copyNcListAddNc(
@@ -132,7 +140,7 @@ auto validateSourcesForNameCount(const std::string& clue_name,
   if (args.name_list.size() == 1u) {
     // NOTE leave this here and at entry point of validateSources
     //assert(args.validate_all && "!validateAll not implemented");
-    SourceList src_list = mergeNcListResults(nc_list);
+    SourceList src_list = mergeNcListResults(nc_list, clue_name);
     if (!src_list.empty()) {
       args.nc_list.emplace_back(name, count);
     }

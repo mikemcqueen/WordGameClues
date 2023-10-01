@@ -73,20 +73,6 @@ void for_each_nc_source(const cm::NameCount& nc, const auto& fn) {
 */
 
 /*
-SourceData copy_src_as_nc(const SourceData& src, const NameCount& nc) {
-  NameCountList name_src_list;
-  NameCountList nc_list;
-  UsedSources used_sources;
-  int int_src;
-  auto [_, err] =
-    std::from_chars(str_src.data(), str_src.data() + str_src.size(), int_src);
-  assert(err == std::errc{});
-  name_src_list.emplace_back(name, int_src);
-  nc_list.emplace_back(name, 1);
-  used_sources.addSource(int_src);
-  return {std::move(name_src_list), std::move(nc_list), std::move(used_sources))};
-}
-
 auto copy_src_list_for_nc(const NameCount& nc) {
   SourceList src_list;
   for (const auto& entry_cref : get_known_source_map_entries(nc)) {
@@ -178,6 +164,7 @@ auto get_num_nc_sources(const NameCount& nc) -> int {
   return get_nc_src_list(nc).size();
 }
 
+/*
 void append_nc_sources(const NameCount& nc, SourceList& src_list) {
   auto& nc_sources = get_nc_sources(nc);
   for (auto& src: src_list) {
@@ -188,7 +175,8 @@ void append_nc_sources(const NameCount& nc, SourceList& src_list) {
     }
   }
 }
-
+*/
+  
 int append_nc_sources_from_known_source(
   const cm::NameCount& nc, const std::string& known_src_csv) {
   //
@@ -198,6 +186,15 @@ int append_nc_sources_from_known_source(
     src_map_entry.src_list.begin(), src_map_entry.src_list.end());
   return std::distance(
     src_map_entry.src_list.begin(), src_map_entry.src_list.end());
+}
+
+// look up an nc in ncSourcesMap, take the source at the specified index,
+// and replace the ncList to be a single-entry list with only 'nc'.
+auto copy_nc_src_as_nc(const NameCount& nc, index_t src_idx) -> SourceData {
+  auto nc_src = get_nc_src_list(nc).at(src_idx); // copy
+  NameCountList nc_list = { nc };
+  nc_src.ncList = std::move(nc_list);
+  return nc_src;
 }
 
 auto make_src_list_for_nc(const NameCount& nc) -> cm::SourceList {

@@ -472,6 +472,10 @@ export const loadAllClues = function (args: any): void {
         console.error(`addCompound max(${args.max_sources})` +
             `, total_sources(${total_sources}) - ${PrettyMs(t_dur)}`);
     }
+    let nc = NameCount.makeNew("fir", 8);
+    console.error(`${nc} known: ${Native.isKnownSourceMapEntry(nc.count, nc.name)}`);
+    nc.name = "apple";
+    console.error(`${nc} known: ${Native.isKnownSourceMapEntry(nc.count, nc.name)}`);
     State.loaded = true;
 };
 

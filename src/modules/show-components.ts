@@ -93,7 +93,7 @@ const getCountListArrays = (nameList: string[], pcResult: PreCompute.Result,
                     .map(clue => clue.src);
             }
             if (srcList.length) {
-                clues.push({ countList, nameList: srcList });
+                clues.push({ countList: [sum], nameList: srcList });
             } else {
                 console.log('well, nothing');
             }
