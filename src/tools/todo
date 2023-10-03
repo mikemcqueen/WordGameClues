@@ -34,8 +34,6 @@
   this will reduce load time and merge time. not 100% sure how to go about
   implementing thouhg. but should figure it out.
 
-* can i build the knownNcSourceListMap during loadClues?
-
 * no --xor == no filter call?  it's crashing due to empty xor data probably
   (but probably shouldn't even be called)
   what about --or with no --xor? bet that's fun. probably should fail (or fix).
@@ -73,8 +71,6 @@
   add vec_product, vec_to_string, etc.
 **************************************************************************
   
-* markAllCompatibleOrSources in c++. is this marking used?
-
 * get rid of std::async? have 1 thread waiting on queue, executing filters,
   and main thread just adds execute requests to queue?
   * async, while a sloppy approach, does appear to be reasonably performant.
@@ -100,10 +96,6 @@
 * running multiple list_pair_compat kernels in merge stage seems unnecessary;
   i could make that kernel more loopy and handle all list pairs in one call.
   low priority though, as it finishes the current impl in under 25ms.
-
-* i'm not really sure what the point of having a whole separate confederate
-  variation is. it seems unnecessary, a performance pessimization, and in
-  general problematic.
 
 * tricky situation that should be fixed (and in general, beyond this specific
   tricky instance). blue is a synonym of navy in clues 1.  we later go on to
@@ -148,8 +140,6 @@
   the alternative is that "cog" is ... what.. an anagram? and thus we
   do a syn lookup? maybe "anagram" could be generalized? kinda nice to
   have each "rule" encapsulated as a separate variation entry type.
-
-* "addon-mode" module return string "Debug" or "Release" for setting addon path
 
 * NameCount.listHasCompatibleSources looks unnecessary, or weird, or both
 
