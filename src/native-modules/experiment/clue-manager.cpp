@@ -52,20 +52,10 @@ auto& get_nc_sources_map(int count) {
   return ncSourcesMaps.at(idx);
 }
 
-auto& get_nc_sources(const NameCount& nc) {
-  // TODO: specialize std::hash for NameCount?
-  auto& map{get_nc_sources_map(nc.count)};
-  const auto nc_str{nc.toString()};
-  if (!map.contains(nc_str)) {
-    auto [_, success] = map.emplace(nc_str, UniqueSources{});
-    assert(success);
-  }
-  return map.find(nc_str)->second;
-}
-
 //////////
 
 auto& get_known_source_map(int count, bool force_create = false) {
+  // allow force-creates exactly in-sequence only, or throw an exception
   const auto idx = count - 1;
   if (force_create && ((int)knownSourceMaps.size() == idx)) {
     knownSourceMaps.emplace_back(KnownSourceMap{});
@@ -76,8 +66,8 @@ auto& get_known_source_map(int count, bool force_create = false) {
 void init_known_source_map_entry(
   int count, const std::string& src, SourceList&& src_list) {
   // True is arbitrary here. I *could* support replacing an existing src_list,
-  // but i'm unaware of any situation that requires it, and I want things to
-  // blow up when it happens.
+  // but i'm unaware of any situation that requires it, and as a result I want
+  // things to blow up when it is attempted, currently.
   auto& map = get_known_source_map(count, true);
   auto [_, success] = map.emplace(src, std::move(src_list));
   assert(success);
@@ -90,7 +80,9 @@ auto& get_known_source_map_entry(int count, const std::string& nc_str) {
   return it->second;
 }
 
-auto get_name_sources_map(int count) {
+///////////
+
+const auto& get_name_sources_map(int count) {
   return nameSourcesMaps.at(count - 1);
 }
 
@@ -98,6 +90,7 @@ auto build_primary_name_sources_map(
   const PrimaryNameSrcIndicesMap& name_src_indices_map) {
   //
   NameSourcesMap name_sources_map;
+  // TODO: [name, idx_list]
   for (const auto& kv_pair : name_src_indices_map) {
     const auto& idx_list = kv_pair.second;
     std::vector<std::string> sources;
@@ -125,6 +118,7 @@ const auto& get_unique_clue_names(int count) {
   auto& names = uniqueClueNames.at(idx);
   if (names.empty()) {
     populate_unique_clue_names(names, count);
+    assert(!names.empty());
   }
   return names;
 }
@@ -135,10 +129,25 @@ const auto& get_unique_clue_names(int count) {
 // ncSourcesMaps
 //
 
+// non-const return. would like it to be (in some cases). so a class type
+// container would have some benefit here.
+auto get_nc_src_list(const NameCount& nc) -> cm::SourceList& {
+  // TODO: specialize std::hash for NameCount?
+  auto& map{get_nc_sources_map(nc.count)};
+  const auto nc_str{nc.toString()};
+  if (!map.contains(nc_str)) {
+    auto [_, success] = map.emplace(nc_str, UniqueSources{});
+    assert(success);
+  }
+  return map.find(nc_str)->second.src_list;
+}
+
+/*
 auto get_nc_src_list(const cm::NameCount& nc) -> const cm::SourceList& {
   return get_nc_sources(nc).src_list;
 }
-
+*/
+  
 auto get_num_nc_sources(const NameCount& nc) -> int {
   return get_nc_src_list(nc).size();
 }
@@ -146,10 +155,10 @@ auto get_num_nc_sources(const NameCount& nc) -> int {
 int append_nc_sources_from_known_source(
   const cm::NameCount& nc, const std::string& known_src_csv) {
   //
-  auto& nc_sources = get_nc_sources(nc);
+  auto& src_list = get_nc_src_list(nc);
   const auto& src_map_entry = get_known_source_map_entry(nc.count, known_src_csv);
-  nc_sources.src_list.insert(nc_sources.src_list.end(),
-    src_map_entry.src_list.begin(), src_map_entry.src_list.end());
+  src_list.insert(src_list.end(), src_map_entry.src_list.begin(),
+    src_map_entry.src_list.end());
   return std::distance(
     src_map_entry.src_list.begin(), src_map_entry.src_list.end());
 }
@@ -158,7 +167,7 @@ auto make_src_list_for_nc(const NameCount& nc) -> cm::SourceList {
   SourceList src_list;
   for_each_nc_source(nc, [&src_list](const SourceData& src) {
     src_list.emplace_back(src);
-  });  // format
+  });  // cl-format
   return src_list;
 }
 
@@ -186,6 +195,7 @@ auto buildPrimaryNameSrcIndicesMap(std::vector<std::string>& names,
 
 void setNameSourcesMap(int count, NameSourcesMap&& name_sources_map) {
   auto idx = count - 1;
+  // allow sets exactly in-sequence only, or throw an exception
   assert((int)nameSourcesMaps.size() == idx);
   nameSourcesMaps.emplace_back(std::move(name_sources_map));
 }
@@ -194,13 +204,17 @@ bool is_known_name_count(const std::string& name, int count) {
   return get_name_sources_map(count).contains(name);
 }
 
+const std::vector<std::string>& get_nc_sources(const NameCount& nc) {
+  return get_name_sources_map(nc.count).at(nc.name);
+}
+
 void setPrimaryNameSrcIndicesMap(PrimaryNameSrcIndicesMap&& src_indices_map) {
   assert(primaryNameSrcIndicesMap.empty());
   using namespace std::chrono;
   auto ksm0 = high_resolution_clock::now();
   auto name_sources_map = build_primary_name_sources_map(src_indices_map);  
   for (const auto& [name, sources] : name_sources_map) {
-    SourceList src_list;  // TODO = build_primary_src_list(name, kv_pair.second);
+    SourceList src_list;  // TODO = build_primary_src_list(name, sources);
     for (const auto& str_src : sources) {
       if (is_known_source_map_entry(1, str_src))
         continue;

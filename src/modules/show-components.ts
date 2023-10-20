@@ -43,6 +43,60 @@ function Stringify (val) {
     }, " ");
 }
 
+
+const getPrimaryClueNameSources = (name: string): string[] => {
+    const nc: NameCount.Type = { name, count: 1};
+    const primary_sources: string[] = Native.getSourcesForNc(nc);
+/*
+  well it seems this is all unnecessary, and variations names exist in the
+  native nameSourcesMap! and I didn't realize that before I spent an hour
+  writing code assuming it didn't. which tells me I don't really understand
+  this code very well.
+
+    const variation_sources = new Set<string>();
+    const variation_names = ClueManager.getAllNamesForVariationName(name);
+    for (let v_name of variation_names) {
+        const sources: string[] = Native.getSourcesForNc(nc);
+        for (let source of sources) {
+            variation_sources.add(source);
+        }
+    }
+    // test if a particular name is both used as a "primary" (non-variation)
+    // name and as a variation name.
+    // nothing wrong with this, i just don't expect it (yet), and want to be
+    // notified when it happens. the likelihood that something is wrong when 
+    // it does happen seems about equal to the likelihood that it is benign.
+    if ((primary_sources.length && variation_sources.size)) {
+        console.error(`name: ${name}`);
+        console.error(`primary_sources: ${primary_sources}`);
+        console.error(`variation_sources: ${[...variation_sources]}`);
+        process.exit(-1);
+    }
+    for (let source of primary_sources) {
+        variation_sources.add(source);
+    }
+    return [...variation_sources];
+*/
+    return primary_sources;
+/*
+    return xorSource.primaryNameSrcList
+        .filter(nameSrc => nameSrc.name === name)
+        .map(nameSrc => `${nameSrc.count}`);
+*/
+};
+
+const getCompoundNcSrcList = (nc: NameCount.Type): string[] => {
+    Assert(nc.count > 1);
+    return ClueManager.getClueList(nc.count)
+        .filter(clue => clue.name === nc.name)
+        .map(clue => clue.src);
+};
+
+const getNcSrcList = (nc: NameCount.Type): string[] => {
+    return nc.count === 1 ? getPrimaryClueNameSources(nc.name)
+        : getCompoundNcSrcList(nc);
+};
+
 const getCountListArrays = (nameList: string[], pcResult: PreCompute.Result,
     options: any): any =>
 {
@@ -79,23 +133,11 @@ const getCountListArrays = (nameList: string[], pcResult: PreCompute.Result,
         const sum = countList.reduce((a, b) => a + b);
         if (nameList.length === 1) {
             const name = nameList[0];
-            let srcList: string[];
-            // this is a bit awkward. I didn't want to write the code to handle
-            // candidate clue lookup for ClueList(1) so I hacked it to look
-            // at primaryNameSrcList.
-            if (sum === 1) {
-                srcList = xorSource.primaryNameSrcList
-                    .filter(nameSrc => nameSrc.name === name)
-                    .map(nameSrc => `${nameSrc.count}`);
-            } else {
-                srcList = ClueManager.getClueList(sum)
-                    .filter(clue => clue.name === name)
-                    .map(clue => clue.src);
-            }
+            let srcList = getNcSrcList({ name, count: sum });
             if (srcList.length) {
                 clues.push({ countList: [sum], nameList: srcList });
             } else {
-                console.log('well, nothing');
+                console.log(`hmm, no sources for ${name}:${sum}`);
             }
         } else {
             const sourceMap = ClueManager.getKnownSourceMap(sum);

@@ -45,6 +45,7 @@ auto mergeNcListCombo(const NameCountList& nc_list, const IndexList& idx_list,
       return std::nullopt;
     }
   }
+  // ncList is preserved for show-components (-t) and this is what it wants.
   NameCountList hax_nc_list = {as_nc};
   src.ncList = std::move(hax_nc_list);
   return {src};

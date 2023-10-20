@@ -1,6 +1,11 @@
+* node clues -pf.72 -t buck
+  * tentatively fixed.
+  
 * I think there are a couple places where I'm not using or_src.xor_compat:
   * somewhere in JS, which is commented, but maybe stale code now.
   * in the filter kernel somewhere
+  * oddly though, sometimes it only produces results when I call markAll, even
+    though I can't identify where it's actually used.
   
 * getUniqueClueNameCount -> Native.get_num_uniuque_clue_names
 

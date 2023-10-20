@@ -11,7 +11,6 @@
 #include <vector>
 #include "clue-manager.h"
 #include "cm-precompute.h"
-#include "peco.h"
 #include "merge.h"
 
 namespace cm {
@@ -153,12 +152,47 @@ auto buildOrArg(SourceList& src_list) {
   return or_arg;
 };
 
+auto count_or_sources(const OrArgList& or_arg_list) {
+  uint32_t total{};
+  for (const auto& or_arg: or_arg_list) {
+    total += or_arg.or_src_list.size();
+  }
+  return total;
+}
+
 auto buildOrArgList(std::vector<SourceList>&& or_src_list) -> OrArgList {
+  using namespace std::chrono;
+  
   OrArgList or_arg_list;
+  auto t0 = high_resolution_clock::now();
   for (auto& src_list : or_src_list) {
     or_arg_list.emplace_back(buildOrArg(src_list));
   }
+  auto t1 = high_resolution_clock::now();
+  [[maybe_unused]] auto t_dur = duration_cast<milliseconds>(t1 - t0).count();
+  std::cerr << "  buildOrArgList args(" << or_arg_list.size() << ")"
+            << ", sources(" << count_or_sources(or_arg_list) << ") - "
+            << t_dur << "ms" << std::endl;
+
   return or_arg_list;
+}
+
+bool isXorCompatibleWithAnySource(const OrSourceData& or_src,
+  const std::vector<SourceList>& xor_src_lists,
+  const std::vector<IndexList>& compat_idx_lists,
+  const ComboIndexList& compat_indices) {
+  //
+  for (size_t i{}; i < compat_indices.size(); ++i) {
+    if (every_combo_idx(compat_indices.at(i), compat_idx_lists,
+          [&src = or_src.src, &xor_src_lists](
+            index_t list_idx, index_t src_idx) {
+            return src.isXorCompatibleWith(
+              xor_src_lists.at(list_idx).at(src_idx));
+          })) {
+      return true;
+    }
+  }
+  return false;
 }
 
 void markAllXorCompatibleOrSources(OrArgList& or_arg_list,
@@ -166,20 +200,22 @@ void markAllXorCompatibleOrSources(OrArgList& or_arg_list,
   const std::vector<IndexList>& compat_idx_lists,
   const ComboIndexList& compat_indices) {
   // whee nesting
+  uint32_t num_compat{};
+  using namespace std::chrono;
+  auto t0 = high_resolution_clock::now();
   for (auto& or_arg : or_arg_list) {
     for (auto& or_src : or_arg.or_src_list) {
-      for (size_t i{}; i < compat_indices.size(); ++i) {
-        if (!every_combo_idx(compat_indices.at(i), compat_idx_lists,
-              [&src = or_src.src, &xor_src_lists](
-                index_t list_idx, index_t src_idx) {
-                return src.isXorCompatibleWith(
-                  xor_src_lists.at(list_idx).at(src_idx));
-              })) {
-          or_src.xor_compat = false;
-        }
+      if (isXorCompatibleWithAnySource(
+            or_src, xor_src_lists, compat_idx_lists, compat_indices)) {
+        or_src.xor_compat = true;
+        ++num_compat;
       }
     }
   }
+  auto t1 = high_resolution_clock::now();
+  [[maybe_unused]] auto t_dur = duration_cast<milliseconds>(t1 - t0).count();
+  std::cerr << "  markAllXorCompatibleOrSources(" << num_compat << ") - "
+            << t_dur << "ms" << std::endl;
 }
 
 //////////
@@ -235,7 +271,7 @@ auto buildSentenceVariationIndices(const std::vector<SourceList>& xor_src_lists,
       }
       variationIndicesList.at(variation_idx).push_back(compat_indices.at(i));
     }
-}
+  }
   // Some sentences may contain no variations across all xorSources.
   // At least, this is true in the current case when not all sentences use
   // variations. TODO: TBD if this is still true after all sentences have

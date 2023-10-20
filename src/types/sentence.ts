@@ -251,7 +251,7 @@ const addVariations = (toVariations: VariationMap,
     }
 };
 
-export const addAllVariations = (variations: Variations, sentence: Type): void => {
+export const addAllVariations = (sentence: Type, variations: Variations): void => {
     addVariations(variations.anagrams, sentence.anagrams);
     addVariations(variations.synonyms, sentence.synonyms);
     addVariations(variations.homophones, sentence.homophones);

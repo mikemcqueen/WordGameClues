@@ -31,7 +31,7 @@ using NameSourcesMap = std::unordered_map<std::string, std::vector<std::string>>
 
 // ncSourcesMaps
 
-auto get_nc_src_list(const cm::NameCount& nc) -> const cm::SourceList&;
+auto get_nc_src_list(const cm::NameCount& nc) -> cm::SourceList&;
 
 auto get_num_nc_sources(const cm::NameCount& nc) -> int;
 
@@ -53,6 +53,10 @@ void setPrimaryNameSrcIndicesMap(PrimaryNameSrcIndicesMap&& src_indices_map);
 
 void setNameSourcesMap(int count, NameSourcesMap&& name_sources_map);
 
+bool is_known_name_count(const std::string& name, int count);  // known_nc
+
+const std::vector<std::string>& get_nc_sources(const cm::NameCount& nc);
+
 // knownSourceMaps
 
 bool is_known_source_map_entry(int count, const std::string& src_csv);
@@ -61,8 +65,6 @@ void init_known_source_map_entry(int count,
   const std::vector<std::string>& name_list, cm::SourceList&& src_list);
 
 const cm::IndexList& getPrimaryClueSrcIndices(const std::string& name);
-
-bool is_known_name_count(const std::string& name, int count);  // known_nc
 
 auto get_known_source_map_entries(const cm::NameCount& nc)
   -> std::vector<KnownSourceMapValueCRef>;

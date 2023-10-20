@@ -300,7 +300,35 @@ const addUniqueVariationNames = (toList: string[],
         for (let name of variations[key]) {
             addUniqueName(toList, name, hash);
         }
+        // prob do this elsewhere
+        //Native.addUniquePrimaryClueNameVariations(variations[key]);
     }
+};
+
+const addNamesForVariationName = (variation_name: string,
+    variations: Sentence.VariationMap, names: Set<string>): void =>
+{
+    for (let key of Object.keys(variations)) {
+        for (let name of variations[key]) {
+            if (name === variation_name) {
+                names.add(key);
+                break;
+            }
+        }
+    }
+}
+
+// this is kinda awkward and slow, but is only used for -t during output
+// phase so shouldn't matter too much. don't use it though.
+export const getAllNamesForVariationName = (name: string): Set<string> => {
+    let names = new Set<string>();
+    for (let sentence of State.sentences) {
+        if (!sentence) continue;
+        addNamesForVariationName(name, sentence.anagrams, names);
+        addNamesForVariationName(name, sentence.synonyms, names);
+        addNamesForVariationName(name, sentence.homophones, names);
+    }
+    return names;
 };
 
 const initUniquePrimaryClueNames = (uniqueComponentNames: Set<string>,
@@ -391,7 +419,7 @@ const primaryClueListPostProcessing = (args: any): void => {
     let variations = Sentence.emptyVariations();
     for (let sentence of sentences) {
         if (!sentence) continue;
-        Sentence.addAllVariations(variations, sentence);
+        Sentence.addAllVariations(sentence, variations);
     }
 
     // 2nd pass through sentences
@@ -400,8 +428,8 @@ const primaryClueListPostProcessing = (args: any): void => {
     let uniqueComponentNames = new Set<string>();
     for (let i = 1; i < sentences.length; ++i) {
         const sentence = sentences[i];
-        // just info, but i want it output to stderr
         if (args.verbose) {
+            // just info, but i want it output to stderr
             console.error(`sentence ${i}:`);
         }
         Assert(sentence, `sentence ${i}:`);
@@ -413,6 +441,8 @@ const primaryClueListPostProcessing = (args: any): void => {
             console.error(` names: ${names.size}, variations: ${container.candidates.length}`);
         }
     }
+    // Required by combo-maker first/next. It could also just use C++ addon
+    // functions, or eventually be converted to C++ entirely.
     State.uniquePrimaryClueNames = initUniquePrimaryClueNames(uniqueComponentNames,
         args.addVariations ? sentences : undefined);
     State.variations = variations;
@@ -456,6 +486,7 @@ export const loadAllClues = function (args: any): void {
         console.error(`addCompound max(${args.max_sources})` +
             `, total_sources(${total_sources}) - ${PrettyMs(t_dur)}`);
     }
+    console.error('remove this:');
     let nc = NameCount.makeNew("fir", 8);
     console.error(`${nc} known: ${Native.isKnownSourceMapEntry(nc.count, nc.name)}`);
     nc.name = "apple";
@@ -513,7 +544,7 @@ let addCompoundClue = (clue: Clue.Compound, count: number, args: any): boolean =
         }
     }
     if (vs_result && args.validateAll) {
-        Native.populateNcSourcesFromKnownSource({name : clue.name, count}, srcCsv);
+        Native.populateNcSourcesFromKnownSource({name: clue.name, count}, srcCsv);
         (srcMap[srcCsv].clues as ClueList.Compound).push(clue);
     }
     return vs_result;

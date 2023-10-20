@@ -389,10 +389,7 @@ async function main () {
     console.error(`loadClues(${PrettyMs(loadMillis)})`);
     setLogging(false); //options.verbose);
 
-    console.error(`merge_nclr(${Validator.merge_nclr})` +
-        `, Native.merge_nclc(${Validator.native_merge_nclc})` +
-        `, Native.get_num_ncr(${Validator.native_get_num_ncr})`);
-//    process.exit(0);
+    //process.exit(0);
 
     options.notebook = options.notebook || Note.getWorksheetName(clueSource);
 

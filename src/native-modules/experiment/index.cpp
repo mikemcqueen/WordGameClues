@@ -358,21 +358,6 @@ Value isKnownSourceMapEntry(const CallbackInfo& info) {
   return Boolean::New(env, clue_manager::is_known_source_map_entry(count, src_csv));
 }
 
-//
-// Validator
-//
-
-Value getNumNcResults(const CallbackInfo& info) {
-  Env env = info.Env();
-  if (!info[0].IsObject()) {
-    TypeError::New(env, "getNumNcResults: invalid parameter type")
-      .ThrowAsJavaScriptException();
-    return env.Null();
-  }
-  auto nc = makeNameCount(env, info[0].As<Object>());
-  return Number::New(env, clue_manager::get_num_nc_sources(nc));
-}
-
 // nc, name_csv
 Value populateNcSourcesFromKnownSource(const CallbackInfo& info) {
   Env env = info.Env();
@@ -389,6 +374,48 @@ Value populateNcSourcesFromKnownSource(const CallbackInfo& info) {
   auto num_appended =
     clue_manager::append_nc_sources_from_known_source(nc, src_csv);
   return Number::New(env, num_appended);
+}
+
+  /*
+Value addPrimaryClueNameVariations(const CallbackInfo& info) {
+  Env env = info.Env();
+  if (!info[1].IsArray()) {
+    TypeError::New(env, "addPrimaryClueNameVariations: invalid parameter type")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+  return env.Null();
+}
+  */
+
+Value getSourcesForNc(const CallbackInfo& info) {
+  Env env = info.Env();
+  if (!info[0].IsObject()) {
+    TypeError::New(env, "getSourcesForNc: invalid parameter type")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+  // arg0
+  auto nc = makeNameCount(env, info[0].As<Object>());
+  // --
+  assert(nc.count == 1);  // assert only known use case.
+  return wrap(env, clue_manager::get_nc_sources(nc));
+}
+
+
+//
+// Validator
+//
+
+Value getNumNcResults(const CallbackInfo& info) {
+  Env env = info.Env();
+  if (!info[0].IsObject()) {
+    TypeError::New(env, "getNumNcResults: invalid parameter type")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+  auto nc = makeNameCount(env, info[0].As<Object>());
+  return Number::New(env, clue_manager::get_num_nc_sources(nc));
 }
 
 Value validateSources(const CallbackInfo& info) {
@@ -514,8 +541,10 @@ Value setOrArgs(const CallbackInfo& info) {
   // no remaining XOR-compatible sourceLists.
   // TODO: markAllANDCompatibleOrSources(xorSourceList, orSourceList);
 
-  markAllXorCompatibleOrSources(
-    MFD.or_arg_list, MFD.xor_src_lists, MFD.compat_idx_lists, MFD.combo_indices);
+  if constexpr (true) {
+    markAllXorCompatibleOrSources(MFD.or_arg_list, MFD.xor_src_lists,
+      MFD.compat_idx_lists, MFD.combo_indices);
+  }
 
   auto [device_or_sources, num_or_sources] =
     cuda_allocCopyOrSources(MFD.or_arg_list);
@@ -525,7 +554,7 @@ Value setOrArgs(const CallbackInfo& info) {
   auto build1 = high_resolution_clock::now();
   [[maybe_unused]] auto d_build =
     duration_cast<milliseconds>(build1 - build0).count();
-  std::cerr << " build/mark/copy or_ args(" << MFD.num_or_args << ")"
+  std::cerr << " build/mark/copy or_args(" << MFD.num_or_args << ")"
             << ", or_sources(" << MFD.num_or_sources << ") - " << d_build
             << "ms" << std::endl;
   return Number::New(env, num_or_sources);
@@ -630,8 +659,13 @@ Object Init(Env env, Object exports) {
   exports["setPrimaryNameSrcIndicesMap"] = Function::New(env, setPrimaryNameSrcIndicesMap);
   exports["setCompoundClueNameSourcesMap"] = Function::New(env, setCompoundClueNameSourcesMap);
   exports["isKnownSourceMapEntry"] = Function::New(env, isKnownSourceMapEntry);
+  exports["getSourcesForNc"] = Function::New(env, getSourcesForNc);
   exports["populateNcSourcesFromKnownSource"] =
     Function::New(env, populateNcSourcesFromKnownSource);
+  /*
+  exports["addPrimaryClueNameVariations"] =
+    Function::New(env, addPrimaryClueNameVariations);
+  */
 
   // validator
   //
