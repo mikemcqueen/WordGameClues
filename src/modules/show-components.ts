@@ -43,11 +43,12 @@ function Stringify (val) {
     }, " ");
 }
 
-
+/*
 const getPrimaryClueNameSources = (name: string): string[] => {
     const nc: NameCount.Type = { name, count: 1};
     const primary_sources: string[] = Native.getSourcesForNc(nc);
-/*
+    return primary_sources;
+    //begin
   well it seems this is all unnecessary, and variations names exist in the
   native nameSourcesMap! and I didn't realize that before I spent an hour
   writing code assuming it didn't. which tells me I don't really understand
@@ -76,13 +77,6 @@ const getPrimaryClueNameSources = (name: string): string[] => {
         variation_sources.add(source);
     }
     return [...variation_sources];
-*/
-    return primary_sources;
-/*
-    return xorSource.primaryNameSrcList
-        .filter(nameSrc => nameSrc.name === name)
-        .map(nameSrc => `${nameSrc.count}`);
-*/
 };
 
 const getCompoundNcSrcList = (nc: NameCount.Type): string[] => {
@@ -96,16 +90,16 @@ const getNcSrcList = (nc: NameCount.Type): string[] => {
     return nc.count === 1 ? getPrimaryClueNameSources(nc.name)
         : getCompoundNcSrcList(nc);
 };
+*/
 
+/*
 const getCountListArrays = (nameList: string[], pcResult: PreCompute.Result,
     options: any): any =>
 {
     let addRemoveSet: Set<number> = new Set<number>();
-    /*
-    if (options.add || options.remove) {
-        addRemoveSet = new Set<number>();
-    }
-    */
+    //if (options.add || options.remove) {
+    //  addRemoveSet = new Set<number>();
+    //}
     let valid: number[][] = [];
     let known: CountListNameList[] = [];
     let clues: CountListNameList[] = [];
@@ -124,12 +118,12 @@ const getCountListArrays = (nameList: string[], pcResult: PreCompute.Result,
         // walk through all ClueManager.knownSourceMaps looking for a sourceCsv combo,
         // and displaying those that *aren't* in the xor list. the latter should be done
         // in a separate loop probably, not in this loop.
-        /*
-        if (!result.success) {
-            //console.log(`invalid: ${nameList}  CL ${clueCountList}  x ${x} sum ${sum}  validateAll=${validateAll}`);
-            invalid.push(clueCountList);
-        } else
-        */
+
+        //if (!result.success) {
+        //  console.log(`invalid: ${nameList}  CL ${clueCountList}  x ${x} sum ${sum}  validateAll=${validateAll}`);
+        //  invalid.push(clueCountList);
+        //} else
+
         const sum = countList.reduce((a, b) => a + b);
         if (nameList.length === 1) {
             const name = nameList[0];
@@ -206,6 +200,12 @@ const showCountLists = (nameList: string[], result: any, options: any): any => {
     showCountListArray(nameList.toString(), result.clues, 'PRESENT as clue with source:', true);
     showCountListArray(null, result.valid, 'VALID');
 
+    //
+    // *****
+    // TODO: honor options.addMaxSum, options.removeMinSum here
+    // *****
+    //
+
     // TODO: extract this to helper function, maybe in clue-manager
     // NOTE: explicit undefined check here is necessary
     const save = _.isUndefined(options.save) ? true : options.save;
@@ -226,18 +226,7 @@ const showCountLists = (nameList: string[], result: any, options: any): any => {
     }
     return Object.assign(result, { added: count });
 };
-
-
-const slow_show = (nameList: string[], options: any) => {
-    Assert(0 && "slow_show broken; consider removing");
-    const nameCsv = nameList.toString();
-    const result = []; // REPLACE: = ClueManager.getCountListArrays(nameCsv, options);
-    if (!result) {
-        console.log('No matches');
-        return null;
-    }
-    return showCountLists(nameList, result, options);
-};
+*/
 
 export const show = (options: any): any => {
     Expect(options).is.an.Object();
@@ -255,26 +244,26 @@ export const show = (options: any): any => {
     console.log(`test: ${options.test}, fast=${options.fast}`);
 
     const nameList = options.test.split(',').sort();
-    if (options.fast) {
-        const pc_args = {
-            xor: nameList,
-            merge_only: true, // flag: wrap xorSources on return from Native.merge()
-            max: 2,
-            max_sources: options.max_sources,
-            quiet: options.quiet,
-            ignoreErrors: options.ignoreErrors
-        };
-        const pcResult = PreCompute.preCompute(2, options.max_sources, pc_args);
-        if (pcResult.success) {
-            const result = getCountListArrays(nameList, pcResult, options);
-            showCountLists(nameList, result, options);
-        } else {
-            console.error(`Precompute failed.`);
-        }
-        return 0;
+    const pc_args = {
+        xor: nameList,
+        merge_only: true, // flag: wrap xorSources on return from Native.merge()
+        max: 2,
+        max_sources: options.max_sources,
+        quiet: options.quiet,
+        ignoreErrors: options.ignoreErrors
+    };
+    // TODO: don't wrap here for -t, but save results in Native.MFD
+    const pc_result = PreCompute.preCompute(2, options.max_sources, pc_args);
+    if (pc_result) {
+        Native.showComponents(nameList);
+        /*
+          const result = getCountListArrays(nameList, pcResult, options);
+          showCountLists(nameList, result, options);
+        */
     } else {
-        return slow_show(nameList, options);
+        console.error(`Precompute failed.`);
     }
+    return 0;
 };
 
 //////// all below probably should be removed.

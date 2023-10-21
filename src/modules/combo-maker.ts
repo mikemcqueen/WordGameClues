@@ -320,9 +320,8 @@ export const makeCombos = (args: any): any => {
             });
     } else {
         let totals = ClueManager.emptyFilterResult();
-        const result = PreCompute.preCompute(first, last, args);
-        if (result.success) {
-            PCD = result.data!;
+        const pc_result = PreCompute.preCompute(first, last, args);
+        if (pc_result) {
             // seed "incompatible sources" with 2-clue sources to make all
             // subsequent sums faster. but, synchronously.
             makeCombosForSum(2, args, true);

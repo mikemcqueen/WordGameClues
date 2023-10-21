@@ -31,10 +31,10 @@ std::vector<NcSourcesMap> ncSourcesMaps;
 // map primary clue_name -> idx_list 
 PrimaryNameSrcIndicesMap primaryNameSrcIndicesMap;
 
-// map clue_name -> src_csv_list for each count (including primary)
+// map clue_name -> source_csv_list for each count (including primary)
 std::vector<NameSourcesMap> nameSourcesMaps;
 
-// map src_csv -> src_list for each count
+// map source_csv -> { src_list, clue_name_list } for each count
 std::vector<KnownSourceMap> knownSourceMaps;
 
 // populated on demand from primaryNameSrcIndicesMap/nameSrcMaps
@@ -73,11 +73,15 @@ void init_known_source_map_entry(
   assert(success);
 }
 
-auto& get_known_source_map_entry(int count, const std::string& nc_str) {
-  auto& map = get_known_source_map(count);
-  auto it = map.find(nc_str);
-  assert(it != map.end());
-  return it->second;
+int append_known_sources_to_nc_sources(
+  const std::string& sources_csv, const cm::NameCount& nc) {
+  //
+  auto& nc_src_list = get_nc_src_list(nc);
+  const auto& known_src_list =
+    get_known_source_map_entry(nc.count, sources_csv).src_list;
+  nc_src_list.insert(
+    nc_src_list.end(), known_src_list.begin(), known_src_list.end());
+  return std::distance(known_src_list.begin(), known_src_list.end());
 }
 
 ///////////
@@ -152,15 +156,12 @@ auto get_num_nc_sources(const NameCount& nc) -> int {
   return get_nc_src_list(nc).size();
 }
 
-int append_nc_sources_from_known_source(
-  const cm::NameCount& nc, const std::string& known_src_csv) {
+void add_compound_clue(
+  const cm::NameCount& nc, const std::string& sources_csv) {
   //
-  auto& src_list = get_nc_src_list(nc);
-  const auto& src_map_entry = get_known_source_map_entry(nc.count, known_src_csv);
-  src_list.insert(src_list.end(), src_map_entry.src_list.begin(),
-    src_map_entry.src_list.end());
-  return std::distance(
-    src_map_entry.src_list.begin(), src_map_entry.src_list.end());
+  append_known_sources_to_nc_sources(sources_csv, nc);
+  get_known_source_map_entry(nc.count, sources_csv)
+    .clue_names.emplace_back(nc.name);
 }
 
 auto make_src_list_for_nc(const NameCount& nc) -> cm::SourceList {
@@ -212,7 +213,7 @@ void setPrimaryNameSrcIndicesMap(PrimaryNameSrcIndicesMap&& src_indices_map) {
   assert(primaryNameSrcIndicesMap.empty());
   using namespace std::chrono;
   auto ksm0 = high_resolution_clock::now();
-  auto name_sources_map = build_primary_name_sources_map(src_indices_map);  
+  auto name_sources_map = build_primary_name_sources_map(src_indices_map);
   for (const auto& [name, sources] : name_sources_map) {
     SourceList src_list;  // TODO = build_primary_src_list(name, sources);
     for (const auto& str_src : sources) {
@@ -257,15 +258,29 @@ const IndexList& getPrimaryClueSrcIndices(const std::string& name) {
 void init_known_source_map_entry(
   int count, const std::vector<std::string>& name_list, SourceList&& src_list) {
   //
-  init_known_source_map_entry(count, util::join(name_list, ","), std::move(src_list));
+  init_known_source_map_entry(
+    count, util::join(name_list, ","), std::move(src_list));
 }
 
-bool is_known_source_map_entry(int count, const std::string& src_csv) {
+bool has_known_source_map(int count) {
+  assert(count > 0);
+  return (int)knownSourceMaps.size() >= count;
+}
+
+bool is_known_source_map_entry(int count, const std::string& sources_csv) {
   const auto idx = count - 1;
   if ((int)knownSourceMaps.size() > idx) {
-    return get_known_source_map(count).contains(src_csv);
+    return get_known_source_map(count).contains(sources_csv);
   }
   return false;
+}
+
+auto get_known_source_map_entry(int count, const std::string& sources_csv)
+  -> KnownSourceMapValue& {
+  auto& map = get_known_source_map(count);
+  auto it = map.find(sources_csv);
+  assert(it != map.end());
+  return it->second;
 }
 
 auto get_known_source_map_entries(const NameCount& nc)
@@ -273,9 +288,9 @@ auto get_known_source_map_entries(const NameCount& nc)
   //
   std::vector<KnownSourceMapValueCRef> cref_entries;
   const auto& name_sources_map = get_name_sources_map(nc.count);
-  for (const auto& src_csv : name_sources_map.at(nc.name)) {
+  for (const auto& sources_csv : name_sources_map.at(nc.name)) {
     cref_entries.emplace_back(
-      std::cref(get_known_source_map_entry(nc.count, src_csv)));
+      std::cref(get_known_source_map_entry(nc.count, sources_csv)));
   }
   return cref_entries;
 }

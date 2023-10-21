@@ -14,6 +14,7 @@ namespace clue_manager {
 // types
 struct KnownSourceMapValue {
   cm::SourceList src_list;
+  std::vector<std::string> clue_names;
 };
 using KnownSourceMapValueCRef = std::reference_wrapper<const KnownSourceMapValue>;
 
@@ -34,9 +35,6 @@ using NameSourcesMap = std::unordered_map<std::string, std::vector<std::string>>
 auto get_nc_src_list(const cm::NameCount& nc) -> cm::SourceList&;
 
 auto get_num_nc_sources(const cm::NameCount& nc) -> int;
-
-int append_nc_sources_from_known_source(
-  const cm::NameCount& nc, const std::string& known_src_csv);
 
 // NOTE: this doesn't properly set nc_list. it could.
 auto make_src_list_for_nc(const cm::NameCount& nc) -> cm::SourceList;
@@ -59,7 +57,12 @@ const std::vector<std::string>& get_nc_sources(const cm::NameCount& nc);
 
 // knownSourceMaps
 
-bool is_known_source_map_entry(int count, const std::string& src_csv);
+bool has_known_source_map(int count);
+
+bool is_known_source_map_entry(int count, const std::string& sources_csv);
+
+auto get_known_source_map_entry(int count, const std::string& sources_csv)
+  -> KnownSourceMapValue&;
 
 void init_known_source_map_entry(int count,
   const std::vector<std::string>& name_list, cm::SourceList&& src_list);
@@ -68,6 +71,8 @@ const cm::IndexList& getPrimaryClueSrcIndices(const std::string& name);
 
 auto get_known_source_map_entries(const cm::NameCount& nc)
   -> std::vector<KnownSourceMapValueCRef>;
+
+void add_compound_clue(const cm::NameCount& nc, const std::string& sources_csv);
 
 // uniqueClueNames
 

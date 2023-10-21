@@ -49,10 +49,12 @@ export interface Data {
     xor: Source.List|number;
 }
 
+/*
 export interface Result {
     success: boolean;
     data?: Data;
 }
+*/
 
 // TODO: NameCount.ListContainer
 interface NCData {
@@ -235,33 +237,28 @@ const markAllXorCompatibleOrSources = (xorSourceList: Source.List,
     }
 };
 
-export const preCompute = (first: number, last: number, args: any): Result => {
+export const preCompute = (first: number, last: number, args: any): boolean => {
     const maxSum = args.max_sources - 1;
     const merge_only = args.merge_only || false;
 
     const begin = new Date();
     // XOR first
     const xorNcDataLists = args.xor ? buildAllUseNcDataLists(args.xor, maxSum) : [ [] ];
-    if (args.xor && listIsEmpty(xorNcDataLists)) return { success: false };
+    if (args.xor && listIsEmpty(xorNcDataLists)) return false;
 
-    const xorSourceListOrNumIndices: Source.List|number = 
+    const num_indices: number = 
         Native.mergeCompatibleXorSourceCombinations(xorNcDataLists, merge_only);
-    if (merge_only) {
-        Assert(typeof(xorSourceListOrNumIndices) !== "number");
-        const xorSourceList = xorSourceListOrNumIndices as Source.List;
-        return args.xor && listIsEmpty(xorSourceList) ? { success: false } :
-            { success: true, data: { xor: xorSourceList } };
-    }
-    if (args.xor && (xorSourceListOrNumIndices === 0)) return { success: false };
+    if (args.xor && !num_indices) return false;
+    if (merge_only) return true;
 
     // OR next
     const orNcDataLists = args.or ? buildAllUseNcDataLists(args.or, maxSum) : [ [] ];
-    if (args.or && listIsEmpty(orNcDataLists)) return { success: false };
+    if (args.or && listIsEmpty(orNcDataLists)) return false;
 
     Native.setOrArgs(orNcDataLists);
     Native.filterPreparation();
 
     const d = new Duration(begin, new Date()).milliseconds;
     console.error(`--Precompute - ${PrettyMs(d)}`);
-    return { success: true, data: { xor: xorSourceListOrNumIndices } };
+    return true;
 };

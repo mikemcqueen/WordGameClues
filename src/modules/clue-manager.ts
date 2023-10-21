@@ -54,9 +54,9 @@ type InternalStateBase = {
 
     uniquePrimaryClueNames: string[];
 
-    maybeListArray: any[];            // the JSON maybe files in an array
-    rejectListArray: any[];           // the JSON reject files in an array
-    rejectSourceMap: any;             // map reject source to true/false (currently)
+    //maybeListArray: any[];            // the JSON maybe files in an array
+    //rejectListArray: any[];           // the JSON reject files in an array
+    //rejectSourceMap: any;             // map reject source to true/false (currently)
     
     dir: string;
 
@@ -82,9 +82,9 @@ const initialState = (): InternalState => {
         uniquePrimaryClueNames: [],
 
         // TODO: remove? maybe, at least
-        maybeListArray: [],
-        rejectListArray: [],
-        rejectSourceMap: {},
+        //maybeListArray: [],
+        //rejectListArray: [],
+        //rejectSourceMap: {},
 
         dir: '',
         
@@ -544,7 +544,8 @@ let addCompoundClue = (clue: Clue.Compound, count: number, args: any): boolean =
         }
     }
     if (vs_result && args.validateAll) {
-        Native.populateNcSourcesFromKnownSource({name: clue.name, count}, srcCsv);
+        Native.addCompoundClue({name: clue.name, count}, srcCsv);
+        // TODO: can remove, along with all of knownSourceMapArray
         (srcMap[srcCsv].clues as ClueList.Compound).push(clue);
     }
     return vs_result;
@@ -649,6 +650,7 @@ let removeClue = function (count: number, clue: Clue.Compound,
     return false;
 };
 
+/*
 let addReject = function (srcNameList: string|string[], save = false): boolean {
     if (_.isString(srcNameList)) {
         srcNameList = (srcNameList as string).split(',');
@@ -703,6 +705,7 @@ let isKnownSource = function (source: string, count = 0): boolean {
 let isRejectSource = function (source: string | string[]): boolean {
     return _.has(State.rejectSourceMap, source.toString());
 };
+*/
 
 export let getCountListForName = (name: string): CountList => {
     let countList: CountList = [...Array(State.knownClueMapArray.length).keys()];
@@ -737,11 +740,11 @@ export const filter = (srcCsvList: string[], clueCount: number, result: FilterRe
     FilterResult =>
 {
     srcCsvList.forEach(srcCsv => {
+        /*
         if (isRejectSource(srcCsv)) {
             //log(`isRejectSource(${clueCount}) ${srcCsv}`);
             ++result.reject;
         } else {
-            /*
             if (isKnownSource(srcCsv, clueCount)) {
                 log(`isKnownSource(${clueCount}) ${srcCsv}`);
                 ++result.known;
@@ -750,13 +753,14 @@ export const filter = (srcCsvList: string[], clueCount: number, result: FilterRe
                 log(`duplicate: ${srcCsv}`);
                 ++result.duplicate;
             }
-            */
-            result.map[srcCsv] = true;
-        }
+        */
+        result.map[srcCsv] = true;
+        //}
     });
     return result;
 };
 
+/*
 const getKnownClues = (nameList: string|string[]): Record<string, Clue.Any[]> => {
     if (_.isString(nameList)) {
         nameList = (nameList as string).split(',');
@@ -780,6 +784,7 @@ const getKnownClues = (nameList: string|string[]): Record<string, Clue.Any[]> =>
 export const getKnownClueNames = (nameList: string | string[]): string[] => {
     return Object.keys(getKnownClues(nameList));
 };
+*/
 
 const addClueForCounts = (countSet: Set<number>, name: string, src: string,
     propertyName: string, options: any): number =>
@@ -890,7 +895,8 @@ export const addRemoveOrReject = (args: any, nameList: string[],
             let removeOptions = { save: options.save, nothrow: true };
             count = removeClueForCounts(countSet, args.remove, nameList.toString(), args.property, removeOptions);
         }
-    } else if (args.reject) {
+    }
+/* else if (args.reject) {
         if (nameList.length === 1) {
             console.log('WARNING! ignoring --reject due to single source');
         } else if (args.isKnown) {
@@ -902,6 +908,7 @@ export const addRemoveOrReject = (args: any, nameList: string[],
             console.log('update failed');
         }
     }
+*/
     return count;
 };
 

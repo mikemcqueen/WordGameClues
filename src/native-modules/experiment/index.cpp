@@ -16,6 +16,7 @@
 #include "merge.h"
 #include "merge-filter-common.h"
 #include "merge-filter-data.h"
+#include "show-components.h"
 #include "validator.h"
 #include "wrap.h"
 
@@ -359,7 +360,7 @@ Value isKnownSourceMapEntry(const CallbackInfo& info) {
 }
 
 // nc, name_csv
-Value populateNcSourcesFromKnownSource(const CallbackInfo& info) {
+Value addCompoundClue(const CallbackInfo& info) {
   Env env = info.Env();
   if (!info[0].IsObject() || !info[1].IsString()) {
     TypeError::New(env, "appendNcResultsFromSrcMap: invalid parameter type")
@@ -370,23 +371,10 @@ Value populateNcSourcesFromKnownSource(const CallbackInfo& info) {
   auto nc = makeNameCount(env, info[0].As<Object>());
   // arg1
   auto src_csv = info[1].As<String>().Utf8Value();
-
-  auto num_appended =
-    clue_manager::append_nc_sources_from_known_source(nc, src_csv);
-  return Number::New(env, num_appended);
-}
-
-  /*
-Value addPrimaryClueNameVariations(const CallbackInfo& info) {
-  Env env = info.Env();
-  if (!info[1].IsArray()) {
-    TypeError::New(env, "addPrimaryClueNameVariations: invalid parameter type")
-      .ThrowAsJavaScriptException();
-    return env.Null();
-  }
+  // --
+  clue_manager::add_compound_clue(nc, src_csv);
   return env.Null();
 }
-  */
 
 Value getSourcesForNc(const CallbackInfo& info) {
   Env env = info.Env();
@@ -435,7 +423,7 @@ Value validateSources(const CallbackInfo& info) {
   auto sum = info[2].As<Number>().Int32Value();
   // arg 3
   auto validate_all = info[3].As<Boolean>();
-
+  // --
   auto src_list =
     validator::validateSources(clue_name, src_names, sum, validate_all);
   auto empty_src_list = src_list.empty();
@@ -462,9 +450,9 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   }
   // arg0
   auto ncDataLists = makeNcDataLists(env, info[0].As<Array>());
-  //arg1
+  // arg1
   auto merge_only = info[1].As<Boolean>();
-  //--
+  // --
   auto build0 = high_resolution_clock::now();
   // TODO: I'm not convinced this data needs to hang around on host side.
   // maybe for async copy?
@@ -483,7 +471,6 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
 #endif
 
   //--
-  XorSourceList merge_only_xor_src_list;
   if (!merge_only || (MFD.xor_src_lists.size() > 1)) {
     // TODO: support for single-list compat indices
     auto compat_idx_lists = get_compatible_indices(MFD.xor_src_lists);
@@ -492,24 +479,23 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
         cuda_get_compat_xor_src_indices(MFD.xor_src_lists, compat_idx_lists);
       if (merge_only) {
         // merge-only with multiple xor args uses compat index lists and combo
-        // indices for the sole purpose of generating an xor_src_list.
-        merge_only_xor_src_list = std::move(merge_xor_sources(
+        // indices for the sole purpose of generating an xor_src_list - no need
+        // to save them for later use
+        MFD.merge_xor_src_list = std::move(merge_xor_sources(
           MFD.xor_src_lists, compat_idx_lists, combo_indices));
       } else {
-        // filter will need them both later
+        // filter otoh will need them both later
         MFD.compat_idx_lists = std::move(compat_idx_lists);
         MFD.combo_indices = std::move(combo_indices);
       }
     }
   } else if (MFD.xor_src_lists.size() == 1) {
-    merge_only_xor_src_list = std::move(MFD.xor_src_lists.back());
+    assert(merge_only);
+    MFD.merge_xor_src_list = std::move(MFD.xor_src_lists.back());
   }
-  if (merge_only) {
-    // merge-only returns wrapped xor_src_list
-    return wrap(env, merge_only_xor_src_list);
-  }
-  // filter returns number of compatible indices
-  return Number::New(env, (uint32_t)MFD.combo_indices.size());
+  auto result =
+    (merge_only) ? MFD.merge_xor_src_list.size() : MFD.combo_indices.size();
+  return Number::New(env, (uint32_t)result);
 }
 
 Value setOrArgs(const CallbackInfo& info) {
@@ -524,7 +510,7 @@ Value setOrArgs(const CallbackInfo& info) {
   }
   // arg0
   auto ncDataLists = makeNcDataLists(env, info[0].As<Array>());
-  //
+  // --
   auto build0 = high_resolution_clock::now();
   // TODO: I'm not convinced this data needs to hang around on host side.
   // maybe for async copy?
@@ -612,9 +598,12 @@ Value considerCandidate(const CallbackInfo& info) {
       .ThrowAsJavaScriptException();
     return env.Null();
   }
+  // arg0
   auto ncList = makeNameCountList(env, info[0].As<Array>());
+  // arg1
   const auto sum = info[1].As<Number>().Int32Value();
   assert(sum >= 2);
+  // --
   consider_candidate(ncList, sum);
   return env.Null();
 }
@@ -637,6 +626,7 @@ Value filterCandidatesForSum(const CallbackInfo& info) {
   auto stride = info[3].As<Number>().Int32Value();
   auto iters = info[4].As<Number>().Int32Value();
   auto synchronous = info[5].As<Boolean>().Value();
+  // --
   filterCandidatesCuda(
     sum, threads_per_block, streams, stride, iters, synchronous);
   return env.Null();
@@ -652,20 +642,34 @@ Value getResult(const CallbackInfo& info) {
 }
 
 //
+// showComponents
+//
+Value showComponents(const CallbackInfo& info) {
+  Env env = info.Env();
+  if (!info[0].IsArray()) {
+    TypeError::New(env, "showComponents: invalid parameter type")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+  // arg0:
+  auto name_list = makeStringList(env, info[0].As<Array>());
+  // --
+  show_components::of(name_list);
+  // TODO: return addRemoveSet contents
+  return env.Null();
+}
+
+
+//
 Object Init(Env env, Object exports) {
-  //
   // clue-manager
+  //
   exports["getNumNcResults"] = Function::New(env, getNumNcResults);
   exports["setPrimaryNameSrcIndicesMap"] = Function::New(env, setPrimaryNameSrcIndicesMap);
   exports["setCompoundClueNameSourcesMap"] = Function::New(env, setCompoundClueNameSourcesMap);
   exports["isKnownSourceMapEntry"] = Function::New(env, isKnownSourceMapEntry);
   exports["getSourcesForNc"] = Function::New(env, getSourcesForNc);
-  exports["populateNcSourcesFromKnownSource"] =
-    Function::New(env, populateNcSourcesFromKnownSource);
-  /*
-  exports["addPrimaryClueNameVariations"] =
-    Function::New(env, addPrimaryClueNameVariations);
-  */
+  exports["addCompoundClue"] = Function::New(env, addCompoundClue);
 
   // validator
   //
@@ -681,6 +685,10 @@ Object Init(Env env, Object exports) {
   exports["filterCandidatesForSum"] =
     Function::New(env, filterCandidatesForSum);
   exports["getResult"] = Function::New(env, getResult);
+
+  // show-components
+  //
+  exports["showComponents"] = Function::New(env, showComponents);
 
   return exports;
 }

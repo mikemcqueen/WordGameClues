@@ -37,15 +37,19 @@ struct VariationIndices {
 }  // namespace device
 
 struct MergeFilterData {
-  /* merge + filter */
+  // merge
+  //
+  SourceList merge_xor_src_list;
 
+  // merge + filter
+  //
   std::vector<SourceList> xor_src_lists;
 
   SourceCompatibilityData* device_src_lists{};
   index_t* device_idx_lists{};
 
-  /* filter */
-  
+  // filter
+  //
   index_t* device_src_list_start_indices{};
   index_t* device_idx_list_start_indices{};
   index_t* device_idx_list_sizes{};
@@ -56,7 +60,7 @@ struct MergeFilterData {
 
   device::VariationIndices* device_variation_indices{};
   unsigned num_nariation_indices{};
-  //  SentenceVariationIndices sentenceVariationIndices;
+  // SentenceVariationIndices sentenceVariationIndices;
 
   OrArgList or_arg_list;
   unsigned num_or_args{};
@@ -66,6 +70,6 @@ struct MergeFilterData {
 
 inline MergeFilterData MFD;
 
-}
+}  // namespace cm
 
 #endif  // INCLUDE_MERGE_FILTER_DATA_H

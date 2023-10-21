@@ -1,3 +1,25 @@
+* -t wrap is very slow for simple combinations, e.g. -t navy,'man o war' = 43 seconds.
+  the solution to this would seem to be to move the relevant parts of show-components
+  to C++ in order to avoid wrapping.
+  * getCountListArrays - easyish
+    * DONE need to move knownSourceMap.clues to C++. Might require defining clue type in c++.
+    * DONE then show-components::add_result_for_sources should be implementable.
+    * DONE i also wonder what I am doing exactly for get_compound_nc_sources; currently I
+      am just calling cm::get_nc_sources, and that may be fine, but the JS code for
+      compound case was using ClueManager.clueList or something, which is weird.
+      * I wonder if that "clues" field in knownSourceMap can cover this case, so I can
+        compare results?
+  * DONE showCountListArrays - easy
+
+  * TODO addRemoveOrReject - probably could wrap only the contents of this set back to
+    JS and perform the action there.
+
+* i should probably document and/or name and/or encapsulate some of the clue-manager
+  global data into classes to help me remember what is what and what goes where. its
+  a bit of a mess of rather poorly named global data and functions at the moment,
+  and i don't have a lot of intuition about it all, so could use the help of some
+  additional structure.
+
 * node clues -pf.72 -t buck
   * tentatively fixed.
   
@@ -6,8 +28,9 @@
   * in the filter kernel somewhere
   * oddly though, sometimes it only produces results when I call markAll, even
     though I can't identify where it's actually used.
+  * why don't i change the field name to is_xor_compat, and see what breaks.
   
-* getUniqueClueNameCount -> Native.get_num_uniuque_clue_names
+* getUniqueClueNameCount -> Native.get_num_unique_clue_names
 
 * hash/is_equal for NameCount, make (nc)knownSrcListMap key a NameCount
 
@@ -15,7 +38,7 @@
   actually exist in one of the variations? After the variations have been generated,
   in case they're a syn/an/hom of a component variation, for example.
 
-*  merge_support: uint64_t num_combos{200'000'000}; // hard-coded chunk size
+* merge_support: uint64_t num_combos{200'000'000}; // hard-coded chunk size
    should probably (eventually) figure out:
    - hardcoded:
    - GD = goal duration (ms) per chunk (e.g. 50ms)
@@ -37,13 +60,14 @@
 
 * synonyms need to be global. probably all of them. global hash map.
   this will reduce load time and merge time. not 100% sure how to go about
-  implementing thouhg. but should figure it out.
+  implementing though. but should figure it out.
 
 * no --xor == no filter call?  it's crashing due to empty xor data probably
   (but probably shouldn't even be called)
   what about --or with no --xor? bet that's fun. probably should fail (or fix).
 
 * fix lifetime issue requiring sync in cuda_allocCopySentenceVariationIndices(
+  * store in MFD
 
 * incompatible_sources: could be CRefs?
 
@@ -67,7 +91,6 @@
 **************************************************************************
 
 * consider stripping some types out of combo_maker.h into separate files.
-* PreComputeData probably needs to go do it's own thing. Some form of singleton.
 
 **************************************************************************
 * i have count(), countIndices(), and sum_sizes() and I think they all do 

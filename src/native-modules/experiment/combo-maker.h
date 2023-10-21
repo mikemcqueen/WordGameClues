@@ -414,6 +414,15 @@ struct NameCount {
     return count_set;
   }
 
+  static auto listToCountList(const NameCountList& list) {
+    std::vector<int> result;
+    result.reserve(list.size());
+    for (const auto& nc : list) {
+      result.push_back(nc.count);
+    }
+    return result;
+  }
+
   static auto listToUsedSources(const NameCountList& list) {
     UsedSources usedSources{};
     for (const auto& nc : list) {

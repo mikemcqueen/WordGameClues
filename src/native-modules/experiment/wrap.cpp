@@ -1,4 +1,5 @@
 #include <chrono>
+#include <iostream>
 #include "wrap.h"
 
 using namespace Napi;
@@ -36,10 +37,16 @@ Object wrap(Env& env, const XorSource& xorSource) {
 }
 
 Array wrap(Env& env, const XorSourceList& xorSourceList) {
+  using namespace std::chrono;
+  auto t0 = high_resolution_clock::now();
   Array jsList = Array::New(env, xorSourceList.size());
   for (size_t i{}; i < xorSourceList.size(); ++i) {
     jsList.Set(i, wrap(env, xorSourceList[i]));
   }
+  auto t1 = high_resolution_clock::now();
+  [[maybe_unused]] auto t_dur = duration_cast<milliseconds>(t1 - t0).count();
+  std::cout << " wrap src-list(" << xorSourceList.size() << ")"
+            << " - " << t_dur << "ms" << std::endl;
   return jsList;
 }
 
