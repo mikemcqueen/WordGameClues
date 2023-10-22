@@ -31,11 +31,6 @@ import * as Source from './source';
 
 ///////////
 
-interface CountListNameList {
-    countList: number[];
-    nameList: string[];
-}
-
 function Stringify (val) {
     return stringify(val, (value, indent, stringify) => {
         if (typeof value == 'function') return "function";
@@ -43,170 +38,7 @@ function Stringify (val) {
     }, " ");
 }
 
-/*
-const getPrimaryClueNameSources = (name: string): string[] => {
-    const nc: NameCount.Type = { name, count: 1};
-    const primary_sources: string[] = Native.getSourcesForNc(nc);
-    return primary_sources;
-    //begin
-  well it seems this is all unnecessary, and variations names exist in the
-  native nameSourcesMap! and I didn't realize that before I spent an hour
-  writing code assuming it didn't. which tells me I don't really understand
-  this code very well.
-
-    const variation_sources = new Set<string>();
-    const variation_names = ClueManager.getAllNamesForVariationName(name);
-    for (let v_name of variation_names) {
-        const sources: string[] = Native.getSourcesForNc(nc);
-        for (let source of sources) {
-            variation_sources.add(source);
-        }
-    }
-    // test if a particular name is both used as a "primary" (non-variation)
-    // name and as a variation name.
-    // nothing wrong with this, i just don't expect it (yet), and want to be
-    // notified when it happens. the likelihood that something is wrong when 
-    // it does happen seems about equal to the likelihood that it is benign.
-    if ((primary_sources.length && variation_sources.size)) {
-        console.error(`name: ${name}`);
-        console.error(`primary_sources: ${primary_sources}`);
-        console.error(`variation_sources: ${[...variation_sources]}`);
-        process.exit(-1);
-    }
-    for (let source of primary_sources) {
-        variation_sources.add(source);
-    }
-    return [...variation_sources];
-};
-
-const getCompoundNcSrcList = (nc: NameCount.Type): string[] => {
-    Assert(nc.count > 1);
-    return ClueManager.getClueList(nc.count)
-        .filter(clue => clue.name === nc.name)
-        .map(clue => clue.src);
-};
-
-const getNcSrcList = (nc: NameCount.Type): string[] => {
-    return nc.count === 1 ? getPrimaryClueNameSources(nc.name)
-        : getCompoundNcSrcList(nc);
-};
-*/
-
-/*
-const getCountListArrays = (nameList: string[], pcResult: PreCompute.Result,
-    options: any): any =>
-{
-    let addRemoveSet: Set<number> = new Set<number>();
-    //if (options.add || options.remove) {
-    //  addRemoveSet = new Set<number>();
-    //}
-    let valid: number[][] = [];
-    let known: CountListNameList[] = [];
-    let clues: CountListNameList[] = [];
-    let invalid: number[][] = [];
-    let nameListStr: string = nameList.toString();
-    let hash = {};
-
-    for (const xorSource of pcResult.data!.xor as Source.List) {
-        const countList = NameCount.listToCountList(xorSource.ncList);
-        // for --verbose, we could allow this:
-        const hashKey = countList.toString();
-        if (hash[hashKey]) continue;
-        hash[hashKey] = true;
-        // TODO: in order to support this, we'd need to pass a flag to PreCompute to
-        // tell it to preserve the filtered incompatible combinations, or manually
-        // walk through all ClueManager.knownSourceMaps looking for a sourceCsv combo,
-        // and displaying those that *aren't* in the xor list. the latter should be done
-        // in a separate loop probably, not in this loop.
-
-        //if (!result.success) {
-        //  console.log(`invalid: ${nameList}  CL ${clueCountList}  x ${x} sum ${sum}  validateAll=${validateAll}`);
-        //  invalid.push(clueCountList);
-        //} else
-
-        const sum = countList.reduce((a, b) => a + b);
-        if (nameList.length === 1) {
-            const name = nameList[0];
-            let srcList = getNcSrcList({ name, count: sum });
-            if (srcList.length) {
-                clues.push({ countList: [sum], nameList: srcList });
-            } else {
-                console.log(`hmm, no sources for ${name}:${sum}`);
-            }
-        } else {
-            const sourceMap = ClueManager.getKnownSourceMap(sum);
-            if (!sourceMap) {
-                console.error(`!sourceMap(${sum}), nameList: ${nameListStr}`);
-                //  + ` xorSource.ncList: ${NameCount.listToString(xorSource.ncList)}`);
-                continue;
-            }
-            let sourceData = sourceMap[nameListStr];
-            if (sourceData) {
-                known.push({
-                    countList,
-                    nameList: (sourceData.clues as ClueList.Compound).map(clue => clue.name)
-                });
-            } else {
-                valid.push(countList);
-            }
-            if ((options.add && (sum <= options.addMaxSum))
-                  || (options.remove && (sum >= options.removeMinSum))) {
-                addRemoveSet.add(sum);
-            }
-        }
-    }
-    return { valid, known, invalid, clues, addRemoveSet };
-};
-
-function getClueSources (nameList) {
-    return nameList.join(' - ');
-}
-
-function getSourceClues (source, countList, nameList) {
-    const count = countList.reduce((sum, count) => sum + count, 0);
-    if (!Native.isKnownSourceMapEntry(count, source)) {
-        let sourceList = source.split(',');
-        let s = '';
-        sourceList.forEach((source, index) => {
-            // [source] is wrong at least for primary clue case, need actual list of sources.
-            s += getClueSources([source]);
-        });
-        return s;
-    }
-    return getClueSources(nameList);
-}
-
-function showCountListArray (name, countListArray, text, hasNameList = false) {
-    for (const elem of countListArray) {
-        const countList = hasNameList ? elem.countList : elem;
-        let sources = '';
-        if (name) {
-            if (countList.length > 1) {
-                // -t name1,name2[,name3,...] (multiple names; name == nameCsv here)
-                sources += getSourceClues(name, countList, elem.nameList); // 
-            } else {
-                // -t name (one name only)
-                sources += getClueSources(elem.nameList);
-            }
-        }
-        console.log(`${countList} ${text} ${sources}`);
-    }
-}
-
-const showCountLists = (nameList: string[], result: any, options: any): any => {
-    //showCountListArray(null, result.rejects, 'REJECTED');
-    showCountListArray(null, result.invalid, 'INVALID');
-    showCountListArray(nameList.toString(), result.known, 'PRESENT as', true);
-    showCountListArray(nameList.toString(), result.clues, 'PRESENT as clue with source:', true);
-    showCountListArray(null, result.valid, 'VALID');
-
-    //
-    // *****
-    // TODO: honor options.addMaxSum, options.removeMinSum here
-    // *****
-    //
-
-    // TODO: extract this to helper function, maybe in clue-manager
+export const addRemove = (names: string[], counts: number[], options: any): number => {
     // NOTE: explicit undefined check here is necessary
     const save = _.isUndefined(options.save) ? true : options.save;
     // good lord this function call is something else
@@ -214,31 +46,23 @@ const showCountLists = (nameList: string[], result: any, options: any): any => {
         add:      options.add,
         remove:   options.remove,
         property: options.property,
-        reject:   options.reject,
-        isKnown:  !_.isEmpty(result.known),
-        isReject: !_.isEmpty(result.reject)
-    }, nameList, result.addRemoveSet, {
+        reject:   options.reject
+    }, names, counts, {
         save,
-        max: options.max ? Number(options.max) : 0
+        addMax: options.max ? Number(options.max) : 30,
+        removeMin: 0
     });
     if (options.add || options.remove) {
         console.log(`${options.add ? "added" : "removed"} ${count} clues`);
     }
-    return Object.assign(result, { added: count });
+    return count;
 };
-*/
 
 export const show = (options: any): any => {
     Expect(options).is.an.Object();
     Expect(options.test).is.a.String();
     if (options.reject) {
         Expect(options.add).is.undefined();
-    }
-    if (options.add) {
-        options.addMaxSum = 30;
-    }
-    if (options.remove) {
-        options.removeMinSum = 0;
     }
     options.fast = true; // force fast
     console.log(`test: ${options.test}, fast=${options.fast}`);
@@ -255,11 +79,8 @@ export const show = (options: any): any => {
     // TODO: don't wrap here for -t, but save results in Native.MFD
     const pc_result = PreCompute.preCompute(2, options.max_sources, pc_args);
     if (pc_result) {
-        Native.showComponents(nameList);
-        /*
-          const result = getCountListArrays(nameList, pcResult, options);
-          showCountLists(nameList, result, options);
-        */
+        const counts = Native.showComponents(nameList);
+        addRemove(nameList, counts, options);
     } else {
         console.error(`Precompute failed.`);
     }

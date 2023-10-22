@@ -1,8 +1,8 @@
 #ifndef INCLUDE_WRAP_H
 #define INCLUDE_WRAP_H
 
-#include <unordered_set>
-#include <string_view>
+#include <set>
+#include <string>
 #include <vector>
 #include <napi.h>
 #include "combo-maker.h"
@@ -23,6 +23,7 @@ Napi::Object wrap(Napi::Env& env, const PerfData& perf);
 Napi::Object wrap(Napi::Env& env, const CandidateStats& cs);
 
 Napi::Array wrap(Napi::Env& env, const std::vector<std::string>& strList);
+Napi::Array wrap(Napi::Env& env, const std::set<int>& values);
 
 }  // namespace cm
 

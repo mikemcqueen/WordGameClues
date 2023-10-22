@@ -29,6 +29,15 @@ Array wrap(Env& env, const std::vector<std::string>& strList) {
   return jsList;
 }
 
+Napi::Array wrap(Napi::Env& env, const std::set<int>& values) {
+  Array jsList = Array::New(env, values.size());
+  int idx{};
+  for (auto it = values.begin(); it != values.end(); ++it, ++idx) {
+    jsList.Set(idx, Number::New(env, *it));
+  }
+  return jsList;
+}
+
 Object wrap(Env& env, const XorSource& xorSource) {
   Object jsObj = Object::New(env);
   jsObj.Set("primaryNameSrcList", wrap(env, xorSource.primaryNameSrcList));

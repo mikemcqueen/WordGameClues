@@ -3,12 +3,13 @@
 #ifndef INCLUDE_SHOW_COMPONENTS_H
 #define INCLUDE_SHOW_COMPONENTS_H
 
+#include <set>
 #include <string>
 #include <vector>
 
 namespace cm::show_components {
 
-void of(const std::vector<std::string>& name_list);
+auto of(const std::vector<std::string>& name_list) -> std::set<int>;
 
 }  // namespace cm::show_components
 

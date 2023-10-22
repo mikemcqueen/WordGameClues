@@ -47,7 +47,7 @@ export interface AllCandidatesContainer {
 type InternalStateBase = {
     clueListArray: ClueList.Any[];    // the JSON "known" clue files in an array
     knownClueMapArray: ClueMap[];     // map clue name to list of clue sourceCsvs
-    knownSourceMapArray: SourceMap[]; // map sourceCsv to SourceMapValue
+    //knownSourceMapArray: SourceMap[]; // map sourceCsv to SourceMapValue
 
     variations: Sentence.Variations;  // "global" variations aggregated from all sentences
     sentences: Sentence.Type[];
@@ -74,7 +74,7 @@ const initialState = (): InternalState => {
     return {
         clueListArray: [],
         knownClueMapArray: [],
-        knownSourceMapArray: [],
+        //knownSourceMapArray: [],
 
         sentences: [],
         variations: Sentence.emptyVariations(),
@@ -113,9 +113,11 @@ export function getKnownClueMap (count: number): ClueMap {
     return State.knownClueMapArray[count];
 }
 
+/*
 export function getKnownSourceMap (count: number): SourceMap {
     return State.knownSourceMapArray[count];
 }
+*/
 
 export function getAllCandidates (): AllCandidates {
     return State.allCandidates;
@@ -530,23 +532,25 @@ const findConflicts = (set: Set<string>, nameSrcList: NameCount.List) : boolean 
 // 
 let addCompoundClue = (clue: Clue.Compound, count: number, args: any): boolean => {
     let nameList = clue.src.split(',').sort();
-    let srcMap = getKnownSourceMap(count);
+    //let srcMap = getKnownSourceMap(count);
     let srcCsv = nameList.toString();
     let vs_result = true;
     // new sources need to be validated
     if (!Native.isKnownSourceMapEntry(count, srcCsv)) {
         vs_result = Native.validateSources(clue.name, nameList, count,
             args.validateAll);
+        /*
         if (vs_result && args.validateAll) {
             srcMap[srcCsv] = {
                 clues: [],
             };
         }
+        */
     }
     if (vs_result && args.validateAll) {
         Native.addCompoundClue({name: clue.name, count}, srcCsv);
         // TODO: can remove, along with all of knownSourceMapArray
-        (srcMap[srcCsv].clues as ClueList.Compound).push(clue);
+        //(srcMap[srcCsv].clues as ClueList.Compound).push(clue);
     }
     return vs_result;
 };
@@ -573,10 +577,10 @@ const addKnownCompoundClues = (clueList: ClueList.Compound, clueCount: number,
 {
     Assert(clueCount > 1);
     // this is currently only callable once per clueCount.
-    Assert(!getKnownClueMap(clueCount) && !getKnownSourceMap(clueCount));
+    Assert(!getKnownClueMap(clueCount)); //  && !getKnownSourceMap(clueCount));
 
     State.knownClueMapArray[clueCount] = {};
-    State.knownSourceMapArray[clueCount] = {};
+    //State.knownSourceMapArray[clueCount] = {};
 
     clueList
         .filter(clue => !clue.ignore)
@@ -786,12 +790,12 @@ export const getKnownClueNames = (nameList: string | string[]): string[] => {
 };
 */
 
-const addClueForCounts = (countSet: Set<number>, name: string, src: string,
+const addClueForCounts = (counts: number[], name: string, src: string,
     propertyName: string, options: any): number =>
 {
     const clue: Clue.Compound = { name, src };
-    return Array.from(countSet)
-        .filter((count: number) => { return !options.max || (count <= options.max); })
+    return counts
+        .filter((count: number) => { return !options.addMax || (count <= options.addMax); })
         .reduce((added: number, count: number) => {
             if (!propertyName) {
                 if (options.compound) {
@@ -819,11 +823,11 @@ const addClueForCounts = (countSet: Set<number>, name: string, src: string,
         }, 0);
 };
 
-const removeClueForCounts = (countSet: Set<number>, name: string, src: string,
+const removeClueForCounts = (counts: number[], name: string, src: string,
     propertyName: string, options: any = {}): number =>
 {
     let removed = 0;
-    for (let count of countSet.keys()) {
+    for (let count of counts) {
         if (!propertyName) {
             if (removeClue(count, { name, src }, options.save, options.nothrow)) {
                 Debug(`removed ${name}:${count}`);
@@ -839,7 +843,7 @@ const removeClueForCounts = (countSet: Set<number>, name: string, src: string,
             if (foundClue) {
                 delete foundClue[propertyName];
                 console.log(`${count}: removed '${propertyName}' property from ${name}:${src}`);
-            removed += 1;
+                removed += 1;
             }
         }
     }
@@ -875,25 +879,32 @@ const getKnownClueIndexLists = (nameList: string[]): CountList[] => {
 //   isReject
 //
 export const addRemoveOrReject = (args: any, nameList: string[],
-    countSet: Set<number>, options: any = {}): number =>
+    counts: number[], options: any = {}): number =>
 {
     let count = 0;
     nameList = nameList.sort();
     if (args.add) {
         if (nameList.length === 1) {
             console.log('WARNING! ignoring --add due to single source');
-        } else if (args.isReject) {
+        }
+        /*
+        else if (args.isReject) {
             console.log('WARNING! cannot add known clue: already rejected, ' + nameList);
-        } else {
-            count = addClueForCounts(countSet, args.add, nameList.toString(), args.property, options);
+        }
+        */
+        else {
+            count = addClueForCounts(counts, args.add, nameList.toString(), args.property, options);
         }
     } else if (args.remove) {
-        Debug(`remove [${args.remove}] as ${nameList} from ${[...countSet.values()]}`);
+        Debug(`remove [${args.remove}] as ${nameList} from ${counts}`);
         if (nameList.length === 1) {
             console.log('WARNING! ignoring --remove due to single source');
         } else {
-            let removeOptions = { save: options.save, nothrow: true };
-            count = removeClueForCounts(countSet, args.remove, nameList.toString(), args.property, removeOptions);
+            let removeOptions = {
+                save: options.save,
+                nothrow: true
+            };
+            count = removeClueForCounts(counts, args.remove, nameList.toString(), args.property, removeOptions);
         }
     }
 /* else if (args.reject) {

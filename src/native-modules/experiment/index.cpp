@@ -654,9 +654,8 @@ Value showComponents(const CallbackInfo& info) {
   // arg0:
   auto name_list = makeStringList(env, info[0].As<Array>());
   // --
-  show_components::of(name_list);
-  // TODO: return addRemoveSet contents
-  return env.Null();
+  auto sums = show_components::of(name_list);
+  return wrap(env, sums);
 }
 
 

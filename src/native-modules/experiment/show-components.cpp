@@ -1,7 +1,6 @@
 // show-components.cpp
 
 #include <iostream>
-#include <unordered_set>
 #include "clue-manager.h"
 #include "combo-maker.h"
 #include "merge-filter-data.h"
@@ -16,7 +15,7 @@ struct NamesAndCounts {
 };
 
 struct Results {
-  std::unordered_set<int> sums;
+  std::set<int> sums;
   std::vector<std::vector<int>> valid;
   std::vector<std::vector<int>> invalid;
   std::vector<NamesAndCounts> known;
@@ -137,9 +136,10 @@ void display_results(
 
 }  // namespace
 
-void of(const std::vector<std::string>& name_list) {
+auto of(const std::vector<std::string>& name_list) -> std::set<int> {
   auto results = get_results(name_list);
   display_results(name_list, results);
+  return results.sums;
 }
 
 }  // namespace cm::show_components
