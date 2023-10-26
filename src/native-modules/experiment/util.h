@@ -5,19 +5,21 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
-#include "peco.h"
+#include "cuda-types.h" // IndexList
+#include "peco.h" // Peco::IndexList
 
 namespace util {
 
-inline int list_size(const Peco::IndexList& indexList) {
-  // TODO: use std::distance?
-  int size = 0;
-  std::for_each(indexList.cbegin(), indexList.cend(),
-                [&size](int i){ ++size; });
-  return size;
+inline auto make_list_sizes(const std::vector<cm::IndexList>& idx_lists) {
+  cm::IndexList sizes;
+  sizes.reserve(idx_lists.size());
+  for (const auto& idx_list : idx_lists) {
+    sizes.push_back(idx_list.size());
+  }
+  return sizes;
 }
 
-template <typename T> auto sum_sizes(const std::vector<T>& vecs) {
+template <typename T> inline auto sum_sizes(const std::vector<T>& vecs) {
   size_t sum{};
   for (const auto& v : vecs) {
     sum += v.size();
@@ -38,7 +40,7 @@ inline std::string vec_to_string(const std::vector<T>& v) {
 
 template <typename T>
 // TODO: is_integral_type<T>
-inline T sum(const std::vector<T>& nums) {
+T sum(const std::vector<T>& nums) {
   return std::accumulate(nums.begin(), nums.end(), 0, [](T total, T num) {
     total += num;
     return total;

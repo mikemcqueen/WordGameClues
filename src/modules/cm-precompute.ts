@@ -244,7 +244,7 @@ export const preCompute = (first: number, last: number, args: any): boolean => {
     const begin = new Date();
     // XOR first
     const xorNcDataLists = args.xor ? buildAllUseNcDataLists(args.xor, maxSum) : [ [] ];
-    if (args.xor && listIsEmpty(xorNcDataLists)) return false;
+    if (listIsEmpty(xorNcDataLists)) return false;
 
     const num_indices: number = 
         Native.mergeCompatibleXorSourceCombinations(xorNcDataLists, merge_only);
@@ -253,10 +253,10 @@ export const preCompute = (first: number, last: number, args: any): boolean => {
 
     // OR next
     const orNcDataLists = args.or ? buildAllUseNcDataLists(args.or, maxSum) : [ [] ];
-    if (args.or && listIsEmpty(orNcDataLists)) return false;
+    if (listIsEmpty(orNcDataLists)) return false;
 
-    Native.setOrArgs(orNcDataLists);
-    Native.filterPreparation();
+    //Native.setOrArgs(orNcDataLists);
+    Native.filterPreparation(orNcDataLists);
 
     const d = new Duration(begin, new Date()).milliseconds;
     console.error(`--Precompute - ${PrettyMs(d)}`);

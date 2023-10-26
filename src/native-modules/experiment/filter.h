@@ -10,12 +10,13 @@ namespace cm {
 
 // functions
 
-void filterCandidatesCuda(int sum, int threads_per_block, int num_streams,
-  int stride, int iters, bool synchronous);
+void filterCandidatesCuda(const MergeFilterData& mfd, int sum,
+  int threads_per_block, int num_streams, int stride, int iters,
+  bool synchronous);
 
 void run_xor_kernel(StreamData& stream, int threads_per_block,
-  const SourceCompatibilityData* device_sources, result_t* device_results,
-  const index_t* device_list_start_indices);
+  const MergeFilterData& mfd, const SourceCompatibilityData* device_sources,
+  result_t* device_results, const index_t* device_list_start_indices);
 
 filter_result_t get_filter_result();
 

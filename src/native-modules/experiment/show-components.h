@@ -9,7 +9,8 @@
 
 namespace cm::show_components {
 
-auto of(const std::vector<std::string>& name_list) -> std::set<int>;
+auto of(const std::vector<std::string>& name_list,
+  const SourceList& xor_src_list) -> std::set<int>;
 
 }  // namespace cm::show_components
 

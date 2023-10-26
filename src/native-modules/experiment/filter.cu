@@ -337,8 +337,8 @@ void dump_xor(int index) {
 namespace cm {
 
 void run_xor_kernel(StreamData& stream, int threads_per_block,
-  const SourceCompatibilityData* device_sources, result_t* device_results,
-  const index_t* device_list_start_indices) {
+  const MergeFilterData& mfd, const SourceCompatibilityData* device_sources,
+  result_t* device_results, const index_t* device_list_start_indices) {
   //
   int num_sm;
   cudaDeviceGetAttribute(&num_sm, cudaDevAttrMultiProcessorCount, 0);
@@ -347,9 +347,9 @@ void run_xor_kernel(StreamData& stream, int threads_per_block,
   auto blocks_per_sm = threads_per_sm / block_size;
   // assert(blocks_per_sm * block_size == threads_per_sm);
   auto grid_size = num_sm * blocks_per_sm;  // aka blocks per grid
-  auto shared_bytes = MFD.num_or_args * sizeof(result_t);
+  auto shared_bytes = mfd.host.num_or_args * sizeof(result_t);
   // enforce assumption in is_source_or_compatible()
-  assert(MFD.num_or_args < block_size);
+  assert(mfd.host.num_or_args < block_size);
 
   stream.is_running = true;
   stream.sequence_num = StreamData::next_sequence_num();
@@ -363,11 +363,11 @@ void run_xor_kernel(StreamData& stream, int threads_per_block,
     assert((err == cudaSuccess) && "sync before kernel");
   }
   xor_kernel_new<<<grid_dim, block_dim, shared_bytes, stream.cuda_stream>>>(
-    device_sources, stream.source_indices.size(), MFD.device_src_lists,
-    MFD.device_src_list_start_indices, MFD.device_idx_lists,
-    MFD.device_idx_list_start_indices, MFD.device_idx_list_sizes,
-    MFD.compat_idx_lists.size(), MFD.device_variation_indices, MFD.num_or_args,
-    MFD.device_or_sources, MFD.num_or_sources, stream.device_source_indices,
+    device_sources, stream.source_indices.size(), mfd.device.src_lists,
+    mfd.device.src_list_start_indices, mfd.device.idx_lists,
+    mfd.device.idx_list_start_indices, mfd.device.idx_list_sizes,
+    mfd.host.compat_idx_lists.size(), mfd.device.variation_indices, mfd.host.num_or_args,
+    mfd.device.or_sources, mfd.device.num_or_sources, stream.device_source_indices,
     device_list_start_indices, device_results, stream.stream_idx);
 
 #if defined(LOGGING)

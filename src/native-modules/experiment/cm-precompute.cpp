@@ -207,7 +207,7 @@ void markAllXorCompatibleOrSources(OrArgList& or_arg_list,
     for (auto& or_src : or_arg.or_src_list) {
       if (isXorCompatibleWithAnySource(
             or_src, xor_src_lists, compat_idx_lists, compat_indices)) {
-        or_src.xor_compat = true;
+        or_src.is_xor_compat = true;
         ++num_compat;
       }
     }

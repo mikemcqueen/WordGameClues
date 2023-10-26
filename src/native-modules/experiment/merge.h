@@ -18,13 +18,14 @@ int run_list_pair_compat_kernel(const SourceCompatibilityData* device_sources1,
   result_t* device_compat_results);
 
 int run_get_compat_combos_kernel(uint64_t first_combo, uint64_t num_combos,
-  const result_t* device_compat_matrices,
+  const result_t* device_compat_matrices, unsigned num_compat_matrices,
   const index_t* device_compat_matrix_start_indices,
-  unsigned num_compat_matrices, const index_t* device_idx_list_sizes,
-  result_t* device_results);
+  const index_t* device_idx_list_sizes, result_t* device_results);
 
-auto cuda_get_compat_xor_src_indices(const std::vector<SourceList>& sourceLists,
-  const std::vector<IndexList>& idx_lists) -> std::vector<uint64_t>;
+auto cuda_get_compat_xor_src_indices(const std::vector<SourceList>& src_lists,
+  const SourceCompatibilityData* device_src_lists,
+  const std::vector<IndexList>& idx_lists, const index_t* device_idx_lists,
+  const index_t* device_idx_list_sizes) -> std::vector<uint64_t>;
 
 auto get_compatible_indices(const std::vector<SourceList>& src_lists)
   -> std::vector<IndexList>;
@@ -32,6 +33,15 @@ auto get_compatible_indices(const std::vector<SourceList>& src_lists)
 auto merge_xor_sources(const std::vector<SourceList>& src_lists,
   const std::vector<IndexList>& idx_lists,
   const std::vector<uint64_t>& combo_indices) -> XorSourceList;
+
+SourceCompatibilityData* alloc_copy_src_lists(
+  const std::vector<SourceList>& src_lists, size_t* num_bytes = nullptr);
+
+index_t* alloc_copy_idx_lists(
+  const std::vector<IndexList>& idx_lists, size_t* num_bytes = nullptr);
+
+index_t* alloc_copy_list_sizes(
+  const std::vector<index_t>& list_sizes, size_t* num_bytes = nullptr);
 
 }  // namespace cm
 

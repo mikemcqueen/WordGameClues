@@ -148,74 +148,6 @@ void add_compat_sources(
   }
 }
 
-auto alloc_copy_src_lists(
-  const std::vector<SourceList>& src_lists, size_t* num_bytes = nullptr) {
-  // alloc sources
-  const cudaStream_t stream = cudaStreamPerThread;
-  cudaError_t err = cudaSuccess;
-  const auto num_sources = util::sum_sizes(src_lists);
-  const auto sources_bytes = num_sources * sizeof(SourceCompatibilityData);
-  std::cerr << "  allocating device_sources (" << sources_bytes << " bytes)"
-            << std::endl;
-  SourceCompatibilityData* device_sources;
-  err = cudaMallocAsync((void**)&device_sources, sources_bytes, stream);
-  std::cerr << "  allocate complete" << std::endl;
-  assert((err == cudaSuccess) && "merge alloc sources");
-  // copy sources
-  std::vector<SourceCompatibilityData> src_compat_list;
-  src_compat_list.reserve(num_sources);
-  std::cerr << "  building src_compat_lists..." << std::endl;
-  for (const auto& src_list : src_lists) {
-    // this is somewhat braindead.perhaps I could only marshal the
-    // SourceCompatibiltyData when passed from JavaScript? since I
-    // no longer need to round-trip it back to JavaScript?
-    // Alternatively, build one gimungous array and blast it over
-    // in one memcopy.
-    // TODO: comments in todo file or in notebook about how to split
-    // pnsl/ncList from SourceCompatibilityData.
-    add_compat_sources(src_compat_list, src_list);
-  }
-  std::cerr << "  copying src_compat_lists..." << std::endl;
-  err = cudaMemcpyAsync(device_sources, src_compat_list.data(), sources_bytes,
-    cudaMemcpyHostToDevice, stream);
-  if (err != cudaSuccess) {
-    fprintf(stdout, "merge copy sources, error: %s", cudaGetErrorString(err));
-    throw std::runtime_error("merge copy sources");
-  }
-  if (num_bytes) {
-    *num_bytes = sources_bytes;
-  }
-  return device_sources;
-}
-
-auto alloc_copy_idx_lists(
-  const std::vector<IndexList>& idx_lists, size_t* num_bytes = nullptr) {
-  // alloc indices
-  const cudaStream_t stream = cudaStreamPerThread;
-  cudaError_t err = cudaSuccess;
-  auto indices_bytes = util::sum_sizes(idx_lists) * sizeof(index_t);
-  index_t* device_indices;
-  err = cudaMallocAsync((void**)&device_indices, indices_bytes, stream);
-  assert((err == cudaSuccess) && "merge alloc idx lists");
-
-  // copy indices
-  size_t index{};
-  for (const auto& idx_list : idx_lists) {
-    err = cudaMemcpyAsync(&device_indices[index], idx_list.data(),
-      idx_list.size() * sizeof(index_t), cudaMemcpyHostToDevice, stream);
-    if (err != cudaSuccess) {
-      fprintf(
-        stdout, "merge copy idx lists, error: %s", cudaGetErrorString(err));
-      throw std::runtime_error("merge copy idx lists");
-    }
-    index += idx_list.size();
-  }
-  if (num_bytes) {
-    *num_bytes = indices_bytes;
-  }
-  return device_indices;
-}
-
 // nC2 formula (# of combinations: pick 2 from n)
 auto calc_num_list_pairs(const std::vector<IndexList>& idx_lists) {
   return idx_lists.size() * (idx_lists.size() - 1) / 2;
@@ -266,35 +198,6 @@ auto make_compat_matrix_start_indices(const std::vector<IndexList>& idx_lists) {
     index += idx_lists.at(i).size() * idx_lists.at(j).size();
   });
   return start_indices;
-}
-
-auto make_list_sizes(const std::vector<IndexList>& idx_lists) {
-  IndexList sizes;
-  sizes.reserve(idx_lists.size());
-  for (const auto& idx_list : idx_lists) {
-    sizes.push_back(idx_list.size());
-  }
-  return sizes;
-}
-
-auto alloc_copy_list_sizes(
-  const std::vector<index_t>& list_sizes, size_t* num_bytes = nullptr) {
-  //
-  cudaStream_t stream = cudaStreamPerThread;
-  cudaError_t err = cudaSuccess;
-  // alloc list sizes
-  auto list_sizes_bytes = list_sizes.size() * sizeof(index_t);
-  index_t* device_list_sizes;
-  err = cudaMallocAsync((void**)&device_list_sizes, list_sizes_bytes, stream);
-  assert((err == cudaSuccess) && "merge alloc list sizes");
-  // copy list sizes
-  err = cudaMemcpyAsync(device_list_sizes, list_sizes.data(), list_sizes_bytes,
-    cudaMemcpyHostToDevice, stream);
-  assert((err == cudaSuccess) && "merge copy list sizes");
-  if (num_bytes) {
-    *num_bytes = list_sizes_bytes;
-  }
-  return device_list_sizes;
 }
 
 // for debugging
@@ -420,15 +323,15 @@ auto process_results(const std::vector<result_t>& results, uint64_t start_idx,
 
 //
 auto run_get_compat_combos_task(const result_t* device_compat_matrices,
+  unsigned num_compat_matrices,
   const index_t* device_compat_matrix_start_indices,
-  const std::vector<index_t>& idx_list_sizes) {
+  const index_t* device_idx_list_sizes, uint64_t max_combos) {
   //
   constexpr auto logging = false;
 
   using namespace std::chrono;
   uint64_t first_combo{};
   uint64_t num_combos{600'000'000}; // chunk size
-  const uint64_t max_combos{util::multiply_with_overflow_check(idx_list_sizes)};
   // TODO: free
   auto device_results = alloc_results(num_combos);
   std::vector<result_t> host_results(num_combos);
@@ -445,8 +348,9 @@ auto run_get_compat_combos_task(const result_t* device_compat_matrices,
     auto gcc0 = high_resolution_clock::now();
 
     run_get_compat_combos_kernel(first_combo, num_combos,
-      device_compat_matrices, device_compat_matrix_start_indices,
-      idx_list_sizes.size(), MFD.device_idx_list_sizes, device_results);
+      device_compat_matrices, num_compat_matrices,
+      device_compat_matrix_start_indices, device_idx_list_sizes,
+      device_results);
 
     // sync is only necessary for accurate timing
     cudaStreamSynchronize(cudaStreamPerThread);
@@ -513,50 +417,31 @@ XorSource merge_sources(const std::vector<index_t>& src_indices,
 namespace cm {
 
 auto cuda_get_compat_xor_src_indices(const std::vector<SourceList>& src_lists,
-  const std::vector<IndexList>& idx_lists) -> std::vector<uint64_t> {
+  const SourceCompatibilityData* device_src_lists,
+  const std::vector<IndexList>& idx_lists, const index_t* device_idx_lists,
+  const index_t* device_idx_list_sizes) -> std::vector<uint64_t> {
   //
   using namespace std::chrono;
   assert(!src_lists.empty() && !idx_lists.empty()
          && !getNumEmptySublists(src_lists) && "cuda_merge: invalid param");
 
   auto t0 = high_resolution_clock::now();
-  size_t total_bytes_allocated{};
-  size_t total_bytes_copied{};
-  size_t num_bytes{};
-  // std::cerr << " copying src_lists to device..." << std::endl;
-  // alloc/copy source lists and generate start indices
-  // TODO: free
-  MFD.device_src_lists = alloc_copy_src_lists(src_lists, &num_bytes);
-  total_bytes_allocated += num_bytes;
-  total_bytes_copied += num_bytes;
   auto src_list_start_indices = make_start_indices(src_lists);
-
-  // std::cerr << " copying idx_lists to device..." << std::endl;
-  // alloc/copy index lists and generate start indices
-  // TODO: free
-  MFD.device_idx_lists = alloc_copy_idx_lists(idx_lists, &num_bytes);
-  total_bytes_allocated += num_bytes;
-  total_bytes_copied += num_bytes;
   auto idx_list_start_indices = make_start_indices(idx_lists);
-
-  // alloc compatibility result matrices and generate start indices
-  std::cerr << " allocating compat_matrics on device..." << std::endl;
-  size_t num_compat_matrix_bytes{};
+  size_t num_bytes{};
   // TODO: free
-  auto device_compat_matrices =
-    alloc_compat_matrices(idx_lists, &num_compat_matrix_bytes);
-  total_bytes_allocated += num_compat_matrix_bytes;
+  auto device_compat_matrices = alloc_compat_matrices(idx_lists, &num_bytes);
   auto compat_matrix_start_indices =
     make_compat_matrix_start_indices(idx_lists);
+
   if constexpr (0) {
     // sync if we want accurate timing
     cudaError_t err = cudaStreamSynchronize(cudaStreamPerThread);
     assert(err == cudaSuccess);
     auto t1 = high_resolution_clock::now();
     auto t_dur = duration_cast<milliseconds>(t1 - t0).count();
-    std::cerr << "  copy complete - " << t_dur << "ms" << std::endl;
-    std::cerr << "  allocated: " << total_bytes_allocated
-              << ", copied: " << total_bytes_copied << std::endl;
+    std::cerr << "  alloc/copy complete, allocated: " << num_bytes << " - "
+              << t_dur << "ms" << std::endl;
   }
 
   auto lp0 = high_resolution_clock::now();
@@ -568,14 +453,15 @@ auto cuda_get_compat_xor_src_indices(const std::vector<SourceList>& src_lists,
                 << ", " << j << "]" << std::endl;
     }
     run_list_pair_compat_kernel(
-      &MFD.device_src_lists[src_list_start_indices.at(i)],
-      &MFD.device_src_lists[src_list_start_indices.at(j)],
-      &MFD.device_idx_lists[idx_list_start_indices.at(i)],
+      &device_src_lists[src_list_start_indices.at(i)],
+      &device_src_lists[src_list_start_indices.at(j)],
+      &device_idx_lists[idx_list_start_indices.at(i)],
       idx_lists.at(i).size(),
-      &MFD.device_idx_lists[idx_list_start_indices.at(j)],
+      &device_idx_lists[idx_list_start_indices.at(j)],
       idx_lists.at(j).size(),
       &device_compat_matrices[compat_matrix_start_indices.at(n)]);
   });
+
   if constexpr (0) {
     // sync if we want accurate timing
     cudaError_t err = cudaStreamSynchronize(cudaStreamPerThread);
@@ -594,14 +480,14 @@ auto cuda_get_compat_xor_src_indices(const std::vector<SourceList>& src_lists,
   // TODO: free
   auto device_compat_matrix_start_indices =
     alloc_copy_start_indices(compat_matrix_start_indices);
-  const auto idx_list_sizes = make_list_sizes(idx_lists);
-  MFD.device_idx_list_sizes = alloc_copy_list_sizes(idx_list_sizes);
-
+  const uint64_t max_combos{
+    util::multiply_with_overflow_check(util::make_list_sizes(idx_lists))};
   auto gcc0 = high_resolution_clock::now();
 
   // run get_compat_combos kernels
-  auto combo_indices = run_get_compat_combos_task(
-    device_compat_matrices, device_compat_matrix_start_indices, idx_list_sizes);
+  auto combo_indices = run_get_compat_combos_task(device_compat_matrices,
+    idx_lists.size(), device_compat_matrix_start_indices, device_idx_list_sizes,
+    max_combos);  // clang-format
 
   auto gcc1 = high_resolution_clock::now();
   auto gcc_dur = duration_cast<milliseconds>(gcc1 - gcc0).count();
@@ -671,6 +557,94 @@ auto merge_xor_sources(const std::vector<SourceList>& src_lists,
             << ") - " << hm_dur << "ms" << std::endl;
 
   return xorSourceList;
+}
+
+SourceCompatibilityData* alloc_copy_src_lists(
+  const std::vector<SourceList>& src_lists, size_t* num_bytes /* = nullptr*/) {
+  // alloc sources
+  const cudaStream_t stream = cudaStreamPerThread;
+  cudaError_t err = cudaSuccess;
+  const auto num_sources = util::sum_sizes(src_lists);
+  const auto sources_bytes = num_sources * sizeof(SourceCompatibilityData);
+  std::cerr << "  allocating device_sources (" << sources_bytes << " bytes)"
+            << std::endl;
+  SourceCompatibilityData* device_sources;
+  err = cudaMallocAsync((void**)&device_sources, sources_bytes, stream);
+  std::cerr << "  allocate complete" << std::endl;
+  assert((err == cudaSuccess) && "merge alloc sources");
+  // copy sources
+  std::vector<SourceCompatibilityData> src_compat_list;
+  src_compat_list.reserve(num_sources);
+  std::cerr << "  building src_compat_lists..." << std::endl;
+  for (const auto& src_list : src_lists) {
+    // this is somewhat braindead.perhaps I could only marshal the
+    // SourceCompatibiltyData when passed from JavaScript? since I
+    // no longer need to round-trip it back to JavaScript?
+    // Alternatively, build one gimungous array and blast it over
+    // in one memcopy.
+    // TODO: comments in todo file or in notebook about how to split
+    // pnsl/ncList from SourceCompatibilityData.
+    add_compat_sources(src_compat_list, src_list);
+  }
+  std::cerr << "  copying src_compat_lists..." << std::endl;
+  err = cudaMemcpyAsync(device_sources, src_compat_list.data(), sources_bytes,
+    cudaMemcpyHostToDevice, stream);
+  if (err != cudaSuccess) {
+    fprintf(stdout, "merge copy sources, error: %s", cudaGetErrorString(err));
+    throw std::runtime_error("merge copy sources");
+  }
+  if (num_bytes) {
+    *num_bytes = sources_bytes;
+  }
+  return device_sources;
+}
+
+index_t* alloc_copy_idx_lists(
+  const std::vector<IndexList>& idx_lists, size_t* num_bytes /* = nullptr*/) {
+  // alloc indices
+  const cudaStream_t stream = cudaStreamPerThread;
+  cudaError_t err = cudaSuccess;
+  auto indices_bytes = util::sum_sizes(idx_lists) * sizeof(index_t);
+  index_t* device_indices;
+  err = cudaMallocAsync((void**)&device_indices, indices_bytes, stream);
+  assert((err == cudaSuccess) && "merge alloc idx lists");
+
+  // copy indices
+  size_t index{};
+  for (const auto& idx_list : idx_lists) {
+    err = cudaMemcpyAsync(&device_indices[index], idx_list.data(),
+      idx_list.size() * sizeof(index_t), cudaMemcpyHostToDevice, stream);
+    if (err != cudaSuccess) {
+      fprintf(
+        stdout, "merge copy idx lists, error: %s", cudaGetErrorString(err));
+      throw std::runtime_error("merge copy idx lists");
+    }
+    index += idx_list.size();
+  }
+  if (num_bytes) {
+    *num_bytes = indices_bytes;
+  }
+  return device_indices;
+}
+
+index_t* alloc_copy_list_sizes(
+  const std::vector<index_t>& list_sizes, size_t* num_bytes /* = nullptr*/) {
+  //
+  cudaStream_t stream = cudaStreamPerThread;
+  cudaError_t err = cudaSuccess;
+  // alloc list sizes
+  auto list_sizes_bytes = list_sizes.size() * sizeof(index_t);
+  index_t* device_list_sizes;
+  err = cudaMallocAsync((void**)&device_list_sizes, list_sizes_bytes, stream);
+  assert((err == cudaSuccess) && "merge alloc list sizes");
+  // copy list sizes
+  err = cudaMemcpyAsync(device_list_sizes, list_sizes.data(), list_sizes_bytes,
+    cudaMemcpyHostToDevice, stream);
+  assert((err == cudaSuccess) && "merge copy list sizes");
+  if (num_bytes) {
+    *num_bytes = list_sizes_bytes;
+  }
+  return device_list_sizes;
 }
 
 }  // namespace cm

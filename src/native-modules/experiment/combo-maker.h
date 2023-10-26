@@ -513,8 +513,8 @@ using XorSourceList = std::vector<XorSource>;
 
 struct OrSourceData {
   SourceCompatibilityData src;
-  bool xor_compat{false};
-  bool and_compat{false};
+  bool is_xor_compat{false};
+  //bool is_and_compat{false};
 };
 using OrSourceList = std::vector<OrSourceData>;
 

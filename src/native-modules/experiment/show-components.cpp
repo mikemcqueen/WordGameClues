@@ -56,10 +56,12 @@ void add_result_for_sources(const std::string& sources_csv,
   }
 }
 
-auto get_results(const std::vector<std::string>& name_list) {
+auto get_results(
+  const std::vector<std::string>& name_list, const SourceList& xor_src_list) {
+  //
   Results results;
   std::unordered_set<std::string> hash;
-  for (const auto& src: MFD.merge_xor_src_list) {
+  for (const auto& src: xor_src_list) {
     const auto count_list = NameCount::listToCountList(src.ncList);
     const auto key = util::join(count_list, ",");
     if (hash.contains(key)) {
@@ -136,8 +138,9 @@ void display_results(
 
 }  // namespace
 
-auto of(const std::vector<std::string>& name_list) -> std::set<int> {
-  auto results = get_results(name_list);
+auto of(const std::vector<std::string>& name_list,
+  const SourceList& xor_src_list) -> std::set<int> {
+  auto results = get_results(name_list, xor_src_list);
   display_results(name_list, results);
   return results.sums;
 }

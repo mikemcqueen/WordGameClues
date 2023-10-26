@@ -17,15 +17,24 @@
 #include "merge-filter-common.h"
 #include "merge-filter-data.h"
 #include "show-components.h"
+#include "util.h"
 #include "validator.h"
 #include "wrap.h"
 
 namespace {
 
+// types
+
 using namespace Napi;
 using namespace clue_manager;
 using namespace cm;
 using namespace validator;
+
+// globals
+
+MergeFilterData MFD;
+
+// functions
 
 std::vector<int> makeIntList(Env& env, const Array& jsList) {
   std::vector<int> int_list{};
@@ -252,8 +261,8 @@ OrSourceData makeOrSource(Env& env, const Object& jsObject) {
   OrSourceData orSource;
   orSource.src = std::move(makeSourceCompatibilityDataFromSourceData(
     env, jsObject["source"].As<Object>()));
-  orSource.xor_compat = jsObject["xorCompatible"].As<Boolean>();
-  orSource.and_compat = jsObject["andCompatible"].As<Boolean>();
+  orSource.is_xor_compat = jsObject["xorCompatible"].As<Boolean>();
+  //  orSource.and_compat = jsObject["andCompatible"].As<Boolean>();
   return orSource;
 }
 
@@ -456,7 +465,7 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   auto build0 = high_resolution_clock::now();
   // TODO: I'm not convinced this data needs to hang around on host side.
   // maybe for async copy?
-  MFD.xor_src_lists =
+  MFD.host.xor_src_lists =
     std::move(buildSourceListsForUseNcData(ncDataLists));
 
   auto build1 = high_resolution_clock::now();
@@ -465,57 +474,54 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   std::cerr << " build xor_src_lists - " << d_build << "ms" << std::endl;
 
 #if 0
-  for (const auto& src_list: MFD.xor_src_lists) {
+  for (const auto& src_list: MFD.host.xor_src_lists) {
     assert_valid(src_list);
   }
 #endif
 
   //--
-  if (!merge_only || (MFD.xor_src_lists.size() > 1)) {
+  if (!merge_only || (MFD.host.xor_src_lists.size() > 1)) {
     // TODO: support for single-list compat indices
-    auto compat_idx_lists = get_compatible_indices(MFD.xor_src_lists);
+    auto compat_idx_lists = get_compatible_indices(MFD.host.xor_src_lists);
     if (!compat_idx_lists.empty()) {
-      auto combo_indices =
-        cuda_get_compat_xor_src_indices(MFD.xor_src_lists, compat_idx_lists);
+      MFD.device.src_lists = alloc_copy_src_lists(MFD.host.xor_src_lists);
+      MFD.device.idx_lists = alloc_copy_idx_lists(compat_idx_lists);
+      const auto idx_list_sizes = util::make_list_sizes(compat_idx_lists);
+      MFD.device.idx_list_sizes = alloc_copy_list_sizes(idx_list_sizes);
+      auto combo_indices = cuda_get_compat_xor_src_indices(
+        MFD.host.xor_src_lists, MFD.device.src_lists, compat_idx_lists,
+        MFD.device.idx_lists, MFD.device.idx_list_sizes);
       if (merge_only) {
         // merge-only with multiple xor args uses compat index lists and combo
         // indices for the sole purpose of generating an xor_src_list - no need
         // to save them for later use
-        MFD.merge_xor_src_list = std::move(merge_xor_sources(
-          MFD.xor_src_lists, compat_idx_lists, combo_indices));
+        MFD.host.merged_xor_src_list = std::move(merge_xor_sources(
+          MFD.host.xor_src_lists, compat_idx_lists, combo_indices));
       } else {
         // filter otoh will need them both later
-        MFD.compat_idx_lists = std::move(compat_idx_lists);
-        MFD.combo_indices = std::move(combo_indices);
+        MFD.host.compat_idx_lists = std::move(compat_idx_lists);
+        MFD.host.combo_indices = std::move(combo_indices);
       }
     }
-  } else if (MFD.xor_src_lists.size() == 1) {
+  } else if (MFD.host.xor_src_lists.size() == 1) {
     assert(merge_only);
-    MFD.merge_xor_src_list = std::move(MFD.xor_src_lists.back());
+    MFD.host.merged_xor_src_list = std::move(MFD.host.xor_src_lists.back());
   }
-  auto result =
-    (merge_only) ? MFD.merge_xor_src_list.size() : MFD.combo_indices.size();
+  auto result = (merge_only) ? MFD.host.merged_xor_src_list.size()
+                             : MFD.host.combo_indices.size();
   return Number::New(env, (uint32_t)result);
 }
 
-Value setOrArgs(const CallbackInfo& info) {
+void set_or_args(const std::vector<NCDataList>& ncDataLists) {
   using namespace std::chrono;
-
-  Env env = info.Env();
-  if (!info[0].IsArray()) {
-    TypeError::New(
-      env, "setOrArgs: invalid parameter")
-      .ThrowAsJavaScriptException();
-    return env.Null();
-  }
-  // arg0
-  auto ncDataLists = makeNcDataLists(env, info[0].As<Array>());
-  // --
   auto build0 = high_resolution_clock::now();
-  // TODO: I'm not convinced this data needs to hang around on host side.
-  // maybe for async copy?
-  MFD.or_arg_list = buildOrArgList(buildSourceListsForUseNcData(ncDataLists));
-  MFD.num_or_args = MFD.or_arg_list.size();
+  MFD.host.or_arg_list = buildOrArgList(buildSourceListsForUseNcData(ncDataLists));
+  MFD.host.num_or_args = MFD.host.or_arg_list.size();
+
+  auto [device_or_sources, num_or_sources] =
+    cuda_allocCopyOrSources(MFD.host.or_arg_list);
+  MFD.device.or_sources = device_or_sources;
+  MFD.device.num_or_sources = num_or_sources;
 
   // Thoughts on AND compatibility of OrSources:
   // Just because (one sourceList of) an OrSource is AND compatible with an
@@ -527,44 +533,41 @@ Value setOrArgs(const CallbackInfo& info) {
   // no remaining XOR-compatible sourceLists.
   // TODO: markAllANDCompatibleOrSources(xorSourceList, orSourceList);
 
-  if constexpr (true) {
-    markAllXorCompatibleOrSources(MFD.or_arg_list, MFD.xor_src_lists,
-      MFD.compat_idx_lists, MFD.combo_indices);
-  }
-
-  auto [device_or_sources, num_or_sources] =
-    cuda_allocCopyOrSources(MFD.or_arg_list);
-  MFD.device_or_sources = device_or_sources;
-  MFD.num_or_sources = num_or_sources;
+  /*
+  auto [device_or_src_indices, num_or_src_indices] =
+    markAllXorCompatibleOrSourcesCuda(MFD.device.or_sources, MFD.device.num_or_sources,
+      MFD.xor_src_lists, MFD.compat_idx_lists, MFD.combo_indices);
+  MFD.device.or_src_indices = device_or_src_indices;
+  MFD.device.num_or_src_indices = num_or_src_indices;
+  */
 
   auto build1 = high_resolution_clock::now();
   [[maybe_unused]] auto d_build =
     duration_cast<milliseconds>(build1 - build0).count();
-  std::cerr << " build/mark/copy or_args(" << MFD.num_or_args << ")"
-            << ", or_sources(" << MFD.num_or_sources << ") - " << d_build
+  std::cerr << " build/mark or_args" << MFD.host.num_or_args << ")"
+            << ", or_sources(" << MFD.device.num_or_sources << ") - " << d_build
             << "ms" << std::endl;
-  return Number::New(env, num_or_sources);
 }
 
-void prepare_filter_indices() {
+void alloc_copy_filter_indices() {
   using namespace std::chrono;
-  assert(!MFD.combo_indices.empty());
-  auto svi0 = high_resolution_clock::now();
+  assert(!MFD.host.combo_indices.empty());
+  auto t0 = high_resolution_clock::now();
 
-  auto src_list_start_indices = make_start_indices(MFD.xor_src_lists);
-  MFD.device_src_list_start_indices =
+  auto src_list_start_indices = make_start_indices(MFD.host.xor_src_lists);
+  MFD.device.src_list_start_indices =
     alloc_copy_start_indices(src_list_start_indices);
-  auto idx_list_start_indices = make_start_indices(MFD.compat_idx_lists);
-  MFD.device_idx_list_start_indices =
+  auto idx_list_start_indices = make_start_indices(MFD.host.compat_idx_lists);
+  MFD.device.idx_list_start_indices =
     alloc_copy_start_indices(idx_list_start_indices);
   auto variation_indices = buildSentenceVariationIndices(
-    MFD.xor_src_lists, MFD.compat_idx_lists, MFD.combo_indices);
-  MFD.device_variation_indices =
+    MFD.host.xor_src_lists, MFD.host.compat_idx_lists, MFD.host.combo_indices);
+  MFD.device.variation_indices =
     cuda_allocCopySentenceVariationIndices(variation_indices);
 
-  auto svi1 = high_resolution_clock::now();
-  auto d_svi = duration_cast<milliseconds>(svi1 - svi0).count();
-  std::cerr << " prepare filter indices - " << d_svi << "ms" << std::endl;
+  auto t1 = high_resolution_clock::now();
+  auto t_dur = duration_cast<milliseconds>(t1 - t0).count();
+  std::cerr << " prepare filter indices - " << t_dur << "ms" << std::endl;
 }
 
 //
@@ -573,20 +576,16 @@ void prepare_filter_indices() {
 Value filterPreparation(const CallbackInfo& info) {
   using namespace std::chrono;
   Env env = info.Env();
-  /*
   if (!info[0].IsArray()) {
-      TypeError::New(env, "filterPreparation: non-array parameter")
-        .ThrowAsJavaScriptException();
-      return env.Null();
+    TypeError::New(env, "setOrArgs: invalid parameter")
+      .ThrowAsJavaScriptException();
+    return env.Null();
   }
-  */
-  auto t0 = high_resolution_clock::now();
-
-  prepare_filter_indices();
-
-  auto t1 = high_resolution_clock::now();
-  auto d_t = duration_cast<milliseconds>(t1 - t0).count();
-  std::cerr << " filter preparation - " << d_t << "ms" << std::endl;
+  // arg0
+  auto orNcDataLists = makeNcDataLists(env, info[0].As<Array>());
+  // --
+  alloc_copy_filter_indices();
+  set_or_args(orNcDataLists);
   return env.Null();
 }
 
@@ -628,7 +627,7 @@ Value filterCandidatesForSum(const CallbackInfo& info) {
   auto synchronous = info[5].As<Boolean>().Value();
   // --
   filterCandidatesCuda(
-    sum, threads_per_block, streams, stride, iters, synchronous);
+    MFD, sum, threads_per_block, streams, stride, iters, synchronous);
   return env.Null();
 }
 
@@ -654,7 +653,7 @@ Value showComponents(const CallbackInfo& info) {
   // arg0:
   auto name_list = makeStringList(env, info[0].As<Array>());
   // --
-  auto sums = show_components::of(name_list);
+  auto sums = show_components::of(name_list, MFD.host.merged_xor_src_list);
   return wrap(env, sums);
 }
 
@@ -678,7 +677,7 @@ Object Init(Env env, Object exports) {
   //
   exports["mergeCompatibleXorSourceCombinations"] =
     Function::New(env, mergeCompatibleXorSourceCombinations);
-  exports["setOrArgs"] = Function::New(env, setOrArgs);
+  //  exports["setOrArgs"] = Function::New(env, setOrArgs);
   exports["filterPreparation"] = Function::New(env, filterPreparation);
   exports["considerCandidate"] = Function::New(env, considerCandidate);
   exports["filterCandidatesForSum"] =
