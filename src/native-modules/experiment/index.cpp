@@ -540,39 +540,42 @@ void validate_marked_or_sources(
 void set_or_args(const std::vector<NCDataList>& ncDataLists) {
   using namespace std::chrono;
   auto build0 = high_resolution_clock::now();
-  MFD.host.or_arg_list = buildOrArgList(buildSourceListsForUseNcData(ncDataLists));
-  MFD.host.num_or_args = MFD.host.or_arg_list.size();
+  MFD.host.or_arg_list =
+    buildOrArgList(buildSourceListsForUseNcData(ncDataLists));
+  if (MFD.host.or_arg_list.size()) {
+    // TODO: to eliminate sync call in allocCopyOrSources
+    //  auto or_src_list = make_or_src_list(MFD.host.or_arg_list);
+    auto [device_or_src_list, num_or_sources] =
+      cuda_allocCopyOrSources(MFD.host.or_arg_list);
+    MFD.device.or_src_list = device_or_src_list;
+    MFD.device.num_or_sources = num_or_sources;
 
-  // TODO: to eliminate sync call in allocCopyOrSources
-  //  auto or_src_list = make_or_src_list(MFD.host.or_arg_list);
-  auto [device_or_src_list, num_or_sources] =
-    cuda_allocCopyOrSources(MFD.host.or_arg_list);
-  MFD.device.or_src_list = device_or_src_list;
-  MFD.device.num_or_sources = num_or_sources;
+    // Thoughts on AND compatibility of OrSources:
+    // Just because (one sourceList of) an OrSource is AND compatible with an
+    // XorSource doesn't mean the OrSource is redundant and can be ignored
+    // (i.e., the container cannot be marked as "compatible.") We still need
+    // to check the possibility that any of the other XOR-but-not-AND-compatible
+    // sourceLists could be AND-compatible with the generated-combo sourceList.
+    // So, a container can be marked compatible if and only if there are no
+    // no remaining XOR-compatible sourceLists.
+    // TODO: markAllANDCompatibleOrSources(xorSourceList, orSourceList);
 
-  // Thoughts on AND compatibility of OrSources:
-  // Just because (one sourceList of) an OrSource is AND compatible with an
-  // XorSource doesn't mean the OrSource is redundant and can be ignored
-  // (i.e., the container cannot be marked as "compatible.") We still need
-  // to check the possibility that any of the other XOR-but-not-AND-compatible
-  // sourceLists could be AND-compatible with the generated-combo sourceList.
-  // So, a container can be marked compatible if and only if there are no
-  // no remaining XOR-compatible sourceLists.
-  // TODO: markAllANDCompatibleOrSources(xorSourceList, orSourceList);
-
-  if constexpr (0) {
-    markAllXorCompatibleOrSources(MFD.host.or_arg_list, MFD.host.xor_src_lists,
-      MFD.host.compat_idx_lists, MFD.host.combo_indices);
+    if (num_or_sources) {
+      if constexpr (0) {
+        markAllXorCompatibleOrSources(MFD.host.or_arg_list,
+          MFD.host.xor_src_lists, MFD.host.compat_idx_lists,
+          MFD.host.combo_indices);
+      }
+      auto mark_results = cuda_markAllXorCompatibleOrSources(MFD);
+      validate_marked_or_sources(MFD.host.or_arg_list, mark_results);
+      MFD.device.num_or_sources =
+        move_marked_or_sources(MFD.device.or_src_list, mark_results);
+    }
   }
-
-  auto mark_results = cuda_markAllXorCompatibleOrSources(MFD);
-  validate_marked_or_sources(MFD.host.or_arg_list, mark_results);
-  MFD.device.num_or_sources = move_marked_or_sources(MFD.device.or_src_list, mark_results);
-
   auto build1 = high_resolution_clock::now();
   [[maybe_unused]] auto d_build =
     duration_cast<milliseconds>(build1 - build0).count();
-  std::cerr << " build/mark or_args(" << MFD.host.num_or_args << ")"
+  std::cerr << " build/mark or_args(" << MFD.host.or_arg_list.size() << ")"
             << ", or_sources(" << MFD.device.num_or_sources << ") - " << d_build
             << "ms" << std::endl;
 }

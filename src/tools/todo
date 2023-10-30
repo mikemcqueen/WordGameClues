@@ -1,5 +1,6 @@
-* there is a possibility my "XOR" logic for marking/filtering OR sources is wrong.
-  It's not intuitively obvious to me. Compare to subsets JS code.
+* get_smallest_index_spans is probably correct but i dont completely understand the
+  "zero indices" case. understand it and document it. some clues in cuda-merge-filter.cu
+  i'm just not fully grokking it atm.
 
 * shouldn't I be using a uint64_t for combo_idx in filter kernel? maybe not? look at
   what these things are host-side and how/where I am copying them to device_side.

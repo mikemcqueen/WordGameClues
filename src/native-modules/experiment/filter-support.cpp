@@ -365,21 +365,22 @@ auto cuda_markAllXorCompatibleOrSources(const MergeFilterData& mfd)
 unsigned move_marked_or_sources(device::OrSourceData* device_or_src_list,
   const std::vector<result_t>& mark_results) {
   //
-  size_t list_idx{};
-  for (size_t result_idx{}; result_idx < mark_results.size(); ++result_idx) {
-    if (!mark_results[result_idx]) {
-      continue;
-    }
-    if (result_idx > list_idx) {
-      cudaError_t err = cudaMemcpyAsync(&device_or_src_list[list_idx++],
-        &device_or_src_list[result_idx], sizeof(device::OrSourceData),
+  size_t dst_idx{};
+  size_t src_idx{};
+  // skip over any marked (and therefore correctly placed) results at beginning
+  for (; (src_idx < mark_results.size()) && mark_results[src_idx];
+       ++src_idx, ++dst_idx)
+    ;
+  // move any remaining marked (and therefore incorrectly placed) results
+  for (; src_idx < mark_results.size(); ++src_idx) {
+    if (mark_results[src_idx]) {
+      cudaError_t err = cudaMemcpyAsync(&device_or_src_list[dst_idx++],
+        &device_or_src_list[src_idx], sizeof(device::OrSourceData),
         cudaMemcpyDeviceToDevice);
       assert((err == cudaSuccess) && "move_marked_or_sources memcpy");
-    } else {
-      ++list_idx;
     }
   }
-  return list_idx;
+  return dst_idx;
 }
 
 [[nodiscard]] SourceCompatibilityData* cuda_allocCopyXorSources(

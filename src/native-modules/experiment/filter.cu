@@ -214,6 +214,25 @@ __device__ void print_variation_indices(
   variation_indices_shown = true;
 }
 
+// variation_indices is an optimization. it allows us to restrict comparisons
+// of a candidate source to only those xor_sources that have the same (or no)
+// variation for each sentence - since a variation mismatch will alway result
+// in comparison failure.
+//
+// individual xor_src indices are potentially (and often) duplicated in the
+// variation_indices lists. for example, if a particular compound xor_src has
+// variations S1:V1 and S2:V3, its xor_src_idx will appear in both of those
+// corresponding variation_indices lists.
+//
+// because of this, we actually need only compare a candidate source with the
+// xor_sources corresponding to the variation_indices that have the same (or no)
+// variation for a *single* sentence.
+//
+// the question then becomes, which sentence/variation should we choose?
+//
+// answer: the one with the fewest indices! (resulting in the fewest compares).
+// that's what this function determines.
+//
 __device__ auto get_smallest_src_index_spans(
   const SourceCompatibilityData& source,
   const device::VariationIndices* __restrict__ variation_indices) {
@@ -222,15 +241,20 @@ __device__ auto get_smallest_src_index_spans(
   int sentence_with_fewest{-1};
   for (int s{}; s < kNumSentences; ++s) {
     const auto& vi = variation_indices[s];
-    // skip sentences for which there are no xor_sources with a primary clue
+    // if there are no xor_sources that contain a primary source from this
+    // sentence, skip it. (as it would result in num_indices == all_indices)
     if (!vi.num_variations) {
       continue;
     }
     const auto variation = source.usedSources.variations[s] + 1;
-    // skip sources that have no primary clue from this sentence
+    // if the candidate source has no primary source from this sentence,
+    // skip it. (same reason as above)
     if (!variation) {
       continue;
     }
+    // sum the xor_src indices that have no variation (index 0), and the same
+    // variation as the candidate source, for this sentence. remember the
+    // smallest sum, and sentence.
     const auto num_indices =
       vi.num_combo_indices[0] + vi.num_combo_indices[variation];
     if (num_indices < fewest_indices) {
@@ -241,6 +265,16 @@ __device__ auto get_smallest_src_index_spans(
       }
     }
   }
+  // if the candidate source sentence variation with the fewest number of
+  // compatible (same or no variation) xor_sources is zero, it means the 
+  // following conditions are met:
+  // * the candidate source contains a primary source from this sentence
+  // * every xor_source both:
+  //   a) contains a primary source from this sentence, and
+  //   b) has a different variation for this sentence than that of the
+  //      candidate source.
+  // as a result, we can skip all xor-compares for the candidate source
+  // as we know they will all fail due to variation mismatch.
   if (!fewest_indices) {
     return std::make_pair(ComboIndexSpan{}, ComboIndexSpan{});
   }
@@ -341,7 +375,6 @@ __device__ bool is_source_XOR_compatible_with_any(
     __syncthreads();
     // "flat" index, i.e. not yet indexed into appropriate idx_spans array
     const auto flat_idx = chunk_idx * chunk_size + threadIdx.x;
-    //printf("idx: %d\n", (int)flat_idx);
     if (flat_idx < num_indices) {
       auto combo_idx = get_combo_index(flat_idx, idx_spans);
       if (is_source_XOR_compatible(source, combo_idx, xor_src_lists,
@@ -349,7 +382,6 @@ __device__ bool is_source_XOR_compatible_with_any(
             xor_idx_list_start_indices, xor_idx_list_sizes, num_idx_lists)) {
         is_xor_compat = true;
       }
-      //printf("idx: %d, compat: %d\n", (int)flat_idx, (int)is_xor_compat);
     }
     __syncthreads();
     if (is_xor_compat) {
@@ -359,6 +391,7 @@ __device__ bool is_source_XOR_compatible_with_any(
   return false;
 }
 
+// TODO: syncthreads required?
 __global__ void mark_or_sources_kernel(
   const SourceCompatibilityData* __restrict__ xor_src_lists,
   const index_t* __restrict__ xor_src_list_start_indices,
@@ -375,12 +408,13 @@ __global__ void mark_or_sources_kernel(
     auto& result = results[idx];
     auto idx_spans = get_smallest_src_index_spans(or_source.src, variation_indices);
     __syncthreads();
-    assert(idx_spans.first.size() + idx_spans.second.size());
-    if (is_source_XOR_compatible_with_any(or_source.src, idx_spans, xor_src_lists,
-          xor_src_list_start_indices, xor_idx_lists, xor_idx_list_start_indices,
-          xor_idx_list_sizes, num_idx_lists)) {
-      if (!threadIdx.x) {
-        result = 1;
+    if (idx_spans.first.size() + idx_spans.second.size()) {
+      if (is_source_XOR_compatible_with_any(or_source.src, idx_spans,
+            xor_src_lists, xor_src_list_start_indices, xor_idx_lists,
+            xor_idx_list_start_indices, xor_idx_list_sizes, num_idx_lists)) {
+        if (!threadIdx.x) {
+          result = 1;
+        }
       }
     }
   }
@@ -439,9 +473,9 @@ void run_xor_kernel(StreamData& stream, int threads_per_block,
   auto blocks_per_sm = threads_per_sm / block_size;
   // assert(blocks_per_sm * block_size == threads_per_sm);
   auto grid_size = num_sm * blocks_per_sm;  // aka blocks per grid
-  auto shared_bytes = mfd.host.num_or_args * sizeof(result_t);
-  // enforce assumption in is_source_or_compatible()
-  assert(mfd.host.num_or_args < block_size);
+  auto shared_bytes = mfd.host.or_arg_list.size() * sizeof(result_t);
+  // enforce assumption in is_source_OR_compatible()
+  assert(mfd.host.or_arg_list.size() < block_size);
 
   stream.is_running = true;
   stream.sequence_num = StreamData::next_sequence_num();
@@ -458,8 +492,9 @@ void run_xor_kernel(StreamData& stream, int threads_per_block,
     device_src_list, stream.source_indices.size(), mfd.device.src_lists,
     mfd.device.src_list_start_indices, mfd.device.idx_lists,
     mfd.device.idx_list_start_indices, mfd.device.idx_list_sizes,
-    mfd.host.compat_idx_lists.size(), mfd.device.variation_indices, mfd.host.num_or_args,
-    mfd.device.or_src_list, mfd.device.num_or_sources, stream.device_source_indices,
+    mfd.host.compat_idx_lists.size(), mfd.device.variation_indices,
+    mfd.host.or_arg_list.size(), mfd.device.or_src_list,
+    mfd.device.num_or_sources, stream.device_source_indices,
     device_list_start_indices, device_results, stream.stream_idx);
 
 #if defined(LOGGING)
@@ -488,8 +523,8 @@ void run_mark_or_sources_kernel(
     mfd.device.src_lists, mfd.device.src_list_start_indices,
     mfd.device.idx_lists, mfd.device.idx_list_start_indices,
     mfd.device.idx_list_sizes, mfd.host.compat_idx_lists.size(),
-    mfd.device.variation_indices, mfd.host.num_or_args, mfd.device.or_src_list,
-    mfd.device.num_or_sources, device_results);
+    mfd.device.variation_indices, mfd.host.or_arg_list.size(),
+    mfd.device.or_src_list, mfd.device.num_or_sources, device_results);
 }
 
 }  // namespace cm

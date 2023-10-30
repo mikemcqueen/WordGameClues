@@ -49,7 +49,6 @@ struct MergeFilterData {
     ComboIndexList combo_indices;
 
     OrArgList or_arg_list;
-    unsigned num_or_args{};
   } host;
 
   struct Device {
