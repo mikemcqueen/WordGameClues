@@ -1,20 +1,8 @@
-* -t wrap is very slow for simple combinations, e.g. -t navy,'man o war' = 43 seconds.
-  the solution to this would seem to be to move the relevant parts of show-components
-  to C++ in order to avoid wrapping.
-  * DONE getCountListArrays - easyish
-    * DONE need to move knownSourceMap.clues to C++. Might require defining clue type in c++.
-    * DONE then show-components::add_result_for_sources should be implementable.
-    * DONE i also wonder what I am doing exactly for get_compound_nc_sources; currently I
-      am just calling cm::get_nc_sources, and that may be fine, but the JS code for
-      compound case was using ClueManager.clueList or something, which is weird.
-      * I wonder if that "clues" field in knownSourceMap can cover this case, so I can
-        compare results?
-  * DONE showCountListArrays - easy
-  --- TODO ---
-  * DONE addRemoveOrReject - probably could wrap only the contents of this set back to
-    JS and perform the action there.
-  * remove knownSourceMapArray from clue-manager.ts.
-  * remove dead code from show-components.js.
+* there is a possibility my "XOR" logic for marking/filtering OR sources is wrong.
+  It's not intuitively obvious to me. Compare to subsets JS code.
+
+* shouldn't I be using a uint64_t for combo_idx in filter kernel? maybe not? look at
+  what these things are host-side and how/where I am copying them to device_side.
 
 * i should probably document and/or name and/or encapsulate some of the clue-manager
   global data into classes to help me remember what is what and what goes where. its
@@ -22,13 +10,6 @@
   and i don't have a lot of intuition about it all, so could use the help of some
   additional structure.
 
-* I think there are a couple places where I'm not using or_src.xor_compat:
-  * somewhere in JS, which is commented, but maybe stale code now.
-  * in the filter kernel somewhere
-  * oddly though, sometimes it only produces results when I call markAll, even
-    though I can't identify where it's actually used.
-  * why don't i change the field name to is_xor_compat, and see what breaks.
-  
 * getUniqueClueNameCount -> Native.get_num_unique_clue_names
 
 * hash/is_equal for NameCount, make (nc)knownSrcListMap key a NameCount

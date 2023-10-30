@@ -200,11 +200,13 @@ void markAllXorCompatibleOrSources(OrArgList& or_arg_list,
   const std::vector<IndexList>& compat_idx_lists,
   const ComboIndexList& compat_indices) {
   // whee nesting
+  uint32_t total{};
   uint32_t num_compat{};
   using namespace std::chrono;
   auto t0 = high_resolution_clock::now();
   for (auto& or_arg : or_arg_list) {
     for (auto& or_src : or_arg.or_src_list) {
+      ++total;
       if (isXorCompatibleWithAnySource(
             or_src, xor_src_lists, compat_idx_lists, compat_indices)) {
         or_src.is_xor_compat = true;
@@ -214,7 +216,7 @@ void markAllXorCompatibleOrSources(OrArgList& or_arg_list,
   }
   auto t1 = high_resolution_clock::now();
   [[maybe_unused]] auto t_dur = duration_cast<milliseconds>(t1 - t0).count();
-  std::cerr << "  markAllXorCompatibleOrSources(" << num_compat << ") - "
+  std::cerr << "  host marked " << num_compat << " of " << total << " - "
             << t_dur << "ms" << std::endl;
 }
 

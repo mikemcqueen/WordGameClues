@@ -512,15 +512,42 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   return Number::New(env, (uint32_t)result);
 }
 
+void validate_marked_or_sources(
+  const OrArgList& or_arg_list, const std::vector<result_t>& mark_results) {
+  //
+  size_t or_arg_idx{};
+  size_t num_or_args = or_arg_list[or_arg_idx].or_src_list.size();
+  bool is_arg_marked{false};
+  for (size_t result_idx{}; result_idx < mark_results.size();) {
+    if (mark_results[result_idx]) {
+      is_arg_marked = true;
+    }
+    if (++result_idx == num_or_args) {
+      if (!is_arg_marked) {
+        std::cerr << "or_arg_idx " << or_arg_idx << " is not compatible"
+                  << std::endl;
+        assert(is_arg_marked);
+      }
+      if (++or_arg_idx == or_arg_list.size()) {
+        return;
+      }
+      num_or_args += or_arg_list[++or_arg_idx].or_src_list.size();
+      is_arg_marked = false;
+    }
+  }
+}
+
 void set_or_args(const std::vector<NCDataList>& ncDataLists) {
   using namespace std::chrono;
   auto build0 = high_resolution_clock::now();
   MFD.host.or_arg_list = buildOrArgList(buildSourceListsForUseNcData(ncDataLists));
   MFD.host.num_or_args = MFD.host.or_arg_list.size();
 
-  auto [device_or_sources, num_or_sources] =
+  // TODO: to eliminate sync call in allocCopyOrSources
+  //  auto or_src_list = make_or_src_list(MFD.host.or_arg_list);
+  auto [device_or_src_list, num_or_sources] =
     cuda_allocCopyOrSources(MFD.host.or_arg_list);
-  MFD.device.or_sources = device_or_sources;
+  MFD.device.or_src_list = device_or_src_list;
   MFD.device.num_or_sources = num_or_sources;
 
   // Thoughts on AND compatibility of OrSources:
@@ -533,18 +560,19 @@ void set_or_args(const std::vector<NCDataList>& ncDataLists) {
   // no remaining XOR-compatible sourceLists.
   // TODO: markAllANDCompatibleOrSources(xorSourceList, orSourceList);
 
-  /*
-  auto [device_or_src_indices, num_or_src_indices] =
-    markAllXorCompatibleOrSourcesCuda(MFD.device.or_sources, MFD.device.num_or_sources,
-      MFD.xor_src_lists, MFD.compat_idx_lists, MFD.combo_indices);
-  MFD.device.or_src_indices = device_or_src_indices;
-  MFD.device.num_or_src_indices = num_or_src_indices;
-  */
+  if constexpr (0) {
+    markAllXorCompatibleOrSources(MFD.host.or_arg_list, MFD.host.xor_src_lists,
+      MFD.host.compat_idx_lists, MFD.host.combo_indices);
+  }
+
+  auto mark_results = cuda_markAllXorCompatibleOrSources(MFD);
+  validate_marked_or_sources(MFD.host.or_arg_list, mark_results);
+  MFD.device.num_or_sources = move_marked_or_sources(MFD.device.or_src_list, mark_results);
 
   auto build1 = high_resolution_clock::now();
   [[maybe_unused]] auto d_build =
     duration_cast<milliseconds>(build1 - build0).count();
-  std::cerr << " build/mark or_args" << MFD.host.num_or_args << ")"
+  std::cerr << " build/mark or_args(" << MFD.host.num_or_args << ")"
             << ", or_sources(" << MFD.device.num_or_sources << ") - " << d_build
             << "ms" << std::endl;
 }

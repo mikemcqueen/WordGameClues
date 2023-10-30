@@ -9,7 +9,7 @@ namespace cm {
 namespace device {  // on-device data structures
 
 struct OrSourceData {
-  SourceCompatibilityData source;
+  SourceCompatibilityData src;
   unsigned or_arg_idx;
 };
 
@@ -65,7 +65,7 @@ struct MergeFilterData {
     device::VariationIndices* variation_indices{};
     unsigned num_variation_indices{};
 
-    device::OrSourceData* or_sources{};
+    device::OrSourceData* or_src_list{};
     unsigned num_or_sources{};
   } device;
 };

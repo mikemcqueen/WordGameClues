@@ -119,7 +119,7 @@ int run_list_pair_compat_kernel(const SourceCompatibilityData* device_sources1,
   dim3 grid_dim(grid_size);
   dim3 block_dim(block_size);
   cudaStream_t stream = cudaStreamPerThread;
-  cudaStreamSynchronize(cudaStreamPerThread);
+  //cudaStreamSynchronize(cudaStreamPerThread);
   list_pair_compat_kernel<<<grid_dim, block_dim, shared_bytes, stream>>>(
     device_sources1, device_sources2, device_indices1, num_device_indices1,
     device_indices2, num_device_indices2, device_compat_results);
@@ -144,7 +144,7 @@ int run_get_compat_combos_kernel(uint64_t first_combo, uint64_t num_combos,
   dim3 grid_dim(grid_size);
   dim3 block_dim(block_size);
   cudaStream_t stream = cudaStreamPerThread;
-  cudaStreamSynchronize(cudaStreamPerThread);
+  //cudaStreamSynchronize(cudaStreamPerThread);
   get_compat_combos_kernel<<<grid_dim, block_dim, shared_bytes, stream>>>(
     first_combo, num_combos, device_compat_matrices,
     device_compat_matrix_start_indices, num_compat_matrices,

@@ -63,11 +63,11 @@
             "name": "cppdbg xor",
             "program": "/usr/local/bin/node",
             "cwd": "${workspaceFolder}/src/tools",
-            "args": [ "clues.js", "-pf.72", "-c2,2", "-x2",
+            "args": [ "clues.js", "-pf.72", "-c2,2",
 //                "--xor", "us 50",
                 "--xor", "koa",
                 "--xor", "21",
-//                "--xor", "currant",
+                "--or", "tree",
                 "-v"
             ]
         }

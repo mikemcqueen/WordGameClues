@@ -53,22 +53,22 @@ auto* allocCopySources(const CandidateList& candidates) {
   return device_sources;
 }
 
-void zeroResults(result_t* results, size_t num_results, cudaStream_t stream) {
-  cudaError_t err = cudaSuccess;
-  auto results_bytes = num_results * sizeof(result_t);
-  err = cudaMemsetAsync(results, 0, results_bytes, stream);
-  assert((err == cudaSuccess) && "zero results");
-}
-
-auto allocResults(size_t num_results) {  // TODO cudaStream_t stream) {
-  cudaStream_t stream = cudaStreamPerThread;
-  cudaError_t err = cudaSuccess;
+auto alloc_results(size_t num_results,
+  cudaStream_t stream = cudaStreamPerThread) {  // TODO cudaStream_t stream) {
   // alloc results
   auto results_bytes = num_results * sizeof(result_t);
   result_t* device_results;
-  err = cudaMallocAsync((void**)&device_results, results_bytes, stream);
+  cudaError_t err = cudaMallocAsync((void**)&device_results, results_bytes, stream);
   assert((err == cudaSuccess) && "alloc results");
   return device_results;
+}
+
+void zero_results(result_t* results, size_t num_results,
+  cudaStream_t stream = cudaStreamPerThread) {
+  // memset results to zero
+  auto results_bytes = num_results * sizeof(result_t);
+  cudaError_t err = cudaMemsetAsync(results, 0, results_bytes, stream);
+  assert((err == cudaSuccess) && "zero results");
 }
 
 auto* allocCopyListStartIndices(const IndexStates& index_states) {
@@ -87,25 +87,26 @@ auto* allocCopyListStartIndices(const IndexStates& index_states) {
 }
 
 void copy_device_results(std::vector<result_t>& results,
-  result_t* device_results, cudaStream_t stream) {
-  //
+  result_t* device_results, cudaStream_t stream = cudaStreamPerThread) {
+  // sync the kernel
   cudaError_t err = cudaStreamSynchronize(stream);
-  assert((err == cudaSuccess) && "sychronize");
-
+  assert((err == cudaSuccess) && "copy_results sychronize kernel");
+  // copy results
   auto results_bytes = results.size() * sizeof(result_t);
   err = cudaMemcpyAsync(results.data(), device_results, results_bytes,
     cudaMemcpyDeviceToHost, stream);
   if (err != cudaSuccess) {
-    fprintf(stdout, "copy device results, error: %s", cudaGetErrorString(err));
-    assert((err != cudaSuccess) && "copy device results");
+    fprintf(stdout, "copy_results memcpy error: %s", cudaGetErrorString(err));
+    assert((err != cudaSuccess) && "copy_results memcpy");
   }
+  // sync the memcpy
   err = cudaStreamSynchronize(stream);
-  assert((err == cudaSuccess) && "cudaStreamSynchronize");
+  assert((err == cudaSuccess) && "copy_results synchronize memcpy");
 }
 
 int run_filter_task(StreamSwarm& streams, int threads_per_block,
   const CandidateList& candidates, IndexStates& idx_states,
-  const MergeFilterData& mfd, const SourceCompatibilityData* device_sources,
+  const MergeFilterData& mfd, const SourceCompatibilityData* device_src_list,
   result_t* device_results, const index_t* device_list_start_indices,
   std::vector<result_t>& results) {
   //
@@ -131,7 +132,7 @@ int run_filter_task(StreamSwarm& streams, int threads_per_block,
                 << std::endl;
 #endif
       stream.allocCopy(idx_states);
-      run_xor_kernel(stream, threads_per_block, mfd, device_sources,
+      run_xor_kernel(stream, threads_per_block, mfd, device_src_list,
         device_results, device_list_start_indices);
       continue;
     }
@@ -205,10 +206,10 @@ std::unordered_set<std::string> filter_task(const MergeFilterData& mfd, int sum,
   auto it = allSumsCandidateData.find(sum);
   assert((it != allSumsCandidateData.end()) && "no candidates for sum");
   const auto& candidates = it->second;
-  auto device_sources = allocCopySources(candidates);
+  auto device_src_list = allocCopySources(candidates);
   IndexStates idx_states{candidates};
   auto device_list_start_indices = allocCopyListStartIndices(idx_states);
-  auto device_results = allocResults(candidates.size());
+  auto device_results = alloc_results(candidates.size());
 
   stride = std::min((int)candidates.size(), stride);
   StreamSwarm streams(num_streams, stride);
@@ -221,12 +222,12 @@ std::unordered_set<std::string> filter_task(const MergeFilterData& mfd, int sum,
   for(int i{}; i < iters; ++i) {
     streams.reset();
     idx_states.reset();
-    zeroResults(device_results, candidates.size(), cudaStreamPerThread);
+    zero_results(device_results, candidates.size());
     auto t0 = high_resolution_clock::now();
 
     auto total_compat =
       run_filter_task(streams, threads_per_block, candidates, idx_states, mfd,
-        device_sources, device_results, device_list_start_indices, results);
+        device_src_list, device_results, device_list_start_indices, results);
 
     auto t1 = high_resolution_clock::now();
     auto d_total = duration_cast<milliseconds>(t1 - t0).count();
@@ -243,11 +244,11 @@ std::unordered_set<std::string> filter_task(const MergeFilterData& mfd, int sum,
   }
 
 #if 0
-  err = cudaFree(device_sources);
+  err = cudaFree(device_src_list);
   if (err != cudaSuccess) {
-    fprintf(stderr, "Failed to free device sources, error: %s\n",
+    fprintf(stderr, "Failed to free device src_list, error: %s\n",
       cudaGetErrorString(err));
-    throw std::runtime_error("failed to free device sources");
+    throw std::runtime_error("failed to free device src_list");
   }
 #endif
   return get_compat_combos(results, candidates);
@@ -344,20 +345,41 @@ filter_result_t get_filter_result() {
   return unique_combos;
 }
 
-auto markAllXorCompatibleOrSourcesCuda(
-  const device::OrSourceData* device_or_sources, unsigned num_or_sources,
-  const std::vector<SourceList>& xor_src_lists,
-  const std::vector<IndexList>& compat_idx_lists,
-  const ComboIndexList& compat_indices)
-  -> std::pair<index_t*, unsigned> {
-  // TODO: alloc/zero results
-  /*
-  mark_or_sources_task(device_or_sources, num_or_sources, xor_src_lists,
-    compat_idx_lists, combo_indices);
-  */
-  // TODO: build index list, return index list
-  // TODO: in filterCandidatesCuda, take idx_list; in filter_task; alloc/copy device_or_indices
-  return std::make_pair(nullptr, 0);
+auto cuda_markAllXorCompatibleOrSources(const MergeFilterData& mfd)
+  -> std::vector<result_t> {
+  // alloc/zero results
+  auto device_results = alloc_results(mfd.device.num_or_sources);
+  zero_results(device_results, mfd.device.num_or_sources);
+  run_mark_or_sources_kernel(mfd, device_results);
+  std::vector<result_t> results(mfd.device.num_or_sources);
+  copy_device_results(results, device_results);
+  auto marked = std::accumulate(results.begin(), results.end(), 0,
+    [](int total, result_t val) { return total + val; });
+  std::cerr << "  cuda marked " << marked << " of " << mfd.device.num_or_sources
+            << std::endl;
+  return results;
+}
+
+// This "compacts" the device_or_src_list by moving all "compatible" sources
+// to the front of the array, and returns the compatible source count.
+unsigned move_marked_or_sources(device::OrSourceData* device_or_src_list,
+  const std::vector<result_t>& mark_results) {
+  //
+  size_t list_idx{};
+  for (size_t result_idx{}; result_idx < mark_results.size(); ++result_idx) {
+    if (!mark_results[result_idx]) {
+      continue;
+    }
+    if (result_idx > list_idx) {
+      cudaError_t err = cudaMemcpyAsync(&device_or_src_list[list_idx++],
+        &device_or_src_list[result_idx], sizeof(device::OrSourceData),
+        cudaMemcpyDeviceToDevice);
+      assert((err == cudaSuccess) && "move_marked_or_sources memcpy");
+    } else {
+      ++list_idx;
+    }
+  }
+  return list_idx;
 }
 
 [[nodiscard]] SourceCompatibilityData* cuda_allocCopyXorSources(
@@ -393,28 +415,28 @@ cuda_allocCopyOrSources(const OrArgList& orArgList) {
   // size/alignment of or_src probably).
   // Or, just blast these out in chunks, per or_arg. Will need to alloc/copy a
   // device_or_arg_sizes and pass num_or_args as well in that case.
-  std::vector<device::OrSourceData> or_sources;
+  std::vector<device::OrSourceData> or_src_list;
   for (unsigned arg_idx{}; arg_idx < orArgList.size(); ++arg_idx) {
     const auto& or_arg = orArgList.at(arg_idx);
     for (const auto& or_src: or_arg.or_src_list) {
-      or_sources.emplace_back(device::OrSourceData{or_src.src, arg_idx});
+      or_src_list.emplace_back(device::OrSourceData{or_src.src, arg_idx});
     }
   }
-  const auto or_src_bytes = or_sources.size() * sizeof(device::OrSourceData);
-  device::OrSourceData* device_or_sources;
+  const auto or_src_bytes = or_src_list.size() * sizeof(device::OrSourceData);
+  device::OrSourceData* device_or_src_list;
   err = cudaMallocAsync(
-    (void**)&device_or_sources, or_src_bytes, cudaStreamPerThread);
-  assert((err == cudaSuccess) && "alloc device or sources");
+    (void**)&device_or_src_list, or_src_bytes, cudaStreamPerThread);
+  assert((err == cudaSuccess) && "or_sources alloc");
 
-  err = cudaMemcpyAsync(device_or_sources, or_sources.data(), or_src_bytes,
+  err = cudaMemcpyAsync(device_or_src_list, or_src_list.data(), or_src_bytes,
     cudaMemcpyHostToDevice, cudaStreamPerThread);
-  assert((err == cudaSuccess) && "copy device or sources");
+  assert((err == cudaSuccess) && "or_sources memcpy");
 
-  // TODO: need to store or_sources in MFD or something for async copy lifetime
+  // TODO: need to store or_src_list in MFD or something for async copy lifetime
   err = cudaStreamSynchronize(cudaStreamPerThread);
-  assert((err == cudaSuccess) && "sync device or sources");
+  assert((err == cudaSuccess) && "or_sources sync");
 
-  return std::make_pair(device_or_sources, or_sources.size());
+  return std::make_pair(device_or_src_list, or_src_list.size());
 }
 
 [[nodiscard]] auto cuda_allocCopySentenceVariationIndices(
