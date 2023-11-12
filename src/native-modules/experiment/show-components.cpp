@@ -121,7 +121,7 @@ void display(const std::vector<NamesAndCounts>& names_counts_list,
       sources += get_source_clues(source_list, names_counts);
     } else {
       // -t name (one name only)
-      sources += util::join(names_counts.names, ",");
+      sources += util::join(names_counts.names, " - ");
     }
     display(names_counts.counts, text, sources);
   }

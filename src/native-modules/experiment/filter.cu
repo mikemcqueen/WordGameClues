@@ -30,19 +30,6 @@ template <typename T> __device__ __forceinline__ void store(T* addr, T val) {
   *(volatile T*)addr = val;
 }
 
-__device__ __host__ auto isSourceXORCompatibleWithAnyXorSource(
-  const SourceCompatibilityData& source, const XorSource* xorSources,
-  size_t numXorSources) {
-  bool compatible = true;
-  for (size_t i{}; i < numXorSources; ++i) {
-    compatible = source.isXorCompatibleWith(xorSources[i]);
-    if (compatible) {
-      break;
-    }
-  }
-  return compatible;
-}
-
 __device__ bool is_source_OR_compatibile(const SourceCompatibilityData& source,
   const unsigned num_or_args,
   const device::OrSourceData* __restrict__ or_sources,
@@ -406,7 +393,8 @@ __global__ void mark_or_sources_kernel(
   for (unsigned idx{blockIdx.x}; idx < num_or_sources; idx += gridDim.x) {
     const auto& or_source = or_src_list[idx];
     auto& result = results[idx];
-    auto idx_spans = get_smallest_src_index_spans(or_source.src, variation_indices);
+    auto idx_spans =
+      get_smallest_src_index_spans(or_source.src, variation_indices);
     __syncthreads();
     if (idx_spans.first.size() + idx_spans.second.size()) {
       if (is_source_XOR_compatible_with_any(or_source.src, idx_spans,
@@ -430,6 +418,19 @@ auto flat_index(
 }
 
 #if 0
+__device__ __host__ auto isSourceXORCompatibleWithAnyXorSource(
+  const SourceCompatibilityData& source, const XorSource* xorSources,
+  size_t numXorSources) {
+  bool compatible = true;
+  for (size_t i{}; i < numXorSources; ++i) {
+    compatible = source.isXorCompatibleWith(xorSources[i]);
+    if (compatible) {
+      break;
+    }
+  }
+  return compatible;
+}
+
 void check(
   const SourceCompatibilityLists& src_list, index_t list_index, index_t index) {
   constexpr const auto logging = true;
