@@ -9,7 +9,7 @@
 #include "clue-manager.h"
 #include "combo-maker.h"
 #include "merge-filter-data.h"
-#include "show-components.h"
+#include "components.h"
 #include "util.h"
 
 namespace cm::components {

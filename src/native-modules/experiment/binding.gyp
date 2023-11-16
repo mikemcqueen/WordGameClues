@@ -24,7 +24,7 @@
       'filter-support.cpp',
       'index.cpp',
       'merge-support.cpp',
-      'show-components.cpp',
+      'components.cpp',
       'validator.cpp',
       'wrap.cpp'
     ],

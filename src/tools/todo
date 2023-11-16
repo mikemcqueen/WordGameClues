@@ -1,3 +1,4 @@
+  
 * add syn/hom of anagrams at .. post-process?
   * so i had a thought about this. if i do -t <primary-src> i probably want to see
     name variations there don't i?  I mean, why not. which means i'd need to duplicate

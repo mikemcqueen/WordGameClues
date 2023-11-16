@@ -9,15 +9,12 @@ const _           = require('lodash');
 const ClueList    = require('../dist/types/clue-list');
 const ClueManager = require('../dist/modules/clue-manager');
 const ComboMaker  = require('../dist/modules/combo-maker');
-const Components  = require('../dist/modules/show-components');
-const Consistency = require('../dist/modules/consistency');
+const Components  = require('../dist/modules/components');
 const MinMax      = require("../dist/types/min-max");
 const NameCount   = require('../dist/types/name-count');
 const Validator   = require('../dist/modules/validator');
 
-const AltSources  = require('../modules/alt-sources');
 const Clues       = require('../modules/clue-types');
-const ComboSearch = require('../modules/combo-search');
 
 const Debug       = require('debug')('clues');
 const Duration    = require('duration');
@@ -41,8 +38,6 @@ const Timing      = require('debug')('timing');
 // 
 
 const CmdLineOptions = Opt.create(_.concat(Clues.Options, [
-    ['a', 'alt-sources=NAME',                  'show alternate sources for the specified clue NAME'],
-    ['A', 'all-alt-sources',                   'show alternate sources for all clues'],
     ['o', 'output',                            '  output json -or- clues(huh?)'],
     ['c', 'count=COUNT[LO,COUNTHI]',           'show combos of the specified COUNT; if COUNTHI, treat as range'],
     ['x', 'max=COUNT',                         '  maximum # of sources to combine'],
@@ -278,8 +273,6 @@ function copyClues (fromType, options = {}) {
 function setLogging (flag) {
     ClueManager.setLogging(flag);
     ComboMaker.logging  = flag;
-    AltSources.logging  = flag;
-    ComboSearch.logging = flag;
     //Peco.setLogging(flag);
 
     LOGGING = flag;
@@ -320,8 +313,6 @@ async function main () {
     // TODO: get rid of this, just pass Opt.options around
     let useClueList = options.use;
     let showSourcesClueName = options['show-sources'];
-    let altSourcesArg = options['alt-sources'];
-    let allAltSourcesFlag = options['all-alt-sources'];
     options.allow_dupe_source = options['allow-dupe-source'] ? true : false;
     options.allow_used = options['allow-used'] ? true : false;
     options.merge_style = Boolean(options['merge-style']);
@@ -335,8 +326,6 @@ async function main () {
     if (!options.count) {
         needCount = true;
         if (showSourcesClueName ||
-            altSourcesArg ||
-            allAltSourcesFlag ||
             showKnownArg ||
             useClueList ||
             options.test ||
@@ -376,7 +365,7 @@ async function main () {
         process.exit(0);
     }
 
-    if (options.count && !showKnownArg && !altSourcesArg && !allAltSourcesFlag && !options['ccc']) {
+    if (options.count && !showKnownArg && !options['ccc']) {
         let countRange = options.count.split(',').map(_.toNumber);
         options.count_lo = countRange[0];
         options.count_hi = countRange.length > 1 ? countRange[1] : countRange[0];
@@ -417,7 +406,8 @@ async function main () {
     } else if (options.test) {
         let start = new Date();
         if (options.validate) {
-            Components.validate(options.test, options);
+            Assert(false);
+            //Components.validate(options.test, options);
         } else {
             Components.show(options);
         }
@@ -426,18 +416,8 @@ async function main () {
         Timing(`${PrettyMs(d)}`);
     } else if (showSourcesClueName) {
         showSources(showSourcesClueName);
-    } else if (altSourcesArg || allAltSourcesFlag) {
-        AltSources.show(allAltSourcesFlag ? {
-            all    : true,
-            output : options.output,
-            count  : Number(options.count)
-        } : {
-            all    : false,
-            name   : altSourcesArg,
-            output : options.output
-        });
     } else if (options['ccc']) {
-        Consistency.check(options);
+        Components.consistency_check(options);
     } else if (options.copy_from) {
         const from = Clues.getByVariety(options.copy_from);
         Debug(`from: ${from.baseDir}`);

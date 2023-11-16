@@ -16,7 +16,7 @@
 #include "merge.h"
 #include "merge-filter-common.h"
 #include "merge-filter-data.h"
-#include "show-components.h"
+#include "components.h"
 #include "util.h"
 #include "validator.h"
 #include "wrap.h"

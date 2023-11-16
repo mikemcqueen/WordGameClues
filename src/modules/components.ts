@@ -86,6 +86,56 @@ export const show = (options: any): any => {
     return 0;
 };
 
+//////// 
+
+let get_unique_combos = (first: number, last: number): Set<string> => {
+    let combos = new Set<string>();
+    for (let i = first; i <= last; ++i) {
+        const clues = ClueManager.getClueList(i) as ClueList.Compound;
+        if (!clues) continue;
+        for (let clue of clues) {
+            if (!combos.has(clue.src)) {
+                combos.add(clue.src);
+            }
+        }
+    }
+    return combos;
+}
+
+export const consistency_check = (options: any): void => {
+    const max_sources = 30;
+    let combos = get_unique_combos(2, max_sources);
+    let inconsistent_combos = new Set<string>();
+    for (let combo of combos) {
+        const nameList = combo.split(',').sort();
+        const pc_args = {
+            xor: nameList,
+            merge_only: true,
+            max: 2,
+            max_sources,
+            quiet: true,
+            ignoreErrors: options.ignoreErrors
+        };
+        const pc_result = PreCompute.preCompute(2, max_sources, pc_args);
+        if (pc_result) {
+            if (!Native.checkClueConsistency(nameList)) {
+                inconsistent_combos.add(combo);
+            }
+        } else {
+            console.error(`Consistency::Precompute failed at ${combo}.`);
+        }
+        //console.error(combo);
+    }
+    if (inconsistent_combos.size) {
+        console.error(`inconsistent combos:`);
+        for (let combo of inconsistent_combos) {
+            console.error(combo);
+        }
+    } else {
+        console.error(`No inconsistent combos`);
+    }
+};
+
 //////// all below probably should be removed.
 
 function get_clue_names (options: any) {
