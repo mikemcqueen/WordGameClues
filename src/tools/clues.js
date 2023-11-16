@@ -10,6 +10,7 @@ const ClueList    = require('../dist/types/clue-list');
 const ClueManager = require('../dist/modules/clue-manager');
 const ComboMaker  = require('../dist/modules/combo-maker');
 const Components  = require('../dist/modules/show-components');
+const Consistency = require('../dist/modules/consistency');
 const MinMax      = require("../dist/types/min-max");
 const NameCount   = require('../dist/types/name-count');
 const Validator   = require('../dist/modules/validator');
@@ -81,6 +82,7 @@ const CmdLineOptions = Opt.create(_.concat(Clues.Options, [
     ['m', 'max-sources=COUNT',                 'enforce COUUNT max primary sources for a single clue;' +
                                                ' impacts clue loading, combo generation'],
     ['R', 'remove-all-invalid',                'remove all invalid (validation error) clues'],
+    ['',  'ccc',                               'clue (source) consistency check'],
     ['z', 'flags=OPTION+',                     'flags: 2=ignoreErrors' ],
     ['v', 'verbose',                           'more output'],
     ['q', 'quiet',                             'less output'],
@@ -339,7 +341,8 @@ async function main () {
             useClueList ||
             options.test ||
             options.copy_from ||
-            options['sort-all-clues'])
+            options['sort-all-clues'] ||
+            options['ccc'])
         {
             needCount = false;
         }
@@ -373,7 +376,7 @@ async function main () {
         process.exit(0);
     }
 
-    if (options.count && !showKnownArg && !altSourcesArg && !allAltSourcesFlag) {
+    if (options.count && !showKnownArg && !altSourcesArg && !allAltSourcesFlag && !options['ccc']) {
         let countRange = options.count.split(',').map(_.toNumber);
         options.count_lo = countRange[0];
         options.count_hi = countRange.length > 1 ? countRange[1] : countRange[0];
@@ -433,6 +436,8 @@ async function main () {
             name   : altSourcesArg,
             output : options.output
         });
+    } else if (options['ccc']) {
+        Consistency.check(options);
     } else if (options.copy_from) {
         const from = Clues.getByVariety(options.copy_from);
         Debug(`from: ${from.baseDir}`);

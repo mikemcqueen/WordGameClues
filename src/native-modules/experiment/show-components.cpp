@@ -1,13 +1,18 @@
 // show-components.cpp
 
+#include <functional>
 #include <iostream>
+#include <optional>
+#include <string>
+#include <unordered_set>
+#include <vector>
 #include "clue-manager.h"
 #include "combo-maker.h"
 #include "merge-filter-data.h"
 #include "show-components.h"
 #include "util.h"
 
-namespace cm::show_components {
+namespace cm::components {
 
 struct NamesAndCounts {
   std::vector<std::string> names;
@@ -136,13 +141,76 @@ void display_results(
   display(results.valid, "VALID");
 }
 
+using opt_str_list_cref_t =
+  std::optional<std::reference_wrapper<const std::vector<std::string>>>;
+
+opt_str_list_cref_t get_clue_names_for_sources(int sum, const std::string& sources_csv) {
+  static const std::vector<std::string> empty;
+  using namespace clue_manager;
+  if (has_known_source_map(sum)) {
+    if (is_known_source_map_entry(sum, sources_csv)) {
+      return std::make_optional(std::cref(get_known_source_map_entry(sum, sources_csv).clue_names));
+    } else {
+      return std::make_optional(std::cref(empty));
+    }
+  } else {
+    std::cerr << "!knownSourceMap(" << sum << "), sources: " << sources_csv
+              << std::endl;
+    return std::nullopt;
+  }
+}
+
+bool are_sources_consistent(
+  const std::vector<std::string>& name_list, const SourceList& xor_src_list) {
+  //
+  assert(name_list.size() > 1u);
+  const auto sources_csv = util::join(name_list, ",");
+  std::unordered_set<std::string> hash;
+  std::unordered_set<std::string> names;
+  for (const auto& src: xor_src_list) {
+    const auto count_list = NameCount::listToCountList(src.ncList);
+    const auto key = util::join(count_list, ",");
+    if (hash.contains(key)) {
+      continue;
+    }
+    bool first = hash.empty();
+    hash.insert(key);
+    const auto sum = util::sum(count_list);
+    auto opt_names = get_clue_names_for_sources(sum, sources_csv);
+    if (!opt_names.has_value()) {
+      continue;
+    }
+    if (first) {
+      for (const auto& name: opt_names.value().get()) {
+        names.insert(name);
+      }
+      continue;
+    }
+    if (names.size() != opt_names.value().get().size()) {
+      return false;
+    }
+    for (const auto& name : opt_names.value().get()) {
+      if (!names.contains(name)) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
 }  // namespace
 
-auto of(const std::vector<std::string>& name_list,
+auto show(const std::vector<std::string>& name_list,
   const SourceList& xor_src_list) -> std::set<int> {
   auto results = get_results(name_list, xor_src_list);
   display_results(name_list, results);
   return results.sums;
 }
 
-}  // namespace cm::show_components
+auto consistency_check(const std::vector<std::string>& name_list,
+  const SourceList& xor_src_list) -> bool {
+  //
+  return are_sources_consistent(name_list, xor_src_list);
+}
+
+}  // namespace cm::components

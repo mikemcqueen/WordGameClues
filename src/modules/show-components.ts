@@ -70,13 +70,12 @@ export const show = (options: any): any => {
     const nameList = options.test.split(',').sort();
     const pc_args = {
         xor: nameList,
-        merge_only: true, // flag: wrap xorSources on return from Native.merge()
+        merge_only: true,
         max: 2,
         max_sources: options.max_sources,
         quiet: options.quiet,
         ignoreErrors: options.ignoreErrors
     };
-    // TODO: don't wrap here for -t, but save results in Native.MFD
     const pc_result = PreCompute.preCompute(2, options.max_sources, pc_args);
     if (pc_result) {
         const counts = Native.showComponents(nameList);

@@ -1,3 +1,4 @@
+#include <experimental/scope>
 #include <chrono>
 #include <iostream>
 #include <cuda_runtime.h>
@@ -11,6 +12,14 @@
 namespace {
 
 using namespace cm;
+
+void cuda_free(void* ptr) {
+  cudaError_t err = cudaFree(ptr);
+  if (err != cudaSuccess) {
+    std::cerr << "cudaFree failed, " << cudaGetErrorString(err) << std::endl;
+    std::terminate();
+  }
+}
 
 auto anyCompatibleXorSources(const SourceData& source,
   const Peco::IndexList& indexList, const SourceList& sourceList) {
@@ -330,10 +339,11 @@ auto run_get_compat_combos_task(const result_t* device_compat_matrices,
   constexpr auto logging = false;
 
   using namespace std::chrono;
+  using namespace std::experimental::fundamentals_v3;
   uint64_t first_combo{};
   uint64_t num_combos{600'000'000}; // chunk size
-  // TODO: free
   auto device_results = alloc_results(num_combos);
+  scope_exit free_results{[device_results]() { cuda_free(device_results); }};
   std::vector<result_t> host_results(num_combos);
   std::vector<uint64_t> result_indices;
   for (int n{};; ++n, first_combo += num_combos) {
@@ -362,7 +372,8 @@ auto run_get_compat_combos_task(const result_t* device_compat_matrices,
     }
     auto cpr0 = high_resolution_clock::now();
 
-    sync_copy_results(host_results, num_combos, device_results, cudaStreamPerThread);
+    sync_copy_results(
+      host_results, num_combos, device_results, cudaStreamPerThread);
     auto num_hits =
       process_results(host_results, first_combo, num_combos, result_indices);
 
@@ -422,6 +433,7 @@ auto cuda_get_compat_xor_src_indices(const std::vector<SourceList>& src_lists,
   const index_t* device_idx_list_sizes) -> std::vector<uint64_t> {
   //
   using namespace std::chrono;
+  using namespace std::experimental::fundamentals_v3;
   assert(!src_lists.empty() && !idx_lists.empty()
          && !getNumEmptySublists(src_lists) && "cuda_merge: invalid param");
 
@@ -429,8 +441,9 @@ auto cuda_get_compat_xor_src_indices(const std::vector<SourceList>& src_lists,
   auto src_list_start_indices = make_start_indices(src_lists);
   auto idx_list_start_indices = make_start_indices(idx_lists);
   size_t num_bytes{};
-  // TODO: free
   auto device_compat_matrices = alloc_compat_matrices(idx_lists, &num_bytes);
+  scope_exit free_compat_matrices(
+    [device_compat_matrices]() { cuda_free(device_compat_matrices); });
   auto compat_matrix_start_indices =
     make_compat_matrix_start_indices(idx_lists);
 
@@ -477,9 +490,11 @@ auto cuda_get_compat_xor_src_indices(const std::vector<SourceList>& src_lists,
   // num_compat_matrix_bytes);
 
   // alloc/copy start indices
-  // TODO: free
   auto device_compat_matrix_start_indices =
     alloc_copy_start_indices(compat_matrix_start_indices);
+  scope_exit free_start_indices([device_compat_matrix_start_indices]() {
+    cuda_free(device_compat_matrix_start_indices);
+  });
   const uint64_t max_combos{
     util::multiply_with_overflow_check(util::make_list_sizes(idx_lists))};
   auto gcc0 = high_resolution_clock::now();
@@ -489,12 +504,10 @@ auto cuda_get_compat_xor_src_indices(const std::vector<SourceList>& src_lists,
     idx_lists.size(), device_compat_matrix_start_indices, device_idx_list_sizes,
     max_combos);  // clang-format
 
-  auto gcc1 = high_resolution_clock::now();
-  auto gcc_dur = duration_cast<milliseconds>(gcc1 - gcc0).count();
+  auto t1 = high_resolution_clock::now();
+  auto gcc_dur = duration_cast<milliseconds>(t1 - gcc0).count();
   std::cerr << "  get_compat_combos kernels complete (" << combo_indices.size()
             << ") - " << gcc_dur << "ms" << std::endl;
-
-  auto t1 = high_resolution_clock::now();
   auto t_dur = duration_cast<milliseconds>(t1 - t0).count();
   std::cerr << " cuda_get_compat_xor_src_indices - " << t_dur << "ms"
             << std::endl;
@@ -508,8 +521,8 @@ auto cuda_get_compat_xor_src_indices(const std::vector<SourceList>& src_lists,
 }
 
 // Given a vector of source lists, generate a vector of index lists: one for
-// each source list, representing every source in every list. Then filter out
-// incompatible indices from each index list, returning a vector of compatible
+// each source list, together containing indices for every source in every
+// list. Then filter out all incompatible, and return a vector of compatible
 // index lists.
 auto get_compatible_indices(const std::vector<SourceList>& src_lists)
   -> std::vector<IndexList> {

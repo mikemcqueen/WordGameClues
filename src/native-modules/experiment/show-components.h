@@ -7,11 +7,14 @@
 #include <string>
 #include <vector>
 
-namespace cm::show_components {
+namespace cm::components {
 
-auto of(const std::vector<std::string>& name_list,
+auto show(const std::vector<std::string>& name_list,
   const SourceList& xor_src_list) -> std::set<int>;
 
-}  // namespace cm::show_components
+auto consistency_check(const std::vector<std::string>& name_list,
+  const SourceList& xor_src_list) -> bool;
+  
+}  // namespace cm::components
 
 #endif // INCLUDE_SHOW_COMPONENTS_H

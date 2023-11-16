@@ -484,6 +484,7 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
     // TODO: support for single-list compat indices
     auto compat_idx_lists = get_compatible_indices(MFD.host.xor_src_lists);
     if (!compat_idx_lists.empty()) {
+      // TODO: free if already set. set_src_lists?
       MFD.device.src_lists = alloc_copy_src_lists(MFD.host.xor_src_lists);
       MFD.device.idx_lists = alloc_copy_idx_lists(compat_idx_lists);
       const auto idx_list_sizes = util::make_list_sizes(compat_idx_lists);
@@ -684,10 +685,27 @@ Value showComponents(const CallbackInfo& info) {
   // arg0:
   auto name_list = makeStringList(env, info[0].As<Array>());
   // --
-  auto sums = show_components::of(name_list, MFD.host.merged_xor_src_list);
+  auto sums = components::show(name_list, MFD.host.merged_xor_src_list);
   return wrap(env, sums);
 }
 
+//
+// checkClueConsistency
+//
+Value checkClueConsistency(const CallbackInfo& info) {
+  Env env = info.Env();
+  if (!info[0].IsArray()) {
+    TypeError::New(env, "checkClueConsistency: invalid parameter type")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+  // arg0:
+  auto name_list = makeStringList(env, info[0].As<Array>());
+  // --
+  auto result =
+    components::consistency_check(name_list, MFD.host.merged_xor_src_list);
+  return Boolean::New(env, result);
+}
 
 //
 Object Init(Env env, Object exports) {
@@ -718,6 +736,10 @@ Object Init(Env env, Object exports) {
   // show-components
   //
   exports["showComponents"] = Function::New(env, showComponents);
+
+  // consistency
+  //
+  exports["checkClueConsistency"] = Function::New(env, checkClueConsistency);
 
   return exports;
 }
