@@ -12,10 +12,9 @@ const ComboMaker  = require('../dist/modules/combo-maker');
 const Components  = require('../dist/modules/components');
 const MinMax      = require("../dist/types/min-max");
 const NameCount   = require('../dist/types/name-count');
-const Validator   = require('../dist/modules/validator');
+const Native      = require('../../build/experiment.node');
 
 const Clues       = require('../modules/clue-types');
-
 const Debug       = require('debug')('clues');
 const Duration    = require('duration');
 const Expect      = require('should/as-function');
@@ -24,9 +23,7 @@ const Note        = require('../modules/note');
 const Opt         = require('node-getopt');
 const Peco        = require('../modules/peco');
 const PrettyMs    = require('pretty-ms');
-const Show        = require('../modules/show');
 const Stringify   = require('stringify-object');
-const ResultMap   = require('../types/result-map');
 const Timing      = require('debug')('timing');
 
 
@@ -56,9 +53,9 @@ const CmdLineOptions = Opt.create(_.concat(Clues.Options, [
     ['',  'allow-dupe-source',                 '  allow duplicate sources'],
     ['',  'merge-style',                       '  merge-style, no validation except for immediate sources'],
     ['',  'remaining',                         '  only word combos not present in any named note'],
-    ['k', 'show-known',                        'show compatible known clues; -u <clue> required' ],
-    ['',  'csv',                               '  output in search-term csv format' ],
-    ['',  'files',                             '  output in result file full-path format' ],
+//    ['k', 'show-known',                        'show compatible known clues; -u <clue> required' ],
+//    ['',  'csv',                               '  output in search-term csv format' ],
+//    ['',  'files',                             '  output in result file full-path format' ],
     ['s', 'show-sources=NAME[:COUNT][,v]',     'show primary source combos for the specified NAME[:COUNT]' ],
     ['t', 'test=SOURCE[,SOURCE,...]',          'test the specified source list, e.g. blue,fish' ],
     ['',  'add=NAME',                          '  add compound clue NAME=SOURCE; use with --test' ],
@@ -185,17 +182,17 @@ function showSources(clueName) {
         throw new Error('Need to supply a count as name:count (for now)');
     }
 
-    const entries = ClueManager.getKnownSourceMapEntries(nc);
-    if (!entries) {
+    const src_lists = Native.getSourceListsForNc(nc);
+    if (!src_lists) {
         usage('explosion');
     }
-    entries.forEach(entry => {
-        entry.results.forEach(result => {
-            console.log(Stringify(result.resultMap.map(), { indent: '  ' }));
-            console.log('nameSrcList: ' + result.nameSrcList);
+    src_lists.forEach(src_list => {
+        src_list.forEach(src => {
+            //console.log(Stringify(result.resultMap.map(), { indent: '  ' }));
+            console.log(`pnsl:   ${NameCount.listToStringList(src.primaryNameSrcList)}`);
             if (verbose) {
-                console.log('ncList:      ' + result.ncList);
-                result.resultMap.dump();
+                console.log(`ncList: ${NameCount.listToStringList(src.ncList)}`);
+                //result.resultMap.dump();
             }
         });
     });
@@ -317,7 +314,7 @@ async function main () {
     options.allow_used = options['allow-used'] ? true : false;
     options.merge_style = Boolean(options['merge-style']);
     options.removeAllInvalid = Boolean(options['remove-all-invalid']);
-    let showKnownArg = options['show-known'];
+//    let showKnownArg = options['show-known'];
     options.copy_from = options['copy-from'];
     options.max_sources = _.toNumber(options['max-sources'] || 20);
     console.error(`max_sources(${options.max_sources})`);
@@ -326,7 +323,7 @@ async function main () {
     if (!options.count) {
         needCount = true;
         if (showSourcesClueName ||
-            showKnownArg ||
+//            showKnownArg ||
             useClueList ||
             options.test ||
             options.copy_from ||
@@ -344,14 +341,6 @@ async function main () {
         QUIET = true;
     }
 
-    /****
-    OldValidator.setAllowDupeFlags({
-        allowDupeNameSrc: false,
-        allowDupeSrc:     options.allow_dupe_source,
-        allowDupeName:    true
-    });
-    ****/
-
     if (_.includes(options.flags, '2')) {
         options.ignoreErrors = true;
         Debug('ignoreErrors=true');
@@ -365,7 +354,7 @@ async function main () {
         process.exit(0);
     }
 
-    if (options.count && !showKnownArg && !options['ccc']) {
+    if (options.count && /*!showKnownArg && */ !options['ccc']) {
         let countRange = options.count.split(',').map(_.toNumber);
         options.count_lo = countRange[0];
         options.count_hi = countRange.length > 1 ? countRange[1] : countRange[0];
@@ -388,6 +377,7 @@ async function main () {
     log(`count=${options.count}, max=${maxArg}`);
 
     // TODO: add "show.js" with these exports
+/*
     if (showKnownArg) {
         if (!useClueList) {
             // TODO: require max if !metaFlag
@@ -403,7 +393,9 @@ async function main () {
                 files: options.files
             }
         });
-    } else if (options.test) {
+    } else
+*/
+    if (options.test) {
         let start = new Date();
         if (options.validate) {
             Assert(false);
@@ -411,7 +403,7 @@ async function main () {
         } else {
             Components.show(options);
         }
-        Timing(`count: ${Validator.count}, dupe: ${Validator.dupe}`);
+        //Timing(`count: ${Validator.count}, dupe: ${Validator.dupe}`);
         const d = new Duration(start, new Date()).milliseconds;
         Timing(`${PrettyMs(d)}`);
     } else if (showSourcesClueName) {
