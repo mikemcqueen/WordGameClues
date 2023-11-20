@@ -54,8 +54,20 @@ Array wrap(Env& env, const XorSourceList& xorSourceList) {
   }
   auto t1 = high_resolution_clock::now();
   [[maybe_unused]] auto t_dur = duration_cast<milliseconds>(t1 - t0).count();
+  /*
   std::cout << " wrap src-list(" << xorSourceList.size() << ")"
             << " - " << t_dur << "ms" << std::endl;
+  */
+  return jsList;
+}
+
+Napi::Array wrap(Napi::Env& env,
+  std::vector<clue_manager::KnownSourceMapValueCRef> cref_entries) {
+  //
+  Array jsList = Array::New(env, cref_entries.size());
+  for (size_t i{}; i < cref_entries.size(); ++i) {
+    jsList.Set(i, wrap(env, cref_entries.at(i).get().src_list));
+  }
   return jsList;
 }
 
@@ -71,24 +83,24 @@ Object wrap(Env& env, const PerfData& perf) {
   return jsObj;
 }
 
-Object wrap(Env& env, const CandidateStats& cs) {
-  Object jsObj = Object::New(env);
-  jsObj.Set("sum", Number::New(env, cs.sum));
-  jsObj.Set("sourceLists", Number::New(env, cs.sourceLists));
-  jsObj.Set("totalSources", Number::New(env, cs.totalSources));
-  jsObj.Set("comboMapIndices", Number::New(env, cs.comboMapIndices));
-  jsObj.Set("totalCombos", Number::New(env, cs.totalCombos));
-  return jsObj;
-};
+    Object wrap(Env & env, const CandidateStats& cs) {
+      Object jsObj = Object::New(env);
+      jsObj.Set("sum", Number::New(env, cs.sum));
+      jsObj.Set("sourceLists", Number::New(env, cs.sourceLists));
+      jsObj.Set("totalSources", Number::New(env, cs.totalSources));
+      jsObj.Set("comboMapIndices", Number::New(env, cs.comboMapIndices));
+      jsObj.Set("totalCombos", Number::New(env, cs.totalCombos));
+      return jsObj;
+    };
 
-// unordered_set<std::string>
-Array wrap(Env& env, const filter_result_t& filter_result) {
-  Array jsList = Array::New(env, filter_result.size());
-  int i{};
-  for (const auto& combo : filter_result) {
-    jsList.Set(i++, String::New(env, combo));
-  }
-  return jsList;
-}
+    // unordered_set<std::string>
+    Array wrap(Env & env, const filter_result_t& filter_result) {
+      Array jsList = Array::New(env, filter_result.size());
+      int i{};
+      for (const auto& combo : filter_result) {
+        jsList.Set(i++, String::New(env, combo));
+      }
+      return jsList;
+    }
 
-} // namespace cm
+  }  // namespace cm

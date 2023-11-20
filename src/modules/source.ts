@@ -7,7 +7,6 @@
 import _ from 'lodash'; // import statement to signal that we are a "module"
 
 const Peco        = require('../../modules/peco');
-const ResultMap   = require('../../types/result-map');
 
 const Assert      = require('assert');
 const Debug       = require('debug')('source');

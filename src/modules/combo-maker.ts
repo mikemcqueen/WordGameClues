@@ -7,7 +7,6 @@
 import _ from 'lodash'; // import statement to signal that we are a "module"
 
 const BootstrapComboMaker = require('../../modules/bootstrap-combo-maker');
-const ResultMap   = require('../../types/result-map');
 const Peco        = require('../../modules/peco');
 const Log         = require('../../modules/log')('combo-maker');
 const My          = require('../../modules/util');

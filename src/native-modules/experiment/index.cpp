@@ -399,6 +399,30 @@ Value getSourcesForNc(const CallbackInfo& info) {
   return wrap(env, clue_manager::get_nc_sources(nc));
 }
 
+Value getSourceListsForNc(const CallbackInfo& info) {
+  Env env = info.Env();
+  if (!info[0].IsObject()) {
+    TypeError::New(env, "getSourceListForNc: invalid parameter type")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+  // arg0
+  auto nc = makeNameCount(env, info[0].As<Object>());
+  // --
+  //assert(nc.count == 1);  // assert only known use case.
+#if 0
+  if (!clue_manager::is_known_name_count(nc.name, nc.count)) {
+    std::cerr << "invalid nc" << std::endl;
+    return env.Null();
+  }
+  const auto& nc_sources = clue_manager::get_nc_sources(nc);
+  for (const auto& source_csv : nc_sources) {
+
+  }
+#endif
+  auto cref_entries = clue_manager::get_known_source_map_entries(nc);
+  return wrap(env, cref_entries);
+}
 
 //
 // Validator
@@ -435,12 +459,12 @@ Value validateSources(const CallbackInfo& info) {
   // --
   auto src_list =
     validator::validateSources(clue_name, src_names, sum, validate_all);
-  auto empty_src_list = src_list.empty();
-  if (validate_all && !empty_src_list) {
+  auto is_valid_src_list = !src_list.empty();
+  if (validate_all && is_valid_src_list) {
     clue_manager::init_known_source_map_entry(
       sum, src_names, std::move(src_list));
   }
-  return Boolean::New(env, !empty_src_list);
+  return Boolean::New(env, is_valid_src_list);
 }
 
 //
@@ -716,6 +740,7 @@ Object Init(Env env, Object exports) {
   exports["setCompoundClueNameSourcesMap"] = Function::New(env, setCompoundClueNameSourcesMap);
   exports["isKnownSourceMapEntry"] = Function::New(env, isKnownSourceMapEntry);
   exports["getSourcesForNc"] = Function::New(env, getSourcesForNc);
+  exports["getSourceListsForNc"] = Function::New(env, getSourceListsForNc);
   exports["addCompoundClue"] = Function::New(env, addCompoundClue);
 
   // validator
