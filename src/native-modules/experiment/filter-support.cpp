@@ -29,10 +29,9 @@ void add_filter_future(std::future<filter_task_result_t>&& filter_future) {
 [[nodiscard]] auto cuda_alloc_copy_sources(const CandidateList& candidates,
   int num_sources, const cudaStream_t stream = cudaStreamPerThread) {
   // alloc sources
-  cudaError_t err = cudaSuccess;
   auto sources_bytes = num_sources * sizeof(SourceCompatibilityData);
   SourceCompatibilityData* device_sources;
-  err = cudaMallocAsync((void**)&device_sources, sources_bytes, stream);
+  auto err = cudaMallocAsync((void**)&device_sources, sources_bytes, stream);
   assert_cuda_success(err, "alloc sources");
   // copy sources
   size_t index{};
@@ -51,24 +50,6 @@ void add_filter_future(std::future<filter_task_result_t>&& filter_future) {
   const cudaStream_t stream = cudaStreamPerThread) {
   return cuda_alloc_copy_sources(
     candidates, count_candidates(candidates), stream);
-}
-
-auto cuda_alloc_results(size_t num_results,
-  cudaStream_t stream = cudaStreamPerThread) {
-  // alloc results
-  auto results_bytes = num_results * sizeof(result_t);
-  result_t* device_results;
-  cudaError_t err = cudaMallocAsync((void**)&device_results, results_bytes, stream);
-  assert_cuda_success(err, "alloc results");
-  return device_results;
-}
-
-void cuda_zero_results(result_t* results, size_t num_results,
-  cudaStream_t stream = cudaStreamPerThread) {
-  // memset results to zero
-  auto results_bytes = num_results * sizeof(result_t);
-  cudaError_t err = cudaMemsetAsync(results, 0, results_bytes, stream);
-  assert_cuda_success(err, "zero results");
 }
 
 void cuda_copy_results(std::vector<result_t>& results,
@@ -96,10 +77,9 @@ auto cuda_copy_results(result_t* device_results, unsigned num_results,
 [[nodiscard]] auto allocCopyListStartIndices(
   const IndexStates& index_states, cudaStream_t stream = cudaStreamPerThread) {
   // alloc indices
-  cudaError_t err = cudaSuccess;
   auto indices_bytes = index_states.list_start_indices.size() * sizeof(index_t);
   index_t* device_indices;
-  err = cudaMallocAsync((void**)&device_indices, indices_bytes, stream);
+  auto err = cudaMallocAsync((void**)&device_indices, indices_bytes, stream);
   assert_cuda_success(err, "alloc list start indices");
   // copy indices
   err = cudaMemcpyAsync(device_indices, index_states.list_start_indices.data(),
@@ -202,6 +182,7 @@ auto get_compatible_sources(const SourceCompatibilityData* device_sources,
   return results;
 }
 
+  /*
 CandidateList make_compatible_candidates(
   const SourceCompatibilityLists& src_lists,
   const CandidateList& unfiltered_candidates) {
@@ -220,6 +201,7 @@ CandidateList make_compatible_candidates(
   }
   return candidates;
 }
+  */
 
 //////////
 
@@ -333,7 +315,6 @@ filter_task_result_t xor_filter_task(const MergeFilterData& mfd,
   //
   using namespace std::experimental::fundamentals_v3;
   using namespace std::chrono;
-  [[maybe_unused]] cudaError_t err = cudaSuccess;
   // err = cudaDeviceSetLimit(cudaLimitPrintfFifoSize, 7'500'000);
 
   num_streams = num_streams ? num_streams : 3;
@@ -580,10 +561,10 @@ unsigned move_marked_or_sources(device::OrSourceData* device_or_src_list,
   // move any remaining marked (and therefore incorrectly placed) results
   for (; src_idx < mark_results.size(); ++src_idx) {
     if (mark_results[src_idx]) {
-      cudaError_t err = cudaMemcpyAsync(&device_or_src_list[dst_idx++],
+      auto err = cudaMemcpyAsync(&device_or_src_list[dst_idx++],
         &device_or_src_list[src_idx], sizeof(device::OrSourceData),
         cudaMemcpyDeviceToDevice);
-      assert((err == cudaSuccess) && "move_marked_or_sources memcpy");
+      assert_cuda_success(err, "move_marked_or_sources memcpy");
     }
   }
   return dst_idx;
@@ -633,7 +614,6 @@ unsigned move_marked_or_sources(device::OrSourceData* device_or_src_list,
 
 [[nodiscard]] std::pair<device::OrSourceData*, unsigned>
 cuda_allocCopyOrSources(const OrArgList& orArgList) {
-  cudaError_t err = cudaSuccess;
   // build host-side vector of compatible device::OrSourceData that we can
   // blast to device with one copy.
   // TODO: while this method is faster kernel-side, it's also uses more memory,
@@ -650,17 +630,15 @@ cuda_allocCopyOrSources(const OrArgList& orArgList) {
   }
   const auto or_src_bytes = or_src_list.size() * sizeof(device::OrSourceData);
   device::OrSourceData* device_or_src_list;
-  err = cudaMallocAsync(
+  auto err = cudaMallocAsync(
     (void**)&device_or_src_list, or_src_bytes, cudaStreamPerThread);
-  assert((err == cudaSuccess) && "or_sources alloc");
-
+  assert_cuda_success(err, "alloc or_sources");
   err = cudaMemcpyAsync(device_or_src_list, or_src_list.data(), or_src_bytes,
     cudaMemcpyHostToDevice, cudaStreamPerThread);
-  assert((err == cudaSuccess) && "or_sources memcpy");
-
+  assert_cuda_success(err, "copy or_sources");
   // TODO: need to store or_src_list in MFD or something for async copy lifetime
   err = cudaStreamSynchronize(cudaStreamPerThread);
-  assert((err == cudaSuccess) && "or_sources sync");
+  assert_cuda_success(err, "sync or_sources");
 
   return std::make_pair(device_or_src_list, or_src_list.size());
 }
@@ -670,7 +648,6 @@ cuda_allocCopyOrSources(const OrArgList& orArgList) {
   -> device::VariationIndices* {
   // assumption made throughout
   static_assert(sizeof(combo_index_t) == sizeof(index_t) * 2);
-  cudaError_t err = cudaSuccess;
   using DeviceVariationIndicesArray =
     std::array<device::VariationIndices, kNumSentences>;
   DeviceVariationIndicesArray device_indices_array;
@@ -682,9 +659,9 @@ cuda_allocCopyOrSources(const OrArgList& orArgList) {
       (countIndices(variation_indices) + num_variations)
       * sizeof(combo_index_t);
     auto& device_indices = device_indices_array.at(s);
-    err = cudaMallocAsync((void**)&device_indices.device_data,
+    auto err = cudaMallocAsync((void**)&device_indices.device_data,
       device_data_bytes, cudaStreamPerThread);
-    assert(err == cudaSuccess);
+    assert_cuda_success(err, "variation_indices alloc");
 
     device_indices.num_variations = num_variations;
     // copy combo indices first, populating offsets and num_combo_indices
@@ -702,7 +679,7 @@ cuda_allocCopyOrSources(const OrArgList& orArgList) {
       err = cudaMemcpyAsync(&device_indices.combo_indices[offset],
         combo_indices.data(), indices_bytes, cudaMemcpyHostToDevice,
         cudaStreamPerThread);
-      assert(err == cudaSuccess);
+      assert_cuda_success(err, "combo_indices memcpy");
       offset += combo_indices.size();
     }
     // copy variation offsets
@@ -711,7 +688,7 @@ cuda_allocCopyOrSources(const OrArgList& orArgList) {
     err = cudaMemcpyAsync(device_indices.variation_offsets,
       variation_offsets.data(), offsets_bytes, cudaMemcpyHostToDevice,
       cudaStreamPerThread);
-    assert(err == cudaSuccess);
+    assert_cuda_success(err, "variation_offsets memcpy");
     // copy num combo indices
     device_indices.num_combo_indices =
       &((index_t*)device_indices.device_data)[num_variations];
@@ -719,25 +696,25 @@ cuda_allocCopyOrSources(const OrArgList& orArgList) {
     err = cudaMemcpyAsync(device_indices.num_combo_indices,
       num_combo_indices.data(), num_indices_bytes, cudaMemcpyHostToDevice,
       cudaStreamPerThread);
-    assert(err == cudaSuccess);
+    assert_cuda_success(err, "combo_indices memcpy");
   }
   const auto variation_indices_bytes =
     kNumSentences * sizeof(device::VariationIndices);
   device::VariationIndices* device_variation_indices;
-  err = cudaMallocAsync((void**)&device_variation_indices,
+  auto err = cudaMallocAsync((void**)&device_variation_indices,
     variation_indices_bytes, cudaStreamPerThread);
-  assert(err == cudaSuccess);
+  assert_cuda_success(err, "variation_indices memcpy");
 
   err = cudaMemcpyAsync(device_variation_indices,
     device_indices_array.data(), variation_indices_bytes,
     cudaMemcpyHostToDevice, cudaStreamPerThread);
-  assert(err == cudaSuccess);
+  assert_cuda_success(err, "indices_array memcpy");
 
   // TODO: be nice to get rid of this
   // just to be sure, due to lifetime problems of local host-side memory
   // solution: cram stuff into MFD
   err = cudaStreamSynchronize(cudaStreamPerThread);
-  assert(err == cudaSuccess);
+  assert_cuda_success(err, "variation indices post-sync");
   return device_variation_indices;
 }
 

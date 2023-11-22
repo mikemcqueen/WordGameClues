@@ -28,6 +28,24 @@ inline void assert_cuda_success(cudaError err, std::string_view sv) {
   }
 }
 
+inline auto cuda_alloc_results(size_t num_results,
+  cudaStream_t stream = cudaStreamPerThread) {
+  // alloc results
+  auto results_bytes = num_results * sizeof(result_t);
+  result_t* device_results;
+  cudaError_t err = cudaMallocAsync((void**)&device_results, results_bytes, stream);
+  assert_cuda_success(err, "alloc results");
+  return device_results;
+}
+
+inline void cuda_zero_results(result_t* results, size_t num_results,
+  cudaStream_t stream = cudaStreamPerThread) {
+  // memset results to zero
+  auto results_bytes = num_results * sizeof(result_t);
+  cudaError_t err = cudaMemsetAsync(results, 0, results_bytes, stream);
+  assert_cuda_success(err, "zero results");
+}
+
 inline void cuda_free(void* ptr) {
   cudaError_t err = cudaFree(ptr);
   assert_cuda_success(err, "cuda_free");
