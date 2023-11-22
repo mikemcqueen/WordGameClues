@@ -38,11 +38,11 @@ inline std::string vec_to_string(const std::vector<T>& v) {
   return result;
 }
 
-template <typename T>
+template <typename T, typename R = T>
 // TODO: is_integral_type<T>
-T sum(const std::vector<T>& nums) {
-  return std::accumulate(nums.begin(), nums.end(), 0, [](T total, T num) {
-    total += num;
+R sum(const std::vector<T>& vals) {
+  return std::accumulate(vals.begin(), vals.end(), 0, [](R total, T val) {
+    total += val;
     return total;
   });
 }

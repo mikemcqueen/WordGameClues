@@ -2,7 +2,6 @@
 #define INCLUDE_MERGE_FILTER_COMMON_H
 
 #include <vector>
-#include <cuda_runtime.h>
 #include "cuda-types.h"
 
 namespace cm {

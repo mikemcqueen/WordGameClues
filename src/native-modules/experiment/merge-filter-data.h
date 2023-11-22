@@ -58,6 +58,9 @@ struct MergeFilterData {
     index_t* idx_list_sizes{};
 
     // filter
+    SourceCompatibilityData* incompatible_sources{};
+    unsigned num_incompatible_sources{};
+
     index_t* src_list_start_indices{};
     index_t* idx_list_start_indices{};
 

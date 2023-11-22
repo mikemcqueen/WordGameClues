@@ -217,8 +217,8 @@ const getCombosForUseNcLists = (sum: number, max: number, args: any): void => {
             `, totalCombos(${cs.totalCombos})`);
         */
     }
-    Native.filterCandidatesForSum(sum, args.tpb, args.streams,
-      args.stride, args.iters, args.synchronous);
+    Native.filterCandidatesForSum(sum, args.tpb, args.streams, args.stride,
+        args.iters, args.synchronous, args);
 };
 
 export const makeCombosForSum = (sum: number, args: any,
@@ -321,8 +321,8 @@ export const makeCombos = (args: any): any => {
         let totals = ClueManager.emptyFilterResult();
         const pc_result = PreCompute.preCompute(first, last, args);
         if (pc_result) {
-            // seed "incompatible sources" with 2-clue sources to make all
-            // subsequent sums faster. but, synchronously.
+            // run 2-clue sources synchronously to seed "incompatible sources"
+            // and subsequent sums faster. 
             makeCombosForSum(2, args, true);
             if (first == 2) ++first;
             for (let sum = first; sum <= last; ++sum) {

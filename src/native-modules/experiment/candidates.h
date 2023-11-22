@@ -18,8 +18,8 @@ struct CandidateData {
   std::reference_wrapper<const SourceCompatibilityList> src_list_cref;
   std::set<std::string> combos;  // TODO: why is this a set vs. unordered_set?
 };
-
 using CandidateList = std::vector<CandidateData>;
+using CandidateMap = std::unordered_map<int, CandidateList>;
 
 // functions
 
@@ -33,12 +33,14 @@ inline auto count_candidates(const CandidateList& candidates) {
 
 void consider_candidate(const NameCountList& ncList, int sum);
 
-void filterCandidates(
+  /*
+void filter_candidates(
   int sum, int threads_per_block, int streams, int stride, int iters);
+  */
 
 // globals
 
-inline std::unordered_map<int, CandidateList> allSumsCandidateData{};
+inline CandidateMap allSumsCandidateData{};
 
 }  // namespace cm
 

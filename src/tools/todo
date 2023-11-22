@@ -1,5 +1,47 @@
+* I may need to re-think OR compatibility. Since it's using IsCompatibleSubsetOf
+  now. Is that really appropriate for the OR = (XOR || AND) case?
+
+* so fillIndices is slow now because it's calling isAndCompatible with (potentially)
+  all the incompatible sources from -c2. the kernel is really fast because it's not
+  checking a bunch of incompatible sources.
+  DONE it seems like it might be worthwhile to spin up a kernel prior to the xor_kernel,
+       which filters out all the sources which are AND compatible with incompatible
+       sources? in order to make fill faster. which would in turn potentially allow for 
+       larger strides.
+  DONE this would potentially negate the need to manage the incompatible souurces on
+       the host - just leave them in device memory? or copy them once to device after
+       -c2. <<-- this. copied once.
+  * now we're rebuilding a "candidates" thing on the host after every "incompatible
+    source check". which is pretty fucking expensive (and memory intensive). and also
+    completely unnecessary, right?
+    what I really want to do is just copy the compatible sources one by one to device
+    memory asynchronously as they are discovered (via result[idx]), and keep track of
+    the list sizes (and the original candidates list idx each list corresponds to - in
+    case some lists are removed entirely). list indices can be built from list sizes.
+    basically, i think I need to get away from the idea of using "candidates" as input
+    to so many host side calculations. this might be a little tricky for sum==2, but
+    i could call copy_compatible_sources (renamed from get_compatible_src_lists)
+    in the synchronous case too perhaps, with an empty results vector (that's probably
+    what should passed if it's not currently).
+
+* memory is getting tight with -c2,20. see if i can free some stuff up, like from
+  merge, that I don't need anymore. or temporary stuff in filter. add some more
+  exit_scopes.
+
+* xor_kernel runtime is inaccurate with multiple streams because it includes the
+  fill() time of any stream(s) that occurred before it finished. isn't there some
+  way to add markers to the cudaStream to measure actual runtime?
+
 * -t braves,ace ?
   
+* filter.cu:is_source_AND_compatible
+  sync here probably not technically necessary, but probably a decent
+  optimization. the alternative is just to always execute the entire loop
+  and return is_and_compat at end.
+  it's probable this "short circuit" makes it go fast, especially with a
+  large sized src_list. it'd be interesting to compare when the list size
+  is very large (like 100k+).
+
 * add syn/hom of anagrams at .. post-process?
   * so i had a thought about this. if i do -t <primary-src> i probably want to see
     name variations there don't i?  I mean, why not. which means i'd need to duplicate

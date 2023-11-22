@@ -117,7 +117,8 @@ public:
     return true;
   }
 
-  constexpr auto isAndCompatibleWith(
+  // NOTE: order of (a,b) in a.is(b) here matters.
+  constexpr auto isCompatibleSubsetOf(
     const UsedSources& other, bool check_variations = true) const {
     if (!getBits().is_subset_of(other.getBits()))
       return false;
@@ -260,9 +261,9 @@ struct SourceCompatibilityData {
     return usedSources.isXorCompatibleWith(other.usedSources, check_variations);
   }
 
-  constexpr auto isAndCompatibleWith(
+  constexpr auto isCompatibleSubsetOf(
     const SourceCompatibilityData& other, bool check_variations = true) const {
-    return usedSources.isAndCompatibleWith(other.usedSources, check_variations);
+    return usedSources.isCompatibleSubsetOf(other.usedSources, check_variations);
   }
 
   // OR == XOR || AND
@@ -282,7 +283,7 @@ struct SourceCompatibilityData {
       return false;
     }
     return isXorCompatibleWith(other, false)
-           || isAndCompatibleWith(other, false);
+           || isCompatibleSubsetOf(other, false);  // TODO: bad mojo
   }
 
   bool isXorCompatibleWithAnySource(const auto& src_list) {
@@ -341,6 +342,7 @@ struct SourceCompatibilityData {
 };  // SourceCompatibilityData
 
 using SourceCompatibilityList = std::vector<SourceCompatibilityData>;
+using SourceCompatibilitySet = std::unordered_set<SourceCompatibilityData>;
 using SourceCompatibilityDataCRef =
   std::reference_wrapper<const SourceCompatibilityData>;
 using SourceCompatibilityCRefList = std::vector<SourceCompatibilityDataCRef>;

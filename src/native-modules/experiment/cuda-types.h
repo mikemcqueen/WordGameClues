@@ -1,10 +1,13 @@
-#ifndef INCLUDE_CUDA_TYPES_H
+#ifndef INCLUDE_CUDA_TYPES_H // TODO: CUDA_COMMON
 #define INCLUDE_CUDA_TYPES_H
 
-#include <span>
+#include <cassert>
+#include <iostream>
 #include <cstdint>
+#include <span>
 #include <utility>
 #include <vector>
+#include <cuda_runtime.h>
 
 namespace cm {
 
@@ -17,6 +20,18 @@ using ComboIndexList = std::vector<combo_index_t>;
 
 using ComboIndexSpan = std::span<const combo_index_t>;
 using ComboIndexSpanPair = std::pair<ComboIndexSpan, ComboIndexSpan>;
+
+inline void assert_cuda_success(cudaError err, std::string_view sv) {
+  if (err != cudaSuccess) {
+    std::cerr << sv << ", error " << cudaGetErrorString(err) << std::endl;
+    assert(0);
+  }
+}
+
+inline void cuda_free(void* ptr) {
+  cudaError_t err = cudaFree(ptr);
+  assert_cuda_success(err, "cuda_free");
+}
 
 }  // namespace cm
 

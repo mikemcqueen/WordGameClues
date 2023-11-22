@@ -13,14 +13,6 @@ namespace {
 
 using namespace cm;
 
-void cuda_free(void* ptr) {
-  cudaError_t err = cudaFree(ptr);
-  if (err != cudaSuccess) {
-    std::cerr << "cudaFree failed, " << cudaGetErrorString(err) << std::endl;
-    std::terminate();
-  }
-}
-
 auto anyCompatibleXorSources(const SourceData& source,
   const Peco::IndexList& indexList, const SourceList& sourceList) {
   //

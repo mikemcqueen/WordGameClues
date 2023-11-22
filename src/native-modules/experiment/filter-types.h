@@ -6,20 +6,24 @@
 #include <iostream>
 #include <optional>
 #include <thread>
+#include <unordered_set>
+#include <utility>
 #include <vector>
 #include <cuda_runtime.h>
 #include "cuda-types.h"
 #include "candidates.h"
+#include "util.h"
 
 namespace cm {
 
 // globals
 
-inline std::vector<SourceCompatibilityData> incompatible_sources;
+//inline std::vector<SourceCompatibilityData> incompatible_sources;
 
 // types
 
 using filter_result_t = std::unordered_set<std::string>;
+using hr_time_point_t = decltype(std::chrono::high_resolution_clock::now());
 
 struct SourceIndex {
   index_t listIndex{};
@@ -38,11 +42,12 @@ struct SourceIndex {
 
 // functions
 
+/*
 inline const auto& get_src(
   const CandidateList& candidates, SourceIndex src_idx) {
   return candidates.at(src_idx.listIndex).src_list_cref.get().at(src_idx.index);
 }
-
+  
 inline bool is_compatible_src(const SourceCompatibilityData& src) {
   //, const SourceCompatibilityList& incompatible_sources) const {
   for (const auto& bad_src : incompatible_sources) {
@@ -52,6 +57,7 @@ inline bool is_compatible_src(const SourceCompatibilityData& src) {
   }
   return true;
 }
+*/
 
 // more types! yay!
 
@@ -223,7 +229,6 @@ public:
 // the pointers in this are allocated in device memory
 struct StreamData {
 private:
-  using hr_time_point_t = decltype(std::chrono::high_resolution_clock::now());
   static const auto num_cores = 1280;
   static const auto max_chunks = 20ul;
 
@@ -247,8 +252,9 @@ public:
     return indexStates.num_compatible(0, num_list_indices);
   }
 
-  auto fillSourceIndices(
-    IndexStates& idx_states, int max_idx, const CandidateList& candidates) {
+  // TODO: remove candidates
+  auto fillSourceIndices(IndexStates& idx_states, int max_idx,
+    [[maybe_unused]] const CandidateList& candidates) {
     //
     source_indices.resize(idx_states.done ? 0 : max_idx);
     for (int idx{}; !idx_states.done && (idx < max_idx);) {
@@ -261,11 +267,13 @@ public:
         const auto opt_src_idx = idx_states.get_and_increment_index(list_idx);
         if (opt_src_idx.has_value()) {
           const auto src_idx = opt_src_idx.value();
-          assert(src_idx.listIndex == list_idx);
+          //assert(src_idx.listIndex == list_idx);
           num_skipped_idx = 0;
+          /*
           if (!is_compatible_src(get_src(candidates, src_idx))) {
             continue;
           }
+          */
           source_indices.at(idx++) = src_idx;
         } else if (++num_skipped_idx >= idx_states.num_lists()) {
           // we've skipped over the entire list (with index overlap)
