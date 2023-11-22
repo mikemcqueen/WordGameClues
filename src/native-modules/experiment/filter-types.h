@@ -38,6 +38,16 @@ struct SourceIndex {
     sprintf(buf, "%d:%d", listIndex, index);
     return buf;
   }
+
+  /*
+  constexpr auto to_flat_index(const IndexList& list_sizes) const {
+    index_t flat_idx{};
+    for (index_t idx{}; idx < listIndex; ++idx) {
+      flat_idx += list_sizes[idx];
+    }
+    return flat_idx + index;
+  }
+  */
 };
 
 // functions
@@ -88,6 +98,7 @@ public:
   };
 
   IndexStates() = delete;
+  /*
   IndexStates(const SizeIndexList& size_idx_list) {
     list.resize(size_idx_list.size());
     // TODO iota
@@ -100,8 +111,7 @@ public:
       list_start_index += size_idx.size;
     }
   }
-
-  /*
+  */
   IndexStates(const CandidateList& candidates) {
     list.resize(candidates.size());
     for (index_t idx{}; auto& data : list) {
@@ -114,7 +124,6 @@ public:
       list_start_index += num_sources;
     }
   }
-  */
 
   void reset() {
     for (auto& data: list) {
@@ -267,8 +276,8 @@ public:
     return indexStates.num_compatible(0, num_list_indices);
   }
 
-  auto fill_source_indices(IndexStates& idx_states, int max_idx) {
-    //    [[maybe_unused]] const CandidateList& candidates) {
+  auto fill_source_indices(IndexStates& idx_states, int max_idx,
+    const std::vector<result_t>& compat_src_results) {
     //
     source_indices.resize(idx_states.done ? 0 : max_idx);
     for (int idx{}; !idx_states.done && (idx < max_idx);) {
@@ -281,13 +290,12 @@ public:
         const auto opt_src_idx = idx_states.get_and_increment_index(list_idx);
         if (opt_src_idx.has_value()) {
           const auto src_idx = opt_src_idx.value();
-          //assert(src_idx.listIndex == list_idx);
+          //assert(src_idx.listIndex == list_idx); // valid assert, but slower
           num_skipped_idx = 0;
-          /*
-          if (!is_compatible_src(get_src(candidates, src_idx))) {
+          if (!compat_src_results.empty()
+              && !compat_src_results.at(idx_states.flat_index(src_idx))) {
             continue;
           }
-          */
           source_indices.at(idx++) = src_idx;
         } else if (++num_skipped_idx >= idx_states.num_lists()) {
           // we've skipped over the entire list (with index overlap)
@@ -311,8 +319,9 @@ public:
     return !source_indices.empty();
   }
 
-  bool fill_source_indices(IndexStates& idx_states) {
-    return fill_source_indices(idx_states, num_list_indices);
+  bool fill_source_indices(
+    IndexStates& idx_states, const std::vector<result_t>& compat_src_results) {
+    return fill_source_indices(idx_states, num_list_indices, compat_src_results);
   }
 
   void allocCopy([[maybe_unused]] const IndexStates& idx_states) {
