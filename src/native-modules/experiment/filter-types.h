@@ -88,6 +88,20 @@ public:
   };
 
   IndexStates() = delete;
+  IndexStates(const SizeIndexList& size_idx_list) {
+    list.resize(size_idx_list.size());
+    // TODO iota
+    for (index_t idx{}; auto& data : list) {
+      data.sourceIndex.listIndex = idx++;
+    }
+    for (index_t list_start_index{}; const auto& size_idx : size_idx_list) {
+      list_sizes.push_back(size_idx.size);
+      list_start_indices.push_back(list_start_index);
+      list_start_index += size_idx.size;
+    }
+  }
+
+  /*
   IndexStates(const CandidateList& candidates) {
     list.resize(candidates.size());
     for (index_t idx{}; auto& data : list) {
@@ -100,6 +114,7 @@ public:
       list_start_index += num_sources;
     }
   }
+  */
 
   void reset() {
     for (auto& data: list) {
@@ -252,9 +267,8 @@ public:
     return indexStates.num_compatible(0, num_list_indices);
   }
 
-  // TODO: remove candidates
-  auto fillSourceIndices(IndexStates& idx_states, int max_idx,
-    [[maybe_unused]] const CandidateList& candidates) {
+  auto fill_source_indices(IndexStates& idx_states, int max_idx) {
+    //    [[maybe_unused]] const CandidateList& candidates) {
     //
     source_indices.resize(idx_states.done ? 0 : max_idx);
     for (int idx{}; !idx_states.done && (idx < max_idx);) {
@@ -297,9 +311,8 @@ public:
     return !source_indices.empty();
   }
 
-  bool fillSourceIndices(
-    IndexStates& idx_states, const CandidateList& candidates) {
-    return fillSourceIndices(idx_states, num_list_indices, candidates);
+  bool fill_source_indices(IndexStates& idx_states) {
+    return fill_source_indices(idx_states, num_list_indices);
   }
 
   void allocCopy([[maybe_unused]] const IndexStates& idx_states) {

@@ -1,3 +1,6 @@
+* filer_support::get_incmpatible_sources looks wrong. i'm leaving it wrong for now
+  because it helps confirm before/after counts, even if the counts are wrong.
+
 * I may need to re-think OR compatibility. Since it's using IsCompatibleSubsetOf
   now. Is that really appropriate for the OR = (XOR || AND) case?
 
@@ -18,11 +21,10 @@
     memory asynchronously as they are discovered (via result[idx]), and keep track of
     the list sizes (and the original candidates list idx each list corresponds to - in
     case some lists are removed entirely). list indices can be built from list sizes.
-    basically, i think I need to get away from the idea of using "candidates" as input
-    to so many host side calculations. this might be a little tricky for sum==2, but
-    i could call copy_compatible_sources (renamed from get_compatible_src_lists)
-    in the synchronous case too perhaps, with an empty results vector (that's probably
-    what should passed if it's not currently).
+  * basically, i think I need to get away from the idea of using "candidates" as input
+    to so many host side calculations. for sum==2/syncronous it might be a special case.
+  * i should be able to do a device->device copy here. similar to how I do in
+    filter_support::move_marked_or_sources().
 
 * memory is getting tight with -c2,20. see if i can free some stuff up, like from
   merge, that I don't need anymore. or temporary stuff in filter. add some more

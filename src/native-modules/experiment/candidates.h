@@ -5,6 +5,7 @@
 #include <unordered_map>
 #include <set>
 #include <string>
+#include <utility>
 #include <vector>
 #include "combo-maker.h"
 
@@ -31,12 +32,26 @@ inline auto count_candidates(const CandidateList& candidates) {
   return num;
 }
 
-void consider_candidate(const NameCountList& ncList, int sum);
+struct SizeIndex {
+  index_t size;
+  index_t index;
+};
+using SizeIndexList = std::vector<SizeIndex>;
 
-  /*
-void filter_candidates(
-  int sum, int threads_per_block, int streams, int stride, int iters);
-  */
+inline std::pair<SizeIndexList, index_t>
+make_size_idx_list(const CandidateList& candidates) {
+  SizeIndexList size_idx_list;
+  index_t num_sources{};
+  for (index_t idx{}; const auto& candidate : candidates) {
+    index_t size = candidate.src_list_cref.get().size();
+    // TODO weird. this should be more straightforward?
+    size_idx_list.emplace_back(SizeIndex{size, idx++});
+    num_sources += size;
+  }
+  return {size_idx_list, num_sources};
+}
+
+void consider_candidate(const NameCountList& ncList, int sum);
 
 // globals
 
