@@ -23,8 +23,10 @@ NVCC_LINK_FLAGS := -Xcompiler -fPIC
 build: $(DIR)/$(FILE)_dlink.o
 
 $(DIR)/$(FILE)_dlink.o: $(DIR)/$(FILE).o
+	echo "Device linking $@"
 	nvcc $(ARCH) $(NVCC_LINK_FLAGS) -dlink $(DIR)/$(FILE).o -o $@
 
 $(DIR)/$(FILE).o: $(FILE).cu
 	@mkdir -p $(DIR)
+	echo "Compiling $@"
 	nvcc $(ARCH) -MP -MMD -MF $(DIR)/$(FILE).d $(NVCC_COMPILE_FLAGS) -dc $(FILE).cu -o $@

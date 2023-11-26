@@ -30,63 +30,67 @@ template <typename T> __device__ __forceinline__ void store(T* addr, T val) {
   *(volatile T*)addr = val;
 }
 
-// Test if *any* of the sources in src_list are a compatible (same variations)
-// subset of the supplied source.
-__device__ bool is_source_compatible_superset(
-  const SourceCompatibilityData& source,
-  const UsedSources::SourceDescriptorPair* __restrict__ src_desc_pairs,
+// Test if the supplied source contains both of the sources described by
+// any element in the supplied array of source descriptor pairs.
+__device__ bool source_contains_desc_pair(const SourceCompatibilityData& source,
+  const UsedSources::SourceDescriptorPair* /*__restrict__*/ src_desc_pairs,
   const unsigned num_src_desc_pairs) {
   //
   __shared__ bool is_compat;
   if (!threadIdx.x) {
     is_compat = false;
   }
+  __syncthreads();
   // NOTE: chunk-indexing is necessary as described elsewhere.
   const auto chunk_size = blockDim.x;
   const auto chunk_max = num_src_desc_pairs;
   // one thread per src_desc_pair
   for (unsigned chunk_idx{}; chunk_idx * chunk_size < chunk_max; ++chunk_idx) {
-    __syncthreads();
-    if (is_compat) {
-      return true;
-    }
     const auto pair_idx = chunk_idx * chunk_size + threadIdx.x;
     if (pair_idx < num_src_desc_pairs) {
       if (source.usedSources.has(src_desc_pairs[pair_idx])) {
         is_compat = true;
       }
     }
+    __syncthreads();
+    if (is_compat) {
+      return true;
+    }
   }
   return false;
 }
+
+// note that this really only makes sense when running a single sum, not
+// a range. for range support, i could allocate and pass a separate global.
+constexpr const bool kLogCompatSources = true;
 
 __device__ unsigned int device_num_compat_sources = 0;
 __device__ unsigned int device_num_blocks = 0;
 
 __global__ void get_compatible_sources_kernel(
-  const SourceCompatibilityData* __restrict__ sources,
+  const SourceCompatibilityData* /*__restrict__*/ sources,
   const unsigned num_sources,
   const UsedSources::
-    SourceDescriptorPair* __restrict__ incompatible_src_desc_pairs,
-  const unsigned num_src_desc_pairs, result_t* __restrict__ results) {
+  SourceDescriptorPair* /*__restrict__*/ incompatible_src_desc_pairs,
+  const unsigned num_src_desc_pairs, /*volatile*/ result_t* __restrict__ results) {
   // one block per source
-
-device_num_compat_sources = 0;
-
   for (unsigned idx{blockIdx.x}; idx < num_sources; idx += gridDim.x) {
     const auto& source = sources[idx];
-    // TODO try without this __sync
-    __syncthreads();
-    if (!is_source_compatible_superset(
+    if (!source_contains_desc_pair(
           source, incompatible_src_desc_pairs, num_src_desc_pairs)) {
       if (!threadIdx.x) {
-        results[idx] = 1;
-        atomicInc(&device_num_compat_sources, std::numeric_limits<unsigned int>::max());
+        store(&results[idx], (result_t)1);
+        // results[idx] = 1;
+        if constexpr (kLogCompatSources) {
+          atomicInc(&device_num_compat_sources,
+            std::numeric_limits<unsigned int>::max());
+        }
       }
     }
-
-    if (!threadIdx.x) {
-      atomicInc(&device_num_blocks, std::numeric_limits<unsigned int>::max());
+    if constexpr (kLogCompatSources) {
+      if (!threadIdx.x) {
+        atomicInc(&device_num_blocks, std::numeric_limits<unsigned int>::max());
+      }
     }
   }
 }
@@ -160,6 +164,7 @@ __device__ bool is_source_XOR_compatible(const SourceCompatibilityData& source,
     const auto idx_list = &xor_idx_lists[xor_idx_list_start_indices[list_idx]];
     const auto idx_list_size = xor_idx_list_sizes[list_idx];
     const auto xor_src_idx = idx_list[combo_idx % idx_list_size];
+    // const auto& here and no address-of intead?
     const auto xor_src_list =
       &xor_src_lists[xor_src_list_start_indices[list_idx]];
     if (!source.isXorCompatibleWith(xor_src_list[xor_src_idx])) {
@@ -208,7 +213,7 @@ __device__ bool is_source_XOR_and_OR_compatible(
   for (unsigned chunk_idx{}; chunk_idx * chunk_size < chunk_max; ++chunk_idx) {
     // TODO: i imagine i can move this synchthreads to after shared memory
     // initialization, and add one to the end, which might be slightly more
-    // performant.
+    // performant. This might even be wrong (apparently sanitary though)
     __syncthreads();
     // "flat" index, i.e. not yet indexed into appropriate idx_spans array
     const auto flat_idx = chunk_idx * chunk_size + threadIdx.x;
@@ -542,15 +547,9 @@ void run_get_compatible_sources_kernel(
   get_compatible_sources_kernel<<<grid_dim, block_dim, shared_bytes, stream>>>(
     device_sources, num_sources, device_src_desc_pairs, num_src_desc_pairs,
     device_results);
-  if constexpr(1) {
-    CudaEvent stop_event;
-    stop_event.synchronize();
-    /*
-    unsigned int* num_compat_sources_ptr;
-    err = cudaGetSymbolAddress(
-      (void**)&num_compat_sources_ptr, device_num_compat_sources);
-    assert_cuda_success(err, "cudaGetSymbolAddress");
-    */
+  if constexpr(kLogCompatSources) {
+    CudaEvent stop;
+    stop.synchronize();
     unsigned int num_compat_sources;
     err = cudaMemcpyFromSymbol(&num_compat_sources, device_num_compat_sources,
       sizeof(num_compat_sources));
@@ -558,9 +557,9 @@ void run_get_compatible_sources_kernel(
     unsigned int num_blocks;
     err =
       cudaMemcpyFromSymbol(&num_blocks, device_num_blocks, sizeof(num_blocks));
-    assert_cuda_success(err, "cudaMemcpyFromSymbol - blocks");
-    fprintf(stderr, "blocks: %d, compat sources: %d\n", num_blocks,
-      num_compat_sources);
+    assert_cuda_success(err, "cudaMemcpyFromSymbol - num_blocks");
+    fprintf(stderr, " atomic compat: %d, blocks: %d\n",
+      num_compat_sources, num_blocks);
   }
 }
 

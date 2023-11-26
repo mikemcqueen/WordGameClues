@@ -1,30 +1,59 @@
+* issue with only modifying, e.g., filter.cu, it doesn't seem to build correctly.
+  it's like i need to touch another file to make it link.
+  problem: filter_dlink.o is not getting built.
+
+* synccheck errors in get_compatible_sources
+
+* spawn a thread to do "synchronous" sum=2, but acquire a binary semaphore to
+  prevent the next sum from executing until all the data from 2 is packed into MFD.
+
+* think about if there is some way to specify an "old combinations" string in a
+  sentence.json file, and maintain the corresponding compound clues that use that
+  combination, but don't actually use that combination in combo-maker.
+  * this would include:
+    * syntactically, some way to mark it in the sentence.json. like a "skip" flag
+      or maybe a priority value, and default priority could be 1, but a command
+      line flag could increase it.
+    * some way to mark the variations created from that combination with the 
+      corresponding priority.
+    * combo-maker awareness of current priority, and exclusion of combinations
+      containing variations of lower than current priority.
+
+* return CudaEvent (stop) from run_xxx_kernel functions. then we maybe don't need
+  the stop_event in StreamData? maybe not though.
+
+* fix lifetime issue requiring sync in cuda_allocCopySentenceVariationIndices()
+  * store in MFD.
+
+* sync on an event whenever i get kernel results. like.. in cuda_copy_results?
+  and elsewhere maybe
+
+* I think there's still potentially some optimization opportunity in xor_kernel by
+  shoving some of the read-only data into constant memory, if there's enough room
+  (like, source indices, list sizes, even the source descriptor, which are tiny).
+
 * kernel timing from @nightchild:
-  also nvidia-smi -i 0 -pm 1 will give more reproduce-able results cause it will force a fixed clock
+  also nvidia-smi -i 0 -pm 1 will give more reproduce-able results cause it will 
+  force a fixed clock
 
-* the delay between alloc_copy_sources and get_compatible_sources kernel messages doesn't make sense.
+* the delay between alloc_copy_sources and get_compatible_sources kernel messages
+  doesn't make sense.
 
-* modifying filter-types.h is rebuilding merge-support, wrap, index, apparently unnecessarily.
-
-* filer_support::get_incmpatible_sources looks wrong. i'm leaving it wrong for now
+* filer_support::get_incompatible_sources looks wrong. i'm leaving it wrong for now
   because it helps confirm before/after counts, even if the counts are wrong.
+* old-working compatible sources and working compatible sources are different.
+  why? is it related to above?
 
 * I may need to re-think OR compatibility. Since it's using IsCompatibleSubsetOf
   now. Is that really appropriate for the OR = (XOR || AND) case?
-
-* i suspect there is a big host-side copy happening somewhere. cpu usage and
-  apparent memory bus contention seem extreme.
 
 * memory usage (both host and GPU) is a concern with 2,20, probable cause for a big
   slowdown. "shared" GPU memory usage is increasing as dedicated GPU memory appears
   to be capped. driver magic? probably want to consider only running ~5 or so tasks
   simultaneously.
 * memory is getting tight with -c2,20. see if i can free some stuff up, like from
-    merge, that I don't need anymore. or temporary stuff in filter. add some more
-    exit_scopes.
-
-* xor_kernel runtime is inaccurate with multiple streams because it includes the
-  fill() time of any stream(s) that occurred before it finished. isn't there some
-  way to add markers to the cudaStream to measure actual runtime?
+  merge, that I don't need anymore. or temporary stuff in filter. add some more
+  exit_scopes.
 
 * -t braves,ace ?
   
@@ -81,9 +110,6 @@
 * no --xor == no filter call?  it's crashing due to empty xor data probably
   (but probably shouldn't even be called)
   what about --or with no --xor? bet that's fun. probably should fail (or fix).
-
-* fix lifetime issue requiring sync in cuda_allocCopySentenceVariationIndices(
-  * store in MFD
 
 * incompatible_sources: could be CRefs?
 

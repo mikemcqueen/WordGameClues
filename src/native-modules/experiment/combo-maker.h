@@ -19,8 +19,6 @@ namespace cm {
 
 constexpr auto kMaxSourcesPerSentence = 32;
 constexpr auto kNumSentences = 9;
-// constexpr auto kMaxUsedSourcesPerSentence = 32;
-// constexpr auto kMaxUsedSources = kMaxUsedSourcesPerSentence * kNumSentences;
 
 template<typename T, size_t N>
 constexpr auto make_array(T value) -> std::array<T, N> {
@@ -84,7 +82,6 @@ struct UsedSources {
     SourceDescriptor first;
     SourceDescriptor second;
   };
-
 
   // 32 bits per sentence * 9 sentences = 288 bits, 36 bytes
   using SourceBits = mme::bitset<kMaxSourcesPerSentence * kNumSentences>;
@@ -226,7 +223,6 @@ public:
   }
 
   constexpr void dump() const {
-    //
     auto first{true};
     printf("sources:");
     for (auto s{1}; s <= kNumSentences; ++s) {
@@ -264,7 +260,6 @@ public:
       while (word) {
         auto new_word = word & (word - 1);  // word with LSB removed
         int bit_pos = lrint(log2(word ^ new_word));
-        //std::cerr << "log2: " << log2(word ^ new_word)<< ", bit_pos: " << bit_pos << std::endl;
         SourceDescriptor sd{ i + 1, bit_pos, getVariation(i + 1)};
         if (!first.sentence) {
           first = sd;
@@ -585,7 +580,7 @@ using OrArgList = std::vector<OrArgData>;
 // These are precomputed on xorSourceList, to identify only those sources
 // which share the same per-sentence variation.
 // One list of indices per variation, plus '-1' (no) variation.
-// indices to outer vector are offset by 1; variation -1 is index 0.
+// indices are offset by 1; variation -1 is index 0.
 using VariationIndicesList = std::vector<ComboIndexList>;
 // one variationIndicesLists per sentence
 using SentenceVariationIndices = std::array<VariationIndicesList, kNumSentences>;
@@ -607,27 +602,7 @@ struct MergedSources : SourceCompatibilityData {
 };
 
 using MergedSourcesList = std::vector<MergedSources>;
-
 using StringList = std::vector<std::string>;
-
-struct PerfData {
-  int calls;       // # of function calls
-  int range_calls; // # of calls with range
-  int64_t comps;   // # of compares
-  int compat;      // # of compatible results. # of incompatible = calls - compat
-  int ss_attempt;  // # of short-circuit attempts
-  int ss_fail;     // # of short-circute failures; # of successes = ss_attempt - ss_fail
-  int full;        // # of full range calls; eventually this should = calls - ss_attempt
-};
-
-
-struct CandidateStats {
-  int sum;
-  int sourceLists;
-  int totalSources;
-  int comboMapIndices;
-  int totalCombos;
-};
 
 // functions
 
@@ -645,11 +620,6 @@ inline std::vector<SourceCompatibilityData> makeCompatibleSources(
   }
   return compat_sources;
 }
-
-// globals - hehe HAHA HOHO
-
-inline PerfData isany_perf{};
-  //inline PreComputedData PCD;
 
 } // namespace cm
 

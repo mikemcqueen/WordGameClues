@@ -47,7 +47,7 @@
        'filter.cu'
     ],
     'rules': [{
-      'extension': 'cu',           
+      'extension': 'cu',
       'rule_name': 'kernel lib',
       'message': 'CUDA static lib',
       'inputs': [ '<(RULE_INPUT_PATH)' ],
@@ -75,7 +75,7 @@
       'outputs': [ '<(RULE_INPUT_ROOT)_dummy_output' ],
       'action': [
           'env', 'DIR=<(SHARED_INTERMEDIATE_DIR)', 'FILE=<(RULE_INPUT_ROOT)',
-          'make', '-sf', 'kernel.mk'
+          'make', '-sf', 'kernel.mk', 'build'
       ]
     }]
   }]

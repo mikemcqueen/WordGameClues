@@ -95,8 +95,6 @@ auto get_compatible_sources_results(int sum,
   const UsedSources::SourceDescriptorPair* device_incompatible_src_desc_pairs,
   unsigned num_src_desc_pairs) {
   //
-  using namespace std::chrono;
-
   CudaEvent alloc_event;
   // TODO: cuda_calloc_results
   auto device_results = cuda_alloc_results(num_sources);
@@ -104,9 +102,17 @@ auto get_compatible_sources_results(int sum,
   CudaEvent start_event;
   run_get_compatible_sources_kernel(device_sources, num_sources,
     device_incompatible_src_desc_pairs, num_src_desc_pairs, device_results);
+  // probably sync always is correct/easiest thing to do here. sync'ing only
+  // when logging is wrong, esp. if semaphore is introduced at calling site.
+  CudaEvent stop_event;
+  stop_event.synchronize();
   if (log_level >= 1) {
-    CudaEvent stop_event;
-    stop_event.synchronize();
+    if (log_level >= 3) { // ludicrous logging
+      auto results = cuda_copy_results(device_results, num_sources);
+      auto num_compat = std::accumulate(results.begin(), results.end(), 0u,
+        [](unsigned sum, result_t r) { return sum + r; });
+      fprintf(stderr, " actual compat: %d\n", num_compat);
+    }
     auto alloc_duration = start_event.elapsed(alloc_event);
     auto kernel_duration = stop_event.elapsed(start_event);
     std::cerr << " " << sum
