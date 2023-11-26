@@ -246,7 +246,7 @@ auto buildSentenceVariationIndices(const std::vector<SourceList>& xor_src_lists,
   const std::vector<IndexList>& compat_idx_lists,
   const ComboIndexList& compat_indices) -> SentenceVariationIndices {
   //
-  auto sentenceVariationIndices = SentenceVariationIndices{};
+  SentenceVariationIndices sentenceVariationIndices;
   for (size_t i = 0; i < compat_indices.size(); ++i) {
     std::array<int, kNumSentences> variations = {
       -1, -1, -1, -1, -1, -1, -1, -1, -1};

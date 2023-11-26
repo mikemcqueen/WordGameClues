@@ -3,11 +3,11 @@
 
 #include <set>
 #include <string>
+#include <unordered_set>
 #include <vector>
 #include <napi.h>
 #include "combo-maker.h"
 #include "candidates.h"
-#include "filter-types.h"
 #include "clue-manager.h"
 
 namespace cm {
@@ -20,11 +20,8 @@ Napi::Array wrap(Napi::Env& env, const XorSourceList& xorSourceList);
 Napi::Array wrap(Napi::Env& env,
   std::vector<clue_manager::KnownSourceMapValueCRef> cref_entries);
 
-Napi::Array wrap(Napi::Env& env, const filter_result_t& filter_result);
-
-Napi::Object wrap(Napi::Env& env, const PerfData& perf);
-Napi::Object wrap(Napi::Env& env, const CandidateStats& cs);
-
+// TODO: combine two or three of these with templated forward delcarations?
+Napi::Array wrap(Napi::Env& env, const std::unordered_set<std::string>& string_set);
 Napi::Array wrap(Napi::Env& env, const std::vector<std::string>& strList);
 Napi::Array wrap(Napi::Env& env, const std::set<int>& values);
 

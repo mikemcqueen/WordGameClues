@@ -26,11 +26,13 @@
 #ifndef assert
 #include <assert.h>
 #endif // assert
+// TODO: remove
 #ifdef __CUDA_ARCH__
 #include <cuda_runtime.h>
 #endif
+#include <cstdint>
 
-typedef unsigned int uint32_t;
+//typedef unsigned int uint32_t;
 
 namespace mme {
 
@@ -58,7 +60,7 @@ public:
     }
     */
 
-    // word count
+  // word count
   constexpr inline static auto wc() {
     return (size+31)/32;
   }
@@ -131,10 +133,12 @@ public:
       bits[i] = 0;
   }
   
+  /*
   void set() {
     for (int i=0; i<wc(); i++)
       bits[i] = ~0;
   }
+  */
   
   void set(unsigned int bit, bool value = true) {
     unsigned int mask = 1 << (bit & 0x1F);
@@ -142,6 +146,11 @@ public:
     else bits[bit/32] &= ~mask;
   }
   
+  constexpr bool test(int word, unsigned int relative_bit) const {
+    unsigned int mask = 1 << relative_bit;
+    return (bits[word] & mask) ? true : false;
+  }
+
   constexpr bool test(unsigned int bit) const {
     unsigned int mask = 1 << (bit & 0x1F);
     return (bits[bit/32] & mask) ? true : false;

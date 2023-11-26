@@ -1,3 +1,8 @@
+* kernel timing from @nightchild:
+  also nvidia-smi -i 0 -pm 1 will give more reproduce-able results cause it will force a fixed clock
+
+* the delay between alloc_copy_sources and get_compatible_sources kernel messages doesn't make sense.
+
 * modifying filter-types.h is rebuilding merge-support, wrap, index, apparently unnecessarily.
 
 * filer_support::get_incmpatible_sources looks wrong. i'm leaving it wrong for now
@@ -23,14 +28,6 @@
 
 * -t braves,ace ?
   
-* filter.cu:is_source_AND_compatible
-  sync here probably not technically necessary, but probably a decent
-  optimization. the alternative is just to always execute the entire loop
-  and return is_and_compat at end.
-  it's probable this "short circuit" makes it go fast, especially with a
-  large sized src_list. it'd be interesting to compare when the list size
-  is very large (like 100k+).
-
 * add syn/hom of anagrams at .. post-process?
   * so i had a thought about this. if i do -t <primary-src> i probably want to see
     name variations there don't i?  I mean, why not. which means i'd need to duplicate

@@ -1,3 +1,5 @@
+// wrap.cpp
+
 #include <chrono>
 #include <iostream>
 #include "wrap.h"
@@ -17,23 +19,6 @@ Array wrap(Env& env, const NameCountList& ncList) {
   Array jsList = Array::New(env, ncList.size());
   for (size_t i{}; i < ncList.size(); ++i) {
     jsList.Set(i, wrap(env, ncList[i]));
-  }
-  return jsList;
-}
-
-Array wrap(Env& env, const std::vector<std::string>& strList) {
-  Array jsList = Array::New(env, strList.size());
-  for (size_t i{}; i < strList.size(); ++i) {
-    jsList.Set(i, String::New(env, strList[i]));
-  }
-  return jsList;
-}
-
-Napi::Array wrap(Napi::Env& env, const std::set<int>& values) {
-  Array jsList = Array::New(env, values.size());
-  int idx{};
-  for (auto it = values.begin(); it != values.end(); ++it, ++idx) {
-    jsList.Set(idx, Number::New(env, *it));
   }
   return jsList;
 }
@@ -71,36 +56,29 @@ Napi::Array wrap(Napi::Env& env,
   return jsList;
 }
 
-Object wrap(Env& env, const PerfData& perf) {
-  Object jsObj = Object::New(env);
-  jsObj.Set("calls", Number::New(env, perf.calls));
-  jsObj.Set("comps", Number::New(env, perf.comps));
-  jsObj.Set("compat", Number::New(env, perf.compat));
-  jsObj.Set("range_calls", Number::New(env, perf.range_calls));
-  jsObj.Set("ss_attempt", Number::New(env, perf.ss_attempt));
-  jsObj.Set("ss_fail", Number::New(env, perf.ss_fail));
-  jsObj.Set("full", Number::New(env, perf.full));
-  return jsObj;
+Array wrap(Env& env, const std::unordered_set<std::string>& str_set) {
+  Array jsList = Array::New(env, str_set.size());
+  for (int i{}; const auto& str : str_set) {
+    jsList.Set(i++, String::New(env, str));
+  }
+  return jsList;
 }
 
-    Object wrap(Env & env, const CandidateStats& cs) {
-      Object jsObj = Object::New(env);
-      jsObj.Set("sum", Number::New(env, cs.sum));
-      jsObj.Set("sourceLists", Number::New(env, cs.sourceLists));
-      jsObj.Set("totalSources", Number::New(env, cs.totalSources));
-      jsObj.Set("comboMapIndices", Number::New(env, cs.comboMapIndices));
-      jsObj.Set("totalCombos", Number::New(env, cs.totalCombos));
-      return jsObj;
-    };
+Array wrap(Env& env, const std::vector<std::string>& strList) {
+  Array jsList = Array::New(env, strList.size());
+  for (size_t i{}; i < strList.size(); ++i) {
+    jsList.Set(i, String::New(env, strList[i]));
+  }
+  return jsList;
+}
 
-    // unordered_set<std::string>
-    Array wrap(Env & env, const filter_result_t& filter_result) {
-      Array jsList = Array::New(env, filter_result.size());
-      int i{};
-      for (const auto& combo : filter_result) {
-        jsList.Set(i++, String::New(env, combo));
-      }
-      return jsList;
-    }
+Napi::Array wrap(Napi::Env& env, const std::set<int>& values) {
+  Array jsList = Array::New(env, values.size());
+  int idx{};
+  for (auto it = values.begin(); it != values.end(); ++it, ++idx) {
+    jsList.Set(idx, Number::New(env, *it));
+  }
+  return jsList;
+}
 
-  }  // namespace cm
+}  // namespace cm

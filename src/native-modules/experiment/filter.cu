@@ -32,50 +32,61 @@ template <typename T> __device__ __forceinline__ void store(T* addr, T val) {
 
 // Test if *any* of the sources in src_list are a compatible (same variations)
 // subset of the supplied source.
-__device__ bool is_source_compatible_superset(const SourceCompatibilityData& source,
-  const SourceCompatibilityData* __restrict__ src_list,
-  const unsigned num_sources) {
+__device__ bool is_source_compatible_superset(
+  const SourceCompatibilityData& source,
+  const UsedSources::SourceDescriptorPair* __restrict__ src_desc_pairs,
+  const unsigned num_src_desc_pairs) {
   //
-  __shared__ bool is_and_compat;
+  __shared__ bool is_compat;
   if (!threadIdx.x) {
-    is_and_compat = false;
+    is_compat = false;
   }
-  __syncthreads();
   // NOTE: chunk-indexing is necessary as described elsewhere.
   const auto chunk_size = blockDim.x;
-  const auto chunk_max = num_sources;
-  // one thread per source in src_list
+  const auto chunk_max = num_src_desc_pairs;
+  // one thread per src_desc_pair
   for (unsigned chunk_idx{}; chunk_idx * chunk_size < chunk_max; ++chunk_idx) {
-    const auto src_idx = chunk_idx * chunk_size + threadIdx.x;
-    if (src_idx < num_sources) {
-      if (src_list[src_idx].isCompatibleSubsetOf(source)) {
-        is_and_compat = true;
-      }
-    }
     __syncthreads();
-    if (is_and_compat) {
+    if (is_compat) {
       return true;
     }
+    const auto pair_idx = chunk_idx * chunk_size + threadIdx.x;
+    if (pair_idx < num_src_desc_pairs) {
+      if (source.usedSources.has(src_desc_pairs[pair_idx])) {
+        is_compat = true;
+      }
+    }
   }
-  // source is not AND compatible with any sources in src_list
   return false;
 }
+
+__device__ unsigned int device_num_compat_sources = 0;
+__device__ unsigned int device_num_blocks = 0;
 
 __global__ void get_compatible_sources_kernel(
   const SourceCompatibilityData* __restrict__ sources,
   const unsigned num_sources,
-  const SourceCompatibilityData* __restrict__ incompatible_sources,
-  const unsigned num_incompatible_sources,
-  result_t* __restrict__ results) {
-  // for each source (one block per source)
+  const UsedSources::
+    SourceDescriptorPair* __restrict__ incompatible_src_desc_pairs,
+  const unsigned num_src_desc_pairs, result_t* __restrict__ results) {
+  // one block per source
+
+device_num_compat_sources = 0;
+
   for (unsigned idx{blockIdx.x}; idx < num_sources; idx += gridDim.x) {
     const auto& source = sources[idx];
+    // TODO try without this __sync
     __syncthreads();
     if (!is_source_compatible_superset(
-          source, incompatible_sources, num_incompatible_sources)) {
+          source, incompatible_src_desc_pairs, num_src_desc_pairs)) {
       if (!threadIdx.x) {
         results[idx] = 1;
+        atomicInc(&device_num_compat_sources, std::numeric_limits<unsigned int>::max());
       }
+    }
+
+    if (!threadIdx.x) {
+      atomicInc(&device_num_blocks, std::numeric_limits<unsigned int>::max());
     }
   }
 }
@@ -87,7 +98,6 @@ __device__ bool is_source_OR_compatibile(const SourceCompatibilityData& source,
   const unsigned num_or_sources) {
   //
   extern __shared__ volatile result_t or_arg_results[];
-
   // ASSUMPTION: # of --or args will always be smaller than block size.
   if (threadIdx.x < num_or_args) {
     // store not required here, even without volatile, because __sync
@@ -196,6 +206,9 @@ __device__ bool is_source_XOR_and_OR_compatible(
   const auto chunk_max = num_indices;
   // one thread per xor_source
   for (unsigned chunk_idx{}; chunk_idx * chunk_size < chunk_max; ++chunk_idx) {
+    // TODO: i imagine i can move this synchthreads to after shared memory
+    // initialization, and add one to the end, which might be slightly more
+    // performant.
     __syncthreads();
     // "flat" index, i.e. not yet indexed into appropriate idx_spans array
     const auto flat_idx = chunk_idx * chunk_size + threadIdx.x;
@@ -225,6 +238,8 @@ __device__ bool is_source_XOR_and_OR_compatible(
           // reset is_xor_compat. sync will happen at loop entrance.
           is_xor_compat = false;
         }
+        // todo: add here, move at loop entrance
+        // __syncthreads();
         continue;
       }
     }
@@ -335,28 +350,20 @@ __global__ void xor_kernel_new(
   const device::OrSourceData* __restrict__ or_src_list,
   const unsigned num_or_sources, const SourceIndex* __restrict__ source_indices,
   const index_t* __restrict__ list_start_indices,
+  const result_t* __restrict__ compat_src_results,
   result_t* __restrict__ results, int stream_idx) {
-#if 0
-  if (!threadIdx.x && !blockIdx.x && !stream_idx) {
-    print_variation_indices(variation_indices);
-  }
-#endif
   // for each source (one block per source)
   for (unsigned idx{blockIdx.x}; idx < num_sources; idx += gridDim.x) {
     const auto src_idx = source_indices[idx];
-    const auto flat_index =
+    const auto flat_idx =
       list_start_indices[src_idx.listIndex] + src_idx.index;
-    auto& source = src_list[flat_index];
-    auto& result = results[src_idx.listIndex];
-    auto idx_spans = get_smallest_src_index_spans(source, variation_indices);
-#if 0
-    if (!threadIdx.x && !stream_idx) {
-      printf("block %d, first: %d, second: %d, total: %d\n", blockIdx.x,
-        (int)idx_spans.first.size(), (int)idx_spans.second.size(),
-        (int)(idx_spans.first.size() + idx_spans.second.size()));
-    }
-#endif
     __syncthreads();
+    if (compat_src_results && !compat_src_results[flat_idx]) {
+      continue;
+    }
+    const auto& source = src_list[flat_idx];
+    auto idx_spans = get_smallest_src_index_spans(source, variation_indices);
+    //__syncthreads();
     if (!(idx_spans.first.size() + idx_spans.second.size())) {
       continue;
     }
@@ -366,7 +373,8 @@ __global__ void xor_kernel_new(
           num_or_sources)) {
       if (!threadIdx.x) {
         // TODO: store probably not necessary
-        store(&result, (result_t)1);
+        //store(&result, (result_t)1);
+        results[src_idx.listIndex] = 1;
       }
     }
   }
@@ -456,6 +464,7 @@ __global__ void mark_or_sources_kernel(
   }
 }
 
+#if 0
 auto flat_index(
   const SourceCompatibilityLists& src_list, const SourceIndex src_idx) {
   uint32_t flat{};
@@ -465,7 +474,6 @@ auto flat_index(
   return flat + src_idx.index;
 }
 
-#if 0
 __device__ __host__ auto isSourceXORCompatibleWithAnyXorSource(
   const SourceCompatibilityData& source, const XorSource* xorSources,
   size_t numXorSources) {
@@ -512,15 +520,15 @@ namespace cm {
 
 void run_get_compatible_sources_kernel(
   const SourceCompatibilityData* device_sources, unsigned num_sources,
-  const SourceCompatibilityData* device_incompatible_sources,
-  unsigned num_incompatible_sources, result_t* device_results) {
+  const UsedSources::SourceDescriptorPair* device_src_desc_pairs,
+  unsigned num_src_desc_pairs, result_t* device_results) {
   //
   int num_sm;
   cudaDeviceGetAttribute(&num_sm, cudaDevAttrMultiProcessorCount, 0);
   auto threads_per_sm = 2048;
-  auto block_size = 1024;
+  auto block_size = 1024; // aka threads per block
   auto blocks_per_sm = threads_per_sm / block_size;
-  // assert(blocks_per_sm * block_size == threads_per_sm);
+  assert(blocks_per_sm * block_size == threads_per_sm);
   auto grid_size = num_sm * blocks_per_sm;  // aka blocks per grid
   auto shared_bytes = 0;
 
@@ -532,13 +540,34 @@ void run_get_compatible_sources_kernel(
   //  err = cudaStreamSynchronize(cudaStreamPerThread);
   //  assert_cuda_success(err, "run_get_compatible_sources_kernel sync-before");
   get_compatible_sources_kernel<<<grid_dim, block_dim, shared_bytes, stream>>>(
-    device_sources, num_sources, device_incompatible_sources,
-    num_incompatible_sources, device_results);
+    device_sources, num_sources, device_src_desc_pairs, num_src_desc_pairs,
+    device_results);
+  if constexpr(1) {
+    CudaEvent stop_event;
+    stop_event.synchronize();
+    /*
+    unsigned int* num_compat_sources_ptr;
+    err = cudaGetSymbolAddress(
+      (void**)&num_compat_sources_ptr, device_num_compat_sources);
+    assert_cuda_success(err, "cudaGetSymbolAddress");
+    */
+    unsigned int num_compat_sources;
+    err = cudaMemcpyFromSymbol(&num_compat_sources, device_num_compat_sources,
+      sizeof(num_compat_sources));
+    assert_cuda_success(err, "cudaMemcpyFromSymbol - num_compat_sources");
+    unsigned int num_blocks;
+    err =
+      cudaMemcpyFromSymbol(&num_blocks, device_num_blocks, sizeof(num_blocks));
+    assert_cuda_success(err, "cudaMemcpyFromSymbol - blocks");
+    fprintf(stderr, "blocks: %d, compat sources: %d\n", num_blocks,
+      num_compat_sources);
+  }
 }
 
 void run_xor_kernel(StreamData& stream, int threads_per_block,
   const MergeFilterData& mfd, const SourceCompatibilityData* device_src_list,
-  result_t* device_results, const index_t* device_list_start_indices) {
+  const result_t* device_compat_src_results, result_t* device_results,
+  const index_t* device_list_start_indices) {
   //
   int num_sm;
   cudaDeviceGetAttribute(&num_sm, cudaDevAttrMultiProcessorCount, 0);
@@ -553,12 +582,12 @@ void run_xor_kernel(StreamData& stream, int threads_per_block,
 
   stream.is_running = true;
   stream.sequence_num = StreamData::next_sequence_num();
-  stream.start_time = std::chrono::high_resolution_clock::now();
   dim3 grid_dim(grid_size);
   dim3 block_dim(block_size);
   // ensure any async alloc/copies are complete on thread stream
   cudaError_t err = cudaStreamSynchronize(cudaStreamPerThread);
   assert_cuda_success(err, "run_xor_kernel sync");
+  stream.kernel_start.record();
   xor_kernel_new<<<grid_dim, block_dim, shared_bytes, stream.cuda_stream>>>(
     device_src_list, stream.source_indices.size(), mfd.device.src_lists,
     mfd.device.src_list_start_indices, mfd.device.idx_lists,
@@ -566,14 +595,14 @@ void run_xor_kernel(StreamData& stream, int threads_per_block,
     mfd.host.compat_idx_lists.size(), mfd.device.variation_indices,
     mfd.host.or_arg_list.size(), mfd.device.or_src_list,
     mfd.device.num_or_sources, stream.device_source_indices,
-    device_list_start_indices, device_results, stream.stream_idx);
+    device_list_start_indices, device_compat_src_results, device_results,
+    stream.stream_idx);
+  stream.kernel_stop.record();
 
-#if defined(LOGGING)
-  std::cerr << "stream " << stream.stream_idx
-            << " started with " << grid_size << " blocks"
-            << " of " << block_size << " threads"
-            << std::endl;
-#endif
+  if constexpr (0) {
+    std::cerr << "stream " << stream.stream_idx << " started with " << grid_size
+              << " blocks of " << block_size << " threads" << std::endl;
+  }
 }
 
 void run_mark_or_sources_kernel(

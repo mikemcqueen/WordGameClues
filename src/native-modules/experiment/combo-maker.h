@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
+#include <cmath>
 #include <cstring>
 #include <iostream>
 #include <set>
@@ -16,10 +17,10 @@
 
 namespace cm {
 
-constexpr auto kMaxSourcesPerSentence = 32; // bits - old: 128
+constexpr auto kMaxSourcesPerSentence = 32;
 constexpr auto kNumSentences = 9;
-constexpr auto kMaxUsedSourcesPerSentence = 32;
-constexpr auto kMaxUsedSources = kMaxUsedSourcesPerSentence * kNumSentences;
+// constexpr auto kMaxUsedSourcesPerSentence = 32;
+// constexpr auto kMaxUsedSources = kMaxUsedSourcesPerSentence * kNumSentences;
 
 template<typename T, size_t N>
 constexpr auto make_array(T value) -> std::array<T, N> {
@@ -39,10 +40,55 @@ namespace Source {
 }  // namespace Source
 
 struct UsedSources {
-  using VariationIndex_t = int16_t;
-  // 32 bits per sentence * 9 sentences = 1152 bits, 144 bytes, 18 64-bit words
+  using variation_index_t = int16_t;
+
+  struct SourceDescriptor {
+    SourceDescriptor() = default;
+    SourceDescriptor(int sentence, int bit_pos, variation_index_t variation)
+        : sentence(sentence),
+          bit_pos(bit_pos),
+          variation(variation) {
+      validate();
+    }
+
+    constexpr void dump() const {
+      printf("sentence %d, variation %d, bit_pos %d\n", (int)sentence, (int)variation, (int)bit_pos);
+    }
+
+    constexpr void validate() const {
+      bool valid = true;
+      if ((sentence < 0) || (sentence > kNumSentences)) {
+        printf("invalid sentence\n");
+        valid = false;
+      }
+      if ((bit_pos < 0) || (bit_pos >= kNumSentences * kMaxSourcesPerSentence)) {
+        printf("invalid bit_pos\n");
+        valid = false;
+      }
+      if (variation < 0) {
+        printf("invalid variation\n");
+        valid = false;
+      }
+      if (!valid) {
+        dump();
+        assert(0 && "SourceDescriptor::validate");
+      }
+    }
+
+    int8_t sentence{};
+    int8_t bit_pos{};
+    variation_index_t variation{};
+  };
+  //  using SourceDescriptorPair = std::pair<SourceDescriptor, SourceDescriptor>;
+  struct SourceDescriptorPair {
+    SourceDescriptor first;
+    SourceDescriptor second;
+  };
+
+
+  // 32 bits per sentence * 9 sentences = 288 bits, 36 bytes
   using SourceBits = mme::bitset<kMaxSourcesPerSentence * kNumSentences>;
-  using Variations = std::array<VariationIndex_t, kNumSentences>;
+  using Variations = std::array<variation_index_t, kNumSentences>;
 
   constexpr static auto getFirstBitIndex(int sentence) {
     assert(sentence > 0);
@@ -50,11 +96,19 @@ struct UsedSources {
   }
 
   constexpr SourceBits& getBits() noexcept { return bits; }
-  constexpr const SourceBits& getBits() const noexcept { return bits; }
+  constexpr const SourceBits& getBits() const noexcept {
+    return bits;
+  }
 
-  constexpr int getVariation(int sentence) const { return variations.at(sentence - 1); }
-  void setVariation(int sentence, int value) { variations.at(sentence - 1) = value; }
-  constexpr bool hasVariation(int sentence) const { return getVariation(sentence) > -1; }
+  constexpr variation_index_t getVariation(int sentence) const {
+    return variations.at(sentence - 1);
+  }
+  void setVariation(int sentence, int value) {
+    variations.at(sentence - 1) = value;
+  }
+  constexpr bool hasVariation(int sentence) const {
+    return getVariation(sentence) > -1;
+  }
 
   /*
   auto andBits(const SourceBits& other) const noexcept {
@@ -171,58 +225,27 @@ public:
     return result;
   }
 
-  constexpr void dump(
-    bool device = false, char* buf = nullptr, char* smolbuf = nullptr) const {
+  constexpr void dump() const {
     //
-    char big_buf[256];
-    char smol_buf[32];
-    if (!buf) buf = big_buf;
-    if (!smolbuf) smolbuf = smol_buf;
-    *buf = 0;
-    *smolbuf = 0;
     auto first{true};
-    if (device) {
-      printf("sources:");
-    } else {
-      std::cout << "sources:";
-    }
+    printf("sources:");
     for (auto s{1}; s <= kNumSentences; ++s) {
       if (getVariation(s) > -1) {
         if (first) {
-          if (device) {
-            printf("\n");
-          } else {
-            std::cout << std::endl;
-          }
+          printf("\n");
           first = false;
         }
-        if (device) {
-          printf("  s%d v%d:", s, getVariation(s));
-        } else {
-          std::cout << "  s" << s << " v" << getVariation(s) << ":";
-        }
+        printf("  s%d v%d:", s, getVariation(s));
         for (int i{}; i < kMaxSourcesPerSentence; ++i) {
           if (bits.test((s - 1) * kMaxSourcesPerSentence + i)) {
-            if (device) {
-              printf(" %d", i);
-            } else {
-              std::cout << " " << i;
-            }
+            printf(" %d", i);
           }
         }
-        if (device) {
-            printf("\n");
-        } else {
-          std::cout << std::endl;
-        }
+        printf("\n");
       }
     }
     if (first) {
-      if (device) {
-        printf(" none\n");
-      } else {
-        std::cout << " none" << std::endl;
-      }
+      printf(" none\n");
     }
   }
 
@@ -234,8 +257,38 @@ public:
     }
   }
 
+  SourceDescriptorPair get_source_descriptor_pair() const {
+    SourceDescriptor first;
+    for (int i{}; i < bits.wc(); ++i) {
+      auto word = bits.word(i);
+      while (word) {
+        auto new_word = word & (word - 1);  // word with LSB removed
+        int bit_pos = lrint(log2(word ^ new_word));
+        //std::cerr << "log2: " << log2(word ^ new_word)<< ", bit_pos: " << bit_pos << std::endl;
+        SourceDescriptor sd{ i + 1, bit_pos, getVariation(i + 1)};
+        if (!first.sentence) {
+          first = sd;
+        } else {
+          return {first, sd};
+        }
+        word = new_word;
+      }
+    }
+    assert(0 && "two sources not found");
+    return {};
+  }
+
+  constexpr auto has(SourceDescriptor sd) const {
+    return (getVariation(sd.sentence) == sd.variation)
+           && getBits().test(sd.sentence - 1, sd.bit_pos);
+  }
+
+  constexpr auto has(SourceDescriptorPair sd_pair) const {
+    return has(sd_pair.first) && has(sd_pair.second);
+  }
+
   SourceBits bits{};
-  Variations variations = make_array<VariationIndex_t, kNumSentences>(-1);
+  Variations variations = make_array<variation_index_t, kNumSentences>(-1);
 };  // UsedSources
 
 struct SourceCompatibilityData {
@@ -326,7 +379,7 @@ struct SourceCompatibilityData {
         std::cout << header << std::endl;
       }
     }
-    usedSources.dump(device);
+    usedSources.dump();
     if (device) {
       printf("\n");
     } else {

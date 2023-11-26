@@ -24,12 +24,13 @@ auto filter_candidates_cuda(const MergeFilterData& mfd, int sum,
 
 void run_get_compatible_sources_kernel(
   const SourceCompatibilityData* device_sources, unsigned num_sources,
-  const SourceCompatibilityData* device_incompatible_sources,
-  unsigned num_incompatible_sources, result_t* device_results);
+  const UsedSources::SourceDescriptorPair* device_incompatible_src_desc_pairs,
+  unsigned num_src_desc_pairs, result_t* device_results);
 
 void run_xor_kernel(StreamData& stream, int threads_per_block,
   const MergeFilterData& mfd, const SourceCompatibilityData* device_sources,
-  result_t* device_results, const index_t* device_list_start_indices);
+  const result_t* device_compat_src_results, result_t* device_results,
+  const index_t* device_list_start_indices);
 
 filter_result_t get_filter_result();
 
@@ -46,6 +47,10 @@ void run_mark_or_sources_kernel(
 [[nodiscard]] SourceCompatibilityData* cuda_allocCopyXorSources(
   const XorSourceList& xorSourceList);
 */
+
+[[nodiscard]] UsedSources::SourceDescriptorPair*
+cuda_alloc_copy_source_desc_pairs(
+  const std::vector<UsedSources::SourceDescriptorPair>& src_desc_pairs);
 
 [[nodiscard]] SourceCompatibilityData* cuda_alloc_copy_sources(
   const SourceCompatibilitySet& sources);

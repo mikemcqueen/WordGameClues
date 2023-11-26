@@ -5,7 +5,6 @@
 #include "merge.h"
 #include "merge-filter-common.h"
 #include "merge-filter-data.h"
-#include "filter-types.h" // StreamSwarm, should generalize header
 #include "peco.h"
 #include "util.h"
 

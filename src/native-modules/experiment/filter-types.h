@@ -1,9 +1,13 @@
+// filter-types.h
+
 #ifndef INCLUDE_FILTER_TYPES_H
 #define INCLUDE_FILTER_TYPES_H
 
 #include <algorithm>
 #include <chrono>
+#include <forward_list>
 #include <iostream>
+#include <numeric>
 #include <optional>
 #include <thread>
 #include <unordered_set>
@@ -15,10 +19,6 @@
 #include "util.h"
 
 namespace cm {
-
-// globals
-
-//inline std::vector<SourceCompatibilityData> incompatible_sources;
 
 // types
 
@@ -38,38 +38,7 @@ struct SourceIndex {
     sprintf(buf, "%d:%d", listIndex, index);
     return buf;
   }
-
-  /*
-  constexpr auto to_flat_index(const IndexList& list_sizes) const {
-    index_t flat_idx{};
-    for (index_t idx{}; idx < listIndex; ++idx) {
-      flat_idx += list_sizes[idx];
-    }
-    return flat_idx + index;
-  }
-  */
 };
-
-// functions
-
-/*
-inline const auto& get_src(
-  const CandidateList& candidates, SourceIndex src_idx) {
-  return candidates.at(src_idx.listIndex).src_list_cref.get().at(src_idx.index);
-}
-  
-inline bool is_compatible_src(const SourceCompatibilityData& src) {
-  //, const SourceCompatibilityList& incompatible_sources) const {
-  for (const auto& bad_src : incompatible_sources) {
-    if (bad_src.isAndCompatibleWith(src)) {
-      return false;
-    }
-  }
-  return true;
-}
-*/
-
-// more types! yay!
 
 class IndexStates {
 public:
@@ -98,20 +67,6 @@ public:
   };
 
   IndexStates() = delete;
-  /*
-  IndexStates(const SizeIndexList& size_idx_list) {
-    list.resize(size_idx_list.size());
-    // TODO iota
-    for (index_t idx{}; auto& data : list) {
-      data.sourceIndex.listIndex = idx++;
-    }
-    for (index_t list_start_index{}; const auto& size_idx : size_idx_list) {
-      list_sizes.push_back(size_idx.size);
-      list_start_indices.push_back(list_start_index);
-      list_start_index += size_idx.size;
-    }
-  }
-  */
   IndexStates(const CandidateList& candidates) {
     list.resize(candidates.size());
     for (index_t idx{}; auto& data : list) {
@@ -123,15 +78,21 @@ public:
       list_start_indices.push_back(list_start_index);
       list_start_index += num_sources;
     }
+    fill_indices.resize(candidates.size());
+    std::iota(fill_indices.begin(), fill_indices.end(), 0);
+    fill_iter = fill_indices.before_begin();
   }
 
+      /*
   void reset() {
     for (auto& data: list) {
       data.reset();
     }
+    todo: fill_indices
     next_fill_idx = 0;
     done = false;
   }
+      */
 
   index_t flat_index(SourceIndex src_index) const {
     return list_start_indices.at(src_index.listIndex) + src_index.index;
@@ -198,6 +159,7 @@ public:
     return list.at(list_index);
   }
 
+  /*
   auto get_and_increment_index(index_t list_index)
     -> std::optional<SourceIndex> {
     auto& data = list.at(list_index);
@@ -211,15 +173,47 @@ public:
     return std::nullopt;
   }
 
-  size_t num_lists() const {
-    return list.size();
-  }
-
   auto get_next_fill_idx() {
     auto fill_idx = next_fill_idx;
-    if (++next_fill_idx >= num_lists())
+    if (++next_fill_idx >= num_lists()) {
       next_fill_idx = 0;
+    }
     return fill_idx;
+  }
+  */
+
+  auto get_and_increment_index(index_t list_index)
+    -> std::optional<SourceIndex> {
+    auto& data = list.at(list_index);
+    if (data.ready_state()
+        && (data.sourceIndex.index < list_sizes.at(list_index))) {
+      // capture and return value before increment
+      auto capture = std::make_optional(data.sourceIndex);
+      ++data.sourceIndex.index;
+      return capture;
+    }
+    return std::nullopt;
+  }
+
+  std::optional<SourceIndex> get_next_fill_idx() {
+    while (!fill_indices.empty()) {
+      auto next_fill_iter = std::next(fill_iter);
+      if (next_fill_iter == fill_indices.end()) {
+        fill_iter = fill_indices.before_begin();
+        continue;
+      }
+      auto opt_src_idx = get_and_increment_index(*next_fill_iter);
+      if (opt_src_idx.has_value()) {
+        fill_iter = next_fill_iter;
+        return opt_src_idx.value();
+      }
+      fill_indices.erase_after(fill_iter);
+    }
+    return std::nullopt;
+  }
+
+  size_t num_lists() const {
+    return list.size();
   }
 
   void mark_compatible(const IndexList& list_indices) {
@@ -241,11 +235,11 @@ public:
     std::cout << std::endl << "total: " << count << std::endl;
   }
 
-  bool done{false};
-  index_t next_fill_idx{};
   std::vector<Data> list;
   std::vector<index_t> list_start_indices;
   std::vector<index_t> list_sizes;
+  std::forward_list<index_t> fill_indices;
+  std::forward_list<index_t>::iterator fill_iter;
 };  // class IndexStates
 
 //////////
@@ -264,6 +258,18 @@ public:
 
   //
 
+  StreamData(int idx, cudaStream_t stream, int stride)
+      : stream_idx(idx),
+        cuda_stream(stream),
+        kernel_start(stream, false),
+        kernel_stop(stream, false),
+        //copy_sources_start(stream, false),
+        //copy_sources_stop(stream, false),
+        num_list_indices(stride) {
+  }
+
+  //
+
   int num_ready(const IndexStates& indexStates) const {
     return indexStates.num_ready(0, num_list_indices);
   }
@@ -276,13 +282,10 @@ public:
     return indexStates.num_compatible(0, num_list_indices);
   }
 
-  auto fill_source_indices(IndexStates& idx_states, int max_idx,
-    const std::vector<result_t>& compat_src_results) {
-    //
-    source_indices.resize(idx_states.done ? 0 : max_idx);
-    for (int idx{}; !idx_states.done && (idx < max_idx);) {
-      // tiny optimization available here with more complicated logic on following
-      // "list" wrapping and going past original.
+  /*
+  auto fill_source_indices(IndexStates& idx_states, int max_idx) {
+    source_indices.resize(idx_states.done() ? 0 : max_idx);
+    for (int idx{}; !idx_states.done() && (idx < max_idx);) {
       size_t num_skipped_idx{};  // # of idx skipped (!has_value()) in a row
       for (auto list_idx = idx_states.get_next_fill_idx();
            !idx_states.done && (idx < max_idx);
@@ -290,12 +293,8 @@ public:
         const auto opt_src_idx = idx_states.get_and_increment_index(list_idx);
         if (opt_src_idx.has_value()) {
           const auto src_idx = opt_src_idx.value();
-          //assert(src_idx.listIndex == list_idx); // valid assert, but slower
+          // assert(src_idx.listIndex == list_idx); // valid assert, but slower
           num_skipped_idx = 0;
-          if (!compat_src_results.empty()
-              && !compat_src_results.at(idx_states.flat_index(src_idx))) {
-            continue;
-          }
           source_indices.at(idx++) = src_idx;
         } else if (++num_skipped_idx >= idx_states.num_lists()) {
           // we've skipped over the entire list (with index overlap)
@@ -305,23 +304,49 @@ public:
         }
       }
     }
-#if 0
-    std::cerr << "ending next_fill_idx: " << idx_states.next_fill_idx
-              << std::endl;
-    std::cerr
-      << "stream " << stream_idx << " filled " << source_indices.size()
-      << " of " << max_idx << ", first = "
-      << (source_indices.empty() ? -1 : (int)source_indices.front().listIndex)
-      << ", last = "
-      << (source_indices.empty() ? -1 : (int)source_indices.back().listIndex)
-      << ", done: " << std::boolalpha << idx_states.done << std::endl;
-#endif
+    if constexpr (0) {
+      std::cerr << "ending next_fill_idx: " << idx_states.next_fill_idx
+                << std::endl;
+      std::cerr
+        << "stream " << stream_idx << " filled " << source_indices.size()
+        << " of " << max_idx << ", first = "
+        << (source_indices.empty() ? -1 : (int)source_indices.front().listIndex)
+        << ", last = "
+        << (source_indices.empty() ? -1 : (int)source_indices.back().listIndex)
+        << ", done: " << std::boolalpha << idx_states.done << std::endl;
+    }
+    return !source_indices.empty();
+  }
+  */
+
+  auto fill_source_indices(IndexStates& idx_states, int max_idx) {
+    source_indices.resize(idx_states.fill_indices.empty() ? 0 : max_idx); // iters hackery
+    for (size_t idx{}; idx < source_indices.size(); ++idx) {
+      auto opt_src_idx = idx_states.get_next_fill_idx();
+      if (!opt_src_idx.has_value()) {
+        source_indices.resize(idx);
+        break;
+      }
+      source_indices.at(idx) = opt_src_idx.value();
+    }
+    if constexpr (0) {
+      //      std::cerr << "ending next_fill_idx: " << idx_states.next_fill_idx
+      //      << std::endl;
+      std::cerr
+        << "stream " << stream_idx << " filled " << source_indices.size()
+        << " of " << max_idx << ", first = "
+        << (source_indices.empty() ? -1 : (int)source_indices.front().listIndex)
+        << ", last = "
+        << (source_indices.empty() ? -1 : (int)source_indices.back().listIndex)
+        << std::endl;
+      //        << ", done: " << std::boolalpha << idx_states.done
+    }
     return !source_indices.empty();
   }
 
-  bool fill_source_indices(
-    IndexStates& idx_states, const std::vector<result_t>& compat_src_results) {
-    return fill_source_indices(idx_states, num_list_indices, compat_src_results);
+  bool fill_source_indices(IndexStates& idx_states) {
+    //, const std::vector<result_t>& compat_src_results) {
+    return fill_source_indices(idx_states, num_list_indices);
   }
 
   void allocCopy([[maybe_unused]] const IndexStates& idx_states) {
@@ -359,16 +384,21 @@ public:
               << std::endl;
   }
 
-  // TODO: doesn't belong here
-  int num_list_indices;
   int stream_idx{-1};
+  cudaStream_t cuda_stream{};
+  CudaEvent kernel_start;
+  CudaEvent kernel_stop;
+  //CudaEvent copy_sources_start;
+  //CudaEvent copy_sources_stop;
+  std::chrono::milliseconds::rep fill_duration{};
+
   int sequence_num{};
   bool is_running{false};  // is running (true until results retrieved)
   bool has_run{false};     // has run at least once
   SourceIndex* device_source_indices{};
-  cudaStream_t cuda_stream{};
   std::vector<SourceIndex> source_indices;  // hasWorkRemaining = (size() > 0)
-  hr_time_point_t start_time;
+
+  int num_list_indices;    // TODO: this doesn't belong here
 };  // struct StreamData
 
 class StreamSwarm {
@@ -381,19 +411,15 @@ public:
   }
 
   void init(unsigned num_streams, unsigned stride) {
-    // TODO: reserve() + emplace_back()
-    streams_.resize(num_streams);
-    for (unsigned i{}; i < num_streams; ++i) {
-      auto& stream = streams_.at(i);
-      stream.num_list_indices = stride;
-      if (i >= cuda_streams.size()) {
+    streams_.reserve(num_streams);
+    for (unsigned idx{}; idx < num_streams; ++idx) {
+      if (idx == cuda_streams.size()) {
         cudaStream_t cuda_stream;
-        cudaError_t err = cudaStreamCreate(&cuda_stream);
-        assert((err == cudaSuccess) && "failed to create stream");
+        auto err = cudaStreamCreate(&cuda_stream);
+        assert_cuda_success(err, "cudaStreamCreate");
         cuda_streams.push_back(cuda_stream);
       }
-      stream.stream_idx = i;
-      stream.cuda_stream = cuda_streams.at(i);
+      streams_.emplace_back(idx, cuda_streams.at(idx), stride);
     }
     reset();
   }

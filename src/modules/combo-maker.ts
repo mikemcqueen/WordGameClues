@@ -197,7 +197,7 @@ const getCombosForUseNcLists = (sum: number, max: number, args: any): void => {
             } else {
                 firstIter = false;
             }
-           Native.considerCandidate(result.ncList!, sum);
+            Native.considerCandidate(result.ncList!);
         }
         totalVariations += numVariations;
     });
@@ -326,7 +326,8 @@ export const makeCombos = (args: any): any => {
             makeCombosForSum(2, args, true);
             if (first == 2) ++first;
             for (let sum = first; sum <= last; ++sum) {
-                // TODO: return # of combos filtered due to note name match
+            //for (let sum = last; sum >= first; --sum) {
+               // TODO: return # of combos filtered due to note name match
                 makeCombosForSum(sum, args);
             }
             const comboList = Native.getResult();

@@ -45,6 +45,8 @@ struct MergeFilterData {
     std::vector<SourceList> xor_src_lists;
 
     // filter
+    std::vector<UsedSources::SourceDescriptorPair> incompatible_src_desc_pairs;
+
     std::vector<IndexList> compat_idx_lists;
     ComboIndexList combo_indices;
 
@@ -58,7 +60,7 @@ struct MergeFilterData {
     index_t* idx_list_sizes{};
 
     // filter
-    SourceCompatibilityData* incompatible_sources{};
+    UsedSources::SourceDescriptorPair* incompatible_src_desc_pairs{};
     unsigned num_incompatible_sources{};
 
     index_t* src_list_start_indices{};

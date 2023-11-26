@@ -2,8 +2,9 @@
 #define INCLUDE_CUDA_TYPES_H
 
 #include <cassert>
-#include <iostream>
+#include <cmath>
 #include <cstdint>
+#include <iostream>
 #include <span>
 #include <utility>
 #include <vector>
@@ -50,6 +51,56 @@ inline void cuda_free(void* ptr) {
   cudaError_t err = cudaFree(ptr);
   assert_cuda_success(err, "cuda_free");
 }
+
+inline auto cuda_get_free_mem() {
+  size_t free;
+  size_t total;
+  cudaError_t err = cudaMemGetInfo(&free, &total);
+  assert_cuda_success(err, "cudaMemGetInfo");
+  return free;
+}
+
+class CudaEvent {
+private:
+  cudaEvent_t event_;
+  cudaStream_t stream_;
+
+public:
+  CudaEvent(const cudaStream_t stream = cudaStreamPerThread, bool record_now = true) : stream_(stream) {
+    auto err = cudaEventCreate(&event_);
+    assert_cuda_success(err, "cudaEventCreate");
+    if (record_now) {
+      record();
+    }
+  }
+
+  auto event() const {
+    return event_;
+  }
+
+  void record() const {
+    auto err = cudaEventRecord(event_, stream_);
+    assert_cuda_success(err, "cudaEventRecord");
+  }
+
+  void synchronize() const {
+    auto err = cudaEventSynchronize(event_);
+    assert_cuda_success(err, "cudaEventSynchronize");
+  }
+
+  long synchronize(const CudaEvent& start_event) const {
+    synchronize();
+    return elapsed(start_event);
+  }
+
+  long elapsed(const CudaEvent& start_event) const {
+    float elapsed_ms;
+    auto err = cudaEventElapsedTime(&elapsed_ms, start_event.event(), event_);
+    assert_cuda_success(err, "cudaEventElapsedTime");
+    return std::lround(elapsed_ms);
+  }
+};
+
 
 }  // namespace cm
 

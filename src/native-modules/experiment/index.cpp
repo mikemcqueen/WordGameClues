@@ -357,84 +357,106 @@ Value setPrimaryNameSrcIndicesMap(const CallbackInfo& info) {
   clue_manager::setPrimaryNameSrcIndicesMap(
     buildPrimaryNameSrcIndicesMap(name_list, idx_lists));
   return env.Null();
-  }
+}
 
-  // count, _.entries(clueMap[count])
-  Value setCompoundClueNameSourcesMap(const CallbackInfo& info) {
-    Env env = info.Env();
-    if (!info[0].IsNumber() || !info[1].IsArray()) {
-      TypeError::New(env, "setCompoundClueNames: invalid parameter type")
-        .ThrowAsJavaScriptException();
-      return env.Null();
-    }
-    // arg0
-    auto count{info[0].As<Number>().Int32Value()};
-    // arg1
-    auto map{makeNameSourcesMap(env, info[1].As<Array>())};
-    // --
-    clue_manager::setNameSourcesMap(count, std::move(map));
+// count, _.entries(clueMap[count])
+Value setCompoundClueNameSourcesMap(const CallbackInfo& info) {
+  Env env = info.Env();
+  if (!info[0].IsNumber() || !info[1].IsArray()) {
+    TypeError::New(env, "setCompoundClueNames: invalid parameter type")
+      .ThrowAsJavaScriptException();
     return env.Null();
   }
+  // arg0
+  auto count{info[0].As<Number>().Int32Value()};
+  // arg1
+  auto map{makeNameSourcesMap(env, info[1].As<Array>())};
+  // --
+  clue_manager::setNameSourcesMap(count, std::move(map));
+  return env.Null();
+}
 
-  // count, nameCsv
-  Value isKnownSourceMapEntry(const CallbackInfo& info) {
-    Env env = info.Env();
-    if (!info[0].IsNumber() || !info[1].IsString()) {
-      TypeError::New(env, "isKnownSourceMapEntry: invalid parameter type")
-        .ThrowAsJavaScriptException();
-      return env.Null();
-    }
-    // arg0
-    auto count = info[0].As<Number>().Int32Value();
-    // arg1
-    auto src_csv = info[1].As<String>().Utf8Value();
-    // --
-    return Boolean::New(
-      env, clue_manager::is_known_source_map_entry(count, src_csv));
-  }
-
-  // nc, name_csv
-  Value addCompoundClue(const CallbackInfo& info) {
-    Env env = info.Env();
-    if (!info[0].IsObject() || !info[1].IsString()) {
-      TypeError::New(env, "appendNcResultsFromSrcMap: invalid parameter type")
-        .ThrowAsJavaScriptException();
-      return env.Null();
-    }
-    // arg0
-    auto nc = makeNameCount(env, info[0].As<Object>());
-    // arg1
-    auto src_csv = info[1].As<String>().Utf8Value();
-    // --
-    clue_manager::add_compound_clue(nc, src_csv);
+// count, nameCsv
+Value isKnownSourceMapEntry(const CallbackInfo& info) {
+  Env env = info.Env();
+  if (!info[0].IsNumber() || !info[1].IsString()) {
+    TypeError::New(env, "isKnownSourceMapEntry: invalid parameter type")
+      .ThrowAsJavaScriptException();
     return env.Null();
   }
+  // arg0
+  auto count = info[0].As<Number>().Int32Value();
+  // arg1
+  auto src_csv = info[1].As<String>().Utf8Value();
+  // --
+  return Boolean::New(
+    env, clue_manager::is_known_source_map_entry(count, src_csv));
+}
 
-  Value getSourcesForNc(const CallbackInfo& info) {
-    Env env = info.Env();
-    if (!info[0].IsObject()) {
-      TypeError::New(env, "getSourcesForNc: invalid parameter type")
-        .ThrowAsJavaScriptException();
-      return env.Null();
+void show_device_state() {
+  static auto state_shown = false;
+  if (!state_shown) {
+    unsigned flags;
+    auto err = cudaGetDeviceFlags(&flags);
+    assert_cuda_success(err, "cudaGetDeviceFlags");
+    auto blocking_sync = !!(flags & cudaDeviceScheduleBlockingSync);
+    std::cerr << "cudaDeviceScheduleBlockingSync: " << std::boolalpha
+              << blocking_sync << " (" << flags << ")" << std::endl;
+    if (!blocking_sync) {
+      err = cudaSetDeviceFlags(cudaDeviceScheduleBlockingSync);
+      std::cerr << "set blocking sync to true, error: " << err << std::endl;
+    } else {
+      state_shown = true;
     }
-    // arg0
-    auto nc = makeNameCount(env, info[0].As<Object>());
-    // --
-    assert(nc.count == 1);  // assert only known use case.
-    return wrap(env, clue_manager::get_nc_sources(nc));
   }
+}
 
-  Value getSourceListsForNc(const CallbackInfo& info) {
-    Env env = info.Env();
-    if (!info[0].IsObject()) {
-      TypeError::New(env, "getSourceListForNc: invalid parameter type")
-        .ThrowAsJavaScriptException();
-      return env.Null();
-    }
-    // arg0
-    auto nc = makeNameCount(env, info[0].As<Object>());
-    // --
-    // assert(nc.count == 1);  // assert only known use case.
+// nc, name_csv
+Value addCompoundClue(const CallbackInfo& info) {
+  Env env = info.Env();
+  if (!info[0].IsObject() || !info[1].IsString()) {
+    TypeError::New(env, "appendNcResultsFromSrcMap: invalid parameter type")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+  // arg0
+  auto nc = makeNameCount(env, info[0].As<Object>());
+  // arg1
+  auto src_csv = info[1].As<String>().Utf8Value();
+  // --
+  clue_manager::add_compound_clue(nc, src_csv);
+
+  // arbitrary to put it here; just somewhere early
+  //show_device_state();
+
+  return env.Null();
+}
+
+Value getSourcesForNc(const CallbackInfo& info) {
+  Env env = info.Env();
+  if (!info[0].IsObject()) {
+    TypeError::New(env, "getSourcesForNc: invalid parameter type")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+  // arg0
+  auto nc = makeNameCount(env, info[0].As<Object>());
+  // --
+  assert(nc.count == 1);  // assert only known use case.
+  return wrap(env, clue_manager::get_nc_sources(nc));
+}
+
+Value getSourceListsForNc(const CallbackInfo& info) {
+  Env env = info.Env();
+  if (!info[0].IsObject()) {
+    TypeError::New(env, "getSourceListForNc: invalid parameter type")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+  // arg0
+  auto nc = makeNameCount(env, info[0].As<Object>());
+  // --
+  // assert(nc.count == 1);  // assert only known use case.
 #if 0
   if (!clue_manager::is_known_name_count(nc.name, nc.count)) {
     std::cerr << "invalid nc" << std::endl;
@@ -674,18 +696,15 @@ Value filterPreparation(const CallbackInfo& info) {
 // considerCandidate
 Value considerCandidate(const CallbackInfo& info) {
   Env env = info.Env();
-  if (!info[0].IsArray() || !info[1].IsNumber()) {
+  if (!info[0].IsArray()) {
     TypeError::New(env, "considerCandidates: invalid parameter type")
       .ThrowAsJavaScriptException();
     return env.Null();
   }
   // arg0
   auto ncList = makeNameCountList(env, info[0].As<Array>());
-  // arg1
-  const auto sum = info[1].As<Number>().Int32Value();
-  assert(sum >= 2);
   // --
-  consider_candidate(ncList, sum);
+  consider_candidate(ncList);
   return env.Null();
 }
   
@@ -693,11 +712,37 @@ Value considerCandidate(const CallbackInfo& info) {
 // filterCandidatesForSum
 //
 
-void set_incompatible_sources(const SourceCompatibilitySet& incompatible_sources) {
+auto make_source_descriptor_pairs(
+  const SourceCompatibilitySet& incompatible_sources) {
+  //
+  std::vector<UsedSources::SourceDescriptorPair> src_desc_pairs;
+  src_desc_pairs.reserve(incompatible_sources.size());
+  for (const auto& src: incompatible_sources) {
+    if constexpr (0) {
+      auto pair = src.usedSources.get_source_descriptor_pair();
+      printf("---\n");
+      src.usedSources.dump();
+      pair.first.dump();
+      pair.second.dump();
+      src_desc_pairs.emplace_back(pair);
+    } else {
+      src_desc_pairs.emplace_back(src.usedSources.get_source_descriptor_pair());
+    }
+  }
+  return src_desc_pairs;
+}
+
+void set_incompatible_sources(
+  const SourceCompatibilitySet& incompatible_sources) {
   // empty set technically possible; disallowed here as a canary
   assert(!incompatible_sources.empty());
-  assert(!MFD.device.incompatible_sources);
-  MFD.device.incompatible_sources = cuda_alloc_copy_sources(incompatible_sources);
+  assert(MFD.host.incompatible_src_desc_pairs.empty());
+  assert(!MFD.device.incompatible_src_desc_pairs);
+
+  MFD.host.incompatible_src_desc_pairs =
+    std::move(make_source_descriptor_pairs(incompatible_sources));
+  MFD.device.incompatible_src_desc_pairs =
+    cuda_alloc_copy_source_desc_pairs(MFD.host.incompatible_src_desc_pairs);
   MFD.device.num_incompatible_sources = incompatible_sources.size();
   std::cerr << " incompatible sources: " << incompatible_sources.size()
             << std::endl;
@@ -726,7 +771,7 @@ Value filterCandidatesForSum(const CallbackInfo& info) {
     MFD, sum, threads_per_block, streams, stride, iters, synchronous);
   assert(synchronous == opt_incompatible_sources.has_value());
   if (opt_incompatible_sources.has_value()) {
-    set_incompatible_sources(std::move(*opt_incompatible_sources));
+    set_incompatible_sources(*opt_incompatible_sources);
   }
   return env.Null();
 }

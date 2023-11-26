@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <chrono>
+#include <numeric>
 #include <optional>
 #include <unordered_map>
 #include "candidates.h"
@@ -25,11 +26,15 @@ struct CandidateRepoValue {
   std::optional<int> opt_idx;
 };
 
-// globals
-
-std::unordered_map<std::string, CandidateRepoValue> candidate_repo;
+using CandidateRepo = std::unordered_map<std::string, CandidateRepoValue>;
 
 // functions
+
+auto& get_candidate_repo(int sum) {
+  constexpr const int kMaxRepos = 20;
+  static std::vector<CandidateRepo> candidate_repos(kMaxRepos);
+  return candidate_repos.at(sum - 2);
+}
 
 auto get_src_compat_list(const NameCount& nc) {
   SourceCompatibilityList src_list;
@@ -101,7 +106,7 @@ SourceCompatibilityList merge_all_compatible_sources(
   return merged_src_list;
 }
 
-auto add_candidate(int sum, const std::string&& combo, int index) -> int {
+auto add_candidate(int sum, const std::string&& combo, int index) {
   auto& candidate_list = allSumsCandidateData.find(sum)->second;
   candidate_list.at(index).combos.emplace(std::move(combo));
   return index;
@@ -126,19 +131,22 @@ int add_candidate(int sum, std::string&& combo,
 
 namespace cm {
 
-void consider_candidate(const NameCountList& ncList, int sum) {
-  auto key = NameCount::listToString(ncList);
+void consider_candidate(const NameCountList& nc_list) {
+  auto sum = std::accumulate(nc_list.begin(), nc_list.end(), 0,
+    [](int total, const NameCount& nc) { return total + nc.count; });
+  auto& candidate_repo = get_candidate_repo(sum);
+  auto key = NameCount::listToString(nc_list);
   if (!candidate_repo.contains(key)) {
     CandidateRepoValue repo_value;
     repo_value.merged_src_list =
-      std::move(merge_all_compatible_sources(ncList));
+      std::move(merge_all_compatible_sources(nc_list));
     candidate_repo.emplace(std::make_pair(key, std::move(repo_value)));
   }
   auto& repo_value = candidate_repo.find(key)->second;
   if (repo_value.merged_src_list.empty()) {
     return;
   }
-  auto combo = NameCount::listToString(NameCount::listToNameList(ncList));
+  auto combo = NameCount::listToString(NameCount::listToNameList(nc_list));
   if (repo_value.opt_idx.has_value()) {
     add_candidate(sum, std::move(combo), repo_value.opt_idx.value());
   } else {
@@ -147,5 +155,16 @@ void consider_candidate(const NameCountList& ncList, int sum) {
   }
 }
 
-} // namespace cm
+void clear_candidates(int sum) {
+  get_candidate_repo(sum).clear();
+}
 
+int count_candidates(const CandidateList& candidates) {
+  size_t num{};
+  for (const auto& candidate : candidates) {
+    num += candidate.src_list_cref.get().size();
+  }
+  return num;
+}
+
+}  // namespace cm
