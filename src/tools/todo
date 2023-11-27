@@ -1,8 +1,11 @@
-* issue with only modifying, e.g., filter.cu, it doesn't seem to build correctly.
-  it's like i need to touch another file to make it link.
-  problem: filter_dlink.o is not getting built.
+* toggling "kLogCompatSources" off is causing get_compatible_sources kernel to be wobbly.
 
-* synccheck errors in get_compatible_sources
+* thoughts from last night: i really want to focus on new sentence combinations, and
+  corresponding compound clues in the sub-10 (typically 6-8) region. then combine
+  those to build larger combinations. so, performance (and memory use) of large
+  compound clues like 19,20 shouldn't really be relevant for the "important" work.
+  but I still need to make sure I can load those in at runtime to build XorSources
+  (which I am currently doing anyway, up to 20).
 
 * spawn a thread to do "synchronous" sum=2, but acquire a binary semaphore to
   prevent the next sum from executing until all the data from 2 is packed into MFD.

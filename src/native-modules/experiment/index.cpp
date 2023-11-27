@@ -316,12 +316,12 @@ LogArgs makeLogArgs(Env& env, const Object& jsObject) {
     log_args.quiet = jsQuiet.As<Boolean>();
   }
   if (!jsVerbose.IsUndefined()) {
-    if (!jsVerbose.IsBoolean()) {
+    if (!jsVerbose.IsNumber()) {
       TypeError::New(env, "makeLogArgs: invalid verbose arg")
         .ThrowAsJavaScriptException();
       return {};
     }
-    log_args.verbose = jsVerbose.As<Boolean>();
+    log_args.verbose = jsVerbose.As<Number>().Int32Value();
   }
   return log_args;
 }

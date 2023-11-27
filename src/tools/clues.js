@@ -26,14 +26,6 @@ const PrettyMs    = require('pretty-ms');
 const Stringify   = require('stringify-object');
 const Timing      = require('debug')('timing');
 
-
-// initialize command line options.  do this before logger.
-//
-
-// TODO:
-// solve the -p/-y problem: standardize how to set/initialize state based on target clues
-// 
-
 const CmdLineOptions = Opt.create(_.concat(Clues.Options, [
     ['o', 'output',                            '  output json -or- clues(huh?)'],
     ['c', 'count=COUNT[LO,COUNTHI]',           'show combos of the specified COUNT; if COUNTHI, treat as range'],
@@ -53,9 +45,9 @@ const CmdLineOptions = Opt.create(_.concat(Clues.Options, [
     ['',  'allow-dupe-source',                 '  allow duplicate sources'],
     ['',  'merge-style',                       '  merge-style, no validation except for immediate sources'],
     ['',  'remaining',                         '  only word combos not present in any named note'],
-//    ['k', 'show-known',                        'show compatible known clues; -u <clue> required' ],
-//    ['',  'csv',                               '  output in search-term csv format' ],
-//    ['',  'files',                             '  output in result file full-path format' ],
+//  ['k', 'show-known',                        'show compatible known clues; -u <clue> required' ],
+//  ['',  'csv',                               '  output in search-term csv format' ],
+//  ['',  'files',                             '  output in result file full-path format' ],
     ['s', 'show-sources=NAME[:COUNT][,v]',     'show primary source combos for the specified NAME[:COUNT]' ],
     ['t', 'test=SOURCE[,SOURCE,...]',          'test the specified source list, e.g. blue,fish' ],
     ['',  'add=NAME',                          '  add compound clue NAME=SOURCE; use with --test' ],
@@ -76,7 +68,9 @@ const CmdLineOptions = Opt.create(_.concat(Clues.Options, [
     ['R', 'remove-all-invalid',                'remove all invalid (validation error) clues'],
     ['',  'ccc',                               'clue (source) consistency check'],
     ['z', 'flags=OPTION+',                     'flags: 2=ignoreErrors' ],
-    ['v', 'verbose',                           'more output'],
+    ['v', 'verbose',                           'more output' ],
+    ['',  'vv',                                'More' ],
+    ['',  'vvv',                               'MOAR' ],
     ['q', 'quiet',                             'less output'],
     ['h', 'help',                              'this screen']
 ])).bindHelp();
@@ -116,26 +110,6 @@ const loadClues = (clues, max, options) => {
     log('done.');
     return true;
 }
-
-/*
-//
-// args:
-//  sum:     countArg,
-//  max:     maxArg,
-//  require: requiredSizes,
-//  sources: primarySourcesArg,
-//  use:     useClueList
-//
-function doCombos(args) {
-    if (!_.isUndefined(args.sources)) {
-        args.sources = _.chain(args.sources).split(',').map(_.toNumber).value();
-    }
-    if (!_.isUndefined(args.require)) {
-    // is _chain even necessary here?
-        args.require = _.chain(args.require).split(',').map(_.toNumber).value();
-    }
-}
-    */
 
 async function getNamedNoteNames(options) {
     if (options.production) Log.info('---PRODUCTION---');
@@ -306,6 +280,11 @@ async function main () {
 
     const opt = CmdLineOptions.parseSystem();
     const options = opt.options;
+
+    // default log_level (in c++) is 1. verbose options increase it.
+    if (options.vvv) options.verbose = 4;          // ludicrous
+    else if (options.vv) options.verbose = 3;      // extra-verbase
+    else if (options.verbose) options.verbose = 2; // verbose
 
     // TODO: get rid of this, just pass Opt.options around
     let useClueList = options.use;

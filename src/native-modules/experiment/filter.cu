@@ -30,30 +30,28 @@ template <typename T> __device__ __forceinline__ void store(T* addr, T val) {
   *(volatile T*)addr = val;
 }
 
-// Test if the supplied source contains both of the sources described by
-// any element in the supplied array of source descriptor pairs.
-__device__ bool source_contains_desc_pair(const SourceCompatibilityData& source,
-  const UsedSources::SourceDescriptorPair* /*__restrict__*/ src_desc_pairs,
+// Test if the supplied source contains both of the primary sources described
+// by any of the supplied source descriptor pairs.
+__device__ bool source_contains_any_descriptor_pair(
+  const SourceCompatibilityData& source,
+  const UsedSources::SourceDescriptorPair* __restrict__ src_desc_pairs,
   const unsigned num_src_desc_pairs) {
   //
-  __shared__ bool is_compat;
+  __shared__ bool contains_both;
   if (!threadIdx.x) {
-    is_compat = false;
+    contains_both = false;
   }
   __syncthreads();
-  // NOTE: chunk-indexing is necessary as described elsewhere.
-  const auto chunk_size = blockDim.x;
-  const auto chunk_max = num_src_desc_pairs;
   // one thread per src_desc_pair
-  for (unsigned chunk_idx{}; chunk_idx * chunk_size < chunk_max; ++chunk_idx) {
-    const auto pair_idx = chunk_idx * chunk_size + threadIdx.x;
+  for (unsigned idx{}; idx * blockDim.x < num_src_desc_pairs; ++idx) {
+    const auto pair_idx = idx * blockDim.x + threadIdx.x;
     if (pair_idx < num_src_desc_pairs) {
       if (source.usedSources.has(src_desc_pairs[pair_idx])) {
-        is_compat = true;
+        contains_both = true;
       }
     }
     __syncthreads();
-    if (is_compat) {
+    if (contains_both) {
       return true;
     }
   }
@@ -61,35 +59,38 @@ __device__ bool source_contains_desc_pair(const SourceCompatibilityData& source,
 }
 
 // note that this really only makes sense when running a single sum, not
-// a range. for range support, i could allocate and pass a separate global.
-constexpr const bool kLogCompatSources = true;
+// concurrent kernels for a range. for range support, i could allocate 
+// and pass a separate per-sum global.
+constexpr const bool kLogCompatSources = false;
 
 __device__ unsigned int device_num_compat_sources = 0;
 __device__ unsigned int device_num_blocks = 0;
 
 __global__ void get_compatible_sources_kernel(
-  const SourceCompatibilityData* /*__restrict__*/ sources,
+  const SourceCompatibilityData* __restrict__ sources,
   const unsigned num_sources,
-  const UsedSources::
-  SourceDescriptorPair* /*__restrict__*/ incompatible_src_desc_pairs,
-  const unsigned num_src_desc_pairs, /*volatile*/ result_t* __restrict__ results) {
+  const UsedSources::SourceDescriptorPair* __restrict__
+    incompatible_src_desc_pairs,
+  const unsigned num_src_desc_pairs,
+  compat_src_result_t* __restrict__ results) {
   // one block per source
   for (unsigned idx{blockIdx.x}; idx < num_sources; idx += gridDim.x) {
     const auto& source = sources[idx];
-    if (!source_contains_desc_pair(
+    // I don't understand why this is required, but fails synccheck and
+    // produces wobbly results without.
+    __syncthreads();
+    if (!source_contains_any_descriptor_pair(
           source, incompatible_src_desc_pairs, num_src_desc_pairs)) {
       if (!threadIdx.x) {
-        store(&results[idx], (result_t)1);
-        // results[idx] = 1;
+        results[idx] = 1;
         if constexpr (kLogCompatSources) {
-          atomicInc(&device_num_compat_sources,
-            std::numeric_limits<unsigned int>::max());
+          atomicInc(&device_num_compat_sources, num_sources);
         }
       }
     }
     if constexpr (kLogCompatSources) {
       if (!threadIdx.x) {
-        atomicInc(&device_num_blocks, std::numeric_limits<unsigned int>::max());
+        atomicInc(&device_num_blocks, gridDim.x);
       }
     }
   }
@@ -191,6 +192,7 @@ __device__ bool is_source_XOR_and_OR_compatible(
   __shared__ bool is_or_compat;
 
   if (!threadIdx.x) {
+    // store not necessary because syncthreads
     store(&is_xor_compat, false);
     store(&is_or_compat, false);
   }
@@ -355,7 +357,7 @@ __global__ void xor_kernel_new(
   const device::OrSourceData* __restrict__ or_src_list,
   const unsigned num_or_sources, const SourceIndex* __restrict__ source_indices,
   const index_t* __restrict__ list_start_indices,
-  const result_t* __restrict__ compat_src_results,
+  const compat_src_result_t* __restrict__ compat_src_results,
   result_t* __restrict__ results, int stream_idx) {
   // for each source (one block per source)
   for (unsigned idx{blockIdx.x}; idx < num_sources; idx += gridDim.x) {
@@ -526,7 +528,7 @@ namespace cm {
 void run_get_compatible_sources_kernel(
   const SourceCompatibilityData* device_sources, unsigned num_sources,
   const UsedSources::SourceDescriptorPair* device_src_desc_pairs,
-  unsigned num_src_desc_pairs, result_t* device_results) {
+  unsigned num_src_desc_pairs, compat_src_result_t* device_results) {
   //
   int num_sm;
   cudaDeviceGetAttribute(&num_sm, cudaDevAttrMultiProcessorCount, 0);
@@ -548,8 +550,9 @@ void run_get_compatible_sources_kernel(
     device_sources, num_sources, device_src_desc_pairs, num_src_desc_pairs,
     device_results);
   if constexpr(kLogCompatSources) {
-    CudaEvent stop;
-    stop.synchronize();
+    //    CudaEvent stop(stream);
+    //    stop.synchronize();
+    /*
     unsigned int num_compat_sources;
     err = cudaMemcpyFromSymbol(&num_compat_sources, device_num_compat_sources,
       sizeof(num_compat_sources));
@@ -560,12 +563,13 @@ void run_get_compatible_sources_kernel(
     assert_cuda_success(err, "cudaMemcpyFromSymbol - num_blocks");
     fprintf(stderr, " atomic compat: %d, blocks: %d\n",
       num_compat_sources, num_blocks);
+    */
   }
 }
 
 void run_xor_kernel(StreamData& stream, int threads_per_block,
   const MergeFilterData& mfd, const SourceCompatibilityData* device_src_list,
-  const result_t* device_compat_src_results, result_t* device_results,
+  const compat_src_result_t* device_compat_src_results, result_t* device_results,
   const index_t* device_list_start_indices) {
   //
   int num_sm;

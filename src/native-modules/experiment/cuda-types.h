@@ -13,6 +13,7 @@
 namespace cm {
 
 using result_t = uint8_t;
+using compat_src_result_t = result_t;
 using index_t = uint32_t;
 using combo_index_t = uint64_t;
 
@@ -29,20 +30,22 @@ inline void assert_cuda_success(cudaError err, std::string_view sv) {
   }
 }
 
-inline auto cuda_alloc_results(size_t num_results,
-  cudaStream_t stream = cudaStreamPerThread) {
+template <typename T = result_t>
+inline auto cuda_alloc_results(
+  size_t num_results, cudaStream_t stream = cudaStreamPerThread) {
   // alloc results
-  auto results_bytes = num_results * sizeof(result_t);
-  result_t* device_results;
+  auto results_bytes = num_results * sizeof(T);
+  T* device_results;
   cudaError_t err = cudaMallocAsync((void**)&device_results, results_bytes, stream);
   assert_cuda_success(err, "alloc results");
   return device_results;
 }
 
-inline void cuda_zero_results(result_t* results, size_t num_results,
-  cudaStream_t stream = cudaStreamPerThread) {
+template <typename T = result_t>
+inline void cuda_zero_results(
+  T* results, size_t num_results, cudaStream_t stream = cudaStreamPerThread) {
   // memset results to zero
-  auto results_bytes = num_results * sizeof(result_t);
+  auto results_bytes = num_results * sizeof(T);
   cudaError_t err = cudaMemsetAsync(results, 0, results_bytes, stream);
   assert_cuda_success(err, "zero results");
 }

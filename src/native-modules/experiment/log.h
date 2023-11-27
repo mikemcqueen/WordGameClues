@@ -6,18 +6,27 @@ namespace cm {
 // TODO: log.h
 struct LogArgs {
   bool quiet{};
-  bool verbose{};
+  int verbose{};
 };
 
-inline int log_level = 1;
+inline const auto Normal = 1;
+inline const auto Verbose = 2;
+inline const auto ExtraVerbose = 3;
+inline const auto Ludicrous = 4;
+
+inline int the_log_level = Normal;
+
+inline bool log_level(int level) {
+  return the_log_level >= level;
+}
 
 inline void set_log_args(const LogArgs& args) {
   if (args.quiet) {
-    log_level = 0;
-  } else if (args.verbose) {
-    log_level = 2;
+    the_log_level = 0;
+  } else if (!args.verbose) {
+    the_log_level = Normal;
   } else {
-    log_level = 1;
+    the_log_level = args.verbose;
   }
 }
 
