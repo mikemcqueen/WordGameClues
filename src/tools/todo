@@ -1,4 +1,7 @@
-* toggling "kLogCompatSources" off is causing get_compatible_sources kernel to be wobbly.
+* fix lifetime issue requiring sync in cuda_allocCopySentenceVariationIndices()
+  * store in MFD.
+
+* need to pass LogArgs to plugin earlier.
 
 * thoughts from last night: i really want to focus on new sentence combinations, and
   corresponding compound clues in the sub-10 (typically 6-8) region. then combine
@@ -25,9 +28,6 @@
 * return CudaEvent (stop) from run_xxx_kernel functions. then we maybe don't need
   the stop_event in StreamData? maybe not though.
 
-* fix lifetime issue requiring sync in cuda_allocCopySentenceVariationIndices()
-  * store in MFD.
-
 * sync on an event whenever i get kernel results. like.. in cuda_copy_results?
   and elsewhere maybe
 
@@ -38,9 +38,6 @@
 * kernel timing from @nightchild:
   also nvidia-smi -i 0 -pm 1 will give more reproduce-able results cause it will 
   force a fixed clock
-
-* the delay between alloc_copy_sources and get_compatible_sources kernel messages
-  doesn't make sense.
 
 * filer_support::get_incompatible_sources looks wrong. i'm leaving it wrong for now
   because it helps confirm before/after counts, even if the counts are wrong.

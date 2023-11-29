@@ -164,7 +164,9 @@ const largestNcDataCountSum = (ncDataList: NCDataList): [number, NameCount.List]
     return [largest, ncList];
 }
 
-const buildAllUseNcDataLists = (useArgsList: string[], maxSum: number): NCDataList[] => {
+const buildAllUseNcDataLists = (listName: string, maxSum: number, args: any): NCDataList[] => {
+    const useArgsList: string[] = args[listName];
+    Assert(useArgsList);
     const combinationNcLists = getCombinationNcLists(useArgsList);
     const ncDataLists = combinationsToNcDataLists(combinationNcLists)
     const begin = new Date();
@@ -176,8 +178,10 @@ const buildAllUseNcDataLists = (useArgsList: string[], maxSum: number): NCDataLi
         }
         return largest <= maxSum;
     });
-    let d = new Duration(begin, new Date()).milliseconds;
-    console.error(` buildAllUseNc max(${maxSum}) - ${PrettyMs(d)}`);
+    if (args.verbose) {
+        let d = new Duration(begin, new Date()).milliseconds;
+        console.error(` buildAllUseNc "${listName}", max(${maxSum}) - ${PrettyMs(d)}`);
+    }
     return result;
 };
 
@@ -243,7 +247,7 @@ export const preCompute = (first: number, last: number, args: any): boolean => {
 
     const begin = new Date();
     // XOR first
-    const xorNcDataLists = args.xor ? buildAllUseNcDataLists(args.xor, maxSum) : [ [] ];
+    const xorNcDataLists = args.xor ? buildAllUseNcDataLists("xor", maxSum, args) : [ [] ];
     if (listIsEmpty(xorNcDataLists)) return false;
 
     const num_indices: number = 
@@ -252,7 +256,7 @@ export const preCompute = (first: number, last: number, args: any): boolean => {
     if (merge_only) return true;
 
     // OR next
-    const orNcDataLists = args.or ? buildAllUseNcDataLists(args.or, maxSum) : [ [] ];
+    const orNcDataLists = args.or ? buildAllUseNcDataLists("or", maxSum, args) : [ [] ];
     if (listIsEmpty(orNcDataLists)) return false;
 
     //Native.setOrArgs(orNcDataLists);

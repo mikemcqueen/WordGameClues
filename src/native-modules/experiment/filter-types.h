@@ -159,29 +159,6 @@ public:
     return list.at(list_index);
   }
 
-  /*
-  auto get_and_increment_index(index_t list_index)
-    -> std::optional<SourceIndex> {
-    auto& data = list.at(list_index);
-    if (data.ready_state()
-        && (data.sourceIndex.index < list_sizes.at(list_index))) {
-      // capture and return value before increment
-      auto capture = std::make_optional(data.sourceIndex);
-      ++data.sourceIndex.index;
-      return capture;
-    }
-    return std::nullopt;
-  }
-
-  auto get_next_fill_idx() {
-    auto fill_idx = next_fill_idx;
-    if (++next_fill_idx >= num_lists()) {
-      next_fill_idx = 0;
-    }
-    return fill_idx;
-  }
-  */
-
   auto get_and_increment_index(index_t list_index)
     -> std::optional<SourceIndex> {
     auto& data = list.at(list_index);
@@ -263,8 +240,6 @@ public:
         cuda_stream(stream),
         kernel_start(stream, false),
         kernel_stop(stream, false),
-        //copy_sources_start(stream, false),
-        //copy_sources_stop(stream, false),
         num_list_indices(stride) {
   }
 
@@ -282,43 +257,6 @@ public:
     return indexStates.num_compatible(0, num_list_indices);
   }
 
-  /*
-  auto fill_source_indices(IndexStates& idx_states, int max_idx) {
-    source_indices.resize(idx_states.done() ? 0 : max_idx);
-    for (int idx{}; !idx_states.done() && (idx < max_idx);) {
-      size_t num_skipped_idx{};  // # of idx skipped (!has_value()) in a row
-      for (auto list_idx = idx_states.get_next_fill_idx();
-           !idx_states.done && (idx < max_idx);
-           list_idx = idx_states.get_next_fill_idx()) {
-        const auto opt_src_idx = idx_states.get_and_increment_index(list_idx);
-        if (opt_src_idx.has_value()) {
-          const auto src_idx = opt_src_idx.value();
-          // assert(src_idx.listIndex == list_idx); // valid assert, but slower
-          num_skipped_idx = 0;
-          source_indices.at(idx++) = src_idx;
-        } else if (++num_skipped_idx >= idx_states.num_lists()) {
-          // we've skipped over the entire list (with index overlap)
-          // and haven't consumed any indices. nothing left to do.
-          idx_states.done = true;
-          source_indices.resize(idx);
-        }
-      }
-    }
-    if constexpr (0) {
-      std::cerr << "ending next_fill_idx: " << idx_states.next_fill_idx
-                << std::endl;
-      std::cerr
-        << "stream " << stream_idx << " filled " << source_indices.size()
-        << " of " << max_idx << ", first = "
-        << (source_indices.empty() ? -1 : (int)source_indices.front().listIndex)
-        << ", last = "
-        << (source_indices.empty() ? -1 : (int)source_indices.back().listIndex)
-        << ", done: " << std::boolalpha << idx_states.done << std::endl;
-    }
-    return !source_indices.empty();
-  }
-  */
-
   auto fill_source_indices(IndexStates& idx_states, int max_idx) {
     source_indices.resize(idx_states.fill_indices.empty() ? 0 : max_idx); // iters hackery
     for (size_t idx{}; idx < source_indices.size(); ++idx) {
@@ -330,8 +268,8 @@ public:
       source_indices.at(idx) = opt_src_idx.value();
     }
     if constexpr (0) {
-      //      std::cerr << "ending next_fill_idx: " << idx_states.next_fill_idx
-      //      << std::endl;
+      // std::cerr << "ending next_fill_idx: " << idx_states.next_fill_idx
+      //           << std::endl;
       std::cerr
         << "stream " << stream_idx << " filled " << source_indices.size()
         << " of " << max_idx << ", first = "
@@ -339,7 +277,7 @@ public:
         << ", last = "
         << (source_indices.empty() ? -1 : (int)source_indices.back().listIndex)
         << std::endl;
-      //        << ", done: " << std::boolalpha << idx_states.done
+      //<< ", done: " << std::boolalpha << idx_states.done
     }
     return !source_indices.empty();
   }
@@ -358,15 +296,6 @@ public:
         cudaMallocAsync((void**)&device_source_indices, indices_bytes, cuda_stream);
       assert((err == cudaSuccess) && "allocate source indices");
     }
-
-    /*
-    std::vector<index_t> flat_indices;
-    flat_indices.reserve(source_indices.size());
-    for (const auto& src_idx: source_indices) {
-      flat_indices.push_back(idx_states.flat_index(src_idx));
-    }
-    */
-
     // copy source indices
     err = cudaMemcpyAsync(device_source_indices, source_indices.data(),
       indices_bytes, cudaMemcpyHostToDevice, cuda_stream);
@@ -388,8 +317,6 @@ public:
   cudaStream_t cuda_stream{};
   CudaEvent kernel_start;
   CudaEvent kernel_stop;
-  //CudaEvent copy_sources_start;
-  //CudaEvent copy_sources_stop;
   std::chrono::milliseconds::rep fill_duration{};
 
   int sequence_num{};
@@ -463,11 +390,15 @@ public:
     ValueIndex lowest = {std::numeric_limits<int>::max()};
     for (size_t i{}; i < streams_.size(); ++i) {
       const auto& stream = streams_.at(i);
-      if (stream.is_running
-          && (cudaSuccess == cudaStreamQuery(stream.cuda_stream))) {
-        if (stream.sequence_num < lowest.value) {
-          lowest.value = stream.sequence_num;
-          lowest.index = i;
+      if (stream.is_running) {
+        cudaError_t err = cudaStreamQuery(stream.cuda_stream);
+        if (err == cudaSuccess) {
+          if (stream.sequence_num < lowest.value) {
+            lowest.value = stream.sequence_num;
+            lowest.index = i;
+          }
+        } else if (err != cudaErrorNotReady) {
+          assert_cuda_success(err, "cudaStreamQuery");
         }
       }
     }

@@ -6,6 +6,7 @@
 #include <vector>
 #include "clue-manager.h"
 #include "util.h"
+#include "log.h"
 
 namespace clue_manager {
 
@@ -236,10 +237,12 @@ void setPrimaryNameSrcIndicesMap(PrimaryNameSrcIndicesMap&& src_indices_map) {
       init_known_source_map_entry(1, str_src, std::move(src_list));
     }
   }
-  auto ksm1 = high_resolution_clock::now();
-  auto ksm_dur = duration_cast<milliseconds>(ksm1 - ksm0).count();
-  std::cerr << " init primary known_src_map - " << ksm_dur << "ms" << std::endl;
-
+  if (log_level(Verbose)) {
+    auto ksm1 = high_resolution_clock::now();
+    auto ksm_dur = duration_cast<milliseconds>(ksm1 - ksm0).count();
+    std::cerr << " init primary known_src_map - " << ksm_dur << "ms"
+              << std::endl;
+  }
   setNameSourcesMap(1, std::move(name_sources_map));
   primaryNameSrcIndicesMap = std::move(src_indices_map);
 }

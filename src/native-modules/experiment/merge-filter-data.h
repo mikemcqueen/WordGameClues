@@ -13,13 +13,6 @@ struct OrSourceData {
   unsigned or_arg_idx;
 };
 
-/*
-struct OrArgData {
-  OrSourceData* or_sources;
-  unsigned num_or_sources;
-};
-*/
-
 struct VariationIndices {
   combo_index_t* device_data;  // one chunk of allocated data; other pointers
                                // below point inside this chunk.
@@ -121,8 +114,6 @@ struct MergeFilterData {
   device::OrSourceData* device_or_sources{}; 
   unsigned num_or_sources{};
 #endif
-
-  //inline MergeFilterData MFD;
 
 }  // namespace cm
 

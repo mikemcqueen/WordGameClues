@@ -447,10 +447,12 @@ auto cuda_markAllXorCompatibleOrSources(const MergeFilterData& mfd)
   cuda_zero_results(device_results, mfd.device.num_or_sources);
   run_mark_or_sources_kernel(mfd, device_results);
   auto results = cuda_copy_results(device_results, mfd.device.num_or_sources);
-  auto marked = std::accumulate(results.begin(), results.end(), 0,
-    [](int total, result_t val) { return total + val; });
-  std::cerr << "  cuda marked " << marked << " of " << mfd.device.num_or_sources
-            << std::endl;
+  if (log_level(Verbose)) {
+    auto marked = std::accumulate(results.begin(), results.end(), 0,
+      [](int total, result_t val) { return total + val; });
+    std::cerr << "  marked " << marked << " of " << mfd.device.num_or_sources
+              << " or sources" << std::endl;
+  }
   return results;
 }
 
@@ -589,7 +591,7 @@ cuda_allocCopyOrSources(const OrArgList& orArgList) {
     auto& device_indices = device_indices_array.at(s);
     auto err = cudaMallocAsync((void**)&device_indices.device_data,
       device_data_bytes, cudaStreamPerThread);
-    assert_cuda_success(err, "variation_indices alloc");
+    assert_cuda_success(err, "alloc device data");
 
     device_indices.num_variations = num_variations;
     // copy combo indices first, populating offsets and num_combo_indices

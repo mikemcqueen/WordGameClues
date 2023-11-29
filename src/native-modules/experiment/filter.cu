@@ -213,9 +213,6 @@ __device__ bool is_source_XOR_and_OR_compatible(
   const auto chunk_max = num_indices;
   // one thread per xor_source
   for (unsigned chunk_idx{}; chunk_idx * chunk_size < chunk_max; ++chunk_idx) {
-    // TODO: i imagine i can move this synchthreads to after shared memory
-    // initialization, and add one to the end, which might be slightly more
-    // performant. This might even be wrong (apparently sanitary though)
     __syncthreads();
     // "flat" index, i.e. not yet indexed into appropriate idx_spans array
     const auto flat_idx = chunk_idx * chunk_size + threadIdx.x;
@@ -245,8 +242,6 @@ __device__ bool is_source_XOR_and_OR_compatible(
           // reset is_xor_compat. sync will happen at loop entrance.
           is_xor_compat = false;
         }
-        // todo: add here, move at loop entrance
-        // __syncthreads();
         continue;
       }
     }
@@ -273,6 +268,17 @@ __device__ void print_variation_indices(
   variation_indices_shown = true;
 }
 
+namespace SmallestSpans {
+
+enum class ResultCode { All, None, Check };
+
+struct ResultType {
+  ResultCode code{};
+  ComboIndexSpanPair idx_spans{};
+};
+
+}  // namespace SmallestSpans
+
 // variation_indices is an optimization. it allows us to restrict comparisons
 // of a candidate source to only those xor_sources that have the same (or no)
 // variation for each sentence - since a variation mismatch will alway result
@@ -280,19 +286,18 @@ __device__ void print_variation_indices(
 //
 // individual xor_src indices are potentially (and often) duplicated in the
 // variation_indices lists. for example, if a particular compound xor_src has
-// variations S1:V1 and S2:V3, its xor_src_idx will appear in both of those
-// corresponding variation_indices lists.
+// variations S1:V1 and S2:V3, its xor_src_idx will appear in the variation
+// indices lists for both of those sentences (1 and 2).
 //
-// because of this, we actually need only compare a candidate source with the
-// xor_sources corresponding to the variation_indices that have the same (or
-// no) variation for a *single* sentence.
+// because of this, we only need to compare a candidate source with the
+// xor_sources that have the same (or no) variations for a *single* sentence.
 //
-// the question then becomes, which sentence/variation should we choose?
+// the question then becomes, which sentence should we choose?
 //
-// answer: the one with the fewest indices! (resulting in the fewest
-// compares). that's what this function determines.
+// answer: the one with the fewest indices! (which results in the fewest
+// comparisons). that's what this function determines.
 //
-__device__ auto get_smallest_src_index_spans(
+__device__ SmallestSpans::ResultType get_smallest_src_index_spans(
   const SourceCompatibilityData& source,
   const device::VariationIndices* __restrict__ variation_indices) {
   //
@@ -306,14 +311,14 @@ __device__ auto get_smallest_src_index_spans(
       continue;
     }
     const auto variation = source.usedSources.variations[s] + 1;
-    // if the candidate source has no primary source from this sentence,
-    // skip it. (same reason as above)
+    // if the candidate source has no primary source from this sentence, skip
+    // it. (same reason as above)
     if (!variation) {
       continue;
     }
-    // sum the xor_src indices that have no variation (index 0), and the same
-    // variation as the candidate source, for this sentence. remember the
-    // smallest sum, and sentence.
+    // sum the xor_src indices that have no variation (index 0), with those
+    // that have the same variation as the candidate source, for this sentence.
+    // remember the sentence with the smallest sum.
     const auto num_indices =
       vi.num_combo_indices[0] + vi.num_combo_indices[variation];
     if (num_indices < fewest_indices) {
@@ -324,24 +329,26 @@ __device__ auto get_smallest_src_index_spans(
       }
     }
   }
-  // if the candidate source sentence variation with the fewest number of
-  // compatible (same or no variation) xor_sources is zero, it means the
-  // following conditions are met:
-  // * the candidate source contains a primary source from this sentence
-  // * every xor_source both:
-  //   a) contains a primary source from this sentence, and
-  //   b) has a different variation for this sentence than that of the
-  //      candidate source.
-  // as a result, we can skip all xor-compares for the candidate source
-  // as we know they will all fail due to variation mismatch.
-  if (!fewest_indices) {
-    return std::make_pair(ComboIndexSpan{}, ComboIndexSpan{});
+  using enum SmallestSpans::ResultCode;
+  if (sentence_with_fewest < 0) {
+    // there are no sentences from which both the candidate source and any
+    // xor_source contain a primary source. we can skip xor-compat checks
+    // since they will all succeed.
+    return { All };
   }
-  assert(sentence_with_fewest > -1);
+  if (!fewest_indices) {
+    // both the candidate source and all xor_sources contain a primary source
+    // from sentence_with_fewest, but all xor_sources use a different variation
+    // than the candidate source. we can skip all xor-compat checks since they
+    // will all fail due to variation mismatch.
+    return { None };
+  }
   const auto variation =
     source.usedSources.variations[sentence_with_fewest] + 1;
   const auto& vi = variation_indices[sentence_with_fewest];
-  return std::make_pair(vi.get_index_span(0), vi.get_index_span(variation));
+  //todo:  std::make_optional, or { make_pair };
+  return {
+    Check, std::make_pair(vi.get_index_span(0), vi.get_index_span(variation))};
 }
 
 __global__ void xor_kernel_new(
@@ -369,20 +376,21 @@ __global__ void xor_kernel_new(
       continue;
     }
     const auto& source = src_list[flat_idx];
-    auto idx_spans = get_smallest_src_index_spans(source, variation_indices);
-    //__syncthreads();
-    if (!(idx_spans.first.size() + idx_spans.second.size())) {
+    auto result = get_smallest_src_index_spans(source, variation_indices);
+    using enum SmallestSpans::ResultCode;
+    if (result.code == None) {
       continue;
     }
-    if (is_source_XOR_and_OR_compatible(source, xor_src_lists,
+    if ((result.code == Check)
+        && !is_source_XOR_and_OR_compatible(source, xor_src_lists,
           xor_src_list_start_indices, xor_idx_lists, xor_idx_list_start_indices,
-          xor_idx_list_sizes, num_idx_lists, idx_spans, num_or_args, or_src_list,
-          num_or_sources)) {
-      if (!threadIdx.x) {
-        // TODO: store probably not necessary
-        //store(&result, (result_t)1);
-        results[src_idx.listIndex] = 1;
-      }
+          xor_idx_list_sizes, num_idx_lists, result.idx_spans, num_or_args,
+          or_src_list, num_or_sources)) {
+      continue;
+    }
+    // result.code is All, or Check and compatibilty check succeeded
+    if (!threadIdx.x) {
+      results[src_idx.listIndex] = 1;
     }
   }
 }
@@ -441,7 +449,6 @@ __device__ bool is_source_XOR_compatible_with_any(
   return false;
 }
 
-// TODO: syncthreads required?
 __global__ void mark_or_sources_kernel(
   const SourceCompatibilityData* __restrict__ xor_src_lists,
   const index_t* __restrict__ xor_src_list_start_indices,
@@ -454,19 +461,23 @@ __global__ void mark_or_sources_kernel(
   const unsigned num_or_sources, result_t* __restrict__ results) {
   // for each or_source (one block per source)
   for (unsigned idx{blockIdx.x}; idx < num_or_sources; idx += gridDim.x) {
-    const auto& or_source = or_src_list[idx];
-    auto& result = results[idx];
-    auto idx_spans =
-      get_smallest_src_index_spans(or_source.src, variation_indices);
     __syncthreads();
-    if (idx_spans.first.size() + idx_spans.second.size()) {
-      if (is_source_XOR_compatible_with_any(or_source.src, idx_spans,
-            xor_src_lists, xor_src_list_start_indices, xor_idx_lists,
-            xor_idx_list_start_indices, xor_idx_list_sizes, num_idx_lists)) {
-        if (!threadIdx.x) {
-          result = 1;
-        }
-      }
+    const auto& or_source = or_src_list[idx];
+    auto result =
+      get_smallest_src_index_spans(or_source.src, variation_indices);
+    using enum SmallestSpans::ResultCode;
+    if (result.code == None) {
+      continue;
+    }
+    if ((result.code == Check)
+        && !is_source_XOR_compatible_with_any(or_source.src, result.idx_spans,
+          xor_src_lists, xor_src_list_start_indices, xor_idx_lists,
+          xor_idx_list_start_indices, xor_idx_list_sizes, num_idx_lists)) {
+      continue;
+    }
+    // result.code is All, or Check and compatibilty check succeeded
+    if (!threadIdx.x) {
+      results[idx] = 1;
     }
   }
 }

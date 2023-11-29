@@ -12,6 +12,7 @@
 #include "clue-manager.h"
 #include "cm-precompute.h"
 #include "merge.h"
+#include "log.h"
 
 namespace cm {
 
@@ -162,18 +163,18 @@ auto count_or_sources(const OrArgList& or_arg_list) {
 
 auto buildOrArgList(std::vector<SourceList>&& or_src_list) -> OrArgList {
   using namespace std::chrono;
-  
   OrArgList or_arg_list;
   auto t0 = high_resolution_clock::now();
   for (auto& src_list : or_src_list) {
     or_arg_list.emplace_back(buildOrArg(src_list));
   }
-  auto t1 = high_resolution_clock::now();
-  [[maybe_unused]] auto t_dur = duration_cast<milliseconds>(t1 - t0).count();
-  std::cerr << "  buildOrArgList args(" << or_arg_list.size() << ")"
-            << ", sources(" << count_or_sources(or_arg_list) << ") - "
-            << t_dur << "ms" << std::endl;
-
+  if (log_level(Verbose)) {
+    auto t1 = high_resolution_clock::now();
+    [[maybe_unused]] auto t_dur = duration_cast<milliseconds>(t1 - t0).count();
+    std::cerr << "  buildOrArgList args(" << or_arg_list.size() << ")"
+              << ", sources(" << count_or_sources(or_arg_list) << ") - "
+              << t_dur << "ms" << std::endl;
+  }
   return or_arg_list;
 }
 
@@ -247,7 +248,7 @@ auto buildSentenceVariationIndices(const std::vector<SourceList>& xor_src_lists,
   const ComboIndexList& compat_indices) -> SentenceVariationIndices {
   //
   SentenceVariationIndices sentenceVariationIndices;
-  for (size_t i = 0; i < compat_indices.size(); ++i) {
+  for (size_t i{}; i < compat_indices.size(); ++i) {
     std::array<int, kNumSentences> variations = {
       -1, -1, -1, -1, -1, -1, -1, -1, -1};
     every_combo_idx(compat_indices.at(i), compat_idx_lists,
@@ -256,12 +257,13 @@ auto buildSentenceVariationIndices(const std::vector<SourceList>& xor_src_lists,
           xor_src_lists.at(list_idx).at(src_idx).primaryNameSrcList) {
           using namespace Source;
           assert(isCandidate(nc.count));
-          auto sentence = getSentence(nc.count) - 1;
-          auto variation = getVariation(nc.count);
-          // sanity check
-          assert((variations.at(sentence) < 0)
-                 || (variations.at(sentence) == variation));
-          variations.at(sentence) = variation;
+          auto nc_variation = getVariation(nc.count);
+          if (auto& variation = variations.at(getSentence(nc.count) - 1);
+              variation < 0) {
+            variation = nc_variation;
+          } else {
+            assert(variation == nc_variation);
+          }
         }
         return true;
       });
@@ -274,18 +276,12 @@ auto buildSentenceVariationIndices(const std::vector<SourceList>& xor_src_lists,
       variationIndicesList.at(variation_idx).push_back(compat_indices.at(i));
     }
   }
-  // Some sentences may contain no variations across all xorSources.
-  // At least, this is true in the current case when not all sentences use
-  // variations. TODO: TBD if this is still true after all sentences have
-  // been converted to use variations.
-  // Until that time, destroy the variationIndicesLists for those sentences
-  // with no variations, since these lists only contain a single element (0)
-  // representing the "-1" variation that contains all indices.
-  // It's redundant/unnecessary data and it's cleaner to be able to just test
-  // if a variationIndicesList is empty.
-  // Depending on resolution of TBD above, the "empty" check may eventually
-  // become redundant/unnecessary.
-  // for (auto& variationIndicesList : sentenceVariationIndices) {
+  // When the list of xor_sources is very small, there may be no xor_source
+  // that contain a primary source from one or more sentences. Destroy the
+  // variationIndicesLists for those sentences with no variations, since they
+  // only contain a single element (index 0) representing the "-1" or "no"
+  // variation, that contains all indices. It's redundant and unnecessary data.
+  // TODO: for (auto& variationIndicesList : sentenceVariationIndices) {
   std::for_each(sentenceVariationIndices.begin(),
     sentenceVariationIndices.end(), [](auto& variationIndicesList) {
       if (variationIndicesList.size() == 1) {

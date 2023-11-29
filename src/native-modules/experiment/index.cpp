@@ -539,10 +539,12 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   MFD.host.xor_src_lists =
     std::move(buildSourceListsForUseNcData(ncDataLists));
 
-  auto build1 = high_resolution_clock::now();
-  [[maybe_unused]] auto d_build =
-    duration_cast<milliseconds>(build1 - build0).count();
-  std::cerr << " build xor_src_lists - " << d_build << "ms" << std::endl;
+  if (log_level(Verbose)) {
+    auto build1 = high_resolution_clock::now();
+    [[maybe_unused]] auto d_build =
+      duration_cast<milliseconds>(build1 - build0).count();
+    std::cerr << " build xor_src_lists - " << d_build << "ms" << std::endl;
+  }
 
 #if 0
   for (const auto& src_list: MFD.host.xor_src_lists) {
@@ -645,12 +647,13 @@ void set_or_args(const std::vector<NCDataList>& ncDataLists) {
         move_marked_or_sources(MFD.device.or_src_list, mark_results);
     }
   }
-  auto build1 = high_resolution_clock::now();
-  [[maybe_unused]] auto d_build =
-    duration_cast<milliseconds>(build1 - build0).count();
-  std::cerr << " build/mark or_args(" << MFD.host.or_arg_list.size() << ")"
-            << ", or_sources(" << MFD.device.num_or_sources << ") - " << d_build
-            << "ms" << std::endl;
+  if (log_level(Verbose)) {
+    auto build1 = high_resolution_clock::now();
+    auto d_build = duration_cast<milliseconds>(build1 - build0).count();
+    std::cerr << " build/mark or_args(" << MFD.host.or_arg_list.size() << ")"
+              << ", or_sources(" << MFD.device.num_or_sources << ") - "
+              << d_build << "ms" << std::endl;
+  }
 }
 
 void alloc_copy_filter_indices() {
@@ -669,9 +672,11 @@ void alloc_copy_filter_indices() {
   MFD.device.variation_indices =
     cuda_allocCopySentenceVariationIndices(variation_indices);
 
-  auto t1 = high_resolution_clock::now();
-  auto t_dur = duration_cast<milliseconds>(t1 - t0).count();
-  std::cerr << " prepare filter indices - " << t_dur << "ms" << std::endl;
+  if (log_level(Verbose)) {
+    auto t1 = high_resolution_clock::now();
+    auto t_dur = duration_cast<milliseconds>(t1 - t0).count();
+    std::cerr << " prepare filter indices - " << t_dur << "ms" << std::endl;
+  }
 }
 
 //
@@ -744,8 +749,6 @@ void set_incompatible_sources(
   MFD.device.incompatible_src_desc_pairs =
     cuda_alloc_copy_source_desc_pairs(MFD.host.incompatible_src_desc_pairs);
   MFD.device.num_incompatible_sources = incompatible_sources.size();
-  std::cerr << " incompatible sources: " << incompatible_sources.size()
-            << std::endl;
 }
 
 Value filterCandidatesForSum(const CallbackInfo& info) {

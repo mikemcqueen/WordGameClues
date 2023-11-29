@@ -7,6 +7,8 @@
 #include "merge-filter-data.h"
 #include "peco.h"
 #include "util.h"
+#include "cuda-types.h"
+#include "log.h"
 
 namespace {
 
@@ -68,10 +70,11 @@ bool filterAllXorIncompatibleIndices(Peco::IndexListVector& idx_lists,
       }
     }
   }
-  auto t1 = high_resolution_clock::now();
-  auto t_dur = duration_cast<milliseconds>(t1 - t0).count();
-  std::cerr << "  filter incompatible - " << t_dur << "ms" << std::endl;
-
+  if (log_level(Verbose)) {
+    auto t1 = high_resolution_clock::now();
+    auto t_dur = duration_cast<milliseconds>(t1 - t0).count();
+    std::cerr << "  filter incompatible - " << t_dur << "ms" << std::endl;
+  }
   return true;
 }
 
@@ -342,31 +345,29 @@ auto run_get_compat_combos_task(const result_t* device_compat_matrices,
                 << first_combo << ", " << first_combo + num_combos << "]"
                 << std::endl;
     }
-    auto gcc0 = high_resolution_clock::now();
 
+    CudaEvent gcc_start;
     run_get_compat_combos_kernel(first_combo, num_combos,
       device_compat_matrices, num_compat_matrices,
       device_compat_matrix_start_indices, device_idx_list_sizes,
       device_results);
 
-    // sync is only necessary for accurate timing
-    cudaStreamSynchronize(cudaStreamPerThread);
-    auto gcc1 = high_resolution_clock::now();
-    auto gcc_dur = duration_cast<milliseconds>(gcc1 - gcc0).count();
-    if constexpr (logging) {
-      std::cerr << " completed get_compat_combos_kernel " << n << " - "
-                << gcc_dur << "ms" << std::endl;
+    if (log_level(Verbose)) {
+      CudaEvent gcc_stop;
+      auto gcc_elapsed = gcc_stop.synchronize(gcc_start);
+        std::cerr << " completed get_compat_combos_kernel " << n << " - "
+                  << gcc_elapsed << "ms" << std::endl;
     }
-    auto cpr0 = high_resolution_clock::now();
 
+    auto cpr0 = high_resolution_clock::now();
     sync_copy_results(
       host_results, num_combos, device_results, cudaStreamPerThread);
     auto num_hits =
       process_results(host_results, first_combo, num_combos, result_indices);
 
-    auto cpr1 = high_resolution_clock::now();
-    auto cpr_dur = duration_cast<milliseconds>(cpr1 - cpr0).count();
     if constexpr (logging) {
+      auto cpr1 = high_resolution_clock::now();
+      auto cpr_dur = duration_cast<milliseconds>(cpr1 - cpr0).count();
       std::cerr << " copy/process results, hits: " << num_hits << " - "
                 << cpr_dur << "ms" << std::endl;
     }
@@ -444,7 +445,7 @@ auto cuda_get_compat_xor_src_indices(const std::vector<SourceList>& src_lists,
               << t_dur << "ms" << std::endl;
   }
 
-  auto lp0 = high_resolution_clock::now();
+  CudaEvent lp_start;
   //  run list_pair_compat kernels
   //  the only unnecessary capture here is src_lists
   for_each_list_pair(idx_lists, [&](size_t i, size_t j, size_t n) {
@@ -461,13 +462,9 @@ auto cuda_get_compat_xor_src_indices(const std::vector<SourceList>& src_lists,
       idx_lists.at(j).size(),
       &device_compat_matrices[compat_matrix_start_indices.at(n)]);
   });
-
   if constexpr (0) {
-    // sync if we want accurate timing
-    auto err = cudaStreamSynchronize(cudaStreamPerThread);
-    assert(err == cudaSuccess);
-    auto lp1 = high_resolution_clock::now();
-    auto lp_dur = duration_cast<milliseconds>(lp1 - lp0).count();
+    CudaEvent lp_stop;
+    auto lp_dur = lp_start.synchronize(lp_start);
     std::cerr << "  list_pair_compat_kernels complete - " << lp_dur << "ms"
               << std::endl;
   }
@@ -484,20 +481,17 @@ auto cuda_get_compat_xor_src_indices(const std::vector<SourceList>& src_lists,
   });
   const uint64_t max_combos{
     util::multiply_with_overflow_check(util::make_list_sizes(idx_lists))};
-  auto gcc0 = high_resolution_clock::now();
-
   // run get_compat_combos kernels
   auto combo_indices = run_get_compat_combos_task(device_compat_matrices,
     idx_lists.size(), device_compat_matrix_start_indices, device_idx_list_sizes,
     max_combos);  // clang-format
 
-  auto t1 = high_resolution_clock::now();
-  auto gcc_dur = duration_cast<milliseconds>(t1 - gcc0).count();
-  std::cerr << "  get_compat_combos kernels complete (" << combo_indices.size()
-            << ") - " << gcc_dur << "ms" << std::endl;
-  auto t_dur = duration_cast<milliseconds>(t1 - t0).count();
-  std::cerr << " cuda_get_compat_xor_src_indices - " << t_dur << "ms"
-            << std::endl;
+  if (log_level(Verbose)) {
+    auto t1 = high_resolution_clock::now();
+    auto t_dur = duration_cast<milliseconds>(t1 - t0).count();
+    std::cerr << " cuda_get_compat_xor_src_indices - " << t_dur << "ms"
+              << std::endl;
+  }
 
 #if defined(HOST_SIDE_COMPARISON)
   // host-side compat combo counter for debugging/comparison. slow.
@@ -519,18 +513,22 @@ auto get_compatible_indices(const std::vector<SourceList>& src_lists)
   for (const auto& sl : src_lists) {
     lengths.push_back(sl.size());
   }
-  std::cerr << "  initial lengths: " << util::vec_to_string(lengths)
-            << ", product: " << util::multiply_with_overflow_check(lengths)
-            << std::endl;
+  if (log_level(Verbose)) {
+    std::cerr << "  initial lengths: " << util::vec_to_string(lengths)
+              << ", product: " << util::multiply_with_overflow_check(lengths)
+              << std::endl;
+  }
   auto idx_lists = Peco::initial_indices(lengths);
   bool valid = filterAllXorIncompatibleIndices(idx_lists, src_lists);
   lengths.clear();
   for (const auto& il : idx_lists) {
     lengths.push_back(std::distance(il.begin(), il.end()));
   }
-  std::cerr << "  filtered lengths: " << util::vec_to_string(lengths)
-            << ", product: " << util::multiply_with_overflow_check(lengths)
-            << ", valid: " << std::boolalpha << valid << std::endl;
+  if (log_level(Verbose)) {
+    std::cerr << "  filtered lengths: " << util::vec_to_string(lengths)
+              << ", product: " << util::multiply_with_overflow_check(lengths)
+              << ", valid: " << std::boolalpha << valid << std::endl;
+  }
   // "valid" means all resulting index lists have non-zero length
   if (!valid) {
     return {};
@@ -545,17 +543,20 @@ auto merge_xor_sources(const std::vector<SourceList>& src_lists,
   using namespace std::chrono;
   XorSourceList xorSourceList;
 
-  std::cerr << "  starting merge_xor_sources..." << std::endl;
+  if (log_level(Verbose)) {
+    std::cerr << "  starting merge_xor_sources..." << std::endl;
+  }
   auto hm0 = high_resolution_clock::now();
   for (auto combo_idx : combo_indices) {
     auto src_indices = get_src_indices(combo_idx, idx_lists);
     xorSourceList.emplace_back(merge_sources(src_indices, src_lists));
   }
-  auto hm1 = high_resolution_clock::now();
-  auto hm_dur = duration_cast<milliseconds>(hm1 - hm0).count();
-  std::cerr << "  merge_xor_sources complete (" << xorSourceList.size()
-            << ") - " << hm_dur << "ms" << std::endl;
-
+  if (log_level(Verbose)) {
+    auto hm1 = high_resolution_clock::now();
+    auto hm_dur = duration_cast<milliseconds>(hm1 - hm0).count();
+    std::cerr << "  merge_xor_sources complete (" << xorSourceList.size()
+              << ") - " << hm_dur << "ms" << std::endl;
+  }
   return xorSourceList;
 }
 
@@ -565,16 +566,13 @@ SourceCompatibilityData* alloc_copy_src_lists(
   const cudaStream_t stream = cudaStreamPerThread;
   const auto num_sources = util::sum_sizes(src_lists);
   const auto sources_bytes = num_sources * sizeof(SourceCompatibilityData);
-  std::cerr << "  allocating device_sources (" << sources_bytes << " bytes)"
-            << std::endl;
   SourceCompatibilityData* device_sources;
   auto err = cudaMallocAsync((void**)&device_sources, sources_bytes, stream);
-  std::cerr << "  allocate complete" << std::endl;
   assert_cuda_success(err, "merge alloc sources");
   // copy sources
   std::vector<SourceCompatibilityData> src_compat_list;
   src_compat_list.reserve(num_sources);
-  std::cerr << "  building src_compat_lists..." << std::endl;
+  //std::cerr << "  building src_compat_lists..." << std::endl;
   for (const auto& src_list : src_lists) {
     // this is somewhat braindead.perhaps I could only marshal the
     // SourceCompatibiltyData when passed from JavaScript? since I
@@ -585,7 +583,7 @@ SourceCompatibilityData* alloc_copy_src_lists(
     // pnsl/ncList from SourceCompatibilityData.
     add_compat_sources(src_compat_list, src_list);
   }
-  std::cerr << "  copying src_compat_lists..." << std::endl;
+  //std::cerr << "  copying src_compat_lists..." << std::endl;
   err = cudaMemcpyAsync(device_sources, src_compat_list.data(), sources_bytes,
     cudaMemcpyHostToDevice, stream);
   assert_cuda_success(err, "merge copy sources");
