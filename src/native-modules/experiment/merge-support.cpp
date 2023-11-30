@@ -130,14 +130,14 @@ auto alloc_results(size_t num_results) {  // TODO cudaStream_t stream) {
 void sync_copy_results(std::vector<result_t>& results, unsigned num_results,
   result_t* device_results, cudaStream_t stream) {
   //
-  cudaError_t err = cudaStreamSynchronize(stream);
-  assert_cuda_success(err, "merge copy results pre-sync");
+  CudaEvent temp1;
+  temp1.synchronize();
   auto results_bytes = num_results * sizeof(result_t);
-  err = cudaMemcpyAsync(results.data(), device_results, results_bytes,
+  cudaError_t err = cudaMemcpyAsync(results.data(), device_results, results_bytes,
     cudaMemcpyDeviceToHost, stream);
-  assert_cuda_success(err, "merge copy results");
-  err = cudaStreamSynchronize(stream);
-  assert_cuda_success(err, "merge copy results post-sync");
+  assert_cuda_success(err, "copy merge results");
+  CudaEvent temp2;
+  temp2.synchronize();
 }
 
 void add_compat_sources(
@@ -209,7 +209,8 @@ void debug_copy_show_compat_matrix_hit_count(
   auto err = cudaMemcpyAsync(results.data(), device_compat_matrices, num_bytes,
     cudaMemcpyDeviceToHost, stream);
   assert_cuda_success(err, "copy compat matrices");
-  cudaStreamSynchronize(stream);
+  CudaEvent temp;
+  temp.synchronize();
   uint64_t num_compat{};
   for (auto result: results) {
     if (result) {
@@ -438,7 +439,7 @@ auto cuda_get_compat_xor_src_indices(const std::vector<SourceList>& src_lists,
   if constexpr (0) {
     // sync if we want accurate timing
     auto err = cudaStreamSynchronize(cudaStreamPerThread);
-    assert(err == cudaSuccess);
+    assert_cuda_success(err, "cudaStreamSynchronize");
     auto t1 = high_resolution_clock::now();
     auto t_dur = duration_cast<milliseconds>(t1 - t0).count();
     std::cerr << "  alloc/copy complete, allocated: " << num_bytes << " - "
@@ -482,11 +483,14 @@ auto cuda_get_compat_xor_src_indices(const std::vector<SourceList>& src_lists,
   const uint64_t max_combos{
     util::multiply_with_overflow_check(util::make_list_sizes(idx_lists))};
   // run get_compat_combos kernels
+  CudaEvent gcc_start;
   auto combo_indices = run_get_compat_combos_task(device_compat_matrices,
     idx_lists.size(), device_compat_matrix_start_indices, device_idx_list_sizes,
     max_combos);  // clang-format
 
-  if (log_level(Verbose)) {
+  if (log_level(ExtraVerbose)) {
+    CudaEvent gcc_stop;
+    gcc_stop.synchronize(gcc_start);
     auto t1 = high_resolution_clock::now();
     auto t_dur = duration_cast<milliseconds>(t1 - t0).count();
     std::cerr << " cuda_get_compat_xor_src_indices - " << t_dur << "ms"
@@ -587,6 +591,8 @@ SourceCompatibilityData* alloc_copy_src_lists(
   err = cudaMemcpyAsync(device_sources, src_compat_list.data(), sources_bytes,
     cudaMemcpyHostToDevice, stream);
   assert_cuda_success(err, "merge copy sources");
+  CudaEvent temp;
+  temp.synchronize();
   if (num_bytes) {
     *num_bytes = sources_bytes;
   }
@@ -610,6 +616,8 @@ index_t* alloc_copy_idx_lists(
     assert_cuda_success(err, "merge copy idx list");
     index += idx_list.size();
   }
+  CudaEvent temp;
+  temp.synchronize();
   if (num_bytes) {
     *num_bytes = indices_bytes;
   }
@@ -629,6 +637,8 @@ index_t* alloc_copy_list_sizes(
   err = cudaMemcpyAsync(device_list_sizes, list_sizes.data(), list_sizes_bytes,
     cudaMemcpyHostToDevice, stream);
   assert_cuda_success(err, "copy list sizes");
+  CudaEvent temp;
+  temp.synchronize();
   if (num_bytes) {
     *num_bytes = list_sizes_bytes;
   }

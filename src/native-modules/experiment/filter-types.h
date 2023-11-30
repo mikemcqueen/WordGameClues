@@ -317,7 +317,7 @@ public:
   cudaStream_t cuda_stream{};
   CudaEvent kernel_start;
   CudaEvent kernel_stop;
-  std::chrono::milliseconds::rep fill_duration{};
+  std::chrono::microseconds::rep fill_duration{};
 
   int sequence_num{};
   bool is_running{false};  // is running (true until results retrieved)

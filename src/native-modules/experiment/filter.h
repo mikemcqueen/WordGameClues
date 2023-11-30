@@ -49,7 +49,7 @@ void run_mark_or_sources_kernel(
 */
 
 [[nodiscard]] UsedSources::SourceDescriptorPair*
-cuda_alloc_copy_source_desc_pairs(
+cuda_alloc_copy_source_descriptor_pairs(
   const std::vector<UsedSources::SourceDescriptorPair>& src_desc_pairs);
 
 [[nodiscard]] SourceCompatibilityData* cuda_alloc_copy_sources(

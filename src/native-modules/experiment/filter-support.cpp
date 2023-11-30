@@ -64,10 +64,9 @@ void cuda_copy_results(std::vector<T>& results, T* device_results,
   err = cudaMemcpyAsync(results.data(), device_results, results_bytes,
     cudaMemcpyDeviceToHost, stream);
   assert_cuda_success(err, "copy results memcpy");
-  // TODO: this is probably wrong. add a stop event, sync event.
   // sync the memcpy
-  err = cudaStreamSynchronize(stream);
-  assert_cuda_success(err, "copyresults sync memcpy");
+  CudaEvent temp;
+  temp.synchronize();
 }
 
 template <typename T = result_t>
@@ -144,13 +143,13 @@ int run_xor_filter_task(int sum, StreamSwarm& streams, int threads_per_block,
         continue;
       }
       auto f1 = high_resolution_clock::now();
-      stream.fill_duration = duration_cast<milliseconds>(f1 - f0).count();
+      stream.fill_duration = duration_cast<microseconds>(f1 - f0).count();
       if (log_level(Ludicrous)) {
-        auto f_dur = duration_cast<milliseconds>(f1 - f0).count();
         std::cerr << " " << sum << ": stream " << stream.stream_idx
                   << " source_indices: " << stream.source_indices.size()
                   << ", ready: " << stream.num_ready(idx_states)
-                  << ", filled in " << f_dur << "ms" << std::endl;
+                  << ", filled in " << stream.fill_duration << "us"
+                  << std::endl;
       }
       //stream.copy_sources_start.record();
       stream.allocCopy(idx_states);
@@ -169,11 +168,11 @@ int run_xor_filter_task(int sum, StreamSwarm& streams, int threads_per_block,
     if (log_level(ExtraVerbose)) {
       auto kernel_duration =
         stream.kernel_stop.synchronize(stream.kernel_start);
-      auto total_duration = stream.fill_duration + kernel_duration;
+      //auto total_duration = stream.fill_duration + kernel_duration;
       std::cerr << " " << sum << ": stream " << stream.stream_idx
                 << ", fill: " << stream.fill_duration
-                << "ms, kernel: " << kernel_duration
-                << "ms, total: " << total_duration << "ms" << std::endl;
+                << "us, kernel: " << kernel_duration << "ms" << std::endl;
+      //        << "ms, total: " << total_duration 
     }
     if (log_level(Ludicrous)) {
       auto num_actual_compat = std::accumulate(results.begin(), results.end(),
@@ -242,7 +241,7 @@ filter_task_result_t xor_filter_task(const MergeFilterData& mfd,
   // err = cudaDeviceSetLimit(cudaLimitPrintfFifoSize, 7'500'000);
 
   num_streams = num_streams ? num_streams : 3;
-  stride = stride ? stride : 1024;
+  stride = stride ? stride : candidates.size();
   iters = iters ? iters : 1;
 
   //auto i0 = high_resolution_clock::now();
@@ -254,7 +253,7 @@ filter_task_result_t xor_filter_task(const MergeFilterData& mfd,
   scope_exit free_results{[device_results]() { cuda_free(device_results); }};
 
   // TODO: num_streams should be min'd here too
-  stride = std::min((int)candidates.size(), stride);
+  //  stride = std::min((int)candidates.size(), stride);
   StreamSwarm streams(num_streams, stride);
   std::vector<result_t> results(candidates.size());
   cuda_zero_results(device_results, results.size());
@@ -479,53 +478,8 @@ unsigned move_marked_or_sources(device::OrSourceData* device_or_src_list,
   return dst_idx;
 }
 
-  /*
-[[nodiscard]] SourceCompatibilityData* cuda_allocCopyXorSources(
-  const XorSourceList& xorSourceList) {
-  //
-  auto xorsrc_bytes = xorSourceList.size() * sizeof(SourceCompatibilityData);
-  SourceCompatibilityData* device_xorSources = nullptr;
-  cudaError_t err = cudaMallocAsync(
-    (void**)&device_xorSources, xorsrc_bytes, cudaStreamPerThread);
-  if (err != cudaSuccess) {
-    fprintf(stderr, "Failed to allocate device xorSources, error: %s\n",
-      cudaGetErrorString(err));
-    assert(!"failed to allocate device xorSources");
-  }
-  auto compat_sources = makeCompatibleSources(xorSourceList);
-  err = cudaMemcpyAsync(device_xorSources, compat_sources.data(),
-    xorsrc_bytes, cudaMemcpyHostToDevice, cudaStreamPerThread);
-  if (err != cudaSuccess) {
-    fprintf(
-      stderr, "copy xorSource to device, error: %s\n", cudaGetErrorString(err));
-    assert(!"failed to copy xorSource to device");
-  }
-  return device_xorSources;
-}
-  */
-
-  /*
-// this is dumb.  blast all sources in one memcpy
-[[nodiscard]] SourceCompatibilityData* cuda_alloc_copy_sources(
-  const SourceCompatibilitySet& sources) {
-  //
-  auto sources_bytes = sources.size() * sizeof(SourceCompatibilityData);
-  SourceCompatibilityData* device_sources = nullptr;
-  cudaError_t err = cudaMallocAsync(
-    (void**)&device_sources, sources_bytes, cudaStreamPerThread);
-  assert_cuda_success(err, "alloc sources");
-  for (int idx{}; const auto& src : sources) {
-    err = cudaMemcpyAsync(&device_sources[idx++], &src,
-      sizeof(SourceCompatibilityData), cudaMemcpyHostToDevice,
-      cudaStreamPerThread);
-    assert_cuda_success(err, "copy source");
-  }
-  return device_sources;
-}
-  */
-
 [[nodiscard]] UsedSources::SourceDescriptorPair*
-cuda_alloc_copy_source_desc_pairs(
+cuda_alloc_copy_source_descriptor_pairs(
   const std::vector<UsedSources::SourceDescriptorPair>& src_desc_pairs) {
   //
   auto pairs_bytes =
@@ -534,11 +488,9 @@ cuda_alloc_copy_source_desc_pairs(
   cudaError_t err = cudaMallocAsync(
     (void**)&device_src_desc_pairs, pairs_bytes, cudaStreamPerThread);
   assert_cuda_success(err, "alloc src_desc_pairs");
-  //  for (int idx{}; const auto& src_desc_pair : src_desc_pairs) {
   err = cudaMemcpyAsync(device_src_desc_pairs, src_desc_pairs.data(),
     pairs_bytes, cudaMemcpyHostToDevice, cudaStreamPerThread);
   assert_cuda_success(err, "copy src_desc_pairs");
-  //  }
   return device_src_desc_pairs;
 }
 
@@ -566,10 +518,6 @@ cuda_allocCopyOrSources(const OrArgList& orArgList) {
   err = cudaMemcpyAsync(device_or_src_list, or_src_list.data(), or_src_bytes,
     cudaMemcpyHostToDevice, cudaStreamPerThread);
   assert_cuda_success(err, "copy or_sources");
-  // TODO: need to store or_src_list in MFD or something for async copy lifetime
-  err = cudaStreamSynchronize(cudaStreamPerThread);
-  assert_cuda_success(err, "sync or_sources");
-
   return std::make_pair(device_or_src_list, or_src_list.size());
 }
 
@@ -643,8 +591,8 @@ cuda_allocCopyOrSources(const OrArgList& orArgList) {
   // TODO: be nice to get rid of this
   // just to be sure, due to lifetime problems of local host-side memory
   // solution: cram stuff into MFD
-  err = cudaStreamSynchronize(cudaStreamPerThread);
-  assert_cuda_success(err, "variation indices post-sync");
+  CudaEvent temp;
+  temp.synchronize();
   return device_variation_indices;
 }
 

@@ -1,3 +1,7 @@
+* I should maybe think about how to introduce an "ignore" letter into a combination
+  specifically for sentence 7, if i could just ignore [s] or make (s) optional or
+  something.
+
 * fix lifetime issue requiring sync in cuda_allocCopySentenceVariationIndices()
   * store in MFD.
 

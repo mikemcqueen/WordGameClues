@@ -747,7 +747,7 @@ void set_incompatible_sources(
   MFD.host.incompatible_src_desc_pairs =
     std::move(make_source_descriptor_pairs(incompatible_sources));
   MFD.device.incompatible_src_desc_pairs =
-    cuda_alloc_copy_source_desc_pairs(MFD.host.incompatible_src_desc_pairs);
+    cuda_alloc_copy_source_descriptor_pairs(MFD.host.incompatible_src_desc_pairs);
   MFD.device.num_incompatible_sources = incompatible_sources.size();
 }
 
