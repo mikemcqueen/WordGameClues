@@ -1,3 +1,59 @@
+++PERF
+
+* elimination of event sync'ing by storing of host-side data in MFD during copies.
+  * deletion of appropriate host data after launch of associated kernel.
+  * maybe a "host.merge" and "host.filter" section of MFD, though that may not
+    be granular enough. may need a section for every kernel?
+
+* move remaining combo-maker TS code to C++.
+
+* spawn a thread to do "synchronous" sum=2, but acquire a binary semaphore to
+  prevent the next sum from executing until all the data from 2 is packed into MFD.
+
+* potentially hairy: see if it's possible to process sources in chunks, such that
+  device-data requirements are restricted to some threshold such as 1GB, for sums
+  that have lots of sources (such as 19, 20 currently, but this may become a much
+  more common problem.)
+  * may also want to look at MemPool stuff so I have a bit more control over memory
+    and can eliminate the possibility of managed memory being silently allocated.
+  * this may also involve a way to accurately compute the total amount of device
+    memory used, so I can determine how many "chunks" can run. maybe a chunk is
+    100-256MB or something.
+  * may also want to do more work to ensure device memory really is all in one
+    flat chunk of contiguous memory, rather than a small chunk for indexes, a
+    small chunk for sizes, etc. so that "free memory" accurately reflects the
+    kind of contiguous chunks that can be loaded. or maybe i can just rely on
+    memalloc failing, at least as a first pass, assuming that i can stop managed
+    memory from being silently allocated.
+  * ultimately i think i'm looking for an abstraction here, that contains the
+    host-memory, and "contiains" (or points to) the device memory, for each
+    kernel. it can know the total amount of device memory required, take care of
+    freeing host (and device if appropriate) memory after launch, etc.
+
+* another possible solution to device-side memory as # of combinations increases,
+  is to find out what kind of reduction we'd see if sources were pre-processed
+  such that any two sources that have the same source bits and differ only by
+  variations, are linked, and only the variation change(s), at 32bits each
+  (sentence:16,variation:16) are tagged on to the source. currently a source
+  is 9*4 (bits) + 9*2 (variation) = 54 bytes. this would reduce nearly-matching
+  sources to (as low as) 6 bytes (incuding 2 bytes for # of different sentence/
+  varation pairs). i'm using 2bytes for pair count and sentence index because of
+  what I assume is an alignment requirement.
+  * could write a kernel to assess the potential savings achievable here, by
+    comparing every source (bits) to each other and storing the first bits-compatible
+    source in a 32bit output-word.
+  * ultimately this would have to be done host-side though, right? because, device
+    memory. so maybe just write it host-side. if there's a real benefit, maybe
+    consider_candidate() could add to a queue and be processed by a thread(pool)
+    to do the check as they are inserted.
+
+* I think there's still potentially some optimization opportunity in xor_kernel by
+  shoving some of the read-only data into constant memory, if there's enough room
+  (like, source indices, list sizes, even the source descriptor, which are tiny).
+
+
+--PERF
+
 * I should maybe think about how to introduce an "ignore" letter into a combination
   specifically for sentence 7, if i could just ignore [s] or make (s) optional or
   something.
@@ -13,9 +69,6 @@
   compound clues like 19,20 shouldn't really be relevant for the "important" work.
   but I still need to make sure I can load those in at runtime to build XorSources
   (which I am currently doing anyway, up to 20).
-
-* spawn a thread to do "synchronous" sum=2, but acquire a binary semaphore to
-  prevent the next sum from executing until all the data from 2 is packed into MFD.
 
 * think about if there is some way to specify an "old combinations" string in a
   sentence.json file, and maintain the corresponding compound clues that use that
@@ -35,10 +88,6 @@
 * sync on an event whenever i get kernel results. like.. in cuda_copy_results?
   and elsewhere maybe
 
-* I think there's still potentially some optimization opportunity in xor_kernel by
-  shoving some of the read-only data into constant memory, if there's enough room
-  (like, source indices, list sizes, even the source descriptor, which are tiny).
-
 * kernel timing from @nightchild:
   also nvidia-smi -i 0 -pm 1 will give more reproduce-able results cause it will 
   force a fixed clock
@@ -55,9 +104,6 @@
   slowdown. "shared" GPU memory usage is increasing as dedicated GPU memory appears
   to be capped. driver magic? probably want to consider only running ~5 or so tasks
   simultaneously.
-* memory is getting tight with -c2,20. see if i can free some stuff up, like from
-  merge, that I don't need anymore. or temporary stuff in filter. add some more
-  exit_scopes.
 
 * -t braves,ace ?
   
@@ -72,6 +118,9 @@
 
 * shouldn't I be using a uint64_t for combo_idx in filter kernel? maybe not? look at
   what these things are host-side and how/where I am copying them to device_side.
+  * the problem is that i am using "combo_idx" to mean different things depending on
+    the context. in at least one function, i use both "compat_idx" and "combo_idx"
+    to refer to the same thing.
 
 * i should probably document and/or name and/or encapsulate some of the clue-manager
   global data into classes to help me remember what is what and what goes where. its
@@ -115,16 +164,11 @@
   (but probably shouldn't even be called)
   what about --or with no --xor? bet that's fun. probably should fail (or fix).
 
-* incompatible_sources: could be CRefs?
-
 * can i sort sources within each device_sources list, in order of the smallest
   xor_sources IndexSpanPair they will test against? like, could I store
   candidates in an ordered set, with a test for the smallest IndexSpanPair
   combined size in the comparator function? or, is a candidate a sourcelist
   already? or just a single source?
-
-* what does "ready: 0" mean for filter? I'm calling the filter what seems like
-  an unnecessary amount of times with ready:0 when running -c15,15 -x2
 
 * have a stream keep track of how many times it's been run, and/or a total
   count of the number of indices it's processed, then total all of them at
@@ -203,10 +247,6 @@
   necessary anymore.
 
 * NCData/List -> NcListContainer
-
-* eventually bits per sentence could be based on max sources per sentence
-  (uniqueNameCount) and usedSources bitset size is the sum, rather than
-  being a fixed size (128*9)
 
 * do i need a new variation category, "prefixes", for which we also do
   a syn/hom lookup in post-process? e.g. cogburn -> cog -> tooth.
