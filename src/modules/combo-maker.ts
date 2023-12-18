@@ -333,19 +333,12 @@ export const makeCombos = (args: any): any => {
             const comboList = Native.getResult();
             total += comboList.length;
             ClueManager.filter(comboList, 0, totals);
-        }
-        let d = new Duration(begin, new Date()).milliseconds;
-        console.error(`--combos, total(${total}), known(${totals.known})` +
-            `, reject(${totals.reject}), dupes(${totals.duplicate})` +
-            ` - ${PrettyMs(d)}`);
-        if (1) {
-            /*
-            const isany: PerfData = Native.getIsAnyPerfData();
-            console.error(`isAny: calls(${isany.calls})` +
-                `, range_calls(${isany.range_calls}), full_range(${isany.full})` +
-                `, comps(${isany.comps}), compat(${isany.compat})` +
-                `, ss_attempt(${isany.ss_attempt}), ss_fail(${isany.ss_fail})`);
-            */
+	    let d = new Duration(begin, new Date()).milliseconds;
+            console.error(`--combos, total(${total}), known(${totals.known})` +
+                `, reject(${totals.reject}), dupes(${totals.duplicate})` +
+                ` - ${PrettyMs(d)}`);
+        } else {
+            console.error('Precompute failed.');
         }
         Debug(`total: ${total}, filtered(${_.size(totals.map)})`);
         displayCombos(Object.keys(totals.map), ClueManager.getVariations());

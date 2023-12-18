@@ -5,7 +5,7 @@
 #'-DCUDA_FORCE_CDP1_IF_SUPPORTED',
 # -lcudadevrt -lcudart
 
-ARCH := -arch sm_61
+ARCH := -arch sm_89
 
 NVCC_COMPILE_FLAGS := -Xcompiler -fPIC \
 	-Xcompiler -Wall \

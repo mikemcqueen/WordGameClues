@@ -539,12 +539,13 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   MFD.host.xor_src_lists =
     std::move(buildSourceListsForUseNcData(ncDataLists));
 
-  if (log_level(Verbose)) {
-    auto build1 = high_resolution_clock::now();
-    [[maybe_unused]] auto d_build =
-      duration_cast<milliseconds>(build1 - build0).count();
-    std::cerr << " build xor_src_lists - " << d_build << "ms" << std::endl;
-  }
+  // if (log_level(Verbose)) {
+  auto build1 = high_resolution_clock::now();
+  [[maybe_unused]] auto d_build =
+		     duration_cast<milliseconds>(build1 - build0).count();
+  std::cerr << " build xor_src_lists(" << MFD.host.xor_src_lists.size() << ") - "
+	    << d_build << "ms" << std::endl;
+  // }
 
 #if 0
   for (const auto& src_list: MFD.host.xor_src_lists) {
@@ -556,6 +557,7 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   if (!merge_only || (MFD.host.xor_src_lists.size() > 1)) {
     // TODO: support for single-list compat indices
     auto compat_idx_lists = get_compatible_indices(MFD.host.xor_src_lists);
+    std::cerr << " compat_idx_lists(" << compat_idx_lists.size() << ")" << std::endl;
     if (!compat_idx_lists.empty()) {
       // TODO: free if already set. set_src_lists?
       MFD.device.src_lists = alloc_copy_src_lists(MFD.host.xor_src_lists);

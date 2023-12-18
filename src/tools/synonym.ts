@@ -7,7 +7,7 @@
 import _ from 'lodash';
 import * as Cheerio from 'cheerio';
 import Fetch from 'node-fetch';
-import * as Synonym from '../dist/modules/synonym';
+//import * as Synonym from '../dist/modules/synonym';
 
 const Assert       = require('assert');
 const My           = require('../../modules/util');
@@ -56,6 +56,7 @@ let main = async (): Promise<void> => {
         process.exit(-1);
     } else {
         const retryDelay = 31000;
+/*
         let synList: Synonym.ListData = { list: [] };
         at.each((i, elem) => {
             const name: string = $(elem).html() || '';
@@ -65,6 +66,7 @@ let main = async (): Promise<void> => {
             //console.log(`${i}: ${$(elem).html()}`);
         });
         console.log(JSON.stringify(synList, null, 4));
+	*/
     }
 }
 

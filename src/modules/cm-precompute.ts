@@ -248,11 +248,17 @@ export const preCompute = (first: number, last: number, args: any): boolean => {
     const begin = new Date();
     // XOR first
     const xorNcDataLists = args.xor ? buildAllUseNcDataLists("xor", maxSum, args) : [ [] ];
-    if (listIsEmpty(xorNcDataLists)) return false;
+    if (listIsEmpty(xorNcDataLists)) {
+       console.error(`empty xorNcDataLists`);
+       return false;
+    }
 
     const num_indices: number = 
         Native.mergeCompatibleXorSourceCombinations(xorNcDataLists, merge_only);
-    if (args.xor && !num_indices) return false;
+    if (args.xor && !num_indices) {
+        console.error(`!num_indices`);
+        return false;
+    }
     if (merge_only) return true;
 
     // OR next
