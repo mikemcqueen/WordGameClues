@@ -17,7 +17,7 @@ export const get_all = (starting_dir: string = process.cwd(), show = false): str
         if (show) console.error(`${child_dirs[idx]}: ${solutions.toString()}`);
         all_solutions.push(...solutions);
     }
-    if (show) console.error(`all_solutions ${all_solutions.toString()}`);
+    if (show) console.error(`all_solutions: ${all_solutions.toString()}`);
     return all_solutions;
 }
 
