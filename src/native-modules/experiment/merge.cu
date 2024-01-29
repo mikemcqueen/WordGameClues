@@ -1,3 +1,4 @@
+#include <cassert>
 #include <chrono>
 #include <iostream>
 #include <cuda_runtime.h>
@@ -110,9 +111,11 @@ int run_list_pair_compat_kernel(const SourceCompatibilityData* device_sources1,
   //
   int num_sm;
   cudaDeviceGetAttribute(&num_sm, cudaDevAttrMultiProcessorCount, 0);
-  auto threads_per_sm = 2048;
+  int threads_per_sm;
+  cudaDeviceGetAttribute(&threads_per_sm, cudaDevAttrMaxThreadsPerMultiProcessor, 0);
   auto block_size = 256;
   auto blocks_per_sm = threads_per_sm / block_size;
+  assert(blocks_per_sm * block_size == threads_per_sm);
   auto grid_size = num_sm * blocks_per_sm;  // aka blocks per grid
   auto shared_bytes = 0;
 
@@ -135,9 +138,11 @@ int run_get_compat_combos_kernel(uint64_t first_combo, uint64_t num_combos,
          && "max compat matrix count exceeded (easy fix)");
   int num_sm;
   cudaDeviceGetAttribute(&num_sm, cudaDevAttrMultiProcessorCount, 0);
-  auto threads_per_sm = 2048;
+  int threads_per_sm;
+  cudaDeviceGetAttribute(&threads_per_sm, cudaDevAttrMaxThreadsPerMultiProcessor, 0);
   auto block_size = 256;
   auto blocks_per_sm = threads_per_sm / block_size;
+  assert(blocks_per_sm * block_size == threads_per_sm);
   auto grid_size = num_sm * blocks_per_sm;  // aka blocks per grid
   auto shared_bytes = 0;
 

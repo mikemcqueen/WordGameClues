@@ -13,7 +13,7 @@
   {
     'target_name': 'build_experiment',
     'product_name': 'experiment',
-    'cflags_cc': [ '-fPIC -std=c++20 -Wno-unused-function' ],
+    'cflags_cc': [ '-fPIC -std=c++20 -Wno-unused-function -O3' ],
     'cflags!': [ '-fno-exceptions' ],
     'cflags_cc!': [ '-fno-exceptions' ],
     'ldflags': [ '-Wl,-rpath,/usr/local/cuda/targets/x86_64-linux/lib' ],

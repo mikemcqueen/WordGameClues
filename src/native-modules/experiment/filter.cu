@@ -367,6 +367,7 @@ __global__ void xor_kernel_new(
   const compat_src_result_t* __restrict__ compat_src_results,
   result_t* __restrict__ results, int stream_idx) {
   // for each source (one block per source)
+  //  __shared__ SourceCompatibilityData source;
   for (unsigned idx{blockIdx.x}; idx < num_sources; idx += gridDim.x) {
     const auto src_idx = source_indices[idx];
     const auto flat_idx =
@@ -376,6 +377,7 @@ __global__ void xor_kernel_new(
       continue;
     }
     const auto& source = src_list[flat_idx];
+    //const auto source = src_list[flat_idx];
     auto result = get_smallest_src_index_spans(source, variation_indices);
     using enum SmallestSpans::ResultCode;
     if (result.code == None) {
@@ -543,8 +545,9 @@ void run_get_compatible_sources_kernel(
   //
   int num_sm;
   cudaDeviceGetAttribute(&num_sm, cudaDevAttrMultiProcessorCount, 0);
-  auto threads_per_sm = 2048;
-  auto block_size = 1024; // aka threads per block
+  int threads_per_sm;;
+  cudaDeviceGetAttribute(&threads_per_sm, cudaDevAttrMaxThreadsPerMultiProcessor, 0);
+  auto block_size = 768; // aka threads per block
   auto blocks_per_sm = threads_per_sm / block_size;
   assert(blocks_per_sm * block_size == threads_per_sm);
   auto grid_size = num_sm * blocks_per_sm;  // aka blocks per grid
@@ -585,10 +588,11 @@ void run_xor_kernel(StreamData& stream, int threads_per_block,
   //
   int num_sm;
   cudaDeviceGetAttribute(&num_sm, cudaDevAttrMultiProcessorCount, 0);
-  auto threads_per_sm = 2048;
-  auto block_size = threads_per_block ? threads_per_block : 1024;
+  int threads_per_sm;;
+  cudaDeviceGetAttribute(&threads_per_sm, cudaDevAttrMaxThreadsPerMultiProcessor, 0);
+  auto block_size = threads_per_block ? threads_per_block : 768;
   auto blocks_per_sm = threads_per_sm / block_size;
-  // assert(blocks_per_sm * block_size == threads_per_sm);
+  assert(blocks_per_sm * block_size == threads_per_sm);
   auto grid_size = num_sm * blocks_per_sm;  // aka blocks per grid
   auto shared_bytes = mfd.host.or_arg_list.size() * sizeof(result_t);
   // enforce assumption in is_source_OR_compatible()
@@ -623,9 +627,11 @@ void run_mark_or_sources_kernel(
   const MergeFilterData& mfd, result_t* device_results) {
   int num_sm;
   cudaDeviceGetAttribute(&num_sm, cudaDevAttrMultiProcessorCount, 0);
-  auto threads_per_sm = 2048;
-  auto block_size = 1024;
+  int threads_per_sm;;
+  cudaDeviceGetAttribute(&threads_per_sm, cudaDevAttrMaxThreadsPerMultiProcessor, 0);
+  auto block_size = 768;
   auto blocks_per_sm = threads_per_sm / block_size;
+  assert(blocks_per_sm * block_size == threads_per_sm);
   auto grid_size = num_sm * blocks_per_sm;  // aka blocks per grid
   auto shared_bytes = 0;
 
