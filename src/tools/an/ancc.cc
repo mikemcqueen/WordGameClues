@@ -134,6 +134,8 @@ int length_of_anagram = MAXWORDS;       /* Maximum number of words in anagram */
 int max_num_anagrams = FALSE;   /*Maximum number of anagrams to output */
 int num_anagrams = 0;           /* Number of anagrams found */
 int output_words = FALSE;       /* output words option flag */
+int json_flag = FALSE;
+int first_word = TRUE;
 char **words;                   /* array of words to make anagrams from */
 int *wc;                        /* array of wordcounts of words */
 int **word_len_hash;            /* length & letter index into words array */
@@ -249,7 +251,7 @@ void fix_stack() {
   int result;
   
   result = getrlimit(RLIMIT_STACK, &rl);
-  printf("rlimit: %d, rlim_cur: %ld, rlim_max: %ld\n", result, rl.rlim_cur, rl.rlim_max);
+  fprintf(stderr, "rlimit: %d, rlim_cur: %ld, rlim_max: %ld\n", result, rl.rlim_cur, rl.rlim_max);
   if (result == 0) {
     if (rl.rlim_cur < kStackSize) {
       rl.rlim_cur = kStackSize;
@@ -258,7 +260,7 @@ void fix_stack() {
         fprintf(stderr, "setrlimit returned result = %d\n", result);
       }
       result = getrlimit(RLIMIT_STACK, &rl);
-      printf("rlimit: %d, rlim_cur: %ld, rlim_max: %ld\n", result, rl.rlim_cur, rl.rlim_max);
+      fprintf(stderr, "rlimit: %d, rlim_cur: %ld, rlim_max: %ld\n", result, rl.rlim_cur, rl.rlim_max);
     }
   }
 }
@@ -296,6 +298,7 @@ int main (int argc, char *argv[])
      {"contain", required_argument, 0, 'c'},
      {"dict", required_argument, 0, 'd'},
      {"help", no_argument, 0, 'h'},
+     {"json", no_argument, &json_flag, TRUE},
      {"stdin", no_argument, &stdin_flag, TRUE},
      {"length", required_argument, 0, 'l'},
      {"minimum", required_argument, 0, 'm'},
@@ -317,7 +320,7 @@ int main (int argc, char *argv[])
 
    /* Process short and long options */
 
-   while ((opt = getopt_long (argc, argv, "c:d:l:m:x:n:r:aopwhivu:t:", long_options,
+   while ((opt = getopt_long (argc, argv, "c:d:l:m:x:n:r:ajopwhivu:t:", long_options,
                               &option_index))
           != -1) {
       switch (opt) {
@@ -346,6 +349,9 @@ int main (int argc, char *argv[])
         break;
       case 'p':
          pair_flag = TRUE;
+         break;
+      case 'j':
+         json_flag = TRUE;
          break;
       case 'r':
          num_required_pairs = atoi (optarg);
@@ -399,7 +405,8 @@ int main (int argc, char *argv[])
          exit (1);
          break;
       default:
-         printf ("%c\n", optopt);
+         printf ("unknown options: %c\n", optopt);
+         fflush(stdout);
          abort ();
       }
    }
@@ -538,6 +545,10 @@ int main (int argc, char *argv[])
    /* Read in words from file DICT_FILE which can be made from letters 
       in PHRASE_WORD */
 
+   if (output_words && json_flag) {
+     puts("[");
+   }
+
    dict_words = get_words (dict_file, phrase_word, dict);
 
    /* If no words found output error message and exit */
@@ -549,8 +560,12 @@ int main (int argc, char *argv[])
 
    /* If OUTPUT_WORDS option is turned on exit now */
 
-   if (output_words)
-      exit (0);
+   if (output_words) {
+     if (json_flag) {
+       puts("]");
+     }
+     exit(0);
+   }
 
    /* Sort word by length, shortest to largest, if same length sort
       alphabetically */
@@ -679,9 +694,9 @@ asdf_10.push_back(1);
      check_dict (phrase_len, phrase_mask, num_phrase_masks, word_mask,
         level, 0, 0, 0);
    } catch (std::exception& e) {
-     printf("std::exception, %s\n", e.what());
+     fprintf(stderr, "std::exception, %s\n", e.what());
    } catch (...) {
-     puts("catchall exception");
+     fputs("catchall exception", stderr);
    }
 
    /* Return control to caller */
@@ -1329,7 +1344,16 @@ int get_words (char */*dict_file*/, char *phrase_word, FILE *dict) {
     
     if (word_ok) {
       if (output_words) {
-        printf ("%s\n", line);
+        if (json_flag) {
+          if (first_word) {
+            printf("    \"%s\"\n", line);
+            first_word = FALSE;
+          } else {
+            printf("   ,\"%s\"\n", line);
+          }
+        } else {
+          printf ("%s\n", line);
+        }
         fflush (stdout);
         num_words++;
       }
@@ -1353,7 +1377,7 @@ int get_words (char */*dict_file*/, char *phrase_word, FILE *dict) {
     }
   }
   fclose (dict);               /* Close dictionary file */
-  printf("words: %d, discarded: %d\n", num_words, discard);
+  fprintf(stderr, "words: %d, discarded: %d\n", num_words, discard);
   return (num_words);
 }
 
