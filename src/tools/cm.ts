@@ -11,7 +11,7 @@ const Opt   = require('node-getopt')
     ])
     .bindHelp('Usage: cm populate');
 
-const commands = [ "populate", "pairs", "show-solutions" ];
+const commands = [ "populate", "pairs", "solutions" ];
 
 
 const is_command = (cmd: string, cmds: string[] = commands): boolean => {
@@ -22,7 +22,7 @@ const execute_command = (cmd: string, args: string[]): number => {
     switch(cmd) {
         case "populate": return Populate.run(args);
         case "pairs": return Pairs.run(args);
-        case "show-solutions": Solutions.show_all(); break;
+        case "solutions": return Solutions.run(args);
     }
     return -1;
 };

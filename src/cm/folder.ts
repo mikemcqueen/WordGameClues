@@ -15,7 +15,7 @@ export const file_exists = (dir: string, file: string): boolean => {
 };
 
 
-export const find_file_up = (dir: string, filename: string): string => {
+export const find_parent_with = (dir: string, filename: string): string => {
     // because logic is slightly simpler if true
     Assert((dir.length > 0) && (dir[0] === '/'), 'absolute path required');
     while (!file_exists(dir, filename)) {
@@ -23,7 +23,16 @@ export const find_file_up = (dir: string, filename: string): string => {
         const last_index = dir.lastIndexOf('/');
         dir = dir.slice(0, last_index);
     }
-    return make_path(dir, filename);;
+    return dir; // make_path(dir, filename);;
+};
+
+export const get_parent_names_until = (filename: string): Set<string> => {
+    const current_dir = process.cwd();
+    const root = find_parent_with(current_dir, filename);
+    const parents = current_dir.slice(root.length);
+    const names = parents.split('/').filter(name => name.length);
+    //console.error(`names: ${names}`);
+    return new Set(names);
 };
 
 export const find_root = (dir: string): string => {

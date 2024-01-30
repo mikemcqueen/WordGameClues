@@ -1,18 +1,17 @@
 import * as Folder from './folder';
 import * as Json from './json';
-import * as enhanceJSON from 'enhancejson';
 const Assert = require('assert');
 const Fs = require('fs-extra');
-//const Stringify = require('stringify-object');
 
-type MapEntry = {
+export type MapEntry = {
   [key: string]: string[] | Set<string>;
 };
-type MapType = Map<string, MapEntry>;
+export type MapType = Map<string, MapEntry>;
 
 type FileMapEntry = Record<string, string[]>;
 type FileMapType = Record<string, FileMapEntry>;
 
+/*
 export const get_all = (starting_dir: string = process.cwd()): Map<string, string[]> => {
     const root_dir = Folder.find_root(starting_dir);
     const child_dirs = starting_dir.slice(root_dir.length).split('/').filter(dir => dir.length);
@@ -36,6 +35,7 @@ export const old_show_all = (): void => {
         console.error(`${key}: ${solutions.get(key)!.toString()}`);
     }
 };
+*/
 
 const transform = (file_map: FileMapType): MapType => {
     let map: MapType = new Map();
@@ -73,10 +73,38 @@ const transform = (file_map: FileMapType): MapType => {
     return map;
 };
 
-export const load = (starting_dir: string = process.cwd()): MapType => {
-    const file = Folder.find_file_up(starting_dir, 'solutions.json');
-    return transform(Json.load(file) as FileMapType);
+const load = (starting_dir: string = process.cwd()): FileMapType => {
+    const file = 'solutions.json';
+    const dir = Folder.find_parent_with(starting_dir, file);
+    return Json.load(Folder.make_path(dir, file)); // as FileMapType);
 };
+
+export const get_all = (): MapType => {
+    return transform(load());
+}
+
+const filter = (source: FileMapType, keys: Set<string>): FileMapType => {
+    let result: FileMapType = {};
+    for (const key of Object.keys(source)) {
+        if (keys.has(key)) {
+            result[key] = source[key];
+        }
+    }
+    return result;
+};
+
+const fixup = (names: Set<string>): Set<string> => {
+    let result = new Set<string>();
+    for (const name of names.keys()) {
+        result.add(name.replace('.', ' '));
+    }
+    return result;
+}
+
+export const get_filtered = (): MapType => {
+    const names = Folder.get_parent_names_until('solutions.json');
+    return transform(filter(load(), fixup(names)));
+}
 
 const is_map = (o) => o instanceof Map;
 const is_set = (o) => o instanceof Set;
@@ -90,9 +118,17 @@ const my_replacer = (key, value) => {
     return value;
 }
 
-export const show_all = (): void => {
-    const solutions = load();
+export const show = (solutions: MapType): void => {
     for (let key of solutions.keys()) {
-        console.error(`${key}: ${/*enhance*/JSON.stringify(solutions.get(key)!, my_replacer)}`);
+        console.error(`${key}: ${JSON.stringify(solutions.get(key)!, my_replacer)}`);
     }
 };
+
+export const run = (args: string[]): number => {
+    if (args.length && (args[0] === 'all')) {
+        show(get_all());
+    } else {
+        show(get_filtered());
+    }
+    return 0;
+}
