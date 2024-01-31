@@ -37,13 +37,14 @@ export const old_show_all = (): void => {
 };
 */
 
+/*
 const transform = (file_map: FileMapType): MapType => {
     let map: MapType = new Map();
-    const outer_keys = Object.keys(file_map);
+    const outer_keys = new Set(Object.keys(file_map));
     for (const outer_key of outer_keys) {
-        Assert(!map.has(outer_key)); // unexpected dupe, but not surprised if it happens
+        Assert(!map.has(outer_key)); // not expected, but not surprised if it happens
         map.set(outer_key, {});
-        const inner_map = file_map[outer_key]!;;
+        const inner_map = file_map[outer_key]!;
         const inner_keys = Object.keys(inner_map);
         for (const inner_key of inner_keys) {
             const values = inner_map[inner_key]!;
@@ -61,10 +62,10 @@ const transform = (file_map: FileMapType): MapType => {
             }
             for (const value of values) {
                 if (inner_key === 'solutions') {
-                    Assert(!map.has(value)); // unexpected dupe, but not surprised if it happens
+                    Assert(!map.has(value)); // unexpected, but not surprised
                     map.set(value, { depends: new Set([outer_key]) });
                 } else { // if (!map.has(value)) {
-                    Assert(!map.has(value)); // unexpected dupe, possibly tricky if it happens
+                    Assert(!map.has(value)); // unexpected, possibly tricky if it happens
                     map.set(value, { depends: new Set([outer_key, inner_key]) });
                 }
             }
@@ -72,39 +73,7 @@ const transform = (file_map: FileMapType): MapType => {
     }
     return map;
 };
-
-const load = (starting_dir: string = process.cwd()): FileMapType => {
-    const file = 'solutions.json';
-    const dir = Folder.find_parent_with(starting_dir, file);
-    return Json.load(Folder.make_path(dir, file)); // as FileMapType);
-};
-
-export const get_all = (): MapType => {
-    return transform(load());
-}
-
-const filter = (source: FileMapType, keys: Set<string>): FileMapType => {
-    let result: FileMapType = {};
-    for (const key of Object.keys(source)) {
-        if (keys.has(key)) {
-            result[key] = source[key];
-        }
-    }
-    return result;
-};
-
-const fixup = (names: Set<string>): Set<string> => {
-    let result = new Set<string>();
-    for (const name of names.keys()) {
-        result.add(name.replace('.', ' '));
-    }
-    return result;
-}
-
-export const get_filtered = (): MapType => {
-    const names = Folder.get_parent_names_until('solutions.json');
-    return transform(filter(load(), fixup(names)));
-}
+*/
 
 const is_map = (o) => o instanceof Map;
 const is_set = (o) => o instanceof Set;
@@ -123,6 +92,102 @@ export const show = (solutions: MapType): void => {
         console.error(`${key}: ${JSON.stringify(solutions.get(key)!, my_replacer)}`);
     }
 };
+
+const do_transform = (file_map: FileMapType, map: MapType, valid_keys: Set<string>): boolean => {
+    //console.error(`transform, keys(${valid_keys.size}): ${Array.from(valid_keys).toString()}`);
+    let changed = false;
+    const outer_keys = Object.keys(file_map).filter(key => valid_keys.has(key));
+    for (const outer_key of outer_keys) {
+        if (!map.has(outer_key)) {
+            map.set(outer_key, {});
+            //console.error(`c1`);
+            changed = true;
+        }
+        const inner_map = file_map[outer_key]!;
+        const inner_keys = Object.keys(inner_map).filter(key => valid_keys.has(key));
+        for (const inner_key of inner_keys) {
+            const values = inner_map[inner_key]!;
+            if (inner_key !== 'solutions') {
+                // TODO:
+                //if (!add_key(map, outer_key, inner_key, values)) continue;
+                let obj = map.get(outer_key)!;
+                // skip key if already processed
+                if (obj.hasOwnProperty(inner_key)) continue;
+                // e.g. add "actress" (inner) to "wonder woman" (outer)
+                obj[inner_key] = values;
+                if (!map.has(inner_key)) map.set(inner_key, {});
+                obj = map.get(inner_key)!;
+                Assert(!obj.hasOwnProperty(outer_key));
+                // e.g. add  "wonder woman" (inner) to "actress" (outer)
+                obj[outer_key] = values;
+                // old way pre-Assert
+                //if (!obj.hasOwnProperty(outer_key)) obj[outer_key] = [];
+                //(obj[outer_key] as string[]).push(...values);
+                //console.error(`c2`);
+                changed = true;
+            }
+            for (const value of values) {
+                if (inner_key === 'solutions') {
+                    Assert(!map.has(value));
+                    map.set(value, { depends: new Set([outer_key]) });
+                    //console.error(`c3`);
+                    changed = true;
+                } else {
+                    // if (!map.has(value)) {
+                    Assert(!map.has(value));
+                    map.set(value, { depends: new Set([outer_key, inner_key]) });
+                }
+            }
+        }
+    }
+    return changed;
+};
+
+const transform = (file_map: FileMapType, valid_keys: Set<string> = new Set()): MapType => {
+    let map: MapType = new Map;
+    valid_keys.add('solutions');
+    while (do_transform(file_map, map, valid_keys)) {
+        if (0) {
+            console.error(`transform result:`);
+            show(map);
+            console.error(`----------------`);
+        }
+        if (!valid_keys.size) break;
+        valid_keys = new Set(map.keys());
+    }
+    return map;
+};
+
+const load = (starting_dir: string = process.cwd()): FileMapType => {
+    const file = 'solutions.json';
+    const dir = Folder.find_parent_with(starting_dir, file);
+    return Json.load(Folder.make_path(dir, file)); // as FileMapType);
+};
+
+export const get_all = (): MapType => {
+    return transform(load());
+}
+
+const filter = (file_map: FileMapType, valid_keys: Set<string>): FileMapType => {
+    let result: FileMapType = {};
+    const keys = Object.keys(file_map);
+    for (const key of keys) {
+        if (valid_keys.has(key)) {
+            result[key] = file_map[key];
+        }
+    }
+    return result;
+};
+
+const fixup = (names: string[]): string[] => {
+    return names.map(name => name.replace('.', ' '));
+}
+
+export const get_filtered = (): MapType => {
+    const name_list = Folder.get_parent_names_until('solutions.json');
+    const names = new Set(fixup(name_list));
+    return transform(filter(load(), names), names);
+}
 
 export const run = (args: string[]): number => {
     if (args.length && (args[0] === 'all')) {

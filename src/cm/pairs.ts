@@ -83,7 +83,7 @@ const show_solution_pairs = (): void => {
 
 export const run = (args: string[]): number => {
     console.error(`pairs.run args: ${JSON.stringify(args)}`);
-    if (args.length && (args[0] == 'solutions')) {
+    if (args.length && (args[0] === 'solutions')) {
         show_solution_pairs();
     } else {
         show_all_pairs(args);

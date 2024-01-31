@@ -23,16 +23,14 @@ export const find_parent_with = (dir: string, filename: string): string => {
         const last_index = dir.lastIndexOf('/');
         dir = dir.slice(0, last_index);
     }
-    return dir; // make_path(dir, filename);;
+    return dir;
 };
 
-export const get_parent_names_until = (filename: string): Set<string> => {
+export const get_parent_names_until = (filename: string): string[] => {
     const current_dir = process.cwd();
     const root = find_parent_with(current_dir, filename);
     const parents = current_dir.slice(root.length);
-    const names = parents.split('/').filter(name => name.length);
-    //console.error(`names: ${names}`);
-    return new Set(names);
+    return parents.split('/').filter(name => name.length);
 };
 
 export const find_root = (dir: string): string => {
