@@ -45,3 +45,8 @@ export const find_root = (dir: string): string => {
     }
     return dir;
 };
+
+export const get_child_dirs = (parent_path: string, child_path: string = process.cwd()): string[] => {
+    const remaining_path = child_path.slice(parent_path.length);
+    return remaining_path.split('/').filter(name => name.length);
+};

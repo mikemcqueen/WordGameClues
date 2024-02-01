@@ -3,16 +3,16 @@
 import * as _ from 'lodash';
 import * as Pairs from '../cm/pairs';
 import * as Populate from '../cm/populate';
+import * as Remain from '../cm/remain';
 import * as Solutions from '../cm/solutions';
 
 const Opt   = require('node-getopt')
     .create([
         ['h', 'help',                'this screen' ]
     ])
-    .bindHelp('Usage: cm populate');
+    .bindHelp('Usage: cm populate|pairs|solutions|remain');
 
-const commands = [ "populate", "pairs", "solutions" ];
-
+const commands = [ "populate", "pairs", "solutions", "remain" ];
 
 const is_command = (cmd: string, cmds: string[] = commands): boolean => {
     return cmds.includes(cmd);
@@ -23,6 +23,7 @@ const execute_command = (cmd: string, args: string[]): number => {
         case "populate": return Populate.run(args);
         case "pairs": return Pairs.run(args);
         case "solutions": return Solutions.run(args);
+        case "remain": return Remain.run(args);
     }
     return -1;
 };

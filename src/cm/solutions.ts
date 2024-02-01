@@ -3,6 +3,8 @@ import * as Json from './json';
 const Assert = require('assert');
 const Fs = require('fs-extra');
 
+const FILE = 'solutions.json';
+
 export type MapEntry = {
   [key: string]: string[] | Set<string>;
 };
@@ -158,10 +160,12 @@ const transform = (file_map: FileMapType, valid_keys: Set<string> = new Set()): 
     return map;
 };
 
-const load = (starting_dir: string = process.cwd()): FileMapType => {
-    const file = 'solutions.json';
-    const dir = Folder.find_parent_with(starting_dir, file);
-    return Json.load(Folder.make_path(dir, file)); // as FileMapType);
+export const find_dir = (starting_dir: string = process.cwd()): string => {
+    return Folder.find_parent_with(starting_dir, FILE);
+}
+
+const load = (starting_dir?: string): FileMapType => {
+    return Json.load(Folder.make_path(find_dir(starting_dir), FILE));
 };
 
 export const get_all = (): MapType => {
@@ -179,13 +183,13 @@ const filter = (file_map: FileMapType, valid_keys: Set<string>): FileMapType => 
     return result;
 };
 
-const fixup = (names: string[]): string[] => {
+const fix_names = (names: string[]): string[] => {
     return names.map(name => name.replace('.', ' '));
 }
 
 export const get_filtered = (): MapType => {
     const name_list = Folder.get_parent_names_until('solutions.json');
-    const names = new Set(fixup(name_list));
+    const names = new Set(fix_names(name_list));
     return transform(filter(load(), names), names);
 }
 
