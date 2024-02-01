@@ -3,7 +3,7 @@
 import * as _ from 'lodash';
 import * as Pairs from '../cm/pairs';
 import * as Populate from '../cm/populate';
-import * as Remain from '../cm/remain';
+import * as Remaining from '../cm/remaining';
 import * as Solutions from '../cm/solutions';
 
 const Opt   = require('node-getopt')
@@ -23,7 +23,7 @@ const execute_command = (cmd: string, args: string[]): number => {
         case "populate": return Populate.run(args);
         case "pairs": return Pairs.run(args);
         case "solutions": return Solutions.run(args);
-        case "remain": return Remain.run(args);
+        case "remain": return Remaining.run(args);
     }
     return -1;
 };

@@ -3,6 +3,7 @@
 import * as Json from './json';
 import * as Remaining from "./remaining";
 import * as Solutions from "./solutions";
+const Assert = require('assert');
 
 const Stringify = require("stringify-object");
 
@@ -11,11 +12,11 @@ const concat = (first: string, second: string): string => {
     if (result.length > 0) {
         result += ' ';
     }
-    result += second;
-    return result;
+    return result + second;
 };
 
-const show_pairs = (primary_words: string[], secondary_words: string[] | undefined,
+/*
+const old_show_pairs = (primary_words: string[], secondary_words: string[] | undefined,
     remaining: Remaining.LetterCounts, max_depth: number = 2, depth: number = 1,
     preceding_words: string = ''): void =>
 {
@@ -33,17 +34,45 @@ const show_pairs = (primary_words: string[], secondary_words: string[] | undefin
         }
     }
 };
+*/
 
-const show_all_pairs = (args: string[]): void => {
-    const letters: string = Json.load("remain.json");
-    let remaining = Remaining.make_letter_counts(letters);
-    const words: string[] = Json.load("words.json");
-    // assert(validate_letters(words, remaining));
-    let primary_words = undefined;
-    if (args.length) {
-        primary_words = Json.load(args[0]);
+const show_pairs = (list1: string[], list2: string[], letter_counts: Remaining.LetterCounts): number => {
+    let count = 0;
+    for (const word1 of list1) {
+        let remaining1 = Remaining.remove_letters(letter_counts, word1);
+        // because some words in list1 may be "solution" (to folder names) words.
+        // *may* is not as strict as i'd like.
+        let remaining2_required = false;
+        if (!remaining1) {
+            remaining1 = letter_counts;
+            remaining2_required = true;
+        }
+        for (const word2 of list2) {
+            let remaining2 = Remaining.remove_letters(remaining1, word2);
+            if (remaining2) {
+                console.log(`${word1} ${word2}`);
+                count += 1;
+            } else if (remaining2_required) {
+                Assert(remaining2, `${word1} ${word2}`);
+            }
+        }
     }
-    show_pairs(primary_words || words, primary_words ? words : undefined, remaining);
+    return count;
+};
+
+const show_all_pairs = (args: string[]): number => {
+    const remaining = Remaining.letter_counts();
+    const words: string[] = Json.load('words.json');
+    // Assert(validate_letters(words, remaining));
+    let words1 = words;
+    let words2 = words;
+    if (args.length) {
+        words1 = Json.load(args[0]);
+    } else {
+        words2 = words2.slice(1);
+    }
+    // TODO: append solution words to words1
+    return show_pairs(words1, words2, remaining);
 };
 
 const has_any = (target: Set<string>|undefined, source: Set<string>|undefined): boolean => {
@@ -54,8 +83,8 @@ const has_any = (target: Set<string>|undefined, source: Set<string>|undefined): 
     return false;
 };
 
-const get_solution_pairs = (): string[] => {
-    let pairs: string[] = [];
+const show_solution_pairs = (): number => {
+    let count = 0;
     const solutions = Solutions.get_filtered();
     const keys: string[] = Array.from(solutions.keys());
     for (let i = 0; i < keys.length - 1; ++i) {
@@ -69,24 +98,21 @@ const get_solution_pairs = (): string[] => {
             if (has_any(first_deps, deps) || deps?.has(first_key)) continue;
             // skip "known good" pairs
             if (first_value.hasOwnProperty(second_key)) continue;
-            pairs.push(`${first_key} ${second_key}`);
+            console.log(`${first_key} ${second_key}`);
+            count += 1;
         }
     }
-    return pairs;
-};
-
-const show_solution_pairs = (): void => {
-    console.error("solution pairs");
-    const pairs = get_solution_pairs();
-    console.error(`${Stringify(pairs)}`);
+    return count;
 };
 
 export const run = (args: string[]): number => {
     console.error(`pairs.run args: ${JSON.stringify(args)}`);
+    let count = 0;
     if (args.length && (args[0] === 'solutions')) {
-        show_solution_pairs();
+        count = show_solution_pairs();
     } else {
-        show_all_pairs(args);
+        count = show_all_pairs(args);
     }
+    console.error(`pairs: ${count}`);
     return 0;
 };

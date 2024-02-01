@@ -13,7 +13,7 @@ const make_directories = (words: string[], remaining: Remaining.LetterCounts,
 {
     for (let i = 0; i < words.length; ++i) {
         let word = words[i];;
-        const remaining_minus_word = Remaining.has_letters(remaining, word);
+        const remaining_minus_word = Remaining.remove_letters(remaining, word);
         if (!remaining_minus_word) continue;
         const dir = base_dir + word;
         // Fs.mkdir (dir);
