@@ -87,7 +87,7 @@ const my_replacer = (key, value) => {
         return { ['S']: Array.from(value) };
     }
     return value;
-}
+};
 
 export const show = (solutions: MapType): void => {
     for (let key of solutions.keys()) {
@@ -162,7 +162,7 @@ const transform = (file_map: FileMapType, valid_keys: Set<string> = new Set()): 
 
 export const find_dir = (starting_dir: string = process.cwd()): string => {
     return Folder.find_parent_with(starting_dir, FILE);
-}
+};
 
 const load = (starting_dir?: string): FileMapType => {
     return Json.load(Folder.make_path(find_dir(starting_dir), FILE));
@@ -170,7 +170,7 @@ const load = (starting_dir?: string): FileMapType => {
 
 export const get_all = (): MapType => {
     return transform(load());
-}
+};
 
 const filter = (file_map: FileMapType, valid_keys: Set<string>): FileMapType => {
     let result: FileMapType = {};
@@ -185,19 +185,36 @@ const filter = (file_map: FileMapType, valid_keys: Set<string>): FileMapType => 
 
 const fix_names = (names: string[]): string[] => {
     return names.map(name => name.replace('.', ' '));
-}
+};
 
 export const get_filtered = (): MapType => {
     const name_list = Folder.get_parent_names_until('solutions.json');
     const names = new Set(fix_names(name_list));
     return transform(filter(load(), names), names);
-}
+};
+
+export const show_words = (solutions: MapType, args: string[]): void => {
+    const required_word_count = args.length ? Number(args[0]) : 0;
+    for (let key of solutions.keys()) {
+        const word_count = (key.indexOf(' ') > -1) ? 2 : 1;
+        if (!required_word_count || (word_count === required_word_count)) {
+            console.log(key);
+        }
+    }
+};
 
 export const run = (args: string[]): number => {
-    if (args.length && (args[0] === 'all')) {
-        show(get_all());
+    console.error(`solutions.run args: ${JSON.stringify(args)}`);
+    if (args.length) {
+        if (args[0] === 'all') {
+            show(get_all());
+        } else if (args[0] === 'words') {
+            show_words(get_filtered(), args.slice(1));
+        } else {
+            console.error(`unknown arg: ${args[0]}`);
+        }
     } else {
         show(get_filtered());
     }
     return 0;
-}
+};

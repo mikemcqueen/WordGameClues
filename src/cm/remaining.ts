@@ -9,7 +9,7 @@ export type LetterCounts = Int16Array;
 
 const FILE = 'remain.json';
 const LOWER_A = 'a'.charCodeAt(0);
-const lower_z = 'z'.charCodeAt(0);
+const LOWER_Z = 'z'.charCodeAt(0);
 
 export const topmost_dir = (starting_dir?: string): string => {
     return Solutions.find_dir(starting_dir);
@@ -31,7 +31,7 @@ const get_ascii_code = (letter: string): number => {
 };
 
 const is_lower_alpha_ascii = (code: number): boolean => {
-    return (code >= LOWER_A) && (code <= lower_z);
+    return (code >= LOWER_A) && (code <= LOWER_Z);
 };
 
 const is_lower_alpha = (letter: string): boolean => {
@@ -45,12 +45,12 @@ const get_letter_index = (letter: string): number => {
 };
 
 export const make_letter_counts = (letters: string): LetterCounts => {
-    let remaining: LetterCounts = new Int16Array(26);
+    let counts: LetterCounts = new Int16Array(26);
     for (const letter of letters) {
         if (!is_lower_alpha(letter)) continue;
-        remaining[get_letter_index(letter)] += 1;
+        counts[get_letter_index(letter)] += 1;
     }
-    return remaining;
+    return counts;
 };
 
 export const remove_letters = (counts: LetterCounts, letters: string): LetterCounts|undefined => {
@@ -64,7 +64,7 @@ export const remove_letters = (counts: LetterCounts, letters: string): LetterCou
     return new_counts;
 };
 
-const total_counts = (counts: LetterCounts): number => {
+export const total_counts = (counts: LetterCounts): number => {
     return counts.reduce((total, count) => total + count, 0);
 };
 
@@ -142,16 +142,16 @@ const remove_letters = (source: string, letters: string): string => {
 
 export const letter_counts = (dir?: string): LetterCounts => {
     const topmost = topmost_dir(dir);
-    let remain = make_letter_counts(load(topmost));
-    //console.error(`topmost: ${remain}`);
+    let counts = make_letter_counts(load(topmost));
+    //console.error(`topmost: ${counts}`);
     if (dir !== topmost) {
         const child_dirs = Folder.get_child_dirs(topmost);
         let cur_dir = topmost.slice();
         for (const child_dir of child_dirs) {
-            remain = remove_letters(remain, child_dir)!;
+            counts = remove_letters(counts, child_dir)!;
         }
     }
-    return remain;
+    return counts;
 }
 
 export const letters = (dir?: string): string => {
@@ -159,6 +159,14 @@ export const letters = (dir?: string): string => {
 };
 
 export const run = (args: string[]): number => {
-    console.log(letters());
+    let counts = letter_counts();
+    for (const word of args) {
+        counts = remove_letters(counts, word)!;
+        if (!counts) {
+            console.error(`error removing letters in '${word}'`);
+            process.exit(-1);
+        }
+    }
+    console.log(to_letters(counts));
     return 0;
 };
