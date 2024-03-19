@@ -41,7 +41,7 @@ const get_latest_idx = (): number => {
     return Number(Fs.readFileSync(latest_idx_path));
 };
 
-const get_latest = (): string|undefined => {
+const get_latest = (): string => {
     const latest_idx = get_latest_idx();
     let latest_pairs_path = make_pairs_path(latest_idx);
     // edge case: the "latest" pairs file doesn't exit. this could happen if this
@@ -50,7 +50,7 @@ const get_latest = (): string|undefined => {
     if (!Fs.existsSync(latest_pairs_path)) {
         if (latest_idx === 0) {
             // there is in fact no latest pairs file.
-            return undefined;
+            return '';
         } else {
             Assert(latest_idx > 0, `latest_idx: ${latest_idx}`);
             // maybe we're recovering from a prior retire failure. in which case,
@@ -89,22 +89,43 @@ const get_next = (): string => {
     return next_pairs_path;
 };
 
+const revert_latest = (path: string): boolean => {
+    const latest_idx = get_latest_idx();
+    let latest_pairs_path = make_pairs_path(latest_idx);
+    if (path !== latest_pairs_path) {
+        console.error('invalid path supplied');
+        return false;
+    }
+    if (latest_idx > 0) {
+        set_latest_idx(latest_idx - 1);
+    }
+    return true;
+};
+
 export const run = (args: string[]): number => {
-    console.error(`retire.run args: ${JSON.stringify(args)}`);
+    //console.error(`retire.run args: ${JSON.stringify(args)}`);
     if (args.length) {
         if (args[0] === 'latest') {
             const latest = get_latest();
-            if (!latest) return -1;
             console.log(latest);
         } else if (args[0] === 'next') {
             const next = get_next();
             console.log(next);
+        } else if (args[0] === 'revert') {
+            if (args[1]) {
+                if (!revert_latest(args[1])) {
+                    return -1;
+                }
+            } else {
+                console.error(`missing path`);
+                return -1;
+            }
         } else {
             console.error(`unrecognized argument: ${args[0]}`);
             return -1;
         }
     } else {
-        console.log(`missing argument`);
+        console.error(`missing argument`);
         return -1;
     }
     return 0;

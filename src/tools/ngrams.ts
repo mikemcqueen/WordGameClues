@@ -129,11 +129,6 @@ const process_file = async (filename: string): Promise<void> => {
         });
         rl.on('line', process_line);
         await Events.once(rl, 'close');
-        /*
-        console.log('Reading file line by line with readline done.');
-        const used = process.memoryUsage().heapUsed / 1024 / 1024;
-        console.log(`The script uses approximately ${Math.round(used * 100) / 100} MB`);
-        */
     } catch (err) {
         console.error(err);
     }

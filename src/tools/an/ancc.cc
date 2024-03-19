@@ -389,7 +389,8 @@ int main (int argc, char *argv[])
          printf (_("  -i, --stdin\t\tread PHRASE from stdin\n"));
          printf (_("  -t, --test ANAG\ttest if ANAG can be made with PHRASE\n"));
          printf (_("  -u, --used PHRASE\tFlag PHRASE letters allready used\n"));
-         printf (_("  -o, --two output two words\n"));
+         printf (_("  -o, --two\toutput two words\n"));
+         printf (_("  -j, --json\toutput --words as json array\n"));
          printf (_("      --help\t\tdisplay this help and exit\n"));
          printf (_("      --version\t\toutput version information and exit\n"));
 #ifdef HAVE64

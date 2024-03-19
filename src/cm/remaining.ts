@@ -69,20 +69,21 @@ export const total_counts = (counts: LetterCounts): number => {
 };
 
 // convert lettercounts to charcode array
-const flatten = (counts: LetterCounts): Uint16Array => {
+const flatten = (counts: LetterCounts, allow_duplicates: boolean): Uint16Array => {
     let result = new Uint16Array(total_counts(counts));
     let result_idx = 0;
     for (let i = 0; i < counts.length; ++i) {
         let count = counts[i];
         while (count--) {
             result[result_idx++] = LOWER_A + i;
+            if (!allow_duplicates) break;
         }
     }
-    return result;
+    return result.slice(0, result_idx);
 };
 
-const to_letters = (counts: LetterCounts): string => {
-    return String.fromCharCode(...flatten(counts));
+const to_letters = (counts: LetterCounts, allow_duplicates = true): string => {
+    return String.fromCharCode(...flatten(counts, allow_duplicates));
 };
 
 const show_letter_counts = (counts: LetterCounts): void => {
@@ -143,19 +144,21 @@ const remove_letters = (source: string, letters: string): string => {
 export const letter_counts = (dir?: string): LetterCounts => {
     const topmost = topmost_dir(dir);
     let counts = make_letter_counts(load(topmost));
-    //console.error(`topmost: ${counts}`);
     if (dir !== topmost) {
         const child_dirs = Folder.get_child_dirs(topmost);
         let cur_dir = topmost.slice();
         for (const child_dir of child_dirs) {
             counts = remove_letters(counts, child_dir)!;
+            if (!counts) {
+                throw new Error(`error removing letters in '${child_dir}'`);
+            }
         }
     }
     return counts;
 }
 
-export const letters = (dir?: string): string => {
-    return to_letters(letter_counts(dir));
+export const letters = (dir?: string, allow_duplicates = true): string => {
+    return to_letters(letter_counts(dir), allow_duplicates);
 };
 
 export const run = (args: string[]): number => {
@@ -164,7 +167,7 @@ export const run = (args: string[]): number => {
         counts = remove_letters(counts, word)!;
         if (!counts) {
             console.error(`error removing letters in '${word}'`);
-            process.exit(-1);
+            return -1;
         }
     }
     console.log(to_letters(counts));
