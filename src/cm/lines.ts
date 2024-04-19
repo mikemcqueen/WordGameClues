@@ -47,7 +47,7 @@ const dump = (letter_counts: LetterCount[]): void => {
     }
 };
 
-export const run = (args: string[]): Promise<number> => {
+export const run = (args: string[], options: any): Promise<number> => {
     if (!args.length) {
         console.error('missing filename');
         return Promise.resolve(-1);

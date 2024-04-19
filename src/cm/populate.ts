@@ -31,7 +31,7 @@ const enum_directories = (primary_words: string[], secondary_words: string[],
     return any_appended;
 }
 
-export const run = (args: string[]): number => {
+export const run = (args: string[], options: any): number => {
     console.log(`populate.run args: ${JSON.stringify(args)}`);
     const letters: string = Json.load("remain.json");
     let remaining = Remaining.make_letter_counts(letters);

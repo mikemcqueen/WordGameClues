@@ -1,42 +1,135 @@
 // cm.ts
 
+//const Getopt = require('node-getopt');
+import * as Getopt from 'node-getopt';
 import * as Lines from '../cm/lines';
 import * as Pairs from '../cm/pairs';
 import * as Populate from '../cm/populate';
 import * as Remaining from '../cm/remaining';
 import * as Retire from '../cm/retire';
 import * as Solutions from '../cm/solutions';
+import { stringify as Stringify } from 'javascript-stringify';
 
-const Opt = require('node-getopt')
-    .create([
-        ['h', 'help',                'this screen' ]
-    ])
-    .bindHelp('Usage: cm populate|pairs|solutions|remain|lines');
-
-const commands = [ "populate", "pairs", "solutions", "remain", "retire", "lines" ];
-
-const is_command = (cmd: string, cmds: string[] = commands): boolean => {
-    return cmds.includes(cmd);
+interface OptionsInterface {
+    parse: (args: string[]) => any;
+    setHelp: (text: string) => Object;
+    showHelp: () => void;
 }
 
-const execute_command = async (cmd: string, args: string[]): Promise<number> => {
-    switch(cmd) {
-        case "populate": return Populate.run(args);
-        case "pairs": return Pairs.run(args);
-        case "solutions": return Solutions.run(args);
-        case "remain": return Remaining.run(args);
-        case "retire": return Retire.run(args);
-        case "lines": return Lines.run(args);
+type OptionsModule = {
+    Options?: string[][];
+    show_help?: () => void;
+    run: (args: string[], options: any) => number|Promise<number>;
+};
+
+type CommandDefinitionTuple = [string, OptionsModule|null, string];
+
+const Commands: CommandDefinitionTuple[] = [
+    [ "lines", Lines, "lines blah blah" ],
+    [ "pairs", Pairs, "blah blah populate" ],
+    [ "populate", Populate, "blah blah populate" ],
+    [ "remain", Remaining, "blah blah remain" ],
+    [ "retire", Retire, "blah blah retire" ] ,
+    [ "solutions", Solutions, "blah blah solutions" ],
+    [ "help", null, "help COMMAND for command-specific help" ]
+];
+
+const Options = [
+    [ 'v', 'verbose', 'more output' ],
+    [ 'h', 'help',    'this screen' ]
+];
+
+const show_commands = (commands: CommandDefinitionTuple[]): void => {
+    console.log('\nCommands:');
+    for (let tuple of commands) {
+        console.log(`  ${tuple[0]}${' '.repeat(15 - tuple[0].length)}${tuple[2]}`);
     }
-    return -1;
+};
+
+const is_help_requested = (args: string[]): boolean => {
+    return !args.length || !is_command(args[0]);
+};
+
+const build_options = (module?: OptionsModule): OptionsInterface => {
+    const options_list = module?.Options ? module.Options.concat(Options) : Options;
+    const options: OptionsInterface = Getopt.create(options_list);
+    options.setHelp('\nOptions:\n[[OPTIONS]]');
+    return options;
+};
+
+const show_default_help = (): void => {
+    console.log('Usage: node cm COMMAND [OPTION...]');
+    show_commands(Commands);
+    build_options().showHelp();
+};
+
+const show_module_help = (module: OptionsModule): void => {
+    // TODO: make this property non-optionsal, remove this conditional
+    if (module.show_help) {
+        module.show_help();
+        build_options(module).showHelp();
+    }
+    else
+        show_default_help();
+};
+
+const is_command = (cmd: string): boolean => {
+    return get_module(cmd) != null;
+};
+
+const show_help = (args: string[]): void => {
+    if (!args.length) {
+        show_default_help();
+        return;
+    }
+    let cmd = args[0];
+    if (cmd === 'help') {
+        if (args.length === 1) {
+            show_default_help();
+            return;
+        }
+        cmd = args[1];
+    }
+    if (!is_command(cmd)) {
+        console.error(`${cmd} is not a valid COMMAND.\n`);
+        show_default_help();
+        return;
+    }
+    show_module_help(get_module(cmd)!);
+};
+
+const get_module = (cmd: string, commands: CommandDefinitionTuple[] = Commands):
+    OptionsModule|null =>
+{
+    for (let tuple of commands) {
+        if (tuple[0] === cmd) return tuple[1];
+    }
+    return null;
+};
+
+const execute_command = async (cmd: string, args: string[],
+    commands: CommandDefinitionTuple[] = Commands): Promise<number> =>
+{
+    const module = get_module(cmd, commands);
+    if (!module) throw new Error('should never happen!');
+    const opt = build_options(module).parse(args);
+    if (opt.argv.length) {
+        console.error(`Unrecognized parameter(s): ${Stringify(opt.argv)}`)
+        return -1;
+    }
+    const options = opt.options;
+    if (options.verbose) {
+        console.error(`cmd: ${cmd}, args: ${Stringify(opt.argv)}, options: ${Stringify(options)}`);
+    }
+    return module.run(opt.argv, options);
 };
 
 // "main"
 ((): Promise<void> => {
     const args = process.argv.slice(2);
-    if (!args.length || !is_command(args[0])) {
-        Opt.showHelp();
-        process.exit(-1);
+    if (is_help_requested(args)) {
+        show_help(args);
+        process.exit(0);
     }
     execute_command(args[0], args.slice(1)).then(code => {
         process.exit(code);

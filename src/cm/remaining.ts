@@ -161,7 +161,7 @@ export const letters = (dir?: string, allow_duplicates = true): string => {
     return to_letters(letter_counts(dir), allow_duplicates);
 };
 
-export const run = (args: string[]): number => {
+export const run = (args: string[], options: any): number => {
     let counts = letter_counts();
     for (const word of args) {
         counts = remove_letters(counts, word)!;

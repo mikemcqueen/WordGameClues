@@ -102,7 +102,7 @@ const revert_latest = (path: string): boolean => {
     return true;
 };
 
-export const run = (args: string[]): number => {
+export const run = (args: string[], options: any): number => {
     //console.error(`retire.run args: ${JSON.stringify(args)}`);
     if (args.length) {
         if (args[0] === 'latest') {
@@ -112,12 +112,11 @@ export const run = (args: string[]): number => {
             const next = get_next();
             console.log(next);
         } else if (args[0] === 'revert') {
-            if (args[1]) {
-                if (!revert_latest(args[1])) {
-                    return -1;
-                }
-            } else {
+            if (!args[1]) {
                 console.error(`missing path`);
+                return -1;
+            }
+            if (!revert_latest(args[1])) {
                 return -1;
             }
         } else {

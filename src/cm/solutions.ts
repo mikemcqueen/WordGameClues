@@ -203,7 +203,7 @@ export const show_words = (solutions: MapType, args: string[]): void => {
     }
 };
 
-export const run = (args: string[]): number => {
+export const run = (args: string[], options: any): number => {
     console.error(`solutions.run args: ${JSON.stringify(args)}`);
     if (args.length) {
         if (args[0] === 'all') {
