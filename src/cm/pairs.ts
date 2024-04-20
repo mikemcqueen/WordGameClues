@@ -121,51 +121,53 @@ const get_word_list = (src_id: number, filename?: string): WordList => {
     return { src_id, words };
 };
 
-const get_word_lists = (src_ids: number[], other?: string[]): [WordList, WordList|null] => {
+const get_word_lists = (src_ids: number[], other?: string[]): [WordList, WordList] => {
     let word_lists: WordList[] = [];
     let other_idx = 0;
     for (const src_id of src_ids) {
         word_lists.push(get_word_list(src_id, other?.[other_idx]));
         if (src_id === WordSourceId.Other) ++other_idx;
     }
-    return [word_lists[0], word_lists.length > 1 ? word_lists[1] : null];
+    return [word_lists[0], word_lists.length > 1 ? word_lists[1] : word_lists[0]];
 };
 
-const show_pairs = (list1: string[], list2: string[], letter_counts: Remaining.LetterCounts): number => {
+const show_pairs = (words1: WordList, words2: WordList,
+                    letter_counts: Remaining.LetterCounts): number =>
+{
     let count = 0;
-
-    let used_words = new Set<string>();
-    for (const word1 of list1) {
-        used_words.add(word1);
-        let remaining1 = Remaining.remove_letters(letter_counts, word1);
-        // Some words in list1 may be "solution" (e.g. to folder names) words. in which case,
-        // remove_letters() may (and hopefully will) fail, because the letters of the word
-        // didn't actually come from remaining letters. In that case, just skip testing the
-        // first word and only test the second word for remaining letters.
-        // TODO:
-        // Note that this is kind of a dumb way to determine that a word is a solution word,
-        // because what if a solution word actually does contain only letters that match
-        // remaining letters? Then we're kinda fucked and producing bad pairs. I need to be
-        // able to signal somehow that a word (or list of words) is a solution word.
-        let remaining2_required = false;
-        if (!remaining1) {
-            remaining1 = letter_counts;
-            remaining2_required = true;
-        }
-        for (const word2 of list2) {
-            if (used_words.has(word2)) continue;
-            let remaining2 = Remaining.remove_letters(remaining1, word2);
-            if (remaining2) {
-                console.log(`${word1} ${word2}`);
-                count += 1;
-            } else if (remaining2_required) {
-                Assert(remaining2, `${word1} ${word2}`);
+    let word_set1 = new Set<string>(words1.words);
+    let word_set2 = new Set<string>(words2.words);
+    //let used_words = new Set<string>();
+    for (const word1 of words1.words) {
+        //used_words.add(word1);
+        let remaining = letter_counts;
+        // if it's a solution word, don't remove letters from remaining
+        if (!is_solution_source_id(words1.src_id)) {
+            remaining = Remaining.remove_letters(remaining, word1)!;
+            if (!remaining) {
+                continue;
             }
+        }
+        for (const word2 of words2.words) {
+            // we already have, or will, evaluate this pair in reverse order
+            if (word_set1.has(word2) && word_set2.has(word1)) {
+                continue;
+            }
+            //if (used_words.has(word2)) continue;
+            // if it's a solution word, don't remove letters from remaining
+            if (!is_solution_source_id(words2.src_id) &&
+                !Remaining.remove_letters(remaining, word2))
+            {
+                continue;
+            }
+            console.log(`${word1} ${word2}`);
+            ++count;
         }
     }
     return count;
 };
 
+/*
 const show_all_pairs = (args: string[]): number => {
     const remaining = Remaining.letter_counts();
     const words: string[] = Json.load('words.json');
@@ -178,6 +180,7 @@ const show_all_pairs = (args: string[]): number => {
     // TODO: do something with "solution" words
     return show_pairs(words1, words2, remaining);
 };
+*/
 
 const is_all_solution_source_ids = (src_ids: number[]): boolean => {
     for (const id of src_ids) {
@@ -239,7 +242,9 @@ export const run = (args: string[], options: any): number => {
         console.error(`At most two word sources may be specified. (${src_ids.length})`);
         return -1;
     }
-    console.error(`${Stringify(src_ids)} (${src_ids.length})`);
+    if (options.verbose) {
+        console.error(`${Stringify(src_ids)} (${src_ids.length})`);
+    }
     let count = 0;
     if (is_all_solution_source_ids(src_ids)) {
         const first_word_type = get_word_type_from_source_id(src_ids[0]);

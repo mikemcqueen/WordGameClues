@@ -1,17 +1,19 @@
 // PAIRS
 
-* need to add "solution" words to pairs output
- * might need to split this up into multiple steps via shell script file. the problem
-   is that some "solution words" are multiple words, and if I add an additional word
-   to that, we're now at 3 words, and we'll fail bigram matching. it's like i want to
-   do a pass with all single-word "solution words", then comm -12 bigrams, then add the
-   multiple-word solution words.
- * there's also the problem that pair-generation is based on 'remaining letters', and
-   solution words should skip that. this isn't a problem when generating pairs of *only*
-   solution words, but when mixing solution words with those from words.json, i need
-   to selectively skip the remaining-letters check on the solution words. so maybe a flag
-   gets passed to cm pairs that says "the first list is solution words".
- * I think what I really need to do is outline "what are the various combinations of
-   pair generation I need to support, and how do I support that through command line
-   parameters/flags". Once i have that, I can build the tool, and possibly wrap it in
-   a shell script file if necessary.
+* problem with cm pairs -m -a not displaying all combos
+  * what i'm thinking is, go back to using a single show_pairs(), and getting
+    solution word lists independently.  but wordlists now come with an optional
+    .depends for each word. like:
+    type WordData = {
+      word: string;
+      depends?: Set<string>;
+    };
+    type WordList = {
+      src_id: number;
+      words: WordData[];
+    };
+  * and show_pairs() can work with that.
+  * this way, we get the "build sets of wordlists, that allow us to  skip
+    flipped-order pairs" for free.
+    and we get "don't combine solution words with dependent words from 
+    non-solution sources" for free also. which is a nice freebie.
