@@ -16,7 +16,7 @@ export const Options = [
 ];
 
 export const show_help = (): void => {
-    console.log('Usage: node cm pairs [-w] [-s] [-m] [-a] [-o <words-file>]...');
+    console.log('Usage: node cm pairs [-w] [-s] [-m] [-a] [-f FILE]...');
     console.log('\nGenerate pairs from words in words.json, solutions.json, and/or another words file.');
 };
 
@@ -78,7 +78,7 @@ const get_word_count_from_source_id = (src_id: number): WordCountType => {
     }
 };
 
-const is_word_count_allowed = (word_count: WordCountType,
+const is_allowed_word_count = (word_count: WordCountType,
                                allowed_word_counts: WordCountType): boolean => {
     return (word_count.single! && allowed_word_counts.single!) ||
         (word_count.multi! && allowed_word_counts.multi!);
@@ -86,7 +86,9 @@ const is_word_count_allowed = (word_count: WordCountType,
 
 type WordType = {
     word: string;
-    depends?: Set<string>;
+    // for solution words:
+    props?: any;             // all properties
+    depends?: Set<string>;  // depends property
 }
 
 const list_from_strings = (words: string[]): WordType[] => {
@@ -99,8 +101,8 @@ const list_from_strings = (words: string[]): WordType[] => {
 
 const list_to_string_set = (words: WordType[]): Set<string> => {
     const result = new Set<string>();
-    for (const wt of words) {
-        result.add(wt.word);
+    for (const word of words) {
+        result.add(word.word);
     }
     return result;
 }
@@ -115,8 +117,9 @@ const get_solution_words = (word_count: WordCountType): WordType[] => {
     const solutions = Solutions.get_filtered();
     const words: string[] = Array.from(solutions.keys());
     for (const word of words) {
-        if (is_word_count_allowed(get_word_count(word), word_count)) {
-            result.push({ word, depends: solutions.get(word)!.depends as Set<string> });
+        if (is_allowed_word_count(get_word_count(word), word_count)) {
+            const props = solutions.get(word)!;
+            result.push({ word, props, depends: props.depends as Set<string> });
         }
     }
     return result;
@@ -171,9 +174,16 @@ const is_disjoint = (set1: Set<string>|undefined, set2: Set<string>|undefined): 
 };
 
 const has_dependency_conflict = (word1: WordType, word2: WordType): boolean => {
-    if (word2.depends?.has(word1.word)) return true;
     if (word1.depends?.has(word2.word)) return true;
-    return !is_disjoint(word1.depends, word2.depends);
+    if (word2.depends?.has(word1.word)) return true;
+    if (!is_disjoint(word1.depends, word2.depends)) return true;
+    return false;
+};
+
+const is_known_good_pair = (word1: WordType, word2: WordType): boolean => {
+    if (word1.props?.hasOwnProperty(word2.word)) return true;
+    if (word2.props?.hasOwnProperty(word1.word)) return true;
+    return false;
 };
 
 const filter_pair = (word1: WordType, word2: WordType, shown_pairs: Set<string>): boolean => {
@@ -181,8 +191,10 @@ const filter_pair = (word1: WordType, word2: WordType, shown_pairs: Set<string>)
     if (word1.word === word2.word) return false;
     // pair already shown
     if (shown_pairs.has(`${word1.word} ${word2.word}`)) return false;
-    // reversed pair already shown
+    // reverse pair already shown
     if (shown_pairs.has(`${word2.word} ${word1.word}`)) return false;
+    // pair with known solution, e.g. "stinky", "french cheese"
+    if (is_known_good_pair(word1, word2)) return false;
     // pair with dependency conflict
     if (has_dependency_conflict(word1, word2)) return false;
     return true;
@@ -194,7 +206,7 @@ const show_pairs = (words1: WordList, words2: WordList,
     let shown_pairs = new Set<string>();
     for (const word1 of words1.words) {
         let remaining = letter_counts;
-        // if it's a solution word, don't remove letters from remaining
+        // remove letters from remaining for non-solution words
         if (!is_solution_source_id(words1.src_id)) {
             remaining = Remaining.remove_letters(remaining, word1.word)!;
             if (!remaining) {
@@ -202,59 +214,19 @@ const show_pairs = (words1: WordList, words2: WordList,
             }
         }
         for (const word2 of words2.words) {
-            if (!filter_pair(word1, word2, shown_pairs)) continue;
-
-            // skip "known good" pairs
-            // TODO
-            // TODO
-            // TODO
-            //if (first_value.hasOwnProperty(second_word)) continue;
-
-            // if it's a solution word, don't remove letters from remaining.
+            // remove_letters from remaining for non-solution words must succeed
             if (!is_solution_source_id(words2.src_id) &&
                 !Remaining.remove_letters(remaining, word2.word))
             {
                 continue;
             }
+            if (!filter_pair(word1, word2, shown_pairs)) continue;
             const pair = `${word1.word} ${word2.word}`;
             console.log(pair);
             shown_pairs.add(pair);
         }
     }
     return shown_pairs.size;
-};
-
-const is_all_solution_source_ids = (src_ids: number[]): boolean => {
-    for (const id of src_ids) {
-        if (!is_solution_source_id(id)) return false;
-    }
-    return true;
-};
-
-const show_solution_pairs = (allowed_first_words: WordCountType,
-                             allowed_second_words: WordCountType): number => {
-    let count = 0;
-    const solutions = Solutions.get_filtered();
-    const words: string[] = Array.from(solutions.keys());
-    //console.error(`words: ${Stringify(words)}\nsolutions: ${Stringify(solutions)}`);
-    for (let i = 0; i < words.length - 1; ++i) {
-        const first_word = words[i];
-        if (!is_word_count_allowed(get_word_count(first_word), allowed_first_words)) continue;
-        const first_value = solutions.get(first_word)!;
-        const first_deps = first_value.depends as Set<string>;
-        for (let j = i + 1; j < words.length; ++j) {
-            const second_word = words[j];
-            if (!is_word_count_allowed(get_word_count(second_word), allowed_second_words)) continue;
-            const deps = solutions.get(second_word)!.depends as Set<string>;
-            // skip pairs with dependency conflicts
-            if (!is_disjoint(first_deps, deps) || deps?.has(first_word)) continue;
-            // skip "known good" pairs
-            if (first_value.hasOwnProperty(second_word)) continue;
-            console.log(`${first_word} ${second_word}`);
-            count += 1;
-        }
-    }
-    return count;
 };
 
 export const run = (args: string[], options: any): number => {
@@ -270,19 +242,10 @@ export const run = (args: string[], options: any): number => {
     if (options.verbose) {
         console.error(`${Stringify(src_ids)} (${src_ids.length})`);
     }
-    let count = 0;
-/*
-    if (is_all_solution_source_ids(src_ids)) {
-        const first_word_type = get_word_count_from_source_id(src_ids[0]);
-        count = show_solution_pairs(first_word_type, src_ids.length === 1 ?
-            first_word_type : get_word_count_from_source_id(src_ids[1]));
-    } else
-*/
-    {
-        const [words1, words2] = get_word_lists(src_ids, options.file);
-        //console.error(`words1: ${StringifyObj(words1)}\nwords2: ${StringifyObj(words2)}`);
-        count = show_pairs(words1, words2, Remaining.letter_counts());
+    const [words1, words2] = get_word_lists(src_ids, options.file);
+    const count = show_pairs(words1, words2, Remaining.letter_counts());
+    if (options.verbose) {
+        console.error(`pairs: ${count}`);
     }
-    console.error(`pairs: ${count}`);
     return 0;
 };
