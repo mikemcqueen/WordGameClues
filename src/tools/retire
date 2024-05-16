@@ -1,0 +1,63 @@
+#!/bin/sh
+if [ $# -lt 1  ]; then
+    echo "usage: retire <pairs-file>"
+    exit 1
+fi
+
+_input_file=$1
+if [ ! -e "$_input_file" ]; then
+    echo "File doesn't exist: $_input_file"
+    exit 1
+fi
+
+# TODO remove
+_cm=~/code/clues/src/dist/tools/cm
+
+_latest_pairs_file=$(node $_cm retire --latest)
+#echo "latest: $_latest_pairs_file"
+_exitcode=$?
+if [ $_exitcode -ne 0 ]; then
+    echo "cm retire --latest failed."
+    exit 1
+fi
+_num_latest=0
+if [ ! -z "$_latest_pairs_file" ]; then 
+    _num_latest=$(wc -l "$_latest_pairs_file" | cut -d' ' -f1)
+fi
+echo "existing pairs:  $_num_latest"
+
+_next_pairs_file=$(node $_cm retire --next)
+#echo "next: $_next_pairs_file"
+_exitcode=$?
+if [ $_exitcode -ne 0 ]; then
+    echo "cm retire --next failed."
+    exit 1
+fi
+_next_folder=$(dirname "$_next_pairs_file")
+_next_filename=$(basename "$_next_pairs_file")
+_file_to_retire="$_next_folder/files/$_next_filename"
+#echo "to_retire: $_file_to_retire"
+
+# the flippening
+awk -F, '{ print $1 "," $2; print $2 "," $1 }' "$_input_file" > "$_file_to_retire"
+_num_to_retire=$(wc -l "$_file_to_retire" | cut -d' ' -f1)
+echo "pairs to retire: $_num_to_retire"
+
+cat $_latest_pairs_file $_file_to_retire | sort | uniq > $_next_pairs_file
+_num_next=$(wc -l "$_next_pairs_file" | cut -d' ' -f1)
+echo "resulting pairs: $_num_next"
+
+if [ "$_num_latest" -eq "$_num_next" ]; then
+    echo "nothing to retire"
+    rm "$_file_to_retire"
+    rm "$_next_pairs_file"
+    node $_cm retire --revert "$_next_pairs_file"
+    _exitcode=$?
+    if [ $_exitcode -ne 0 ]; then
+        echo "cm --revert failed."
+    fi
+    exit 1;
+fi
+
+_num_retired=$(($_num_next - $_num_latest))
+echo "retired pairs:   $_num_retired"

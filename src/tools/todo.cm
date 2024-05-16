@@ -1,19 +1,7 @@
-// PAIRS
-
-* problem with cm pairs -m -a not displaying all combos
-  * what i'm thinking is, go back to using a single show_pairs(), and getting
-    solution word lists independently.  but wordlists now come with an optional
-    .depends for each word. like:
-    type WordData = {
-      word: string;
-      depends?: Set<string>;
-    };
-    type WordList = {
-      src_id: number;
-      words: WordData[];
-    };
-  * and show_pairs() can work with that.
-  * this way, we get the "build sets of wordlists, that allow us to  skip
-    flipped-order pairs" for free.
-    and we get "don't combine solution words with dependent words from 
-    non-solution sources" for free also. which is a nice freebie.
+* fixup_options - function to add mulit_word properties to options object
+  that contains hyphenated options (e.g. dry-run -> dry_run)
+* preload module in cm, so we can check for "help" (including -h) early and
+  in one spot only. need to solve the "help" is not a module problem.
+* retire script
+* pairs script
+* add tools to path

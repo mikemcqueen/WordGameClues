@@ -17,21 +17,23 @@ interface OptionsInterface {
 }
 
 type OptionsModule = {
+    // TODO: remove these optionals eventually?
     Options?: string[][];
     show_help?: () => void;
     run: (args: string[], options: any) => number|Promise<number>;
 };
 
+// command name | module | command description
 type CommandDefinitionTuple = [string, OptionsModule|null, string];
 
 const Commands: CommandDefinitionTuple[] = [
-    [ "lines", Lines, "lines blah blah" ],
-    [ "pairs", Pairs, "blah blah populate" ],
-    [ "populate", Populate, "blah blah populate" ],
-    [ "remain", Remaining, "blah blah remain" ],
-    [ "retire", Retire, "blah blah retire" ] ,
-    [ "solutions", Solutions, "blah blah solutions" ],
-    [ "help", null, "help COMMAND for command-specific help" ]
+    [ 'lines', Lines, 'lines blah blah' ],
+    [ 'pairs', Pairs, 'generate word pairs' ],
+    [ 'populate', Populate, 'blah blah populate' ],
+    [ 'remain', Remaining, 'display remaining letters in a clue folder-hierarchy' ],
+    [ 'retire', Retire, 'retire word pairs from a file' ] ,
+    [ 'solutions', Solutions, 'blah blah solutions' ],
+    [ 'help', null, 'help COMMAND for command-specific help' ]
 ];
 
 const Options = [
@@ -46,8 +48,21 @@ const show_commands = (commands: CommandDefinitionTuple[]): void => {
     }
 };
 
+const get_module = (cmd: string, commands: CommandDefinitionTuple[] = Commands):
+    OptionsModule|null =>
+{
+    for (let tuple of commands) {
+        if (tuple[0] === cmd) return tuple[1];
+    }
+    return null;
+};
+
+const is_command = (cmd: string): boolean => {
+    return get_module(cmd) != null;
+};
+
 const is_help_requested = (args: string[]): boolean => {
-    return !args.length || !is_command(args[0]);
+    return !args.length || !is_command(args[0]) || (args[0] === 'help');
 };
 
 const build_options = (module?: OptionsModule): OptionsInterface => {
@@ -64,17 +79,13 @@ const show_default_help = (): void => {
 };
 
 const show_module_help = (module: OptionsModule): void => {
-    // TODO: make this property non-optionsal, remove this conditional
+    // TODO: make this property non-optional, remove this conditional
     if (module.show_help) {
         module.show_help();
         build_options(module).showHelp();
     }
     else
         show_default_help();
-};
-
-const is_command = (cmd: string): boolean => {
-    return get_module(cmd) != null;
 };
 
 const show_help = (args: string[]): void => {
@@ -98,26 +109,24 @@ const show_help = (args: string[]): void => {
     show_module_help(get_module(cmd)!);
 };
 
-const get_module = (cmd: string, commands: CommandDefinitionTuple[] = Commands):
-    OptionsModule|null =>
-{
-    for (let tuple of commands) {
-        if (tuple[0] === cmd) return tuple[1];
-    }
-    return null;
-};
-
 const execute_command = async (cmd: string, args: string[],
     commands: CommandDefinitionTuple[] = Commands): Promise<number> =>
 {
     const module = get_module(cmd, commands);
     if (!module) throw new Error('should never happen!');
     const opt = build_options(module).parse(args);
+    const options = opt.options;
+    // TODO: this is a code smell that we wait to parse '--help' option here,
+    // rather than doing it in is_help_requested. should call get_module()
+    // in main(), and pass around the module, probably.
+    if (options.help) {
+        show_help(args);
+        return 0;
+    }
     if (opt.argv.length) {
         console.error(`Unrecognized parameter(s): ${Stringify(opt.argv)}`)
         return -1;
     }
-    const options = opt.options;
     if (options.verbose) {
         console.error(`cmd: ${cmd}, args: ${Stringify(opt.argv)}, options: ${Stringify(options)}`);
     }
@@ -125,17 +134,20 @@ const execute_command = async (cmd: string, args: string[],
 };
 
 // "main"
-((): Promise<void> => {
-    const args = process.argv.slice(2);
-    if (is_help_requested(args)) {
-        show_help(args);
-        process.exit(0);
-    }
-    execute_command(args[0], args.slice(1)).then(code => {
-        process.exit(code);
+((): Promise<number> => {
+    return new Promise((resolve, reject) => {
+        const args = process.argv.slice(2); // ignore: node cm
+        if (is_help_requested(args)) {
+            show_help(args);
+            resolve(0);
+        }
+        execute_command(args[0], args.slice(1))
+            .then(code => { resolve(code); })
+            .catch(e => { reject(e); });
     });
-    return Promise.resolve();
-})().catch(err => {
-    console.error(err, err.stack);
+})().then(code => {
+    process.exit(code);
+}).catch(err => {
+    console.error(err); //, err.stack);
     process.exit(-1);
 });

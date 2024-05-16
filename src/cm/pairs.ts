@@ -87,7 +87,7 @@ const is_allowed_word_count = (word_count: WordCountType,
 type WordType = {
     word: string;
     // for solution words:
-    props?: any;             // all properties
+    props?: any;            // all properties
     depends?: Set<string>;  // depends property
 }
 
@@ -186,13 +186,17 @@ const is_known_good_pair = (word1: WordType, word2: WordType): boolean => {
     return false;
 };
 
-const filter_pair = (word1: WordType, word2: WordType, shown_pairs: Set<string>): boolean => {
+const make_pair = (word1: WordType, word2: WordType): string => {
+    return `${word1.word},${word2.word}`;
+}
+
+const allow_pair = (word1: WordType, word2: WordType, shown_pairs: Set<string>): boolean => {
     // same word
     if (word1.word === word2.word) return false;
     // pair already shown
-    if (shown_pairs.has(`${word1.word} ${word2.word}`)) return false;
+    if (shown_pairs.has(make_pair(word1, word2))) return false;
     // reverse pair already shown
-    if (shown_pairs.has(`${word2.word} ${word1.word}`)) return false;
+    if (shown_pairs.has(make_pair(word2, word1))) return false;
     // pair with known solution, e.g. "stinky", "french cheese"
     if (is_known_good_pair(word1, word2)) return false;
     // pair with dependency conflict
@@ -220,8 +224,8 @@ const show_pairs = (words1: WordList, words2: WordList,
             {
                 continue;
             }
-            if (!filter_pair(word1, word2, shown_pairs)) continue;
-            const pair = `${word1.word} ${word2.word}`;
+            if (!allow_pair(word1, word2, shown_pairs)) continue;
+            const pair = make_pair(word1, word2);
             console.log(pair);
             shown_pairs.add(pair);
         }
