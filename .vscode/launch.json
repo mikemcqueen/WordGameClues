@@ -7,14 +7,24 @@
         {
             "type": "node",
             "request": "launch",
+            "name": "cm pairs -a -v",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "program": "${workspaceFolder}/src/dist/tools/cm.js",
+            "cwd": "${workspaceFolder}/data/pairs/s3/hobbit.home",
+            "args": [ "pairs", "-a", "-v" ]
+        },    
+        {
+            "type": "node",
+            "request": "launch",
             "name": "nodejs -t",
             "skipFiles": [
                 "<node_internals>/**"
             ],
             "program": "${workspaceFolder}/src/tools/clues.js",
-            "args": [ "-pf.72", "-t",
-                "fir"
-        //       ,"-v"
+            "args": [ "-pf.72", "-t", "name"
+            //       ,"-v"
             ]
         },
         {
@@ -27,10 +37,8 @@
             "localRoot": "${workspaceFolder}",
             "program": "${workspaceFolder}/src/tools/clues.js",
             "args": [ "clues.js", "-pf.72", "-c2,2", "-x2", "-v",
-//                "--xor", "us 50",
-                "--xor", "koa",
-                "--xor", "21",
-//                "--xor", "currant",
+                "--xor", "name1",
+                "--xor", "name2",
             ]
         },
         {
@@ -39,7 +47,7 @@
             "name": "cppdbg -t",
             "program": "/usr/local/bin/node",
             "cwd": "${workspaceFolder}/src/tools",
-            "args": [ "clues.js", "-pf.72", "-t", "fir"  ]
+            "args": [ "clues.js", "-pf.72", "-t", "name" ]
         },
         {
             "type": "cppdbg",
@@ -55,7 +63,7 @@
             "name": "cpp -t",
             "program": "/usr/local/bin/node",
             "cwd": "${workspaceFolder}/src/tools",
-            "args": [ "clues.js", "-pf.72", "-v", "-z2", "-t", "vacuum" ]
+            "args": [ "clues.js", "-pf.72", "-v", "-z2", "-t", "name" ]
         },
         {
             "type": "cppdbg",
@@ -64,10 +72,8 @@
             "program": "/usr/local/bin/node",
             "cwd": "${workspaceFolder}/src/tools",
             "args": [ "clues.js", "-pf.72", "-c2,2",
-//                "--xor", "us 50",
-                "--xor", "koa",
-                "--xor", "21",
-//                "--or", "tree",
+                "--xor", "name1",
+                "--xor", "name2",
                 "-v"
             ]
         }

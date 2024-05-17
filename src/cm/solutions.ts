@@ -1,9 +1,18 @@
 import * as Folder from './folder';
 import * as Json from './json';
 const Assert = require('assert');
-const Fs = require('fs-extra');
 
-const FILE = 'solutions.json';
+export const Options = [
+    [ 'a', 'all',          'do not filter by parent directory names' ],
+    [ '', 'words[=COUNT]', 'show solutions "words", optionally containing exactly COUNT words' ]
+];
+
+export const show_help = (): void => {
+    console.log('Usage: node cm solutions [-a] [--words [COUNT]]');
+    console.log('\nShow solutions word-map, or solution words only (filtered by parent directory names by default).');
+};
+
+const FILENAME = 'solutions.json';
 
 export type MapEntry = {
   [key: string]: string[] | Set<string>;
@@ -12,70 +21,6 @@ export type MapType = Map<string, MapEntry>;
 
 type FileMapEntry = Record<string, string[]>;
 type FileMapType = Record<string, FileMapEntry>;
-
-/*
-export const get_all = (starting_dir: string = process.cwd()): Map<string, string[]> => {
-    const root_dir = Folder.find_root(starting_dir);
-    const child_dirs = starting_dir.slice(root_dir.length).split('/').filter(dir => dir.length);
-    //if (show) console.error(`root_dir: ${root_dir} child_dirs: ${child_dirs.toString()}`);
-    let result = new Map<string, string[]>();
-    let dir = Folder.make_path(root_dir.slice(), child_dirs[0]);
-    // skip first level below root (no solutions)
-    for (let idx = 1; idx < child_dirs.length; ++idx) {
-        const child = child_dirs[idx];
-        dir = Folder.make_path(dir, child);
-        const solutions = Json.load(Folder.make_path(dir, 'solutions.json'));
-        Assert(!result.has(child));
-        result.set(child, solutions);
-    }
-    return result;
-}
-
-export const old_show_all = (): void => {
-    const solutions = get_all();
-    for (let key of solutions.keys()) {
-        console.error(`${key}: ${solutions.get(key)!.toString()}`);
-    }
-};
-*/
-
-/*
-const transform = (file_map: FileMapType): MapType => {
-    let map: MapType = new Map();
-    const outer_keys = new Set(Object.keys(file_map));
-    for (const outer_key of outer_keys) {
-        Assert(!map.has(outer_key)); // not expected, but not surprised if it happens
-        map.set(outer_key, {});
-        const inner_map = file_map[outer_key]!;
-        const inner_keys = Object.keys(inner_map);
-        for (const inner_key of inner_keys) {
-            const values = inner_map[inner_key]!;
-            if (inner_key !== 'solutions') {
-                // e.g. add "actress" (inner) to "wonder woman" (outer)
-                let obj = map.get(outer_key)!;
-                Assert(!obj.hasOwnProperty(inner_key));
-                obj[inner_key] = values;
-
-                // e.g. add  "wonder woman" (inner) to "actress" (outer)
-                if (!map.has(inner_key)) map.set(inner_key, {});
-                obj = map.get(inner_key)!;
-                if (!obj.hasOwnProperty(outer_key)) obj[outer_key] = [];
-                (obj[outer_key] as string[]).push(...values);
-            }
-            for (const value of values) {
-                if (inner_key === 'solutions') {
-                    Assert(!map.has(value)); // unexpected, but not surprised
-                    map.set(value, { depends: new Set([outer_key]) });
-                } else { // if (!map.has(value)) {
-                    Assert(!map.has(value)); // unexpected, possibly tricky if it happens
-                    map.set(value, { depends: new Set([outer_key, inner_key]) });
-                }
-            }
-        }
-    }
-    return map;
-};
-*/
 
 const is_map = (o) => o instanceof Map;
 const is_set = (o) => o instanceof Set;
@@ -102,7 +47,6 @@ const do_transform = (file_map: FileMapType, map: MapType, valid_keys: Set<strin
     for (const outer_key of outer_keys) {
         if (!map.has(outer_key)) {
             map.set(outer_key, {});
-            //console.error(`c1`);
             changed = true;
         }
         const inner_map = file_map[outer_key]!;
@@ -122,20 +66,14 @@ const do_transform = (file_map: FileMapType, map: MapType, valid_keys: Set<strin
                 Assert(!obj.hasOwnProperty(outer_key));
                 // e.g. add  "wonder woman" (inner) to "actress" (outer)
                 obj[outer_key] = values;
-                // old way pre-Assert
-                //if (!obj.hasOwnProperty(outer_key)) obj[outer_key] = [];
-                //(obj[outer_key] as string[]).push(...values);
-                //console.error(`c2`);
                 changed = true;
             }
             for (const value of values) {
                 if (inner_key === 'solutions') {
                     Assert(!map.has(value));
                     map.set(value, { depends: new Set([outer_key]) });
-                    //console.error(`c3`);
                     changed = true;
                 } else {
-                    // if (!map.has(value)) {
                     Assert(!map.has(value));
                     map.set(value, { depends: new Set([outer_key, inner_key]) });
                 }
@@ -147,6 +85,8 @@ const do_transform = (file_map: FileMapType, map: MapType, valid_keys: Set<strin
 
 const transform = (file_map: FileMapType, valid_keys: Set<string> = new Set()): MapType => {
     let map: MapType = new Map;
+    // copy and "append"
+    valid_keys = new Set(valid_keys);
     valid_keys.add('solutions');
     while (do_transform(file_map, map, valid_keys)) {
         if (0) {
@@ -161,11 +101,11 @@ const transform = (file_map: FileMapType, valid_keys: Set<string> = new Set()): 
 };
 
 export const find_dir = (starting_dir: string = process.cwd()): string => {
-    return Folder.find_parent_with(starting_dir, FILE);
+    return Folder.find_parent_with(starting_dir, FILENAME);
 };
 
 const load = (starting_dir?: string): FileMapType => {
-    return Json.load(Folder.make_path(find_dir(starting_dir), FILE));
+    return Json.load(Folder.make_path(find_dir(starting_dir), FILENAME));
 };
 
 export const get_all = (): MapType => {
@@ -190,29 +130,57 @@ const fix_names = (names: string[]): string[] => {
 export const get_filtered = (): MapType => {
     const name_list = Folder.get_parent_names_until('solutions.json');
     const names = new Set(fix_names(name_list));
-    return transform(filter(load(), names), names);
+    const map = transform(filter(load(), names), names);
+    // to support the case where parent diretory names haven't been added to
+    // the solutions.json map yet, do a 2nd pass adding all the names that
+    // haven't yet been added to the result.
+    // this is a partial solution that only works on "filtered" results; a
+    // broader solution is outlined in todo.cm
+    for (const name of names) {
+        if (!map.has(name)) {
+            map.set(name, {});
+        }
+    }
+    return map;
 };
 
-export const show_words = (solutions: MapType, args: string[]): void => {
-    const required_word_count = args.length ? Number(args[0]) : 0;
+export const show_words = (solutions: MapType, required_word_count: number): void => {
     for (let key of solutions.keys()) {
-        const word_count = (key.indexOf(' ') > -1) ? 2 : 1;
-        if (!required_word_count || (word_count === required_word_count)) {
+        if (!required_word_count || (key.split(' ').length === required_word_count)) {
             console.log(key);
         }
     }
 };
 
+const get_num_primary_options = (options: any): number => {
+    return Number(!!options.words) + (options.all|0);
+};
+
+// for maximum flexibility, if another optional-value option is added,
+// should pass process.argv here.
+const get_required_word_count = (option: string, args: string[]) : number => {
+    let count = 0;
+    if (!option.length) {
+        if (args.length) count = Number(args[0]);
+    } else {
+        count = Number(option);
+    }
+    Assert(!isNaN(count));
+    return count;
+};
+
 export const run = (args: string[], options: any): number => {
-    console.error(`solutions.run args: ${JSON.stringify(args)}`);
-    if (args.length) {
-        if (args[0] === 'all') {
-            show(get_all());
-        } else if (args[0] === 'words') {
-            show_words(get_filtered(), args.slice(1));
-        } else {
-            console.error(`unknown arg: ${args[0]}`);
-        }
+    const num_options = get_num_primary_options(options);
+    // TODO: remove restriction. allow filtering for both show and show_words.
+    if (num_options > 1) {
+        console.error('Only one of --words or --all may be specified.');
+        return -1;
+    }
+    if (options.all) {
+        show(get_all());
+    } else if (options.words !== undefined) {
+        // NOTE: args[1] is not very forward-compatible
+        show_words(get_filtered(), get_required_word_count(options.words, args.slice(1)));
     } else {
         show(get_filtered());
     }

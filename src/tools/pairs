@@ -1,0 +1,30 @@
+#!/bin/sh
+if [ $# -gt 0  ]; then
+    echo "optional words-file not yet supported."
+    exit 1
+fi
+
+#_words_file=$1
+#if [ ! -e "$_words_file" ]; then
+#    echo "File doesn't exist: $_words_file"
+#    exit 1
+#fi
+
+_bigram_file=~/uniq.10
+_unsorted_file=intermediate.pairs.unsorted
+_sorted_file=intermediate.pairs
+
+cm pairs -w > "$_unsorted_file"      # pairs of words
+cm pairs -w -s >> "$_unsorted_file"  # pairs of words and single-word solution words
+sort "$_unsorted_file" > "$_sorted_file"
+
+# valid bigrams back to (soon to be) unsorted file
+comm -12 "$_bigram_file" "$_sorted_file" > "$_unsorted_file"
+cm pairs -w -m >> "$_unsorted_file"  # pairs of words and multiple-word solution words
+cm pairs -s -m >> "$_unsorted_file"  # pairs of 1-word and multipe-word solution words
+cm pairs -m >> "$_unsorted_file"     # mutliple-word solution words
+cat "$_unsorted_file" | sort | uniq
+
+# cleanup
+rm "$_unsorted_file"
+rm "$_sorted_file"

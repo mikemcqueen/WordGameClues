@@ -1,7 +1,17 @@
 * fixup_options - function to add mulit_word properties to options object
   that contains hyphenated options (e.g. dry-run -> dry_run)
+  i think i'm currently doing this in my hacked local copy of node-getopt,
+  but i should just write a standalone function to do it.
 * preload module in cm, so we can check for "help" (including -h) early and
   in one spot only. need to solve the "help" is not a module problem.
-* retire script
-* pairs script
-* add tools to path
+
+
+* cm solutions should:
+  * allow filtering on both "words-map" and "words" 
+  * pick up any solution words (parent directory names) that are not in solutions.json
+    * this is the potentially tricky part. because, it's not a simple check of top-level
+      keys in the FileMap. I actually have to drill down through all children.
+    * In other words, what transform() does. So I really want to add them to the resulting
+      MapType. Buuuuut.. the way I have the code structured right now makes that seem
+      difficult. I'll try to get it working for get_filtered() at least because that's
+      what cm pairs is using.

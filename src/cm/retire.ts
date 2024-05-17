@@ -126,10 +126,10 @@ export const run = (args: string[], options: any): number => {
     const num_options = get_num_primary_options(options);
     if (!num_options) {
         console.error('One of --latest, --next, or --revert must be specified.');
-        return 0;
+        return -1;
     } else if (num_options > 1) {
         console.error('Only one of --latest, --next, or --revert may be specified.');
-        return 0;
+        return -1;
     }
     if (options.latest) {
         console.log(get_latest(options));

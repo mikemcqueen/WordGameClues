@@ -3,8 +3,8 @@
 import * as Json from './json';
 import * as Remaining from "./remaining";
 import * as Solutions from "./solutions";
+import { stringify as Stringify } from 'javascript-stringify';
 const Assert = require('assert');
-const Stringify = require("javascript-stringify").stringify;
 const StringifyObj = require("stringify-object");
 
 export const Options = [
@@ -247,6 +247,10 @@ export const run = (args: string[], options: any): number => {
         console.error(`${Stringify(src_ids)} (${src_ids.length})`);
     }
     const [words1, words2] = get_word_lists(src_ids, options.file);
+    if (options.verbose) {
+        console.error(`${Stringify(options)}: words1(${words1.words.length})` +
+            `, words2(${words2.words.length})`);
+    }
     const count = show_pairs(words1, words2, Remaining.letter_counts());
     if (options.verbose) {
         console.error(`pairs: ${count}`);
