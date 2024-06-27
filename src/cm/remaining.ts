@@ -82,7 +82,7 @@ const flatten = (counts: LetterCounts, allow_duplicates: boolean): Uint16Array =
     return result.slice(0, result_idx);
 };
 
-const to_letters = (counts: LetterCounts, allow_duplicates = true): string => {
+export const to_letters = (counts: LetterCounts, allow_duplicates = true): string => {
     return String.fromCharCode(...flatten(counts, allow_duplicates));
 };
 

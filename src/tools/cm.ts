@@ -28,7 +28,7 @@ type CommandDefinitionTuple = [string, OptionsModule|null, string];
 
 const Commands: CommandDefinitionTuple[] = [
     [ 'lines', Lines, 'lines blah blah' ],
-    [ 'pairs', Pairs, 'generate word pairs' ],
+    [ 'pairs', Pairs, 'operations to generate or operate on word pairs' ],
     [ 'populate', Populate, 'blah blah populate' ],
     [ 'remain', Remaining, 'display remaining letters in a clue folder-hierarchy' ],
     [ 'retire', Retire, 'retire word pairs from a file' ] ,

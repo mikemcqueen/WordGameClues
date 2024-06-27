@@ -1,4 +1,6 @@
 node_modules
+src/dist
+.vscode
 **/tmp
 **/play
 **/.DS_Store
@@ -6,5 +8,3 @@ node_modules
 **/#*
 **/.#*
 **/build
-**/.vscode
-src/dist

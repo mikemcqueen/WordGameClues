@@ -14,6 +14,7 @@ const MinMax      = require("../dist/types/min-max");
 const NameCount   = require('../dist/types/name-count');
 const Native      = require('../../build/experiment.node');
 
+const Assert      = require('assert');
 const Clues       = require('../modules/clue-types');
 const Debug       = require('debug')('clues');
 const Duration    = require('duration');
@@ -27,7 +28,7 @@ const Stringify   = require('stringify-object');
 const Timing      = require('debug')('timing');
 
 const CmdLineOptions = Opt.create(_.concat(Clues.Options, [
-    ['o', 'output',                            '  output json -or- clues(huh?)'],
+    ['o', 'output',                            'output json -or- clues(huh?)'],
     ['c', 'count=COUNT[LO,COUNTHI]',           'show combos of the specified COUNT; if COUNTHI, treat as range'],
     ['x', 'max=COUNT',                         '  maximum # of sources to combine'],
 //  ['',  'and=NAME[:COUNT][,NAME[:COUNT]]+',  '  combos must have source NAME[:COUNT]'],
@@ -67,6 +68,8 @@ const CmdLineOptions = Opt.create(_.concat(Clues.Options, [
                                                ' impacts clue loading, combo generation'],
     ['R', 'remove-all-invalid',                'remove all invalid (validation error) clues'],
     ['',  'ccc',                               'clue (source) consistency check'],
+    ['',  'show-pairs',                        'show unique known source pairs'],
+    ['',  'flip',                              '  include flipped (reversed) pairs in results'],
     ['z', 'flags=OPTION+',                     'flags: 2=ignoreErrors' ],
     ['v', 'verbose',                           'more output' ],
     ['',  'vv',                                'More' ],
@@ -274,6 +277,39 @@ function sortAllClues (clueSource, max) {
     }
 }
 
+const show_pairs = (clueSource, max, options) => {
+    let pairs = new Set();
+    const dir = clueSource.baseDir;
+    for (let count = 2; count < max; ++count) {
+        let list;
+        try {
+            list = ClueManager.loadClueList(count, { dir });
+        } catch (err) {
+            if (!_.includes(err.message, 'ENOENT')) throw err;
+            console.error(err);
+            continue;
+        }
+        for (let clue of list) {
+            const src = clue.src;
+            pairs.add(src);
+            if (options.flip) {
+                const src_list = src.split(',');
+                if (src_list.length !== 2) {
+                    console.error(`${src}`);
+                } else {
+                    const flipped_src = `${src_list[1]},${src_list[0]}`;
+                    pairs.add(flipped_src);
+                }
+            }
+        }
+    }
+    const sorted_pairs = [...pairs].sort();
+    for (let pair of sorted_pairs) {
+        console.log(pair);
+    }
+};
+
+
 async function main () {
     let needCount;
     let ignoreErrors;
@@ -307,6 +343,7 @@ async function main () {
             options.test ||
             options.copy_from ||
             options['sort-all-clues'] ||
+            options['show-pairs'] ||
             options['ccc'])
         {
             needCount = false;
@@ -330,6 +367,10 @@ async function main () {
 
     if (options['sort-all-clues']) {
         sortAllClues(clueSource, load_max);
+        process.exit(0);
+    }
+    if (options['show-pairs']) {
+        show_pairs(clueSource, load_max, options);
         process.exit(0);
     }
 

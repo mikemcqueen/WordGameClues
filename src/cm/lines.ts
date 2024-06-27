@@ -1,4 +1,6 @@
 // lines.ts
+//
+// I don't remember what I was doing here.
 
 const Assert = require('assert');
 const Events = require('events');

@@ -1,3 +1,14 @@
+* cm: shouldn't i filter out retired pairs in pairs(.sh) ?
+  * and for that matter, would a filter-retired(.sh) script be useful for
+    per-letter pairs?
+  * maybe i should make cm pairs -l the per-letter pair option, and -c
+    the "show letter counts" option
+    * reasoning: it will be useful to have a general-purpose script for
+      generating per-letter pairs.  -l would take a required argument
+      (a single letter, at least in initial implementation)
+* cm: ensure words.json is sorted
+
+
 ++PERF
 
 * elimination of event sync'ing by storing of host-side data in MFD during copies.
