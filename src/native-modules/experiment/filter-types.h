@@ -23,7 +23,7 @@ namespace cm {
 // types
 
 using filter_result_t = std::unordered_set<std::string>;
-using hr_time_point_t = decltype(std::chrono::high_resolution_clock::now());
+//using hr_time_point_t = decltype(std::chrono::high_resolution_clock::now());
 
 struct SourceIndex {
   index_t listIndex{};

@@ -46,23 +46,23 @@ auto mergeCompatibleSourceLists(
 auto mergeAllCompatibleSources(const NameCountList& ncList) -> SourceList {
   // because **maybe** broken for > 2 below
   assert(ncList.size() <= 2 && "ncList.length > 2");
-  const auto log = false; // TODO: use log_level(Verbose)?
-  if constexpr (log) {
+  const bool logging = log_level(ExtraVerbose);
+  if (logging) {
     std::cout << "nc[0]: " << ncList[0].toString() << std::endl;
   }
   // TODO: find smallest sourcelist to copy first, then skip merge in loop?
   SourceList src_list{clue_manager::make_src_list_for_nc(ncList[0])};
-  if constexpr (log) {
+  if (logging) {
     SourceData::dumpList(src_list);
   }
   // TODO: std::next() or something.
   for (auto i = 1u; i < ncList.size(); ++i) {
-    if constexpr (log) {
+    if (logging) {
       std::cout << " nc[" << i << "]: " << ncList[i].toString() << std::endl;
     }
-    const auto& src_cref_list{
-      clue_manager::make_src_cref_list_for_nc(ncList[i])};
-    if constexpr (log) {
+    const auto src_cref_list{
+        clue_manager::make_src_cref_list_for_nc(ncList[i])};
+    if (logging) {
       SourceData::dumpList(src_cref_list);
     }
     src_list = std::move(mergeCompatibleSourceLists(src_list, src_cref_list));
@@ -139,15 +139,15 @@ auto buildSourceListsForUseNcData(const std::vector<NCDataList>& useNcDataLists)
       }
     }
   }
-  if constexpr (0) {
-    std::cerr << "  hash: " << hash_called << ", equal_to: " << equal_to_called
-              << std::endl;
+  if (log_level(Verbose)) {
+    //std::cerr << "  hash: " << hash_called << ", equal_to: " << equal_to_called
+    //          << std::endl;
     std::cerr << "  total sources: " << total << ", hash_hits: " << hash_hits
               << ", sourceLists(" << sourceLists.size() << "): "
               << std::accumulate(sourceLists.begin(), sourceLists.end(), 0u,
-                   [](size_t total, const SourceList& list) {
-                     return total + list.size();
-                   })
+                     [](size_t total, const SourceList& list) {
+                       return total + list.size();
+                     })
               << std::endl;
   }
   return sourceLists;

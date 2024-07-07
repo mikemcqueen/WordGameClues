@@ -1,6 +1,7 @@
 #ifndef INCLUDE_UTIL_H
 #define INCLUDE_UTIL_H
 
+#include <chrono>
 #include <limits>
 #include <stdexcept>
 #include <string>
@@ -107,6 +108,34 @@ inline std::string join(
       return acc + delim + std::to_string(num);
     });
 }
+
+class Timer {
+public:
+  void start() {
+    start_ = std::chrono::high_resolution_clock::now();
+  }
+
+  void stop() {
+    stop_ = std::chrono::high_resolution_clock::now();
+  }
+
+  template <typename TimeUnit = std::chrono::milliseconds>
+  auto count() {
+    return std::chrono::duration_cast<TimeUnit>(stop_ - start_).count();
+  }
+
+  static Timer start_timer() {
+    Timer t;
+    t.start();
+    return t;
+  }
+
+private:
+  using time_point_t = decltype(std::chrono::high_resolution_clock::now());
+
+  time_point_t start_{};
+  time_point_t stop_{};
+};
 
 }  // namespace util
 

@@ -674,13 +674,15 @@ void alloc_copy_filter_indices() {
 Value filterPreparation(const CallbackInfo& info) {
   using namespace std::chrono;
   Env env = info.Env();
-  if (!info[0].IsArray()) {
+  if (!info[0].IsArray() || !info[1].IsObject()) {
     TypeError::New(env, "filterPreparation: invalid parameter")
       .ThrowAsJavaScriptException();
     return env.Null();
   }
   // arg0
   auto orNcDataLists = makeNcDataLists(env, info[0].As<Array>());
+  // arg1
+  set_log_args(makeLogArgs(env, info[1].As<Object>()));
   // --
   alloc_copy_filter_indices();
   set_or_args(orNcDataLists);
@@ -742,8 +744,7 @@ void set_incompatible_sources(
 Value filterCandidatesForSum(const CallbackInfo& info) {
   Env env = info.Env();
   if (!info[0].IsNumber() || !info[1].IsNumber() || !info[2].IsNumber()
-      || !info[3].IsNumber() || !info[4].IsNumber() || !info[5].IsBoolean()
-      || !info[6].IsObject()) {
+      || !info[3].IsNumber() || !info[4].IsNumber() || !info[5].IsBoolean()) {
     TypeError::New(env, "fitlerCandidatesForSum: invalid parameter type")
       .ThrowAsJavaScriptException();
     return env.Null();
@@ -755,8 +756,8 @@ Value filterCandidatesForSum(const CallbackInfo& info) {
   auto stride = info[3].As<Number>().Int32Value();
   auto iters = info[4].As<Number>().Int32Value();
   auto synchronous = info[5].As<Boolean>().Value();
-  // arg6
-  set_log_args(makeLogArgs(env, info[6].As<Object>()));
+  // arg6 - moved to filterPrepartion
+  //set_log_args(makeLogArgs(env, info[6].As<Object>()));
   // --
   auto opt_incompatible_sources = filter_candidates_cuda(
     MFD, sum, threads_per_block, streams, stride, iters, synchronous);

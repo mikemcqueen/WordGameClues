@@ -131,19 +131,19 @@ const combinationNcDataList = (ncIndexList: number[], ncLists: NameCount.List[])
         Object({ ncList: ncLists[listIndex][ncIndex]} ));
 };
 
-const combinationsToNcDataLists = (combinationNcLists: NameCount.List[], verbose?: boolean):
+const combinationsToNcDataLists = (combinationNcLists: NameCount.List[], verbose: number):
     NCDataList[] =>
 {
     Debug(`combToNcDataLists() combinationNcLists: ${Stringify(combinationNcLists)}`);
     // TODO: List.toIndexListArray()
     // keys of array are 0..ncList.length-1
     const listArray = combinationNcLists.map(ncList => [...Array(ncList.length).keys()]);
-    if (verbose) console.error(` listArray: ${JStringify(listArray)}`);
+    if (verbose > 2) console.error(` listArray: ${JStringify(listArray)}`);
     let x =  Peco.makeNew({ listArray
         // sum of lengths of nclists
         //, max: combinationNcLists.reduce((sum, ncList) => sum + ncList.length, 0)
     }).getCombinations();
-    if (verbose) console.error(` combinations: ${JStringify(x)}`);
+    if (verbose > 2) console.error(` combinations: ${JStringify(x)}`);
     return x.map((ncIndexList: number[]) =>
         combinationNcDataList(ncIndexList, combinationNcLists));
 };
@@ -175,13 +175,13 @@ const buildAllUseNcDataLists = (listName: string, maxSum: number, args: any): NC
     const useArgsList: string[] = args[listName];
     Assert(useArgsList);
     if (args.verbose) {
-        console.error(`buildAllUseNcDataLists(${listName}) - maxSum(${maxSum})`);
-        console.error(` useArgList(${useArgsList.length})`);
+        console.error(`buildAllUseNcDataLists(${listName}), useArgList(${useArgsList.length})` +
+            `, maxSum(${maxSum})`);
     }
     const combinationNcLists = getCombinationNcLists(useArgsList);
-    if (args.verbose) console.error(` combinationNcLists(${combinationNcLists.length})`);
-    const ncDataLists = combinationsToNcDataLists(combinationNcLists, args.verbose);
-    if (args.verbose) console.error(` ncDataLists(${ncDataLists.length})`);
+    if (args.verbose > 2) console.error(` combinationNcLists(${combinationNcLists.length})`);
+    const ncDataLists = combinationsToNcDataLists(combinationNcLists, args.verbose || 0);
+    if (args.verbose > 2) console.error(` ncDataLists(${ncDataLists.length})`);
     const begin = new Date();
     const result = ncDataLists.filter((ncDataList: NCDataList) => {
         const [largest, ncList] = largestNcDataCountSum(ncDataList);
@@ -191,7 +191,7 @@ const buildAllUseNcDataLists = (listName: string, maxSum: number, args: any): NC
         }
         return largest <= maxSum;
     });
-    if (args.verbose) {
+    if (args.verbose > 2) {
         let d = new Duration(begin, new Date()).milliseconds;
         console.error(` filtered ncDataLists(${result.length}) - ${PrettyMs(d)}`);
     }
@@ -280,8 +280,8 @@ export const preCompute = (first: number, last: number, args: any): boolean => {
     const orNcDataLists = args.or ? buildAllUseNcDataLists("or", maxSum, args) : [ [] ];
     if (listIsEmpty(orNcDataLists)) return false;
 
-    //Native.setOrArgs(orNcDataLists);
-    Native.filterPreparation(orNcDataLists);
+    // NOTE: eventually  Native.setFlags(args) (for verbose flag) should exist
+    Native.filterPreparation(orNcDataLists, args);
 
     const d = new Duration(begin, new Date()).milliseconds;
     console.error(`--Precompute - ${PrettyMs(d)}`);
