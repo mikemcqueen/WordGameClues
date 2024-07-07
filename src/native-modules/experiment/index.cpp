@@ -536,6 +536,7 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   auto build0 = high_resolution_clock::now();
   // TODO: I'm not convinced this data needs to hang around on host side.
   // maybe for async copy?
+  // NOTE: it's used for -t, we call preCompute(), then Native.showComponents()
   MFD.host.xor_src_lists =
     std::move(buildSourceListsForUseNcData(ncDataLists));
 
@@ -617,7 +618,7 @@ void set_or_args(const std::vector<NCDataList>& ncDataLists) {
   using namespace std::chrono;
   auto build0 = high_resolution_clock::now();
   MFD.host.or_arg_list =
-    buildOrArgList(buildSourceListsForUseNcData(ncDataLists));
+    std::move(buildOrArgList(buildSourceListsForUseNcData(ncDataLists)));
   if (MFD.host.or_arg_list.size()) {
     // TODO: to eliminate sync call in allocCopyOrSources
     //  auto or_src_list = make_or_src_list(MFD.host.or_arg_list);

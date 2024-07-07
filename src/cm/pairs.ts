@@ -25,7 +25,7 @@ export const Options = [
 
 export const show_help = (): void => {
     // TODO: updatee
-    console.log('Usage: node cm pairs [-w] [-s] [-m] [-a] [-f FILE]...');
+    console.log('Usage (outdated): node cm pairs [-w] [-s] [-m] [-a] [-f FILE]...');
     console.log('\nGenerate pairs from words in words.json, solutions.json, and/or another words file.');
 };
 

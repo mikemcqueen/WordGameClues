@@ -14,6 +14,7 @@ const Debug       = require('debug')('cm-precompute');
 const Duration    = require('duration');
 const PrettyMs    = require('pretty-ms');
 const Stringify   = require('stringify-object');
+const JStringify   = require('javascript-stringify').stringify;
 
 import * as Clue from '../types/clue';
 import * as ClueManager from './clue-manager';
@@ -99,7 +100,7 @@ const nameOrNcStrListToKnownNcLists = (nameOrNcStrList: string[]):
         .map(nc => nc.count ? ncAsKnownNcList(nc) : getKnownNcListForName(nc.name));
 };
 
-const combinationNcList =  (indexList: number[], ncLists: NameCount.List[]):
+const combinationNcList = (indexList: number[], ncLists: NameCount.List[]):
     NameCount.List =>
 {
     return indexList.map((ncIndex: number, listIndex: number) =>
@@ -123,26 +124,32 @@ const getCombinationNcLists = (useArgsList: string[]): any => {
 };
 
 // TODO: combinationNcDataListFromNcLists
-const combinationNcDataList = (indexList: number[], ncLists: NameCount.List[]):
+const combinationNcDataList = (ncIndexList: number[], ncLists: NameCount.List[]):
     NCDataList =>
 {
-    return indexList.map((ncIndex: number, listIndex: number) =>
+    return ncIndexList.map((ncIndex: number, listIndex: number) =>
         Object({ ncList: ncLists[listIndex][ncIndex]} ));
 };
 
-const combinationsToNcDataLists = (combinationNcLists: NameCount.List[]):
+const combinationsToNcDataLists = (combinationNcLists: NameCount.List[], verbose?: boolean):
     NCDataList[] =>
 {
     Debug(`combToNcDataLists() combinationNcLists: ${Stringify(combinationNcLists)}`);
-    return Peco.makeNew({
-        // TODO: List.toIndexList()
-        listArray: combinationNcLists.map(ncList => [...Array(ncList.length).keys()]), // keys of array are 0..ncList.length-1
-        //max: combinationNcLists.reduce((sum, ncList) => sum + ncList.length, 0)        // sum of lengths of nclists
-    }).getCombinations().map((ncListIndexes: number[]) =>
-        combinationNcDataList(ncListIndexes, combinationNcLists));
+    // TODO: List.toIndexListArray()
+    // keys of array are 0..ncList.length-1
+    const listArray = combinationNcLists.map(ncList => [...Array(ncList.length).keys()]);
+    if (verbose) console.error(` listArray: ${JStringify(listArray)}`);
+    let x =  Peco.makeNew({ listArray
+        // sum of lengths of nclists
+        //, max: combinationNcLists.reduce((sum, ncList) => sum + ncList.length, 0)
+    }).getCombinations();
+    if (verbose) console.error(` combinations: ${JStringify(x)}`);
+    return x.map((ncIndexList: number[]) =>
+        combinationNcDataList(ncIndexList, combinationNcLists));
 };
 
-// it's really questionable whether we want to be summing the NC counts or taking
+// TODO:
+// it's an open question whether we want to be summing the NC counts or taking
 // the largest individual NC "count" value. haven't fully thought through all the
 // use cases
 const largestNcDataCountSum = (ncDataList: NCDataList): [number, NameCount.List] => {
@@ -162,25 +169,31 @@ const largestNcDataCountSum = (ncDataList: NCDataList): [number, NameCount.List]
         }
     }
     return [largest, ncList];
-}
+};
 
 const buildAllUseNcDataLists = (listName: string, maxSum: number, args: any): NCDataList[] => {
     const useArgsList: string[] = args[listName];
     Assert(useArgsList);
+    if (args.verbose) {
+        console.error(`buildAllUseNcDataLists(${listName}) - maxSum(${maxSum})`);
+        console.error(` useArgList(${useArgsList.length})`);
+    }
     const combinationNcLists = getCombinationNcLists(useArgsList);
-    const ncDataLists = combinationsToNcDataLists(combinationNcLists)
+    if (args.verbose) console.error(` combinationNcLists(${combinationNcLists.length})`);
+    const ncDataLists = combinationsToNcDataLists(combinationNcLists, args.verbose);
+    if (args.verbose) console.error(` ncDataLists(${ncDataLists.length})`);
     const begin = new Date();
     const result = ncDataLists.filter((ncDataList: NCDataList) => {
         const [largest, ncList] = largestNcDataCountSum(ncDataList);
         if (largest > maxSum) {
-            // NOTE this doesn't display the largest ncList
+            // NOTE this doesn't display the largest ncList ??
             //console.error(`skipping ${largest}, ${NameCount.listToString(ncList)}`);
         }
         return largest <= maxSum;
     });
     if (args.verbose) {
         let d = new Duration(begin, new Date()).milliseconds;
-        console.error(` buildAllUseNc "${listName}", max(${maxSum}) - ${PrettyMs(d)}`);
+        console.error(` filtered ncDataLists(${result.length}) - ${PrettyMs(d)}`);
     }
     return result;
 };
@@ -192,7 +205,7 @@ const listCandidateCount = (ncList: NameCount.List): number => {
         if (hasCandidate(nc)) ++count;
     }
     return count;
-}
+};
 
 const initOrSource = (source: Source.Data): OrSourceData => {
     return {
@@ -227,6 +240,7 @@ const buildOrArgDataList = (sourceLists: Source.List[]): OrArgDataList => {
     return orArgDataList;
 };
 
+/*
 // Given a list of XorSources, and a list of OrSources, TODO
 //
 const markAllXorCompatibleOrSources = (xorSourceList: Source.List,
@@ -240,6 +254,7 @@ const markAllXorCompatibleOrSources = (xorSourceList: Source.List,
         }
     }
 };
+*/
 
 export const preCompute = (first: number, last: number, args: any): boolean => {
     const maxSum = args.max_sources - 1;

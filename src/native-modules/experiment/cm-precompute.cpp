@@ -109,12 +109,12 @@ auto buildSourceListsForUseNcData(const std::vector<NCDataList>& useNcDataLists)
       for (const auto& source : sourceList) {
         // TODO: NOT GOOD ENOUUGH. still need a set of strings in value type.
         // HOWEVER, instead of listToSring'ing 75 million lists, how about we
-        // mark "duplicate count, different name", i.e. "aliased" sources in 
+        // mark "duplicate count, different name", i.e. "aliased" sources in
         // clue-manager, and only listToString and add those to a separate
         // map<bitset, set<String>> for ncLists with "shared" sourceBits.
         // probably don't need a separate map. just don't bother populating
         // and looking in the set unless its an aliased source.
-        
+
         // usedSources is being used (in makeBitString). and there are lots
         // of hash hits, so I know this is necessary. i'm not sure why its
         // still not good enough though, according to above. Might have been
@@ -133,15 +133,17 @@ auto buildSourceListsForUseNcData(const std::vector<NCDataList>& useNcDataLists)
       }
     }
   }
-#if defined(PRECOMPUTE_LOGGING)
-  std::cerr << "  hash: " << hash_called << ", equal_to: "
-    << equal_to_called << std::endl;
-  std::cerr << "  total sources: " << total << ", hash_hits: " << hash_hits
-    << ", sourceLists(" << sourceLists.size() << "): "
-    << std::accumulate(sourceLists.begin(), sourceLists.end(), 0u,
-      [](size_t total, const SourceList& list){ return total + list.size(); })
-    << std::endl;
-#endif
+  if constexpr (0) {
+    std::cerr << "  hash: " << hash_called << ", equal_to: " << equal_to_called
+              << std::endl;
+    std::cerr << "  total sources: " << total << ", hash_hits: " << hash_hits
+              << ", sourceLists(" << sourceLists.size() << "): "
+              << std::accumulate(sourceLists.begin(), sourceLists.end(), 0u,
+                   [](size_t total, const SourceList& list) {
+                     return total + list.size();
+                   })
+              << std::endl;
+  }
   return sourceLists;
 }
 
@@ -288,7 +290,7 @@ auto buildSentenceVariationIndices(const std::vector<SourceList>& xor_src_lists,
         variationIndicesList.clear();
       }
     });
-  if (0) {
+  if constexpr (0) {
     dumpSentenceVariationIndices(sentenceVariationIndices);
   }
   return sentenceVariationIndices;

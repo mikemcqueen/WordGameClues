@@ -14,7 +14,7 @@ using namespace cm;
 constexpr auto kMaxMatrices = 10u;
 
 // Given two arrays of sources, test xor compatibility of all combinations
-// of two sources (pairs), containing one source from each list.
+// of source pairs consisting of one source from each list.
 //
 // Indices are used because only a subset (as specified by indicee arrays)
 // of each source array is actually considered.

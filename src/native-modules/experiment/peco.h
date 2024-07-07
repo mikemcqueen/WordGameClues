@@ -32,8 +32,8 @@ public:
 
   take_type next_combination() {
     int i{};
-    for (i = iterators_.size() - 1; i >= 0; --i) {
-      auto& il = index_lists_[i];
+    for (i = (int)iterators_.size() - 1; i >= 0; --i) {
+      const auto& il = index_lists_[i];
       assert(std::next(iterators_[i]) != il.end());
       ++iterators_[i];
       if (std::next(iterators_[i]) != il.end()) break;
@@ -43,17 +43,17 @@ public:
     return take();
   }
 
-  // TODO:
-  // these static methods actually made sense to be in this class at one point,
-  // but I think they're kinda standalone at this point and don't really belong
-  // here
+  // TODO: it may have made sense for some of these static methods to be in this
+  // class at one time, but it has become rather polluted with them, and it may
+  // be time to re-think the organization of this class/namespace
+  // maybe something like namespace peco { class Generator }
   template <typename T>
   // TODO: requires integral_type
   static auto initial_indices(const std::vector<T>& lengths) {
     IndexListVector idx_lists;
     idx_lists.resize(lengths.size());
     for (size_t i{}; i < idx_lists.size(); ++i) {
-      initialize_list(idx_lists[i], lengths[i]);
+      initialize_list(idx_lists.at(i), lengths.at(i));
     }
     return idx_lists;
   }

@@ -324,7 +324,7 @@ export const makeCombos = (args: any): any => {
             // run 2-clue sources synchronously to seed "incompatible sources"
             // and subsequent sums faster. 
             makeCombosForSum(2, args, true);
-            if (first == 2) ++first;
+            if (first === 2) ++first;
             for (let sum = first; sum <= last; ++sum) {
             //for (let sum = last; sum >= first; --sum) {
                // TODO: return # of combos filtered due to note name match

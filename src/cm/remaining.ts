@@ -11,6 +11,17 @@ const FILE = 'remain.json';
 const LOWER_A = 'a'.charCodeAt(0);
 const LOWER_Z = 'z'.charCodeAt(0);
 
+/*
+export const Options = [
+];
+*/
+
+export const show_help = (): void => {
+    console.log('Usage: node cm remain [WORDS...]');
+    console.log('\nDisplay remaining letters, optionally after removing characters from WORDS.');
+};
+
+
 export const topmost_dir = (starting_dir?: string): string => {
     return Solutions.find_dir(starting_dir);
 };
