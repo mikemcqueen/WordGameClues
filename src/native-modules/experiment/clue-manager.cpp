@@ -65,7 +65,7 @@ auto& get_known_source_map(int count, bool force_create = false) {
 }
 
 void init_known_source_map_entry(
-  int count, const std::string& src, SourceList&& src_list) {
+    int count, const std::string& src, SourceList&& src_list) {
   // True is arbitrary here. I *could* support replacing an existing src_list,
   // but i'm unaware of any situation that requires it, and as a result I want
   // things to blow up when it is attempted, currently.
@@ -75,8 +75,7 @@ void init_known_source_map_entry(
 }
 
 int append_known_sources_to_nc_sources(
-  const std::string& sources_csv, const cm::NameCount& nc) {
-  //
+    const std::string& sources_csv, const cm::NameCount& nc) {
   auto& nc_src_list = get_nc_src_list(nc);
   const auto& known_src_list =
     get_known_source_map_entry(nc.count, sources_csv).src_list;
@@ -92,8 +91,7 @@ const auto& get_name_sources_map(int count) {
 }
 
 auto build_primary_name_sources_map(
-  const PrimaryNameSrcIndicesMap& name_src_indices_map) {
-  //
+    const PrimaryNameSrcIndicesMap& name_src_indices_map) {
   NameSourcesMap name_sources_map;
   // TODO: [name, idx_list]
   for (const auto& kv_pair : name_src_indices_map) {
@@ -158,8 +156,7 @@ auto get_num_nc_sources(const NameCount& nc) -> int {
 }
 
 void add_compound_clue(
-  const cm::NameCount& nc, const std::string& sources_csv) {
-  //
+    const cm::NameCount& nc, const std::string& sources_csv) {
   append_known_sources_to_nc_sources(sources_csv, nc);
   get_known_source_map_entry(nc.count, sources_csv)
     .clue_names.emplace_back(nc.name);
@@ -186,8 +183,7 @@ auto make_src_cref_list_for_nc(const NameCount& nc) -> cm::SourceCRefList {
 //
 
 auto buildPrimaryNameSrcIndicesMap(std::vector<std::string>& names,
-  std::vector<IndexList>& idx_lists) -> PrimaryNameSrcIndicesMap {
-  //
+    std::vector<IndexList>& idx_lists) -> PrimaryNameSrcIndicesMap {
   PrimaryNameSrcIndicesMap src_indices_map;
   for (size_t i{}; i < names.size(); ++i) {
     src_indices_map.emplace(std::move(names.at(i)), std::move(idx_lists.at(i)));
@@ -258,9 +254,8 @@ const IndexList& getPrimaryClueSrcIndices(const std::string& name) {
 // knownSourceMaps
 //
 
-void init_known_source_map_entry(
-  int count, const std::vector<std::string>& name_list, SourceList&& src_list) {
-  //
+void init_known_source_map_entry(int count,
+    const std::vector<std::string>& name_list, SourceList&& src_list) {
   init_known_source_map_entry(
     count, util::join(name_list, ","), std::move(src_list));
 }
@@ -279,7 +274,7 @@ bool is_known_source_map_entry(int count, const std::string& sources_csv) {
 }
 
 auto get_known_source_map_entry(int count, const std::string& sources_csv)
-  -> KnownSourceMapValue& {
+    -> KnownSourceMapValue& {
   auto& map = get_known_source_map(count);
   auto it = map.find(sources_csv);
   assert(it != map.end());
@@ -287,8 +282,7 @@ auto get_known_source_map_entry(int count, const std::string& sources_csv)
 }
 
 auto get_known_source_map_entries(const NameCount& nc)
-  -> std::vector<KnownSourceMapValueCRef> {
-  //
+    -> std::vector<KnownSourceMapValueCRef> {
   std::vector<KnownSourceMapValueCRef> cref_entries;
   const auto& name_sources_map = get_name_sources_map(nc.count);
   for (const auto& sources_csv : name_sources_map.at(nc.name)) {

@@ -103,8 +103,7 @@ NameCountList makeNameCountList(Env& env, const Array& jsList) {
 }
 
 SourceData makeSourceData(Env& env, const Object& jsSourceData,
-  std::string_view nameSrcList = "primaryNameSrcList") {
-  //
+    std::string_view nameSrcList = "primaryNameSrcList") {
   auto jsPrimaryNameSrcList = jsSourceData.Get(nameSrcList.data());
   if (!jsPrimaryNameSrcList.IsArray()) {
     TypeError::New(env, "makeSourceData: primaryNameSrcList is not an array")
@@ -132,8 +131,7 @@ SourceData makeSourceData(Env& env, const Object& jsSourceData,
 }
 
 SourceList makeSourceList(Env& env, const Array& jsList,
-  std::string_view nameSrcList = "primaryNameSrcList") {
-  //
+    std::string_view nameSrcList = "primaryNameSrcList") {
   SourceList sourceList{};
   for (size_t i{}; i < jsList.Length(); ++i) {
     if (!jsList[i].IsObject()) {
@@ -206,7 +204,7 @@ NameSourcesMap makeNameSourcesMap(Env& env, const Array& jsList) {
 }
 
 SourceCompatibilityData makeSourceCompatibilityDataFromSourceData(
-  Env& env, const Object& jsSourceData) {
+    Env& env, const Object& jsSourceData) {
   // TODO: addPnslToCompatData(jsSouceData, compatData);
   SourceCompatibilityData compatData{};
   const auto jsPnsl = jsSourceData.Get("primaryNameSrcList").As<Array>();
@@ -219,8 +217,7 @@ SourceCompatibilityData makeSourceCompatibilityDataFromSourceData(
 }
 
 SourceCompatibilityData makeSourceCompatibilityDataFromSourceList(
-  Env& env, const Array& jsSourceList) {
-
+    Env& env, const Array& jsSourceList) {
   SourceCompatibilityData compatData{};
   for (size_t i{}; i < jsSourceList.Length(); ++i) {
     if (!jsSourceList[i].IsObject()) {
@@ -241,8 +238,7 @@ SourceCompatibilityData makeSourceCompatibilityDataFromSourceList(
 }
 
 SourceCompatibilityList makeSourceCompatibilityListFromMergedSourcesList(
-  Env& env, const Array& jsList) {
-  //
+    Env& env, const Array& jsList) {
   SourceCompatibilityList sourceCompatList{};
   for (size_t i{}; i < jsList.Length(); ++i) {
     if (!jsList[i].IsObject()) {
@@ -520,7 +516,6 @@ Value validateSources(const CallbackInfo& info) {
 
 Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   using namespace std::chrono;
-
   Env env = info.Env();
   if (!info[0].IsArray() || !info[1].IsBoolean()) {
     TypeError::New(
@@ -589,32 +584,6 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   return Number::New(env, (uint32_t)result);
 }
 
-#if 0
-// TODO: re-write when not high. probably i was high when i wrote this.
-void validate_marked_or_sources(
-    const OrArgList& arg_list, const std::vector<result_t>& mark_results) {
-  size_t arg_idx{};
-  size_t num_sources = arg_list[arg_idx].or_src_list.size();
-  bool is_arg_marked{false};
-  for (size_t result_idx{}; result_idx < mark_results.size();) {
-    if (mark_results[result_idx]) {
-      is_arg_marked = true;
-    }
-    if (++result_idx == num_sources) {
-      if (!is_arg_marked) {
-        std::cerr << "or_arg_idx " << arg_idx << " is not compatible"
-                  << std::endl;
-        assert(is_arg_marked);
-      }
-      if (++arg_idx == arg_list.size()) {
-        return;
-      }
-      num_sources += arg_list[arg_idx].or_src_list.size();
-      is_arg_marked = false;
-    }
-  }
-}
-#else
 void validate_marked_or_sources(
     const OrArgList& or_arg_list, const std::vector<result_t>& mark_results) {
   auto arg_idx = int{0};
@@ -630,7 +599,6 @@ void validate_marked_or_sources(
     ++arg_idx;
   }
 }
-#endif
 
 void set_or_args(const std::vector<NCDataList>& ncDataLists) {
   using namespace std::chrono;
@@ -739,8 +707,7 @@ Value considerCandidate(const CallbackInfo& info) {
 //
 
 auto make_source_descriptor_pairs(
-  const SourceCompatibilitySet& incompatible_sources) {
-  //
+    const SourceCompatibilitySet& incompatible_sources) {
   std::vector<UsedSources::SourceDescriptorPair> src_desc_pairs;
   src_desc_pairs.reserve(incompatible_sources.size());
   for (const auto& src: incompatible_sources) {
@@ -759,7 +726,7 @@ auto make_source_descriptor_pairs(
 }
 
 void set_incompatible_sources(
-  const SourceCompatibilitySet& incompatible_sources) {
+    const SourceCompatibilitySet& incompatible_sources) {
   // empty set technically possible; disallowed here as a canary
   assert(!incompatible_sources.empty());
   assert(MFD.host.incompatible_src_desc_pairs.empty());

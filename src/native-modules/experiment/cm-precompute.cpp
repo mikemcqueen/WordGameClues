@@ -20,17 +20,16 @@ namespace {
 
 SourceData mergeSources(const SourceData& source1, const SourceData& source2) {
   auto primaryNameSrcList = NameCount::listMerge(
-    source1.primaryNameSrcList, source2.primaryNameSrcList);
+      source1.primaryNameSrcList, source2.primaryNameSrcList);
   // MAYBE TODO: ncList merge probably not necessary (??)
   auto ncList = NameCount::listMerge(source1.ncList, source2.ncList);
   auto usedSources = source1.usedSources.copyMerge(source2.usedSources);
   return {
-    std::move(primaryNameSrcList), std::move(ncList), std::move(usedSources)};
+      std::move(primaryNameSrcList), std::move(ncList), std::move(usedSources)};
 }
 
 auto mergeCompatibleSourceLists(
-  const SourceList& src_list, const SourceCRefList& src_cref_list) {
-  //
+    const SourceList& src_list, const SourceCRefList& src_cref_list) {
   SourceList result{};
   for (const auto& src : src_list) {
     for (const auto& src_cref : src_cref_list) {
@@ -47,7 +46,7 @@ auto mergeCompatibleSourceLists(
 auto mergeAllCompatibleSources(const NameCountList& ncList) -> SourceList {
   // because **maybe** broken for > 2 below
   assert(ncList.size() <= 2 && "ncList.length > 2");
-  const auto log = true;
+  const auto log = false; // TODO: use log_level(Verbose)?
   if constexpr (log) {
     std::cout << "nc[0]: " << ncList[0].toString() << std::endl;
   }
@@ -75,8 +74,7 @@ auto mergeAllCompatibleSources(const NameCountList& ncList) -> SourceList {
 }
 
 bool every_combo_idx(combo_index_t combo_idx,
-  const std::vector<IndexList>& idx_lists, const auto& fn) {
-  //
+    const std::vector<IndexList>& idx_lists, const auto& fn) {
   for (int i{(int)idx_lists.size() - 1}; i >= 0; --i) {
     const auto& idx_list = idx_lists.at(i);
     auto src_idx = idx_list.at(combo_idx % idx_list.size());
@@ -190,10 +188,9 @@ auto buildOrArgList(std::vector<SourceList>&& or_src_list) -> OrArgList {
 }
 
 bool isXorCompatibleWithAnySource(const OrSourceData& or_src,
-  const std::vector<SourceList>& xor_src_lists,
-  const std::vector<IndexList>& compat_idx_lists,
-  const ComboIndexList& compat_indices) {
-  //
+    const std::vector<SourceList>& xor_src_lists,
+    const std::vector<IndexList>& compat_idx_lists,
+    const ComboIndexList& compat_indices) {
   for (size_t i{}; i < compat_indices.size(); ++i) {
     if (every_combo_idx(compat_indices.at(i), compat_idx_lists,
           [&src = or_src.src, &xor_src_lists](
@@ -208,10 +205,9 @@ bool isXorCompatibleWithAnySource(const OrSourceData& or_src,
 }
 
 void markAllXorCompatibleOrSources(OrArgList& or_arg_list,
-  const std::vector<SourceList>& xor_src_lists,
-  const std::vector<IndexList>& compat_idx_lists,
-  const ComboIndexList& compat_indices) {
-  // whee nesting
+    const std::vector<SourceList>& xor_src_lists,
+    const std::vector<IndexList>& compat_idx_lists,
+    const ComboIndexList& compat_indices) {
   uint32_t total{};
   uint32_t num_compat{};
   using namespace std::chrono;
@@ -237,7 +233,7 @@ void markAllXorCompatibleOrSources(OrArgList& or_arg_list,
 namespace {
 
 void dumpSentenceVariationIndices(
-  const SentenceVariationIndices& sentenceVariationIndices) {
+    const SentenceVariationIndices& sentenceVariationIndices) {
   for (int s{}; s < kNumSentences; ++s) {
     const auto& variationIndicesList = sentenceVariationIndices.at(s);
     if (!variationIndicesList.empty()) {
@@ -255,9 +251,8 @@ void dumpSentenceVariationIndices(
 }  // namespace
 
 auto buildSentenceVariationIndices(const std::vector<SourceList>& xor_src_lists,
-  const std::vector<IndexList>& compat_idx_lists,
-  const ComboIndexList& compat_indices) -> SentenceVariationIndices {
-  //
+    const std::vector<IndexList>& compat_idx_lists,
+    const ComboIndexList& compat_indices) -> SentenceVariationIndices {
   SentenceVariationIndices sentenceVariationIndices;
   for (size_t i{}; i < compat_indices.size(); ++i) {
     std::array<int, kNumSentences> variations = {
