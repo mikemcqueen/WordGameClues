@@ -589,30 +589,48 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   return Number::New(env, (uint32_t)result);
 }
 
+#if 0
+// TODO: re-write when not high. probably i was high when i wrote this.
 void validate_marked_or_sources(
-  const OrArgList& or_arg_list, const std::vector<result_t>& mark_results) {
-  //
-  size_t or_arg_idx{};
-  size_t num_or_args = or_arg_list[or_arg_idx].or_src_list.size();
+    const OrArgList& arg_list, const std::vector<result_t>& mark_results) {
+  size_t arg_idx{};
+  size_t num_sources = arg_list[arg_idx].or_src_list.size();
   bool is_arg_marked{false};
   for (size_t result_idx{}; result_idx < mark_results.size();) {
     if (mark_results[result_idx]) {
       is_arg_marked = true;
     }
-    if (++result_idx == num_or_args) {
+    if (++result_idx == num_sources) {
       if (!is_arg_marked) {
-        std::cerr << "or_arg_idx " << or_arg_idx << " is not compatible"
+        std::cerr << "or_arg_idx " << arg_idx << " is not compatible"
                   << std::endl;
         assert(is_arg_marked);
       }
-      if (++or_arg_idx == or_arg_list.size()) {
+      if (++arg_idx == arg_list.size()) {
         return;
       }
-      num_or_args += or_arg_list[++or_arg_idx].or_src_list.size();
+      num_sources += arg_list[arg_idx].or_src_list.size();
       is_arg_marked = false;
     }
   }
 }
+#else
+void validate_marked_or_sources(
+    const OrArgList& or_arg_list, const std::vector<result_t>& mark_results) {
+  auto arg_idx = int{0};
+  auto results_begin = mark_results.cbegin();
+  for (const auto& or_arg: or_arg_list) {
+    auto results_end = results_begin + or_arg.or_src_list.size();
+    if (std::find(results_begin, results_end, 1) == results_end) {
+      std::cerr << "or_arg_idx " << arg_idx << " is not compatible"
+                << std::endl;
+      assert(0);
+    }
+    results_begin = results_end;
+    ++arg_idx;
+  }
+}
+#endif
 
 void set_or_args(const std::vector<NCDataList>& ncDataLists) {
   using namespace std::chrono;

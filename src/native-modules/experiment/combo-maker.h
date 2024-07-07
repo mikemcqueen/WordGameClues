@@ -512,6 +512,11 @@ struct NCData {
 };
 using NCDataList = std::vector<NCData>;
 
+struct SourceData;
+using SourceList = std::vector<SourceData>;
+using SourceCRef = std::reference_wrapper<const SourceData>;
+using SourceCRefList = std::vector<SourceCRef>;
+
 struct SourceData : SourceCompatibilityData {
   SourceData() = default;
   SourceData(NameCountList&& primaryNameSrcList, NameCountList&& ncList,
@@ -547,13 +552,37 @@ struct SourceData : SourceCompatibilityData {
     return true;
   }
 
+  static void dumpList(const SourceList& src_list) {
+    std::cout << "dumping " << src_list.size() << " sources" << std::endl;
+    for (const auto& src : src_list) {
+      std::cout << " ncList: " << NameCount::listToString(src.ncList)
+                << std::endl;
+      std::cout << " pnsl: " << NameCount::listToString(src.primaryNameSrcList)
+                << std::endl;
+    }
+  }
+
+  static void dumpList(const SourceCRefList& src_cref_list) {
+    // TODO: auto-ref or just auto here?
+    std::cout << "dumping " << src_cref_list.size() << " cref_sources" << std::endl;
+    for (const auto& src_cref : src_cref_list) {
+      std::cout << " ncList: " << NameCount::listToString(src_cref.get().ncList)
+                << std::endl;
+      std::cout << " pnsl: "
+                << NameCount::listToString(src_cref.get().primaryNameSrcList)
+                << std::endl;
+    }
+  }
+
   NameCountList primaryNameSrcList;
   NameCountList ncList;
 };
 
+#if 0
 using SourceList = std::vector<SourceData>;
 using SourceCRef = std::reference_wrapper<const SourceData>;
 using SourceCRefList = std::vector<SourceCRef>;
+#endif
 using SourceListCRef = std::reference_wrapper<const SourceList>;
 using SourceListCRefList = std::vector<SourceListCRef>;
 using SourceListMap = std::unordered_map<std::string, SourceList>;

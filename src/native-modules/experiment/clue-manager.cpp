@@ -216,7 +216,7 @@ void setPrimaryNameSrcIndicesMap(PrimaryNameSrcIndicesMap&& src_indices_map) {
   auto ksm0 = high_resolution_clock::now();
   auto name_sources_map = build_primary_name_sources_map(src_indices_map);
   for (const auto& [name, sources] : name_sources_map) {
-    SourceList src_list;  // TODO = build_primary_src_list(name, sources);
+    SourceList src_list;  // TODO: = build_primary_src_list(name, sources);
     for (const auto& str_src : sources) {
       if (is_known_source_map_entry(1, str_src))
         continue;

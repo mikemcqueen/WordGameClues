@@ -104,7 +104,7 @@ AllowAllConstructorInitializersOnNextLine: false
 # The indentation width of the initialization list of the constructor
 ConstructorInitializerIndentWidth: 4
 # The indentation width of the continued line
-ContinuationIndentWidth: 2
+ContinuationIndentWidth: 4
 # Remove the space before the curly braces {after and before the C++11 list initialization
 Cpp11BracedListStyle: true
 # Inherit the most commonly used pointer and reference alignment

@@ -21,7 +21,7 @@ namespace {
 SourceData mergeSources(const SourceData& source1, const SourceData& source2) {
   auto primaryNameSrcList = NameCount::listMerge(
     source1.primaryNameSrcList, source2.primaryNameSrcList);
-  // ncList merge probably not necessary
+  // MAYBE TODO: ncList merge probably not necessary (??)
   auto ncList = NameCount::listMerge(source1.ncList, source2.ncList);
   auto usedSources = source1.usedSources.copyMerge(source2.usedSources);
   return {
@@ -47,20 +47,27 @@ auto mergeCompatibleSourceLists(
 auto mergeAllCompatibleSources(const NameCountList& ncList) -> SourceList {
   // because **maybe** broken for > 2 below
   assert(ncList.size() <= 2 && "ncList.length > 2");
-  constexpr auto log = false;
+  const auto log = true;
   if constexpr (log) {
-    std::cerr << "nc[0]: " << ncList[0].toString() << std::endl;
+    std::cout << "nc[0]: " << ncList[0].toString() << std::endl;
   }
   // TODO: find smallest sourcelist to copy first, then skip merge in loop?
-  SourceList src_list{clue_manager::make_src_list_for_nc(ncList[0])};  // copy
+  SourceList src_list{clue_manager::make_src_list_for_nc(ncList[0])};
+  if constexpr (log) {
+    SourceData::dumpList(src_list);
+  }
+  // TODO: std::next() or something.
   for (auto i = 1u; i < ncList.size(); ++i) {
     if constexpr (log) {
-      std::cerr << " nc[" << i << "]: " << ncList[i].toString() << std::endl;
+      std::cout << " nc[" << i << "]: " << ncList[i].toString() << std::endl;
     }
     const auto& src_cref_list{
       clue_manager::make_src_cref_list_for_nc(ncList[i])};
+    if constexpr (log) {
+      SourceData::dumpList(src_cref_list);
+    }
     src_list = std::move(mergeCompatibleSourceLists(src_list, src_cref_list));
-    // TODO BUG this is broken for > 2; should be something like:
+    // MAYBE BUG: this might be broken for > 2; should be something like:
     // if (sourceList.length !== ncIndex + 1) 
     if (src_list.empty()) break;
   }
@@ -98,6 +105,7 @@ auto buildSourceListsForUseNcData(const std::vector<NCDataList>& useNcDataLists)
   srand(-1); // why? hash?
   int total = 0;
   int hash_hits = 0;
+  // all useNcDataLists are the same length, so just grab length of first
   const auto size = useNcDataLists[0].size();
   std::vector<HashMap> hashList(size);
   std::vector<SourceList> sourceLists(size);
@@ -128,7 +136,7 @@ auto buildSourceListsForUseNcData(const std::vector<NCDataList>& useNcDataLists)
           hash_hits++;
           continue;
         }
-        hashList[i][key] = StringSet{}; // std::move ?
+        hashList[i][key] = StringSet{}; // TODO: emplace? std::move?
         sourceLists[i].emplace_back(std::move(source));
       }
     }
@@ -156,6 +164,7 @@ auto buildOrArg(SourceList& src_list) {
 };
 
 auto count_or_sources(const OrArgList& or_arg_list) {
+  // TODO: std::accumulate
   uint32_t total{};
   for (const auto& or_arg: or_arg_list) {
     total += or_arg.or_src_list.size();
