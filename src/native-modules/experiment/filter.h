@@ -32,7 +32,7 @@ void run_xor_kernel(StreamData& stream, int threads_per_block,
   const compat_src_result_t* device_compat_src_results, result_t* device_results,
   const index_t* device_list_start_indices);
 
-filter_result_t get_filter_result();
+filter_result_t get_filter_result(const MergeFilterData& mfd);
 
 auto cuda_markAllXorCompatibleOrSources(const MergeFilterData& mfd)
   -> std::vector<result_t>;
@@ -42,6 +42,8 @@ unsigned move_marked_or_sources(device::OrSourceData* device_or_src_list,
 
 void run_mark_or_sources_kernel(
   const MergeFilterData& mfd, result_t* device_results);
+
+void show_incompatible_or_arg_counts(unsigned num_or_args);
 
 /*
 [[nodiscard]] SourceCompatibilityData* cuda_allocCopyXorSources(

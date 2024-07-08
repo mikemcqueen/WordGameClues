@@ -4,6 +4,7 @@
 #include <chrono>
 #include <exception>
 #include <future>
+#include <iostream>
 #include <limits>
 #include <numeric>
 #include <optional>
@@ -33,10 +34,10 @@ template <typename T> __device__ __forceinline__ void store(T* addr, T val) {
 // Test if the supplied source contains both of the primary sources described
 // by any of the supplied source descriptor pairs.
 __device__ bool source_contains_any_descriptor_pair(
-  const SourceCompatibilityData& source,
-  const UsedSources::SourceDescriptorPair* __restrict__ src_desc_pairs,
-  const unsigned num_src_desc_pairs) {
-  //
+    const SourceCompatibilityData& source,
+    const UsedSources::SourceDescriptorPair* __restrict__ src_desc_pairs,
+    const unsigned num_src_desc_pairs) {
+
   __shared__ bool contains_both;
   if (!threadIdx.x) {
     contains_both = false;
@@ -67,12 +68,12 @@ __device__ unsigned int device_num_compat_sources = 0;
 __device__ unsigned int device_num_blocks = 0;
 
 __global__ void get_compatible_sources_kernel(
-  const SourceCompatibilityData* __restrict__ sources,
-  const unsigned num_sources,
-  const UsedSources::SourceDescriptorPair* __restrict__
-    incompatible_src_desc_pairs,
-  const unsigned num_src_desc_pairs,
-  compat_src_result_t* __restrict__ results) {
+    const SourceCompatibilityData* __restrict__ sources,
+    const unsigned num_sources,
+    const UsedSources::
+        SourceDescriptorPair* __restrict__ incompatible_src_desc_pairs,
+    const unsigned num_src_desc_pairs,
+    compat_src_result_t* __restrict__ results) {
   // one block per source
   for (unsigned idx{blockIdx.x}; idx < num_sources; idx += gridDim.x) {
     const auto& source = sources[idx];
@@ -96,22 +97,43 @@ __global__ void get_compatible_sources_kernel(
   }
 }
 
-// "with all or sources"
+#define MAX_OR_ARGS 3
+__device__ unsigned device_incompatible_or_arg_counts[MAX_OR_ARGS] = {0};
+
+__device__ void update_incompatible_counts(
+    volatile result_t* or_arg_results, unsigned num_or_args) {
+  __syncthreads();
+  if (threadIdx.x == 0) {
+    auto max_or_args = std::min(MAX_OR_ARGS, (int)num_or_args);
+    for (int i{}; i < max_or_args; ++i) {
+      if (!or_arg_results[i]) {
+        atomicInc(&device_incompatible_or_arg_counts[i], 1'000'000);
+      }
+    }
+  }
+}
+
+// is_source_OR_compatible with at least one source from each  or arg
+// TODO:
+// Just thinking, but if different sources from the same sentence have
+// different variations, don't we need to take that into account?
+// i.e. if Arg1 source is S1:V1 and Arg2 source is S1:V2, that seems a
+// bit whackabilly. Need more brains on it.
 __device__ bool is_source_OR_compatibile(const SourceCompatibilityData& source,
-  const unsigned num_or_args,
-  const device::OrSourceData* __restrict__ or_sources,
-  const unsigned num_or_sources) {
-  //
+    const unsigned num_or_args,
+    const device::OrSourceData* __restrict__ or_sources,
+    const unsigned num_or_sources) {
+
   extern __shared__ volatile result_t or_arg_results[];
   // ASSUMPTION: # of --or args will always be smaller than block size.
   if (threadIdx.x < num_or_args) {
     // store not required here, even without volatile, because __sync
     or_arg_results[threadIdx.x] = (result_t)0;
   }
-  __syncthreads();
+  //__syncthreads();
   for (unsigned or_chunk{}; or_chunk * blockDim.x < num_or_sources;
        ++or_chunk) {
-    //__syncthreads();
+    __syncthreads();
     const auto or_idx = or_chunk * blockDim.x + threadIdx.x;
     // TODO: if this works without sync in loop, i can possibly move this
     // conditional to loop definition
@@ -123,6 +145,8 @@ __device__ bool is_source_OR_compatibile(const SourceCompatibilityData& source,
       }
     }
   }
+  update_incompatible_counts(or_arg_results, num_or_args);
+  // parallel reduction (sum)
   // i could safely initialize reduce_idx to 16 I think (max 32 --or args)
   for (int reduce_idx = blockDim.x / 2; reduce_idx > 0; reduce_idx /= 2) {
     __syncthreads();
@@ -135,14 +159,17 @@ __device__ bool is_source_OR_compatibile(const SourceCompatibilityData& source,
   }
   if (!threadIdx.x) {
     const auto compat_with_all = or_arg_results[threadIdx.x] == num_or_args;
+    if (0 && !compat_with_all) {
+      printf("%d of %d\n", (int)or_arg_results[threadIdx.x], (int)num_or_args);
+    }
     return compat_with_all;
   }
   return false;
 }
 
 __device__ index_t get_combo_index(
-  index_t flat_idx, const ComboIndexSpanPair& idx_spans) {
-  //
+    index_t flat_idx, const ComboIndexSpanPair& idx_spans) {
+
   if (flat_idx < idx_spans.first.size()) {
     return idx_spans.first[flat_idx];
   }
@@ -155,12 +182,13 @@ __device__ index_t get_combo_index(
 // supplied combo_idx.
 // TODO: shouldn't combo_idx be a uint64_t ?
 __device__ bool is_source_XOR_compatible(const SourceCompatibilityData& source,
-  index_t combo_idx, const SourceCompatibilityData* __restrict__ xor_src_lists,
-  const index_t* __restrict__ xor_src_list_start_indices,
-  const index_t* __restrict__ xor_idx_lists,
-  const index_t* __restrict__ xor_idx_list_start_indices,
-  const index_t* __restrict__ xor_idx_list_sizes, unsigned num_idx_lists) {
-  //
+    index_t combo_idx,
+    const SourceCompatibilityData* __restrict__ xor_src_lists,
+    const index_t* __restrict__ xor_src_list_start_indices,
+    const index_t* __restrict__ xor_idx_lists,
+    const index_t* __restrict__ xor_idx_list_start_indices,
+    const index_t* __restrict__ xor_idx_list_sizes, unsigned num_idx_lists) {
+
   for (int list_idx{(int)num_idx_lists - 1}; list_idx >= 0; --list_idx) {
     const auto idx_list = &xor_idx_lists[xor_idx_list_start_indices[list_idx]];
     const auto idx_list_size = xor_idx_list_sizes[list_idx];
@@ -178,16 +206,17 @@ __device__ bool is_source_XOR_compatible(const SourceCompatibilityData& source,
 
 // Test if a source is XOR -and- OR compatible with supplied xor/or sources.
 __device__ bool is_source_XOR_and_OR_compatible(
-  const SourceCompatibilityData& source,
-  const SourceCompatibilityData* __restrict__ xor_src_lists,
-  const index_t* __restrict__ xor_src_list_start_indices,
-  const index_t* __restrict__ xor_idx_lists,
-  const index_t* __restrict__ xor_idx_list_start_indices,
-  const index_t* __restrict__ xor_idx_list_sizes, const unsigned num_idx_lists,
-  const ComboIndexSpanPair& idx_spans, const unsigned num_or_args,
-  const device::OrSourceData* __restrict__ or_sources,
-  const unsigned num_or_sources) {
-  //
+    const SourceCompatibilityData& source,
+    const SourceCompatibilityData* __restrict__ xor_src_lists,
+    const index_t* __restrict__ xor_src_list_start_indices,
+    const index_t* __restrict__ xor_idx_lists,
+    const index_t* __restrict__ xor_idx_list_start_indices,
+    const index_t* __restrict__ xor_idx_list_sizes,
+    const unsigned num_idx_lists, const ComboIndexSpanPair& idx_spans,
+    const unsigned num_or_args,
+    const device::OrSourceData* __restrict__ or_sources,
+    const unsigned num_or_sources) {
+
   __shared__ bool is_xor_compat;
   __shared__ bool is_or_compat;
 
@@ -253,8 +282,7 @@ __device__ bool is_source_XOR_and_OR_compatible(
 __device__ bool variation_indices_shown = false;
 
 __device__ void print_variation_indices(
-  const device::VariationIndices* __restrict__ variation_indices) {
-  //
+    const device::VariationIndices* __restrict__ variation_indices) {
   if (variation_indices_shown)
     return;
   printf("device:\n");
@@ -298,8 +326,8 @@ struct ResultType {
 // comparisons). that's what this function determines.
 //
 __device__ SmallestSpans::ResultType get_smallest_src_index_spans(
-  const SourceCompatibilityData& source,
-  const device::VariationIndices* __restrict__ variation_indices) {
+    const SourceCompatibilityData& source,
+    const device::VariationIndices* __restrict__ variation_indices) {
   //
   index_t fewest_indices{std::numeric_limits<index_t>::max()};
   int sentence_with_fewest{-1};
@@ -352,20 +380,22 @@ __device__ SmallestSpans::ResultType get_smallest_src_index_spans(
 }
 
 __global__ void xor_kernel_new(
-  const SourceCompatibilityData* __restrict__ src_list,
-  const unsigned num_sources,
-  const SourceCompatibilityData* __restrict__ xor_src_lists,
-  const index_t* __restrict__ xor_src_list_start_indices,
-  const index_t* __restrict__ xor_idx_lists,
-  const index_t* __restrict__ xor_idx_list_start_indices,
-  const index_t* __restrict__ xor_idx_list_sizes, const unsigned num_idx_lists,
-  const device::VariationIndices* __restrict__ variation_indices,
-  const unsigned num_or_args,
-  const device::OrSourceData* __restrict__ or_src_list,
-  const unsigned num_or_sources, const SourceIndex* __restrict__ source_indices,
-  const index_t* __restrict__ list_start_indices,
-  const compat_src_result_t* __restrict__ compat_src_results,
-  result_t* __restrict__ results, int stream_idx) {
+    const SourceCompatibilityData* __restrict__ src_list,
+    const unsigned num_sources,
+    const SourceCompatibilityData* __restrict__ xor_src_lists,
+    const index_t* __restrict__ xor_src_list_start_indices,
+    const index_t* __restrict__ xor_idx_lists,
+    const index_t* __restrict__ xor_idx_list_start_indices,
+    const index_t* __restrict__ xor_idx_list_sizes,
+    const unsigned num_idx_lists,
+    const device::VariationIndices* __restrict__ variation_indices,
+    const unsigned num_or_args,
+    const device::OrSourceData* __restrict__ or_src_list,
+    const unsigned num_or_sources,
+    const SourceIndex* __restrict__ source_indices,
+    const index_t* __restrict__ list_start_indices,
+    const compat_src_result_t* __restrict__ compat_src_results,
+    result_t* __restrict__ results, int stream_idx) {
   // for each source (one block per source)
   //  __shared__ SourceCompatibilityData source;
   for (unsigned idx{blockIdx.x}; idx < num_sources; idx += gridDim.x) {
@@ -399,15 +429,14 @@ __global__ void xor_kernel_new(
 
 // Test if a source is XOR compatible with ANY of the provided xor sources.
 __device__ bool is_source_XOR_compatible_with_any(
-  const SourceCompatibilityData& source,
-  const ComboIndexSpanPair& idx_spans,
-  const SourceCompatibilityData* __restrict__ xor_src_lists,
-  const index_t* __restrict__ xor_src_list_start_indices,
-  const index_t* __restrict__ xor_idx_lists,
-  const index_t* __restrict__ xor_idx_list_start_indices,
-  const index_t* __restrict__ xor_idx_list_sizes,
-  const unsigned num_idx_lists) {
-  //
+    const SourceCompatibilityData& source, const ComboIndexSpanPair& idx_spans,
+    const SourceCompatibilityData* __restrict__ xor_src_lists,
+    const index_t* __restrict__ xor_src_list_start_indices,
+    const index_t* __restrict__ xor_idx_lists,
+    const index_t* __restrict__ xor_idx_list_start_indices,
+    const index_t* __restrict__ xor_idx_list_sizes,
+    const unsigned num_idx_lists) {
+
   __shared__ bool is_xor_compat;
   if (!threadIdx.x) {
     store(&is_xor_compat, false);
@@ -424,7 +453,6 @@ __device__ bool is_source_XOR_compatible_with_any(
   //   for (unsigned flat_idx{threadIdx.x}; flat_idx < num_xor_sources;
   //      flat_idx += blockDim.x) {
   //
-
   // TODO: not sure all the syncthreads are necessary here.
 
   const auto num_indices = idx_spans.first.size() + idx_spans.second.size();
@@ -438,8 +466,8 @@ __device__ bool is_source_XOR_compatible_with_any(
     if (flat_idx < num_indices) {
       auto combo_idx = get_combo_index(flat_idx, idx_spans);
       if (is_source_XOR_compatible(source, combo_idx, xor_src_lists,
-            xor_src_list_start_indices, xor_idx_lists,
-            xor_idx_list_start_indices, xor_idx_list_sizes, num_idx_lists)) {
+              xor_src_list_start_indices, xor_idx_lists,
+              xor_idx_list_start_indices, xor_idx_list_sizes, num_idx_lists)) {
         is_xor_compat = true;
       }
     }
@@ -452,15 +480,16 @@ __device__ bool is_source_XOR_compatible_with_any(
 }
 
 __global__ void mark_or_sources_kernel(
-  const SourceCompatibilityData* __restrict__ xor_src_lists,
-  const index_t* __restrict__ xor_src_list_start_indices,
-  const index_t* __restrict__ xor_idx_lists,
-  const index_t* __restrict__ xor_idx_list_start_indices,
-  const index_t* __restrict__ xor_idx_list_sizes, const unsigned num_idx_lists,
-  const device::VariationIndices* __restrict__ variation_indices,
-  const unsigned num_or_args,
-  const device::OrSourceData* __restrict__ or_src_list,
-  const unsigned num_or_sources, result_t* __restrict__ results) {
+    const SourceCompatibilityData* __restrict__ xor_src_lists,
+    const index_t* __restrict__ xor_src_list_start_indices,
+    const index_t* __restrict__ xor_idx_lists,
+    const index_t* __restrict__ xor_idx_list_start_indices,
+    const index_t* __restrict__ xor_idx_list_sizes,
+    const unsigned num_idx_lists,
+    const device::VariationIndices* __restrict__ variation_indices,
+    const unsigned num_or_args,
+    const device::OrSourceData* __restrict__ or_src_list,
+    const unsigned num_or_sources, result_t* __restrict__ results) {
   // for each or_source (one block per source)
   for (unsigned idx{blockIdx.x}; idx < num_or_sources; idx += gridDim.x) {
     __syncthreads();
@@ -539,10 +568,9 @@ void dump_xor(int index) {
 namespace cm {
 
 void run_get_compatible_sources_kernel(
-  const SourceCompatibilityData* device_sources, unsigned num_sources,
-  const UsedSources::SourceDescriptorPair* device_src_desc_pairs,
-  unsigned num_src_desc_pairs, compat_src_result_t* device_results) {
-  //
+    const SourceCompatibilityData* device_sources, unsigned num_sources,
+    const UsedSources::SourceDescriptorPair* device_src_desc_pairs,
+    unsigned num_src_desc_pairs, compat_src_result_t* device_results) {
   int num_sm;
   cudaDeviceGetAttribute(&num_sm, cudaDevAttrMultiProcessorCount, 0);
   int threads_per_sm;;
@@ -582,10 +610,10 @@ void run_get_compatible_sources_kernel(
 }
 
 void run_xor_kernel(StreamData& stream, int threads_per_block,
-  const MergeFilterData& mfd, const SourceCompatibilityData* device_src_list,
-  const compat_src_result_t* device_compat_src_results, result_t* device_results,
-  const index_t* device_list_start_indices) {
-  //
+    const MergeFilterData& mfd, const SourceCompatibilityData* device_src_list,
+    const compat_src_result_t* device_compat_src_results,
+    result_t* device_results, const index_t* device_list_start_indices) {
+
   int num_sm;
   cudaDeviceGetAttribute(&num_sm, cudaDevAttrMultiProcessorCount, 0);
   int threads_per_sm;;
@@ -623,8 +651,21 @@ void run_xor_kernel(StreamData& stream, int threads_per_block,
   }
 }
 
+void show_incompatible_or_arg_counts(unsigned num_or_args) {
+  // Copy the result back to the host
+  unsigned host_results[MAX_OR_ARGS] = {0};
+  auto max_or_args = std::min(MAX_OR_ARGS, (int)num_or_args);
+  cudaError_t err = cudaMemcpyFromSymbol(host_results,
+      device_incompatible_or_arg_counts, max_or_args * sizeof(unsigned));
+  assert_cuda_success(err, "cudaMemCopyFromSymbol");
+  std::cerr << "incompatible or_args:\n";
+  for (int i{}; i < max_or_args; ++i) {
+    std::cerr << " " << i << ": " << host_results[i] << std::endl;
+  }
+}
+
 void run_mark_or_sources_kernel(
-  const MergeFilterData& mfd, result_t* device_results) {
+    const MergeFilterData& mfd, result_t* device_results) {
   int num_sm;
   cudaDeviceGetAttribute(&num_sm, cudaDevAttrMultiProcessorCount, 0);
   int threads_per_sm;;

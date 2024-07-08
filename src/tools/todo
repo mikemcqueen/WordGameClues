@@ -8,6 +8,11 @@
       (a single letter, at least in initial implementation)
 * cm: ensure words.json is sorted
 
+* is_source_OR_compatible kernel function:
+  We're doing some pretty rudimentary check to ensure that at least one source from
+  each or_arg is compatible, but what if different args refer to the same sentence,
+  and the compatible source found for each arg have different variations? maybe I
+  can write a test case to demonstrate this, and see what should happen.
 
 ++PERF
 

@@ -168,8 +168,7 @@ int run_xor_filter_task(int sum, StreamSwarm& streams, int threads_per_block,
           stream.kernel_stop.synchronize(stream.kernel_start);
       //auto total_duration = stream.fill_duration + kernel_duration;
       std::cerr << " " << sum << ": stream " << stream.stream_idx
-                << ", fill: " << stream.fill_duration
-                << "us, kernel: " << kernel_duration << "ms" << std::endl;
+                << " xor_kernel took " << kernel_duration << "ms" << std::endl;
       //        << "ms, total: " << total_duration 
     }
     if (log_level(Ludicrous)) {
@@ -249,7 +248,8 @@ filter_task_result_t xor_filter_task(const MergeFilterData& mfd,
   StreamSwarm streams(num_streams, stride);
   std::vector<result_t> results(candidates.size());
   cuda_zero_results(device_results, results.size());
-  if (log_level(Verbose)) {
+  if ((synchronous && log_level(Normal))
+      || (!synchronous && log_level(Verbose))) {
     std::cerr << " " << sum << ": src_lists: " << candidates.size()
               << ", streams: " << num_streams << ", stride: " << stride
               << std::endl;
@@ -288,7 +288,8 @@ auto filter_task(const MergeFilterData& mfd, int sum, int threads_per_block,
   CudaEvent copy_start;
   auto device_sources = cuda_alloc_copy_sources(candidates, num_sources);
   scope_exit free_sources{[device_sources]() { cuda_free(device_sources); }};
-  if (log_level(Verbose)) {
+  if ((synchronous && log_level(Normal))
+      || (!synchronous && log_level(Verbose))) {
     CudaEvent copy_stop;
     auto copy_duration = copy_stop.synchronize(copy_start);
     auto free_mem = cuda_get_free_mem() / 1'000'000;
@@ -321,12 +322,10 @@ auto filter_task(const MergeFilterData& mfd, int sum, int threads_per_block,
 auto async_filter_task(const MergeFilterData& mfd, int sum,
     int threads_per_block, int num_streams, int stride, int iters) {
   static std::counting_semaphore<2> semaphore(2);// TODO: not great
-
   semaphore.acquire();
   auto filter_result =
-    filter_task(mfd, sum, threads_per_block, num_streams, stride, iters);
+      filter_task(mfd, sum, threads_per_block, num_streams, stride, iters);
   semaphore.release();
-
   return filter_result;
 }
 
@@ -405,7 +404,7 @@ auto filter_candidates_cuda(const MergeFilterData& mfd, int sum,
   }
 }
 
-filter_result_t get_filter_result() {
+filter_result_t get_filter_result(const MergeFilterData& mfd) {
   filter_result_t unique_combos;
   std::string results{"results: "};
   int total{-1};
@@ -424,6 +423,7 @@ filter_result_t get_filter_result() {
   }
   std::cerr << results << ", total: " << total
             << ", unique: " << unique_combos.size() << std::endl;
+  show_incompatible_or_arg_counts(mfd.host.or_arg_list.size());
   return unique_combos;
 }
 

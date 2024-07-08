@@ -773,7 +773,7 @@ Value filterCandidatesForSum(const CallbackInfo& info) {
 //
 Value getResult(const CallbackInfo& info) {
   Env env = info.Env();
-  auto result = get_filter_result();
+  auto result = get_filter_result(MFD);
   return wrap(env, result);
 }
 
