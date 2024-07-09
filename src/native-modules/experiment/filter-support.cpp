@@ -126,25 +126,71 @@ auto get_compatible_sources_results(int sum,
 
 //////////
 
+// TODO: host-filter.cpp/host.h
 namespace host {
 
-auto or_filter(
+#define MAX_OR_ARGS 20
+int incompatible_or_arg_counts[MAX_OR_ARGS] = {0};
+
+void show_incompat_or_args(unsigned num_or_args) {
+  // std::cerr << "HOST or-compatible sources: " << num_or_arg_compat << std::endl;
+  std::cerr << "HOST incompatible or_args:\n";
+  auto max_or_args = std::min(MAX_OR_ARGS, (int)num_or_args);
+  for (int i{}; i < max_or_args; ++i) {
+    std::cerr << " arg" << i << ": " << incompatible_or_arg_counts[i]
+              << std::endl;
+  }
+}
+
+void update_incompat_or_args(size_t num_or_args, bool incompat_or_args[]) {
+  auto max_or_args = std::min(MAX_OR_ARGS, (int)num_or_args);
+  for (int i{}; i < max_or_args; ++i) {
+    if (incompat_or_args[i]) {
+      incompatible_or_arg_counts[i]++;
+    }
+  }
+}
+
+auto is_OR_compatible(
     const SourceCompatibilityData& source, const MergeFilterData& mfd) {
+  bool incompat_or_args[MAX_OR_ARGS] = {false};
   size_t num_compat_or_args{};
+  int or_arg_idx{};
   for (const auto& or_arg: mfd.host.or_arg_list) {
-    bool or_compat{};
+    bool compat_arg{};
     for (const auto& or_src: or_arg.or_src_list) {
       // TODO: ignoring "marked" is_xor_compat flag for now
       if (or_src.src.isOrCompatibleWith(source)) {
-        or_compat = true;
+        compat_arg = true;
+      } else {
+        incompat_or_args[or_arg_idx] = true;
+      }
+    }
+    if (compat_arg) {
+      ++num_compat_or_args;
+    }
+    ++or_arg_idx;
+  }
+  const auto num_or_args = mfd.host.or_arg_list.size();
+  bool compat = num_compat_or_args == num_or_args;
+  if (!compat) {
+    update_incompat_or_args(num_or_args, incompat_or_args);
+  }
+  return compat;
+}
+
+auto is_XOR_compatible(const SourceCompatibilityData& source,
+    const std::vector<SourceList>& xor_src_lists) {
+  size_t num_compat_lists{};
+  for (const auto& xor_src_list : xor_src_lists) {
+    for (const auto& xor_src : xor_src_list) {
+      if (source.isXorCompatibleWith(xor_src)) {
+        ++num_compat_lists;
         break;
       }
     }
-    if (or_compat) {
-      ++num_compat_or_args;
-    }
   }
-  return num_compat_or_args == mfd.host.or_arg_list.size();
+  return num_compat_lists == xor_src_lists.size();
 }
 
 void xor_filter(int sum, const StreamData& stream, const MergeFilterData& mfd) {
@@ -155,30 +201,24 @@ void xor_filter(int sum, const StreamData& stream, const MergeFilterData& mfd) {
   const auto& candidates = it->second;
   std::vector<result_t> results(candidates.size());
   const auto& xor_src_lists = mfd.host.xor_src_lists;
-  size_t num_compat_sources{};
+  std::cerr << "HOST xor_src_lists: " << xor_src_lists.size()
+            << ", xor_sources: " << xor_src_lists.at(0).size() << std::endl;
+  size_t num_compat{};
+  size_t num_xor_compat{};
   for (auto src_idx : stream.source_indices) {
     const auto& src_list = candidates.at(src_idx.listIndex).src_list_cref.get();
     const auto& source = src_list.at(src_idx.index);
-    size_t num_compat_lists{};
-    for (const auto& xor_src_list : xor_src_lists) {
-      bool compat_src{};
-      for (const auto& xor_src : xor_src_list) {
-        if (source.isXorCompatibleWith(xor_src) && or_filter(source, mfd)) {
-          compat_src = true;
-          break;
-        }
+    if (is_XOR_compatible(source, xor_src_lists)) {
+      ++num_xor_compat;
+      if (is_OR_compatible(source, mfd)) {
+        ++num_compat;
       }
-      if (compat_src) {
-        ++num_compat_lists;
-        break;
-      }
-    }
-    if (num_compat_lists == xor_src_lists.size()) {
-      ++num_compat_sources;
     }
   }
-  std::cerr << "host compat sources " << num_compat_sources << " of "
+  std::cerr << "HOST compatible sources " << num_compat << " of "
             << stream.source_indices.size() << std::endl;
+  std::cerr << "HOST xor-compatible sources: " << num_xor_compat << std::endl;
+  show_incompat_or_args(mfd.host.or_arg_list.size());
 }
 
 }  // namespace host
@@ -255,7 +295,7 @@ auto run_xor_filter_task(int sum, StreamSwarm& streams, int threads_per_block,
     total_compat += num_compat;
     num_processed += stream.source_indices.size();
     log_xor_kernel(sum, stream, results, num_compat, total_compat);
-    if constexpr(1) {
+    if constexpr (1) {
       host::xor_filter(sum, stream, mfd);
     }
     // TODO: FIXMENOW debug: stop after first kernel
@@ -309,7 +349,8 @@ void log_xor_filter_task(int sum, int num_processed, int num_compat,
 //
 // Post-processing:
 //
-// * If call is synchronous (i.e., sum == 2), populate the incompatible_sources
+// * If call is synchronous (i.e., sum == 2), populate the
+// incompatible_sources
 //   set. This set is used to speed up subsequent async sums.
 // * Create a set of compatible combos from compatible candidate sourcelists.
 //
@@ -354,7 +395,7 @@ filter_task_result_t xor_filter_task(const MergeFilterData& mfd,
   t.stop();
   SourceCompatibilitySet incompat_sources;
   int num_incompat_sources{};
-  if (0 && synchronous) { // TODO: FIXMENOW remove
+  if (0 && synchronous) {  // TODO: FIXMENOW remove
     num_incompat_sources =
         idx_states.get_incompatible_sources(candidates, incompat_sources);
   }
@@ -387,8 +428,8 @@ void log_copy_sources(int sum, int num_sources, bool synchronous,
 // * Allocate and copy candidate sources.
 // * If call is not synchronous (i.e. sum > 2), run the compat_sources_kernel
 //   in order to determine which of the sources are compatible with the set of
-//   incompatible_sources that resulted from the first synchronous call (sum=2).
-//   (TODO: fudgy language, add why is this done).
+//   incompatible_sources that resulted from the first synchronous call
+//   (sum=2). (TODO: fudgy language, add why is this done).
 //
 // Returns the result of xor_filter_task with no additional post-processing.
 //
@@ -423,7 +464,7 @@ auto filter_task(const MergeFilterData& mfd, int sum, int threads_per_block,
         mfd.device.num_incompatible_sources);
     // compat_src_semaphore.release();
   }
-  // static std::counting_semaphore<2> filter_semaphore(4);  // TODO: not great
+  // static std::counting_semaphore<2> filter_semaphore(4);
   // filter_semaphore.acquire();
   auto filter_result = xor_filter_task(mfd, device_sources,
       device_compat_src_results, candidates, sum, threads_per_block,

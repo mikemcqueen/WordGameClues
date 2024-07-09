@@ -1,17 +1,11 @@
 * TODO: grep for: FIXMENOW
 
+* display xor_src_lists and xor_sources in normal output, maybe also,
+  "compatible" xor_sources, if that means anything, or post-merged count,
+  or something.
+
 * don't use the same result buffer for multiple streams. maybe make it part
   of the StreamData struct?
-
-* cm: shouldn't i filter out retired pairs in pairs(.sh) ?
-  * and for that matter, would a filter-retired(.sh) script be useful for
-    per-letter pairs?
-  * maybe i should make cm pairs -l the per-letter pair option, and -c
-    the "show letter counts" option
-    * reasoning: it will be useful to have a general-purpose script for
-      generating per-letter pairs.  -l would take a required argument
-      (a single letter, at least in initial implementation)
-* cm: ensure words.json is sorted
 
 * is_source_OR_compatible kernel function:
   We're doing some pretty rudimentary check to ensure that at least one source from
@@ -23,6 +17,27 @@
   XOR compatible with an XorSource then I test if it is OR compatible with at least
   one source of each OR arg.  But shouldn't I also check if the XOR source it was XOR
   compatible with, is also OR-compatible with the candidate OR source?
+
+* is_source_XOR_and_OR_compatible:
+  so i'm wondering, once one thread determines that it's (both XOR and) OR compatible,
+  couldn't I short-circuit the rest of the kernel? like, after the __synchtreads()
+  call at the beginning of the loop, if (is_or_compat) break; ? and I could get
+  rid of the return true inside the loop, and return is_or_compat; at the end of the
+  function?
+  This approach (if it works) might apply to other is__compat functions as well.
+
+CM:
+
+* cm: shouldn't i filter out retired pairs in pairs(.sh) ?
+  * and for that matter, would a filter-retired(.sh) script be useful for
+    per-letter pairs?
+  * maybe i should make cm pairs -l the per-letter pair option, and -c
+    the "show letter counts" option
+    * reasoning: it will be useful to have a general-purpose script for
+      generating per-letter pairs.  -l would take a required argument
+      (a single letter, at least in initial implementation)
+* cm: ensure words.json is sorted
+
 
 ++PERF
 

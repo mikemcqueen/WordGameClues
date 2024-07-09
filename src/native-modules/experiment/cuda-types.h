@@ -118,10 +118,6 @@ inline constexpr int cuda_itoa(int value, char *sp, int radix = 10) {
 }
 
 class CudaEvent {
-private:
-  cudaEvent_t event_;
-  cudaStream_t stream_;
-
 public:
   CudaEvent(const cudaStream_t stream = cudaStreamPerThread, bool record_now = true) : stream_(stream) {
     auto err = cudaEventCreate(&event_);
@@ -156,6 +152,10 @@ public:
     assert_cuda_success(err, "cudaEventElapsedTime");
     return std::lround(elapsed_ms);
   }
+
+private:
+  cudaEvent_t event_;
+  cudaStream_t stream_;
 };
 
 }  // namespace cm

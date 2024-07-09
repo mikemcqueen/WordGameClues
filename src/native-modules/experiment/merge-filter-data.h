@@ -65,55 +65,7 @@ struct MergeFilterData {
     device::OrSourceData* or_src_list{};
     unsigned num_or_sources{};
   } device;
-};
-
-#if 0
-  //
-  // mergeCompatible():
-  //
-
-  // makes this 
-  std::vector<SourceList> xor_src_lists;
-  // makes these in a really convoluted way, as a consequence of making
-  // compat_idx_lists/combo_indices. really should separate these out
-  SourceCompatibilityData* device_src_lists{};
-  index_t* device_idx_lists{};
-  index_t* device_idx_list_sizes{};
-  // makes these as a consequence of making g_merged_xor_src_list, and
-  // saves them here for filter
-  std::vector<IndexList> compat_idx_lists;
-  ComboIndexList combo_indices;
-
-  //
-  // filterPreparation()
-  // should probably call it make_filter_indices
-  //
-
-  // makes these. 
-  index_t* device_src_list_start_indices{};
-  index_t* device_idx_list_start_indices{};
-
-  // makes these via cuda_allocCopySentenceVariationIndices, which has to
-  // sync device because it's doing async copy of local host-side data. should
-  // store host-side data here to eliminate sync.
-  // also names a local host-side array with "device_" prefix which is wrong.
-  device::VariationIndices* device_variation_indices{};
-  unsigned num_nariation_indices{};
-
-  // unused?
-  //  combo_index_t* device_combo_indices{};
-
-  //
-  // set_or_arg
-  // should probably call it make_or_arg_data
-  // 
-
-  // makes these
-  OrArgList or_arg_list;
-  unsigned num_or_args{};
-  device::OrSourceData* device_or_sources{}; 
-  unsigned num_or_sources{};
-#endif
+};  // struct MergeFilterData
 
 }  // namespace cm
 
