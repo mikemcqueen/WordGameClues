@@ -135,10 +135,7 @@ __device__ bool is_source_OR_compatible(const SourceCompatibilityData& source,
   extern __shared__ result_t or_arg_results[];
   // ASSUMPTION: # of --or args will always be smaller than block size.
   if (threadIdx.x < num_or_args) {
-    // store not required here, even without volatile, because __sync
-    // or_arg_results[threadIdx.x] = (result_t)0;
-    // TODO: FIXMENOW?
-    store(&or_arg_results[threadIdx.x], (result_t)0);
+    or_arg_results[threadIdx.x] = 0;
   }
   const auto chunk_size = blockDim.x;
   const auto chunk_max = num_or_arg_sources;
@@ -150,9 +147,9 @@ __device__ bool is_source_OR_compatible(const SourceCompatibilityData& source,
       // NB! order of a,b in a.isOrCompat(b) here matters!
       if (or_src.src.isOrCompatibleWith(source)) {
         // store not required here, because volatile
-        //or_arg_results[or_src.or_arg_idx] = (result_t)1;
+        or_arg_results[or_src.or_arg_idx] = 1;
         // TODO: FIXMENOW?
-        store(&or_arg_results[or_src.or_arg_idx], (result_t)1);
+        //store(&or_arg_results[or_src.or_arg_idx], (result_t)1);
       } else if (0 && (dump_count < MAX_DUMP)) {
         // TODO: FIXMENOW?
         if (!source.usedSources.hasVariation(1)) {
@@ -164,7 +161,9 @@ __device__ bool is_source_OR_compatible(const SourceCompatibilityData& source,
       }
     }
   }
+  // FIXMENOW: wrap in log_level
   update_or_arg_counts(or_arg_results, num_or_args);
+#if 0
   // parallel reduction (sum)
   // i could safely initialize reduce_idx to 16 I think (max 32 --or args)
   for (int reduce_idx = blockDim.x / 2; reduce_idx > 0; reduce_idx /= 2) {
@@ -176,11 +175,20 @@ __device__ bool is_source_OR_compatible(const SourceCompatibilityData& source,
                                     + or_arg_results[reduce_idx + threadIdx.x];
     }
   }
+#endif
+    __syncthreads();
   if (!threadIdx.x) {
-    const auto compat_with_all = or_arg_results[threadIdx.x] == num_or_args;
-    if (0 && !compat_with_all) {
-      printf("%d of %d\n", (int)or_arg_results[threadIdx.x], (int)num_or_args);
+#if 1
+    bool compat_with_all{true};
+    for (int i{}; i < num_or_args; ++i) {
+      if (!or_arg_results[i]) {
+        compat_with_all = false;
+        break;
+      }
     }
+#else
+    const auto compat_with_all = or_arg_results[threadIdx.x] == num_or_args;
+#endif
     return compat_with_all;
   }
   return false;
@@ -411,6 +419,8 @@ __device__ SmallestSpans::ResultType get_smallest_src_index_spans(
       std::make_pair(vi.get_index_span(0), vi.get_index_span(variation))};
 }
 
+__device__ unsigned device_wtfbbq = 0;
+
 __global__ void xor_kernel_new(
     const SourceCompatibilityData* __restrict__ src_list,
     const unsigned num_sources,
@@ -447,34 +457,34 @@ __global__ void xor_kernel_new(
     case None:
       continue;
     case Check:
-      // TODO: FIXMENOW should capture result in a shared variable, then
-      // __syncthreads and test result in !threadIdx.x conditional block.
-      if (!is_source_XOR_and_OR_compatible(source, xor_src_lists,
+      if (is_source_XOR_and_OR_compatible(source, xor_src_lists,
               xor_src_list_start_indices, xor_idx_lists,
               xor_idx_list_start_indices, xor_idx_list_sizes, num_idx_lists,
               result.idx_spans, num_or_args, or_arg_sources,
               num_or_arg_sources)) {
-        continue;
+        is_compat = true;
       }
       break;
     case All:
-      // TODO FIXMENOW (wrap in log_level check?
+      // TODO FIXMENOW (wrap in log_level check?)
       if (!threadIdx.x) {
         atomicInc(&device_num_xor_compat, 1'000'000);
       }
-      // TODO: seems like an OR_compatible function that is callable by a
-      // block would be appropriate/more efficient here. good opportunity
-      // to see if cooperative_groups would be helpful.
-      if (!is_source_OR_compatible(source, num_or_args, or_arg_sources,  //
+      if (is_source_OR_compatible(source, num_or_args, or_arg_sources,  //
               num_or_arg_sources)) {
-        continue;
+        is_compat = true;
       }
       break;
     }
-    // result.code is Check and XOR_and_OR compatibilty check succeeded, or
-    // All and OR compatibility check succeeded
+    __syncthreads();
+    if (!is_compat) {
+      continue;
+    }
     if (!threadIdx.x) {
+      // result.code is Check and XOR_and_OR compatibilty check succeeded, or
+      // All and OR compatibility check succeeded
       results[src_idx.listIndex] = 1;
+      is_compat = false;
     }
   }
 }
@@ -707,6 +717,15 @@ void run_xor_kernel(StreamData& stream, int threads_per_block,
 
 void show_or_arg_counts(unsigned num_or_args) {
   cudaError_t err{cudaSuccess};
+
+#if 0
+  unsigned wtfbbq;
+  err = cudaMemcpyFromSymbol(
+      &wtfbbq, device_wtfbbq, sizeof(unsigned));
+  assert_cuda_success(err, "cudaMemCopyFromSymbol wtfbbq");
+  std::cerr << "wtfbbq: " << wtfbbq << std::endl;
+#endif
+
   unsigned num_compat;
   err = cudaMemcpyFromSymbol(
       &num_compat, device_num_compatible_or_args, sizeof(unsigned));

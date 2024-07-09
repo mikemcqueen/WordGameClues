@@ -129,10 +129,12 @@ public:
       const std::vector<result_t>& results, int stream_idx) {
     int num_compatible{};
     int num_done{};
+    int num_not_ready{};
     for (size_t i{}; i < src_indices.size(); ++i) {
       const auto src_idx = src_indices.at(i);
       auto& idx_state = list_.at(src_idx.listIndex);
       if (!idx_state.ready_state()) {
+        ++num_not_ready;
         continue;
       }
       if (results.at(src_idx.listIndex)) {
@@ -146,10 +148,11 @@ public:
       }
     }
     if (log_level(ExtraVerbose)) {
-      std::cerr << "stream " << stream_idx
-                << " update, total: " << src_indices.size()
+      std::cerr << "stream " << stream_idx << " update"
+                << ", total: " << src_indices.size()
                 << ", compat: " << num_compatible
-                << ", done: " << num_done << std::endl;
+                << ", not ready: " << num_not_ready << ", done: " << num_done
+                << std::endl;
     }
     return num_compatible;
   }

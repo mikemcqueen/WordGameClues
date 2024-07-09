@@ -295,11 +295,11 @@ auto run_xor_filter_task(int sum, StreamSwarm& streams, int threads_per_block,
     total_compat += num_compat;
     num_processed += stream.source_indices.size();
     log_xor_kernel(sum, stream, results, num_compat, total_compat);
-    if constexpr (1) {
+    if (log_level(Ludicrous)) {
       host::xor_filter(sum, stream, mfd);
     }
-    // TODO: FIXMENOW debug: stop after first kernel
-    break;
+    // FIXMENOW debug: stop after first kernel
+    // break;
   }
   return std::make_pair(num_processed, total_compat);
 }
@@ -324,9 +324,9 @@ void log_xor_filter_task(int sum, int num_processed, int num_compat,
   auto num_src_lists = std::min(num_processed, num_results);
   std::cerr << "sum(" << sum << ")"
             << " compatible src_lists: " << num_compat << " of "
-            << num_src_lists << ", processed sources: " << num_processed;
+            << num_src_lists << ", sources processed: " << num_processed;
   if (incompat_sources.size()) {
-    std::cerr << ", incompat sources total: " << num_incompat_sources
+    std::cerr << ", incompat total: " << num_incompat_sources
               << ", unique: " << incompat_sources.size();
   }
   std::cerr << " - " << duration_ms << "ms" << std::endl;
@@ -395,7 +395,7 @@ filter_task_result_t xor_filter_task(const MergeFilterData& mfd,
   t.stop();
   SourceCompatibilitySet incompat_sources;
   int num_incompat_sources{};
-  if (0 && synchronous) {  // TODO: FIXMENOW remove
+  if (synchronous) {
     num_incompat_sources =
         idx_states.get_incompatible_sources(candidates, incompat_sources);
   }
@@ -577,7 +577,9 @@ filter_result_t get_filter_result(const MergeFilterData& mfd) {
   }
   std::cerr << results << ", total: " << total
             << ", unique: " << unique_combos.size() << std::endl;
-  show_or_arg_counts(mfd.host.or_arg_list.size());
+  if (log_level(Ludicrous)) {
+    show_or_arg_counts(mfd.host.or_arg_list.size());
+  }
   return unique_combos;
 }
 
