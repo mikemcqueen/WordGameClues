@@ -62,19 +62,20 @@ public:
 
   // word count
   constexpr inline static auto wc() {
-    return (size+31)/32;
+    return (size + 31) / 32;
   }
-  
+
   constexpr bool any() const {
-    for (int i=0; i<wc(); i++) {
-      if (bits[i]) return true;
+    for (int i{}; i < wc(); ++i) {
+      if (bits[i])
+        return true;
     }
     return false;
   }
-  
+
   constexpr auto count() const {
     int n{};
-    for (int i=0; i<wc(); i++) {
+    for (int i{}; i < wc(); ++i) {
 #ifndef __CUDA_ARCH__ // v- host code
       auto w = bits[i];
       while (w) {
@@ -88,16 +89,16 @@ public:
     return n;
   }
 
-  bitset<size>& operator |= (const bitset<size> &a) {
-    for (int i=0; i<wc(); i++)
-      bits[i] |= a.bits[i];
+  bitset<size>& operator|=(const bitset<size>& other) {
+    for (int i{}; i < wc(); ++i)
+      bits[i] |= other.bits[i];
     return *this;
   }
 
   // test "XOR compatibility" without constructing new object
-  constexpr bool intersects(const bitset<size> &a) const {
-    for (int i{}; i < wc(); i++) {
-      if (bits[i] & a.bits[i]) {
+  constexpr bool intersects(const bitset<size>& other) const {
+    for (int i{}; i < wc(); ++i) {
+      if (bits[i] & other.bits[i]) {
         return true;
       }
     }
@@ -105,9 +106,9 @@ public:
   }
 
   // test "AND compatibility" without constructing new object
-  constexpr bool is_subset_of(const bitset<size>& a) const {
-    for (int i{}; i < wc(); i++) {
-      if (bits[i] && ((bits[i] & a.bits[i]) != bits[i])) {
+  constexpr bool is_subset_of(const bitset<size>& other) const {
+    for (int i{}; i < wc(); ++i) {
+      if (bits[i] && ((bits[i] & other.bits[i]) != bits[i])) {
         return false;
       }
     }

@@ -1,3 +1,5 @@
+* TODO: grep for: FIXMENOW
+
 * cm: shouldn't i filter out retired pairs in pairs(.sh) ?
   * and for that matter, would a filter-retired(.sh) script be useful for
     per-letter pairs?

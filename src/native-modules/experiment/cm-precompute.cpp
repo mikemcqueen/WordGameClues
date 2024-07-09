@@ -13,6 +13,7 @@
 #include "cm-precompute.h"
 #include "merge.h"
 #include "log.h"
+#include "util.h"
 
 namespace cm {
 
@@ -46,28 +47,26 @@ auto mergeCompatibleSourceLists(
 auto mergeAllCompatibleSources(const NameCountList& ncList) -> SourceList {
   // because **maybe** broken for > 2 below
   assert(ncList.size() <= 2 && "ncList.length > 2");
-  const bool logging = log_level(ExtraVerbose);
-  if (logging) {
-    std::cout << "nc[0]: " << ncList[0].toString() << std::endl;
-  }
+  const auto logging = log_level(ExtraVerbose);
   // TODO: find smallest sourcelist to copy first, then skip merge in loop?
   SourceList src_list{clue_manager::make_src_list_for_nc(ncList[0])};
   if (logging) {
+    std::cerr << "nc[0]: " << ncList[0].toString() << " (" << src_list.size()
+              << ")" << std::endl;
     SourceData::dumpList(src_list);
   }
   // TODO: std::next() or something.
   for (auto i = 1u; i < ncList.size(); ++i) {
-    if (logging) {
-      std::cout << " nc[" << i << "]: " << ncList[i].toString() << std::endl;
-    }
     const auto src_cref_list{
         clue_manager::make_src_cref_list_for_nc(ncList[i])};
     if (logging) {
+      std::cerr << " nc[" << i << "]: " << ncList[i].toString() << " ("
+                << src_cref_list.size() << ")" << std::endl;
       SourceData::dumpList(src_cref_list);
     }
     src_list = std::move(mergeCompatibleSourceLists(src_list, src_cref_list));
     // MAYBE BUG: this might be broken for > 2; should be something like:
-    // if (sourceList.length !== ncIndex + 1) 
+    // if (sourceList.length !== ncIndex + 1)
     if (src_list.empty()) break;
   }
   return src_list;
@@ -142,7 +141,7 @@ auto buildSourceListsForUseNcData(const std::vector<NCDataList>& useNcDataLists)
   if (log_level(Verbose)) {
     //std::cerr << "  hash: " << hash_called << ", equal_to: " << equal_to_called
     //          << std::endl;
-    std::cerr << "  total sources: " << total << ", hash_hits: " << hash_hits
+    std::cerr << " total sources: " << total << ", hash_hits: " << hash_hits
               << ", sourceLists(" << sourceLists.size() << "): "
               << std::accumulate(sourceLists.begin(), sourceLists.end(), 0u,
                      [](size_t total, const SourceList& list) {
@@ -164,7 +163,7 @@ auto buildOrArg(SourceList& src_list) {
 auto count_or_sources(const OrArgList& or_arg_list) {
   // TODO: std::accumulate
   uint32_t total{};
-  for (const auto& or_arg: or_arg_list) {
+  for (const auto& or_arg : or_arg_list) {
     total += or_arg.or_src_list.size();
   }
   return total;
@@ -173,16 +172,15 @@ auto count_or_sources(const OrArgList& or_arg_list) {
 auto buildOrArgList(std::vector<SourceList>&& or_src_list) -> OrArgList {
   using namespace std::chrono;
   OrArgList or_arg_list;
-  auto t0 = high_resolution_clock::now();
+  auto t = util::Timer::start_timer();
   for (auto& src_list : or_src_list) {
     or_arg_list.emplace_back(buildOrArg(src_list));
   }
   if (log_level(Verbose)) {
-    auto t1 = high_resolution_clock::now();
-    [[maybe_unused]] auto t_dur = duration_cast<milliseconds>(t1 - t0).count();
-    std::cerr << "  buildOrArgList args(" << or_arg_list.size() << ")"
+    t.stop();
+    std::cerr << " buildOrArgList args(" << or_arg_list.size() << ")"
               << ", sources(" << count_or_sources(or_arg_list) << ") - "
-              << t_dur << "ms" << std::endl;
+              << t.count() << "ms" << std::endl;
   }
   return or_arg_list;
 }

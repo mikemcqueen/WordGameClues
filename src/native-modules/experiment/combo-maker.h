@@ -100,9 +100,11 @@ struct UsedSources {
   constexpr variation_index_t getVariation(int sentence) const {
     return variations.at(sentence - 1);
   }
+
   void setVariation(int sentence, int value) {
     variations.at(sentence - 1) = value;
   }
+
   constexpr bool hasVariation(int sentence) const {
     return getVariation(sentence) > -1;
   }
@@ -124,7 +126,7 @@ struct UsedSources {
 private:
 
   void addVariations(const UsedSources& other) {
-    for (int sentence{ 1 }; sentence <= kNumSentences; ++sentence) {
+    for (int sentence{1}; sentence <= kNumSentences; ++sentence) {
       if (!other.hasVariation(sentence)) continue;
       // ensure variations for this sentence are compatible
       if (hasVariation(sentence)) {
@@ -168,7 +170,7 @@ public:
     return true;
   }
 
-  // NOTE: order of (a,b) in a.is(b) here matters.
+  // NB! order of (a,b) in a.is(b) here matters!
   constexpr auto isCompatibleSubsetOf(
     const UsedSources& other, bool check_variations = true) const {
     if (!getBits().is_subset_of(other.getBits()))
@@ -222,27 +224,40 @@ public:
     return result;
   }
 
-  constexpr void dump() const {
+  constexpr void dump(const char* header = nullptr) const {
+    char buf[512];
+    char smolbuf[32];
     auto first{true};
-    printf("sources:");
-    for (auto s{1}; s <= kNumSentences; ++s) {
-      if (getVariation(s) > -1) {
+    cuda_strcpy(buf, header ? header : "sources:");
+    for (int s{1}; s <= kNumSentences; ++s) {
+      if (hasVariation(s)) {
         if (first) {
-          printf("\n");
+          cuda_strcat(buf, "\n");
           first = false;
         }
-        printf("  s%d v%d:", s, getVariation(s));
+        //sprintf(smolbuf, "  s%d v%d:", s, (int)getVariation(s));
+        cuda_strcat(buf, "s");
+        cuda_itoa(s, smolbuf);
+        cuda_strcat(buf, smolbuf);
+        cuda_strcat(buf, " v");
+        cuda_itoa(getVariation(s), smolbuf);
+        cuda_strcat(buf, smolbuf);
+        cuda_strcat(buf, ":");
         for (int i{}; i < kMaxSourcesPerSentence; ++i) {
           if (bits.test((s - 1) * kMaxSourcesPerSentence + i)) {
-            printf(" %d", i);
+            //sprintf(smolbuf, " %d", i);
+            cuda_strcat(buf, " ");
+            cuda_itoa(i, smolbuf);
+            cuda_strcat(buf, smolbuf);
           }
         }
-        printf("\n");
+        cuda_strcat(buf, "\n");
       }
     }
     if (first) {
-      printf(" none\n");
+      cuda_strcat(buf, " none");
     }
+    printf("%s", buf);
   }
 
   constexpr void assert_valid() const {
@@ -331,17 +346,15 @@ struct SourceCompatibilityData {
       return false;
     }
     return isXorCompatibleWith(other, false)
-           || isCompatibleSubsetOf(other, false);  // TODO: bad mojo
+           || isCompatibleSubsetOf(other, false);
   }
 
   bool isXorCompatibleWithAnySource(const auto& src_list) {
-    auto compat = src_list.empty();
     for (const auto& src : src_list) {
-      compat = isXorCompatibleWith(src);
-      if (compat)
-        break;
+      if (isXorCompatibleWith(src))
+        return true;
     }
-    return compat;
+    return src_list.empty();
   }
 
   bool addSource(int src, bool nothrow = false) {
@@ -358,28 +371,8 @@ struct SourceCompatibilityData {
     return src_copy;
   }
 
-  constexpr void dump(const char* header = nullptr, bool device = false,
-    char* buf = nullptr, char* smolbuf = nullptr) const
-  {
-    char big_buf[256] = "-";
-    char smol_buf[32] = { 0 };
-    if (!buf) buf = big_buf;
-    if (!smolbuf) smolbuf = smol_buf;
-    *buf = 0;
-    *smolbuf = 0;
-    if (header) {
-      if (device) {
-        sprintf(buf, "%s\n", header);
-      } else {
-        std::cout << header << std::endl;
-      }
-    }
-    usedSources.dump();
-    if (device) {
-      printf("\n");
-    } else {
-      std::cout << std::endl;
-    }
+  constexpr void dump(const char* header = nullptr) const {
+    usedSources.dump(header);
   }
 
   constexpr void assert_valid() const {
@@ -553,22 +546,17 @@ struct SourceData : SourceCompatibilityData {
   }
 
   static void dumpList(const SourceList& src_list) {
-    std::cout << "dumping " << src_list.size() << " sources" << std::endl;
     for (const auto& src : src_list) {
-      std::cout << " ncList: " << NameCount::listToString(src.ncList)
-                << std::endl;
-      std::cout << " pnsl: " << NameCount::listToString(src.primaryNameSrcList)
-                << std::endl;
+      std::cerr << " " << NameCount::listToString(src.ncList) << " - "
+                << NameCount::listToString(src.primaryNameSrcList) << std::endl;
     }
   }
 
   static void dumpList(const SourceCRefList& src_cref_list) {
-    // TODO: auto-ref or just auto here?
-    std::cout << "dumping " << src_cref_list.size() << " cref_sources" << std::endl;
-    for (const auto& src_cref : src_cref_list) {
-      std::cout << " ncList: " << NameCount::listToString(src_cref.get().ncList)
-                << std::endl;
-      std::cout << " pnsl: "
+    // TODO: auto& or just auto here?
+    for (const auto src_cref : src_cref_list) {
+      std::cerr << " " << NameCount::listToString(src_cref.get().ncList)
+                << " - "
                 << NameCount::listToString(src_cref.get().primaryNameSrcList)
                 << std::endl;
     }

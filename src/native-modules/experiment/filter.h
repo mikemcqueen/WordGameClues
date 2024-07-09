@@ -43,7 +43,7 @@ unsigned move_marked_or_sources(device::OrSourceData* device_or_src_list,
 void run_mark_or_sources_kernel(
   const MergeFilterData& mfd, result_t* device_results);
 
-void show_incompatible_or_arg_counts(unsigned num_or_args);
+void show_or_arg_counts(unsigned num_or_args);
 
 /*
 [[nodiscard]] SourceCompatibilityData* cuda_allocCopyXorSources(

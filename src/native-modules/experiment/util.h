@@ -124,6 +124,10 @@ public:
     return std::chrono::duration_cast<TimeUnit>(stop_ - start_).count();
   }
 
+  auto microseconds() {
+    return count<std::chrono::microseconds>();
+  }
+
   static Timer start_timer() {
     Timer t;
     t.start();

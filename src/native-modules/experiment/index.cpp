@@ -648,8 +648,7 @@ void set_or_args(const std::vector<NCDataList>& ncDataLists) {
 void alloc_copy_filter_indices() {
   using namespace std::chrono;
   assert(!MFD.host.combo_indices.empty());
-  auto t0 = high_resolution_clock::now();
-
+  auto t = util::Timer::start_timer();
   auto src_list_start_indices = make_start_indices(MFD.host.xor_src_lists);
   MFD.device.src_list_start_indices =
     alloc_copy_start_indices(src_list_start_indices);
@@ -660,11 +659,9 @@ void alloc_copy_filter_indices() {
     MFD.host.xor_src_lists, MFD.host.compat_idx_lists, MFD.host.combo_indices);
   MFD.device.variation_indices =
     cuda_allocCopySentenceVariationIndices(variation_indices);
-
   if (log_level(Verbose)) {
-    auto t1 = high_resolution_clock::now();
-    auto t_dur = duration_cast<milliseconds>(t1 - t0).count();
-    std::cerr << " prepare filter indices - " << t_dur << "ms" << std::endl;
+    t.stop();
+    std::cerr << "prepare filter indices - " << t.count() << "ms" << std::endl;
   }
 }
 
@@ -729,6 +726,9 @@ auto make_source_descriptor_pairs(
 
 void set_incompatible_sources(
     const SourceCompatibilitySet& incompatible_sources) {
+  // TODO: FIXMENOW remove
+  //if (incompatible_sources.empty()) return;
+
   // empty set technically possible; disallowed here as a canary
   assert(!incompatible_sources.empty());
   assert(MFD.host.incompatible_src_desc_pairs.empty());
@@ -763,7 +763,7 @@ Value filterCandidatesForSum(const CallbackInfo& info) {
     MFD, sum, threads_per_block, streams, stride, iters, synchronous);
   assert(synchronous == opt_incompatible_sources.has_value());
   if (opt_incompatible_sources.has_value()) {
-    set_incompatible_sources(*opt_incompatible_sources);
+    set_incompatible_sources(opt_incompatible_sources.value());
   }
   return env.Null();
 }

@@ -21,6 +21,8 @@ using namespace cm;
 
 using filter_task_result_t = std::pair<std::unordered_set<std::string>,
     std::optional<SourceCompatibilitySet>>;
+
+// global
 inline std::vector<std::future<filter_task_result_t>> filter_futures_;
 
 void add_filter_future(std::future<filter_task_result_t>&& filter_future) {
@@ -65,7 +67,7 @@ void cuda_copy_results(std::vector<T>& results, T* device_results,
       cudaMemcpyDeviceToHost, stream);
   assert_cuda_success(err, "copy results memcpy");
   // sync the memcpy
-  CudaEvent temp;
+  CudaEvent temp(stream);
   temp.synchronize();
 }
 
@@ -77,15 +79,15 @@ auto cuda_copy_results(T* device_results, unsigned num_results,
   return results;
 }
 
-[[nodiscard]] auto allocCopyListStartIndices(const IndexStates& index_states,
+[[nodiscard]] auto allocCopyListStartIndices(const IndexStates& idx_states,
     cudaStream_t stream = cudaStreamPerThread) {
   // alloc indices
-  auto indices_bytes = index_states.list_start_indices.size() * sizeof(index_t);
+  auto indices_bytes = idx_states.list_start_indices().size() * sizeof(index_t);
   index_t* device_indices;
   auto err = cudaMallocAsync((void**)&device_indices, indices_bytes, stream);
   assert_cuda_success(err, "alloc list start indices");
   // copy indices
-  err = cudaMemcpyAsync(device_indices, index_states.list_start_indices.data(),
+  err = cudaMemcpyAsync(device_indices, idx_states.list_start_indices().data(),
       indices_bytes, cudaMemcpyHostToDevice, stream);
   assert_cuda_success(err, "copy list start indices");
   return device_indices;
@@ -124,34 +126,66 @@ auto get_compatible_sources_results(int sum,
 
 //////////
 
-int run_xor_filter_task(int sum, StreamSwarm& streams, int threads_per_block,
+void log_fill(int sum, const StreamData& stream, const IndexStates& idx_states,
+    long duration) {
+  if (log_level(Ludicrous)) {
+    std::cerr << " " << sum << ": stream " << stream.stream_idx
+              << " source_indices: " << stream.source_indices.size()
+              << ", ready: " << stream.num_ready(idx_states) << ", filled in "
+              << duration << "us" << std::endl;
+  }
+}
+
+void log_xor_kernel(int sum, const StreamData& stream,
+    const std::vector<result_t>& results, unsigned num_compat,
+    unsigned total_compat) {
+  if (log_level(ExtraVerbose)) {
+    auto kernel_duration = stream.kernel_stop.synchronize(stream.kernel_start);
+    std::cerr << " " << sum << ": stream " << stream.stream_idx
+              << " xor_kernel took " << kernel_duration << "ms" << std::endl;
+  }
+  if (log_level(Ludicrous)) {
+    auto num_actual_compat = std::accumulate(results.begin(), results.end(), 0,
+        [](int sum, result_t r) { return r ? sum + 1 : sum; });
+    std::cerr << " " << sum << ": stream " << stream.stream_idx
+              << " compat results: " << num_compat
+              << ", total: " << total_compat
+              << ", actual: " << num_actual_compat << std::endl;
+  }
+}
+
+//
+// This is the innermost filter "task" function.
+//
+// Divide device_sources up into chunks, and run multiple xor_kernels
+// concurrently on different streams, with each stream processing one
+// chunk at a time.
+//
+// Returns a pair<int, int>, consisting of the number of processed sources
+// and the number of xor-compatible sources. (TODO: compatible with what)
+//
+auto run_xor_filter_task(int sum, StreamSwarm& streams, int threads_per_block,
     IndexStates& idx_states, const MergeFilterData& mfd,
     const SourceCompatibilityData* device_sources,
     const compat_src_result_t* device_compat_src_results,
     result_t* device_results, const index_t* device_start_indices,
     std::vector<result_t>& results) {
   using namespace std::chrono;
+  int num_processed{};
   int total_compat{};
   int current_stream{-1};
   while (streams.get_next_available(current_stream)) {
     auto& stream = streams.at(current_stream);
     if (!stream.is_running) {
-      auto f0 = high_resolution_clock::now();
+      auto t = util::Timer::start_timer();
       if (!stream.fill_source_indices(idx_states)) {
         continue;
       }
-      auto f1 = high_resolution_clock::now();
-      stream.fill_duration = duration_cast<microseconds>(f1 - f0).count();
-      if (log_level(Ludicrous)) {
-        std::cerr << " " << sum << ": stream " << stream.stream_idx
-                  << " source_indices: " << stream.source_indices.size()
-                  << ", ready: " << stream.num_ready(idx_states)
-                  << ", filled in " << stream.fill_duration << "us"
-                  << std::endl;
-      }
-      //stream.copy_sources_start.record();
+      t.stop();
+      log_fill(sum, stream, idx_states, t.microseconds());
+      // stream.copy_sources_start.record();
       stream.allocCopy(idx_states);
-      //stream.copy_sources_stop.record();
+      // stream.copy_sources_stop.record();
       run_xor_kernel(stream, threads_per_block, mfd, device_sources,
           device_compat_src_results, device_results, device_start_indices);
       continue;
@@ -162,47 +196,21 @@ int run_xor_filter_task(int sum, StreamSwarm& streams, int threads_per_block,
     auto num_compat =
         idx_states.update(stream.source_indices, results, stream.stream_idx);
     total_compat += num_compat;
+    num_processed += stream.source_indices.size();
+    log_xor_kernel(sum, stream, results, num_compat, total_compat);
 
-    if (log_level(ExtraVerbose)) {
-      auto kernel_duration =
-          stream.kernel_stop.synchronize(stream.kernel_start);
-      //auto total_duration = stream.fill_duration + kernel_duration;
-      std::cerr << " " << sum << ": stream " << stream.stream_idx
-                << " xor_kernel took " << kernel_duration << "ms" << std::endl;
-      //        << "ms, total: " << total_duration 
-    }
-    if (log_level(Ludicrous)) {
-      auto num_actual_compat = std::accumulate(results.begin(), results.end(),
-          0, [](int sum, result_t r) { return r ? sum + 1 : sum; });
-      std::cerr << " " << sum << ": stream " << stream.stream_idx
-                << " compat results: " << num_compat
-                << ", total: " << total_compat
-                << ", actual: " << num_actual_compat << std::endl;
-    }
+    // TODO: FIXMENOW debug: stop after first kernel
+    //break;
   }
-  return total_compat;
-}
-
-inline int total_incompat{};
-
-auto get_incompatible_sources(
-    const IndexStates& idx_states, const CandidateList& candidates) {
-  SourceCompatibilitySet src_set;
-  for (const auto& data : idx_states.list) {
-    if (!data.is_compatible()) {
-      const auto& src_list =
-          candidates.at(data.sourceIndex.listIndex).src_list_cref.get();
-      src_set.insert(src_list.begin(), src_list.end());
-      total_incompat += src_list.size();
-    }
-  }
-  return src_set;
+  return std::make_pair(num_processed, total_compat);
 }
 
 std::unordered_set<std::string> get_compat_combos(
-    const CandidateList& candidates, const std::vector<result_t>& results) {
+    const CandidateList& candidates, const std::vector<result_t>& results,
+    int num_processed) {
   std::unordered_set<std::string> compat_combos{};
-  for (size_t i{}; i < candidates.size(); ++i) {
+  auto num_candidates = std::min(candidates.size(), (size_t)num_processed);
+  for (size_t i{}; i < num_candidates; ++i) {
     if (results.at(i)) {
       const auto& combos = candidates.at(i).combos;
       compat_combos.insert(combos.begin(), combos.end());
@@ -211,18 +219,44 @@ std::unordered_set<std::string> get_compat_combos(
   return compat_combos;
 }
 
-void log_xor_filter_task(int sum, int num_compat, int num_results,
-    std::optional<SourceCompatibilitySet> opt_sources,
-    std::chrono::milliseconds::rep duration_ms) {
-  std::cerr << "sum(" << sum << ")";
-  std::cerr << " compat: " << num_compat << " of " << num_results;
-  if (opt_sources.has_value()) {
-    std::cerr << ", incompat total: " << total_incompat
-              << ", unique: " << opt_sources->size();
+void log_xor_filter_task(int sum, int num_processed, int num_compat,
+    int num_results, const SourceCompatibilitySet& incompat_sources,
+    int num_incompat_sources, std::chrono::milliseconds::rep duration_ms) {
+  auto num_src_lists = std::min(num_processed, num_results);
+  std::cerr << "sum(" << sum << ")"
+            << " compatible src_lists: " << num_compat << " of "
+            << num_src_lists << ", processed sources: " << num_processed;
+  if (incompat_sources.size()) {
+    std::cerr << ", incompat sources total: " << num_incompat_sources
+              << ", unique: " << incompat_sources.size();
   }
   std::cerr << " - " << duration_ms << "ms" << std::endl;
 }
 
+//
+// This is the intermediate filter "task" function.
+//
+// Additional preparation and post-processing surrounding the call to
+// run_xor_filter_task.
+//
+// Preparation:
+//
+// * Determine the # of streams and stride, and create a StreamSwarm object.
+// * Create and initialize an IndexStates object from all available
+// candidates.
+//   (TODO: what are candidates?).
+// * Allocate and copy "list start indices" from the IndexStates object.
+// * Allocate results buffer.
+//
+// Post-processing:
+//
+// * If call is synchronous (i.e., sum == 2), populate the
+// incompatible_sources
+//   set. This set is used to speed up subsequent async sums.
+// * Create a set of compatible combos. (TODO: what are compatible combos?)
+//
+// Returns a pair<compat_combo_string_set, incompat_sources_set>
+//
 filter_task_result_t xor_filter_task(const MergeFilterData& mfd,
     const SourceCompatibilityData* device_sources,
     const compat_src_result_t* device_compat_src_results,
@@ -244,7 +278,7 @@ filter_task_result_t xor_filter_task(const MergeFilterData& mfd,
   scope_exit free_results{[device_results]() { cuda_free(device_results); }};
 
   // TODO: num_streams should be min'd here too
-  //  stride = std::min((int)candidates.size(), stride);
+  // stride = std::min((int)candidates.size(), stride);
   StreamSwarm streams(num_streams, stride);
   std::vector<result_t> results(candidates.size());
   cuda_zero_results(device_results, results.size());
@@ -255,22 +289,50 @@ filter_task_result_t xor_filter_task(const MergeFilterData& mfd,
               << std::endl;
   }
   auto t = util::Timer::start_timer();
-  auto num_compat = run_xor_filter_task(sum, streams, threads_per_block,
-      idx_states, mfd, device_sources, device_compat_src_results,
-      device_results, device_start_indices, results);
+  auto [num_processed, num_compat] = run_xor_filter_task(sum, streams,
+      threads_per_block, idx_states, mfd, device_sources,
+      device_compat_src_results, device_results, device_start_indices, results);
   t.stop();
-  std::optional<SourceCompatibilitySet> opt_incompatible_sources;
-  if (synchronous) {
-    opt_incompatible_sources =
-        std::move(get_incompatible_sources(idx_states, candidates));
+  SourceCompatibilitySet incompat_sources;
+  int num_incompat_sources{};
+  if (/*0 && */synchronous) { // TODO: FIXMENOW remove
+    num_incompat_sources =
+        idx_states.get_incompatible_sources(candidates, incompat_sources);
   }
-  log_xor_filter_task(
-      sum, num_compat, results.size(), opt_incompatible_sources, t.count());
+  log_xor_filter_task(sum, num_processed, num_compat, results.size(),
+      incompat_sources, num_incompat_sources, t.count());
 
-  return std::make_pair(get_compat_combos(candidates, results),
-    std::move(opt_incompatible_sources));
+  return std::make_pair(get_compat_combos(candidates, results, num_processed),
+      std::move(incompat_sources));  //
 }
 
+void log_copy_sources(int sum, int num_sources, bool synchronous,
+    const CudaEvent& copy_start) {  //
+  if ((synchronous && log_level(Normal))
+      || (!synchronous && log_level(Verbose))) {
+    CudaEvent copy_stop;
+    auto copy_duration = copy_stop.synchronize(copy_start);
+    auto free_mem = cuda_get_free_mem() / 1'000'000;
+    std::cerr << " " << sum << ": alloc_copy_sources(" << num_sources << ")"
+              << ", free: " << free_mem << "MB"
+              << " - " << copy_duration << "ms" << std::endl;
+  }
+}
+
+//
+// This is the outermost filter "task" function.
+//
+// Preparation prior to calling xor_filter_task:
+//
+// * Determine the candidate sources for the supplied sum.
+// * Allocate and copy candidate sources.
+// * If call is not synchronous (i.e. sum > 2), run the compat_sources_kernel
+//   in order to determine which of the sources are compatible with the set of
+//   incompatible_sources that resulted from the first synchronous call (sum=2).
+//   (TODO: fudgy language, add why is this done).
+//
+// Returns the result of xor_filter_task with no additional post-processing.
+//
 auto filter_task(const MergeFilterData& mfd, int sum, int threads_per_block,
     int num_streams, int stride, int iters,  // CandidateMap& all_candidates,
     bool synchronous = false) {
@@ -288,40 +350,32 @@ auto filter_task(const MergeFilterData& mfd, int sum, int threads_per_block,
   CudaEvent copy_start;
   auto device_sources = cuda_alloc_copy_sources(candidates, num_sources);
   scope_exit free_sources{[device_sources]() { cuda_free(device_sources); }};
-  if ((synchronous && log_level(Normal))
-      || (!synchronous && log_level(Verbose))) {
-    CudaEvent copy_stop;
-    auto copy_duration = copy_stop.synchronize(copy_start);
-    auto free_mem = cuda_get_free_mem() / 1'000'000;
-    std::cerr << " " << sum << ": alloc_copy_sources(" << num_sources << ")"
-              << ", free: " << free_mem << "MB"
-              << " - " << copy_duration << "ms" << std::endl;
-  }
+  log_copy_sources(sum, num_sources, synchronous, copy_start);
   compat_src_result_t* device_compat_src_results{};
   scope_exit free_results{[device_compat_src_results]() {
     if (device_compat_src_results)
       cuda_free(device_compat_src_results);
   }};
   if (!synchronous) {
-    static std::counting_semaphore<2> compat_src_semaphore(2);  // TODO: not great
-    //compat_src_semaphore.acquire();
+    // static std::counting_semaphore<2> compat_src_semaphore(2);
+    // compat_src_semaphore.acquire();
     device_compat_src_results = get_compatible_sources_results(sum,
         device_sources, num_sources, mfd.device.incompatible_src_desc_pairs,
         mfd.device.num_incompatible_sources);
-    //compat_src_semaphore.release();
+    // compat_src_semaphore.release();
   }
-  static std::counting_semaphore<2> filter_semaphore(4);  // TODO: not great
-  //filter_semaphore.acquire();
+  // static std::counting_semaphore<2> filter_semaphore(4);  // TODO: not great
+  // filter_semaphore.acquire();
   auto filter_result = xor_filter_task(mfd, device_sources,
       device_compat_src_results, candidates, sum, threads_per_block,
       num_streams, stride, iters, synchronous);
-  //filter_semaphore.release();
+  // filter_semaphore.release();
   return filter_result;
 }
 
 auto async_filter_task(const MergeFilterData& mfd, int sum,
     int threads_per_block, int num_streams, int stride, int iters) {
-  static std::counting_semaphore<2> semaphore(2);// TODO: not great
+  static std::counting_semaphore<2> semaphore(2);  // TODO: not great
   semaphore.acquire();
   auto filter_result =
       filter_task(mfd, sum, threads_per_block, num_streams, stride, iters);
@@ -423,7 +477,7 @@ filter_result_t get_filter_result(const MergeFilterData& mfd) {
   }
   std::cerr << results << ", total: " << total
             << ", unique: " << unique_combos.size() << std::endl;
-  show_incompatible_or_arg_counts(mfd.host.or_arg_list.size());
+  show_or_arg_counts(mfd.host.or_arg_list.size());
   return unique_combos;
 }
 
@@ -435,9 +489,9 @@ auto cuda_markAllXorCompatibleOrSources(const MergeFilterData& mfd)
   run_mark_or_sources_kernel(mfd, device_results);
   auto results = cuda_copy_results(device_results, mfd.device.num_or_sources);
   if (log_level(Verbose)) {
-    auto marked = std::accumulate(results.begin(), results.end(), 0,
+    auto num_marked = std::accumulate(results.begin(), results.end(), 0,
         [](int total, result_t val) { return total + val; });
-    std::cerr << "  marked " << marked << " of " << mfd.device.num_or_sources
+    std::cerr << " marked " << num_marked << " of " << mfd.device.num_or_sources
               << " or sources" << std::endl;
   }
   return results;
@@ -515,6 +569,7 @@ cuda_allocCopyOrSources(const OrArgList& orArgList) {
   using DeviceVariationIndicesArray =
       std::array<device::VariationIndices, kNumSentences>;
   DeviceVariationIndicesArray device_indices_array;
+  cudaStream_t stream = cudaStreamPerThread;
   for (int s{}; s < kNumSentences; ++s) {
     auto& variation_indices = sentenceVariationIndices.at(s);
     const auto num_variations{variation_indices.size()};
@@ -524,7 +579,7 @@ cuda_allocCopyOrSources(const OrArgList& orArgList) {
         * sizeof(combo_index_t);
     auto& device_indices = device_indices_array.at(s);
     auto err = cudaMallocAsync((void**)&device_indices.device_data,
-        device_data_bytes, cudaStreamPerThread);
+        device_data_bytes, stream);
     assert_cuda_success(err, "alloc device data");
 
     device_indices.num_variations = num_variations;
@@ -542,7 +597,7 @@ cuda_allocCopyOrSources(const OrArgList& orArgList) {
       const auto indices_bytes = combo_indices.size() * sizeof(combo_index_t);
       err = cudaMemcpyAsync(&device_indices.combo_indices[offset],
           combo_indices.data(), indices_bytes, cudaMemcpyHostToDevice,
-          cudaStreamPerThread);
+          stream);
       assert_cuda_success(err, "combo_indices memcpy");
       offset += combo_indices.size();
     }
@@ -551,7 +606,7 @@ cuda_allocCopyOrSources(const OrArgList& orArgList) {
     const auto offsets_bytes = variation_offsets.size() * sizeof(index_t);
     err = cudaMemcpyAsync(device_indices.variation_offsets,
         variation_offsets.data(), offsets_bytes, cudaMemcpyHostToDevice,
-        cudaStreamPerThread);
+        stream);
     assert_cuda_success(err, "variation_offsets memcpy");
     // copy num combo indices
     device_indices.num_combo_indices =
@@ -559,24 +614,24 @@ cuda_allocCopyOrSources(const OrArgList& orArgList) {
     const auto num_indices_bytes = num_combo_indices.size() * sizeof(index_t);
     err = cudaMemcpyAsync(device_indices.num_combo_indices,
         num_combo_indices.data(), num_indices_bytes, cudaMemcpyHostToDevice,
-        cudaStreamPerThread);
+        stream);
     assert_cuda_success(err, "combo_indices memcpy");
   }
   const auto variation_indices_bytes =
       kNumSentences * sizeof(device::VariationIndices);
   device::VariationIndices* device_variation_indices;
   auto err = cudaMallocAsync((void**)&device_variation_indices,
-      variation_indices_bytes, cudaStreamPerThread);
+      variation_indices_bytes, stream);
   assert_cuda_success(err, "variation_indices memcpy");
 
   err = cudaMemcpyAsync(device_variation_indices, device_indices_array.data(),
-      variation_indices_bytes, cudaMemcpyHostToDevice, cudaStreamPerThread);
+      variation_indices_bytes, cudaMemcpyHostToDevice, stream);
   assert_cuda_success(err, "indices_array memcpy");
 
   // TODO: be nice to get rid of this
   // just to be sure, due to lifetime problems of local host-side memory
   // solution: cram stuff into MFD
-  CudaEvent temp;
+  CudaEvent temp(stream);
   temp.synchronize();
   return device_variation_indices;
 }
