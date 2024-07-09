@@ -1,5 +1,8 @@
 * TODO: grep for: FIXMENOW
 
+* don't use the same result buffer for multiple streams. maybe make it part
+  of the StreamData struct?
+
 * cm: shouldn't i filter out retired pairs in pairs(.sh) ?
   * and for that matter, would a filter-retired(.sh) script be useful for
     per-letter pairs?
@@ -15,6 +18,11 @@
   each or_arg is compatible, but what if different args refer to the same sentence,
   and the compatible source found for each arg have different variations? maybe I
   can write a test case to demonstrate this, and see what should happen.
+
+* another thought about OR compatibility.  I determine if a particular source is
+  XOR compatible with an XorSource then I test if it is OR compatible with at least
+  one source of each OR arg.  But shouldn't I also check if the XOR source it was XOR
+  compatible with, is also OR-compatible with the candidate OR source?
 
 ++PERF
 

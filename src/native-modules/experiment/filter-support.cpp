@@ -126,6 +126,63 @@ auto get_compatible_sources_results(int sum,
 
 //////////
 
+namespace host {
+
+auto or_filter(
+    const SourceCompatibilityData& source, const MergeFilterData& mfd) {
+  size_t num_compat_or_args{};
+  for (const auto& or_arg: mfd.host.or_arg_list) {
+    bool or_compat{};
+    for (const auto& or_src: or_arg.or_src_list) {
+      // TODO: ignoring "marked" is_xor_compat flag for now
+      if (or_src.src.isOrCompatibleWith(source)) {
+        or_compat = true;
+        break;
+      }
+    }
+    if (or_compat) {
+      ++num_compat_or_args;
+    }
+  }
+  return num_compat_or_args == mfd.host.or_arg_list.size();
+}
+
+void xor_filter(int sum, const StreamData& stream, const MergeFilterData& mfd) {
+  // const IndexStates& idx_states
+  const auto& all_candidates = allSumsCandidateData;
+  const auto it = all_candidates.find(sum);
+  assert((it != all_candidates.end()) && "no candidates for sum");
+  const auto& candidates = it->second;
+  std::vector<result_t> results(candidates.size());
+  const auto& xor_src_lists = mfd.host.xor_src_lists;
+  size_t num_compat_sources{};
+  for (auto src_idx : stream.source_indices) {
+    const auto& src_list = candidates.at(src_idx.listIndex).src_list_cref.get();
+    const auto& source = src_list.at(src_idx.index);
+    size_t num_compat_lists{};
+    for (const auto& xor_src_list : xor_src_lists) {
+      bool compat_src{};
+      for (const auto& xor_src : xor_src_list) {
+        if (source.isXorCompatibleWith(xor_src) && or_filter(source, mfd)) {
+          compat_src = true;
+          break;
+        }
+      }
+      if (compat_src) {
+        ++num_compat_lists;
+        break;
+      }
+    }
+    if (num_compat_lists == xor_src_lists.size()) {
+      ++num_compat_sources;
+    }
+  }
+  std::cerr << "host compat sources " << num_compat_sources << " of "
+            << stream.source_indices.size() << std::endl;
+}
+
+}  // namespace host
+
 void log_fill(int sum, const StreamData& stream, const IndexStates& idx_states,
     long duration) {
   if (log_level(Ludicrous)) {
@@ -184,7 +241,7 @@ auto run_xor_filter_task(int sum, StreamSwarm& streams, int threads_per_block,
       t.stop();
       log_fill(sum, stream, idx_states, t.microseconds());
       // stream.copy_sources_start.record();
-      stream.allocCopy(idx_states);
+      stream.alloc_copy_source_indices(idx_states);
       // stream.copy_sources_stop.record();
       run_xor_kernel(stream, threads_per_block, mfd, device_sources,
           device_compat_src_results, device_results, device_start_indices);
@@ -198,9 +255,11 @@ auto run_xor_filter_task(int sum, StreamSwarm& streams, int threads_per_block,
     total_compat += num_compat;
     num_processed += stream.source_indices.size();
     log_xor_kernel(sum, stream, results, num_compat, total_compat);
-
+    if constexpr(1) {
+      host::xor_filter(sum, stream, mfd);
+    }
     // TODO: FIXMENOW debug: stop after first kernel
-    //break;
+    break;
   }
   return std::make_pair(num_processed, total_compat);
 }
@@ -250,10 +309,9 @@ void log_xor_filter_task(int sum, int num_processed, int num_compat,
 //
 // Post-processing:
 //
-// * If call is synchronous (i.e., sum == 2), populate the
-// incompatible_sources
+// * If call is synchronous (i.e., sum == 2), populate the incompatible_sources
 //   set. This set is used to speed up subsequent async sums.
-// * Create a set of compatible combos. (TODO: what are compatible combos?)
+// * Create a set of compatible combos from compatible candidate sourcelists.
 //
 // Returns a pair<compat_combo_string_set, incompat_sources_set>
 //
@@ -266,7 +324,8 @@ filter_task_result_t xor_filter_task(const MergeFilterData& mfd,
   using namespace std::chrono;
   // err = cudaDeviceSetLimit(cudaLimitPrintfFifoSize, 7'500'000);
 
-  num_streams = num_streams ? num_streams : 3;
+  // TODO: FIXMENOW: streams = 3
+  num_streams = num_streams ? num_streams : 1;
   stride = stride ? stride : candidates.size();
   iters = iters ? iters : 1;
 
@@ -295,7 +354,7 @@ filter_task_result_t xor_filter_task(const MergeFilterData& mfd,
   t.stop();
   SourceCompatibilitySet incompat_sources;
   int num_incompat_sources{};
-  if (/*0 && */synchronous) { // TODO: FIXMENOW remove
+  if (0 && synchronous) { // TODO: FIXMENOW remove
     num_incompat_sources =
         idx_states.get_incompatible_sources(candidates, incompat_sources);
   }

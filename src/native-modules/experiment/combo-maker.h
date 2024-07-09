@@ -93,9 +93,7 @@ struct UsedSources {
   }
 
   constexpr SourceBits& getBits() noexcept { return bits; }
-  constexpr const SourceBits& getBits() const noexcept {
-    return bits;
-  }
+  constexpr const SourceBits& getBits() const noexcept { return bits; }
 
   constexpr variation_index_t getVariation(int sentence) const {
     return variations.at(sentence - 1);
@@ -189,9 +187,9 @@ public:
       if (nothrow) {
         return false;
       }
-      std::cerr << "variation(" << sentence << "), this: "
-                << getVariation(sentence) << ", src: " << variation
-                << std::endl;
+      std::cerr << "sentence " << sentence
+                << " variation: " << getVariation(sentence)
+                << ", src variation: " << variation << std::endl;
       assert(false && "addSource() variation mismatch");
     }
     assert(Source::getIndex(src) < kMaxSourcesPerSentence);

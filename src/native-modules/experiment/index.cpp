@@ -528,19 +528,12 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   // arg1
   auto merge_only = info[1].As<Boolean>();
   // --
-  auto build0 = high_resolution_clock::now();
-  // TODO: I'm not convinced this data needs to hang around on host side.
-  // maybe for async copy?
-  // NOTE: it's used for -t, we call preCompute(), then Native.showComponents()
-  MFD.host.xor_src_lists =
-    std::move(buildSourceListsForUseNcData(ncDataLists));
-
+  auto t = util::Timer::start_timer();
+  MFD.host.xor_src_lists = std::move(buildSourceListsForUseNcData(ncDataLists));
   // if (log_level(Verbose)) {
-  auto build1 = high_resolution_clock::now();
-  [[maybe_unused]] auto d_build =
-		     duration_cast<milliseconds>(build1 - build0).count();
-  std::cerr << " build xor_src_lists(" << MFD.host.xor_src_lists.size() << ") - "
-	    << d_build << "ms" << std::endl;
+  t.stop();
+  std::cerr << " build xor_src_lists(" << MFD.host.xor_src_lists.size()
+            << ") - " << t.count() << "ms" << std::endl;
   // }
 
 #if 0
@@ -553,7 +546,8 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   if (!merge_only || (MFD.host.xor_src_lists.size() > 1)) {
     // TODO: support for single-list compat indices
     auto compat_idx_lists = get_compatible_indices(MFD.host.xor_src_lists);
-    std::cerr << " compat_idx_lists(" << compat_idx_lists.size() << ")" << std::endl;
+    std::cerr << " compat_idx_lists(" << compat_idx_lists.size() << ")"
+              << std::endl;
     if (!compat_idx_lists.empty()) {
       // TODO: free if already set. set_src_lists?
       MFD.device.src_lists = alloc_copy_src_lists(MFD.host.xor_src_lists);
@@ -564,13 +558,13 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
         MFD.host.xor_src_lists, MFD.device.src_lists, compat_idx_lists,
         MFD.device.idx_lists, MFD.device.idx_list_sizes);
       if (merge_only) {
-        // merge-only with multiple xor args uses compat index lists and combo
-        // indices for the sole purpose of generating an xor_src_list - no need
-        // to save them for later use
+        // compat_idx_lists and combo_indices are used in the merge_only case
+        // for the sole purpose of generating merged_xor_src_list, so there is
+        // no need to save them for later use
         MFD.host.merged_xor_src_list = std::move(merge_xor_sources(
-          MFD.host.xor_src_lists, compat_idx_lists, combo_indices));
+            MFD.host.xor_src_lists, compat_idx_lists, combo_indices));
       } else {
-        // filter otoh will need them both later
+        // filter on the other hand will need them both later
         MFD.host.compat_idx_lists = std::move(compat_idx_lists);
         MFD.host.combo_indices = std::move(combo_indices);
       }
@@ -602,7 +596,7 @@ void validate_marked_or_sources(
 
 void set_or_args(const std::vector<NCDataList>& ncDataLists) {
   using namespace std::chrono;
-  auto build0 = high_resolution_clock::now();
+  auto t = util::Timer::start_timer();
   MFD.host.or_arg_list =
     std::move(buildOrArgList(buildSourceListsForUseNcData(ncDataLists)));
   if (MFD.host.or_arg_list.size()) {
@@ -637,11 +631,10 @@ void set_or_args(const std::vector<NCDataList>& ncDataLists) {
     }
   }
   if (log_level(Verbose)) {
-    auto build1 = high_resolution_clock::now();
-    auto d_build = duration_cast<milliseconds>(build1 - build0).count();
+    t.stop();
     std::cerr << " build/mark or_args(" << MFD.host.or_arg_list.size() << ")"
               << ", or_sources(" << MFD.device.num_or_sources << ") - "
-              << d_build << "ms" << std::endl;
+              << t.count() << "ms" << std::endl;
   }
 }
 
@@ -727,7 +720,7 @@ auto make_source_descriptor_pairs(
 void set_incompatible_sources(
     const SourceCompatibilitySet& incompatible_sources) {
   // TODO: FIXMENOW remove
-  //if (incompatible_sources.empty()) return;
+  if (incompatible_sources.empty()) return;
 
   // empty set technically possible; disallowed here as a canary
   assert(!incompatible_sources.empty());

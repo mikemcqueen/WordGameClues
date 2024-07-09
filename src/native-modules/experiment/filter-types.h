@@ -306,7 +306,8 @@ public:
     return fill_source_indices(idx_states, num_list_indices);
   }
 
-  void allocCopy([[maybe_unused]] const IndexStates& idx_states) {
+  void alloc_copy_source_indices(
+      [[maybe_unused]] const IndexStates& idx_states) {
     cudaError_t err = cudaSuccess;
     auto indices_bytes = source_indices.size() * sizeof(SourceIndex);
     // alloc source indices
@@ -336,13 +337,12 @@ public:
   cudaStream_t cuda_stream{};
   CudaEvent kernel_start;
   CudaEvent kernel_stop;
-  //  std::chrono::microseconds::rep fill_duration{};
 
   int sequence_num{};
   bool is_running{false};  // is running (true until results retrieved)
   bool has_run{false};     // has run at least once
   SourceIndex* device_source_indices{};
-  std::vector<SourceIndex> source_indices;  // hasWorkRemaining = (size() > 0)
+  std::vector<SourceIndex> source_indices;
 
   int num_list_indices;    // TODO: this doesn't belong here
 };  // struct StreamData

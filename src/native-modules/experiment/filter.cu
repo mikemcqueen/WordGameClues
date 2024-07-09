@@ -395,7 +395,7 @@ __device__ SmallestSpans::ResultType get_smallest_src_index_spans(
   const auto variation =
       source.usedSources.variations[sentence_with_fewest] + 1;
   const auto& vi = variation_indices[sentence_with_fewest];
-  // todo:  std::make_optional, or { make_pair };
+  // TODO:  std::make_optional, or { make_pair(x, make_pair(y, z)) };
   return {Check,
       std::make_pair(vi.get_index_span(0), vi.get_index_span(variation))};
 }
