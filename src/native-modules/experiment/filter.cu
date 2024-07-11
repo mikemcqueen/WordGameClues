@@ -97,9 +97,10 @@ __global__ void get_compatible_sources_kernel(
   }
 }
 
+#ifdef OR_ARG_COUNTS
 #define MAX_OR_ARGS 20
 __device__ unsigned device_incompatible_or_arg_counts[MAX_OR_ARGS] = {0};
-__device__ unsigned device_num_compatible_or_args = 0;
+__device__ unsigned device_num_compat_or_args = 0;
 
 __device__ void update_or_arg_counts(
     volatile result_t* or_arg_results, unsigned num_or_args) {
@@ -114,13 +115,11 @@ __device__ void update_or_arg_counts(
       }
     }
     if (compatible) {
-      atomicInc(&device_num_compatible_or_args, 1'000'000);
+      atomicInc(&device_num_compat_or_args, 1'000'000);
     }
   }
 }
-
-#define MAX_DUMP 100'000
-__device__ unsigned dump_count = 0;
+#endif
 
 // is_source_OR_compatible with at least one source from each or arg
 // TODO:
@@ -150,19 +149,13 @@ __device__ bool is_source_OR_compatible(const SourceCompatibilityData& source,
         or_arg_results[or_src.or_arg_idx] = 1;
         // TODO: FIXMENOW?
         //store(&or_arg_results[or_src.or_arg_idx], (result_t)1);
-      } else if (0 && (dump_count < MAX_DUMP)) {
-        // TODO: FIXMENOW?
-        if (!source.usedSources.hasVariation(1)) {
-          char buf[8] = "arg";
-          cuda_itoa(or_src.or_arg_idx, &buf[3]);
-          source.dump(buf);
-          atomicInc(&dump_count, 10000);
-        }
       }
     }
   }
-  // FIXMENOW: wrap in log_level
-  update_or_arg_counts(or_arg_results, num_or_args);
+#if OR_ARG_COUNTS
+    // FIXMENOW: wrap in log_level
+    update_or_arg_counts(or_arg_results, num_or_args);
+#endif
 #if 0
   // parallel reduction (sum)
   // i could safely initialize reduce_idx to 16 I think (max 32 --or args)
@@ -434,7 +427,7 @@ __global__ void xor_kernel_new(
     const unsigned num_or_args,
     const device::OrSourceData* __restrict__ or_arg_sources,
     const unsigned num_or_arg_sources,
-    const SourceIndex* __restrict__ source_indices,
+    const SourceIndex* __restrict__ src_indices,
     const index_t* __restrict__ list_start_indices,
     const compat_src_result_t* __restrict__ compat_src_results,
     result_t* __restrict__ results, int stream_idx) {
@@ -445,7 +438,7 @@ __global__ void xor_kernel_new(
   // for each source (one block per source)
   for (unsigned idx{blockIdx.x}; idx < num_sources; idx += gridDim.x) {
     __syncthreads();
-    const auto src_idx = source_indices[idx];
+    const auto src_idx = src_indices[idx];
     const auto flat_idx = list_start_indices[src_idx.listIndex] + src_idx.index;
     if (compat_src_results && !compat_src_results[flat_idx]) {
       continue;
@@ -699,12 +692,12 @@ void run_xor_kernel(StreamData& stream, int threads_per_block,
   assert_cuda_success(err, "run_xor_kernel sync");
   stream.kernel_start.record();
   xor_kernel_new<<<grid_dim, block_dim, shared_bytes, stream.cuda_stream>>>(
-    device_src_list, stream.source_indices.size(), mfd.device.src_lists,
+    device_src_list, stream.src_indices.size(), mfd.device.src_lists,
     mfd.device.src_list_start_indices, mfd.device.idx_lists,
     mfd.device.idx_list_start_indices, mfd.device.idx_list_sizes,
     mfd.host.compat_idx_lists.size(), mfd.device.variation_indices,
     mfd.host.or_arg_list.size(), mfd.device.or_src_list,
-    mfd.device.num_or_sources, stream.device_source_indices,
+    mfd.device.num_or_sources, stream.device_src_indices,
     device_list_start_indices, device_compat_src_results, device_results,
     stream.stream_idx);
   stream.kernel_stop.record();
@@ -726,11 +719,13 @@ void show_or_arg_counts(unsigned num_or_args) {
   std::cerr << "wtfbbq: " << wtfbbq << std::endl;
 #endif
 
+#ifdef OR_ARG_COUNTS
   unsigned num_compat;
   err = cudaMemcpyFromSymbol(
-      &num_compat, device_num_compatible_or_args, sizeof(unsigned));
+      &num_compat, device_num_compat_or_args, sizeof(unsigned));
   assert_cuda_success(err, "cudaMemCopyFromSymbol num_compat");
   std::cerr << "compatible sources: " << num_compat << std::endl;
+#endif
 
   unsigned num_xor_compat;
   err = cudaMemcpyFromSymbol(
@@ -738,6 +733,7 @@ void show_or_arg_counts(unsigned num_or_args) {
   assert_cuda_success(err, "cudaMemCopyFromSymbol num_xor_compat");
   std::cerr << "xor-compatible sources: " << num_xor_compat << std::endl;
 
+#ifdef OR_ARG_COUNTS
   unsigned results[MAX_OR_ARGS] = {0};
   auto max_or_args = std::min(MAX_OR_ARGS, (int)num_or_args);
   err = cudaMemcpyFromSymbol(results, device_incompatible_or_arg_counts,
@@ -747,6 +743,7 @@ void show_or_arg_counts(unsigned num_or_args) {
   for (int i{}; i < max_or_args; ++i) {
     std::cerr << " arg" << i << ": " << results[i] << std::endl;
   }
+#endif
 }
 
 void run_mark_or_sources_kernel(

@@ -6,7 +6,7 @@
 
 namespace cm {
 
-template <typename T>
+template <typename T> 
 auto make_start_indices(const std::vector<T>& vecs) {
   IndexList start_indices{};
   index_t index{};
@@ -17,22 +17,25 @@ auto make_start_indices(const std::vector<T>& vecs) {
   return start_indices;
 }
 
-inline auto alloc_copy_start_indices(
-  const IndexList& start_indices, size_t* num_bytes = nullptr) {
-  cudaStream_t stream = cudaStreamPerThread;
-  cudaError_t err = cudaSuccess;
+inline auto alloc_copy_start_indices(const IndexList& start_indices,
+    cudaStream_t stream = cudaStreamPerThread,
+    std::string_view tag = "start_indices") {
+  cudaError_t err{};
   // alloc indices
   auto indices_bytes = start_indices.size() * sizeof(index_t);
   index_t* device_indices{};
-  err = cudaMallocAsync((void**)&device_indices, indices_bytes, stream);
-  assert((err == cudaSuccess) && "alloc start indices");
+  // err = cudaMallocAsync((void**)&device_indices, indices_bytes, stream);
+  // assert((err == cudaSuccess) && "alloc start indices");
+  cuda_malloc_async((void**)&device_indices, indices_bytes, stream, tag);
   // copy indices
-  err = cudaMemcpyAsync(device_indices, start_indices.data(),
-    indices_bytes, cudaMemcpyHostToDevice, stream);
-  assert((err == cudaSuccess) && "copy start indices");
+  err = cudaMemcpyAsync(device_indices, start_indices.data(), indices_bytes,
+      cudaMemcpyHostToDevice, stream);
+  assert_cuda_success(err, "copy start indices");
+#if 0
   if (num_bytes) {
     *num_bytes = indices_bytes;
   }
+#endif
   return device_indices;
 }
 

@@ -638,20 +638,20 @@ void set_or_args(const std::vector<NCDataList>& ncDataLists) {
   }
 }
 
-void alloc_copy_filter_indices() {
-  using namespace std::chrono;
+void alloc_copy_filter_indices(cudaStream_t stream) {
   assert(!MFD.host.combo_indices.empty());
+  using namespace std::chrono;
   auto t = util::Timer::start_timer();
   auto src_list_start_indices = make_start_indices(MFD.host.xor_src_lists);
-  MFD.device.src_list_start_indices =
-    alloc_copy_start_indices(src_list_start_indices);
+  MFD.device.src_list_start_indices = alloc_copy_start_indices(
+      src_list_start_indices, stream, "src_list_start_indices");
   auto idx_list_start_indices = make_start_indices(MFD.host.compat_idx_lists);
-  MFD.device.idx_list_start_indices =
-    alloc_copy_start_indices(idx_list_start_indices);
+  MFD.device.idx_list_start_indices = alloc_copy_start_indices(
+      idx_list_start_indices, stream, "idx_list_start_indices");
   auto variation_indices = buildSentenceVariationIndices(
     MFD.host.xor_src_lists, MFD.host.compat_idx_lists, MFD.host.combo_indices);
   MFD.device.variation_indices =
-    cuda_allocCopySentenceVariationIndices(variation_indices);
+    cuda_allocCopySentenceVariationIndices(variation_indices, stream);
   if (log_level(Verbose)) {
     t.stop();
     std::cerr << "prepare filter indices - " << t.count() << "ms" << std::endl;
@@ -674,7 +674,7 @@ Value filterPreparation(const CallbackInfo& info) {
   // arg1
   set_log_args(makeLogArgs(env, info[1].As<Object>()));
   // --
-  alloc_copy_filter_indices();
+  alloc_copy_filter_indices(cudaStreamPerThread);
   set_or_args(orNcDataLists);
   return env.Null();
 }
@@ -720,7 +720,7 @@ auto make_source_descriptor_pairs(
 void set_incompatible_sources(
     const SourceCompatibilitySet& incompatible_sources) {
   // TODO: FIXMENOW remove
-  if (incompatible_sources.empty()) return;
+  //if (incompatible_sources.empty()) return;
 
   // empty set technically possible; disallowed here as a canary
   assert(!incompatible_sources.empty());

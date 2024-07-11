@@ -6,11 +6,14 @@
 #include <cstdint>
 #include <iostream>
 #include <span>
+#include <string_view>
 #include <utility>
 #include <vector>
 #include <cuda_runtime.h>
 
 namespace cm {
+
+// aliases
 
 using result_t = uint8_t;
 using compat_src_result_t = result_t;
@@ -23,6 +26,14 @@ using ComboIndexList = std::vector<combo_index_t>;
 using ComboIndexSpan = std::span<const combo_index_t>;
 using ComboIndexSpanPair = std::pair<ComboIndexSpan, ComboIndexSpan>;
 
+// functions
+
+void cuda_malloc_async(void** ptr, size_t bytes, cudaStream_t stream,
+    std::string_view category);  // cl-format
+void cuda_free(void* ptr);
+void cuda_memory_dump();
+size_t cuda_get_free_mem();
+
 inline void assert_cuda_success(cudaError err, std::string_view sv) {
   if (err != cudaSuccess) {
     std::cerr << sv << ", error " << cudaGetErrorString(err) << std::endl;
@@ -31,13 +42,15 @@ inline void assert_cuda_success(cudaError err, std::string_view sv) {
 }
 
 template <typename T = result_t>
-inline auto cuda_alloc_results(
-  size_t num_results, cudaStream_t stream = cudaStreamPerThread) {
+inline auto cuda_alloc_results(size_t num_results,
+    cudaStream_t stream = cudaStreamPerThread,
+    std::string_view category = "results") {
   // alloc results
   auto results_bytes = num_results * sizeof(T);
   T* device_results;
-  cudaError_t err = cudaMallocAsync((void**)&device_results, results_bytes, stream);
-  assert_cuda_success(err, "alloc results");
+  // cudaError_t err = cudaMallocAsync((void**)&device_results, results_bytes, stream);
+  // assert_cuda_success(err, "alloc results");
+  cuda_malloc_async((void**)&device_results, results_bytes, stream, category);
   return device_results;
 }
 
@@ -50,72 +63,11 @@ inline void cuda_zero_results(
   assert_cuda_success(err, "zero results");
 }
 
-inline void cuda_free(void* ptr) {
-  cudaError_t err = cudaFree(ptr);
-  assert_cuda_success(err, "cuda_free");
-}
-
-inline auto cuda_get_free_mem() {
-  size_t free;
-  size_t total;
-  cudaError_t err = cudaMemGetInfo(&free, &total);
-  assert_cuda_success(err, "cudaMemGetInfo");
-  return free;
-}
-
-inline constexpr char* cuda_strcpy(char* dest, const char* src) {
-  int i = 0;
-  do {
-    dest[i] = src[i];
-  } while (src[i++] != 0);
-  return dest;
-}
-
-inline constexpr char* cuda_strcat(char* dest, const char* src) {
-  int i = 0;
-  while (dest[i] != 0)
-    i++;
-  cuda_strcpy(dest + i, src);
-  return dest;
-}
-
-// Yet, another good itoa implementation
-// returns: the length of the number string
-// https://stackoverflow.com/questions/3440726/what-is-the-proper-way-of-implementing-a-good-itoa-function
-inline constexpr int cuda_itoa(int value, char *sp, int radix = 10) {
-  char tmp[32];  // be careful with the length of the buffer
-  char* tp = tmp;
-  int i;
-  unsigned v;
-
-  int sign = (radix == 10 && value < 0);
-  if (sign)
-    v = -value;
-  else
-    v = (unsigned)value;
-
-  while (v || tp == tmp) {
-    i = v % radix;
-    v /= radix;
-    if (i < 10)
-      *tp++ = i + '0';
-    else
-      *tp++ = i + 'a' - 10;
-  }
-
-  int len = tp - tmp;
-
-  if (sign) {
-    *sp++ = '-';
-    len++;
-  }
-
-  while (tp > tmp)
-    *sp++ = *--tp;
-
-  *sp = '\0';
-  return len;
-}
+  /*
+char* cuda_strcpy(char* dest, const char* src);
+char* cuda_strcat(char* dest, const char* src);
+int cuda_itoa(int value, char *sp, int radix = 10);
+  */
 
 class CudaEvent {
 public:
@@ -125,6 +77,11 @@ public:
     if (record_now) {
       record();
     }
+  }
+
+  ~CudaEvent() {
+    auto err = cudaEventDestroy(event_);
+    assert_cuda_success(err, "cudaEventDestroy");
   }
 
   auto event() const {

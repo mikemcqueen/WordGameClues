@@ -16,6 +16,7 @@
 #include <cuda_runtime.h>
 #include "cuda-types.h"
 #include "candidates.h"
+#include "merge-filter-common.h"
 #include "util.h"
 #include "log.h"
 
@@ -169,6 +170,11 @@ public:
     return list_start_indices_;
   }
 
+  auto alloc_copy_start_indices(cudaStream_t stream) {
+    return cm::alloc_copy_start_indices(
+        list_start_indices_, stream, "idx_states.list_start_indices");
+  }
+
   std::optional<SourceIndex> get_next_fill_idx() {
     while (has_fill_indices()) {
       auto next_fill_iter = std::next(fill_iter_);
@@ -238,8 +244,8 @@ private:
   }
 
   std::vector<Data> list_;
-  std::vector<index_t> list_start_indices_;
-  std::vector<index_t> list_sizes_;
+  IndexList list_start_indices_;
+  IndexList list_sizes_;
   std::forward_list<index_t> fill_indices_;
   std::forward_list<index_t>::iterator fill_iter_;
 };  // class IndexStates
@@ -280,28 +286,28 @@ public:
 
   auto fill_source_indices(IndexStates& idx_states, int max_idx) {
     // iters hackery (TODO: better comment)
-    source_indices.resize(idx_states.has_fill_indices() ? max_idx : 0);
-    for (size_t idx{}; idx < source_indices.size(); ++idx) {
+    src_indices.resize(idx_states.has_fill_indices() ? max_idx : 0);
+    for (size_t idx{}; idx < src_indices.size(); ++idx) {
       auto opt_src_idx = idx_states.get_next_fill_idx();
       if (!opt_src_idx.has_value()) {
-        source_indices.resize(idx);
+        src_indices.resize(idx);
         break;
       }
-      source_indices.at(idx) = opt_src_idx.value();
+      src_indices.at(idx) = opt_src_idx.value();
     }
     if (log_level(ExtraVerbose)) {
       // std::cerr << "ending next_fill_idx: " << idx_states.next_fill_idx
       //           << std::endl;
       const auto first =
-          (source_indices.empty() ? -1 : (int)source_indices.front().listIndex);
+          (src_indices.empty() ? -1 : (int)src_indices.front().listIndex);
       const auto last =
-          (source_indices.empty() ? -1 : (int)source_indices.back().listIndex);
+          (src_indices.empty() ? -1 : (int)src_indices.back().listIndex);
       std::cerr << "stream " << stream_idx << " filled "
-                << source_indices.size() << " of " << max_idx
+                << src_indices.size() << " of " << max_idx
                 << ", first = " << first << ", last = " << last << std::endl;
       //<< ", done: " << std::boolalpha << idx_states.done
     }
-    return !source_indices.empty();
+    return !src_indices.empty();
   }
 
   bool fill_source_indices(IndexStates& idx_states) {
@@ -312,26 +318,27 @@ public:
   void alloc_copy_source_indices(
       [[maybe_unused]] const IndexStates& idx_states) {
     cudaError_t err = cudaSuccess;
-    auto indices_bytes = source_indices.size() * sizeof(SourceIndex);
+    auto indices_bytes = src_indices.size() * sizeof(SourceIndex);
     // alloc source indices
-    if (!device_source_indices) {
-      err =
-        cudaMallocAsync((void**)&device_source_indices, indices_bytes, cuda_stream);
-      assert_cuda_success(err, "allocate source indices");
+    if (!device_src_indices) {
+      //err = cudaMallocAsync((void**)&device_src_indices, indices_bytes, cuda_stream);
+      //assert_cuda_success(err, "alloc src_indices");
+      cuda_malloc_async((void**)&device_src_indices, indices_bytes, cuda_stream,
+          "src_indices");
     }
     // copy source indices
-    err = cudaMemcpyAsync(device_source_indices, source_indices.data(),
+    err = cudaMemcpyAsync(device_src_indices, src_indices.data(),
       indices_bytes, cudaMemcpyHostToDevice, cuda_stream);
-    assert_cuda_success(err, "copy source indices");
+    assert_cuda_success(err, "copy src_indices");
   }
 
   auto hasWorkRemaining() const {
-    return !source_indices.empty();
+    return !src_indices.empty();
   }
 
   void dump() const {
     std::cerr << "kernel " << stream_idx << ", is_running: " << std::boolalpha
-              << is_running << ", source_indices: " << source_indices.size()
+              << is_running << ", src_indices: " << src_indices.size()
               << ", num_list_indices: " << num_list_indices
               << std::endl;
   }
@@ -344,8 +351,8 @@ public:
   int sequence_num{};
   bool is_running{false};  // is running (true until results retrieved)
   bool has_run{false};     // has run at least once
-  SourceIndex* device_source_indices{};
-  std::vector<SourceIndex> source_indices;
+  SourceIndex* device_src_indices{};
+  std::vector<SourceIndex> src_indices;
 
   int num_list_indices;    // TODO: this doesn't belong here
 };  // struct StreamData
@@ -375,7 +382,7 @@ public:
 
   void reset() {
     for (auto& stream : streams_) {
-      stream.source_indices.resize(stream.num_list_indices);
+      stream.src_indices.resize(stream.num_list_indices);
       stream.is_running = false;
       stream.has_run = false;
     }

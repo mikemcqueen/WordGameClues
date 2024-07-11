@@ -24,7 +24,13 @@
   call at the beginning of the loop, if (is_or_compat) break; ? and I could get
   rid of the return true inside the loop, and return is_or_compat; at the end of the
   function?
-  This approach (if it works) might apply to other is__compat functions as well.
+  This approach (if it works) might apply to other is_xxx_compat functions as well.
+
+* so how about a cuda_malloc/cuda_free abstraction that takes a string indicating
+  the memory type (e.g. "xor_src_list"), and maintains a string->size_t map for
+  all allocations, that can then be dumped.  cuda-memory.cpp/.h
+
+* fix variable names in filter-support::cuda_allocCopySentenceVariationIndices()
 
 CM:
 

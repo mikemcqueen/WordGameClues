@@ -21,10 +21,11 @@
       'candidates.cpp',
       'clue-manager.cpp',
       'cm-precompute.cpp',
+      'components.cpp',
+      'cuda-common.cpp',
       'filter-support.cpp',
       'index.cpp',
       'merge-support.cpp',
-      'components.cpp',
       'validator.cpp',
       'wrap.cpp'
     ],

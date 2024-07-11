@@ -13,6 +13,7 @@
 #include <unordered_set>
 #include <vector>
 #include "cuda-types.h"
+#include "cuda-string.h"
 #include "mmebitset.h"
 
 namespace cm {
