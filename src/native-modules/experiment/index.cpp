@@ -302,7 +302,6 @@ OrArgList makeOrArgList(Env& env, const Array& jsList) {
 LogArgs makeLogArgs(Env& env, const Object& jsObject) {
   LogArgs log_args;
   auto jsQuiet = jsObject.Get("quiet");
-  auto jsVerbose = jsObject.Get("verbose");
   if (!jsQuiet.IsUndefined()) {
     if (!jsQuiet.IsBoolean()) {
       TypeError::New(env, "makeLogArgs: invalid quiet arg")
@@ -311,13 +310,32 @@ LogArgs makeLogArgs(Env& env, const Object& jsObject) {
     }
     log_args.quiet = jsQuiet.As<Boolean>();
   }
+  auto jsMemory = jsObject.Get("memory");
+  if (!jsMemory.IsUndefined()) {
+    if (!jsMemory.IsBoolean()) {
+      TypeError::New(env, "makeLogArgs: invalid memory arg")
+        .ThrowAsJavaScriptException();
+      return {};
+    }
+    log_args.mem_dumps = jsMemory.As<Boolean>();
+  }
+  auto jsAllocs = jsObject.Get("allocations");
+  if (!jsAllocs.IsUndefined()) {
+    if (!jsAllocs.IsBoolean()) {
+      TypeError::New(env, "makeLogArgs: invalid allocations arg")
+        .ThrowAsJavaScriptException();
+      return {};
+    }
+    log_args.mem_allocs = jsAllocs.As<Boolean>();
+  }
+  auto jsVerbose = jsObject.Get("verbose");
   if (!jsVerbose.IsUndefined()) {
     if (!jsVerbose.IsNumber()) {
       TypeError::New(env, "makeLogArgs: invalid verbose arg")
         .ThrowAsJavaScriptException();
       return {};
     }
-    log_args.verbose = jsVerbose.As<Number>().Int32Value();
+    log_args.level = static_cast<LogLevel>(jsVerbose.As<Number>().Int32Value());
   }
   return log_args;
 }
@@ -616,13 +634,12 @@ void set_or_args(const std::vector<NCDataList>& ncDataLists) {
     // So, a container can be marked compatible if and only if there are no
     // no remaining XOR-compatible sourceLists.
     // TODO: markAllANDCompatibleOrSources(xorSourceList, orSourceList);
-
     if (num_or_sources) {
-      if constexpr (0) {
-        markAllXorCompatibleOrSources(MFD.host.or_arg_list,
-          MFD.host.xor_src_lists, MFD.host.compat_idx_lists,
-          MFD.host.combo_indices);
-      }
+#if 0
+      markAllXorCompatibleOrSources(MFD.host.or_arg_list,
+        MFD.host.xor_src_lists, MFD.host.compat_idx_lists,
+        MFD.host.combo_indices);
+#endif
       // TODO: name change. this doesn't mark anything. 
       auto mark_results = cuda_markAllXorCompatibleOrSources(MFD);
       validate_marked_or_sources(MFD.host.or_arg_list, mark_results);
@@ -810,8 +827,10 @@ Object Init(Env env, Object exports) {
   // clue-manager
   //
   exports["getNumNcResults"] = Function::New(env, getNumNcResults);
-  exports["setPrimaryNameSrcIndicesMap"] = Function::New(env, setPrimaryNameSrcIndicesMap);
-  exports["setCompoundClueNameSourcesMap"] = Function::New(env, setCompoundClueNameSourcesMap);
+  exports["setPrimaryNameSrcIndicesMap"] =
+      Function::New(env, setPrimaryNameSrcIndicesMap);
+  exports["setCompoundClueNameSourcesMap"] =
+      Function::New(env, setCompoundClueNameSourcesMap);
   exports["isKnownSourceMapEntry"] = Function::New(env, isKnownSourceMapEntry);
   exports["getSourcesForNc"] = Function::New(env, getSourcesForNc);
   exports["getSourceListsForNc"] = Function::New(env, getSourceListsForNc);

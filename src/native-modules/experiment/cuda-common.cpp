@@ -65,7 +65,7 @@ void add_ptr(void* ptr, std::string_view tag_sv, size_t size) {
     }
   }
   assert(inserted && "add_ptr: tag_map insertion failed");
-  if (1 || log_level(Verbose)) {
+  if (log_level(MemoryAllocations)) {
     std::cerr << "allocated " << size << " " << tag_sv << " at " << ptr
               << std::endl;
   }
@@ -91,7 +91,7 @@ void remove_ptr(void* ptr) {
     std::scoped_lock lk(tm_mutex_);
     tag_size -= size;
   }
-  if (1 || log_level(Verbose)) {
+  if (log_level(MemoryAllocations)) {
     std::cerr << "freed " << size << " " << tag << " at " << ptr
               << ", remaining: " << tag_size << std::endl;
   }
@@ -120,11 +120,13 @@ void cuda_free(void* ptr) {
 }
 
 void cuda_memory_dump() {
-  // TODO: holding a lock while doing io is dumb.
-  std::scoped_lock lk(tm_mutex_);
-  std::cerr << "cuda_memory_dump:" << std::endl;
-  for (const auto& it : tag_map_) {
-    std::cerr << " " << it.first << ": " << it.second << std::endl;
+  if (log_level(MemoryDumps)) {
+    // TODO: holding a lock while doing io is dumb.
+    std::scoped_lock lk(tm_mutex_);
+    std::cerr << "cuda_memory_dump:" << std::endl;
+    for (const auto& it : tag_map_) {
+      std::cerr << " " << it.first << ": " << it.second << std::endl;
+    }
   }
 }
 

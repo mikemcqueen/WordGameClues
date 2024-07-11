@@ -74,6 +74,8 @@ const CmdLineOptions = Opt.create(_.concat(Clues.Options, [
     ['v', 'verbose',                           'more output' ],
     ['',  'vv',                                'More' ],
     ['',  'vvv',                               'MOAR' ],
+    ['',  'memory',                            'output memory dumps' ],
+    ['',  'allocations',                       'output memory allocations' ],
     ['q', 'quiet',                             'less output'],
     ['h', 'help',                              'this screen']
 ])).bindHelp();
@@ -317,10 +319,10 @@ async function main () {
     const opt = CmdLineOptions.parseSystem();
     const options = opt.options;
 
-    // default log_level (in c++) is 1. verbose options increase it.
-    if (options.vvv) options.verbose = 4;          // ludicrous
-    else if (options.vv) options.verbose = 3;      // extra-verbase
-    else if (options.verbose) options.verbose = 2; // verbose
+    // default log_level (in c++) is 0. verbose options increase it.
+    if (options.vvv) options.verbose = 3;          // ludicrous
+    else if (options.vv) options.verbose = 2;      // extra-verbose
+    else if (options.verbose) options.verbose = 1; // verbose
 
     // TODO: get rid of this, just pass Opt.options around
     let useClueList = options.use;
@@ -435,7 +437,7 @@ async function main () {
         Debug(`from: ${from.baseDir}`);
         copyClues(from, options);
     } else if (options.count) {
-        // this is dumb. just pass options.
+        // TODO: this is dumb. just pass options.
         return combo_maker({
             sum:     options.count,
             max:     maxArg,
@@ -449,6 +451,8 @@ async function main () {
             parallel: options.parallel,
             verbose:  options.verbose,
             quiet:    options.quiet,
+            memory:   options.memory,
+            allocations: options.allocations,
             ignoreErrors: options.ignoreErrors,
             max_sources: options.max_sources,
             tpb: options.tpb ? Number(options.tpb) : 0,
