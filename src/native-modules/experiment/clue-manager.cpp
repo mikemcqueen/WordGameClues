@@ -145,7 +145,7 @@ auto get_nc_src_list(const NameCount& nc) -> cm::SourceList& {
   return map.find(nc_str)->second.src_list;
 }
 
-/*
+/* TODO, as overloaded member function
 auto get_nc_src_list(const cm::NameCount& nc) -> const cm::SourceList& {
   return get_nc_sources(nc).src_list;
 }
@@ -159,7 +159,7 @@ void add_compound_clue(
     const cm::NameCount& nc, const std::string& sources_csv) {
   append_known_sources_to_nc_sources(sources_csv, nc);
   get_known_source_map_entry(nc.count, sources_csv)
-    .clue_names.emplace_back(nc.name);
+      .clue_names.emplace_back(nc.name);
 }
 
 auto make_src_list_for_nc(const NameCount& nc) -> cm::SourceList {

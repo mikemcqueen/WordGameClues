@@ -124,6 +124,14 @@ public:
     return std::chrono::duration_cast<TimeUnit>(stop_ - start_).count();
   }
 
+  template <typename TimeUnit = std::chrono::milliseconds>
+  auto reset() {
+    stop();
+    auto result = count<TimeUnit>();
+    start();
+    return result;
+  }
+
   auto microseconds() {
     return count<std::chrono::microseconds>();
   }

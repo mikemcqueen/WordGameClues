@@ -1,5 +1,6 @@
 // validator.cpp
 
+#include <iostream>
 #include <vector>
 #include "clue-manager.h"
 #include "combo-maker.h"
@@ -27,27 +28,48 @@ auto buildNcSourceIndexLists(const NameCountList& nc_list) {
   return idx_lists;
 }
 
+int num_merges = 0;
+int num_full_merges = 0;
+int num_primary = 0;
+int num_compound = 0;
+long merge_ms = 0;
+
 }  // namespace
 
 auto mergeNcListCombo(const NameCountList& nc_list, const IndexList& idx_list,
-  const NameCount& as_nc) -> std::optional<SourceData> {
-  //
+    const NameCount& as_nc) -> std::optional<SourceData> {
+  using enum SourceData::AddLists;
+  ++num_merges;
   SourceData src;
+  // first pass, update src compatibility bits only
   for (size_t i{}; i < idx_list.size(); ++i) {
     const auto& nc = nc_list.at(i);
     if (nc.count > 1) {
       const auto& nc_src = clue_manager::get_nc_src_list(nc).at(idx_list.at(i));
-      //auto nc_src = clue_manager::copy_nc_src_as_nc(nc, idx_list.at(i));
-      if (!src.addCompoundSource(nc_src)) {
-        return std::nullopt;
+      if (!src.addCompoundSource(nc_src, No)) {
+        return {};
       }
-    } else if (!src.addPrimaryNameSrc(nc, idx_list.at(i))) {
-      return std::nullopt;
+    } else if (!src.addPrimaryNameSrc(nc, idx_list.at(i), No)) {
+      return {};
+    }
+  }
+  // second pass, update lists (ncList, primaryNameSrcList)
+  for (size_t i{}; i < idx_list.size(); ++i) {
+    const auto& nc = nc_list.at(i);
+    if (nc.count > 1) {
+      const auto& nc_src = clue_manager::get_nc_src_list(nc).at(idx_list.at(i));
+      ++num_compound;
+      src.addCompoundSource(nc_src, Only);
+      //assert(nc_src.ncList.size() < 1000);
+    } else {
+      ++num_primary;
+      src.addPrimaryNameSrc(nc, idx_list.at(i), Only);
     }
   }
   // ncList is preserved for show-components (-t) and this is what it wants.
   NameCountList hax_nc_list = {as_nc};
   src.ncList = std::move(hax_nc_list);
+  ++num_full_merges;
   return {src};
 }
 
@@ -60,6 +82,7 @@ auto mergeAllNcListCombinations(const NameCountList& nc_list,
     [](int sum, const NameCount& nc) { return sum + nc.count; });
   NameCount nc{clue_name, count};
   Peco peco(std::move(idx_lists));
+  auto t = util::Timer::start_timer();
   for (auto idx_list = peco.first_combination(); idx_list;
        idx_list = peco.next_combination()) {
     auto opt_src = mergeNcListCombo(nc_list, *idx_list, nc);
@@ -67,6 +90,8 @@ auto mergeAllNcListCombinations(const NameCountList& nc_list,
       src_list.emplace_back(std::move(opt_src.value()));
     }
   }
+  t.stop();
+  merge_ms += t.count();
   return src_list;
 }
 
@@ -160,8 +185,6 @@ auto validateSourcesForNameCount(const std::string& clue_name,
 auto validateSourcesForNameAndCountLists(const std::string& clue_name,
   const std::vector<std::string>& name_list, std::vector<int> count_list,
   NameCountList& nc_list) -> SourceList {
-  //  const VSForNameAndCountListsArgs& args) -> SourceList {
-  //
   // optimization: could have a map of count:boolean entries here
   // on a per-name basis (new map for each outer loop; once a
   // count is checked for a name, no need to check it again
@@ -172,8 +195,8 @@ auto validateSourcesForNameAndCountLists(const std::string& clue_name,
   if (name != clue_name) {
     for (auto count : count_list) {
       if (clue_manager::is_known_name_count(name, count)) {
-        auto src_list = validateSourcesForNameCount(clue_name, name, count,
-          {nc_list, name_list, count_list});
+        auto src_list = validateSourcesForNameCount(
+            clue_name, name, count, {nc_list, name_list, count_list});
         if (!src_list.empty()) {
           return src_list;
         }
@@ -194,16 +217,16 @@ void display_addends(int sum, const std::vector<std::vector<int>>& addends) {
 }
 
 auto validateSources(const std::string& clue_name,
-  const std::vector<std::string>& src_names, int sum, bool validate_all)
-  -> SourceList {
+    const std::vector<std::string>& src_names, int sum, bool validate_all)
+    -> SourceList {
   //
   SourceList results;
   const auto addends = Peco::make_addends(sum, src_names.size());
-  //display_addends(sum, addends);
+  // display_addends(sum, addends);
   for (const auto& count_list : addends) {
     NameCountList nc_list;
-    auto src_list =
-      validateSourcesForNameAndCountLists(clue_name, src_names, count_list, nc_list);
+    auto src_list = validateSourcesForNameAndCountLists(
+        clue_name, src_names, count_list, nc_list);
     if (!src_list.empty()) {
       util::move_append(results, std::move(src_list));
       if (!validate_all) {
@@ -213,6 +236,14 @@ auto validateSources(const std::string& clue_name,
   }
   return results;
 };
+
+void show_validator_durations() {
+  std::cerr << " validatorMerge - " << merge_ms << "ms\n"
+            << "  full merges: " << num_full_merges << " of " << num_merges
+            << " attempts\n"
+            << "  sources added, primary: " << num_primary
+            << ", compound: " << num_compound << std::endl;
+}
 
 }  // namespace validator
 

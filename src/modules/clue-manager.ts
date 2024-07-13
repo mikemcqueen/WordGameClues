@@ -47,17 +47,11 @@ export interface AllCandidatesContainer {
 type InternalStateBase = {
     clueListArray: ClueList.Any[];    // the JSON "known" clue files in an array
     knownClueMapArray: ClueMap[];     // map clue name to list of clue sourceCsvs
-    //knownSourceMapArray: SourceMap[]; // map sourceCsv to SourceMapValue
-
     variations: Sentence.Variations;  // "global" variations aggregated from all sentences
     sentences: Sentence.Type[];
 
     uniquePrimaryClueNames: string[];
 
-    //maybeListArray: any[];            // the JSON maybe files in an array
-    //rejectListArray: any[];           // the JSON reject files in an array
-    //rejectSourceMap: any;             // map reject source to true/false (currently)
-    
     dir: string;
 
     ignoreLoadErrors: boolean;
@@ -74,17 +68,11 @@ const initialState = (): InternalState => {
     return {
         clueListArray: [],
         knownClueMapArray: [],
-        //knownSourceMapArray: [],
 
         sentences: [],
         variations: Sentence.emptyVariations(),
 
         uniquePrimaryClueNames: [],
-
-        // TODO: remove? maybe, at least
-        //maybeListArray: [],
-        //rejectListArray: [],
-        //rejectSourceMap: {},
 
         dir: '',
         
@@ -112,12 +100,6 @@ export function getClueList (index: number): ClueList.Any {// Compound {
 export function getKnownClueMap (count: number): ClueMap {
     return State.knownClueMapArray[count];
 }
-
-/*
-export function getKnownSourceMap (count: number): SourceMap {
-    return State.knownSourceMapArray[count];
-}
-*/
 
 export function getAllCandidates (): AllCandidates {
     return State.allCandidates;
@@ -455,7 +437,8 @@ const primaryClueListPostProcessing = (args: any): void => {
     cacheAllPrimaryClueSources();
 };
 
-let total_sources = 0;
+let num_validates = 0;
+let validate_duration = 0;
 
 // args:
 //  baseDir:  base directory (meta, synth)
@@ -485,8 +468,8 @@ export const loadAllClues = function (args: any): void {
     }
     const t_dur = new Duration(t0, new Date()).milliseconds;
     if (args.verbose) {
-        console.error(`addCompound max(${args.max_sources})` +
-            `, total_sources(${total_sources}) - ${PrettyMs(t_dur)}`);
+        console.error(`addCompound max(${args.max_sources})  - ${PrettyMs(t_dur)}` +
+            `, num_validates(${num_validates}) - ${PrettyMs(validate_duration)}`);
     }
     State.loaded = true;
 };
@@ -527,25 +510,17 @@ const findConflicts = (set: Set<string>, nameSrcList: NameCount.List) : boolean 
 // 
 let addCompoundClue = (clue: Clue.Compound, count: number, args: any): boolean => {
     let nameList = clue.src.split(',').sort();
-    //let srcMap = getKnownSourceMap(count);
     let srcCsv = nameList.toString();
     let vs_result = true;
     // new sources need to be validated
     if (!Native.isKnownSourceMapEntry(count, srcCsv)) {
-        vs_result = Native.validateSources(clue.name, nameList, count,
-            args.validateAll);
-        /*
-        if (vs_result && args.validateAll) {
-            srcMap[srcCsv] = {
-                clues: [],
-            };
-        }
-        */
+        const t0 = new Date();
+        vs_result = Native.validateSources(clue.name, nameList, count, args.validateAll);
+        validate_duration += new Duration(t0, new Date()).milliseconds;
+        num_validates++;
     }
     if (vs_result && args.validateAll) {
         Native.addCompoundClue({name: clue.name, count}, srcCsv);
-        // TODO: can remove, along with all of knownSourceMapArray
-        //(srcMap[srcCsv].clues as ClueList.Compound).push(clue);
     }
     return vs_result;
 };
@@ -572,10 +547,9 @@ const addKnownCompoundClues = (clueList: ClueList.Compound, clueCount: number,
 {
     Assert(clueCount > 1);
     // this is currently only callable once per clueCount.
-    Assert(!getKnownClueMap(clueCount)); //  && !getKnownSourceMap(clueCount));
+    Assert(!getKnownClueMap(clueCount));
 
     State.knownClueMapArray[clueCount] = {};
-    //State.knownSourceMapArray[clueCount] = {};
 
     clueList
         .filter(clue => !clue.ignore)
@@ -649,63 +623,6 @@ let removeClue = function (count: number, clue: Clue.Compound,
     return false;
 };
 
-/*
-let addReject = function (srcNameList: string|string[], save = false): boolean {
-    if (_.isString(srcNameList)) {
-        srcNameList = (srcNameList as string).split(',');
-    }
-    srcNameList = srcNameList as string[];
-    let count = _.size(srcNameList);
-    if (addRejectSource(srcNameList)) {
-        State.rejectListArray[count].push({
-            src: _.toString(srcNameList)
-        });
-        if (save) {
-            State.rejectListArray[count].save(getRejectFilename(count));
-        }
-        return true;
-    }
-    return false;
-};
-
-let addRejectSource = function (srcNameList: string|string[]): boolean {
-    if (_.isString(srcNameList)) {
-        srcNameList = (srcNameList as string).split(',');
-    }
-    srcNameList = srcNameList as string[];
-    srcNameList.sort();
-    log('addRejectSource: ' + srcNameList);
-
-    if (isKnownSource(srcNameList.toString())) {
-        console.log('WARNING! not rejecting known source, ' + srcNameList);
-        return false;
-    }
-    if (isRejectSource(srcNameList)) {
-        console.log('WARNING! duplicate reject source, ' + srcNameList);
-        // i had this return false commented out for some reason,
-        // but it should be here.
-        return false;
-    }
-    State.rejectSourceMap[srcNameList.toString()] = true;
-    return true;
-};
-
-// source is string containing sorted, comma-separated clues
-let isKnownSource = function (source: string, count = 0): boolean {
-    // check for supplied count
-    if (count > 0) {
-        return _.has(getKnownSourceMap(count), source);
-    }
-    // check for all counts
-    return State.knownSourceMapArray.some(srcMap => _.has(srcMap, source));
-};
-
-// source: csv string or array of strings
-let isRejectSource = function (source: string | string[]): boolean {
-    return _.has(State.rejectSourceMap, source.toString());
-};
-*/
-
 export let getCountListForName = (name: string): CountList => {
     let countList: CountList = [...Array(State.knownClueMapArray.length).keys()];
     countList = countList.filter((count: number) => {
@@ -758,32 +675,6 @@ export const filter = (srcCsvList: string[], clueCount: number, result: FilterRe
     });
     return result;
 };
-
-/*
-const getKnownClues = (nameList: string|string[]): Record<string, Clue.Any[]> => {
-    if (_.isString(nameList)) {
-        nameList = (nameList as string).split(',');
-    }
-    nameList = nameList as string[];
-    const sourceCsv = nameList.sort().toString();
-    let nameClueMap: Record<string, Clue.Any[]> = {};
-    State.knownSourceMapArray.forEach(srcMap => {
-        if (_.has(srcMap, sourceCsv)) {
-            for (const clue of srcMap[sourceCsv].clues) {
-                if (!_.has(nameClueMap, clue.name)) {
-                    nameClueMap[clue.name] = [];
-                }
-                nameClueMap[clue.name].push(clue);
-            }
-        }
-    });
-    return nameClueMap;
-};
-
-export const getKnownClueNames = (nameList: string | string[]): string[] => {
-    return Object.keys(getKnownClues(nameList));
-};
-*/
 
 const addClueForCounts = (counts: number[], name: string, src: string,
     propertyName: string, options: any): number =>
@@ -882,11 +773,6 @@ export const addRemoveOrReject = (args: any, nameList: string[],
         if (nameList.length === 1) {
             console.log('WARNING! ignoring --add due to single source');
         }
-        /*
-        else if (args.isReject) {
-            console.log('WARNING! cannot add known clue: already rejected, ' + nameList);
-        }
-        */
         else {
             count = addClueForCounts(counts, args.add, nameList.toString(), args.property, options);
         }
@@ -902,19 +788,6 @@ export const addRemoveOrReject = (args: any, nameList: string[],
             count = removeClueForCounts(counts, args.remove, nameList.toString(), args.property, removeOptions);
         }
     }
-/* else if (args.reject) {
-        if (nameList.length === 1) {
-            console.log('WARNING! ignoring --reject due to single source');
-        } else if (args.isKnown) {
-            console.log('WARNING! cannot add reject clue: already known, ' + nameList);
-        } else if (addReject(nameList.toString(), true)) {
-            console.log('updated');
-        }
-        else {
-            console.log('update failed');
-        }
-    }
-*/
     return count;
 };
 

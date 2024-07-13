@@ -708,7 +708,7 @@ void run_xor_kernel(StreamData& stream, int threads_per_block,
   }
 }
 
-void show_or_arg_counts(unsigned num_or_args) {
+void show_or_arg_counts([[maybe_unused]] unsigned num_or_args) {
   cudaError_t err{cudaSuccess};
 
 #if 0

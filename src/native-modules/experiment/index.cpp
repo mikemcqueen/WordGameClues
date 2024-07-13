@@ -500,13 +500,14 @@ Value getNumNcResults(const CallbackInfo& info) {
   return Number::New(env, clue_manager::get_num_nc_sources(nc));
 }
 
+long validate_ms = 0;
+
 Value validateSources(const CallbackInfo& info) {
   Env env = info.Env();
   if (!info[0].IsString() || !info[1].IsArray() || !info[2].IsNumber()
       || !info[3].IsBoolean()) {
-    TypeError::New(
-      env, "validateSources: invalid parameter type")
-      .ThrowAsJavaScriptException();
+    TypeError::New(env, "validateSources: invalid parameter type")
+        .ThrowAsJavaScriptException();
     return env.Null();
   }
   // arg 0
@@ -518,14 +519,23 @@ Value validateSources(const CallbackInfo& info) {
   // arg 3
   auto validate_all = info[3].As<Boolean>();
   // --
+  auto t = util::Timer::start_timer();
   auto src_list =
-    validator::validateSources(clue_name, src_names, sum, validate_all);
+      validator::validateSources(clue_name, src_names, sum, validate_all);
+  t.stop();
+  validate_ms += t.count();
   auto is_valid_src_list = !src_list.empty();
   if (validate_all && is_valid_src_list) {
     clue_manager::init_known_source_map_entry(
-      sum, src_names, std::move(src_list));
+        sum, src_names, std::move(src_list));
   }
   return Boolean::New(env, is_valid_src_list);
+}
+
+void show_clue_manager_durations(){
+  std::cerr << "(delayed clue_manager durations)\n"
+            << " validateSources - " << validate_ms << "ms\n";
+  show_validator_durations();
 }
 
 //
@@ -546,6 +556,8 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   // arg1
   auto merge_only = info[1].As<Boolean>();
   // --
+  show_clue_manager_durations();
+
   auto t = util::Timer::start_timer();
   MFD.host.xor_src_lists = std::move(buildSourceListsForUseNcData(ncDataLists));
   // if (log_level(Verbose)) {

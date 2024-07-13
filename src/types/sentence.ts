@@ -6,8 +6,10 @@
 
 import _ from 'lodash';
 const Assert = require('assert');
+const Duration = require('duration');
 const Fs = require('fs-extra');
 const Path = require('path');
+const PrettyMs = require('pretty-ms');
 const Stringify = require('stringify-object');
 
 import * as Clue from './clue';

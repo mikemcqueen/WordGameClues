@@ -524,23 +524,39 @@ struct SourceData : SourceCompatibilityData {
   SourceData(SourceData&&) = default;
   SourceData& operator=(SourceData&&) = default;
 
-  bool addCompoundSource(const SourceData& src) {
-    if (!isXorCompatibleWith(src)) {
-      return false;
+  enum class AddLists {
+    Yes,
+    No,
+    Only
+  };
+
+  bool addCompoundSource(
+      const SourceData& src, AddLists add_lists = AddLists::Yes) {
+    using enum AddLists;
+    if (add_lists != Only) {
+      if (!isXorCompatibleWith(src)) {
+        return false;
+      }
+      mergeInPlace(src);
     }
-    mergeInPlace(src);
-    primaryNameSrcList.insert(primaryNameSrcList.end(),
-      src.primaryNameSrcList.begin(), src.primaryNameSrcList.end());
-    ncList.insert(ncList.end(), src.ncList.begin(), src.ncList.end());
+    if (add_lists == Yes || add_lists == Only) {
+      primaryNameSrcList.insert(primaryNameSrcList.end(),
+          src.primaryNameSrcList.begin(), src.primaryNameSrcList.end());
+      ncList.insert(ncList.end(), src.ncList.begin(), src.ncList.end());
+    }
     return true;
   }
 
-  bool addPrimaryNameSrc(const NameCount& nc, int primary_src) {
-    if (!addSource(primary_src, true)) {
+  bool addPrimaryNameSrc(const NameCount& nc, int primary_src,
+      AddLists add_lists = AddLists::Yes) {
+    using enum AddLists;
+    if ((add_lists != Only) && !addSource(primary_src, true)) {
       return false;
     }
-    primaryNameSrcList.emplace_back(NameCount{nc.name, primary_src});
-    ncList.emplace_back(nc);
+    if (add_lists == Yes || add_lists == Only) {
+      primaryNameSrcList.emplace_back(NameCount{nc.name, primary_src});
+      ncList.emplace_back(nc);
+    }
     return true;
   }
 
