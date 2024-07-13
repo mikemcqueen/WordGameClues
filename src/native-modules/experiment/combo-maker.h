@@ -296,6 +296,11 @@ public:
     return has(sd_pair.first) && has(sd_pair.second);
   }
 
+  void reset() {
+    bits.reset();
+    std::memset(&variations, -1, sizeof(variations));
+  }
+
   SourceBits bits{};
   Variations variations = make_array<variation_index_t, kNumSentences>(-1);
 };  // UsedSources
@@ -391,13 +396,12 @@ struct NameCount;
 using NameCountList = std::vector<NameCount>;
 
 struct NameCount {
+  NameCount(const std::string& name, int count) : name(name), count(count) {}
   /*
-  NameCount(std::string&& name, int count) :
-    name(std::move(name)), count(count) {}
   NameCount() = default;
   NameCount(const NameCount&) = default;
-  NameCount& operator=(const NameCount&) = default;
   NameCount(NameCount&&) = default;
+  NameCount& operator=(const NameCount&) = default;
   NameCount& operator=(NameCount&&) = default;
   */
 
@@ -496,7 +500,7 @@ struct NameCount {
   }
 
   std::string name;
-  int count;
+  int count{};
 };
 
 struct NCData {
@@ -516,6 +520,14 @@ struct SourceData : SourceCompatibilityData {
       : SourceCompatibilityData(std::move(usedSources)),
         primaryNameSrcList(std::move(primaryNameSrcList)),
         ncList(std::move(ncList)) {
+  }
+
+  // for validator.merge: usedSources (because it's not moveable) and nc_list
+  SourceData(const UsedSources& usedSources, NameCountList&& primaryNameSrcList,
+      const NameCountList& ncList)
+      : SourceCompatibilityData(usedSources),
+        primaryNameSrcList(std::move(primaryNameSrcList)),
+        ncList(ncList) {
   }
 
   // copy assign allowed for now for precompute.mergeAllCompatibleXorSources
@@ -554,8 +566,8 @@ struct SourceData : SourceCompatibilityData {
       return false;
     }
     if (add_lists == Yes || add_lists == Only) {
-      primaryNameSrcList.emplace_back(NameCount{nc.name, primary_src});
-      ncList.emplace_back(nc);
+      primaryNameSrcList.emplace_back(nc.name, primary_src);
+      ncList.emplace_back(nc.name, nc.count);
     }
     return true;
   }
@@ -581,11 +593,6 @@ struct SourceData : SourceCompatibilityData {
   NameCountList ncList;
 };
 
-#if 0
-using SourceList = std::vector<SourceData>;
-using SourceCRef = std::reference_wrapper<const SourceData>;
-using SourceCRefList = std::vector<SourceCRef>;
-#endif
 using SourceListCRef = std::reference_wrapper<const SourceList>;
 using SourceListCRefList = std::vector<SourceListCRef>;
 using SourceListMap = std::unordered_map<std::string, SourceList>;

@@ -82,11 +82,11 @@ NameCount makeNameCount(Env& env, const Object& jsObject) {
   if (!jsName.IsString() || !jsCount.IsNumber()) {
     TypeError::New(env, "makeNameCount: invalid arguments")
       .ThrowAsJavaScriptException();
-    return {};
+    return NameCount{"error", 1};
   }
   auto name = jsName.As<String>().Utf8Value();
   const int count = (int)jsCount.As<Number>().Int32Value();
-  return NameCount(std::move(name), count);
+  return NameCount{std::move(name), count};
 }
 
 NameCountList makeNameCountList(Env& env, const Array& jsList) {
@@ -367,9 +367,9 @@ Value setPrimaryNameSrcIndicesMap(const CallbackInfo& info) {
     idx_lists.emplace_back(makeIndexList(env, js_idx_lists[i].As<Array>()));
   }
   // --
-  using namespace clue_manager;
+  // TODO: Weird.
   clue_manager::setPrimaryNameSrcIndicesMap(
-    buildPrimaryNameSrcIndicesMap(name_list, idx_lists));
+      clue_manager::buildPrimaryNameSrcIndicesMap(name_list, idx_lists));
   return env.Null();
 }
 

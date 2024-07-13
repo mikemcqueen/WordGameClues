@@ -31,6 +31,7 @@
 #include <cuda_runtime.h>
 #endif
 #include <cstdint>
+//#include 
 
 //typedef unsigned int uint32_t;
 
@@ -130,8 +131,12 @@ public:
   }
 
   void reset() {
-    for (int i=0; i<(size+31)/32; i++)
+#if 0
+    for (int i = 0; i < wc(); i++)
       bits[i] = 0;
+#else
+    memset(bits, 0, sizeof(bits));
+#endif
   }
   
   /*
@@ -228,7 +233,7 @@ public:
 
   auto hash() const {
     size_t seed{};
-    for (int i=0; i<wc(); i++)
+    for (int i = 0; i < wc(); i++)
       hash_combine(seed, (size_t)bits[i]);
     return seed;
   }

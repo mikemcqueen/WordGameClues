@@ -1,5 +1,6 @@
 // validator.cpp
 
+#include <array>
 #include <iostream>
 #include <vector>
 #include "clue-manager.h"
@@ -30,64 +31,87 @@ auto buildNcSourceIndexLists(const NameCountList& nc_list) {
 
 int num_merges = 0;
 int num_full_merges = 0;
-int num_primary = 0;
-int num_compound = 0;
 long merge_ms = 0;
 
 }  // namespace
 
-auto mergeNcListCombo(const NameCountList& nc_list, const IndexList& idx_list,
-    const NameCount& as_nc) -> std::optional<SourceData> {
-  using enum SourceData::AddLists;
+// hot inner loop - called millions of times on startup.  lots of otherwise
+// seemingly unnecessary optimizations to shave off milliseconds
+auto mergeNcListCombo(
+    const NameCountList& nc_list, const IndexList& idx_list, SourceData& src) {
+  // TODO: do we really even *need* primarynameSrcList? precompute is using it
+  //   for something but it's not clear to me what.
+
+  using SrcCRefArray = std::array<SourceCRef, 32>;
+  static SourceData dummy;
+  static auto d = std::cref(dummy);
+  static SrcCRefArray src_cref_array = {d, d, d, d, d, d, d, d, d, d, d, d, d, d, d, d,
+      d, d, d, d, d, d, d, d, d, d, d, d, d, d, d, d};
+
+  NameCountList primaryNameSrcList;
+  size_t num_sources{};
+
   ++num_merges;
-  SourceData src;
+  src.usedSources.reset();
+  using enum SourceData::AddLists;
   // first pass, update src compatibility bits only
   for (size_t i{}; i < idx_list.size(); ++i) {
-    const auto& nc = nc_list.at(i);
+    const auto& nc = nc_list[i];
     if (nc.count > 1) {
-      const auto& nc_src = clue_manager::get_nc_src_list(nc).at(idx_list.at(i));
+      const auto& nc_src = clue_manager::get_nc_src_list(nc)[idx_list[i]];
       if (!src.addCompoundSource(nc_src, No)) {
-        return {};
+        num_sources = 0;
+        break;
       }
-    } else if (!src.addPrimaryNameSrc(nc, idx_list.at(i), No)) {
-      return {};
-    }
-  }
-  // second pass, update lists (ncList, primaryNameSrcList)
-  for (size_t i{}; i < idx_list.size(); ++i) {
-    const auto& nc = nc_list.at(i);
-    if (nc.count > 1) {
-      const auto& nc_src = clue_manager::get_nc_src_list(nc).at(idx_list.at(i));
-      ++num_compound;
-      src.addCompoundSource(nc_src, Only);
-      //assert(nc_src.ncList.size() < 1000);
+      src_cref_array[i] = std::cref(nc_src);
+      num_sources += nc_src.primaryNameSrcList.size();
     } else {
-      ++num_primary;
-      src.addPrimaryNameSrc(nc, idx_list.at(i), Only);
+      if (!src.addPrimaryNameSrc(nc, idx_list[i], No)) {
+        num_sources = 0;
+        break;
+      }
+      ++num_sources;
     }
   }
-  // ncList is preserved for show-components (-t) and this is what it wants.
-  NameCountList hax_nc_list = {as_nc};
-  src.ncList = std::move(hax_nc_list);
-  ++num_full_merges;
-  return {src};
+  if (num_sources) {
+    // second pass: if compatible, populate primaryNameSrcList
+    primaryNameSrcList.reserve(num_sources);
+    for (size_t i{}; i < idx_list.size(); ++i) {
+      const auto& nc = nc_list[i];
+      if (nc.count > 1) {
+        const auto& nc_src = src_cref_array[i].get();
+        primaryNameSrcList.insert(primaryNameSrcList.end(),
+            nc_src.primaryNameSrcList.begin(), nc_src.primaryNameSrcList.end());
+      } else {
+        primaryNameSrcList.emplace_back(nc.name, idx_list[i]);
+      }
+    }
+    ++num_full_merges;
+  }
+  return primaryNameSrcList;
 }
 
 auto mergeAllNcListCombinations(const NameCountList& nc_list,
-  Peco::IndexListVector&& idx_lists, const std::string& clue_name)
-  -> SourceList {
-  //
-  SourceList src_list;
+    Peco::IndexListVector&& idx_lists, const std::string& clue_name)
+    -> SourceList {
   auto count = std::accumulate(nc_list.begin(), nc_list.end(), 0,
     [](int sum, const NameCount& nc) { return sum + nc.count; });
   NameCount nc{clue_name, count};
+  NameCountList ncl = {nc};
+  SourceList src_list;
+  SourceData src;
   Peco peco(std::move(idx_lists));
   auto t = util::Timer::start_timer();
   for (auto idx_list = peco.first_combination(); idx_list;
        idx_list = peco.next_combination()) {
-    auto opt_src = mergeNcListCombo(nc_list, *idx_list, nc);
-    if (opt_src.has_value()) {
-      src_list.emplace_back(std::move(opt_src.value()));
+    // TODO:
+    // could consider early-emplacing the empty SourceData into the
+    // src_list, and merging directly into it, then std::move into
+    // the ncl, copy to pnsl.  to avoid 2.5M usedSources moves
+    //
+    auto pnsl = mergeNcListCombo(nc_list, *idx_list, src);
+    if (pnsl.size()) {
+      src_list.emplace_back(src.usedSources, std::move(pnsl), ncl);
     }
   }
   t.stop();
@@ -96,8 +120,7 @@ auto mergeAllNcListCombinations(const NameCountList& nc_list,
 }
 
 auto mergeNcListResults(
-  const NameCountList& nc_list, const std::string& clue_name) -> SourceList {
-  //
+    const NameCountList& nc_list, const std::string& clue_name) -> SourceList {
   auto idx_lists = buildNcSourceIndexLists(nc_list);
   return mergeAllNcListCombinations(nc_list, std::move(idx_lists), clue_name);
 }
@@ -240,9 +263,9 @@ auto validateSources(const std::string& clue_name,
 void show_validator_durations() {
   std::cerr << " validatorMerge - " << merge_ms << "ms\n"
             << "  full merges: " << num_full_merges << " of " << num_merges
-            << " attempts\n"
-            << "  sources added, primary: " << num_primary
-            << ", compound: " << num_compound << std::endl;
+            << " attempts\n";
+  //  << "  sources added, primary: " << num_primary
+  //  << ", compound: " << num_compound << std::endl;
 }
 
 }  // namespace validator
