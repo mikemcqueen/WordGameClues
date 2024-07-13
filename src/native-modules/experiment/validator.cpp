@@ -29,13 +29,21 @@ auto buildNcSourceIndexLists(const NameCountList& nc_list) {
   return idx_lists;
 }
 
+void display_addends(int sum, const std::vector<std::vector<int>>& addends) {
+  std::cout << "sum: " << sum << std::endl;
+  for (const auto& combination : addends) {
+    std::cout << "[ ";
+    for (const auto& num : combination)
+      std::cout << num << ' ';
+    std::cout << "]" << std::endl;
+  }
+}
+
 int num_merges = 0;
 int num_full_merges = 0;
 long merge_ms = 0;
 
-}  // namespace
-
-// hot inner loop - called millions of times on startup.  lots of otherwise
+// hot inner loop - called millions of times on startup. lots of otherwise
 // seemingly unnecessary optimizations to shave off milliseconds
 auto mergeNcListCombo(
     const NameCountList& nc_list, const IndexList& idx_list, SourceData& src) {
@@ -104,13 +112,11 @@ auto mergeAllNcListCombinations(const NameCountList& nc_list,
   auto t = util::Timer::start_timer();
   for (auto idx_list = peco.first_combination(); idx_list;
        idx_list = peco.next_combination()) {
-    // TODO:
-    // could consider early-emplacing the empty SourceData into the
-    // src_list, and merging directly into it, then std::move into
-    // the ncl, copy to pnsl.  to avoid 2.5M usedSources moves
-    //
+    // NOTE: tried early-emplacing the empty SourceData into the src_list
+    // and merging directly into it, to avoid 2.5M usedSources moves and
+    // no improvement (possible pessimization?!)
     auto pnsl = mergeNcListCombo(nc_list, *idx_list, src);
-    if (pnsl.size()) {
+    if (!pnsl.empty()) {
       src_list.emplace_back(src.usedSources, std::move(pnsl), ncl);
     }
   }
@@ -126,18 +132,20 @@ auto mergeNcListResults(
 }
 
 NameCountList copyNcListAddNc(
-  const NameCountList& nc_list, const std::string& name, int count) {
-  // for non-primary check for duplicate name:count entry
-  // technically this is allowable for count > 1 if the there are
-  // multiple entries of this clue name in the clueList[count].
-  // (at least as many entries as there are copies of name in ncList)
+    const NameCountList& nc_list, const std::string& name, int count) {
+  NameCountList result;
+  // for non-primary (count > 1) check for duplicate name:count entry
+  // technically this is allowable if the there are multiple entries
+  // of this clue name in the clueList[count] (at least as many entries
+  // as there are copies of name in ncList)
   // TODO: make knownSourceMapArray store a count instead of boolean
-  if ((count > 1) && NameCount::listContains(nc_list, name, count)) {
-    return {};
+  // TODO: linear search here yuck. since we have to linear copy
+  //       anyway, maybe we could check as we copy if count > 1?
+  if ((count == 1) || !NameCount::listContains(nc_list, name, count)) {
+    result = nc_list; // copy
+    result.emplace_back(name, count);
   }
-  auto list_copy = nc_list;
-  list_copy.emplace_back(name, count);
-  return list_copy;
+  return result;
 }
 
 template <typename T>
@@ -195,6 +203,7 @@ auto validateSourcesForNameCount(const std::string& clue_name,
     }
     return src_list; // TODO: playing fast & loose with NRVO here
   }
+  // yeah this is kinda insane recursive logic. do better.
   // name_list.length > 1, remove current name & count, and validate remaining
   auto src_list = validateSourcesForNameAndCountLists(clue_name,
     chop_copy(args.name_list, name), chop_copy(args.count_list, count),
@@ -229,15 +238,7 @@ auto validateSourcesForNameAndCountLists(const std::string& clue_name,
   return {};
 }
 
-void display_addends(int sum, const std::vector<std::vector<int>>& addends) {
-  std::cout << "sum: " << sum << std::endl;
-  for (const auto& combination : addends) {
-    std::cout << "[ ";
-    for (const auto& num : combination)
-      std::cout << num << ' ';
-    std::cout << "]" << std::endl;
-  }
-}
+}  // anonymous namespace
 
 auto validateSources(const std::string& clue_name,
     const std::vector<std::string>& src_names, int sum, bool validate_all)
