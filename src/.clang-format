@@ -52,16 +52,16 @@ AlignOperands: true
 # Align consecutive trailing comments
 AlignTrailingComments: true
 # Allow all parameters of the function declaration to be placed on the next line
-AllowAllParametersOfDeclarationOnNextLine: true
+AllowAllParametersOfDeclarationOnNextLine: false
 # Allow short blocks on the same line
-AllowShortBlocksOnASingleLine: false
+AllowShortBlocksOnASingleLine: true
 # Allow short case labels on the same line
 AllowShortCaseLabelsOnASingleLine: false
 # Allow short functions to be placed on the same line: None, InlineOnly (defined in the class),
 # Empty (empty function), Inline (defined in the class, empty function), All
-AllowShortFunctionsOnASingleLine: None
+AllowShortFunctionsOnASingleLine: All
 # Allow short if statements to stay on the same line
-AllowShortIfStatementsOnASingleLine: false
+AllowShortIfStatementsOnASingleLine: true
 # Allow short loops to stay on the same line
 AllowShortLoopsOnASingleLine: false
 # Always break after defining the return type (deprecated)
@@ -156,7 +156,6 @@ SpaceBeforeAssignmentOperators: true
 SpaceBeforeCpp11BracedList: false
 SpaceBeforeCtorInitializerColon: true
 SpaceBeforeInheritanceColon: true
-SpaceBeforeParens: ControlStatements
 # Add a space before opening the parentheses: Never, ControlStatements, Always
 SpaceBeforeParens: ControlStatements
 # Add spaces in empty parentheses

@@ -468,7 +468,7 @@ export const loadAllClues = function (args: any): void {
     }
     const t_dur = new Duration(t0, new Date()).milliseconds;
     if (args.verbose) {
-        console.error(`addCompound max(${args.max_sources})  - ${PrettyMs(t_dur)}` +
+        console.error(`addCompound max(${args.max_sources}) - ${PrettyMs(t_dur)}` +
             `, num_validates(${num_validates}) - ${PrettyMs(validate_duration)}`);
     }
     State.loaded = true;

@@ -100,8 +100,7 @@ auto mergeNcListCombo(
 }
 
 auto mergeAllNcListCombinations(const NameCountList& nc_list,
-    Peco::IndexListVector&& idx_lists, const std::string& clue_name)
-    -> SourceList {
+    Peco::IndexListVector&& idx_lists, const std::string& clue_name) {
   auto count = std::accumulate(nc_list.begin(), nc_list.end(), 0,
     [](int sum, const NameCount& nc) { return sum + nc.count; });
   NameCount nc{clue_name, count};
@@ -126,14 +125,13 @@ auto mergeAllNcListCombinations(const NameCountList& nc_list,
 }
 
 auto mergeNcListResults(
-    const NameCountList& nc_list, const std::string& clue_name) -> SourceList {
+    const NameCountList& nc_list, const std::string& clue_name) {
   auto idx_lists = buildNcSourceIndexLists(nc_list);
   return mergeAllNcListCombinations(nc_list, std::move(idx_lists), clue_name);
 }
 
 NameCountList copyNcListAddNc(
     const NameCountList& nc_list, const std::string& name, int count) {
-  NameCountList result;
   // for non-primary (count > 1) check for duplicate name:count entry
   // technically this is allowable if the there are multiple entries
   // of this clue name in the clueList[count] (at least as many entries
@@ -141,6 +139,7 @@ NameCountList copyNcListAddNc(
   // TODO: make knownSourceMapArray store a count instead of boolean
   // TODO: linear search here yuck. since we have to linear copy
   //       anyway, maybe we could check as we copy if count > 1?
+  NameCountList result;
   if ((count == 1) || !NameCount::listContains(nc_list, name, count)) {
     result = nc_list; // copy
     result.emplace_back(name, count);
@@ -178,9 +177,10 @@ struct VSForNameCountArgs {
   const std::vector<int>& count_list;
 };
 
+ // TODO: broken NRVO
 auto validateSourcesForNameCount(const std::string& clue_name,
-  const std::string& name, int count, const VSForNameCountArgs& args) -> SourceList {
-  //
+    const std::string& name, int count, const VSForNameCountArgs& args)
+    -> SourceList {
   auto nc_list = copyNcListAddNc(args.nc_list, name, count);
   if (nc_list.empty()) {
     // TODO:
@@ -201,7 +201,7 @@ auto validateSourcesForNameCount(const std::string& clue_name,
     if (!src_list.empty()) {
       args.nc_list.emplace_back(name, count);
     }
-    return src_list; // TODO: playing fast & loose with NRVO here
+    return src_list;
   }
   // yeah this is kinda insane recursive logic. do better.
   // name_list.length > 1, remove current name & count, and validate remaining
@@ -220,7 +220,7 @@ auto validateSourcesForNameAndCountLists(const std::string& clue_name,
   // optimization: could have a map of count:boolean entries here
   // on a per-name basis (new map for each outer loop; once a
   // count is checked for a name, no need to check it again
-  SourceList src_list;
+  //  SourceList src_list;
   const auto& name = name_list.at(0);
   // TODO: could do this test earlier, in calling function, check entire
   // name list.

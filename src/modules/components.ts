@@ -18,8 +18,8 @@ const Debug       = require('debug')('show-components');
 const Expect      = require('should/as-function');
 const Path        = require('path');
 const Readlines   = require('n-readlines');
-const stringify   = require('javascript-stringify').stringify;
-const Stringify2  = require('stringify-object');
+const JStringify  = require('javascript-stringify').stringify;
+//const Stringify2  = require('stringify-object');
 const Timing      = require('debug')('timing');
 
 import * as Clue from '../types/clue';
@@ -31,12 +31,12 @@ import * as Source from './source';
 
 ///////////
 
-function Stringify (val) {
-    return stringify(val, (value, indent, stringify) => {
-        if (typeof value == 'function') return "function";
+const Stringify = (val: any): string => {
+    return JStringify(val, (value, indent, stringify) => {
+        if (typeof value === 'function') return "function";
         return stringify(value);
     }, " ");
-}
+};
 
 export const addRemove = (names: string[], counts: number[], options: any): number => {
     // NOTE: explicit undefined check here is necessary
