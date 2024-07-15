@@ -103,8 +103,9 @@ let get_unique_combos = (first: number, last: number): Set<string> => {
 }
 
 export const consistency_check = (options: any): void => {
-    const max_sources = 30;
-    let combos = get_unique_combos(2, max_sources);
+    let version = _.includes(options.flags, '3') ? 2 : 1;
+    console.error(`consistency check v${version}`);
+    let combos = get_unique_combos(2, options.max_sources);
     let inconsistent_combos = new Set<string>();
     for (let combo of combos) {
         const nameList = combo.split(',').sort();
@@ -112,27 +113,33 @@ export const consistency_check = (options: any): void => {
             xor: nameList,
             merge_only: true,
             max: 2,
-            max_sources,
+            max_sources: options.max_sources,
             quiet: true,
             ignoreErrors: options.ignoreErrors
         };
-        const pc_result = PreCompute.preCompute(2, max_sources, pc_args);
-        if (pc_result) {
-            if (!Native.checkClueConsistency(nameList)) {
+        let valid = true;
+        if (version === 1) {
+            valid = PreCompute.preCompute(2, options.max_sources, pc_args);
+            if (!valid) {
+                console.error(`\nConsistency::Precompute failed at ${combo}.`);
+            }
+        }
+        if (valid) {
+            if (!Native.checkClueConsistency(nameList, options.max_sources, version)) {
                 inconsistent_combos.add(combo);
             }
-        } else {
-            console.error(`Consistency::Precompute failed at ${combo}.`);
         }
-        //console.error(combo);
+        if (!options.quiet) {
+            process.stderr.write('.');
+        }
     }
     if (inconsistent_combos.size) {
-        console.error(`inconsistent combos:`);
+        console.error(`\nInconsistent combos:`);
         for (let combo of inconsistent_combos) {
             console.error(combo);
         }
     } else {
-        console.error(`No inconsistent combos`);
+        console.error(`\nNo inconsistent combos`);
     }
 };
 

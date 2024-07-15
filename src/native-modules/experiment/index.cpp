@@ -533,9 +533,13 @@ Value validateSources(const CallbackInfo& info) {
 }
 
 void show_clue_manager_durations(){
-  std::cerr << "(delayed clue_manager durations)\n"
-            << " validateSources - " << validate_ms << "ms\n";
-  show_validator_durations();
+  static bool shown = false;
+  if (!shown) {
+    std::cerr << "(delayed clue_manager durations)\n"
+              << " validateSources - " << validate_ms << "ms\n";
+    show_validator_durations();
+    shown = true;
+  }
 }
 
 //
@@ -555,16 +559,18 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   auto ncDataLists = makeNcDataLists(env, info[0].As<Array>());
   // arg1
   auto merge_only = info[1].As<Boolean>();
+  if (merge_only) the_log_args_.quiet = true;
   // --
+  // arbitrary, want to do it somewhere
   show_clue_manager_durations();
 
   auto t = util::Timer::start_timer();
   MFD.host.xor_src_lists = std::move(buildSourceListsForUseNcData(ncDataLists));
-  // if (log_level(Verbose)) {
-  t.stop();
-  std::cerr << " build xor_src_lists(" << MFD.host.xor_src_lists.size()
-            << ") - " << t.count() << "ms" << std::endl;
-  // }
+  if (log_level(Normal)) {
+    t.stop();
+    std::cerr << " build xor_src_lists(" << MFD.host.xor_src_lists.size()
+              << ") - " << t.count() << "ms" << std::endl;
+  }
 
 #if 0
   for (const auto& src_list: MFD.host.xor_src_lists) {
@@ -576,8 +582,10 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   if (!merge_only || (MFD.host.xor_src_lists.size() > 1)) {
     // TODO: support for single-list compat indices
     auto compat_idx_lists = get_compatible_indices(MFD.host.xor_src_lists);
-    std::cerr << " compat_idx_lists(" << compat_idx_lists.size() << ")"
-              << std::endl;
+    if (log_level(Normal)) {
+      std::cerr << " compat_idx_lists(" << compat_idx_lists.size() << ")"
+                << std::endl;
+    }
     if (!compat_idx_lists.empty()) {
       // TODO: free if already set. set_src_lists?
       MFD.device.src_lists = alloc_copy_src_lists(MFD.host.xor_src_lists);
@@ -585,8 +593,8 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
       const auto idx_list_sizes = util::make_list_sizes(compat_idx_lists);
       MFD.device.idx_list_sizes = alloc_copy_list_sizes(idx_list_sizes);
       auto combo_indices = cuda_get_compat_xor_src_indices(
-        MFD.host.xor_src_lists, MFD.device.src_lists, compat_idx_lists,
-        MFD.device.idx_lists, MFD.device.idx_list_sizes);
+          MFD.host.xor_src_lists, MFD.device.src_lists, compat_idx_lists,
+          MFD.device.idx_lists, MFD.device.idx_list_sizes);
       if (merge_only) {
         // compat_idx_lists and combo_indices are used in the merge_only case
         // for the sole purpose of generating merged_xor_src_list, so there is
@@ -599,10 +607,10 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
         MFD.host.combo_indices = std::move(combo_indices);
       }
     }
-  } else if (MFD.host.xor_src_lists.size() == 1) {
-    assert(merge_only);
-    MFD.host.merged_xor_src_list = std::move(MFD.host.xor_src_lists.back());
-  }
+    } else if (MFD.host.xor_src_lists.size() == 1) {
+      assert(merge_only);
+      MFD.host.merged_xor_src_list = std::move(MFD.host.xor_src_lists.back());
+    }
   auto result = (merge_only) ? MFD.host.merged_xor_src_list.size()
                              : MFD.host.combo_indices.size();
   return Number::New(env, (uint32_t)result);
@@ -821,16 +829,30 @@ Value showComponents(const CallbackInfo& info) {
 //
 Value checkClueConsistency(const CallbackInfo& info) {
   Env env = info.Env();
-  if (!info[0].IsArray()) {
+  if (!info[0].IsArray() && !info[1].IsNumber() && !info[2].IsNumber()) {
     TypeError::New(env, "checkClueConsistency: invalid parameter type")
       .ThrowAsJavaScriptException();
     return env.Null();
   }
   // arg0:
   auto name_list = makeStringList(env, info[0].As<Array>());
+  // arg1:
+  auto max_sources = info[1].As<Number>().Int32Value();
+  // arg2:
+  auto version = info[2].As<Number>().Int32Value();
   // --
-  auto result =
-    components::consistency_check(name_list, MFD.host.merged_xor_src_list);
+  bool result{};
+  switch (version) {
+  case 1:
+    result =
+        components::consistency_check(name_list, MFD.host.merged_xor_src_list);
+    break;
+  case 2:
+    result = components::consistency_check2(name_list, max_sources);
+    break;
+  default:
+    assert(false);
+  }
   return Boolean::New(env, result);
 }
 

@@ -11,6 +11,7 @@
 #include "merge-filter-data.h"
 #include "components.h"
 #include "util.h"
+#include "log.h"
 
 namespace cm::components {
 
@@ -56,8 +57,10 @@ auto add_result_for_sources(const std::string& sources_csv,
     }
     return true;
   } else {
-    std::cerr << "!knownSourceMap(" << sum << "), sources: " << sources_csv
-              << std::endl;
+    if (log_level(Verbose)) {
+      std::cerr << "!knownSourceMap(" << sum << "), sources: " << sources_csv
+                << std::endl;
+    }
     return false;
   }
 }
@@ -150,8 +153,10 @@ opt_str_list_cref_t get_clue_names_for_sources(int sum, const std::string& sourc
       return std::make_optional(std::cref(empty));
     }
   } else {
-    std::cerr << "!knownSourceMap(" << sum << "), sources: " << sources_csv
-              << std::endl;
+    if (log_level(Verbose)) {
+      std::cerr << "!knownSourceMap(" << sum << "), sources: " << sources_csv
+                << std::endl;
+    }
     return {};
   }
 }
@@ -193,6 +198,102 @@ bool are_sources_consistent(
   return true;
 }
 
+auto find_sum(int sum, const std::vector<std::vector<int>>& count_lists,
+    std::vector<std::vector<int>>::const_iterator iter) {
+  auto count_list = *iter;
+  if (std::next(iter) == count_lists.end()) {
+    return std::find(count_list.begin(), count_list.end(), sum) != count_list.end();
+  }
+  for (auto count : count_list) {
+    if (sum - count >= 0) {
+      if (find_sum(sum - count, count_lists, std::next(iter))) return true;
+    }
+  }
+  return false;
+}
+
+auto check_names_and_counts(int sum, const std::vector<std::string>& name_list,
+    const std::vector<int>& count_list) {
+  assert(name_list.size() == count_list.size());
+  std::vector<std::vector<int>> counts_for_names;
+  for (const auto& name: name_list) {
+    // filter_count_lists_for_clue_name(name, count_list)
+    std::vector<int> counts;
+    for (auto count: count_list) {
+      if (clue_manager::is_known_name_count(name, count)) {
+        counts.push_back(count);
+      }
+    }
+    if (!counts.size()) return false;
+    counts_for_names.emplace_back(std::move(counts));
+  }
+  return find_sum(sum, counts_for_names, counts_for_names.begin());
+}
+
+auto get_addends(const std::vector<std::string>& name_list, int max_sources) {
+  struct VectorHash {
+    size_t operator()(const std::vector<int>& v) const {
+      std::hash<int> hasher;
+      size_t seed = 0;
+      for (int i : v) {
+        seed ^= hasher(i) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+      }
+      return seed;
+    }
+  };
+  //  std::unordered_set<std::vector<int>, VectorHash> result;
+  std::unordered_set<int> count_set;
+  for (int sum{2}; sum <= max_sources; ++sum) {
+    auto addends = Peco::make_addends(sum, name_list.size());
+    for (auto& count_list : addends) {
+      if (check_names_and_counts(sum, name_list, count_list)) {
+        //result.emplace(std::move(count_list));
+        count_set.insert(std::accumulate(count_list.begin(), count_list.end(), 0,
+            [](int sum, int count) { return sum + count; }));
+      }
+    }
+  }
+  return std::vector<int>(count_set.begin(), count_set.end());
+}
+
+auto get_known_source_idx_list(const std::string& source_csv, int max_sources) {
+  std::vector<int> idx_list;
+  for (int i{2}; i <= max_sources; ++i) {
+    if (clue_manager::is_known_source_map_entry(i, source_csv)) {
+      idx_list.push_back(i);
+    }
+  }
+  return idx_list;
+}
+
+auto get_all_known_source_clue_names(
+    const std::string& source_csv, const std::vector<int>& idx_list) {
+  std::unordered_set<std::string> clue_names;
+  for (const auto idx : idx_list) {
+    if (clue_manager::is_known_source_map_entry(idx, source_csv)) {
+      const auto& entry =
+          clue_manager::get_known_source_map_entry(idx, source_csv);
+      for (const auto& name : entry.clue_names) {
+        clue_names.insert(name);
+      }
+    }
+  }
+  return clue_names;
+}
+
+auto all_known_sources_have_clue_names(const std::string& source_csv,
+    const std::vector<int>& idx_list, std::unordered_set<std::string>& clue_names) {
+  for (const auto idx : idx_list) {
+    if (!clue_manager::is_known_source_map_entry(idx, source_csv)) return false;
+    const auto& entry =
+        clue_manager::get_known_source_map_entry(idx, source_csv);
+    for (const auto& clue_name : entry.clue_names) {
+      if (!clue_names.contains(clue_name)) return false;
+    }
+  }
+  return true;
+}
+
 }  // anonymous namespace
 
 auto show(const std::vector<std::string>& name_list,
@@ -206,5 +307,31 @@ auto consistency_check(const std::vector<std::string>& name_list,
     const SourceList& xor_src_list) -> bool {
   return are_sources_consistent(name_list, xor_src_list);
 }
+
+auto consistency_check2(
+    const std::vector<std::string>& name_list, int max_sources) -> bool {
+  //  auto idx_lists = get_known_source_addends(name_list, max_sources);
+  using namespace std::literals;
+  auto potential_counts = get_addends(name_list, max_sources);
+  auto source_csv = util::join(name_list, ","s);
+#if 1
+  if (!potential_counts.empty()) {
+    std::cerr << "\n"
+              << source_csv << "(" << potential_counts.size()
+              << "): " << util::join(potential_counts, ","s) << std::endl;
+  }
+#endif
+  auto clue_names = get_all_known_source_clue_names(source_csv, potential_counts);
+  return all_known_sources_have_clue_names(source_csv, potential_counts, clue_names);
+}
+
+#if 0
+  // this only works for already-declared clue-sources, not for VALID but
+  // undeclared.
+  auto idx_list = get_known_source_idx_list(source_csv, max_sources);
+  auto clue_names = get_all_known_source_clue_names(source_csv, idx_list);
+  return all_known_sources_have_clue_names(source_csv, idx_list, clue_names);
+#endif
+
 
 }  // namespace cm::components

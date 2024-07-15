@@ -64,13 +64,13 @@ const CmdLineOptions = Opt.create(_.concat(Clues.Options, [
     ['',  'any',                               '  any match (uh, probably should not use this)'],
     ['',  'production',                        'use production note store'],
     ['',  'sort-all-clues',                    'sort all clue data files by src'],
-    ['m', 'max-sources=COUNT',                 'enforce COUUNT max primary sources for a single clue;' +
-                                               ' impacts clue loading, combo generation'],
+    ['m', 'max-sources=COUNT',                 'enforce COUUNT max primary sources for a single clue; default 20;' +
+                                               ' impacts clue loading, combo generation, consistency checking, etc.'],
     ['R', 'remove-all-invalid',                'remove all invalid (validation error) clues'],
     ['',  'ccc',                               'clue (source) consistency check'],
     ['',  'show-pairs',                        'show unique known source pairs'],
     ['',  'flip',                              '  include flipped (reversed) pairs in results'],
-    ['z', 'flags=OPTION+',                     'flags: 2=ignoreErrors' ],
+    ['z', 'flags=OPTION+',                     'flags: 2=ignoreErrors,3=cccV2' ],
     ['v', 'verbose',                           'more output' ],
     ['',  'vv',                                'More' ],
     ['',  'vvv',                               'MOAR' ],
@@ -431,7 +431,10 @@ async function main () {
     } else if (showSourcesClueName) {
         showSources(showSourcesClueName);
     } else if (options['ccc']) {
+        //if (_.includes(options.flags, '3')) {
+        //} else {
         Components.consistency_check(options);
+        //}
     } else if (options.copy_from) {
         const from = Clues.getByVariety(options.copy_from);
         Debug(`from: ${from.baseDir}`);
