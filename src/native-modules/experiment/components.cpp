@@ -1,5 +1,6 @@
 // show-components.cpp
 
+#include <algorithm>
 #include <functional>
 #include <iostream>
 #include <optional>
@@ -7,11 +8,13 @@
 #include <unordered_set>
 #include <vector>
 #include "clue-manager.h"
+#include "cm-precompute.h"
 #include "combo-maker.h"
-#include "merge-filter-data.h"
 #include "components.h"
-#include "util.h"
+#include "merge.h"
 #include "log.h"
+#include "util.h"
+using namespace std::literals;
 
 namespace cm::components {
 
@@ -198,62 +201,41 @@ bool are_sources_consistent(
   return true;
 }
 
-auto find_sum(int sum, const std::vector<std::vector<int>>& count_lists,
-    std::vector<std::vector<int>>::const_iterator iter) {
-  auto count_list = *iter;
-  if (std::next(iter) == count_lists.end()) {
-    return std::find(count_list.begin(), count_list.end(), sum) != count_list.end();
-  }
-  for (auto count : count_list) {
-    if (sum - count >= 0) {
-      if (find_sum(sum - count, count_lists, std::next(iter))) return true;
-    }
-  }
-  return false;
+//////////
+// v2
+
+void display(const std::vector<std::string>& name_list) {
+  std::cerr << "\nname_list: " << util::join(name_list, ","s) << std::endl;
 }
 
-auto check_names_and_counts(int sum, const std::vector<std::string>& name_list,
-    const std::vector<int>& count_list) {
-  assert(name_list.size() == count_list.size());
-  std::vector<std::vector<int>> counts_for_names;
-  for (const auto& name: name_list) {
-    // filter_count_lists_for_clue_name(name, count_list)
-    std::vector<int> counts;
-    for (auto count: count_list) {
-      if (clue_manager::is_known_name_count(name, count)) {
-        counts.push_back(count);
+void display(const std::vector<NCDataList>& nc_data_lists) {
+  std::cerr << " nc_data_lists(" << nc_data_lists.size() << "):\n";
+  for (const auto& nc_data_list : nc_data_lists) {
+    std::cerr << " nc_lists(" << nc_data_list.size() << "):\n";
+    for (const auto& nc_data : nc_data_list) {
+      std::cerr << "  ";
+      for (const auto& nc : nc_data.ncList) {
+        std::cerr << nc.toString() << ", ";
       }
+      std::cerr << std::endl;
     }
-    if (!counts.size()) return false;
-    counts_for_names.emplace_back(std::move(counts));
   }
-  return find_sum(sum, counts_for_names, counts_for_names.begin());
 }
 
-auto get_addends(const std::vector<std::string>& name_list, int max_sources) {
-  struct VectorHash {
-    size_t operator()(const std::vector<int>& v) const {
-      std::hash<int> hasher;
-      size_t seed = 0;
-      for (int i : v) {
-        seed ^= hasher(i) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-      }
-      return seed;
+void display(const SourceList& src_list) {
+  std::cerr << " src_list(" << src_list.size() << "):\n";
+  for (const auto& src : src_list) {
+    std::cerr << "  ncl: ";
+    for (const auto& nc : src.ncList) {
+      std::cerr << nc.toString() << ", ";
     }
-  };
-  //  std::unordered_set<std::vector<int>, VectorHash> result;
-  std::unordered_set<int> count_set;
-  for (int sum{2}; sum <= max_sources; ++sum) {
-    auto addends = Peco::make_addends(sum, name_list.size());
-    for (auto& count_list : addends) {
-      if (check_names_and_counts(sum, name_list, count_list)) {
-        //result.emplace(std::move(count_list));
-        count_set.insert(std::accumulate(count_list.begin(), count_list.end(), 0,
-            [](int sum, int count) { return sum + count; }));
-      }
+    std::cerr << std::endl;
+    std::cerr << "  pnsl: ";
+    for (const auto& nc : src.primaryNameSrcList) {
+      std::cerr << nc.toString() << ", ";
     }
+    std::cerr << std::endl;
   }
-  return std::vector<int>(count_set.begin(), count_set.end());
 }
 
 auto get_known_source_idx_list(const std::string& source_csv, int max_sources) {
@@ -282,7 +264,8 @@ auto get_all_known_source_clue_names(
 }
 
 auto all_known_sources_have_clue_names(const std::string& source_csv,
-    const std::vector<int>& idx_list, std::unordered_set<std::string>& clue_names) {
+    const std::vector<int>& idx_list,
+    std::unordered_set<std::string>& clue_names) {
   for (const auto idx : idx_list) {
     if (!clue_manager::is_known_source_map_entry(idx, source_csv)) return false;
     const auto& entry =
@@ -292,6 +275,59 @@ auto all_known_sources_have_clue_names(const std::string& source_csv,
     }
   }
   return true;
+}
+
+auto get_addends(const std::vector<std::string>& name_list, int max_sources) {
+  std::vector<std::vector<int>> result;
+  for (int sum{2}; sum <= max_sources; ++sum) {
+    auto addends = Peco::make_addends(sum, name_list.size());
+    util::move_append(result, std::move(addends));
+  }
+  return result;
+}
+
+auto has_names_at_counts(const std::vector<std::string>& name_list,
+    const std::vector<int>& count_list) {
+  for (size_t i{}; i < name_list.size(); ++i) {
+    if (!clue_manager::is_known_name_count(name_list.at(i), count_list.at(i))) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// given a vector of count listss, ex. [ [1,2,3], .. ] generate all
+// permutations of each list and test if the provided names exist at those
+// counts. return all resulting count lists where that condition is true.
+auto filter_valid_addend_perms(std::vector<std::vector<int>>& addends,
+    const std::vector<std::string>& name_list) {
+  std::vector<std::vector<int>> result;
+  for (auto& count_list : addends) {
+    do {
+      if (has_names_at_counts(name_list, count_list)) {
+        result.emplace_back(std::move(count_list));
+        // once we get one valid perm for a count_list, we can break out,
+        // because the NC (name:total_count) will be the same.
+        break;
+      }
+    } while (std::next_permutation(count_list.begin(), count_list.end()));
+  }
+  return result;
+}
+
+auto make_nc_data_lists(const std::vector<std::vector<int>>& addends,
+    const std::vector<std::string>& name_list) {
+  std::vector<NCDataList> result;
+  for (const auto& count_list : addends) {
+    NCDataList nc_data_list;
+    for (size_t i{}; i < name_list.size(); ++i) {
+      NCData nc_data;
+      nc_data.ncList.emplace_back(name_list.at(i), count_list.at(i));
+      nc_data_list.emplace_back(std::move(nc_data));
+    }
+    result.emplace_back(std::move(nc_data_list));
+  }
+  return result;
 }
 
 }  // anonymous namespace
@@ -304,34 +340,141 @@ auto show(const std::vector<std::string>& name_list,
 }
 
 auto consistency_check(const std::vector<std::string>& name_list,
-    const SourceList& xor_src_list) -> bool {
-  return are_sources_consistent(name_list, xor_src_list);
-}
-
-auto consistency_check2(
-    const std::vector<std::string>& name_list, int max_sources) -> bool {
-  //  auto idx_lists = get_known_source_addends(name_list, max_sources);
-  using namespace std::literals;
-  auto potential_counts = get_addends(name_list, max_sources);
-  auto source_csv = util::join(name_list, ","s);
-#if 1
-  if (!potential_counts.empty()) {
-    std::cerr << "\n"
-              << source_csv << "(" << potential_counts.size()
-              << "): " << util::join(potential_counts, ","s) << std::endl;
+    const SourceList& src_list, bool force_dump /*= false*/) -> bool {
+  static bool dump = false;
+  auto result = are_sources_consistent(name_list, src_list);
+  if (force_dump || (!result && dump)) {
+    display(name_list);
+    std::cerr << "v1 result: " << std::boolalpha << result << std::endl;
+    display(src_list);
+    dump = false;
   }
-#endif
-  auto clue_names = get_all_known_source_clue_names(source_csv, potential_counts);
-  return all_known_sources_have_clue_names(source_csv, potential_counts, clue_names);
+  return result;
 }
 
-#if 0
-  // this only works for already-declared clue-sources, not for VALID but
-  // undeclared.
-  auto idx_list = get_known_source_idx_list(source_csv, max_sources);
-  auto clue_names = get_all_known_source_clue_names(source_csv, idx_list);
-  return all_known_sources_have_clue_names(source_csv, idx_list, clue_names);
-#endif
+auto consistency_check2(MergeFilterData& mfd, const std::vector<std::string>& name_list,
+    int max_sources) -> bool {
+  static bool dump = false;
+  if (dump) {
+    display(name_list);
+  }
+  // TODO: 3-source clues don't work currently.
+  if (name_list.size() > 2) return true;
+  auto addends = get_addends(name_list, max_sources);
+  if (0 && dump) {
+    std::cerr << " addends: ";
+    for (const auto& v : addends) {
+      std::cerr << util::join(v, ","s) << ", ";
+    }
+    std::cerr << std::endl;
+  }
+  auto filtered_addends = filter_valid_addend_perms(addends, name_list);
+  if (dump) {
+    std::cerr << " filtered: ";
+    for (const auto& v : filtered_addends) {
+      std::cerr << util::join(v, ","s) << ", ";
+    }
+    std::cerr << std::endl;
+  }
+  auto nc_data_lists = make_nc_data_lists(filtered_addends, name_list);
+  if (dump) {
+    display(nc_data_lists);
+  }
+  //display(name_list);
+  auto src_lists = buildSourceListsForUseNcData(nc_data_lists);
+  /*
+  const auto& src_list = src_lists.back();
+  if (dump) {
+    display(src_list);
+    }
+  */
+  merge_xor_src_lists(mfd, src_lists, true);
+  auto result = consistency_check(name_list, mfd.host.merged_xor_src_list,  //
+      dump);
+  dump = false;
+  return result;
+}
 
+/*
+// old noise
+auto find_sum(int sum, const std::vector<std::vector<int>>& count_lists,
+    std::vector<std::vector<int>>::const_iterator iter) {
+  auto count_list = *iter;
+  if (std::next(iter) == count_lists.end()) {
+    return std::find(count_list.begin(), count_list.end(), sum) !=
+count_list.end();
+  }
+  for (auto count : count_list) {
+    if (sum - count >= 0) {
+      if (find_sum(sum - count, count_lists, std::next(iter))) return true;
+    }
+  }
+  return false;
+}
+
+auto check_names_and_counts(int sum, const std::vector<std::string>& name_list,
+    const std::vector<int>& count_list) {
+  assert(name_list.size() == count_list.size());
+  std::vector<std::vector<int>> counts_for_names;
+  for (const auto& name: name_list) {
+    // filter_count_lists_for_clue_name(name, count_list)
+    std::vector<int> counts;
+    for (auto count: count_list) {
+      if (clue_manager::is_known_name_count(name, count)) {
+        counts.push_back(count);
+      }
+    }
+    if (!counts.size()) return false;
+    counts_for_names.emplace_back(std::move(counts));
+  }
+  return find_sum(sum, counts_for_names, counts_for_names.begin());
+}
+
+// old get_addends noise
+struct VectorHash {
+  size_t operator()(const std::vector<int>& v) const {
+    std::hash<int> hasher;
+    size_t seed = 0;
+    for (int i : v) {
+      seed ^= hasher(i) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+    }
+    return seed;
+  }
+};
+std::unordered_set<std::vector<int>, VectorHash> result;
+std::unordered_set<int> result;
+  for (auto& count_list : addends) {
+    if (check_names_and_counts(sum, name_list, count_list)) {
+      result.emplace(std::move(count_list));
+      result.insert(std::accumulate(count_list.begin(), count_list.end(), 0,
+          [](int sum, int count) { return sum + count; }));
+    }
+  }
+return std::vector<int>(count_set.begin(), count_set.end());
+
+//auto source_csv = util::join(name_list, ","s);
+//auto clue_names = get_all_known_source_clue_names(source_csv,potential_counts);
+//return all_known_sources_have_clue_names(source_csv, potential_counts,clue_names);
+//return true;
+
+// this did.. something.. but not exactly what i wanted.
+auto potential_counts = get_addends(name_list, max_sources);
+auto source_csv = util::join(name_list, ","s);
+if (!potential_counts.empty()) {
+  std::cerr << "\n"
+            << source_csv << "(" << potential_counts.size()
+            << "): " << util::join(potential_counts, ","s) << std::endl;
+}
+auto clue_names = get_all_known_source_clue_names(source_csv, potential_counts);
+return all_known_sources_have_clue_names(source_csv, potential_counts,
+clue_names);
+
+
+// this only works for already-declared clue-sources, not for VALID but
+// undeclared.
+auto idx_list = get_known_source_idx_list(source_csv, max_sources);
+auto clue_names = get_all_known_source_clue_names(source_csv, idx_list);
+return all_known_sources_have_clue_names(source_csv, idx_list, clue_names);
+*/
 
 }  // namespace cm::components

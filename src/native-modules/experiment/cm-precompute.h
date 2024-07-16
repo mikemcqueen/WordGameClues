@@ -16,10 +16,12 @@ auto buildSourceListsForUseNcData(const std::vector<NCDataList>& useNcDataLists)
 
 auto buildOrArgList(std::vector<SourceList>&& or_src_lists) -> OrArgList;
 
+#if 0
 void markAllXorCompatibleOrSources(OrArgList& or_arg_list,
   const std::vector<SourceList>& xor_src_lists,
   const std::vector<IndexList>& compat_idx_lists,
   const ComboIndexList& compat_indices);
+#endif
 
 auto buildSentenceVariationIndices(const std::vector<SourceList>& xor_src_lists,
   const std::vector<IndexList>& compat_idx_lists,

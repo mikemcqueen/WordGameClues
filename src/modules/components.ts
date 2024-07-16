@@ -74,6 +74,7 @@ export const show = (options: any): any => {
         max: 2,
         max_sources: options.max_sources,
         quiet: options.quiet,
+        verbose: options.verbose,
         ignoreErrors: options.ignoreErrors
     };
     const pc_result = PreCompute.preCompute(2, options.max_sources, pc_args);
@@ -115,10 +116,12 @@ export const consistency_check = (options: any): void => {
             max: 2,
             max_sources: options.max_sources,
             quiet: true,
+            verbose: options.verbose,
             ignoreErrors: options.ignoreErrors
         };
         let valid = true;
         if (version === 1) {
+            //console.error(`name_list: ${combo}`);
             valid = PreCompute.preCompute(2, options.max_sources, pc_args);
             if (!valid) {
                 console.error(`\nConsistency::Precompute failed at ${combo}.`);

@@ -542,6 +542,20 @@ void show_clue_manager_durations(){
   }
 }
 
+void display(const std::vector<NCDataList>& nc_data_lists) {
+  std::cerr << " nc_data_lists(" << nc_data_lists.size() << "):\n";
+  for (const auto& nc_data_list : nc_data_lists) {
+    std::cerr << " nc_lists(" << nc_data_list.size() << "):\n";
+    for (const auto& nc_data : nc_data_list) {
+      std::cerr << "  ";
+      for (const auto& nc : nc_data.ncList) {
+        std::cerr << nc.toString() << ", ";
+      }
+      std::cerr << std::endl;
+    }
+  }
+}
+
 //
 // Combo-maker
 //
@@ -557,6 +571,11 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   }
   // arg0
   auto ncDataLists = makeNcDataLists(env, info[0].As<Array>());
+#if 0
+  static bool dump = false;
+  if (dump) { display(ncDataLists); }
+  dump = false;
+#endif
   // arg1
   auto merge_only = info[1].As<Boolean>();
   if (merge_only) the_log_args_.quiet = true;
@@ -564,53 +583,17 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   // arbitrary, want to do it somewhere
   show_clue_manager_durations();
 
-  auto t = util::Timer::start_timer();
-  MFD.host.xor_src_lists = std::move(buildSourceListsForUseNcData(ncDataLists));
+  auto xor_src_lists = buildSourceListsForUseNcData(ncDataLists);
   if (log_level(Normal)) {
-    t.stop();
-    std::cerr << " build xor_src_lists(" << MFD.host.xor_src_lists.size()
-              << ") - " << t.count() << "ms" << std::endl;
+    std::cerr << " build xor_src_lists(" << xor_src_lists.size() << ")\n";
   }
-
 #if 0
-  for (const auto& src_list: MFD.host.xor_src_lists) {
+  for (const auto& src_list: xor_src_lists) {
     assert_valid(src_list);
   }
 #endif
-
   //--
-  if (!merge_only || (MFD.host.xor_src_lists.size() > 1)) {
-    // TODO: support for single-list compat indices
-    auto compat_idx_lists = get_compatible_indices(MFD.host.xor_src_lists);
-    if (log_level(Normal)) {
-      std::cerr << " compat_idx_lists(" << compat_idx_lists.size() << ")"
-                << std::endl;
-    }
-    if (!compat_idx_lists.empty()) {
-      // TODO: free if already set. set_src_lists?
-      MFD.device.src_lists = alloc_copy_src_lists(MFD.host.xor_src_lists);
-      MFD.device.idx_lists = alloc_copy_idx_lists(compat_idx_lists);
-      const auto idx_list_sizes = util::make_list_sizes(compat_idx_lists);
-      MFD.device.idx_list_sizes = alloc_copy_list_sizes(idx_list_sizes);
-      auto combo_indices = cuda_get_compat_xor_src_indices(
-          MFD.host.xor_src_lists, MFD.device.src_lists, compat_idx_lists,
-          MFD.device.idx_lists, MFD.device.idx_list_sizes);
-      if (merge_only) {
-        // compat_idx_lists and combo_indices are used in the merge_only case
-        // for the sole purpose of generating merged_xor_src_list, so there is
-        // no need to save them for later use
-        MFD.host.merged_xor_src_list = std::move(merge_xor_sources(
-            MFD.host.xor_src_lists, compat_idx_lists, combo_indices));
-      } else {
-        // filter on the other hand will need them both later
-        MFD.host.compat_idx_lists = std::move(compat_idx_lists);
-        MFD.host.combo_indices = std::move(combo_indices);
-      }
-    }
-    } else if (MFD.host.xor_src_lists.size() == 1) {
-      assert(merge_only);
-      MFD.host.merged_xor_src_list = std::move(MFD.host.xor_src_lists.back());
-    }
+  merge_xor_src_lists(MFD, xor_src_lists, merge_only);
   auto result = (merge_only) ? MFD.host.merged_xor_src_list.size()
                              : MFD.host.combo_indices.size();
   return Number::New(env, (uint32_t)result);
@@ -844,11 +827,11 @@ Value checkClueConsistency(const CallbackInfo& info) {
   bool result{};
   switch (version) {
   case 1:
-    result =
-        components::consistency_check(name_list, MFD.host.merged_xor_src_list);
+    result = components::consistency_check(name_list,  //
+        MFD.host.merged_xor_src_list);
     break;
   case 2:
-    result = components::consistency_check2(name_list, max_sources);
+    result = components::consistency_check2(MFD, name_list, max_sources);
     break;
   default:
     assert(false);

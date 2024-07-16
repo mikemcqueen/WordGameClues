@@ -6,6 +6,7 @@
 #include "peco.h"
 #include "combo-maker.h"
 #include "cuda-types.h"
+#include "merge-filter-data.h"
 
 namespace cm {
 
@@ -33,6 +34,9 @@ auto get_compatible_indices(const std::vector<SourceList>& src_lists)
 auto merge_xor_sources(const std::vector<SourceList>& src_lists,
   const std::vector<IndexList>& idx_lists,
   const std::vector<uint64_t>& combo_indices) -> XorSourceList;
+
+void merge_xor_src_lists(
+    MergeFilterData& mfd, std::vector<SourceList>& src_lists, bool merge_only);
 
 SourceCompatibilityData* alloc_copy_src_lists(
   const std::vector<SourceList>& src_lists, size_t* num_bytes = nullptr);

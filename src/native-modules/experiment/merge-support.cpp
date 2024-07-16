@@ -385,7 +385,7 @@ XorSource merge_sources(const std::vector<index_t>& src_indices,
     std::move(primaryNameSrcList), std::move(ncList), std::move(usedSources)};
 }
 
-}  // namespace
+}  // anonymous namespace
 
 namespace cm {
 
@@ -522,16 +522,15 @@ auto merge_xor_sources(const std::vector<SourceList>& src_lists,
   if (log_level(Verbose)) {
     std::cerr << "  starting merge_xor_sources..." << std::endl;
   }
-  auto hm0 = high_resolution_clock::now();
+  auto t = util::Timer::start_timer();
   for (auto combo_idx : combo_indices) {
     auto src_indices = get_src_indices(combo_idx, idx_lists);
     xorSourceList.emplace_back(merge_sources(src_indices, src_lists));
   }
   if (log_level(Verbose)) {
-    auto hm1 = high_resolution_clock::now();
-    auto hm_dur = duration_cast<milliseconds>(hm1 - hm0).count();
+    t.stop();
     std::cerr << "  merge_xor_sources complete (" << xorSourceList.size()
-              << ") - " << hm_dur << "ms" << std::endl;
+              << ") - " << t.count() << "ms" << std::endl;
   }
   return xorSourceList;
 }
@@ -627,6 +626,43 @@ index_t* alloc_copy_list_sizes(
     *num_bytes = list_sizes_bytes;
   }
   return device_list_sizes;
+}
+
+// TODO: const src_lists input, return merged
+void merge_xor_src_lists(MergeFilterData& mfd,  //
+    std::vector<SourceList>& src_lists, bool merge_only) {
+  if (!merge_only || (src_lists.size() > 1)) {
+    // TODO: support for single-list compat indices
+    auto compat_idx_lists = get_compatible_indices(src_lists);
+    if (!merge_only || log_level(Verbose)) {
+      std::cerr << " compat_idx_lists(" << compat_idx_lists.size() << ")"
+                << std::endl;
+    }
+    if (!compat_idx_lists.empty()) {
+      // TODO: free if already set. set_src_lists?
+      mfd.device.src_lists = alloc_copy_src_lists(src_lists);
+      mfd.device.idx_lists = alloc_copy_idx_lists(compat_idx_lists);
+      const auto idx_list_sizes = util::make_list_sizes(compat_idx_lists);
+      mfd.device.idx_list_sizes = alloc_copy_list_sizes(idx_list_sizes);
+      auto combo_indices = cuda_get_compat_xor_src_indices(
+          src_lists, mfd.device.src_lists, compat_idx_lists,
+          mfd.device.idx_lists, mfd.device.idx_list_sizes);
+      if (merge_only) {
+        // compat_idx_lists and combo_indices are used in the merge_only case
+        // for the sole purpose of generating merged_xor_src_list, so there is
+        // no need to save them for later use
+        mfd.host.merged_xor_src_list = merge_xor_sources(
+            src_lists, compat_idx_lists, combo_indices);
+      } else {
+        // filter on the other hand will need them both later
+        mfd.host.compat_idx_lists = std::move(compat_idx_lists);
+        mfd.host.combo_indices = std::move(combo_indices);
+      }
+    }
+  } else if (src_lists.size() == 1) {
+    assert(merge_only);
+    mfd.host.merged_xor_src_list = std::move(src_lists.back());
+  }
 }
 
 }  // namespace cm

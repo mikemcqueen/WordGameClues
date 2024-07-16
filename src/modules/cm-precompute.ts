@@ -179,7 +179,7 @@ const buildAllUseNcDataLists = (listName: string, maxSum: number, args: any): NC
             `, maxSum(${maxSum})`);
     }
     const combinationNcLists = getCombinationNcLists(useArgsList);
-    if (args.verbose > 2) console.error(` combinationNcLists(${combinationNcLists.length})`);
+    if (args.verbose > 2) console.error(` combinationNcLists(${combinationNcLists.length})\n ${JStringify(combinationNcLists)}`);
     const ncDataLists = combinationsToNcDataLists(combinationNcLists, args.verbose || 0);
     if (args.verbose > 2) console.error(` ncDataLists(${ncDataLists.length})`);
     const begin = new Date();
@@ -257,7 +257,7 @@ const markAllXorCompatibleOrSources = (xorSourceList: Source.List,
 */
 
 export const preCompute = (first: number, last: number, args: any): boolean => {
-    const maxSum = args.max_sources - 1;
+    const maxSum = args.max_sources;// - 1;
     const merge_only = args.merge_only || false;
 
     const begin = new Date();

@@ -18,31 +18,33 @@ public:
   // TODO: std::optional
   using take_type = IndexVector*;
 
-  Peco() = delete;
-  Peco(IndexListVector&& indexLists) : index_lists_(std::move(indexLists)) {
-    assert(index_lists_.size() >= 2);
-    result_.resize(index_lists_.size());
-  }
-
-  take_type first_combination() {
-    reset_iterators(index_lists_.size());
-    done_ = false;
-    return take();
-  }
-
-  take_type next_combination() {
-    int i{};
-    for (i = (int)iterators_.size() - 1; i >= 0; --i) {
-      const auto& il = index_lists_[i];
-      assert(std::next(iterators_[i]) != il.end());
-      ++iterators_[i];
-      if (std::next(iterators_[i]) != il.end()) break;
-      iterators_[i] = il.before_begin();
+private:
+  
+  template <typename T>
+  // TODO: requires integral_type
+  static void initialize_list(IndexList& idx_list, T size) {
+    idx_list.clear();
+    for (int i{(int)size - 1}; i >= 0; --i) {
+      idx_list.emplace_front(i);
     }
-    if (i < 0) done_ = true;
-    return take();
   }
 
+  static void make_addends_helper(int sum, int count, int start,
+    std::vector<int>& current, std::vector<std::vector<int>>& result) {
+    if (!count) {
+      if (!sum) {
+        result.push_back(current);
+      }
+      return;
+    }
+    for (auto i = start; i <= sum; ++i) {
+      current.push_back(i);
+      make_addends_helper(sum - i, count - 1, i, current, result);
+      current.pop_back();  // backtrack
+    }
+  }
+
+public:
   // TODO: it may have made sense for some of these static methods to be in this
   // class at one time, but it has become rather polluted with them, and it may
   // be time to re-think the organization of this class/namespace
@@ -69,6 +71,8 @@ public:
     return idx_vectors;
   }
 
+  // converts a std::vector (cm::IndexList) to a std::forward_list
+  // (Peco::IndexList). Yes poor name choices.
   static auto make_index_list(const IndexVector& idx_vec) {
     IndexList idx_list;
     for (auto i : idx_vec | std::views::reverse) {
@@ -91,6 +95,31 @@ public:
     return result;
   }
 
+  Peco() = delete;
+  Peco(IndexListVector&& indexLists) : index_lists_(std::move(indexLists)) {
+    assert(index_lists_.size() >= 2);
+    result_.resize(index_lists_.size());
+  }
+
+  take_type first_combination() {
+    reset_iterators(index_lists_.size());
+    done_ = false;
+    return take();
+  }
+
+  take_type next_combination() {
+    int i{};
+    for (i = (int)iterators_.size() - 1; i >= 0; --i) {
+      const auto& il = index_lists_[i];
+      assert(std::next(iterators_[i]) != il.end());
+      ++iterators_[i];
+      if (std::next(iterators_[i]) != il.end()) break;
+      iterators_[i] = il.before_begin();
+    }
+    if (i < 0) done_ = true;
+    return take();
+  }
+
 private:
   take_type take() {
     if (done_) return nullptr;
@@ -105,30 +134,6 @@ private:
     for (size_t i{}; i < size; ++i) {
       assert(!index_lists_[i].empty());
       iterators_[i] = index_lists_[i].before_begin();
-    }
-  }
-
-  template <typename T>
-  // TODO: requires integral_type
-  static void initialize_list(IndexList& idx_list, T size) {
-    idx_list.clear();
-    for (int i{(int)size - 1}; i >= 0; --i) {
-      idx_list.emplace_front(i);
-    }
-  }
-
-  static void make_addends_helper(int sum, int count, int start,
-    std::vector<int>& current, std::vector<std::vector<int>>& result) {
-    if (!count) {
-      if (!sum) {
-        result.push_back(current);
-      }
-      return;
-    }
-    for (auto i = start; i <= sum; ++i) {
-      current.push_back(i);
-      make_addends_helper(sum - i, count - 1, i, current, result);
-      current.pop_back();  // backtrack
     }
   }
 
