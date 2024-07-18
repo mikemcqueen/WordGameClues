@@ -136,6 +136,10 @@ public:
     return count<std::chrono::microseconds>();
   }
 
+  auto nanoseconds() {
+    return count<std::chrono::nanoseconds>();
+  }
+
   static Timer start_timer() {
     Timer t;
     t.start();

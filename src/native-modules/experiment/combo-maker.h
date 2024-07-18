@@ -123,7 +123,6 @@ struct UsedSources {
   */
 
 private:
-
   void addVariations(const UsedSources& other) {
     for (int sentence{1}; sentence <= kNumSentences; ++sentence) {
       if (!other.hasVariation(sentence)) continue;
@@ -137,6 +136,28 @@ private:
   }
 
 public:
+  static auto merge_one_variation(
+      Variations& variations, int sentence, variation_index_t vi) {
+    auto& v = variations.at(sentence - 1);
+    if ((v > -1) && (v != vi)) return false;
+    v = vi;
+    return true;
+  }
+
+  static auto merge_one_variation(Variations& to, int src) {
+    return merge_one_variation(
+        to, Source::getSentence(src), Source::getVariation(src));
+  }
+
+  static auto merge_variations(Variations& to, const Variations& from) {
+    for (int sentence{1}; sentence <= kNumSentences; ++sentence) {
+      auto& vi = from.at(sentence - 1);
+      if (vi == -1) continue;
+      if (!merge_one_variation(to, sentence, vi)) return false;
+    }
+    return true;
+  }
+
   constexpr static auto allVariationsMatch(
     const Variations& v1, const Variations& v2) {
     for (size_t i{}; i < v1.size(); ++i) {
@@ -147,6 +168,7 @@ public:
     return true;
   }
 
+#if 0
   constexpr static bool allVariationsMatch2(
     const Variations& v1, const Variations& v2) {
     int mismatches{};
@@ -157,6 +179,7 @@ public:
     }
     return !mismatches;
   }
+#endif
 
   constexpr auto isXorCompatibleWith(
     const UsedSources& other, bool check_variations = true) const {
@@ -542,11 +565,11 @@ struct SourceData : SourceCompatibilityData {
     Only
   };
 
-  bool addCompoundSource(
-      const SourceData& src, AddLists add_lists = AddLists::Yes) {
+  bool addCompoundSource(const SourceData& src,
+      AddLists add_lists = AddLists::Yes, bool check_variations = true) {
     using enum AddLists;
     if (add_lists != Only) {
-      if (!isXorCompatibleWith(src)) {
+      if (!isXorCompatibleWith(src, check_variations)) {
         return false;
       }
       mergeInPlace(src);

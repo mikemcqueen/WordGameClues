@@ -333,7 +333,7 @@ async function main () {
     options.removeAllInvalid = Boolean(options['remove-all-invalid']);
 //    let showKnownArg = options['show-known'];
     options.copy_from = options['copy-from'];
-    options.max_sources = _.toNumber(options['max-sources'] || 20);
+    options.max_sources = _.toNumber(options['max-sources'] || 19);
     console.error(`max_sources(${options.max_sources})`);
     options.maxArg = _.toNumber(options.max || 0);  // TODO: make this not used
     let maxArg = _.toNumber(options.max || 2);

@@ -26,10 +26,6 @@
   function?
   This approach (if it works) might apply to other is_xxx_compat functions as well.
 
-* so how about a cuda_malloc/cuda_free abstraction that takes a string indicating
-  the memory type (e.g. "xor_src_list"), and maintains a string->size_t map for
-  all allocations, that can then be dumped.  cuda-memory.cpp/.h
-
 * fix variable names in filter-support::cuda_allocCopySentenceVariationIndices()
 
 CM:
@@ -82,10 +78,10 @@ CM:
   such that any two sources that have the same source bits and differ only by
   variations, are linked, and only the variation change(s), at 32bits each
   (sentence:16,variation:16) are tagged on to the source. currently a source
-  is 9*4 (bits) + 9*2 (variation) = 54 bytes. this would reduce nearly-matching
-  sources to (as low as) 6 bytes (incuding 2 bytes for # of different sentence/
-  varation pairs). i'm using 2bytes for pair count and sentence index because of
-  what I assume is an alignment requirement.
+  is 9*4 bytes (sourcebits) + 9*2 bytes (variation) = 54 bytes. this would reduce
+  nearly-matching sources to (as low as) 6 bytes (incuding 2 bytes for # of different
+  sentence/varation pairs). i'm using 2bytes for pair count and sentence index
+  because of what I assume is an alignment requirement.
   * could write a kernel to assess the potential savings achievable here, by
     comparing every source (bits) to each other and storing the first bits-compatible
     source in a 32bit output-word.
