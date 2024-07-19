@@ -86,7 +86,7 @@ bool every_combo_idx(combo_index_t combo_idx,
 
 }  // namespace
 
-auto buildSourceListsForUseNcData(const std::vector<NCDataList>& useNcDataLists)
+auto build_src_lists(const std::vector<NCDataList>& nc_data_lists)
   -> std::vector<SourceList> {
   // possible optimization:
   // instead of constructing a new sourcelist in mergeAllCompatible,
@@ -102,14 +102,15 @@ auto buildSourceListsForUseNcData(const std::vector<NCDataList>& useNcDataLists)
   srand(-1); // why? hash?
   int total = 0;
   int hash_hits = 0;
-  // all useNcDataLists are the same length, so just grab length of first
-  const auto size = useNcDataLists[0].size();
+  // all nc_data_lists are the same length, so just grab length of first
+  const auto size = nc_data_lists[0].size();
   std::vector<HashMap> hashList(size);
   std::vector<SourceList> sourceLists(size);
-  for (const auto& ncDataList : useNcDataLists) {
-    for (size_t i{}; i < ncDataList.size(); ++i) {
+  for (const auto& nc_data_list : nc_data_lists) {
+    assert(nc_data_list.size() == size);
+    for (size_t i{}; i < nc_data_list.size(); ++i) {
       // for size == 2: return by value; or reference to static local in a pinch
-      auto sourceList = mergeAllCompatibleSources(ncDataList[i].ncList);
+      auto sourceList = mergeAllCompatibleSources(nc_data_list[i].ncList);
       total += sourceList.size();
       for (const auto& source : sourceList) {
         // TODO: NOT GOOD ENOUUGH. still need a set of strings in value type.

@@ -11,8 +11,8 @@ namespace cm {
 
 // functions
 
-auto buildSourceListsForUseNcData(const std::vector<NCDataList>& useNcDataLists)
-  -> std::vector<SourceList>;
+auto build_src_lists(
+    const std::vector<NCDataList>& nc_data_lists) -> std::vector<SourceList>;
 
 auto buildOrArgList(std::vector<SourceList>&& or_src_lists) -> OrArgList;
 

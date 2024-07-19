@@ -1,3 +1,7 @@
+* see if i can parallelize xor_merge_src_lists
+
+* log_duration: merge_support.cpp
+
 * TODO: grep for: FIXMENOW
 
 * display xor_src_lists and xor_sources in normal output, maybe also,
@@ -121,6 +125,7 @@ CM:
     * syntactically, some way to mark it in the sentence.json. like a "skip" flag
       or maybe a priority value, and default priority could be 1, but a command
       line flag could increase it.
+
     * some way to mark the variations created from that combination with the 
       corresponding priority.
     * combo-maker awareness of current priority, and exclusion of combinations

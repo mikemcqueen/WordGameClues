@@ -44,17 +44,6 @@ int num_merge_combo = 0;
 int num_full_merges = 0;
 long merge_ns = 0;
 
-#if 0
-auto get_variation(const NameCount& nc, int s) {
-  if (nc.count > 1) {
-    const auto& src = clue_manager::get_nc_src_list(nc)[s];
-    return Source::getVariation(src.source);
-  } else {
-    return Source::getVariation(s);
-  }
-}
-#endif
-
 using SrcCRefArray = std::array<SourceCRef, 32>;
 static SourceData dummy;
 static auto d = std::cref(dummy);
@@ -88,7 +77,6 @@ auto mergeNcListCombo(
     const NameCountList& nc_list, const IndexList& idx_list, SourceData& src) {
   // TODO: do we really even *need* primarynameSrcList? precompute is using
   // it for something but it's not clear to me what.
-
   NameCountList primaryNameSrcList;
   size_t num_sources{};
 
@@ -298,6 +286,10 @@ auto validateSourcesForNameAndCountLists(const std::string& clue_name,
         auto sl = validateSourcesForNameCount(
             clue_name, name, count, {nc_list, name_list, count_list});
         if (!sl.empty()) {
+            src_list = std::move(sl);
+            break;
+        }
+        /*
           // if (!src_list.empty()) { return src_list; }
           // this was an attempt, as commented above, to find alternate
           // nc_lists. it found none, and it takes a lot longer at
@@ -314,6 +306,7 @@ auto validateSourcesForNameAndCountLists(const std::string& clue_name,
             std::cerr << " new:  [" << util::join(count_list, ",") << "]\n";
           }
         }
+        */
       }
     }
   }

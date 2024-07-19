@@ -1,18 +1,19 @@
 #include <experimental/scope>
 #include <chrono>
 #include <iostream>
-#include <cuda_runtime.h>
+//#include <cuda_runtime.h>
+#include "merge.cuh"
 #include "merge.h"
 #include "merge-filter-common.h"
 #include "merge-filter-data.h"
 #include "peco.h"
 #include "util.h"
-#include "cuda-types.h"
+//#include "cuda-types.h"
 #include "log.h"
 
-namespace {
+namespace cm {
 
-using namespace cm;
+namespace {
 
 auto anyCompatibleXorSources(const SourceData& source,
   const Peco::IndexList& indexList, const SourceList& sourceList) {
@@ -34,10 +35,9 @@ int getNumEmptySublists(const std::vector<SourceList>& src_lists) {
 }
 
 // TODO: comment this. code is tricky, but fast.
-auto filterXorIncompatibleIndices(Peco::IndexListVector& index_lists,
-  int first_list_idx, int second_list_idx,
-  const std::vector<SourceList>& src_lists) {
-  //
+auto xor_filter_indices(Peco::IndexListVector& index_lists,
+    int first_list_idx, int second_list_idx,
+    const std::vector<SourceList>& src_lists) {
   Peco::IndexList& first_list = index_lists[first_list_idx];
   for (auto it_first = first_list.before_begin();
        std::next(it_first) != first_list.end();) {
@@ -52,20 +52,19 @@ auto filterXorIncompatibleIndices(Peco::IndexListVector& index_lists,
   }
   return !first_list.empty();
 }
-  
-bool filterAllXorIncompatibleIndices(Peco::IndexListVector& idx_lists,
-  const std::vector<SourceList>& src_lists)
-{
+
+bool xor_filter_all_indices(Peco::IndexListVector& idx_lists,
+    const std::vector<SourceList>& src_lists) {
+  if (idx_lists.size() < 2u) {
+    return true;
+  }
   using namespace std::chrono;
   const auto t0 = high_resolution_clock::now();
-
-  if (idx_lists.size() < 2u)
-    return true;
   for (size_t first{}; first < idx_lists.size(); ++first) {
     for (size_t second{}; second < idx_lists.size(); ++second) {
       if (first == second)
         continue;
-      if (!filterXorIncompatibleIndices(idx_lists, first, second, src_lists)) {
+      if (!xor_filter_indices(idx_lists, first, second, src_lists)) {
         return false;
       }
     }
@@ -157,8 +156,6 @@ auto alloc_compat_matrices(
   const auto matrix_bytes = num_results * sizeof(result_t);
   auto stream = cudaStreamPerThread;
   result_t* device_compat_matrices;
-  //auto err = cudaMallocAsync((void**)&device_compat_matrices, matrix_bytes, stream);
-  //assert_cuda_success(err, "alloc compat matrices");
   cuda_malloc_async((void**)&device_compat_matrices, matrix_bytes, stream,
       "compat_matrices");  // cl-format
   if (num_bytes) {
@@ -274,7 +271,6 @@ void host_show_num_compat_combos(const uint64_t first_combo,
       ++num_compat;
     }
   }
-
   auto t1 = high_resolution_clock::now();
   auto t_dur = duration_cast<milliseconds>(t1 - t0).count();
   std::cerr << " host_show_num_compat_combos "
@@ -313,8 +309,7 @@ auto run_get_compat_combos_task(const result_t* device_compat_matrices,
   std::vector<uint64_t> result_indices;
   for (int n{};; ++n, first_combo += num_combos) {
     num_combos = std::min(num_combos, max_combos - first_combo);
-    if (!num_combos)
-      break;
+    if (!num_combos) break;
     if constexpr (logging) {
       std::cerr << " launching get_compat_combos_kernel " << n << " for ["
                 << first_combo << ", " << first_combo + num_combos << "]"
@@ -326,19 +321,16 @@ auto run_get_compat_combos_task(const result_t* device_compat_matrices,
       device_compat_matrices, num_compat_matrices,
       device_compat_matrix_start_indices, device_idx_list_sizes,
       device_results);
-
     if (log_level(Verbose)) {
       CudaEvent gcc_stop;
       auto gcc_elapsed = gcc_stop.synchronize(gcc_start);
         std::cerr << " completed get_compat_combos_kernel " << n << " - "
                   << gcc_elapsed << "ms" << std::endl;
     }
-
     auto cpr0 = high_resolution_clock::now();
     sync_copy_results(host_results, num_combos, device_results, stream);
     auto num_hits =
-      process_results(host_results, first_combo, num_combos, result_indices);
-
+        process_results(host_results, first_combo, num_combos, result_indices);
     if constexpr (logging) {
       auto cpr1 = high_resolution_clock::now();
       auto cpr_dur = duration_cast<milliseconds>(cpr1 - cpr0).count();
@@ -360,34 +352,127 @@ auto get_src_indices(
   return src_indices;
 }
 
-XorSource merge_sources(const std::vector<index_t>& src_indices,
-    const std::vector<SourceList>& src_lists) {
-  // this code is taken from cm-precompute.cpp.
-  // TODO: this is kind of a weird way of doing things that requires a
-  // XorSource (SourceData) multi-type move constructor. couldn't I just
-  // start with an XorSource here initialized to sourceList[0] values
-  // and merge-in-place all the subsequent elements? could even be a
-  // SourceData member function.
-  NameCountList primaryNameSrcList{};
-  NameCountList ncList{};
-  UsedSources usedSources{};
-  for (size_t i{}; i < src_indices.size(); ++i) {
-    const auto& src = src_lists.at(i).at(src_indices.at(i));
-    const auto& pnsl = src.primaryNameSrcList;
-    primaryNameSrcList.insert(
-      primaryNameSrcList.end(), pnsl.begin(), pnsl.end());  // copy
-    const auto& ncl = src.ncList;
-    ncList.insert(ncList.end(), ncl.begin(), ncl.end());  // copy
-    usedSources.mergeInPlace(src.usedSources);
+// Given a vector of source lists, generate a vector of index lists: one for
+// each source list, each containing indices for every source in each list.
+// Then filter out all xor-incompatible, and return a vector of compatible
+// index lists.
+auto get_compatible_indices(const std::vector<SourceList>& src_lists)
+    -> std::vector<IndexList> {
+  std::vector<size_t> lengths;
+  lengths.reserve(src_lists.size());
+  for (const auto& sl : src_lists) {
+    lengths.push_back(sl.size());
   }
-  assert(!primaryNameSrcList.empty() && !ncList.empty() && "empty ncList");
-  return {
-    std::move(primaryNameSrcList), std::move(ncList), std::move(usedSources)};
+  if (log_level(Verbose)) {
+    std::cerr << "  initial lengths: " << util::vec_to_string(lengths)
+              << ", product: " << util::multiply_with_overflow_check(lengths)
+              << std::endl;
+  }
+  auto idx_lists = Peco::initial_indices(lengths);
+  bool valid = xor_filter_all_indices(idx_lists, src_lists);
+  if (log_level(Verbose)) {
+    lengths.clear();
+    for (const auto& il : idx_lists) {
+      lengths.push_back(std::distance(il.begin(), il.end()));
+    }
+    std::cerr << "  filtered lengths: " << util::vec_to_string(lengths)
+              << ", product: " << util::multiply_with_overflow_check(lengths)
+              << ", valid: " << std::boolalpha << valid << std::endl;
+  }
+  // "valid" means all resulting index lists have non-zero length
+  if (!valid) {
+    return {};
+  }
+  return Peco::to_vectors(idx_lists);
 }
 
-}  // anonymous namespace
+SourceCompatibilityData* alloc_copy_src_lists(
+    const std::vector<SourceList>& src_lists,
+    size_t* num_bytes = nullptr) {
+  // alloc sources
+  const auto stream = cudaStreamPerThread;
+  const auto num_sources = util::sum_sizes(src_lists);
+  const auto sources_bytes = num_sources * sizeof(SourceCompatibilityData);
+  cudaError_t err{};
+  SourceCompatibilityData* device_sources;
+  cuda_malloc_async((void**)&device_sources, sources_bytes, stream,
+      "merge src_lists");  // cl-format
+  // copy sources
+  std::vector<SourceCompatibilityData> src_compat_list;
+  src_compat_list.reserve(num_sources);
+  //std::cerr << "  building src_compat_lists..." << std::endl;
+  for (const auto& src_list : src_lists) {
+    // this is somewhat braindead. i'm basically "slicing" each SourceData
+    // into a subset of itself (SourceCompatibilityData) and shoving it into
+    // a 2nd list.
+    // perhaps I could only marshal the SourceCompatibiltyData when passed
+    // from JavaScript instead? since I no longer need to round-trip it back
+    // to JavaScript.
+    // alternatively, build one gimungous array and blast it over
+    // in one memcpy. (uh, aren't I doing that now?)
+    // TODO: comments in todo file or in notebook about how to split
+    // pnsl/ncList from SourceCompatibilityData.
+    add_compat_sources(src_compat_list, src_list);
+  }
+  //std::cerr << "  copying src_compat_lists..." << std::endl;
+  err = cudaMemcpyAsync(device_sources, src_compat_list.data(), sources_bytes,
+    cudaMemcpyHostToDevice, stream);
+  assert_cuda_success(err, "merge copy sources");
+  CudaEvent temp;
+  temp.synchronize();
+  if (num_bytes) {
+    *num_bytes = sources_bytes;
+  }
+  return device_sources;
+}
 
-namespace cm {
+index_t* alloc_copy_idx_lists(
+    const std::vector<IndexList>& idx_lists, size_t* num_bytes = nullptr) {
+  // alloc indices
+  const auto stream = cudaStreamPerThread;
+  const auto indices_bytes = util::sum_sizes(idx_lists) * sizeof(index_t);
+  cudaError_t err{};
+  index_t* device_indices;
+  cuda_malloc_async((void**)&device_indices, indices_bytes, stream,
+      "merge idx_lists");  // cl-format
+
+  // copy indices
+  size_t index{};
+  for (const auto& idx_list : idx_lists) {
+    err = cudaMemcpyAsync(&device_indices[index], idx_list.data(),
+      idx_list.size() * sizeof(index_t), cudaMemcpyHostToDevice, stream);
+    assert_cuda_success(err, "merge copy idx_lists");
+    index += idx_list.size();
+  }
+  CudaEvent temp;
+  temp.synchronize();
+  if (num_bytes) {
+    *num_bytes = indices_bytes;
+  }
+  return device_indices;
+}
+
+index_t* alloc_copy_list_sizes(
+    const std::vector<index_t>& list_sizes, size_t* num_bytes = nullptr) {
+  const auto stream = cudaStreamPerThread;
+  // alloc list sizes
+  const auto list_sizes_bytes = list_sizes.size() * sizeof(index_t);
+  cudaError_t err{};
+  index_t* device_list_sizes;
+  cuda_malloc_async((void**)&device_list_sizes, list_sizes_bytes, stream,
+      "merge list_sizes");  // cl-format
+
+  // copy list sizes
+  err = cudaMemcpyAsync(device_list_sizes, list_sizes.data(), list_sizes_bytes,
+      cudaMemcpyHostToDevice, stream);
+  assert_cuda_success(err, "copy list sizes");
+  CudaEvent temp;
+  temp.synchronize();
+  if (num_bytes) {
+    *num_bytes = list_sizes_bytes;
+  }
+  return device_list_sizes;
+}
 
 auto cuda_get_compat_xor_src_indices(const std::vector<SourceList>& src_lists,
     const SourceCompatibilityData* device_src_lists,
@@ -453,12 +538,13 @@ auto cuda_get_compat_xor_src_indices(const std::vector<SourceList>& src_lists,
     cuda_free(device_compat_matrix_start_indices);
   });
   const uint64_t max_combos{
-    util::multiply_with_overflow_check(util::make_list_sizes(idx_lists))};
+      util::multiply_with_overflow_check(util::make_list_sizes(idx_lists))};
   // run get_compat_combos kernels
   CudaEvent gcc_start;
-  auto combo_indices = run_get_compat_combos_task(device_compat_matrices,
-    idx_lists.size(), device_compat_matrix_start_indices, device_idx_list_sizes,
-    max_combos);  // clang-format
+  auto combo_indices =
+      run_get_compat_combos_task(device_compat_matrices, idx_lists.size(),
+          device_compat_matrix_start_indices, device_idx_list_sizes,
+          max_combos);  // clang-format
 
   if (log_level(ExtraVerbose)) {
     CudaEvent gcc_stop;
@@ -479,48 +565,39 @@ auto cuda_get_compat_xor_src_indices(const std::vector<SourceList>& src_lists,
   return combo_indices;
 }
 
-// Given a vector of source lists, generate a vector of index lists: one for
-// each source list, together containing indices for every source in every
-// list. Then filter out all incompatible, and return a vector of compatible
-// index lists.
-auto get_compatible_indices(const std::vector<SourceList>& src_lists)
-    -> std::vector<IndexList> {
-  std::vector<size_t> lengths{};
-  lengths.reserve(src_lists.size());
-  for (const auto& sl : src_lists) {
-    lengths.push_back(sl.size());
+XorSource merge_sources(const std::vector<index_t>& src_indices,
+    const std::vector<SourceList>& src_lists) {
+  // this code is taken from cm-precompute.cpp.
+  // TODO: this is kind of a weird way of doing things that requires a
+  // XorSource (SourceData) multi-type move constructor. couldn't I just
+  // start with an XorSource here initialized to sourceList[0] values
+  // and merge-in-place all the subsequent elements? could even be a
+  // SourceData member function.
+  NameCountList primaryNameSrcList{};
+  NameCountList ncList{};
+  UsedSources usedSources{};
+  for (size_t i{}; i < src_indices.size(); ++i) {
+    const auto& src = src_lists.at(i).at(src_indices.at(i));
+    const auto& pnsl = src.primaryNameSrcList;
+    primaryNameSrcList.insert(
+      primaryNameSrcList.end(), pnsl.begin(), pnsl.end());  // copy
+    const auto& ncl = src.ncList;
+    ncList.insert(ncList.end(), ncl.begin(), ncl.end());  // copy
+    usedSources.mergeInPlace(src.usedSources);
   }
-  if (log_level(Verbose)) {
-    std::cerr << "  initial lengths: " << util::vec_to_string(lengths)
-              << ", product: " << util::multiply_with_overflow_check(lengths)
-              << std::endl;
-  }
-  auto idx_lists = Peco::initial_indices(lengths);
-  bool valid = filterAllXorIncompatibleIndices(idx_lists, src_lists);
-  if (log_level(Verbose)) {
-    lengths.clear();
-    for (const auto& il : idx_lists) {
-      lengths.push_back(std::distance(il.begin(), il.end()));
-    }
-    std::cerr << "  filtered lengths: " << util::vec_to_string(lengths)
-              << ", product: " << util::multiply_with_overflow_check(lengths)
-              << ", valid: " << std::boolalpha << valid << std::endl;
-  }
-  // "valid" means all resulting index lists have non-zero length
-  if (!valid) {
-    return {};
-  }
-  return Peco::to_vectors(idx_lists);
+  assert(!primaryNameSrcList.empty() && !ncList.empty() && "empty ncList");
+  return {
+    std::move(primaryNameSrcList), std::move(ncList), std::move(usedSources)};
 }
 
-auto merge_xor_sources(const std::vector<SourceList>& src_lists,
+auto xor_merge_sources(const std::vector<SourceList>& src_lists,
     const std::vector<IndexList>& idx_lists,
     const std::vector<uint64_t>& combo_indices) -> XorSourceList {
-  using namespace std::chrono;
   XorSourceList xorSourceList;
-
+  // TODO:
+  //if (log_duration ld(Verbose, "xor_merge_sources"); true) {
   if (log_level(Verbose)) {
-    std::cerr << "  starting merge_xor_sources..." << std::endl;
+    std::cerr << "  starting xor_merge_sources..." << std::endl;
   }
   auto t = util::Timer::start_timer();
   for (auto combo_idx : combo_indices) {
@@ -529,107 +606,18 @@ auto merge_xor_sources(const std::vector<SourceList>& src_lists,
   }
   if (log_level(Verbose)) {
     t.stop();
-    std::cerr << "  merge_xor_sources complete (" << xorSourceList.size()
+    std::cerr << "  xor_merge_sources complete (" << xorSourceList.size()
               << ") - " << t.count() << "ms" << std::endl;
   }
   return xorSourceList;
 }
 
-SourceCompatibilityData* alloc_copy_src_lists(
-  const std::vector<SourceList>& src_lists, size_t* num_bytes /* = nullptr*/) {
-  // alloc sources
-  const auto stream = cudaStreamPerThread;
-  const auto num_sources = util::sum_sizes(src_lists);
-  const auto sources_bytes = num_sources * sizeof(SourceCompatibilityData);
-  cudaError_t err{};
-  SourceCompatibilityData* device_sources;
-  // err = cudaMallocAsync((void**)&device_sources, sources_bytes, stream);
-  // assert_cuda_success(err, "merge alloc sources");
-  cuda_malloc_async((void**)&device_sources, sources_bytes, stream,
-      "merge src_lists");  // cl-format
-  // copy sources
-  std::vector<SourceCompatibilityData> src_compat_list;
-  src_compat_list.reserve(num_sources);
-  //std::cerr << "  building src_compat_lists..." << std::endl;
-  for (const auto& src_list : src_lists) {
-    // this is somewhat braindead. i'm basically "slicing" each SourceData
-    // into a subset of itself (SourceCompatibilityData) and shoving it into
-    // a 2nd list.
-    // perhaps I could only marshal the SourceCompatibiltyData when passed
-    // from JavaScript instead? since I no longer need to round-trip it back
-    // to JavaScript.
-    // alternatively, build one gimungous array and blast it over
-    // in one memcpy. (uh, aren't I doing that now?)
-    // TODO: comments in todo file or in notebook about how to split
-    // pnsl/ncList from SourceCompatibilityData.
-    add_compat_sources(src_compat_list, src_list);
-  }
-  //std::cerr << "  copying src_compat_lists..." << std::endl;
-  err = cudaMemcpyAsync(device_sources, src_compat_list.data(), sources_bytes,
-    cudaMemcpyHostToDevice, stream);
-  assert_cuda_success(err, "merge copy sources");
-  CudaEvent temp;
-  temp.synchronize();
-  if (num_bytes) {
-    *num_bytes = sources_bytes;
-  }
-  return device_sources;
-}
+}  // anonymous namespace
 
-index_t* alloc_copy_idx_lists(
-    const std::vector<IndexList>& idx_lists, size_t* num_bytes /* = nullptr*/) {
-  // alloc indices
-  const auto stream = cudaStreamPerThread;
-  const auto indices_bytes = util::sum_sizes(idx_lists) * sizeof(index_t);
-  cudaError_t err{};
-  index_t* device_indices;
-  // err = cudaMallocAsync((void**)&device_indices, indices_bytes, stream);
-  // assert_cuda_success(err, "merge alloc idx lists");
-  cuda_malloc_async((void**)&device_indices, indices_bytes, stream,
-      "merge idx_lists");  // cl-format
-
-  // copy indices
-  size_t index{};
-  for (const auto& idx_list : idx_lists) {
-    err = cudaMemcpyAsync(&device_indices[index], idx_list.data(),
-      idx_list.size() * sizeof(index_t), cudaMemcpyHostToDevice, stream);
-    assert_cuda_success(err, "merge copy idx_lists");
-    index += idx_list.size();
-  }
-  CudaEvent temp;
-  temp.synchronize();
-  if (num_bytes) {
-    *num_bytes = indices_bytes;
-  }
-  return device_indices;
-}
-
-index_t* alloc_copy_list_sizes(
-    const std::vector<index_t>& list_sizes, size_t* num_bytes /* = nullptr*/) {
-  const auto stream = cudaStreamPerThread;
-  // alloc list sizes
-  const auto list_sizes_bytes = list_sizes.size() * sizeof(index_t);
-  cudaError_t err{};
-  index_t* device_list_sizes;
-  // err = cudaMallocAsync((void**)&device_list_sizes, list_sizes_bytes, stream);
-  // assert_cuda_success(err, "alloc list sizes");
-  cuda_malloc_async((void**)&device_list_sizes, list_sizes_bytes, stream,
-      "merge list_sizes");  // cl-format
-
-  // copy list sizes
-  err = cudaMemcpyAsync(device_list_sizes, list_sizes.data(), list_sizes_bytes,
-      cudaMemcpyHostToDevice, stream);
-  assert_cuda_success(err, "copy list sizes");
-  CudaEvent temp;
-  temp.synchronize();
-  if (num_bytes) {
-    *num_bytes = list_sizes_bytes;
-  }
-  return device_list_sizes;
-}
+///////////////////////////////////////////////////////////////////////////////
 
 // TODO: const src_lists input, return merged
-void merge_xor_src_lists(MergeFilterData& mfd,  //
+void merge_xor_compatible_src_lists(MergeFilterData& mfd,  //
     std::vector<SourceList>& src_lists, bool merge_only) {
   if (!merge_only || (src_lists.size() > 1)) {
     // TODO: support for single-list compat indices
@@ -651,7 +639,7 @@ void merge_xor_src_lists(MergeFilterData& mfd,  //
         // compat_idx_lists and combo_indices are used in the merge_only case
         // for the sole purpose of generating merged_xor_src_list, so there is
         // no need to save them for later use
-        mfd.host.merged_xor_src_list = merge_xor_sources(
+        mfd.host.merged_xor_src_list = xor_merge_sources(
             src_lists, compat_idx_lists, combo_indices);
       } else {
         // filter on the other hand will need them both later

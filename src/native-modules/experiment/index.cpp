@@ -570,12 +570,7 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
     return env.Null();
   }
   // arg0
-  auto ncDataLists = makeNcDataLists(env, info[0].As<Array>());
-#if 0
-  static bool dump = false;
-  if (dump) { display(ncDataLists); }
-  dump = false;
-#endif
+  auto nc_data_lists = makeNcDataLists(env, info[0].As<Array>());
   // arg1
   auto merge_only = info[1].As<Boolean>();
   if (merge_only) the_log_args_.quiet = true;
@@ -583,7 +578,7 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   // arbitrary, want to do it somewhere
   show_clue_manager_durations();
 
-  auto xor_src_lists = buildSourceListsForUseNcData(ncDataLists);
+  auto xor_src_lists = build_src_lists(nc_data_lists);
   if (log_level(Normal)) {
     std::cerr << " build xor_src_lists(" << xor_src_lists.size() << ")\n";
   }
@@ -593,9 +588,11 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   }
 #endif
   //--
-  merge_xor_src_lists(MFD, xor_src_lists, merge_only);
+  merge_xor_compatible_src_lists(MFD, xor_src_lists, merge_only);
   auto result = (merge_only) ? MFD.host.merged_xor_src_list.size()
                              : MFD.host.combo_indices.size();
+  // filter needs this later
+  if (!merge_only) { MFD.host.xor_src_lists = std::move(xor_src_lists); }
   return Number::New(env, (uint32_t)result);
 }
 
@@ -615,11 +612,11 @@ void validate_marked_or_sources(
   }
 }
 
-void set_or_args(const std::vector<NCDataList>& ncDataLists) {
+void set_or_args(const std::vector<NCDataList>& nc_data_lists) {
   using namespace std::chrono;
   auto t = util::Timer::start_timer();
   MFD.host.or_arg_list =
-    std::move(buildOrArgList(buildSourceListsForUseNcData(ncDataLists)));
+    std::move(buildOrArgList(build_src_lists(nc_data_lists)));
   if (MFD.host.or_arg_list.size()) {
     // TODO: to eliminate sync call in allocCopyOrSources
     //  auto or_src_list = make_or_src_list(MFD.host.or_arg_list);

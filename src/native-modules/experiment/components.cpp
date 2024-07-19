@@ -257,9 +257,9 @@ auto has_names_at_counts(const std::vector<std::string>& name_list,
   return true;
 }
 
-// given a vector of count listss, ex. [ [1,2,3], .. ] generate all
-// permutations of each list and test if the provided names exist at those
-// counts. return all resulting count lists where that condition is true.
+// given a vector of count lists, ex. [ [1,2,3], .. ] generate all permutations
+// of each list and test if the provided names exist at those counts. return
+// all count lists that have a permutation where that condition is true.
 auto filter_valid_addend_perms(std::vector<std::vector<int>>& addends,
     const std::vector<std::string>& name_list) {
   std::vector<std::vector<int>> result;
@@ -268,7 +268,7 @@ auto filter_valid_addend_perms(std::vector<std::vector<int>>& addends,
       if (has_names_at_counts(name_list, count_list)) {
         result.emplace_back(std::move(count_list));
         // once we get one valid perm for a count_list, we can break out,
-        // because the NC (name:total_count) will be the same.
+        // because the NC (name:sum_of_counts) will be the same.
         break;
       }
     } while (std::next_permutation(count_list.begin(), count_list.end()));
@@ -312,8 +312,8 @@ auto consistency_check2(MergeFilterData& mfd, const std::vector<std::string>& na
   auto addends = get_addends(name_list, max_sources);
   auto filtered_addends = filter_valid_addend_perms(addends, name_list);
   auto nc_data_lists = make_nc_data_lists(filtered_addends, name_list);
-  auto src_lists = buildSourceListsForUseNcData(nc_data_lists);
-  merge_xor_src_lists(mfd, src_lists, true);
+  auto src_lists = build_src_lists(nc_data_lists);
+  merge_xor_compatible_src_lists(mfd, src_lists, true);
   auto result =
       consistency_check(name_list, mfd.host.merged_xor_src_list);
   return result;
