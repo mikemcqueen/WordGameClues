@@ -301,22 +301,20 @@ auto show(const std::vector<std::string>& name_list,
 }
 
 auto consistency_check(const std::vector<std::string>& name_list,
-    const SourceList& src_list, bool force_dump /*= false*/) -> bool {
+    const SourceList& src_list) -> bool {
   return are_sources_consistent(name_list, src_list);
 }
 
-auto consistency_check2(MergeFilterData& mfd, const std::vector<std::string>& name_list,
-    int max_sources) -> bool {
+auto consistency_check2(
+    const std::vector<std::string>& name_list, int max_sources) -> bool {
   // TODO: 3-source clues don't work currently.
   if (name_list.size() > 2) return true;
   auto addends = get_addends(name_list, max_sources);
   auto filtered_addends = filter_valid_addend_perms(addends, name_list);
   auto nc_data_lists = make_nc_data_lists(filtered_addends, name_list);
   auto src_lists = build_src_lists(nc_data_lists);
-  merge_xor_compatible_src_lists(mfd, src_lists, true);
-  auto result =
-      consistency_check(name_list, mfd.host.merged_xor_src_list);
-  return result;
+  auto merged_src_list = merge_xor_compatible_src_lists(src_lists);
+  return consistency_check(name_list, merged_src_list);
 }
 
 /*

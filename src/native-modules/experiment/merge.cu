@@ -3,13 +3,14 @@
 #include <iostream>
 #include <cuda_runtime.h>
 #include "filter-types.h"
-#include "merge.h"
+#include "merge.cuh"
 #include "peco.h"
-#include "combo-maker.h"
+
+namespace cm {
 
 namespace {
 
-using namespace cm;
+  //using namespace cm;
 
 constexpr auto kMaxMatrices = 10u;
 
@@ -99,9 +100,7 @@ __device__ void get_combo_index(unsigned idx, unsigned row_size,
   result.elem2_idx = result.elem1_idx + r + 1;
 }
 
-}  // namespace
-
-namespace cm {
+}  // anonymous namespace
 
 int run_list_pair_compat_kernel(const SourceCompatibilityData* device_sources1,
   const SourceCompatibilityData* device_sources2,

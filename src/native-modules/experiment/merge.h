@@ -44,19 +44,22 @@ auto xor_merge_sources(const std::vector<SourceList>& src_lists,
 
 // merge-support.cpp
 
-void merge_xor_compatible_src_lists(
-    MergeFilterData& mfd, std::vector<SourceList>& src_lists, bool merge_only);
+auto get_merge_data(const std::vector<SourceList>& src_lists,
+    MergeData::Host& host, MergeData::Device& device, bool merge_only) -> bool;
 
-  /*
+auto merge_xor_compatible_src_lists(
+    const std::vector<SourceList>& src_lists) -> SourceList;
+
+/*
 SourceCompatibilityData* alloc_copy_src_lists(
-    const std::vector<SourceList>& src_lists, size_t* num_bytes = nullptr);
+  const std::vector<SourceList>& src_lists, size_t* num_bytes = nullptr);
 
 index_t* alloc_copy_idx_lists(
-    const std::vector<IndexList>& idx_lists, size_t* num_bytes = nullptr);
+  const std::vector<IndexList>& idx_lists, size_t* num_bytes = nullptr);
 
 index_t* alloc_copy_list_sizes(
-    const std::vector<index_t>& list_sizes, size_t* num_bytes = nullptr);
-  */
+  const std::vector<index_t>& list_sizes, size_t* num_bytes = nullptr);
+*/
 
 }  // namespace cm
 

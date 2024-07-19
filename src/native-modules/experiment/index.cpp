@@ -588,12 +588,26 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   }
 #endif
   //--
-  merge_xor_compatible_src_lists(MFD, xor_src_lists, merge_only);
-  auto result = (merge_only) ? MFD.host.merged_xor_src_list.size()
-                             : MFD.host.combo_indices.size();
-  // filter needs this later
-  if (!merge_only) { MFD.host.xor_src_lists = std::move(xor_src_lists); }
-  return Number::New(env, (uint32_t)result);
+  uint32_t num_compatible{};
+  // temporarily handle merge_only case until it's eliminated
+  if (merge_only) {
+    // merge-only=true is used for showComponents() and consistencyCheck V1,
+    // both of which can be eliminated.
+    if (xor_src_lists.size() > 1) {
+      MFD.host.merged_xor_src_list =
+          merge_xor_compatible_src_lists(xor_src_lists);
+    } else {
+      MFD.host.merged_xor_src_list = std::move(xor_src_lists.back());
+    }
+    num_compatible = MFD.host.merged_xor_src_list.size();
+  } else {
+    if (get_merge_data(xor_src_lists, MFD.host, MFD.device, merge_only)) {
+      num_compatible = MFD.host.combo_indices.size();
+      // filter needs this later
+      MFD.host.xor_src_lists = std::move(xor_src_lists);
+    }
+  }
+  return Number::New(env, num_compatible);
 }
 
 void validate_marked_or_sources(
@@ -824,11 +838,11 @@ Value checkClueConsistency(const CallbackInfo& info) {
   bool result{};
   switch (version) {
   case 1:
-    result = components::consistency_check(name_list,  //
-        MFD.host.merged_xor_src_list);
+    result =
+        components::consistency_check(name_list, MFD.host.merged_xor_src_list);
     break;
   case 2:
-    result = components::consistency_check2(MFD, name_list, max_sources);
+    result = components::consistency_check2(name_list, max_sources);
     break;
   default:
     assert(false);

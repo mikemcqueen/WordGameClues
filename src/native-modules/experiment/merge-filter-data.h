@@ -29,28 +29,53 @@ struct VariationIndices {
 
 }  // namespace device
 
-struct MergeFilterData {
+struct MergeData {
   struct Host {
-    // merge-only
-    SourceList merged_xor_src_list;
-
-    // merge + filter
-    std::vector<SourceList> xor_src_lists;
-
-    // filter
-    std::vector<UsedSources::SourceDescriptorPair> incompatible_src_desc_pairs;
-
     std::vector<IndexList> compat_idx_lists;
     ComboIndexList combo_indices;
+  } host;
+
+  struct Device {
+    void cuda_free() {
+      cm::cuda_free(src_lists);
+      cm::cuda_free(idx_lists);
+      cm::cuda_free(idx_list_sizes);
+    }
+
+    SourceCompatibilityData* src_lists{};
+    index_t* idx_lists{};
+    index_t* idx_list_sizes{};
+  } device;
+};
+
+struct MergeFilterData {
+  struct Host : MergeData::Host {
+    // merge-only
+    // currently used by showComponents (-t) and conistency check v1.
+    // consistency check v1 can be removed, and showComponents can be
+    // updated to do everything on c++ side, obviating the need for this.
+    SourceList merged_xor_src_list;
+
+    /*
+    std::vector<IndexList> compat_idx_lists;
+    ComboIndexList combo_indices;
+    */
+
+    // filter
+    std::vector<SourceList> xor_src_lists;
+
+    std::vector<UsedSources::SourceDescriptorPair> incompatible_src_desc_pairs;
 
     OrArgList or_arg_list;
   } host;
 
-  struct Device {
+  struct Device : MergeData::Device {
+    /*
     // merge + filter
     SourceCompatibilityData* src_lists{};
     index_t* idx_lists{};
     index_t* idx_list_sizes{};
+    */
 
     // filter
     UsedSources::SourceDescriptorPair* incompatible_src_desc_pairs{};

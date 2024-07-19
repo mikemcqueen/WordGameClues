@@ -15,6 +15,14 @@ namespace cm {
 
 namespace {
 
+auto getNumEmptySublists(const std::vector<SourceList>& src_lists) {
+  int count{};
+  for (const auto& sl : src_lists) {
+    if (sl.empty()) count++;
+  }
+  return count;
+}
+
 auto anyCompatibleXorSources(const SourceData& source,
   const Peco::IndexList& indexList, const SourceList& sourceList) {
   //
@@ -24,14 +32,6 @@ auto anyCompatibleXorSources(const SourceData& source,
     }
   }
   return false;
-}
-
-int getNumEmptySublists(const std::vector<SourceList>& src_lists) {
-  auto count = 0;
-  for (const auto& sl : src_lists) {
-    if (sl.empty()) count++;
-  }
-  return count;
 }
 
 // TODO: comment this. code is tricky, but fast.
@@ -616,41 +616,37 @@ auto xor_merge_sources(const std::vector<SourceList>& src_lists,
 
 ///////////////////////////////////////////////////////////////////////////////
 
-// TODO: const src_lists input, return merged
-void merge_xor_compatible_src_lists(MergeFilterData& mfd,  //
-    std::vector<SourceList>& src_lists, bool merge_only) {
-  if (!merge_only || (src_lists.size() > 1)) {
-    // TODO: support for single-list compat indices
-    auto compat_idx_lists = get_compatible_indices(src_lists);
-    if (!merge_only || log_level(Verbose)) {
-      std::cerr << " compat_idx_lists(" << compat_idx_lists.size() << ")"
-                << std::endl;
-    }
-    if (!compat_idx_lists.empty()) {
-      // TODO: free if already set. set_src_lists?
-      mfd.device.src_lists = alloc_copy_src_lists(src_lists);
-      mfd.device.idx_lists = alloc_copy_idx_lists(compat_idx_lists);
-      const auto idx_list_sizes = util::make_list_sizes(compat_idx_lists);
-      mfd.device.idx_list_sizes = alloc_copy_list_sizes(idx_list_sizes);
-      auto combo_indices = cuda_get_compat_xor_src_indices(
-          src_lists, mfd.device.src_lists, compat_idx_lists,
-          mfd.device.idx_lists, mfd.device.idx_list_sizes);
-      if (merge_only) {
-        // compat_idx_lists and combo_indices are used in the merge_only case
-        // for the sole purpose of generating merged_xor_src_list, so there is
-        // no need to save them for later use
-        mfd.host.merged_xor_src_list = xor_merge_sources(
-            src_lists, compat_idx_lists, combo_indices);
-      } else {
-        // filter on the other hand will need them both later
-        mfd.host.compat_idx_lists = std::move(compat_idx_lists);
-        mfd.host.combo_indices = std::move(combo_indices);
-      }
-    }
-  } else if (src_lists.size() == 1) {
-    assert(merge_only);
-    mfd.host.merged_xor_src_list = std::move(src_lists.back());
+auto get_merge_data(const std::vector<SourceList>& src_lists,
+    MergeData::Host& host, MergeData::Device& device, bool merge_only) -> bool {
+  // TODO: support for single-list compat indices (??)
+  auto compat_idx_lists = get_compatible_indices(src_lists);
+  if (!merge_only || log_level(Verbose)) {
+    std::cerr << " compat_idx_lists(" << compat_idx_lists.size() << ")"
+              << std::endl;
   }
+  if (compat_idx_lists.empty()) return false;
+  device.src_lists = alloc_copy_src_lists(src_lists);
+  device.idx_lists = alloc_copy_idx_lists(compat_idx_lists);
+  const auto idx_list_sizes = util::make_list_sizes(compat_idx_lists);
+  device.idx_list_sizes = alloc_copy_list_sizes(idx_list_sizes);
+  host.combo_indices =
+      cuda_get_compat_xor_src_indices(src_lists, device.src_lists,
+          compat_idx_lists, device.idx_lists, device.idx_list_sizes);
+  host.compat_idx_lists = std::move(compat_idx_lists);
+  return true;
+}
+
+auto merge_xor_compatible_src_lists(
+    const std::vector<SourceList>& src_lists) -> SourceList {
+  assert(src_lists.size() > 1);
+  SourceList merged_src_list;
+  MergeData md;
+  if (get_merge_data(src_lists, md.host, md.device, true)) {
+    merged_src_list = xor_merge_sources(
+        src_lists, md.host.compat_idx_lists, md.host.combo_indices);
+    md.device.cuda_free();
+  }
+  return merged_src_list;
 }
 
 }  // namespace cm
