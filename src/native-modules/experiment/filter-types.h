@@ -171,7 +171,7 @@ public:
   }
 
   auto alloc_copy_start_indices(cudaStream_t stream) {
-    return cm::alloc_copy_start_indices(
+    return cuda_alloc_copy_start_indices(
         list_start_indices_, stream, "idx_states.list_start_indices");
   }
 

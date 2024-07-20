@@ -456,10 +456,8 @@ auto filter_task(const MergeFilterData& mfd, int sum, int threads_per_block,
   scope_exit free_sources{[device_sources]() { cuda_free(device_sources); }};
   log_copy_sources(sum, num_sources, synchronous, copy_start);
   compat_src_result_t* device_compat_src_results{};
-  scope_exit free_results{[device_compat_src_results]() {
-    if (device_compat_src_results)
-      cuda_free(device_compat_src_results);
-  }};
+  scope_exit free_results{
+      [device_compat_src_results]() { cuda_free(device_compat_src_results); }};
   if (!synchronous) {
     // static std::counting_semaphore<2> compat_src_semaphore(2);
     // compat_src_semaphore.acquire();

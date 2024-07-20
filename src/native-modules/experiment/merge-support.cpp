@@ -386,7 +386,7 @@ auto get_compatible_indices(const std::vector<SourceList>& src_lists)
   return Peco::to_vectors(idx_lists);
 }
 
-SourceCompatibilityData* alloc_copy_src_lists(
+SourceCompatibilityData* cuda_alloc_copy_src_lists(
     const std::vector<SourceList>& src_lists,
     size_t* num_bytes = nullptr) {
   // alloc sources
@@ -426,7 +426,7 @@ SourceCompatibilityData* alloc_copy_src_lists(
   return device_sources;
 }
 
-index_t* alloc_copy_idx_lists(
+index_t* cuda_alloc_copy_idx_lists(
     const std::vector<IndexList>& idx_lists, size_t* num_bytes = nullptr) {
   // alloc indices
   const auto stream = cudaStreamPerThread;
@@ -452,7 +452,7 @@ index_t* alloc_copy_idx_lists(
   return device_indices;
 }
 
-index_t* alloc_copy_list_sizes(
+index_t* cuda_alloc_copy_list_sizes(
     const std::vector<index_t>& list_sizes, size_t* num_bytes = nullptr) {
   const auto stream = cudaStreamPerThread;
   // alloc list sizes
@@ -532,7 +532,7 @@ auto cuda_get_compat_xor_src_indices(const std::vector<SourceList>& src_lists,
   // num_compat_matrix_bytes);
 
   // alloc/copy start indices
-  auto device_compat_matrix_start_indices = alloc_copy_start_indices(
+  auto device_compat_matrix_start_indices = cuda_alloc_copy_start_indices(
       compat_matrix_start_indices, stream, "compat_matrix_start_indices");
   scope_exit free_start_indices([device_compat_matrix_start_indices]() {
     cuda_free(device_compat_matrix_start_indices);
@@ -625,10 +625,10 @@ auto get_merge_data(const std::vector<SourceList>& src_lists,
               << std::endl;
   }
   if (compat_idx_lists.empty()) return false;
-  device.src_lists = alloc_copy_src_lists(src_lists);
-  device.idx_lists = alloc_copy_idx_lists(compat_idx_lists);
+  device.src_lists = cuda_alloc_copy_src_lists(src_lists);
+  device.idx_lists = cuda_alloc_copy_idx_lists(compat_idx_lists);
   const auto idx_list_sizes = util::make_list_sizes(compat_idx_lists);
-  device.idx_list_sizes = alloc_copy_list_sizes(idx_list_sizes);
+  device.idx_list_sizes = cuda_alloc_copy_list_sizes(idx_list_sizes);
   host.combo_indices =
       cuda_get_compat_xor_src_indices(src_lists, device.src_lists,
           compat_idx_lists, device.idx_lists, device.idx_list_sizes);
