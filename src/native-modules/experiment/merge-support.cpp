@@ -595,7 +595,7 @@ auto xor_merge_sources(const std::vector<SourceList>& src_lists,
     const std::vector<uint64_t>& combo_indices) -> XorSourceList {
   XorSourceList xorSourceList;
   // TODO:
-  //if (log_duration ld(Verbose, "xor_merge_sources"); true) {
+  //LogDuration ld("xor_merge_sources", Verbose);
   if (log_level(Verbose)) {
     std::cerr << "  starting xor_merge_sources..." << std::endl;
   }

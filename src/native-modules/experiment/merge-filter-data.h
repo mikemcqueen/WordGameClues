@@ -77,6 +77,14 @@ struct MergeFilterData {
     index_t* idx_list_sizes{};
     */
 
+    void cuda_free() {
+      MergeData::Device::cuda_free();
+      cm::cuda_free(incompatible_src_desc_pairs);
+      cm::cuda_free(src_list_start_indices);
+      cm::cuda_free(idx_list_start_indices);
+      cm::cuda_free(or_src_list);
+    }
+
     // filter
     UsedSources::SourceDescriptorPair* incompatible_src_desc_pairs{};
     unsigned num_incompatible_sources{};

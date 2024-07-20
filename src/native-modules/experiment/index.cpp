@@ -672,7 +672,7 @@ void set_or_args(const std::vector<NCDataList>& nc_data_lists) {
 void alloc_copy_filter_indices(cudaStream_t stream) {
   assert(!MFD.host.combo_indices.empty());
   using namespace std::chrono;
-  auto t = util::Timer::start_timer();
+  util::LogDuration ld("alloc_copy_filter_indices", Verbose);
   auto src_list_start_indices = make_start_indices(MFD.host.xor_src_lists);
   MFD.device.src_list_start_indices = alloc_copy_start_indices(
       src_list_start_indices, stream, "src_list_start_indices");
@@ -683,10 +683,6 @@ void alloc_copy_filter_indices(cudaStream_t stream) {
     MFD.host.xor_src_lists, MFD.host.compat_idx_lists, MFD.host.combo_indices);
   MFD.device.variation_indices =
     cuda_allocCopySentenceVariationIndices(variation_indices, stream);
-  if (log_level(Verbose)) {
-    t.stop();
-    std::cerr << "prepare filter indices - " << t.count() << "ms" << std::endl;
-  }
 }
 
 //
@@ -780,8 +776,6 @@ Value filterCandidatesForSum(const CallbackInfo& info) {
   auto stride = info[3].As<Number>().Int32Value();
   auto iters = info[4].As<Number>().Int32Value();
   auto synchronous = info[5].As<Boolean>().Value();
-  // arg6 - moved to filterPrepartion
-  //set_log_args(makeLogArgs(env, info[6].As<Object>()));
   // --
   auto opt_incompatible_sources = filter_candidates_cuda(
     MFD, sum, threads_per_block, streams, stride, iters, synchronous);
@@ -789,6 +783,7 @@ Value filterCandidatesForSum(const CallbackInfo& info) {
   if (opt_incompatible_sources.has_value()) {
     set_incompatible_sources(opt_incompatible_sources.value());
   }
+  // NOTE: can only free device data here after synchronous call. 
   return env.Null();
 }
 
@@ -798,6 +793,9 @@ Value filterCandidatesForSum(const CallbackInfo& info) {
 Value getResult(const CallbackInfo& info) {
   Env env = info.Env();
   auto result = get_filter_result(MFD);
+  // free all the filter-stage device data
+  MFD.device.cuda_free();
+  cuda_memory_dump("filter complete");
   return wrap(env, result);
 }
 
@@ -881,9 +879,6 @@ Object Init(Env env, Object exports) {
   // components
   //
   exports["showComponents"] = Function::New(env, showComponents);
-
-  // consistency
-  //
   exports["checkClueConsistency"] = Function::New(env, checkClueConsistency);
 
   return exports;

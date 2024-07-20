@@ -1,6 +1,9 @@
+* Timer.pretty() - get count<nanoseconds>() and auto determine best unit and suffix
+
 * see if i can parallelize xor_merge_src_lists
 
-* log_duration: merge_support.cpp
+* LogDuration: merge_support.cpp, may also want version that uses a CudaEvent/thread
+  to synchronize on
 
 * TODO: grep for: FIXMENOW
 

@@ -1,6 +1,8 @@
 #ifndef INCLUDE_LOG_H
 #define INCLUDE_LOG_H
 
+#pragma once
+
 namespace cm {
 
 enum class LogLevel : int {

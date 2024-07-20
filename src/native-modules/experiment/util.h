@@ -1,15 +1,18 @@
 #ifndef INCLUDE_UTIL_H
 #define INCLUDE_UTIL_H
 
+#pragma once
 #include <chrono>
+#include <iostream>
 #include <limits>
 #include <stdexcept>
 #include <string>
 #include <vector>
 #include "cuda-types.h" // IndexList
 #include "peco.h" // Peco::IndexList
+#include "log.h"
 
-namespace util {
+namespace cm::util {
 
 inline auto make_list_sizes(const std::vector<cm::IndexList>& idx_lists) {
   cm::IndexList sizes;
@@ -151,8 +154,31 @@ private:
 
   time_point_t start_{};
   time_point_t stop_{};
-};
+}; // class Timer
 
-}  // namespace util
+class LogDuration {
+public:
+  LogDuration() = delete;
+  LogDuration(std::string_view msg, LogLevel log_level = Normal)
+      : msg_(msg),
+        level_(log_level) {
+    t_.start();
+  }
+  ~LogDuration() {
+    if (log_level(level_)) {
+      t_.stop();
+      // TODO: t.pretty() - get count<nanoseconds>() and auto determine best
+      // unit and suffix
+      std::cerr << msg_ << " - " << t_.count() << "ms\n";
+    }
+  }
+
+private:
+  Timer t_;
+  std::string_view msg_;
+  LogLevel level_;
+}; // class LogDuration
+
+}  // namespace cm::util
 
 #endif // INCLUDE_UTIL_H

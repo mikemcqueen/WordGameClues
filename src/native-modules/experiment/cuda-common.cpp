@@ -119,11 +119,11 @@ void cuda_free(void* ptr) {
   remove_ptr(ptr);
 }
 
-void cuda_memory_dump() {
+void cuda_memory_dump(std::string_view header /* = "cuda_memory_dump"sv */) {
   if (log_level(MemoryDumps)) {
     // TODO: holding a lock while doing io is dumb.
     std::scoped_lock lk(tm_mutex_);
-    std::cerr << "cuda_memory_dump:" << std::endl;
+    std::cerr << header << ":" << std::endl;
     for (const auto& it : tag_map_) {
       std::cerr << " " << it.first << ": " << it.second << std::endl;
     }

@@ -31,7 +31,7 @@ using ComboIndexSpanPair = std::pair<ComboIndexSpan, ComboIndexSpan>;
 void cuda_malloc_async(void** ptr, size_t bytes, cudaStream_t stream,
     std::string_view category);  // cl-format
 void cuda_free(void* ptr);
-void cuda_memory_dump();
+void cuda_memory_dump(std::string_view header = "cuda_memory_dump");
 size_t cuda_get_free_mem();
 
 inline void assert_cuda_success(cudaError err, std::string_view sv) {
@@ -42,7 +42,7 @@ inline void assert_cuda_success(cudaError err, std::string_view sv) {
 }
 
 template <typename T = result_t>
-inline auto cuda_alloc_results(size_t num_results,
+[[nodiscard]] inline auto cuda_alloc_results(size_t num_results,
     cudaStream_t stream = cudaStreamPerThread,
     std::string_view category = "results") {
   // alloc results
