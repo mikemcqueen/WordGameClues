@@ -7,6 +7,7 @@
 #include <limits>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <vector>
 #include "cuda-types.h" // IndexList
 #include "peco.h" // Peco::IndexList
@@ -156,7 +157,18 @@ private:
   time_point_t stop_{};
 }; // class Timer
 
-class LogDuration {
+template <typename TimeUnit> std::string_view time_unit_abbrev() {
+  using namespace std::chrono;
+  if constexpr (std::is_same_v<TimeUnit, milliseconds>)
+    return "ms";
+  else if constexpr (std::is_same_v<TimeUnit, microseconds>)
+    return "µs";
+  else if constexpr (std::is_same_v<TimeUnit, nanoseconds>)
+    return "ns";
+  return "units";
+}
+
+template <typename TimeUnit = std::chrono::milliseconds> class LogDuration {
 public:
   LogDuration() = delete;
   LogDuration(std::string_view msg, LogLevel log_level = Normal)
@@ -169,7 +181,8 @@ public:
       t_.stop();
       // TODO: t.pretty() - get count<nanoseconds>() and auto determine best
       // unit and suffix
-      std::cerr << msg_ << " - " << t_.count() << "ms\n";
+      std::cerr << msg_ << " - " << t_.count<TimeUnit>()
+                << time_unit_abbrev<TimeUnit>() << std::endl;
     }
   }
 
@@ -177,7 +190,7 @@ private:
   Timer t_;
   std::string_view msg_;
   LogLevel level_;
-}; // class LogDuration
+};  // class LogDuration
 
 }  // namespace cm::util
 

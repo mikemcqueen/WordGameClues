@@ -324,6 +324,8 @@ async function main () {
     else if (options.vv) options.verbose = 2;      // extra-verbose
     else if (options.verbose) options.verbose = 1; // verbose
 
+    Native.setOptions(options);
+
     // TODO: get rid of this, just pass Opt.options around
     let useClueList = options.use;
     let showSourcesClueName = options['show-sources'];

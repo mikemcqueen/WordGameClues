@@ -301,47 +301,6 @@ OrArgList makeOrArgList(Env& env, const Array& jsList) {
   return orArgList;
 }
 
-LogArgs makeLogArgs(Env& env, const Object& jsObject) {
-  LogArgs log_args;
-  auto jsQuiet = jsObject.Get("quiet");
-  if (!jsQuiet.IsUndefined()) {
-    if (!jsQuiet.IsBoolean()) {
-      TypeError::New(env, "makeLogArgs: invalid quiet arg")
-        .ThrowAsJavaScriptException();
-      return {};
-    }
-    log_args.quiet = jsQuiet.As<Boolean>();
-  }
-  auto jsMemory = jsObject.Get("memory");
-  if (!jsMemory.IsUndefined()) {
-    if (!jsMemory.IsBoolean()) {
-      TypeError::New(env, "makeLogArgs: invalid memory arg")
-        .ThrowAsJavaScriptException();
-      return {};
-    }
-    log_args.mem_dumps = jsMemory.As<Boolean>();
-  }
-  auto jsAllocs = jsObject.Get("allocations");
-  if (!jsAllocs.IsUndefined()) {
-    if (!jsAllocs.IsBoolean()) {
-      TypeError::New(env, "makeLogArgs: invalid allocations arg")
-        .ThrowAsJavaScriptException();
-      return {};
-    }
-    log_args.mem_allocs = jsAllocs.As<Boolean>();
-  }
-  auto jsVerbose = jsObject.Get("verbose");
-  if (!jsVerbose.IsUndefined()) {
-    if (!jsVerbose.IsNumber()) {
-      TypeError::New(env, "makeLogArgs: invalid verbose arg")
-        .ThrowAsJavaScriptException();
-      return {};
-    }
-    log_args.level = static_cast<LogLevel>(jsVerbose.As<Number>().Int32Value());
-  }
-  return log_args;
-}
-
 //
 // Clue-manager
 //
@@ -582,7 +541,7 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
 
   auto xor_src_lists = build_src_lists(nc_data_lists);
   if (log_level(Normal)) {
-    std::cerr << " build xor_src_lists(" << xor_src_lists.size() << ")\n";
+    std::cerr << "build xor_src_lists(" << xor_src_lists.size() << ")\n";
   }
 #if 0
   for (const auto& src_list: xor_src_lists) {
@@ -635,7 +594,6 @@ void set_or_args(const std::vector<NCDataList>& nc_data_lists) {
     std::move(buildOrArgList(build_src_lists(nc_data_lists)));
   if (MFD.host.or_arg_list.size()) {
     // TODO: to eliminate sync call in allocCopyOrSources
-    //  auto or_src_list = make_or_src_list(MFD.host.or_arg_list);
     auto [device_or_src_list, num_or_sources] =
       cuda_allocCopyOrSources(MFD.host.or_arg_list);
     MFD.device.or_src_list = device_or_src_list;
@@ -665,9 +623,9 @@ void set_or_args(const std::vector<NCDataList>& nc_data_lists) {
   }
   if (log_level(Verbose)) {
     t.stop();
-    std::cerr << " build/mark or_args(" << MFD.host.or_arg_list.size() << ")"
+    std::cerr << " build/mark/move or_args(" << MFD.host.or_arg_list.size() << ")"
               << ", or_sources(" << MFD.device.num_or_sources << ") - "
-              << t.count() << "ms" << std::endl;
+              << t.microseconds() << "us" << std::endl;
   }
 }
 
@@ -693,18 +651,17 @@ void alloc_copy_filter_indices(cudaStream_t stream) {
 Value filterPreparation(const CallbackInfo& info) {
   using namespace std::chrono;
   Env env = info.Env();
-  if (!info[0].IsArray() || !info[1].IsObject()) {
+  if (!info[0].IsArray()) {
     TypeError::New(env, "filterPreparation: invalid parameter")
       .ThrowAsJavaScriptException();
     return env.Null();
   }
   // arg0
-  auto orNcDataLists = makeNcDataLists(env, info[0].As<Array>());
-  // arg1
-  set_log_args(makeLogArgs(env, info[1].As<Object>()));
+  auto nc_data_lists = makeNcDataLists(env, info[0].As<Array>());
   // --
   alloc_copy_filter_indices(cudaStreamPerThread);
-  set_or_args(orNcDataLists);
+  set_or_args(nc_data_lists);
+  cuda_memory_dump("filter preparation:");
   return env.Null();
 }
 
@@ -895,6 +852,62 @@ Value getConsistencyCheckResults(const CallbackInfo& info) {
 }
 
 //
+// setArgs
+//
+LogOptions makeLogOptions(Env& env, const Object& jsObject) {
+  LogOptions log_args;
+  auto jsQuiet = jsObject.Get("quiet");
+  if (!jsQuiet.IsUndefined()) {
+    if (!jsQuiet.IsBoolean()) {
+      TypeError::New(env, "makeLogOptions: invalid quiet arg")
+        .ThrowAsJavaScriptException();
+      return {};
+    }
+    log_args.quiet = jsQuiet.As<Boolean>();
+  }
+  auto jsMemory = jsObject.Get("memory");
+  if (!jsMemory.IsUndefined()) {
+    if (!jsMemory.IsBoolean()) {
+      TypeError::New(env, "makeLogOptions: invalid memory arg")
+        .ThrowAsJavaScriptException();
+      return {};
+    }
+    log_args.mem_dumps = jsMemory.As<Boolean>();
+  }
+  auto jsAllocs = jsObject.Get("allocations");
+  if (!jsAllocs.IsUndefined()) {
+    if (!jsAllocs.IsBoolean()) {
+      TypeError::New(env, "makeLogOptions: invalid allocations arg")
+        .ThrowAsJavaScriptException();
+      return {};
+    }
+    log_args.mem_allocs = jsAllocs.As<Boolean>();
+  }
+  auto jsVerbose = jsObject.Get("verbose");
+  if (!jsVerbose.IsUndefined()) {
+    if (!jsVerbose.IsNumber()) {
+      TypeError::New(env, "makeLogOptions: invalid verbose arg")
+        .ThrowAsJavaScriptException();
+      return {};
+    }
+    log_args.level = static_cast<LogLevel>(jsVerbose.As<Number>().Int32Value());
+  }
+  return log_args;
+}
+
+Value setOptions(const CallbackInfo& info) {
+  Env env = info.Env();
+  if (!info[0].IsObject()) {
+    TypeError::New(env, "setOptions: invalid parameter type")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+  // arg0
+  set_log_options(makeLogOptions(env, info[0].As<Object>()));
+  // --
+  return env.Null();
+}
+
 Object Init(Env env, Object exports) {
   // clue-manager
   //
@@ -928,6 +941,11 @@ Object Init(Env env, Object exports) {
   exports["checkClueConsistency"] = Function::New(env, checkClueConsistency);
   exports["getConsistencyCheckResults"] =
       Function::New(env, getConsistencyCheckResults);
+
+  // misc
+  //
+  exports["setOptions"] = Function::New(env, setOptions);
+
   return exports;
 }
 

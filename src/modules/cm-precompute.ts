@@ -280,8 +280,7 @@ export const preCompute = (first: number, last: number, args: any): boolean => {
     const orNcDataLists = args.or ? buildAllUseNcDataLists("or", maxSum, args) : [ [] ];
     if (listIsEmpty(orNcDataLists)) return false;
 
-    // NOTE: eventually  Native.setFlags(args) (for verbose flag) should exist
-    Native.filterPreparation(orNcDataLists, args);
+    Native.filterPreparation(orNcDataLists);
 
     const d = new Duration(begin, new Date()).milliseconds;
     console.error(`--Precompute - ${PrettyMs(d)}`);

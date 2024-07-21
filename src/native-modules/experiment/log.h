@@ -16,15 +16,14 @@ enum class LogLevel : int {
 };
 using enum LogLevel;
 
-
-struct LogArgs {
+struct LogOptions {
   bool quiet{};
   bool mem_dumps{};
   bool mem_allocs{};
   LogLevel level{};
 };
 
-inline LogArgs  the_log_args_;
+inline LogOptions the_log_args_;
 
 /*
 inline const auto Normal = 1;
@@ -47,7 +46,7 @@ inline bool log_level(LogLevel level) {
   }
 }
 
-inline void set_log_args(const LogArgs& args) {
+inline void set_log_options(const LogOptions& args) {
   the_log_args_ = args;
   /*
   if (args.quiet) {

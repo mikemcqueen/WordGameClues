@@ -84,6 +84,56 @@ bool every_combo_idx(combo_index_t combo_idx,
   return true;
 }
 
+auto buildOrArg(SourceList& src_list) {
+  OrArgData or_arg;
+  for (auto&& src : src_list) {
+    or_arg.or_src_list.emplace_back(OrSourceData{ std::move(src) });
+  }
+  return or_arg;
+};
+
+auto count_or_sources(const OrArgList& or_arg_list) {
+  // TODO: std::accumulate
+  uint32_t total{};
+  for (const auto& or_arg : or_arg_list) {
+    total += or_arg.or_src_list.size();
+  }
+  return total;
+}
+
+void dumpSentenceVariationIndices(
+    const SentenceVariationIndices& sentenceVariationIndices) {
+  uint64_t total_indices{};
+  for (int s{}; s < kNumSentences; ++s) {
+    const auto& variationIndicesList = sentenceVariationIndices.at(s);
+    if (!variationIndicesList.empty()) {
+      const auto num_indices = std::accumulate(variationIndicesList.begin(),
+          variationIndicesList.end(), 0,
+          [](uint64_t total, const ComboIndexList& indices) {
+            return total + indices.size();
+          });
+      if (log_level(Verbose)) {
+        std::cerr << "S" << s + 1 << ": variations("
+                  << variationIndicesList.size() << "), indices(" << num_indices
+                  << ")" << std::endl;
+      }
+      total_indices += num_indices;
+      if constexpr (0) {
+        for (int v{}; v < (int)variationIndicesList.size(); ++v) {
+          const auto& indices = variationIndicesList.at(v);
+          std::cerr << "  v" << v - 1 << ": indices(" << indices.size() << ")"
+                    << std::endl;
+        }
+      }
+    }
+  }
+  const auto MB = (total_indices * 8) / 1'000'000;
+  std::cerr << "variationIndices: " << total_indices << " (" << MB << ")\n";
+  if (MB > 2000) {
+    std::cerr << "**** WARNING: variationIndices is getting big! ****\n";
+  }
+}
+
 }  // namespace
 
 auto build_src_lists(const std::vector<NCDataList>& nc_data_lists)
@@ -153,23 +203,6 @@ auto build_src_lists(const std::vector<NCDataList>& nc_data_lists)
   return sourceLists;
 }
 
-auto buildOrArg(SourceList& src_list) {
-  OrArgData or_arg;
-  for (auto&& src : src_list) {
-    or_arg.or_src_list.emplace_back(OrSourceData{ std::move(src) });
-  }
-  return or_arg;
-};
-
-auto count_or_sources(const OrArgList& or_arg_list) {
-  // TODO: std::accumulate
-  uint32_t total{};
-  for (const auto& or_arg : or_arg_list) {
-    total += or_arg.or_src_list.size();
-  }
-  return total;
-}
-
 auto buildOrArgList(std::vector<SourceList>&& or_src_list) -> OrArgList {
   using namespace std::chrono;
   OrArgList or_arg_list;
@@ -177,11 +210,11 @@ auto buildOrArgList(std::vector<SourceList>&& or_src_list) -> OrArgList {
   for (auto& src_list : or_src_list) {
     or_arg_list.emplace_back(buildOrArg(src_list));
   }
-  if (log_level(Verbose)) {
+  if (or_arg_list.size() && log_level(Verbose)) {
     t.stop();
     std::cerr << " buildOrArgList args(" << or_arg_list.size() << ")"
               << ", sources(" << count_or_sources(or_arg_list) << ") - "
-              << t.count() << "ms" << std::endl;
+              << t.microseconds() << "us" << std::endl;
   }
   return or_arg_list;
 }
@@ -227,28 +260,6 @@ void markAllXorCompatibleOrSources(OrArgList& or_arg_list,
             << t_dur << "ms" << std::endl;
 }
 
-//////////
-
-namespace {
-
-void dumpSentenceVariationIndices(
-    const SentenceVariationIndices& sentenceVariationIndices) {
-  for (int s{}; s < kNumSentences; ++s) {
-    const auto& variationIndicesList = sentenceVariationIndices.at(s);
-    if (!variationIndicesList.empty()) {
-      std::cerr << "S" << s << ": variations(" << variationIndicesList.size()
-                << ")" << std::endl;
-      for (int v{}; v < (int)variationIndicesList.size(); ++v) {
-        const auto& indices = variationIndicesList.at(v);
-        std::cerr << "  v" << v - 1 << ": indices(" << indices.size() << ")"
-                  << std::endl;
-      }
-    }
-  }
-}
-
-}  // namespace
-
 auto buildSentenceVariationIndices(const std::vector<SourceList>& xor_src_lists,
     const std::vector<IndexList>& compat_idx_lists,
     const ComboIndexList& compat_indices) -> SentenceVariationIndices {
@@ -293,9 +304,7 @@ auto buildSentenceVariationIndices(const std::vector<SourceList>& xor_src_lists,
         variationIndicesList.clear();
       }
     });
-  if constexpr (0) {
-    dumpSentenceVariationIndices(sentenceVariationIndices);
-  }
+  dumpSentenceVariationIndices(sentenceVariationIndices);
   return sentenceVariationIndices;
 }
 

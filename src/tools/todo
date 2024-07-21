@@ -1,5 +1,12 @@
 * Precompute is taking longer now with -c2,2 and multiple --xors, did I introduce
   some copying?
+  - nope, problem is combo indices. 11 million of them. multiply x 9 x 8 (72) and
+    that's how many variation indices we allocate (850MB).
+  - we could cut that about in half by only copying the 64-bit combo indices once -
+    that's 11M * 8 bytes = 88MB. then 11M * 9 sentences = ~100 million x 4-byte 
+    indices. total: 488MB.
+  - at some point, i'll probably see 100M combo indices (800MB) + 900M x 4-byte (3.6B)
+    = ~4.5GB just for variation indices!
 
 * index.cpp:  merge-only=true is used for showComponents() and consistencyCheck V1,
   both of which can be eliminated.
