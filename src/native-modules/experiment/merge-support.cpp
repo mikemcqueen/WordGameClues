@@ -629,8 +629,8 @@ auto get_merge_data(const std::vector<SourceList>& src_lists,
   device.idx_lists = cuda_alloc_copy_idx_lists(compat_idx_lists);
   const auto idx_list_sizes = util::make_list_sizes(compat_idx_lists);
   device.idx_list_sizes = cuda_alloc_copy_list_sizes(idx_list_sizes);
-  using namespace std::chrono;
-  if (util::LogDuration ld("get combo_indices", Normal); true) {
+  const auto level = merge_only ? ExtraVerbose : Normal;
+  if (util::LogDuration ld("get combo_indices", level); true) {
     host.combo_indices =
         cuda_get_compat_xor_src_indices(src_lists, device.src_lists,
             compat_idx_lists, device.idx_lists, device.idx_list_sizes);

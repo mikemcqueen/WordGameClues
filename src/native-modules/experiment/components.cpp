@@ -14,6 +14,7 @@
 #include "merge.h"
 #include "log.h"
 #include "util.h"
+#include "wtf_pool.h"
 using namespace std::literals;
 
 namespace cm::components {
@@ -32,6 +33,9 @@ struct Results {
 };
 
 namespace {
+
+wtf::ThreadPool<std::string, 5> pool_;
+std::unordered_set<std::string> consistency_results_;
 
 // -t word1
 void add_result_for_nc(const NameCount& nc, Results& results) {
@@ -151,7 +155,8 @@ opt_str_list_cref_t get_clue_names_for_sources(int sum, const std::string& sourc
   using namespace clue_manager;
   if (has_known_source_map(sum)) {
     if (is_known_source_map_entry(sum, sources_csv)) {
-      return std::make_optional(std::cref(get_known_source_map_entry(sum, sources_csv).clue_names));
+      auto& clue_names = get_known_source_map_entry(sum, sources_csv).clue_names;
+      return std::make_optional(std::cref(clue_names));
     } else {
       return std::make_optional(std::cref(empty));
     }
@@ -164,36 +169,60 @@ opt_str_list_cref_t get_clue_names_for_sources(int sum, const std::string& sourc
   }
 }
 
+void dump(const std::unordered_set<std::string>& name_set, int set_sum,
+    const NameCountList& nc_list, const std::vector<std::string>& name_list,
+    const std::string& missing_name) {
+  if (name_set.size() != name_list.size()) {
+    const auto count_list = NameCount::listToCountList(nc_list);
+    const auto list_sum = util::sum(count_list);
+    std::cerr << "\ntest:\n name_set.size(" << name_set.size() << "), sum("
+              << set_sum << ")" << std::endl
+              << " name_list.size(" << name_list.size() << "), sum(" << list_sum
+              << ")\n";
+    std::cerr << " name_list: " << util::join(name_list, ",") << std::endl;
+  }
+  if (!missing_name.empty()) {
+    std::cerr << "test: missing name: " << missing_name << std::endl;
+  }
+}
+
 bool are_sources_consistent(
     const std::vector<std::string>& name_list, const SourceList& xor_src_list) {
   assert(name_list.size() > 1u);
+  const bool test = false;
   const auto sources_csv = util::join(name_list, ",");
   std::unordered_set<std::string> hash;
   std::unordered_set<std::string> names;
+  int names_sum{};
+  bool first = true;
   for (const auto& src: xor_src_list) {
     const auto count_list = NameCount::listToCountList(src.ncList);
+    const auto sum = util::sum(count_list);
     const auto key = util::join(count_list, ",");
     if (hash.contains(key)) {
       continue;
     }
-    bool first = hash.empty();
     hash.insert(key);
-    const auto sum = util::sum(count_list);
     auto opt_names = get_clue_names_for_sources(sum, sources_csv);
     if (!opt_names.has_value()) {
       continue;
     }
+    auto& clue_names = opt_names.value().get();
     if (first) {
-      for (const auto& name: opt_names.value().get()) {
+      for (const auto& name : clue_names) {
         names.insert(name);
       }
+      names_sum = sum;
+      first = false;
       continue;
     }
-    if (names.size() != opt_names.value().get().size()) {
+    if (names.size() != clue_names.size()) {
+      if (test) { dump(names, names_sum, src.ncList, clue_names, {}); }
       return false;
     }
-    for (const auto& name : opt_names.value().get()) {
+    for (const auto& name : clue_names) {
       if (!names.contains(name)) {
+        if (test) { dump(names, names_sum, src.ncList, clue_names, name); }
         return false;
       }
     }
@@ -291,6 +320,81 @@ auto make_nc_data_lists(const std::vector<std::vector<int>>& addends,
   return result;
 }
 
+auto get_all_compatible_sources(
+    const std::vector<std::string>& name_list, int max_sources) {
+  auto addends = get_addends(name_list, max_sources);
+  auto filtered_addends = filter_valid_addend_perms(addends, name_list);
+  auto nc_data_lists = make_nc_data_lists(filtered_addends, name_list);
+  auto src_lists = build_src_lists(nc_data_lists);
+  return merge_xor_compatible_src_lists(src_lists);
+}
+
+auto get_all_clue_names(
+    const std::string& sources_csv, const SourceList& src_list) {
+  std::unordered_set<std::string> result;
+  for (const auto& src: src_list) {
+    const auto sum = util::sum(NameCount::listToCountList(src.ncList));
+    /*
+    const auto key = util::join(count_list, ",");
+    if (hash.contains(key)) {
+      continue;
+    }
+    hash.insert(key);
+    */
+    auto opt_names = get_clue_names_for_sources(sum, sources_csv);
+    if (!opt_names.has_value()) {
+      continue;
+    }
+    auto& clue_names = opt_names.value().get();
+    for (const auto& name : clue_names) {
+      result.insert(name);
+    }
+  }
+  return result;
+}
+
+void fix_sources(const std::vector<std::string>& name_list,
+    const SourceList& src_list, bool dry_run) {
+  const auto source_csv = util::join(name_list, ",");
+  auto all_clue_names = get_all_clue_names(source_csv, src_list);
+  std::unordered_set<int> hash;
+  for (const auto& src : src_list) {
+    const auto sum = util::sum(NameCount::listToCountList(src.ncList));
+    if (hash.contains(sum)) continue;
+    hash.insert(sum);
+    auto opt_names = get_clue_names_for_sources(sum, source_csv);
+    if (!opt_names.has_value()) { continue; }
+    auto& clue_names = opt_names.value().get();
+    bool first{true};
+    // or, just convert names to set and do set_difference(a, b).join(',')
+    for (const auto& name : all_clue_names) {
+      if (std::find(clue_names.begin(), clue_names.end(), name)
+          == clue_names.end()) {
+        if (first) {
+          if (dry_run) std::cerr << "[dry_run] ";
+          std::cerr <<  source_csv << ":" << sum << " adding: ";
+        }
+        if (!first) std::cerr << ",";
+        std::cerr << name;
+        first = false;
+      }
+    }
+    if (!first) std::cerr << std::endl;
+  }
+}
+
+/*
+auto processor = [](const std::string& result) {
+  if (!result.empty()) { consistency_results_.insert(result); }
+};
+*/
+
+void result_processor(const std::string& result) {
+  if (!result.empty()) {  //
+    consistency_results_.insert(result);
+  }
+}
+
 }  // anonymous namespace
 
 auto show(const std::vector<std::string>& name_list,
@@ -300,21 +404,33 @@ auto show(const std::vector<std::string>& name_list,
   return results.sums;
 }
 
-auto consistency_check(const std::vector<std::string>& name_list,
+auto old_consistency_check(const std::vector<std::string>& name_list,
     const SourceList& src_list) -> bool {
   return are_sources_consistent(name_list, src_list);
 }
 
-auto consistency_check2(
-    const std::vector<std::string>& name_list, int max_sources) -> bool {
-  // TODO: 3-source clues don't work currently.
-  if (name_list.size() > 2) return true;
-  auto addends = get_addends(name_list, max_sources);
-  auto filtered_addends = filter_valid_addend_perms(addends, name_list);
-  auto nc_data_lists = make_nc_data_lists(filtered_addends, name_list);
-  auto src_lists = build_src_lists(nc_data_lists);
-  auto merged_src_list = merge_xor_compatible_src_lists(src_lists);
-  return consistency_check(name_list, merged_src_list);
+void consistency_check(
+    const std::vector<std::string>&& name_list, int max_sources, bool fix) {
+  pool_.execute(
+      [name_list = std::move(name_list), max_sources, fix]() {
+        std::string result;
+        // TODO: 3-source clues don't work currently, because reasons.
+        if (name_list.size() == 2) {
+          auto src_list = get_all_compatible_sources(name_list, max_sources);
+          if (!are_sources_consistent(name_list, src_list)) {
+            result = util::join(name_list, ",");
+            fix_sources(name_list, src_list, !fix);
+          }
+        }
+        return result;
+      },
+      result_processor);
+}
+
+auto process_consistency_check_results(
+    bool fix) -> const std::unordered_set<std::string>& {
+  pool_.process_all_results(result_processor);
+  return consistency_results_;
 }
 
 /*

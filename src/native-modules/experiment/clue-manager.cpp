@@ -8,9 +8,7 @@
 #include "util.h"
 #include "log.h"
 
-namespace clue_manager {
-
-using namespace cm;
+namespace cm::clue_manager {
 
 namespace {
 
@@ -304,4 +302,4 @@ const std::string& get_unique_clue_name(int count, int idx) {
   return get_unique_clue_names(count).at(idx).get();
 }
 
-}  // namespace clue_manager
+}  // namespace cm::clue_manager

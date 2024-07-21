@@ -6,11 +6,7 @@
 #include "cuda-types.h"
 #include "peco.h"
 
-namespace validator {
-
-// ugly. make types exist outside of NS, or in "common" or "native" or
-// something
-using namespace cm;
+namespace cm::validator {
 
 auto validateSources(const std::string& clue_name,
   const std::vector<std::string>& src_names, int sum, bool validate_all)
@@ -18,6 +14,6 @@ auto validateSources(const std::string& clue_name,
 
 void show_validator_durations();
 
-};  // namespace validator
+};  // namespace cm::validator
 
 #endif  // INCLUDE_VALIDATOR_H

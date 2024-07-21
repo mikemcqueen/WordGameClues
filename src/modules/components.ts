@@ -19,7 +19,6 @@ const Expect      = require('should/as-function');
 const Path        = require('path');
 const Readlines   = require('n-readlines');
 const JStringify  = require('javascript-stringify').stringify;
-//const Stringify2  = require('stringify-object');
 const Timing      = require('debug')('timing');
 
 import * as Clue from '../types/clue';
@@ -89,7 +88,7 @@ export const show = (options: any): any => {
 
 //////// 
 
-let get_unique_combos = (first: number, last: number): Set<string> => {
+const get_unique_combos = (first: number, last: number): Set<string> => {
     let combos = new Set<string>();
     for (let i = first; i <= last; ++i) {
         const clues = ClueManager.getClueList(i) as ClueList.Compound;
@@ -101,13 +100,14 @@ let get_unique_combos = (first: number, last: number): Set<string> => {
         }
     }
     return combos;
-}
+};
 
 export const consistency_check = (options: any): void => {
-    let version = _.includes(options.flags, '3') ? 2 : 1;
+    const version = _.includes(options.flags, '3') ? 2 : 1;
+    const fix = options.fix || false;
     console.error(`consistency check v${version}`);
     let combos = get_unique_combos(2, options.max_sources);
-//    let inconsistent_combos = new Set<string>();
+    let results: any = new Set<string>();// for v1
     for (let combo of combos) {
         const nameList = combo.split(',').sort();
         const pc_args = {
@@ -128,16 +128,19 @@ export const consistency_check = (options: any): void => {
             }
         }
         if (valid) {
-            if (!Native.checkClueConsistency(nameList, options.max_sources, version)) {
-  //              inconsistent_combos.add(combo);
+            if (!Native.checkClueConsistency(nameList, options.max_sources, version, fix)) {
+                if (version === 1) results.add(combo);
             }
         }
-        if (!options.quiet) {
+        if (!options.quiet && !options.verbose) {
             process.stderr.write('.');
         }
     }
-    const results = Native.getConsistencyCheckResults();
-    if (results.length) {
+    if (version === 2) {
+        results = Native.processConsistencyCheckResults(fix);
+    }
+    const count = (version === 1) ? results.size : results.length;
+    if (count) {
         console.error(`\nInconsistent combos:`);
         for (let result of results) {
             console.error(result);
@@ -147,7 +150,12 @@ export const consistency_check = (options: any): void => {
     }
 };
 
+/*
+///////////////////////////////////////////////////////////////////////////////
+////////
 //////// all below probably should be removed.
+////////
+///////////////////////////////////////////////////////////////////////////////
 
 function get_clue_names (options: any) {
     let result: string[] = [];
@@ -321,3 +329,4 @@ export function validate (filename, options: any = {}) {
         validate_sources(lines, options);
     }
 }
+*/

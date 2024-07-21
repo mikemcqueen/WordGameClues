@@ -9,9 +9,7 @@
 #include "util.h"
 #include "validator.h"
 
-using namespace cm;
-
-namespace validator {
+namespace cm::validator {
 
 namespace {
 
@@ -344,4 +342,4 @@ void show_validator_durations() {
   //  << ", compound: " << num_compound << std::endl;
 }
 
-}  // namespace validator
+}  // namespace cm::validator

@@ -22,16 +22,15 @@
 #include "validator.h"
 #include "wrap.h"
 #include "log.h"
-#include "wtf_pool.h"
 
 namespace {
 
 // types
 
 using namespace Napi;
-using namespace clue_manager;
 using namespace cm;
-using namespace validator;
+using namespace cm::clue_manager;
+using namespace cm::validator;
 
 // globals
 
@@ -775,41 +774,12 @@ Value showComponents(const CallbackInfo& info) {
   return wrap(env, sums);
 }
 
-wtf::ThreadPool<std::string, 5> pool_;
-std::set<std::string> consistency_results_;
-using namespace std::literals;
-
-void execute_consistency_check_v2(
-    const std::vector<std::string>& name_list, int max_sources) {
-  bool executed = true;
-  bool once = false;
-  do {
-    if (pool_.execute([name_list, max_sources]() -> std::string {
-          std::string result;
-          if (!components::consistency_check2(name_list, max_sources)) {
-            result = util::join(name_list, ","s);
-          }
-          return result;
-        })) {
-      break;
-    }
-    pool_.wait_for_any_result();
-    pool_.process_one_result([](const std::string& result) {
-      if (!result.empty()) {
-        //std::cerr << "\none result: " << result << std::endl;
-        consistency_results_.insert(result);
-      }
-    });
-  } while ((once = !once));
-  assert(executed && "poopy");
-}
-
 //
 // checkClueConsistency
 //
 Value checkClueConsistency(const CallbackInfo& info) {
   Env env = info.Env();
-  if (!info[0].IsArray() && !info[1].IsNumber() && !info[2].IsNumber()) {
+  if (!info[0].IsArray() && !info[1].IsNumber() && !info[2].IsNumber() && !info[3].IsBoolean()) {
     TypeError::New(env, "checkClueConsistency: invalid parameter type")
       .ThrowAsJavaScriptException();
     return env.Null();
@@ -820,16 +790,17 @@ Value checkClueConsistency(const CallbackInfo& info) {
   auto max_sources = info[1].As<Number>().Int32Value();
   // arg2:
   auto version = info[2].As<Number>().Int32Value();
+  // arg3:
+  auto fix = info[3].As<Boolean>();
   // --
-  bool result{};
+  bool result{true};
   switch (version) {
   case 1:
-    result =
-        components::consistency_check(name_list, MFD.host.merged_xor_src_list);
+    result = components::old_consistency_check(
+        name_list, MFD.host.merged_xor_src_list);
     break;
   case 2:
-    execute_consistency_check_v2(name_list, max_sources);
-    result = true;
+    components::consistency_check(std::move(name_list), max_sources, fix);
     break;
   default:
     assert(false);
@@ -838,17 +809,19 @@ Value checkClueConsistency(const CallbackInfo& info) {
 }
 
 //
-// getConsistencyCheckResults
+// processConsistencyCheckResults
 //
-Value getConsistencyCheckResults(const CallbackInfo& info) {
+Value processConsistencyCheckResults(const CallbackInfo& info) {
   Env env = info.Env();
-  pool_.process_all_results([](const std::string& result) {
-    if (!result.empty()) {
-      //std::cerr << "\nall  result: " << result << std::endl;
-      consistency_results_.insert(result);
-    }
-  });
-  return wrap(env, consistency_results_);
+  if (!info[0].IsBoolean()) {
+    TypeError::New(env, "getConsistencyCheckResults: invalid parameter type")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+  // arg0:
+  auto fix = info[0].As<Boolean>();
+  // --
+  return wrap(env, components::process_consistency_check_results(fix));
 }
 
 //
@@ -939,8 +912,8 @@ Object Init(Env env, Object exports) {
   //
   exports["showComponents"] = Function::New(env, showComponents);
   exports["checkClueConsistency"] = Function::New(env, checkClueConsistency);
-  exports["getConsistencyCheckResults"] =
-      Function::New(env, getConsistencyCheckResults);
+  exports["processConsistencyCheckResults"] =
+      Function::New(env, processConsistencyCheckResults);
 
   // misc
   //
