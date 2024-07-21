@@ -4,6 +4,7 @@
 #include <iostream>
 #include <memory>
 #include <napi.h>
+#include <set>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -21,6 +22,7 @@
 #include "validator.h"
 #include "wrap.h"
 #include "log.h"
+#include "wtf_pool.h"
 
 namespace {
 
@@ -816,6 +818,35 @@ Value showComponents(const CallbackInfo& info) {
   return wrap(env, sums);
 }
 
+wtf::ThreadPool<std::string, 5> pool_;
+std::set<std::string> consistency_results_;
+using namespace std::literals;
+
+void execute_consistency_check_v2(
+    const std::vector<std::string>& name_list, int max_sources) {
+  bool executed = true;
+  bool once = false;
+  do {
+    if (pool_.execute([name_list, max_sources]() -> std::string {
+          std::string result;
+          if (!components::consistency_check2(name_list, max_sources)) {
+            result = util::join(name_list, ","s);
+          }
+          return result;
+        })) {
+      break;
+    }
+    pool_.wait_for_any_result();
+    pool_.process_one_result([](const std::string& result) {
+      if (!result.empty()) {
+        //std::cerr << "\none result: " << result << std::endl;
+        consistency_results_.insert(result);
+      }
+    });
+  } while ((once = !once));
+  assert(executed && "poopy");
+}
+
 //
 // checkClueConsistency
 //
@@ -840,12 +871,27 @@ Value checkClueConsistency(const CallbackInfo& info) {
         components::consistency_check(name_list, MFD.host.merged_xor_src_list);
     break;
   case 2:
-    result = components::consistency_check2(name_list, max_sources);
+    execute_consistency_check_v2(name_list, max_sources);
+    result = true;
     break;
   default:
     assert(false);
   }
   return Boolean::New(env, result);
+}
+
+//
+// getConsistencyCheckResults
+//
+Value getConsistencyCheckResults(const CallbackInfo& info) {
+  Env env = info.Env();
+  pool_.process_all_results([](const std::string& result) {
+    if (!result.empty()) {
+      //std::cerr << "\nall  result: " << result << std::endl;
+      consistency_results_.insert(result);
+    }
+  });
+  return wrap(env, consistency_results_);
 }
 
 //
@@ -869,18 +915,19 @@ Object Init(Env env, Object exports) {
   // combo-maker
   //
   exports["mergeCompatibleXorSourceCombinations"] =
-    Function::New(env, mergeCompatibleXorSourceCombinations);
+      Function::New(env, mergeCompatibleXorSourceCombinations);
   exports["filterPreparation"] = Function::New(env, filterPreparation);
   exports["considerCandidate"] = Function::New(env, considerCandidate);
   exports["filterCandidatesForSum"] =
-    Function::New(env, filterCandidatesForSum);
+      Function::New(env, filterCandidatesForSum);
   exports["getResult"] = Function::New(env, getResult);
 
   // components
   //
   exports["showComponents"] = Function::New(env, showComponents);
   exports["checkClueConsistency"] = Function::New(env, checkClueConsistency);
-
+  exports["getConsistencyCheckResults"] =
+      Function::New(env, getConsistencyCheckResults);
   return exports;
 }
 

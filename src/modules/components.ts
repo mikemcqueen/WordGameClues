@@ -107,7 +107,7 @@ export const consistency_check = (options: any): void => {
     let version = _.includes(options.flags, '3') ? 2 : 1;
     console.error(`consistency check v${version}`);
     let combos = get_unique_combos(2, options.max_sources);
-    let inconsistent_combos = new Set<string>();
+//    let inconsistent_combos = new Set<string>();
     for (let combo of combos) {
         const nameList = combo.split(',').sort();
         const pc_args = {
@@ -129,17 +129,18 @@ export const consistency_check = (options: any): void => {
         }
         if (valid) {
             if (!Native.checkClueConsistency(nameList, options.max_sources, version)) {
-                inconsistent_combos.add(combo);
+  //              inconsistent_combos.add(combo);
             }
         }
         if (!options.quiet) {
             process.stderr.write('.');
         }
     }
-    if (inconsistent_combos.size) {
+    const results = Native.getConsistencyCheckResults();
+    if (results.length) {
         console.error(`\nInconsistent combos:`);
-        for (let combo of inconsistent_combos) {
-            console.error(combo);
+        for (let result of results) {
+            console.error(result);
         }
     } else {
         console.error(`\nNo inconsistent combos`);

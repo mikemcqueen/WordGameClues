@@ -3,6 +3,7 @@
 
 #include <set>
 #include <string>
+#include <type_traits>
 #include <unordered_set>
 #include <vector>
 #include <napi.h>
@@ -21,8 +22,22 @@ Napi::Array wrap(Napi::Env& env,
   std::vector<clue_manager::KnownSourceMapValueCRef> cref_entries);
 
 // TODO: combine two or three of these with templated forward delcarations?
+/*
 Napi::Array wrap(Napi::Env& env, const std::unordered_set<std::string>& string_set);
 Napi::Array wrap(Napi::Env& env, const std::vector<std::string>& strList);
+*/
+template <class T, template <class> class C>
+requires std::is_same_v<T, std::string> // || is_integral_t<T>
+Napi::Array wrap(Napi::Env& env, const C<T>& container) {
+  Napi::Array jsList = Napi::Array::New(env, container.size());
+  for (int i{}; const auto& elem : container) {
+    if constexpr (std::is_same_v<T, std::string>) {
+      jsList.Set(i++, Napi::String::New(env, elem));
+    }
+  }
+  return jsList;
+}
+
 Napi::Array wrap(Napi::Env& env, const std::set<int>& values);
 
 }  // namespace cm

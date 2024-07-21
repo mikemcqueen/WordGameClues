@@ -56,6 +56,18 @@ Napi::Array wrap(Napi::Env& env,
   return jsList;
 }
 
+  /*
+template <template <class T> class C>
+Array wrap(Env& env, const T<C>& container) {
+  Array jsList = Array::New(env, container.size());
+  for (int i{}; const auto& str : container) {
+    jsList.Set(i++, String::New(env, str));
+  }
+  return jsList;
+}
+  */
+
+  /*
 Array wrap(Env& env, const std::unordered_set<std::string>& str_set) {
   Array jsList = Array::New(env, str_set.size());
   for (int i{}; const auto& str : str_set) {
@@ -71,6 +83,7 @@ Array wrap(Env& env, const std::vector<std::string>& strList) {
   }
   return jsList;
 }
+  */
 
 Napi::Array wrap(Napi::Env& env, const std::set<int>& values) {
   Array jsList = Array::New(env, values.size());

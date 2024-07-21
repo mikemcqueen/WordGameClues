@@ -697,8 +697,7 @@ template struct std::hash<cm::UsedSources::SourceBits>;
 
 namespace std {
 
-template<>
-struct equal_to<cm::UsedSources> {
+template <> struct equal_to<cm::UsedSources> {
   bool operator()(const cm::UsedSources& lhs,
     const cm::UsedSources& rhs) const noexcept
   {
@@ -710,8 +709,7 @@ struct equal_to<cm::UsedSources> {
   }
 };
 
-template<>
-struct hash<cm::UsedSources> {
+template <> struct hash<cm::UsedSources> {
   size_t operator()(const cm::UsedSources& usedSources) const noexcept {
     size_t bits_seed = 0;
     hash_combine(bits_seed, usedSources.getBits().hash());
@@ -726,8 +724,7 @@ struct hash<cm::UsedSources> {
   }
 };
 
-template<>
-struct equal_to<cm::SourceCompatibilityData> {
+template <> struct equal_to<cm::SourceCompatibilityData> {
   bool operator()(const cm::SourceCompatibilityData& lhs,
     const cm::SourceCompatibilityData& rhs) const noexcept
   {
@@ -736,8 +733,7 @@ struct equal_to<cm::SourceCompatibilityData> {
   }
 };
 
-template<>
-struct hash<cm::SourceCompatibilityData> {
+template <> struct hash<cm::SourceCompatibilityData> {
   size_t operator()(const cm::SourceCompatibilityData& data) const noexcept {
     ++hash_called;
     size_t seed = 0;

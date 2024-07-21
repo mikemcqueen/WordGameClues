@@ -1,3 +1,6 @@
 [submodule "data"]
 	path = data
 	url = /mnt/rainbow-repos/data
+[submodule "wtf-threadpool"]
+	path = wtf-threadpool
+	url = https://github.com/mikemcqueen/wtf-threadpool
