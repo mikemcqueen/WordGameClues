@@ -157,7 +157,7 @@ void add_compound_clue(
     const cm::NameCount& nc, const std::string& sources_csv) {
   append_known_sources_to_nc_sources(sources_csv, nc);
   get_known_source_map_entry(nc.count, sources_csv)
-      .clue_names.emplace_back(nc.name);
+      .clue_names.emplace(nc.name);
 }
 
 auto make_src_list_for_nc(const NameCount& nc) -> cm::SourceList {

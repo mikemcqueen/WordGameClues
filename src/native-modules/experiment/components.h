@@ -3,10 +3,12 @@
 #ifndef INCLUDE_SHOW_COMPONENTS_H
 #define INCLUDE_SHOW_COMPONENTS_H
 
+#pragma once
 #include <set>
 #include <string>
+#include <unordered_map>
 #include <vector>
-#include "merge-filter-data.h"
+#include "combo-maker.h"
 
 namespace cm::components {
 
@@ -17,10 +19,10 @@ auto old_consistency_check(const std::vector<std::string>& name_list,
     const SourceList& xor_src_list) -> bool;
 
 void consistency_check(
-    const std::vector<std::string>&& name_list, int max_sources, bool fix);
+    const std::vector<std::string>&& name_list, int max_sources);
 
-auto process_consistency_check_results(
-    bool fix) -> const std::unordered_set<std::string>&;
+auto get_consistency_check_results()
+    -> const std::unordered_map<std::string, NameCountList>&;
 
 }  // namespace cm::components
 

@@ -8,6 +8,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <vector>
 #include "cuda-types.h" // IndexList
 #include "peco.h" // Peco::IndexList
@@ -81,15 +82,16 @@ typename std::vector<T>::const_iterator move_append(
   return result;
 }
 
-inline std::string join(
-  const std::vector<std::string>& strings, const std::string& delim) {
+template <typename T, template <typename> class C>
+  requires std::is_same_v<std::string, T>
+inline std::string join(const C<T>& strings, const std::string& delim) {
   if (strings.empty()) {
     return {};
   }
   if (strings.size() == 1u) {
-    return strings.front();
+    return *strings.begin();
   }
-  return std::accumulate(std::next(strings.begin()), strings.end(), strings.front(),
+  return std::accumulate(std::next(strings.begin()), strings.end(), *strings.begin(),
     [delim](const std::string& acc, const std::string& elem) {
       // well i think this is probably more expensive than multiple += followed
       // by a return. would like to profile.

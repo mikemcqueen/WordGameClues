@@ -790,8 +790,6 @@ Value checkClueConsistency(const CallbackInfo& info) {
   auto max_sources = info[1].As<Number>().Int32Value();
   // arg2:
   auto version = info[2].As<Number>().Int32Value();
-  // arg3:
-  auto fix = info[3].As<Boolean>();
   // --
   bool result{true};
   switch (version) {
@@ -800,7 +798,7 @@ Value checkClueConsistency(const CallbackInfo& info) {
         name_list, MFD.host.merged_xor_src_list);
     break;
   case 2:
-    components::consistency_check(std::move(name_list), max_sources, fix);
+    components::consistency_check(std::move(name_list), max_sources);
     break;
   default:
     assert(false);
@@ -809,19 +807,11 @@ Value checkClueConsistency(const CallbackInfo& info) {
 }
 
 //
-// processConsistencyCheckResults
+// getConsistencyCheckResults
 //
-Value processConsistencyCheckResults(const CallbackInfo& info) {
+Value getConsistencyCheckResults(const CallbackInfo& info) {
   Env env = info.Env();
-  if (!info[0].IsBoolean()) {
-    TypeError::New(env, "getConsistencyCheckResults: invalid parameter type")
-      .ThrowAsJavaScriptException();
-    return env.Null();
-  }
-  // arg0:
-  auto fix = info[0].As<Boolean>();
-  // --
-  return wrap(env, components::process_consistency_check_results(fix));
+  return wrap(env, components::get_consistency_check_results());
 }
 
 //
@@ -912,8 +902,8 @@ Object Init(Env env, Object exports) {
   //
   exports["showComponents"] = Function::New(env, showComponents);
   exports["checkClueConsistency"] = Function::New(env, checkClueConsistency);
-  exports["processConsistencyCheckResults"] =
-      Function::New(env, processConsistencyCheckResults);
+  exports["getConsistencyCheckResults"] =
+      Function::New(env, getConsistencyCheckResults);
 
   // misc
   //

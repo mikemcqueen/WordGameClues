@@ -4,7 +4,9 @@
 #include <functional>
 #include <iostream>
 #include <optional>
+#include <set>
 #include <string>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 #include "clue-manager.h"
@@ -20,11 +22,11 @@ using namespace std::literals;
 namespace cm::components {
 
 struct NamesAndCounts {
-  std::vector<std::string> names;
+  std::set<std::string> names;
   std::vector<int> counts;
 };
 
-struct Results {
+struct ShowResults {
   std::set<int> sums;
   std::vector<std::vector<int>> valid;
   std::vector<std::vector<int>> invalid;
@@ -34,15 +36,17 @@ struct Results {
 
 namespace {
 
-wtf::ThreadPool<std::string, 5> pool_;
-std::unordered_set<std::string> consistency_results_;
+using consistency_t = std::pair<std::string, NameCountList>;
+wtf::ThreadPool<consistency_t, 5> consistency_pool_;
+std::unordered_map<std::string, NameCountList> consistency_results_;
 
 // -t word1
-void add_result_for_nc(const NameCount& nc, Results& results) {
+void add_show_result_for_nc(const NameCount& nc, ShowResults& results) {
   auto sources_list = clue_manager::get_nc_sources(nc);
   if (sources_list.size()) {
     std::vector<int> count_list = { nc.count };
-    results.clues.emplace_back(sources_list, count_list);
+    std::set<std::string> sources_set(sources_list.begin(), sources_list.end());
+    results.clues.emplace_back(std::move(sources_set), std::move(count_list));
   } else {
     std::cerr << "hmm, no sources for " << nc.name << ":" << nc.count
               << std::endl;
@@ -51,8 +55,8 @@ void add_result_for_nc(const NameCount& nc, Results& results) {
 
 // poorly named
 // -t word1,word2
-auto add_result_for_sources(const std::string& sources_csv,
-    const std::vector<int>& counts, int sum, Results& results) {
+auto add_show_result_for_sources(const std::string& sources_csv,
+    const std::vector<int>& counts, int sum, ShowResults& results) {
   using namespace clue_manager;
   if (has_known_source_map(sum)) {
     if (is_known_source_map_entry(sum, sources_csv)) {
@@ -72,9 +76,9 @@ auto add_result_for_sources(const std::string& sources_csv,
   }
 }
 
-auto get_results(
+auto get_show_results(
     const std::vector<std::string>& name_list, const SourceList& xor_src_list) {
-  Results results;
+  ShowResults results;
   std::unordered_set<std::string> hash;
   for (const auto& src: xor_src_list) {
     const auto count_list = NameCount::listToCountList(src.ncList);
@@ -85,8 +89,8 @@ auto get_results(
     hash.insert(key);
     const auto sum = util::sum(count_list);
     if (name_list.size() == 1u) {
-      add_result_for_nc(NameCount{name_list.at(0), sum}, results);
-    } else if (add_result_for_sources(util::join(name_list, ","),  //
+      add_show_result_for_nc(NameCount{name_list.at(0), sum}, results);
+    } else if (add_show_result_for_sources(util::join(name_list, ","),  //
                    count_list, sum, results)) {
       results.sums.insert(sum);
     }
@@ -139,37 +143,37 @@ void display(const std::vector<NamesAndCounts>& names_counts_list,
   }
 }
 
-void display_results(
-    const std::vector<std::string>& name_list, const Results& results) {
+void display_show_results(
+    const std::vector<std::string>& name_list, const ShowResults& results) {
   display(results.invalid, "INVALID");
   display(results.known, "PRESENT as", name_list);
   display(results.clues, "PRESENT as clue with source:", name_list);
   display(results.valid, "VALID");
 }
 
-using opt_str_list_cref_t =
-  std::optional<std::reference_wrapper<const std::vector<std::string>>>;
+using opt_str_set_cref_t =
+  std::optional<std::reference_wrapper<const std::set<std::string>>>;
 
-opt_str_list_cref_t get_clue_names_for_sources(int sum, const std::string& sources_csv) {
-  static const std::vector<std::string> empty;
+opt_str_set_cref_t get_clue_names_for_source(int sum, const std::string& source_csv) {
+  static const std::set<std::string> empty;
   using namespace clue_manager;
   if (has_known_source_map(sum)) {
-    if (is_known_source_map_entry(sum, sources_csv)) {
-      auto& clue_names = get_known_source_map_entry(sum, sources_csv).clue_names;
+    if (is_known_source_map_entry(sum, source_csv)) {
+      auto& clue_names = get_known_source_map_entry(sum, source_csv).clue_names;
       return std::make_optional(std::cref(clue_names));
     } else {
       return std::make_optional(std::cref(empty));
     }
   } else {
     if (log_level(Verbose)) {
-      std::cerr << "!knownSourceMap(" << sum << "), sources: " << sources_csv
+      std::cerr << "!knownSourceMap(" << sum << "), sources: " << source_csv
                 << std::endl;
     }
     return {};
   }
 }
 
-void dump(const std::unordered_set<std::string>& name_set, int set_sum,
+void dump(const std::set<std::string>& name_set, int set_sum,
     const NameCountList& nc_list, const std::vector<std::string>& name_list,
     const std::string& missing_name) {
   if (name_set.size() != name_list.size()) {
@@ -186,24 +190,29 @@ void dump(const std::unordered_set<std::string>& name_set, int set_sum,
   }
 }
 
+// TODO: poorly named function 
+// check if all valid, compatible, instances of the supplied clue source name
+// list (pair, actually) have the same clue names.
+// e.g., if name_list is [dog, food], and dog:1,dog:2,food:3 exist along with
+// dogfood:4=dog,food then dogfood:5=dog,food must also exist.
 bool are_sources_consistent(
     const std::vector<std::string>& name_list, const SourceList& xor_src_list) {
   assert(name_list.size() > 1u);
-  const bool test = false;
-  const auto sources_csv = util::join(name_list, ",");
-  std::unordered_set<std::string> hash;
+  //const bool test = false;
+  const auto source_csv = util::join(name_list, ",");
+  std::unordered_set<std::string> hash; // TODO: could be <int>
   std::unordered_set<std::string> names;
-  int names_sum{};
+  //int names_sum{};
   bool first = true;
   for (const auto& src: xor_src_list) {
     const auto count_list = NameCount::listToCountList(src.ncList);
     const auto sum = util::sum(count_list);
-    const auto key = util::join(count_list, ",");
+    const auto key = util::join(count_list, ","); // TODO: we could just use sum as key?
     if (hash.contains(key)) {
       continue;
     }
     hash.insert(key);
-    auto opt_names = get_clue_names_for_sources(sum, sources_csv);
+    auto opt_names = get_clue_names_for_source(sum, source_csv);
     if (!opt_names.has_value()) {
       continue;
     }
@@ -212,17 +221,17 @@ bool are_sources_consistent(
       for (const auto& name : clue_names) {
         names.insert(name);
       }
-      names_sum = sum;
+      //names_sum = sum;
       first = false;
       continue;
     }
     if (names.size() != clue_names.size()) {
-      if (test) { dump(names, names_sum, src.ncList, clue_names, {}); }
+      //if (test) { dump(names, names_sum, src.ncList, clue_names, {}); }
       return false;
     }
     for (const auto& name : clue_names) {
       if (!names.contains(name)) {
-        if (test) { dump(names, names_sum, src.ncList, clue_names, name); }
+        //if (test) { dump(names, names_sum, src.ncList, clue_names, name); }
         return false;
       }
     }
@@ -286,9 +295,9 @@ auto has_names_at_counts(const std::vector<std::string>& name_list,
   return true;
 }
 
-// given a vector of count lists, ex. [ [1,2,3], .. ] generate all permutations
-// of each list and test if the provided names exist at those counts. return
-// all count lists that have a permutation where that condition is true.
+// given a vector of (sorted) count lists, ex. [ [1,2,3], .. ] test if the
+// providede names exist at any permutation of each list. return all count
+// count lists which have such a permutation.
 auto filter_valid_addend_perms(std::vector<std::vector<int>>& addends,
     const std::vector<std::string>& name_list) {
   std::vector<std::vector<int>> result;
@@ -330,8 +339,8 @@ auto get_all_compatible_sources(
 }
 
 auto get_all_clue_names(
-    const std::string& sources_csv, const SourceList& src_list) {
-  std::unordered_set<std::string> result;
+    const std::string& source_csv, const SourceList& src_list) {
+  std::set<std::string> result;
   for (const auto& src: src_list) {
     const auto sum = util::sum(NameCount::listToCountList(src.ncList));
     /*
@@ -341,7 +350,7 @@ auto get_all_clue_names(
     }
     hash.insert(key);
     */
-    auto opt_names = get_clue_names_for_sources(sum, sources_csv);
+    auto opt_names = get_clue_names_for_source(sum, source_csv);
     if (!opt_names.has_value()) {
       continue;
     }
@@ -353,45 +362,35 @@ auto get_all_clue_names(
   return result;
 }
 
-void fix_sources(const std::vector<std::string>& name_list,
-    const SourceList& src_list, bool dry_run) {
-  const auto source_csv = util::join(name_list, ",");
+auto get_missing_nc_list(
+    const std::string& source_csv, const SourceList& src_list) {
+  NameCountList missing_nc_list;
   auto all_clue_names = get_all_clue_names(source_csv, src_list);
   std::unordered_set<int> hash;
   for (const auto& src : src_list) {
     const auto sum = util::sum(NameCount::listToCountList(src.ncList));
     if (hash.contains(sum)) continue;
     hash.insert(sum);
-    auto opt_names = get_clue_names_for_sources(sum, source_csv);
-    if (!opt_names.has_value()) { continue; }
+    auto opt_names = get_clue_names_for_source(sum, source_csv);
+    if (!opt_names.has_value()) continue;
     auto& clue_names = opt_names.value().get();
-    bool first{true};
-    // or, just convert names to set and do set_difference(a, b).join(',')
-    for (const auto& name : all_clue_names) {
-      if (std::find(clue_names.begin(), clue_names.end(), name)
-          == clue_names.end()) {
-        if (first) {
-          if (dry_run) std::cerr << "[dry_run] ";
-          std::cerr <<  source_csv << ":" << sum << " adding: ";
-        }
-        if (!first) std::cerr << ",";
-        std::cerr << name;
-        first = false;
-      }
-    }
-    if (!first) std::cerr << std::endl;
+    std::vector<std::string> missing_names;
+    std::ranges::set_difference(
+        all_clue_names, clue_names, std::back_inserter(missing_names));
+    std::ranges::transform(missing_names, std::back_inserter(missing_nc_list),
+        [sum](const std::string& name) -> NameCount { return {name, sum}; });
   }
+  return missing_nc_list;
 }
 
-/*
-auto processor = [](const std::string& result) {
-  if (!result.empty()) { consistency_results_.insert(result); }
-};
-*/
-
-void result_processor(const std::string& result) {
-  if (!result.empty()) {  //
-    consistency_results_.insert(result);
+void consistency_check_result_processor(consistency_t&& result) {
+  if (!result.first.empty()) {
+    auto it = consistency_results_.find(result.first);
+    if (it == consistency_results_.end()) {
+      consistency_results_.emplace(std::move(result));
+    } else {
+      std::ranges::move(result.second, std::back_inserter(it->second));
+    }
   }
 }
 
@@ -399,37 +398,39 @@ void result_processor(const std::string& result) {
 
 auto show(const std::vector<std::string>& name_list,
     const SourceList& xor_src_list) -> std::set<int> {
-  auto results = get_results(name_list, xor_src_list);
-  display_results(name_list, results);
+  auto results = get_show_results(name_list, xor_src_list);
+  display_show_results(name_list, results);
   return results.sums;
 }
 
 auto old_consistency_check(const std::vector<std::string>& name_list,
     const SourceList& src_list) -> bool {
-  return are_sources_consistent(name_list, src_list);
+  return are_sources_consistent(name_list,src_list);
 }
 
 void consistency_check(
-    const std::vector<std::string>&& name_list, int max_sources, bool fix) {
-  pool_.execute(
-      [name_list = std::move(name_list), max_sources, fix]() {
-        std::string result;
+    const std::vector<std::string>&& name_list, int max_sources) {
+  consistency_pool_.execute(
+      [name_list = std::move(name_list), max_sources]() -> consistency_t {
+        std::string source_csv;
+        NameCountList nc_list;
         // TODO: 3-source clues don't work currently, because reasons.
         if (name_list.size() == 2) {
           auto src_list = get_all_compatible_sources(name_list, max_sources);
-          if (!are_sources_consistent(name_list, src_list)) {
-            result = util::join(name_list, ",");
-            fix_sources(name_list, src_list, !fix);
+          source_csv = util::join(name_list, ",");
+          if (1 || !are_sources_consistent(name_list, src_list)) {
+            nc_list = get_missing_nc_list(source_csv, src_list);
           }
         }
-        return result;
+        if (nc_list.empty()) source_csv.clear();
+        return std::make_pair(std::move(source_csv), std::move(nc_list));
       },
-      result_processor);
+      consistency_check_result_processor);
 }
 
-auto process_consistency_check_results(
-    bool fix) -> const std::unordered_set<std::string>& {
-  pool_.process_all_results(result_processor);
+auto get_consistency_check_results()
+    -> const std::unordered_map<std::string, NameCountList>& {
+  consistency_pool_.process_all_results(consistency_check_result_processor);
   return consistency_results_;
 }
 

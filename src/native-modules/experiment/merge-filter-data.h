@@ -1,6 +1,7 @@
 #ifndef INCLUDE_MERGE_FILTER_DATA_H
 #define INCLUDE_MERGE_FILTER_DATA_H
 
+#pragma once
 #include "combo-maker.h"
 #include "cuda-types.h"
 

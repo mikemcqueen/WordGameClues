@@ -11,41 +11,32 @@
 import _ from 'lodash'; // import statement to signal that we are a "module"
 
 const Native      = require('../../../build/experiment.node');
-const Peco        = require('../../modules/peco');
-
 const Assert      = require('assert');
-const Debug       = require('debug')('show-components');
+const Debug       = require('debug')('components');
 const Expect      = require('should/as-function');
-const Path        = require('path');
-const Readlines   = require('n-readlines');
+//const Path        = require('path');
+//const Peco        = require('../../modules/peco');
+//const Readlines   = require('n-readlines');
 const JStringify  = require('javascript-stringify').stringify;
-const Timing      = require('debug')('timing');
+//const Timing      = require('debug')('timing');
 
-import * as Clue from '../types/clue';
+//import * as Clue from '../types/clue';
 import * as ClueList from '../types/clue-list';
 import * as ClueManager from './clue-manager';
 import * as NameCount from '../types/name-count';
 import * as PreCompute from './cm-precompute';
-import * as Source from './source';
-
-///////////
-
-const Stringify = (val: any): string => {
-    return JStringify(val, (value, indent, stringify) => {
-        if (typeof value === 'function') return "function";
-        return stringify(value);
-    }, " ");
-};
+//import * as Source from './source';
 
 export const addRemove = (names: string[], counts: number[], options: any): number => {
-    // NOTE: explicit undefined check here is necessary
+    // NOTE: explicit undefined check here is necessary.
+    // TODO: probably should enforce w/AddRemoveOptions type
     const save = _.isUndefined(options.save) ? true : options.save;
-    // good lord this function call is something else
     const count = ClueManager.addRemoveOrReject({
         add:      options.add,
         remove:   options.remove,
-        property: options.property,
+    /*  property: options.property,
         reject:   options.reject
+    */
     }, names, counts, {
         save,
         addMax: options.max ? Number(options.max) : 30,
@@ -102,12 +93,16 @@ const get_unique_combos = (first: number, last: number): Set<string> => {
     return combos;
 };
 
+type ConsistencyResultMap = {
+    [key: string]: NameCount.List;
+};
+
 export const consistency_check = (options: any): void => {
     const version = _.includes(options.flags, '3') ? 2 : 1;
-    const fix = options.fix || false;
     console.error(`consistency check v${version}`);
     let combos = get_unique_combos(2, options.max_sources);
-    let results: any = new Set<string>();// for v1
+    let v1_results = new Set<string>();
+    let v2_results: ConsistencyResultMap;
     for (let combo of combos) {
         const nameList = combo.split(',').sort();
         const pc_args = {
@@ -128,22 +123,30 @@ export const consistency_check = (options: any): void => {
             }
         }
         if (valid) {
-            if (!Native.checkClueConsistency(nameList, options.max_sources, version, fix)) {
-                if (version === 1) results.add(combo);
+            if (!Native.checkClueConsistency(nameList, options.max_sources, version)) {
+                if (version === 1) v1_results.add(combo);
             }
         }
         if (!options.quiet && !options.verbose) {
             process.stderr.write('.');
         }
     }
+    let count = v1_results.size;
     if (version === 2) {
-        results = Native.processConsistencyCheckResults(fix);
+        v2_results = Native.getConsistencyCheckResults();
+        count = Object.keys(v2_results).length;
     }
-    const count = (version === 1) ? results.size : results.length;
     if (count) {
         console.error(`\nInconsistent combos:`);
-        for (let result of results) {
-            console.error(result);
+        if (version === 1) {
+            for (let result of v1_results) {
+                console.error(result);
+            }
+        } else {
+            for (let source_csv of Object.keys(v2_results!)) {
+                const nc_list = v2_results![source_csv];
+                console.error(`${source_csv}: ${NameCount.listToString(nc_list)}`);
+            }
         }
     } else {
         console.error(`\nNo inconsistent combos`);

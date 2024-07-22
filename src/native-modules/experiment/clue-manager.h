@@ -2,8 +2,10 @@
 #define INCLUDE_CLUE_MANAGER_H
 
 #include <functional>
+#include <set>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 #include "cuda-types.h"
 // not thrilled about this. it's really a header organization issue though
@@ -14,7 +16,7 @@ namespace cm::clue_manager {
 // types
 struct KnownSourceMapValue {
   SourceList src_list;
-  std::vector<std::string> clue_names;
+  std::set<std::string> clue_names;
 };
 using KnownSourceMapValueCRef = std::reference_wrapper<const KnownSourceMapValue>;
 
@@ -89,6 +91,6 @@ inline void for_each_nc_source(const NameCount& nc, const auto& fn) {
   }
 }
 
-}  // namespace clue_manager
+}  // namespace cm::clue_manager
 
 #endif // INCLUDE_CLUE_MANAGER_H

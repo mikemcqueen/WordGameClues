@@ -46,7 +46,7 @@ Array wrap(Env& env, const XorSourceList& xorSourceList) {
   return jsList;
 }
 
-Napi::Array wrap(Napi::Env& env,
+Array wrap(Env& env,
   std::vector<clue_manager::KnownSourceMapValueCRef> cref_entries) {
   //
   Array jsList = Array::New(env, cref_entries.size());
@@ -85,13 +85,22 @@ Array wrap(Env& env, const std::vector<std::string>& strList) {
 }
   */
 
-Napi::Array wrap(Napi::Env& env, const std::set<int>& values) {
+Array wrap(Napi::Env& env, const std::set<int>& values) {
   Array jsList = Array::New(env, values.size());
   int idx{};
   for (auto it = values.begin(); it != values.end(); ++it, ++idx) {
     jsList.Set(idx, Number::New(env, *it));
   }
   return jsList;
+}
+
+Object wrap(
+    Napi::Env& env, const std::unordered_map<std::string, NameCountList>& map) {
+  Object jsObj = Object::New(env);
+  for (const auto& [key, value] : map) {
+    jsObj.Set(key, wrap(env, value));
+  }
+  return jsObj;
 }
 
 }  // namespace cm
