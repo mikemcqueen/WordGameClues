@@ -41,11 +41,14 @@ auto validateSourceNamesAtCounts(const std::string& clue_name,
         // TODO: SourceData.copyMerge(const SourceData&)
         // copy
         SourceData merged_src{src0};
-        // merge
+        // merge compatibility data
         merged_src.mergeInPlace(src1);
+        // copy src1 primaryNameSrcList on top
         std::ranges::copy(src1.primaryNameSrcList,
             std::back_inserter(merged_src.primaryNameSrcList));
-        std::ranges::copy(src1.ncList, std::back_inserter(merged_src.ncList));
+        // replace ncList with supplied names/counts
+        merged_src.ncList.clear();
+        merged_src.ncList.emplace_back(clue_name, util::sum(count_list));
         src_list.emplace_back(std::move(merged_src));
       }
     }
