@@ -43,7 +43,6 @@ MergeFilterData MFD;
 // Clue-manager
 //
 
-// _.keys(nameSourcesMap), values_lists(nameSourcesMap)
 Value setPrimaryNameSrcIndicesMap(const CallbackInfo& info) {
   Env env = info.Env();
   if (!info[0].IsArray() || !info[1].IsArray()) {
@@ -66,9 +65,7 @@ Value setPrimaryNameSrcIndicesMap(const CallbackInfo& info) {
     idx_lists.emplace_back(makeIndexList(env, js_idx_lists[i].As<Array>()));
   }
   // --
-  // TODO: Weird.
-  clue_manager::setPrimaryNameSrcIndicesMap(
-      clue_manager::buildPrimaryNameSrcIndicesMap(name_list, idx_lists));
+  clue_manager::init_primary_clues(std::move(name_list), std::move(idx_lists));
   return env.Null();
 }
 
@@ -85,7 +82,7 @@ Value setCompoundClueNameSourcesMap(const CallbackInfo& info) {
   // arg1
   auto map = makeNameSourcesMap(env, info[1].As<Array>());
   // --
-  clue_manager::setNameSourcesMap(count, std::move(map));
+  clue_manager::set_name_sources_map(count, std::move(map));
   return env.Null();
 }
 
@@ -226,7 +223,7 @@ Value validateSources(const CallbackInfo& info) {
   const auto is_valid_src_list = !src_list.empty();
   if (validate_all && is_valid_src_list) {
     clue_manager::init_known_source_map_entry(
-        sum, src_names, std::move(src_list));
+        sum, util::join(src_names, ","), std::move(src_list));
   }
   return Boolean::New(env, is_valid_src_list);
 }

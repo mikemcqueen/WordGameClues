@@ -30,7 +30,7 @@ using StringCRefList = std::vector<std::reference_wrapper<const std::string>>;
 std::vector<NcSourcesMap> ncSourcesMaps;
 
 // map primary clue_name -> idx_list 
-PrimaryNameSrcIndicesMap primaryNameSrcIndicesMap;
+PrimaryNameSrcIndicesMap primaryNameSrcIndicesMap_;
 
 // map clue_name -> source_csv_list for each count (including primary)
 std::vector<NameSourcesMap> nameSourcesMaps;
@@ -41,9 +41,7 @@ std::vector<KnownSourceMap> knownSourceMaps;
 // populated on demand from primaryNameSrcIndicesMap/nameSrcMaps
 std::vector<StringCRefList> uniqueClueNames;
 
-//
-// functions
-//
+// ncSourcesMaps
 
 auto& get_nc_sources_map(int count) {
   const auto idx = count - 1;
@@ -53,7 +51,61 @@ auto& get_nc_sources_map(int count) {
   return ncSourcesMaps.at(idx);
 }
 
-//////////
+// nameSourcesMap
+
+const auto& get_name_sources_map(int count) {
+  return nameSourcesMaps.at(count - 1);
+}
+
+auto build_primary_name_sources_map(
+    const PrimaryNameSrcIndicesMap& name_src_indices_map) {
+  NameSourcesMap name_sources_map;
+  for (auto& [name, idx_list] : name_src_indices_map) {
+    std::vector<std::string> sources;
+    for (auto idx : idx_list) {
+      sources.emplace_back(std::to_string(idx));
+    }
+    name_sources_map.emplace(name, std::move(sources));
+  }
+  return name_sources_map;
+}
+
+// knownSourceMap
+
+// Initialize entries of knownSourceMaps_[0] and populate the src_list fields.
+void init_primary_known_source_map(
+    const PrimaryNameSrcIndicesMap& name_src_indices_map,
+    const NameSourcesMap& name_sources_map) {
+  using namespace std::chrono;
+  util::LogDuration<microseconds> ld(" init primary known_src_map");
+  for (const auto& [name, sources] : name_sources_map) {
+    for (size_t idx{}; idx < sources.size(); ++idx) {
+      const auto str_src = sources.at(idx);
+      if (is_known_source_map_entry(1, str_src)) continue;
+      /*
+      auto [_, err] = std::from_chars(
+        str_src.data(), str_src.data() + str_src.size(), int_src);
+      assert(err == std::errc{});
+      */
+      // we *could* convert the string back to an int here, but we already
+      // have the int version of the source.
+      int int_src = name_src_indices_map.find(name)->second.at(idx);
+      NameCountList name_src_list;
+      name_src_list.emplace_back(name, int_src);
+      NameCountList nc_list;
+      nc_list.emplace_back(name, 1);
+      UsedSources used_sources;
+      used_sources.addSource(int_src);
+      //SourceData src_data(
+      //  std::move(name_src_list), std::move(nc_list), std::move(used_sources));
+      //std::move(src_data));
+      SourceList src_list;
+      src_list.emplace_back(std::move(name_src_list), std::move(nc_list),
+          std::move(used_sources));
+      init_known_source_map_entry(1, str_src, std::move(src_list));
+    }
+  }
+}
 
 auto& get_known_source_map(int count, bool force_create = false) {
   // allow force-creates exactly in-sequence only, or throw an exception
@@ -62,16 +114,6 @@ auto& get_known_source_map(int count, bool force_create = false) {
     knownSourceMaps.emplace_back(KnownSourceMap{});
   }
   return knownSourceMaps.at(idx);
-}
-
-void init_known_source_map_entry(
-    int count, const std::string& src, SourceList&& src_list) {
-  // True is arbitrary here. I *could* support replacing an existing src_list,
-  // but i'm unaware of any situation that requires it, and as a result I want
-  // things to blow up when it is attempted, currently.
-  auto& map = get_known_source_map(count, true);
-  auto [_, success] = map.emplace(src, std::move(src_list));
-  assert(success);
 }
 
 int append_known_sources_to_nc_sources(
@@ -84,28 +126,7 @@ int append_known_sources_to_nc_sources(
   return std::distance(known_src_list.begin(), known_src_list.end());
 }
 
-///////////
-
-const auto& get_name_sources_map(int count) {
-  return nameSourcesMaps.at(count - 1);
-}
-
-auto build_primary_name_sources_map(
-    const PrimaryNameSrcIndicesMap& name_src_indices_map) {
-  NameSourcesMap name_sources_map;
-  // TODO: [name, idx_list]
-  for (const auto& kv_pair : name_src_indices_map) {
-    const auto& idx_list = kv_pair.second;
-    std::vector<std::string> sources;
-    for (auto idx: idx_list) {
-      sources.emplace_back(std::to_string(idx));
-    }
-    name_sources_map.emplace(kv_pair.first, std::move(sources));
-  }
-  return name_sources_map;
-}
-
-//////////
+// uniqueClueNames
 
 void populate_unique_clue_names(StringCRefList& name_cref_list, int count) {
   for (const auto& [name, _] : get_name_sources_map(count)) {
@@ -193,19 +214,31 @@ auto make_src_cref_list_for_nc(const NameCount& nc) -> cm::SourceCRefList {
 }
 
 //
-// nameSourcesMaps
+// primaryNameSrcIndicesMap_
 //
 
-auto buildPrimaryNameSrcIndicesMap(std::vector<std::string>& names,
-    std::vector<IndexList>& idx_lists) -> PrimaryNameSrcIndicesMap {
+auto buildPrimaryNameSrcIndicesMap(std::vector<std::string>&& names,
+    std::vector<IndexList>&& idx_lists) -> PrimaryNameSrcIndicesMap {
   PrimaryNameSrcIndicesMap src_indices_map;
   for (size_t i{}; i < names.size(); ++i) {
-    src_indices_map.emplace(std::move(names.at(i)), std::move(idx_lists.at(i)));
+    src_indices_map.emplace(
+        std::move(names.at(i)), std::move(idx_lists.at(i)));
   }
   return src_indices_map;
 }
 
-void setNameSourcesMap(int count, NameSourcesMap&& name_sources_map) {
+const IndexList& getPrimaryClueSrcIndices(const std::string& name) {
+  const auto& map = primaryNameSrcIndicesMap_;
+  auto it = map.find(name);
+  assert(it != map.end());
+  return it->second;
+}
+
+//
+// nameSourcesMaps
+//
+
+void set_name_sources_map(int count, NameSourcesMap&& name_sources_map) {
   auto idx = count - 1;
   // allow sets exactly in-sequence only, or throw an exception
   assert((int)nameSourcesMaps.size() == idx);
@@ -231,58 +264,18 @@ const std::vector<std::string>& get_nc_sources(const NameCount& nc) {
   return get_name_sources_map(nc.count).at(nc.name);
 }
 
-void setPrimaryNameSrcIndicesMap(PrimaryNameSrcIndicesMap&& src_indices_map) {
-  assert(primaryNameSrcIndicesMap.empty());
-  using namespace std::chrono;
-  auto ksm0 = high_resolution_clock::now();
-  auto name_sources_map = build_primary_name_sources_map(src_indices_map);
-  for (const auto& [name, sources] : name_sources_map) {
-    SourceList src_list;  // TODO: = build_primary_src_list(name, sources);
-    for (const auto& str_src : sources) {
-      if (is_known_source_map_entry(1, str_src))
-        continue;
-
-      NameCountList name_src_list;
-      int int_src;
-      auto [_, err] = std::from_chars(
-        str_src.data(), str_src.data() + str_src.size(), int_src);
-      assert(err == std::errc{});
-      name_src_list.emplace_back(name, int_src);
-      NameCountList nc_list;
-      nc_list.emplace_back(name, 1);
-      UsedSources used_sources;
-      used_sources.addSource(int_src);
-      SourceData src_data(
-        std::move(name_src_list), std::move(nc_list), std::move(used_sources));
-      src_list.emplace_back(std::move(src_data));
-      init_known_source_map_entry(1, str_src, std::move(src_list));
-    }
-  }
-  if (log_level(Verbose)) {
-    auto ksm1 = high_resolution_clock::now();
-    auto ksm_dur = duration_cast<milliseconds>(ksm1 - ksm0).count();
-    std::cerr << " init primary known_src_map - " << ksm_dur << "ms"
-              << std::endl;
-  }
-  setNameSourcesMap(1, std::move(name_sources_map));
-  primaryNameSrcIndicesMap = std::move(src_indices_map);
-}
-
-const IndexList& getPrimaryClueSrcIndices(const std::string& name) {
-  const auto& map = primaryNameSrcIndicesMap;
-  auto it = map.find(name);
-  assert(it != map.end());
-  return it->second;
-}
-
 //
 // knownSourceMaps
 //
 
-void init_known_source_map_entry(int count,
-    const std::vector<std::string>& name_list, SourceList&& src_list) {
-  init_known_source_map_entry(
-    count, util::join(name_list, ","), std::move(src_list));
+void init_known_source_map_entry(
+    int count, const std::string source_csv, SourceList&& src_list) {
+  // True is arbitrary here. I *could* support replacing an existing src_list,
+  // but i'm unaware of any situation that requires it, and as a result I want
+  // things to blow up when it is attempted, currently.
+  auto& map = get_known_source_map(count, true);
+  auto [_, success] = map.emplace(std::move(source_csv), std::move(src_list));
+  assert(success);
 }
 
 bool has_known_source_map(int count) {
@@ -338,6 +331,35 @@ const std::string& get_unique_clue_name(int count, int idx) {
 // misc
 //
 
+// JavaScript's primary name-sources map is Sentence.NameSourcesMap, which is a
+// map of [string: Set<number]. On the C++ side that is unwrapped and manifests
+// as a list of names, and a list of IndexLists, which are passed to us here.
+//
+// This function builds and initializes three globals from these two lists. The
+// first two are simple map representations of the data, with either integer or
+// string primary sources:
+//  * primaryNameSrcIndicesMap_, which is unordered_map<string, IndexList>
+//  * nameSourcesMap_[0], which is unordered_map<string, vector<string>>
+// The third requires we build and populate actual SourceLists:
+//  * knownSourcesMap_[0], which is unordered_map<string, KnownSourceMapValue>
+//
+void init_primary_clues(std::vector<std::string>&& names,
+                        std::vector<IndexList>&& idx_lists) {
+  // FIRST, build and set primaryNameSrcIndicesMap_. The passed-in parameters
+  // names and idx_lists are consumed here.
+  assert(primaryNameSrcIndicesMap_.empty());
+  primaryNameSrcIndicesMap_ =
+      buildPrimaryNameSrcIndicesMap(std::move(names), std::move(idx_lists));
+
+  // SECOND, build and set nameSourcesMap_[0]
+  set_name_sources_map(
+      1, build_primary_name_sources_map(primaryNameSrcIndicesMap_));
+
+  // THIRD, populate knownSourcesMap_[1] from the above two maps.
+  init_primary_known_source_map(
+      primaryNameSrcIndicesMap_, get_name_sources_map(1));
+}
+
 void dump_memory(std::string_view header /* = "clue_manager memory:" */) {
   // struct UniqueSources {
   //   SourceList src_list;
@@ -357,7 +379,7 @@ void dump_memory(std::string_view header /* = "clue_manager memory:" */) {
 
   // std::unordered_map<std::string, IndexList> primaryNameSrcIndicesMap;
   size_t src_indices_map_size{};
-  for (const auto& p : primaryNameSrcIndicesMap) {
+  for (const auto& p : primaryNameSrcIndicesMap_) {
     size_t s{p.first.size()};
     s += p.second.size() * sizeof(IndexList::value_type);
     src_indices_map_size += s;
@@ -379,7 +401,7 @@ void dump_memory(std::string_view header /* = "clue_manager memory:" */) {
   // struct KnownSourceMapValue {
   //   SourceList src_list;
   //   std::set<std::string> clue_names;
-  //   std::set<std::string> nc_names;
+  //   //std::set<std::string> nc_names;
   // };
   // using KnownSourceMap = std::unordered_map<std::string, KnownSourceMapValue>;
   // std::vector<KnownSourceMap> knownSourceMaps;
@@ -393,9 +415,11 @@ void dump_memory(std::string_view header /* = "clue_manager memory:" */) {
       for (const auto& str : p.second.clue_names) {
         s += str.size();
       }
+      /*
       for (const auto& str : p.second.nc_names) {
         s += str.size();
       }
+      */
       known_source_maps_size += s;
     }
   }

@@ -20,7 +20,7 @@ struct KnownSourceMapValue {
   SourceList src_list;
   std::set<std::string> clue_names;
   // all nc names (including primary) used to generate the src_list
-  std::set<std::string> nc_names;
+  //std::set<std::string> nc_names;
 };
 using KnownSourceMapValueCRef = std::reference_wrapper<const KnownSourceMapValue>;
 
@@ -51,12 +51,7 @@ auto make_src_cref_list_for_nc(const NameCount& nc) -> SourceCRefList;
 
 // nameSourcesMaps
 
-auto buildPrimaryNameSrcIndicesMap(std::vector<std::string>& names,
-  std::vector<IndexList>& src_lists) -> PrimaryNameSrcIndicesMap;
-
-void setPrimaryNameSrcIndicesMap(PrimaryNameSrcIndicesMap&& src_indices_map);
-
-void setNameSourcesMap(int count, NameSourcesMap&& name_sources_map);
+void set_name_sources_map(int count, NameSourcesMap&& name_sources_map);
 
 bool is_known_name_count(const std::string& name, int count);  // known_nc
 
@@ -75,8 +70,8 @@ bool is_known_source_map_entry(int count, const std::string& sources_csv);
 auto get_known_source_map_entry(int count, const std::string& sources_csv)
   -> KnownSourceMapValue&;
 
-void init_known_source_map_entry(int count,
-  const std::vector<std::string>& name_list, SourceList&& src_list);
+void init_known_source_map_entry(
+    int count, const std::string source_csv, SourceList&& src_list);
 
 const IndexList& getPrimaryClueSrcIndices(const std::string& name);
 
@@ -94,14 +89,14 @@ int get_num_unique_clue_names(int count);
 
 const std::string& get_unique_clue_name(int count, int idx);
 
-  /*
+/*
 inline void for_each_source_map_entry(
     const std::string& name, int count, const auto& fn) {
   for (const auto& entry_cref : get_known_source_map_entries(nc)) {
     fn(entry_cref.get());
   }
 }
-  */
+*/
 
 inline void for_each_nc_source(
     const std::string& name, int count, const auto& fn) {
@@ -116,6 +111,9 @@ inline void for_each_nc_source(const NameCount& nc, const auto& fn) {
 }
 
 // misc
+
+void init_primary_clues(
+    std::vector<std::string>&& names, std::vector<IndexList>&& idx_lists);
 
 void dump_memory(std::string_view header = "clue-manager memory:");
 

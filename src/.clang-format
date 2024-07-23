@@ -98,9 +98,9 @@ BreakConstructorInitializers: BeforeColon
 BreakAfterJavaFieldAnnotations: false
 BreakStringLiterals: true
 # The initialization list of the constructor is either all on the same line or on their own line
-ConstructorInitializerAllOnOneLineOrOnePerLine: true
+ConstructorInitializerAllOnOneLineOrOnePerLine: false
 # The comfort list of constructors all wrap
-AllowAllConstructorInitializersOnNextLine: false
+AllowAllConstructorInitializersOnNextLine: true
 # The indentation width of the initialization list of the constructor
 ConstructorInitializerIndentWidth: 4
 # The indentation width of the continued line

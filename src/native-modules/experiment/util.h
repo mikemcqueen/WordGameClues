@@ -179,12 +179,15 @@ template <typename TimeUnit = std::chrono::milliseconds> class LogDuration {
 public:
   LogDuration() = delete;
   LogDuration(std::string_view msg, LogLevel log_level = Normal)
-      : msg_(msg),
-        level_(log_level) {
+      : msg_(msg), level_(log_level), logged_(false) {
     t_.start();
   }
   ~LogDuration() {
-    if (log_level(level_)) {
+    log();
+  }
+
+  void log() {
+    if (!logged_ && log_level(level_)) {
       t_.stop();
       // TODO: t.pretty() - get count<nanoseconds>() and auto determine best
       // unit and suffix
@@ -197,6 +200,7 @@ private:
   Timer t_;
   std::string_view msg_;
   LogLevel level_;
+  bool logged_;
 };  // class LogDuration
 
 inline auto pretty_bytes(size_t bytes) {

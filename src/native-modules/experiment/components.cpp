@@ -82,6 +82,7 @@ auto get_show_results(
   std::unordered_set<std::string> hash;
   for (const auto& src: xor_src_list) {
     const auto count_list = NameCount::listToCountList(src.ncList);
+    // TODO: hash sum?
     const auto key = util::join(count_list, ",");
     if (hash.contains(key)) {
       continue;
