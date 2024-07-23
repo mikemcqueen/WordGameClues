@@ -335,11 +335,21 @@ function writeln (dest, text) {
 
 //
 
+function getChar() {
+    console.error(`Press ENTER`);
+    let buffer = Buffer.alloc(1)
+    Fs.readSync(0, buffer, 0, 1)
+    return buffer.toString('utf8')
+}
+
+//
+
 module.exports = {
     between,
     checkIfFile,
     createTmpFile,
     fstat,
+    getChar,
     gitAdd,
     gitAddCommit,
     gitCommit,

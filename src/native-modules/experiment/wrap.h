@@ -1,6 +1,7 @@
 #ifndef INCLUDE_WRAP_H
 #define INCLUDE_WRAP_H
 
+#pragma once
 #include <set>
 #include <string>
 #include <type_traits>

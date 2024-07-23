@@ -1,6 +1,8 @@
 #include <cassert>
 #include <charconv>
 #include <chrono>
+#include <cmath>
+//#include <format>
 #include <string>
 #include <unordered_set>
 #include <vector>
@@ -124,6 +126,20 @@ const auto& get_unique_clue_names(int count) {
   return names;
 }
 
+auto src_list_size(const SourceList& src_list) {
+  size_t s{};
+  for (const auto& src : src_list) {
+    s += sizeof(SourceCompatibilityData);
+    for (const auto& nc : src.primaryNameSrcList) {
+      s += nc.name.size() + sizeof(int);
+    }
+    for (const auto& nc : src.ncList) {
+      s += nc.name.size() + sizeof(int);
+    }
+  }
+  return s;
+}
+
 }  // namespace
 
 //
@@ -198,6 +214,17 @@ void setNameSourcesMap(int count, NameSourcesMap&& name_sources_map) {
 
 bool is_known_name_count(const std::string& name, int count) {
   return get_name_sources_map(count).contains(name);
+}
+
+bool are_known_name_counts(const std::vector<std::string>& name_list,
+    const std::vector<int>& count_list) {
+  // TODO: std::zip opportunity
+  for (size_t i{}; i < name_list.size(); ++i) {
+    if (!is_known_name_count(name_list.at(i), count_list.at(i))) {
+      return false;
+    }
+  }
+  return true;
 }
 
 const std::vector<std::string>& get_nc_sources(const NameCount& nc) {
@@ -279,15 +306,20 @@ auto get_known_source_map_entry(int count, const std::string& sources_csv)
   return it->second;
 }
 
-auto get_known_source_map_entries(const NameCount& nc)
+auto get_known_source_map_entries(const std::string& name, int count)  //
     -> std::vector<KnownSourceMapValueCRef> {
   std::vector<KnownSourceMapValueCRef> cref_entries;
-  const auto& name_sources_map = get_name_sources_map(nc.count);
-  for (const auto& sources_csv : name_sources_map.at(nc.name)) {
+  const auto& name_sources_map = get_name_sources_map(count);
+  for (const auto& sources_csv : name_sources_map.at(name)) {
     cref_entries.emplace_back(
-      std::cref(get_known_source_map_entry(nc.count, sources_csv)));
+      std::cref(get_known_source_map_entry(count, sources_csv)));
   }
   return cref_entries;
+}
+
+auto get_known_source_map_entries(const NameCount& nc)
+    -> std::vector<KnownSourceMapValueCRef> {
+  return get_known_source_map_entries(nc.name, nc.count);
 }
 
 //
@@ -300,6 +332,91 @@ int get_num_unique_clue_names(int count) {
 
 const std::string& get_unique_clue_name(int count, int idx) {
   return get_unique_clue_names(count).at(idx).get();
+}
+
+//
+// misc
+//
+
+void dump_memory(std::string_view header /* = "clue_manager memory:" */) {
+  // struct UniqueSources {
+  //   SourceList src_list;
+  //   std::unordered_set<SourceCompatibilityData> src_compat_set;
+  // };
+  // using NcSourcesMap = std::unordered_map<std::string, UniqueSources>;
+  // std::vector<NcSourcesMap> ncSourcesMaps;
+  size_t nc_source_maps_size{};
+  for (const auto& m : ncSourcesMaps) {
+    for (const auto& p : m) {
+      size_t s{p.first.size()};
+      s += src_list_size(p.second.src_list);
+      s += p.second.src_compat_set.size() * sizeof(SourceCompatibilityData);
+      nc_source_maps_size += s;
+    }
+  }
+
+  // std::unordered_map<std::string, IndexList> primaryNameSrcIndicesMap;
+  size_t src_indices_map_size{};
+  for (const auto& p : primaryNameSrcIndicesMap) {
+    size_t s{p.first.size()};
+    s += p.second.size() * sizeof(IndexList::value_type);
+    src_indices_map_size += s;
+  }
+
+  // using NameSourcesMap = std::unordered_map<std::string, std::vector<std::string>>;
+  // std::vector<NameSourcesMap> nameSourcesMaps;
+  size_t name_sources_maps_size{};
+  for (const auto& m : nameSourcesMaps) {
+    for (const auto& p : m) {
+      size_t s{p.first.size()};
+      for (const auto& str : p.second) {
+        s += str.size();
+      }
+      name_sources_maps_size += s;
+    }
+  }
+
+  // struct KnownSourceMapValue {
+  //   SourceList src_list;
+  //   std::set<std::string> clue_names;
+  //   std::set<std::string> nc_names;
+  // };
+  // using KnownSourceMap = std::unordered_map<std::string, KnownSourceMapValue>;
+  // std::vector<KnownSourceMap> knownSourceMaps;
+  size_t known_source_maps_size{};
+  size_t num_known_source_maps_sources{};
+  for (const auto& m : knownSourceMaps) {
+    for (const auto& p : m) {
+      size_t s{p.first.size()};
+      s += src_list_size(p.second.src_list);
+      num_known_source_maps_sources += p.second.src_list.size();
+      for (const auto& str : p.second.clue_names) {
+        s += str.size();
+      }
+      for (const auto& str : p.second.nc_names) {
+        s += str.size();
+      }
+      known_source_maps_size += s;
+    }
+  }
+
+  // not counted yet
+  // std::vector<StringCRefList> uniqueClueNames;
+  std::cerr << header << std::endl
+            << " nc_source_maps_size:    "
+            << util::pretty_bytes(nc_source_maps_size) << std::endl
+            << " src_indices_map_size:   "
+            << util::pretty_bytes(src_indices_map_size) << std::endl
+            << " name_sources_maps_size: "
+            << util::pretty_bytes(name_sources_maps_size) << std::endl
+            << " known_source_maps_size: "
+            << util::pretty_bytes(known_source_maps_size)  //
+            << ", sources(" << num_known_source_maps_sources << ")" << std::endl
+            << " total:                  "
+            << util::pretty_bytes(nc_source_maps_size + src_indices_map_size
+                                  + name_sources_maps_size
+                                  + known_source_maps_size)
+            << std::endl;
 }
 
 }  // namespace cm::clue_manager

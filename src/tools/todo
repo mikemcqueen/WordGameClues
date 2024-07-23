@@ -1,10 +1,50 @@
+* removed edward,tattoo,wallet =throat and =bomb. (??)
+
+* one of the reasons why the Peco approach is slower, for compatibility
+  checking, especially with length > 2, is that once we determine that the
+  sources at the current indices of 0 and 1 are incompatible, there is no
+  need to test that combination with any other sources from index 2.
+  this may be relevant to --ccc speed.
+
+* RE: tricky situation below, i think the solution might be to add another
+  std::set to KnownSourceMapEntry, something like nc_names which is the set
+  of nc NAMES (including primary) that are collectively used to generate the
+  sourcelist. 
+  I think the key here is that as we walk through each source in a source-list,
+  we'd have to find the KnownSourceMapEntry of that source, in order to access
+  it's nc_names list.
+  * Don't think that will work. Name lookup will be ambiguous because sources
+    (in a merged xor-compatible sourcelist) are (potentially) shared between
+    multiple names; I think the information about the original name it referred
+    to is lost.
+  * Added some comments in build_src_lists that I think describes the problem
+    a bit better.
+  
+* tricky situation that should be fixed (and in general, beyond this specific
+  tricky instance). blue is a synonym of navy in clues 1.  we later go on to
+  derive "navy" as a solution to "dark,blue".  but if the source of the "blue"
+  in this case is the synonym of navy, it should not be allowed.
+
+  to achieve this, it feels like we'll have to (optionally? for components.show)
+  attach the "source/origin component" to variation sources. e.g. "navy" gets
+  attached to that primary synonym "blue", somehow. when --add'ing, check and
+  fail if --add'ed word matches any primary "origin" words.
+
+  * similarly, validateSources(name) -- enforce everywhere, for below
+    validatesources is apparently happy with old:3=not:1,not:1,old:1
+    which is wrong because:
+     this is like that weird case with "bird" being the "name" of a clue that had
+     "bird" as a source, and that should be disallowed.
+     clues3.json:  { "name": "old",             "src": "new,not" },
+  * same: polar,bear -> white,bear + bear = bad
+
 * Precompute is taking longer now with -c2,2 and multiple --xors, did I introduce
   some copying?
   - nope, problem is combo indices. 11 million of them. multiply x 9 x 8 (72) and
     that's how many variation indices we allocate (850MB).
   - we could cut that about in half by only copying the 64-bit combo indices once -
-    that's 11M * 8 bytes = 88MB. then 11M * 9 sentences = ~100 million x 4-byte 
-    indices. total: 488MB.
+    that's 11M * 8 bytes = 88MB. then 11M * 9 sentences = ~100M x 4-byte indices.
+    total: 488MB.
   - at some point, i'll probably see 100M combo indices (800MB) + 900M x 4-byte (3.6B)
     = ~4.5GB just for variation indices!
 
@@ -23,12 +63,11 @@
 * while i don't love the idea, it seems like it'd be a lot cleaner to have the
   kernel-launch wrapper code responsible for free'ing device memory. like, we
   typically have to sync to copy results, why not just free stuff then?
-  or, instead of calling launch wrapper function directly, call from within a
-  lambda that does the freeing afterwards, to keep the code a bit more compartmentalized.
+  OR, instead of calling launch wrapper function directly, call from within a
+  lambda that does the freeing afterwards, to keep the alloc/frees a bit more
+  local to each other.
   
 * Timer.pretty() - get nanoseconds() and auto determine best unit and suffix
-
-* see if i can parallelize xor_merge_src_lists
 
 * LogDuration: merge_support.cpp, may also want version that uses a CudaEvent/thread
   to synchronize on
@@ -133,14 +172,11 @@ CM:
 --PERF
 
 * I should maybe think about how to introduce an "ignore" letter into a combination
-
   specifically for sentence 7, if i could just ignore [s] or make (s) optional or
   something.
 
 * fix lifetime issue requiring sync in cuda_allocCopySentenceVariationIndices()
   * store in MFD.
-
-* need to pass LogArgs to plugin earlier.
 
 * thoughts from last night: i really want to focus on new sentence combinations, and
   corresponding compound clues in the sub-10 (typically 6-8) region. then combine
@@ -174,6 +210,7 @@ CM:
 
 * filer_support::get_incompatible_sources looks wrong. i'm leaving it wrong for now
   because it helps confirm before/after counts, even if the counts are wrong.
+
 * old-working compatible sources and working compatible sources are different.
   why? is it related to above?
 
@@ -276,6 +313,7 @@ CM:
     such as a single worker thread and a locking queue, and maybe some other
     synchronization primitives, just for the sake of using them. performance
     may or may not be any better.
+  * wtf_threadpoool!
 
 * WHEN MERGE EXCEEDS UINT64_T: when I get to this point, which will likely
   result from too many --xor args being specified (although could also happen
@@ -294,23 +332,6 @@ CM:
 * running multiple list_pair_compat kernels in merge stage seems unnecessary;
   i could make that kernel more loopy and handle all list pairs in one call.
   low priority though, as it finishes the current impl in under 25ms.
-
-* tricky situation that should be fixed (and in general, beyond this specific
-  tricky instance). blue is a synonym of navy in clues 1.  we later go on to
-  derive "navy" as a solution to "dark,blue".  but if the source of the "blue"
-  in this case is the synonym of navy, it should not be allowed.
-
-  to achieve this, it feels like we'll have to (optionally? for components.show)
-  attach the "source/origin component" to variation sources. e.g. "navy" gets
-  attached to that primary synonym "blue", somehow. when --add'ing, check and
-  fail if --add'ed word matches any primary "origin" words.
-
-* similarly, validateSources(name) -- enforce everywhere, for below
-  validatesources is apparently happy with old:3=not:1,not:1,old:1
-  which is wrong because:
-   this is like that weird case with "bird" being the "name" of a clue that had
-   "bird" as a source, and that should be disallowed.
-   clues3.json:  { "name": "old",             "src": "new,not" },
 
 * I may have figured out what that NO_DUPLICATES thing in peco was all
   about. in cm-precompute.ts fillKnownNcSourceListMapForSum, with sum=2

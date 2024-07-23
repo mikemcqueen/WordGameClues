@@ -2,7 +2,9 @@
 #define INCLUDE_UTIL_H
 
 #pragma once
+#include <algorithm>
 #include <chrono>
+#include <format>
 #include <iostream>
 #include <limits>
 #include <stdexcept>
@@ -25,12 +27,16 @@ inline auto make_list_sizes(const std::vector<cm::IndexList>& idx_lists) {
   return sizes;
 }
 
-template <typename T> inline auto sum_sizes(const std::vector<T>& vecs) {
+template <typename T> inline auto sum_sizes(const std::vector<T>& v) {
+  return std::accumulate(v.begin(), v.end(), 0u,
+      [](size_t total, const T& t) { return total + t.size(); });
+  /*
   size_t sum{};
   for (const auto& v : vecs) {
     sum += v.size();
   }
   return sum;
+  */
 }
 
 template <typename T>
@@ -67,8 +73,7 @@ R multiply_with_overflow_check(const std::vector<T>& values) {
 
 template <typename T>
 typename std::vector<T>::const_iterator move_append(
-  std::vector<T>& dst, std::vector<T>&& src) {
-  //
+    std::vector<T>& dst, std::vector<T>&& src) {
   typename std::vector<T>::const_iterator result;
   if (dst.empty()) {
     dst = std::move(src);
@@ -193,6 +198,25 @@ private:
   std::string_view msg_;
   LogLevel level_;
 };  // class LogDuration
+
+inline auto pretty_bytes(size_t bytes) {
+  const char* suffixes[7];
+  suffixes[0] = "B";
+  suffixes[1] = "KB";
+  suffixes[2] = "MB";
+  suffixes[3] = "GB";
+  int s = 0;  // which suffix to use
+  double count = bytes;
+  while (count >= 1024.0 && s < 4) {
+    s++;
+    count /= 1024.0;
+  }
+  if (count - floor(count) == 0.0) {
+    return std::format("{} {}", int(count), suffixes[s]);
+  } else {
+    return std::format("{:.1f} {}", count, suffixes[s]);
+  }
+};
 
 }  // namespace cm::util
 

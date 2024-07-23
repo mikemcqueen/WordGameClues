@@ -59,6 +59,10 @@ export function count (nc: NameCount): number {
     return nc.count;
 }
 
+export function toString (nc: NameCount): string {
+    return makeCanonicalName(nc.name, nc.count, nc.index);
+}
+
 export function makeListFromCsv (csv: string): NameCount[] {
     return listFromStrList(csv.split(','));
 }
@@ -69,12 +73,6 @@ export function nameListFromCsv (csv: string): string[] {
 
 export function listFromStrList (strList: string[]): List {
     return strList.map(ncStr => new NameCount_t(ncStr));
-/*
-    let ncList: List = nameList.map(nameOrNcStr => {
-        ncList.push(new NameCount_t(name));
-    });
-    return ncList;
-*/
 }
 
 export function nameListFromStrList (strList: string[]): string[] {
@@ -119,7 +117,7 @@ export function listToStringList (ncList: List): string[] {
 
 // AKA "listToCsv"
 export function listToString (ncList: List): string {
-    return ncList ? listToStringList(ncList).toString() : _.toString(ncList);
+    return listToStringList(ncList).toString(); // old: ncList ?  : _.toString(ncList);
 }
 
 // AKA "listToSortedCsv"
@@ -168,10 +166,6 @@ export function listContainsAll (ncListContains: List, ncList: List) {
 }
 
 //////////////////////////////////////////////////////////////////////////////
-
-export function toString (nc: NameCount): string {
-    return makeCanonicalName(nc.name, nc.count, nc.index);
-}
 
 NameCount_t.prototype.toString = function(): string {
     return makeCanonicalName(this.name, this.count, this.index);

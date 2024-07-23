@@ -57,9 +57,9 @@ export interface Result {
 }
 */
 
-// TODO: NameCount.ListContainer
 interface NCData {
     ncList: NameCount.List;
+    name: string;
 }
 type NCDataList = NCData[];
 
@@ -135,16 +135,13 @@ const combinationsToNcDataLists = (combinationNcLists: NameCount.List[], verbose
     NCDataList[] =>
 {
     Debug(`combToNcDataLists() combinationNcLists: ${Stringify(combinationNcLists)}`);
-    // TODO: List.toIndexListArray()
+    // TODO: NameCount.listsToIndexLists()
     // keys of array are 0..ncList.length-1
     const listArray = combinationNcLists.map(ncList => [...Array(ncList.length).keys()]);
-    if (verbose > 2) console.error(` listArray: ${JStringify(listArray)}`);
-    let x =  Peco.makeNew({ listArray
-        // sum of lengths of nclists
-        //, max: combinationNcLists.reduce((sum, ncList) => sum + ncList.length, 0)
-    }).getCombinations();
-    if (verbose > 2) console.error(` combinations: ${JStringify(x)}`);
-    return x.map((ncIndexList: number[]) =>
+    if (verbose > 1) console.error(` listArray: ${JStringify(listArray)}`);
+    let indexLists =  Peco.makeNew({ listArray }).getCombinations();
+    if (verbose > 1) console.error(` indexLists: ${JStringify(indexLists)}`);
+    return indexLists.map((ncIndexList: number[]) =>
         combinationNcDataList(ncIndexList, combinationNcLists));
 };
 
@@ -171,6 +168,21 @@ const largestNcDataCountSum = (ncDataList: NCDataList): [number, NameCount.List]
     return [largest, ncList];
 };
 
+const displayCombinationNcLists = (combinationNcLists: NameCount.List[][]): void => {
+    console.error(' [');
+    for (let ncLists of combinationNcLists) {
+        let str = '';
+        let first = true;
+        for (let ncList of ncLists) {
+            if (!first) str += ',';
+            str += `[${NameCount.listToString(ncList)}]`;
+            first = false;
+        }
+        console.error(`  [${str}]`);
+    }
+    console.error(' ]');
+};
+
 const buildAllUseNcDataLists = (listName: string, maxSum: number, args: any): NCDataList[] => {
     const useArgsList: string[] = args[listName];
     Assert(useArgsList);
@@ -179,9 +191,15 @@ const buildAllUseNcDataLists = (listName: string, maxSum: number, args: any): NC
             `, maxSum(${maxSum})`);
     }
     const combinationNcLists = getCombinationNcLists(useArgsList);
-    if (args.verbose > 2) console.error(` combinationNcLists(${combinationNcLists.length})\n ${JStringify(combinationNcLists)}`);
-    const ncDataLists = combinationsToNcDataLists(combinationNcLists, args.verbose || 0);
-    if (args.verbose > 2) console.error(` ncDataLists(${ncDataLists.length})`);
+    if (args.verbose > 1) {
+        console.error(` combinationNcLists(${combinationNcLists.length}):`);
+        displayCombinationNcLists(combinationNcLists);
+    }
+    const ncDataLists = combinationsToNcDataLists(combinationNcLists, args.verbose);
+    if (args.verbose > 1) {
+        console.error(` ncDataLists(${ncDataLists.length})`);
+        console.error(`  [0]: ${JStringify(ncDataLists[0])}`);
+    }
     const begin = new Date();
     const result = ncDataLists.filter((ncDataList: NCDataList) => {
         const [largest, ncList] = largestNcDataCountSum(ncDataList);
@@ -191,7 +209,7 @@ const buildAllUseNcDataLists = (listName: string, maxSum: number, args: any): NC
         }
         return largest <= maxSum;
     });
-    if (args.verbose > 2) {
+    if (args.verbose > 1) {
         let d = new Duration(begin, new Date()).milliseconds;
         console.error(` filtered ncDataLists(${result.length}) - ${PrettyMs(d)}`);
     }

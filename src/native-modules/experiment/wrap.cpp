@@ -4,9 +4,9 @@
 #include <iostream>
 #include "wrap.h"
 
-using namespace Napi;
-
 namespace cm {
+
+using namespace Napi;
 
 Object wrap(Env& env, const NameCount& nc) {
   Object jsObj = Object::New(env);

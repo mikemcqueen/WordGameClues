@@ -23,19 +23,23 @@ std::mutex tm_mutex_;
 
 void add_error(std::string_view msg, void* ptr, std::string_view tag_sv,
     size_t size) {
-  std::scoped_lock lk(pm_mutex_, tm_mutex_);
-  auto it_pm = ptr_map_.find(ptr);
-  // TODO: could make key a string_view, and avoid copy
-  const auto& existing_tag = it_pm->second.first;
-  auto existing_size = it_pm->second.second;
-  auto it_tm = tag_map_.find(std::string{tag_sv});
-  auto tag_size = it_tm == tag_map_.end() ? size_t(0) : it_tm->second;
+  std::string existing_tag;
+  size_t existing_size{};
+  size_t tag_size{};
+  {
+    std::scoped_lock lk(pm_mutex_, tm_mutex_);
+    auto it_pm = ptr_map_.find(ptr);
+    existing_tag = it_pm->second.first;
+    existing_size = it_pm->second.second;
+    auto it_tm = tag_map_.find(std::string{tag_sv});
+    tag_size = (it_tm == tag_map_.end()) ? 0u : it_tm->second;
+  }
   std::cerr << "ERROR: " << msg << ": " << ptr << ", attempted size: " << size
             << std::endl
-            << " attempted tag: " << tag_sv
-            << ", size: " << tag_size << std::endl
-            << " existing tag: " << existing_tag
-            << ", size: " << existing_size << std::endl;
+            << " attempted tag: " << tag_sv << ", size: " << tag_size
+            << std::endl
+            << " existing tag: " << existing_tag << ", size: " << existing_size
+            << std::endl;
   std::terminate();
 }
 
@@ -119,14 +123,16 @@ void cuda_free(void* ptr) {
   remove_ptr(ptr);
 }
 
-void cuda_memory_dump(std::string_view header /* = "cuda_memory_dump"sv */) {
-  if (log_level(MemoryDumps)) {
-    // TODO: holding a lock while doing io is dumb.
+void cuda_memory_dump(std::string_view header /* = "cuda_memory_dump" */) {
+  if (!log_level(MemoryDumps)) return;
+  TagMap tag_map_copy;
+  {
     std::scoped_lock lk(tm_mutex_);
-    std::cerr << header << ":" << std::endl;
-    for (const auto& it : tag_map_) {
-      std::cerr << " " << it.first << ": " << it.second << std::endl;
-    }
+    tag_map_copy = tag_map_;
+  }
+  std::cerr << header << ":" << std::endl;
+  for (const auto& it : tag_map_copy) {
+    std::cerr << " " << it.first << ": " << it.second << std::endl;
   }
 }
 

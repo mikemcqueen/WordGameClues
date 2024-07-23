@@ -20,6 +20,7 @@ const Debug       = require('debug')('clues');
 const Duration    = require('duration');
 const Expect      = require('should/as-function');
 const Log         = require('../modules/log')('clues');
+const My          = require('../modules/util');
 const Note        = require('../modules/note');
 const Opt         = require('node-getopt');
 const Peco        = require('../modules/peco');
@@ -98,21 +99,23 @@ function usage (msg) {
 }
 
 const loadClues = (clues, max, options) => {
-    log('loading all clues...');
     ClueManager.loadAllClues({
+        addVariations: !!options.test,
         clues,
-        max,
-        max_sources: options.max_sources,
-        useSentences: true,
-        quiet: options.quiet,
-        verbose: options.verbose,
         ignoreErrors: options.ignoreErrors,
         fast: !options.slow,
-        addVariations: !!options.test,
+        max,
+        max_sources: options.max_sources,
+        memory: options.memory,
+        quiet: options.quiet,
+        removeAllInvalid: options.removeAllInvalid,
+        useSentences: true,
         validateAll: true,
-        removeAllInvalid: options.removeAllInvalid
+        verbose: options.verbose
     });
-    log('done.');
+    if (options.memory) {
+        Native.dumpMemory("after loadclues");
+    }
     return true;
 }
 
@@ -254,12 +257,6 @@ function setLogging (flag) {
     LOGGING = flag;
 }
 
-function log (text) {
-    if (LOGGING) {
-        console.log(text);
-    }
-}
-
 function sortAllClues (clueSource, max) {
     const dir = clueSource.baseDir;
     //max = 3;
@@ -394,11 +391,7 @@ async function main () {
     console.error(`loadClues(${PrettyMs(loadMillis)})`);
     setLogging(false); //options.verbose);
 
-    //process.exit(0);
-
     options.notebook = options.notebook || Note.getWorksheetName(clueSource);
-
-    log(`count=${options.count}, max=${maxArg}`);
 
     // TODO: add "show.js" with these exports
 /*
@@ -469,12 +462,6 @@ async function main () {
     return 0;
 }
 
-//
-
-const appBegin = new Date();
 main().catch(err => {
     console.error(err, err.stack);
 });
-if (LOGGING && !QUIET) {
-    console.error('runtime: ' + (new Duration(appBegin, new Date())).seconds + ' seconds');
-}

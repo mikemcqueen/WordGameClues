@@ -285,16 +285,6 @@ auto get_addends(const std::vector<std::string>& name_list, int max_sources) {
   return result;
 }
 
-auto has_names_at_counts(const std::vector<std::string>& name_list,
-    const std::vector<int>& count_list) {
-  for (size_t i{}; i < name_list.size(); ++i) {
-    if (!clue_manager::is_known_name_count(name_list.at(i), count_list.at(i))) {
-      return false;
-    }
-  }
-  return true;
-}
-
 // given a vector of (sorted) count lists, ex. [ [1,2,3], .. ] test if the
 // providede names exist at any permutation of each list. return all count
 // count lists which have such a permutation.
@@ -303,7 +293,7 @@ auto filter_valid_addend_perms(std::vector<std::vector<int>>& addends,
   std::vector<std::vector<int>> result;
   for (auto& count_list : addends) {
     do {
-      if (has_names_at_counts(name_list, count_list)) {
+      if (clue_manager::are_known_name_counts(name_list, count_list)) {
         result.emplace_back(std::move(count_list));
         // once we get one valid perm for a count_list, we can break out,
         // because the NC (name:sum_of_counts) will be the same.

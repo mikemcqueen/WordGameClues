@@ -27,6 +27,7 @@
       'index.cpp',
       'merge-support.cpp',
       'validator.cpp',
+      'unwrap.cpp',
       'wrap.cpp'
     ],
     'include_dirs': [

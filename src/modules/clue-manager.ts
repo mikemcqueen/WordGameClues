@@ -6,9 +6,10 @@
 
 import _ from 'lodash'; // import statement to signal that we are a "module"
 
-const Log            = require('../../modules/log')('clue-manager');
-const Peco           = require('../../modules/peco');
 const Clues          = require('../../modules/clue-types');
+const Log            = require('../../modules/log')('clue-manager');
+const My             = require('../../modules/util');
+const Peco           = require('../../modules/peco');
 
 const Assert         = require('assert');
 const Debug          = require('debug')('clue-manager');
@@ -464,7 +465,15 @@ export const loadAllClues = function (args: any): void {
         let clueList: ClueList.Compound = loadClueList(count);
         State.clueListArray[count] = clueList;
         addKnownCompoundClues(clueList, count, args);
-        Native.setCompoundClueNameSourcesMap(count, _.entries(getKnownClueMap(count)));
+        const map = getKnownClueMap(count);
+        Native.setCompoundClueNameSourcesMap(count, _.entries(map));
+        if (0 && args.memory) {
+            Native.dumpMemory(`after setNameSourcesMap(${count}), map.size(${Object.keys(map).length})`);
+            const mu = process.memoryUsage();
+            console.error(` v8 heap used: ${mu.heapUsed}`);
+            console.error(` process rss:  ${mu.rss}`);
+            My.getChar();
+        }
     }
     const t_dur = new Duration(t0, new Date()).milliseconds;
     if (args.verbose) {

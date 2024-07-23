@@ -20,12 +20,13 @@
 #include "components.h"
 #include "util.h"
 #include "validator.h"
+#include "unwrap.h"
 #include "wrap.h"
 #include "log.h"
 
 namespace {
 
-// types
+// aliases
 
 using namespace Napi;
 using namespace cm;
@@ -37,268 +38,6 @@ using namespace cm::validator;
 MergeFilterData MFD;
 
 // functions
-
-std::vector<int> makeIntList(Env& env, const Array& jsList) {
-  std::vector<int> int_list{};
-  for (size_t i{}; i < jsList.Length(); ++i) {
-    if (!jsList[i].IsNumber()) {
-      TypeError::New(env, "makeIntList: non-number element")
-        .ThrowAsJavaScriptException();
-      return {};
-    }
-    int_list.emplace_back(jsList[i].As<Number>().Int32Value());
-  }
-  return int_list;
-}
-
-IndexList makeIndexList(Env& env, const Array& jsList) {
-  IndexList idx_list{};
-  for (size_t i{}; i < jsList.Length(); ++i) {
-    if (!jsList[i].IsNumber()) {
-      TypeError::New(env, "makeIndexList: non-number element")
-        .ThrowAsJavaScriptException();
-      return {};
-    }
-    idx_list.emplace_back(jsList[i].As<Number>().Uint32Value());
-  }
-  return idx_list;
-}
-
-std::vector<std::string> makeStringList(Env& env, const Array& jsList) {
-  std::vector<std::string> list{};
-  for (size_t i{}; i < jsList.Length(); ++i) {
-    if (!jsList[i].IsString()) {
-      TypeError::New(env, "makeStringList: non-string element")
-        .ThrowAsJavaScriptException();
-      return {};
-    }
-    list.emplace_back(std::move(jsList[i].As<String>().Utf8Value()));
-  }
-  return list;
-}
-
-NameCount makeNameCount(Env& env, const Object& jsObject) {
-  auto jsName = jsObject.Get("name");
-  auto jsCount = jsObject.Get("count");
-  if (!jsName.IsString() || !jsCount.IsNumber()) {
-    TypeError::New(env, "makeNameCount: invalid arguments")
-      .ThrowAsJavaScriptException();
-    return NameCount{"error", 1};
-  }
-  auto name = jsName.As<String>().Utf8Value();
-  const int count = (int)jsCount.As<Number>().Int32Value();
-  return NameCount{std::move(name), count};
-}
-
-NameCountList makeNameCountList(Env& env, const Array& jsList) {
-  NameCountList ncList{};
-  for (size_t i{}; i < jsList.Length(); ++i) {
-    if (!jsList[i].IsObject()) {
-      TypeError::New(env, "makeNameCountList: non-object element")
-        .ThrowAsJavaScriptException();
-      return {};
-    }
-    ncList.emplace_back(std::move(makeNameCount(env, jsList[i].As<Object>())));
-  }
-  return ncList;
-}
-
-SourceData makeSourceData(Env& env, const Object& jsSourceData,
-    std::string_view nameSrcList = "primaryNameSrcList") {
-  auto jsPrimaryNameSrcList = jsSourceData.Get(nameSrcList.data());
-  if (!jsPrimaryNameSrcList.IsArray()) {
-    TypeError::New(env, "makeSourceData: primaryNameSrcList is not an array")
-      .ThrowAsJavaScriptException();
-    return {};
-  }
-  auto jsNcList = jsSourceData.Get("ncList");
-  if (!jsNcList.IsArray()) {
-    TypeError::New(env, "makeSourceData: ncList is not an array")
-      .ThrowAsJavaScriptException();
-    return {};
-  }
-  // TODO: declare SourceData result; assign result.xxx = std::move(yyy);;
-  // return result (no move-all-params constructor required)
-  auto primaryNameSrcList =
-    makeNameCountList(env, jsPrimaryNameSrcList.As<Array>());
-  auto ncList =
-    makeNameCountList(env, jsNcList.As<Array>());
-  auto usedSources = NameCount::listToUsedSources(primaryNameSrcList);
-#if 0
-  usedSources.assert_valid();
-#endif
-  return {
-    std::move(primaryNameSrcList), std::move(ncList), std::move(usedSources)};
-}
-
-SourceList makeSourceList(Env& env, const Array& jsList,
-    std::string_view nameSrcList = "primaryNameSrcList") {
-  SourceList sourceList{};
-  for (size_t i{}; i < jsList.Length(); ++i) {
-    if (!jsList[i].IsObject()) {
-      TypeError::New(env, "makeSourceList: non-object element")
-        .ThrowAsJavaScriptException();
-      return {};
-    }
-    sourceList.emplace_back(
-      std::move(makeSourceData(env, jsList[i].As<Object>(), nameSrcList)));
-  }
-  return sourceList;
-}
-
-NCData makeNcData(Env& env, const Object& jsObject) {
-  auto jsNcList = jsObject.Get("ncList");
-  if (!jsNcList.IsArray()) {
-    TypeError::New(env, "makeNcData: ncList is non-array type")
-      .ThrowAsJavaScriptException();
-    return {};
-  }
-  return { makeNameCountList(env, jsNcList.As<Array>()) };
-}
-
-NCDataList makeNcDataList(Env& env, const Array& jsList) {
-  NCDataList list;
-  for (size_t i{}; i < jsList.Length(); ++i) {
-    if (!jsList[i].IsObject()) {
-      TypeError::New(env, "makeNcDataList: element is non-object type")
-        .ThrowAsJavaScriptException();
-      return {};
-    }
-    list.emplace_back(std::move(makeNcData(env, jsList[i].As<Object>())));
-  }
-  return list;
-}
-
-std::vector<NCDataList> makeNcDataLists(Env& env, const Array& jsList) {
-  std::vector<NCDataList> lists;  
-  for (size_t i{}; i < jsList.Length(); ++i) {
-    if (!jsList[i].IsArray()) {
-      TypeError::New(env, "makeNcDataLists: element is non-array type")
-        .ThrowAsJavaScriptException();
-      return {};
-    }
-    lists.emplace_back(std::move(makeNcDataList(env, jsList[i].As<Array>())));
-  }
-  return lists;
-}
-
-NameSourcesMap makeNameSourcesMap(Env& env, const Array& jsList) {
-  NameSourcesMap map;
-  for (size_t i{}; i < jsList.Length(); ++i) {
-    if (!jsList[i].IsArray()) {
-      TypeError::New(env, "makeNameSourcesMap: mapEntry is non-array type")
-        .ThrowAsJavaScriptException();
-      return {};
-    }
-    const auto tuple = jsList[i].As<Array>();
-    if (!tuple[0u].IsString() || !tuple[1u].IsArray()) {
-      TypeError::New(
-        env, "makeNameSourcesMap: invalid mapEntry key/value type")
-        .ThrowAsJavaScriptException();
-      return {};
-    }
-    const auto name = tuple[0u].As<String>().Utf8Value();
-    auto sources = makeStringList(env, tuple[1u].As<Array>());
-    map.emplace(std::move(name), std::move(sources));
-  }
-  return map;
-}
-
-SourceCompatibilityData makeSourceCompatibilityDataFromSourceData(
-    Env& env, const Object& jsSourceData) {
-  // TODO: addPnslToCompatData(jsSouceData, compatData);
-  SourceCompatibilityData compatData{};
-  const auto jsPnsl = jsSourceData.Get("primaryNameSrcList").As<Array>();
-  for (size_t i{}; i < jsPnsl.Length(); ++i) {
-    const auto count =
-      jsPnsl[i].As<Object>().Get("count").As<Number>().Int32Value();
-    compatData.addSource(count);
-  }
-  return compatData;
-}
-
-SourceCompatibilityData makeSourceCompatibilityDataFromSourceList(
-    Env& env, const Array& jsSourceList) {
-  SourceCompatibilityData compatData{};
-  for (size_t i{}; i < jsSourceList.Length(); ++i) {
-    if (!jsSourceList[i].IsObject()) {
-      TypeError::New(env, "makeSourceCompatibilityData: non-object element")
-        .ThrowAsJavaScriptException();
-      return {};
-    }
-    // TODO: addPnslToCompatData(jsSourceList[i].As<Object>(), compatData);
-    const auto jsPnsl =
-      jsSourceList[i].As<Object>().Get("primaryNameSrcList").As<Array>();
-    for (size_t j{}; j < jsPnsl.Length(); ++j) {
-      const auto count =
-        jsPnsl[j].As<Object>().Get("count").As<Number>().Int32Value();
-      compatData.addSource(count);
-    }
-  }
-  return compatData;
-}
-
-SourceCompatibilityList makeSourceCompatibilityListFromMergedSourcesList(
-    Env& env, const Array& jsList) {
-  SourceCompatibilityList sourceCompatList{};
-  for (size_t i{}; i < jsList.Length(); ++i) {
-    if (!jsList[i].IsObject()) {
-      TypeError::New(env, "makeSourceCompatibiltyList: non-object element")
-        .ThrowAsJavaScriptException();
-      return {};
-    }
-    auto jsSourceList = jsList[i].As<Object>().Get("sourceList").As<Array>();
-    SourceCompatibilityData compatData =
-      makeSourceCompatibilityDataFromSourceList(env, jsSourceList);
-    sourceCompatList.emplace_back(std::move(compatData));
-  }
-  return sourceCompatList;
-}
-
-OrSourceData makeOrSource(Env& env, const Object& jsObject) {
-  OrSourceData orSource;
-  orSource.src = std::move(makeSourceCompatibilityDataFromSourceData(
-    env, jsObject["source"].As<Object>()));
-  orSource.is_xor_compat = jsObject["xorCompatible"].As<Boolean>();
-  //  orSource.and_compat = jsObject["andCompatible"].As<Boolean>();
-  return orSource;
-}
-
-OrSourceList makeOrSourceList(Env& env, const Array& jsList) {
-  OrSourceList orSourceList{};
-  for (size_t i{}; i < jsList.Length(); ++i) {
-    if (!jsList[i].IsObject()) {
-      TypeError::New(env, "makeOrSourceList: non-object element")
-        .ThrowAsJavaScriptException();
-      return {};
-    }
-    orSourceList.emplace_back(
-      std::move(makeOrSource(env, jsList[i].As<Object>())));
-  }
-  return orSourceList;
-}
-
-OrArgData makeOrArgData(Env& env, const Object& jsObject) {
-  OrArgData orArgData{};
-  orArgData.or_src_list =
-    std::move(makeOrSourceList(env, jsObject["orSourceList"].As<Array>()));
-  orArgData.compat = jsObject["compatible"].As<Boolean>();
-  return orArgData;
-}
-
-OrArgList makeOrArgList(Env& env, const Array& jsList) {
-  OrArgList orArgList{};
-  for (size_t i{}; i < jsList.Length(); ++i) {
-    if (!jsList[i].IsObject()) {
-      TypeError::New(env, "makeOrArgDataList: non-object element")
-        .ThrowAsJavaScriptException();
-      return {};
-    }
-    orArgList.emplace_back(
-      std::move(makeOrArgData(env, jsList[i].As<Object>())));
-  }
-  return orArgList;
-}
 
 //
 // Clue-manager
@@ -342,9 +81,9 @@ Value setCompoundClueNameSourcesMap(const CallbackInfo& info) {
     return env.Null();
   }
   // arg0
-  auto count{info[0].As<Number>().Int32Value()};
+  auto count = info[0].As<Number>().Int32Value();
   // arg1
-  auto map{makeNameSourcesMap(env, info[1].As<Array>())};
+  auto map = makeNameSourcesMap(env, info[1].As<Array>());
   // --
   clue_manager::setNameSourcesMap(count, std::move(map));
   return env.Null();
@@ -460,7 +199,7 @@ Value getNumNcResults(const CallbackInfo& info) {
   return Number::New(env, clue_manager::get_num_nc_sources(nc));
 }
 
-long validate_ms = 0;
+long validate_ns = 0;
 
 Value validateSources(const CallbackInfo& info) {
   Env env = info.Env();
@@ -483,8 +222,8 @@ Value validateSources(const CallbackInfo& info) {
   auto src_list =
       validator::validateSources(clue_name, src_names, sum, validate_all);
   t.stop();
-  validate_ms += t.count();
-  auto is_valid_src_list = !src_list.empty();
+  validate_ns += t.nanoseconds();
+  const auto is_valid_src_list = !src_list.empty();
   if (validate_all && is_valid_src_list) {
     clue_manager::init_known_source_map_entry(
         sum, src_names, std::move(src_list));
@@ -496,7 +235,7 @@ void show_clue_manager_durations(){
   static bool shown = false;
   if (!shown) {
     std::cerr << "(delayed clue_manager durations)\n"
-              << " validateSources - " << validate_ms << "ms\n";
+              << " validateSources - " << (validate_ns / 1e6) << "ms\n";
     show_validator_durations();
     shown = true;
   }
@@ -516,6 +255,33 @@ void display(const std::vector<NCDataList>& nc_data_lists) {
   }
 }
 
+void host_memory_dump(
+    const MergeFilterData::Host& host, std::string_view header = "post merge") {
+  if (!log_level(MemoryDumps)) return;
+
+  // MergeData
+  // std::vector<IndexList> compat_idx_lists;
+  // ComboIndexList combo_indices;
+  auto idx_lists_size =
+      host.compat_idx_lists.size() * sizeof(IndexList::value_type);
+  auto combo_indices_size =
+      host.combo_indices.size() * sizeof(ComboIndexList::value_type);
+  auto merged_src_list_size =
+      host.merged_xor_src_list.size() * sizeof(SourceList::value_type);
+
+  std::cerr << "host memory dump " << header << std::endl
+            << " idx_lists  :     " << util::pretty_bytes(idx_lists_size)
+            << std::endl
+            << " combo_indices:   " << util::pretty_bytes(combo_indices_size)
+            << std::endl
+            << " merged_src_list: " << util::pretty_bytes(merged_src_list_size)
+            << std::endl
+            << " total:           "
+            << util::pretty_bytes(
+                   idx_lists_size + combo_indices_size + merged_src_list_size)
+            << std::endl;
+}
+
 //
 // Combo-maker
 //
@@ -525,8 +291,8 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   Env env = info.Env();
   if (!info[0].IsArray() || !info[1].IsBoolean()) {
     TypeError::New(
-      env, "mergeCompatibleXorSourceCombinations: invalid parameter")
-      .ThrowAsJavaScriptException();
+        env, "mergeCompatibleXorSourceCombinations: invalid parameter")
+        .ThrowAsJavaScriptException();
     return env.Null();
   }
   // arg0
@@ -537,10 +303,9 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   // --
   // arbitrary, want to do it somewhere
   show_clue_manager_durations();
-
   auto xor_src_lists = build_src_lists(nc_data_lists);
   if (log_level(Normal)) {
-    std::cerr << "build xor_src_lists(" << xor_src_lists.size() << ")\n";
+    // std::cerr << "build xor_src_lists(" << xor_src_lists.size() << ")\n";
   }
 #if 0
   for (const auto& src_list: xor_src_lists) {
@@ -560,6 +325,7 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
       MFD.host.merged_xor_src_list = std::move(xor_src_lists.back());
     }
     num_compatible = MFD.host.merged_xor_src_list.size();
+    host_memory_dump(MFD.host);
   } else {
     if (get_merge_data(xor_src_lists, MFD.host, MFD.device, merge_only)) {
       num_compatible = MFD.host.combo_indices.size();
@@ -758,8 +524,9 @@ Value getResult(const CallbackInfo& info) {
 }
 
 //
-// showComponents
+// Components
 //
+
 Value showComponents(const CallbackInfo& info) {
   Env env = info.Env();
   if (!info[0].IsArray()) {
@@ -774,9 +541,6 @@ Value showComponents(const CallbackInfo& info) {
   return wrap(env, sums);
 }
 
-//
-// checkClueConsistency
-//
 Value checkClueConsistency(const CallbackInfo& info) {
   Env env = info.Env();
   if (!info[0].IsArray() && !info[1].IsNumber() && !info[2].IsNumber() && !info[3].IsBoolean()) {
@@ -806,17 +570,11 @@ Value checkClueConsistency(const CallbackInfo& info) {
   return Boolean::New(env, result);
 }
 
-//
-// getConsistencyCheckResults
-//
 Value getConsistencyCheckResults(const CallbackInfo& info) {
   Env env = info.Env();
   return wrap(env, components::get_consistency_check_results());
 }
 
-//
-// setArgs
-//
 LogOptions makeLogOptions(Env& env, const Object& jsObject) {
   LogOptions log_args;
   auto jsQuiet = jsObject.Get("quiet");
@@ -858,6 +616,10 @@ LogOptions makeLogOptions(Env& env, const Object& jsObject) {
   return log_args;
 }
 
+//
+// Misc
+//
+
 Value setOptions(const CallbackInfo& info) {
   Env env = info.Env();
   if (!info[0].IsObject()) {
@@ -868,6 +630,23 @@ Value setOptions(const CallbackInfo& info) {
   // arg0
   set_log_options(makeLogOptions(env, info[0].As<Object>()));
   // --
+  return env.Null();
+}
+
+Value dumpMemory(const CallbackInfo& info) {
+  Env env = info.Env();
+  if (!(info[0].IsString() || !info[0].IsUndefined())) {
+    TypeError::New(env, "dumpMemory: invalid parameter type")
+        .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+  // arg 0
+  if (info[0].IsString()) {
+    auto header = info[0].As<String>().Utf8Value();
+    clue_manager::dump_memory(header);
+  } else {
+    clue_manager::dump_memory();
+  }
   return env.Null();
 }
 
@@ -908,6 +687,7 @@ Object Init(Env env, Object exports) {
   // misc
   //
   exports["setOptions"] = Function::New(env, setOptions);
+  exports["dumpMemory"] = Function::New(env, dumpMemory);
 
   return exports;
 }
