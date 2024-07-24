@@ -367,7 +367,7 @@ filter_task_result_t xor_filter_task(const MergeFilterData& mfd,
   // err = cudaDeviceSetLimit(cudaLimitPrintfFifoSize, 7'500'000);
 
   // TODO: FIXMENOW: streams = 3
-  num_streams = num_streams ? num_streams : 1;
+  num_streams = num_streams ? num_streams : 3;
   stride = stride ? stride : candidates.size();
   iters = iters ? iters : 1;
 

@@ -20,7 +20,7 @@ struct KnownSourceMapValue {
   SourceList src_list;
   std::set<std::string> clue_names;
   // all nc names (including primary) used to generate the src_list
-  //std::set<std::string> nc_names;
+  //std::unordered_set<std::string> nc_names;
 };
 using KnownSourceMapValueCRef = std::reference_wrapper<const KnownSourceMapValue>;
 
@@ -39,15 +39,9 @@ using NameSourcesMap = std::unordered_map<std::string, std::vector<std::string>>
 // ncSourcesMaps
 
 // TODO, const as overloaded member function
-auto get_nc_src_list(const NameCount& nc) -> SourceList&;
+//auto get_nc_src_list(const NameCount& nc) -> SourceList&;
 
-auto get_num_nc_sources(const NameCount& nc) -> int;
-
-// NOTE: this doesn't properly set nc_list. it could.
-auto make_src_list_for_nc(const NameCount& nc) -> SourceList;
-
-// NOTE: this doesn't properly set nc_list. it can't, without a proxy.
-auto make_src_cref_list_for_nc(const NameCount& nc) -> SourceCRefList;
+//auto get_num_nc_sources(const NameCount& nc) -> int;
 
 // nameSourcesMaps
 
@@ -81,7 +75,13 @@ auto get_known_source_map_entries(const std::string& name, int count)  //
 auto get_known_source_map_entries(const NameCount& nc)  //
     -> std::vector<KnownSourceMapValueCRef>;
 
-void add_compound_clue(const NameCount& nc, const std::string& sources_csv);
+bool add_compound_clue(const NameCount& nc, const std::string& sources_csv);
+
+// NOTE: this doesn't properly set nc_list. it could.
+auto make_src_list_for_nc(const NameCount& nc) -> SourceList;
+
+// NOTE: this doesn't properly set nc_list. it can't, without a proxy.
+auto make_src_cref_list_for_nc(const NameCount& nc) -> SourceCRefList;
 
 // uniqueClueNames
 

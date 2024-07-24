@@ -185,6 +185,7 @@ Value getSourceListsForNc(const CallbackInfo& info) {
 // Validator
 //
 
+/*
 Value getNumNcResults(const CallbackInfo& info) {
   Env env = info.Env();
   if (!info[0].IsObject()) {
@@ -195,6 +196,7 @@ Value getNumNcResults(const CallbackInfo& info) {
   auto nc = makeNameCount(env, info[0].As<Object>());
   return Number::New(env, clue_manager::get_num_nc_sources(nc));
 }
+*/
 
 long validate_ns = 0;
 
@@ -650,7 +652,7 @@ Value dumpMemory(const CallbackInfo& info) {
 Object Init(Env env, Object exports) {
   // clue-manager
   //
-  exports["getNumNcResults"] = Function::New(env, getNumNcResults);
+  //  exports["getNumNcResults"] = Function::New(env, getNumNcResults);
   exports["setPrimaryNameSrcIndicesMap"] =
       Function::New(env, setPrimaryNameSrcIndicesMap);
   exports["setCompoundClueNameSourcesMap"] =

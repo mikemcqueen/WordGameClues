@@ -2,7 +2,6 @@
 
 #include <array>
 #include <iostream>
-#include <vector>
 #include "clue-manager.h"
 #include "combo-maker.h"
 #include "peco.h"
@@ -19,6 +18,7 @@ auto validateSourceNamesAtCounts(const std::string& clue_name,
   // NOTE: this could also just be a nested loop. depends how slow it is.
   // build lists of src_crefs for NCs 0 and 1 that have no name conflicts
   // temporary: ignore name conflicts; eventual: for_each_nc_entry
+#if 1
   SourceCRefList src_cref_list0;
   clue_manager::for_each_nc_source(src_names.at(0), count_list.at(0),
       [&list = src_cref_list0](const SourceData& src) {  //
@@ -29,6 +29,38 @@ auto validateSourceNamesAtCounts(const std::string& clue_name,
       [&list = src_cref_list1](const SourceData& src) {  //
         list.emplace_back(std::cref(src));
       });
+#else
+  SourceCRefList src_cref_list0;
+  auto entry_cref_list0 = clue_manager::get_known_source_map_entries(
+      src_names.at(0), count_list.at(0));
+  for (const auto& entry_cref : entry_cref_list) {
+    const auto& entry = entry_cref.get();
+    if (std::any_of(src_names.begin(), src_names.end(),
+            [&nc_names = entry.nc_names](const std::string& src_name) {
+              return nc_names.contains(src_name);
+            })) {
+      continue;
+    }
+    for (const auto& src : entry.src_list) {
+        src_cref_list0.emplace_back(std::cref(src));
+    }
+  }
+  SourceCRefList src_cref_list1;
+  auto entry_cref_list1 = clue_manager::get_known_source_map_entries(
+      src_names.at(1), count_list.at(1));
+  for (const auto& entry_cref : entry_cref_list) {
+    const auto& entry = entry_cref.get();
+    if (std::any_of(src_names.begin(), src_names.end(),
+            [&nc_names = entry.nc_names](const std::string& src_name) {
+              return nc_names.contains(src_name);
+            })) {
+      continue;
+    }
+    for (const auto& src : entry.src_list) {
+        src_cref_list1.emplace_back(std::cref(src));
+    }
+  }
+#endif
   // NOTE: in order to support more than 2 sources here, we'd probably have
   // to bite the bullet and merge sources in lists 0,1 then then merge the
   // resulting list with sources from list 2, and so on.
@@ -67,6 +99,7 @@ auto validateSources(const std::string& clue_name,
     return src_name == clue_name;
   };
   // TODO: test returning same variable at multiple locations
+  // don't love this here. would prefer all of this logic were in one place.
   if (std::ranges::find_if(src_names, pred) != src_names.end()) {
     return result;
   }
@@ -78,7 +111,7 @@ auto validateSources(const std::string& clue_name,
       auto src_list = validateSourceNamesAtCounts(
           clue_name, src_names, count_list, nc_list);
       std::ranges::move(src_list, std::back_inserter(result));
-      if (!validate_all && !result.empty()) return result;
+      if (!validate_all && !src_list.empty()) return result;
     } while (std::ranges::next_permutation(count_list).found);
   }
   return result;
