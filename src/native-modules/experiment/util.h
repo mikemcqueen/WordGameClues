@@ -98,8 +98,6 @@ inline std::string join(const C<T>& strings, const std::string& delim) {
   }
   return std::accumulate(std::next(strings.begin()), strings.end(), *strings.begin(),
     [delim](const std::string& acc, const std::string& elem) {
-      // well i think this is probably more expensive than multiple += followed
-      // by a return. would like to profile.
       return acc + delim + elem;
     });
 }

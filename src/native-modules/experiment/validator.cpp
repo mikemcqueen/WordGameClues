@@ -15,55 +15,25 @@ namespace {
 auto validateSourceNamesAtCounts(const std::string& clue_name,
     const std::vector<std::string>& src_names, std::vector<int> count_list,
     NameCountList& nc_list) -> SourceList {
-  // NOTE: this could also just be a nested loop. depends how slow it is.
-  // build lists of src_crefs for NCs 0 and 1 that have no name conflicts
-  // temporary: ignore name conflicts; eventual: for_each_nc_entry
-#if 1
-  SourceCRefList src_cref_list0;
+  auto src_cref_list0 =
+      clue_manager::make_src_cref_list(src_names.at(0), count_list.at(0));
+  auto src_cref_list1 =
+      clue_manager::make_src_cref_list(src_names.at(1), count_list.at(1));
+  /*
   clue_manager::for_each_nc_source(src_names.at(0), count_list.at(0),
       [&list = src_cref_list0](const SourceData& src) {  //
         list.emplace_back(std::cref(src));
       });
-  SourceCRefList src_cref_list1;
+  // TODO: clue_manager::make_nc_src_list()
   clue_manager::for_each_nc_source(src_names.at(1), count_list.at(1),
       [&list = src_cref_list1](const SourceData& src) {  //
         list.emplace_back(std::cref(src));
       });
-#else
-  SourceCRefList src_cref_list0;
-  auto entry_cref_list0 = clue_manager::get_known_source_map_entries(
-      src_names.at(0), count_list.at(0));
-  for (const auto& entry_cref : entry_cref_list) {
-    const auto& entry = entry_cref.get();
-    if (std::any_of(src_names.begin(), src_names.end(),
-            [&nc_names = entry.nc_names](const std::string& src_name) {
-              return nc_names.contains(src_name);
-            })) {
-      continue;
-    }
-    for (const auto& src : entry.src_list) {
-        src_cref_list0.emplace_back(std::cref(src));
-    }
-  }
-  SourceCRefList src_cref_list1;
-  auto entry_cref_list1 = clue_manager::get_known_source_map_entries(
-      src_names.at(1), count_list.at(1));
-  for (const auto& entry_cref : entry_cref_list) {
-    const auto& entry = entry_cref.get();
-    if (std::any_of(src_names.begin(), src_names.end(),
-            [&nc_names = entry.nc_names](const std::string& src_name) {
-              return nc_names.contains(src_name);
-            })) {
-      continue;
-    }
-    for (const auto& src : entry.src_list) {
-        src_cref_list1.emplace_back(std::cref(src));
-    }
-  }
-#endif
+  */
   // NOTE: in order to support more than 2 sources here, we'd probably have
   // to bite the bullet and merge sources in lists 0,1 then then merge the
   // resulting list with sources from list 2, and so on.
+  const auto logging = true;
   SourceList src_list;
   for (const auto src_cref0 : src_cref_list0) {
     const auto& src0 = src_cref0.get();
@@ -71,8 +41,34 @@ auto validateSourceNamesAtCounts(const std::string& clue_name,
       const auto& src1 = src_cref1.get();
       if (src0.isXorCompatibleWith(src1)) {
         // TODO: SourceData.copyMerge(const SourceData&)
-        // copy
+        // copy src0
         SourceData merged_src{src0};
+        if (!merged_src.merge_nc_names(src1.nc_names, true)) {
+          // merging two NCs with common source names is probably OK.
+          if (0 && logging) {
+            std::cerr << " failed to merge " << util::join(src1.nc_names, ",")
+                      << " of " << NameCount::listToString(src1.ncList)
+                      << " with " << util::join(src0.nc_names, ",") << " of "
+                      << NameCount::listToString(src0.ncList) << " for "
+                      << clue_name << ":" << util::sum(count_list) << std::endl;
+          }
+          //continue;
+        }
+        // what is definitely not OK is when NC name is the same as one of its
+        // source names
+        if (!merged_src.merge_nc_name(clue_name)) {
+          if (log_level(ExtraVerbose)) {
+            std::cerr << "failed to merge " << clue_name << ":"
+                      << util::sum(count_list) << " to nc_names ["
+                      << util::join(merged_src.nc_names, ",") << "]"
+                      << std::endl;
+            std::cerr << " after merging " << util::join(src1.nc_names, ",")
+                      << " of " << NameCount::listToString(src1.ncList)
+                      << " with " << util::join(src0.nc_names, ",") << " of "
+                      << NameCount::listToString(src0.ncList) << std::endl;
+          }
+          continue;
+        }
         // merge compatibility data
         merged_src.mergeInPlace(src1);
         // copy src1 primaryNameSrcList on top

@@ -434,6 +434,10 @@ struct NameCount {
     return buf;
   }
 
+  static std::string makeString(const std::string& name, int count) {
+    return name + ":" + std::to_string(count);
+  }
+
   static std::vector<std::string> listToNameList(const NameCountList& list) {
     std::vector<std::string> names;
     for (auto it = list.cbegin(); it != list.cend(); ++it) {
@@ -545,13 +549,14 @@ struct SourceData : SourceCompatibilityData {
         ncList(std::move(ncList)) {
   }
 
-  // for validator.merge: usedSources (because it's not moveable) and nc_list
-  SourceData(const UsedSources& usedSources, NameCountList&& primaryNameSrcList,
-      const NameCountList& ncList)
-      : SourceCompatibilityData(usedSources),
-        primaryNameSrcList(std::move(primaryNameSrcList)),
-        ncList(ncList) {
-  }
+  // constructor for list.emplace
+  // used_sources is const-ref because it doesn't benefit from move
+  SourceData(const UsedSources& used_sources,
+      NameCountList&& primary_name_src_list, NameCountList&& nc_list,
+      std::set<std::string>&& nc_names)
+      : SourceCompatibilityData(used_sources),
+        primaryNameSrcList(std::move(primary_name_src_list)),
+        ncList(std::move(nc_list)), nc_names(std::move(nc_names)) {}
 
   // copy assign allowed for now for precompute.mergeAllCompatibleXorSources
   SourceData(const SourceData&) = default;
@@ -595,6 +600,22 @@ struct SourceData : SourceCompatibilityData {
     return true;
   }
 
+  auto merge_nc_name(const std::string& name) {
+    return nc_names.insert(name).second;
+  }
+
+  auto merge_nc_names(
+      const std::set<std::string>& from_names, bool allow_duplicates = false) {
+    bool duplicate{};
+    for (const auto& name : from_names) {
+      if (!merge_nc_name(name)) {
+        if (!allow_duplicates) return false;
+        duplicate = true;
+      }
+    }
+    return !duplicate;
+  }
+
   static void dumpList(const SourceList& src_list) {
     for (const auto& src : src_list) {
       std::cerr << " " << NameCount::listToString(src.ncList) << " - "
@@ -614,6 +635,7 @@ struct SourceData : SourceCompatibilityData {
 
   NameCountList primaryNameSrcList;
   NameCountList ncList;
+  std::set<std::string> nc_names;
 };
 
 using SourceListCRef = std::reference_wrapper<const SourceList>;
@@ -626,7 +648,7 @@ using XorSourceList = std::vector<XorSource>;
 struct OrSourceData {
   SourceCompatibilityData src;
   bool is_xor_compat{false};
-  //bool is_and_compat{false};
+  // bool is_and_compat{false};
 };
 using OrSourceList = std::vector<OrSourceData>;
 
@@ -645,11 +667,12 @@ using OrArgList = std::vector<OrArgData>;
 // indices are offset by 1; variation -1 is index 0.
 using VariationIndicesList = std::vector<ComboIndexList>;
 // one variationIndicesLists per sentence
-using SentenceVariationIndices = std::array<VariationIndicesList, kNumSentences>;
+using SentenceVariationIndices =
+    std::array<VariationIndicesList, kNumSentences>;
 
 struct MergedSources : SourceCompatibilityData {
   MergedSources() = default;
-  MergedSources(const MergedSources&) = default; // allow, dangerous?
+  MergedSources(const MergedSources&) = default;  // allow, dangerous?
   MergedSources& operator=(const MergedSources&) = delete;
   MergedSources(MergedSources&&) = default;
   MergedSources& operator=(MergedSources&&) = default;
@@ -657,8 +680,7 @@ struct MergedSources : SourceCompatibilityData {
   // copy from SourceData
   MergedSources(const SourceData& source)
       : SourceCompatibilityData(source.usedSources),
-        sourceCRefList(SourceCRefList{SourceCRef{source}}) {
-  }
+        sourceCRefList(SourceCRefList{SourceCRef{source}}) {}
 
   SourceCRefList sourceCRefList;
 };
@@ -669,13 +691,13 @@ using StringList = std::vector<std::string>;
 // functions
 
 inline constexpr void assert_valid(const SourceList& src_list) {
-  for (const auto& src: src_list) {
+  for (const auto& src : src_list) {
     src.assert_valid();
   }
 }
 
 inline std::vector<SourceCompatibilityData> makeCompatibleSources(
-  const SourceList& sources) {
+    const SourceList& sources) {
   std::vector<SourceCompatibilityData> compat_sources;
   for (const auto& src : sources) {
     compat_sources.push_back(src);
@@ -683,7 +705,7 @@ inline std::vector<SourceCompatibilityData> makeCompatibleSources(
   return compat_sources;
 }
 
-} // namespace cm
+}  // namespace cm
 
 template <typename SizeT>
 inline void hash_combine(SizeT& seed, SizeT value) {

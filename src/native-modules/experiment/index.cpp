@@ -86,7 +86,7 @@ Value setCompoundClueNameSourcesMap(const CallbackInfo& info) {
   return env.Null();
 }
 
-// count, nameCsv
+// count, source
 Value isKnownSourceMapEntry(const CallbackInfo& info) {
   Env env = info.Env();
   if (!info[0].IsNumber() || !info[1].IsString()) {
@@ -142,6 +142,7 @@ Value addCompoundClue(const CallbackInfo& info) {
   return env.Null();
 }
 
+  /*
 Value getSourcesForNc(const CallbackInfo& info) {
   Env env = info.Env();
   if (!info[0].IsObject()) {
@@ -180,7 +181,8 @@ Value getSourceListsForNc(const CallbackInfo& info) {
   auto cref_entries = clue_manager::get_known_source_map_entries(nc);
   return wrap(env, cref_entries);
 }
-
+  */
+  
 //
 // Validator
 //
@@ -652,14 +654,14 @@ Value dumpMemory(const CallbackInfo& info) {
 Object Init(Env env, Object exports) {
   // clue-manager
   //
-  //  exports["getNumNcResults"] = Function::New(env, getNumNcResults);
+  // exports["getNumNcResults"] = Function::New(env, getNumNcResults);
   exports["setPrimaryNameSrcIndicesMap"] =
       Function::New(env, setPrimaryNameSrcIndicesMap);
   exports["setCompoundClueNameSourcesMap"] =
       Function::New(env, setCompoundClueNameSourcesMap);
   exports["isKnownSourceMapEntry"] = Function::New(env, isKnownSourceMapEntry);
-  exports["getSourcesForNc"] = Function::New(env, getSourcesForNc);
-  exports["getSourceListsForNc"] = Function::New(env, getSourceListsForNc);
+  // exports["getSourcesForNc"] = Function::New(env, getSourcesForNc);
+  // exports["getSourceListsForNc"] = Function::New(env, getSourceListsForNc);
   exports["addCompoundClue"] = Function::New(env, addCompoundClue);
 
   // validator

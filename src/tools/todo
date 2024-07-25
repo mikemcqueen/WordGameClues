@@ -1,3 +1,6 @@
+* clue-manager::add_compound_clue could maybe be integrated into validateSources
+  workflow (in index.cpp) depending on conditionals used in TS.
+
 * removed edward,tattoo,wallet =throat and =bomb. (??)
 
 * one of the reasons why the Peco approach is slower, for compatibility

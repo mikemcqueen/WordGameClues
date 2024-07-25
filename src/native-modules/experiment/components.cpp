@@ -48,8 +48,7 @@ void add_show_result_for_nc(const NameCount& nc, ShowResults& results) {
     std::set<std::string> sources_set(sources_list.begin(), sources_list.end());
     results.clues.emplace_back(std::move(sources_set), std::move(count_list));
   } else {
-    std::cerr << "hmm, no sources for " << nc.name << ":" << nc.count
-              << std::endl;
+    std::cerr << "hmm, no sources for " << nc.toString() << std::endl;
   }
 }
 
@@ -389,9 +388,9 @@ void consistency_check_result_processor(consistency_t&& result) {
 
 auto show(const std::vector<std::string>& name_list,
     const SourceList& xor_src_list) -> std::set<int> {
-  auto results = get_show_results(name_list, xor_src_list);
-  display_show_results(name_list, results);
-  return results.sums;
+  auto show_results = get_show_results(name_list, xor_src_list);
+  display_show_results(name_list, show_results);
+  return show_results.sums;
 }
 
 auto old_consistency_check(const std::vector<std::string>& name_list,

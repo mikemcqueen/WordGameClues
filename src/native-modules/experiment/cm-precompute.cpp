@@ -55,7 +55,7 @@ auto mergeAllCompatibleSources(const NameCountList& ncList) -> SourceList {
   // that the src_list was generated from. We can't fully determine
   // compatibility without all of the names.
 
-  SourceList src_list{clue_manager::make_src_list_for_nc(ncList[0])};
+  SourceList src_list = clue_manager::make_src_list(ncList[0]);
   if (logging) {
     std::cerr << "nc[0]: " << ncList[0].toString() << " (" << src_list.size()
               << ")" << std::endl;
@@ -63,8 +63,7 @@ auto mergeAllCompatibleSources(const NameCountList& ncList) -> SourceList {
   }
   // TODO: std::next() or something.
   for (auto i = 1u; i < ncList.size(); ++i) {
-    const auto src_cref_list{
-        clue_manager::make_src_cref_list_for_nc(ncList[i])};
+    const auto src_cref_list = clue_manager::make_src_cref_list(ncList[i]);
     if (logging) {
       std::cerr << " nc[" << i << "]: " << ncList[i].toString() << " ("
                 << src_cref_list.size() << ")" << std::endl;
