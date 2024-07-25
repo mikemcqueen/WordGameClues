@@ -207,6 +207,12 @@ const std::vector<std::string>& get_nc_sources(const NameCount& nc) {
   return get_name_sources_map(nc.count).at(nc.name);
 }
 
+  /*
+const std::vector<std::string>& get_nc_sources(const NameCount& nc) {
+  return get_name_sources_map(nc.count).at(nc.name);
+}
+  */
+
 //
 // knownSourceMaps
 //

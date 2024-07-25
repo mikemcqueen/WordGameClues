@@ -19,21 +19,9 @@ auto validateSourceNamesAtCounts(const std::string& clue_name,
       clue_manager::make_src_cref_list(src_names.at(0), count_list.at(0));
   auto src_cref_list1 =
       clue_manager::make_src_cref_list(src_names.at(1), count_list.at(1));
-  /*
-  clue_manager::for_each_nc_source(src_names.at(0), count_list.at(0),
-      [&list = src_cref_list0](const SourceData& src) {  //
-        list.emplace_back(std::cref(src));
-      });
-  // TODO: clue_manager::make_nc_src_list()
-  clue_manager::for_each_nc_source(src_names.at(1), count_list.at(1),
-      [&list = src_cref_list1](const SourceData& src) {  //
-        list.emplace_back(std::cref(src));
-      });
-  */
   // NOTE: in order to support more than 2 sources here, we'd probably have
   // to bite the bullet and merge sources in lists 0,1 then then merge the
   // resulting list with sources from list 2, and so on.
-  const auto logging = true;
   SourceList src_list;
   for (const auto src_cref0 : src_cref_list0) {
     const auto& src0 = src_cref0.get();
@@ -43,19 +31,9 @@ auto validateSourceNamesAtCounts(const std::string& clue_name,
         // TODO: SourceData.copyMerge(const SourceData&)
         // copy src0
         SourceData merged_src{src0};
-        if (!merged_src.merge_nc_names(src1.nc_names, true)) {
-          // merging two NCs with common source names is probably OK.
-          if (0 && logging) {
-            std::cerr << " failed to merge " << util::join(src1.nc_names, ",")
-                      << " of " << NameCount::listToString(src1.ncList)
-                      << " with " << util::join(src0.nc_names, ",") << " of "
-                      << NameCount::listToString(src0.ncList) << " for "
-                      << clue_name << ":" << util::sum(count_list) << std::endl;
-          }
-          //continue;
-        }
-        // what is definitely not OK is when NC name is the same as one of its
-        // source names
+        // merging sources with common names is fine. allow duplicates.
+        merged_src.merge_nc_names(src1.nc_names, true);
+        // not fine: when an NC name is the same as one of its source names
         if (!merged_src.merge_nc_name(clue_name)) {
           if (log_level(ExtraVerbose)) {
             std::cerr << "failed to merge " << clue_name << ":"
@@ -96,6 +74,7 @@ auto validateSources(const std::string& clue_name,
   };
   // TODO: test returning same variable at multiple locations
   // don't love this here. would prefer all of this logic were in one place.
+  // I suppose this is an "optimization" though.
   if (std::ranges::find_if(src_names, pred) != src_names.end()) {
     return result;
   }

@@ -37,7 +37,7 @@ struct ShowResults {
 namespace {
 
 using consistency_t = std::pair<std::string, NameCountList>;
-wtf::ThreadPool<consistency_t, 5> consistency_pool_;
+wtf::ThreadPool<std::optional<consistency_t>, 5> consistency_pool_;
 std::unordered_map<std::string, NameCountList> consistency_results_;
 
 // -t word1
@@ -340,11 +340,9 @@ auto get_all_clue_names(
     }
     hash.insert(key);
     */
-    auto opt_names = get_clue_names_for_source(sum, source_csv);
-    if (!opt_names.has_value()) {
-      continue;
-    }
-    auto& clue_names = opt_names.value().get();
+    auto maybe_names = get_clue_names_for_source(sum, source_csv);
+    if (!maybe_names.has_value()) continue;
+    auto& clue_names = maybe_names.value().get();
     for (const auto& name : clue_names) {
       result.insert(name);
     }
@@ -361,9 +359,9 @@ auto get_missing_nc_list(
     const auto sum = util::sum(NameCount::listToCountList(src.ncList));
     if (hash.contains(sum)) continue;
     hash.insert(sum);
-    auto opt_names = get_clue_names_for_source(sum, source_csv);
-    if (!opt_names.has_value()) continue;
-    auto& clue_names = opt_names.value().get();
+    auto maybe_names = get_clue_names_for_source(sum, source_csv);
+    if (!maybe_names.has_value()) continue;
+    auto& clue_names = maybe_names.value().get();
     std::vector<std::string> missing_names;
     std::ranges::set_difference(
         all_clue_names, clue_names, std::back_inserter(missing_names));
@@ -373,14 +371,16 @@ auto get_missing_nc_list(
   return missing_nc_list;
 }
 
-void consistency_check_result_processor(consistency_t&& result) {
-  if (!result.first.empty()) {
-    auto it = consistency_results_.find(result.first);
-    if (it == consistency_results_.end()) {
-      consistency_results_.emplace(std::move(result));
-    } else {
-      std::ranges::move(result.second, std::back_inserter(it->second));
-    }
+void consistency_check_result_processor(
+    std::optional<consistency_t>&& maybe_result) {
+  //if (result.first.empty()) return;
+  if (!maybe_result.has_value()) return;
+  auto& result = maybe_result.value();
+  auto it = consistency_results_.find(result.first);
+  if (it == consistency_results_.end()) {
+    consistency_results_.emplace(std::move(result));
+  } else {
+    std::ranges::move(result.second, std::back_inserter(it->second));
   }
 }
 
@@ -399,20 +399,20 @@ auto old_consistency_check(const std::vector<std::string>& name_list,
 }
 
 void consistency_check(
-    const std::vector<std::string>&& name_list, int max_sources) {
+    std::vector<std::string>&& name_list, int max_sources) {
   consistency_pool_.execute(
-      [name_list = std::move(name_list), max_sources]() -> consistency_t {
-        std::string source_csv;
-        NameCountList nc_list;
-        // TODO: 3-source clues don't work currently, because reasons.
-        if (name_list.size() == 2) {
-          auto src_list = get_all_compatible_sources(name_list, max_sources);
-          source_csv = util::join(name_list, ",");
-          if (1 || !are_sources_consistent(name_list, src_list)) {
-            nc_list = get_missing_nc_list(source_csv, src_list);
-          }
-        }
-        if (nc_list.empty()) source_csv.clear();
+      [name_list = std::move(name_list),
+          max_sources]() -> std::optional<consistency_t> {
+        // only 2-source clues supported
+        if (name_list.size() != 2)
+          std::cerr << "name_list: " << util::join(name_list, ",") << std::endl;
+        assert(name_list.size() == 2);
+        auto src_list = get_all_compatible_sources(name_list, max_sources);
+        auto source_csv = util::join(name_list, ",");
+        //if (1 || !are_sources_consistent(name_list, src_list)) {
+        NameCountList nc_list = get_missing_nc_list(source_csv, src_list);
+        //}
+        if (nc_list.empty()) return std::nullopt;
         return std::make_pair(std::move(source_csv), std::move(nc_list));
       },
       consistency_check_result_processor);

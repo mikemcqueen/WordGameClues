@@ -1,3 +1,17 @@
+* try adding testcase to moveable repo for return optional<pair<obj,obj>>
+
+* i need --ccc to run through the same centralized logic as validator to
+  determine if an NC can be assigned to the combination of two sources.
+  currently that's just "is the NC name the same as a source name" but that
+  may change at some point, and I want it to change for everything when it
+  does.
+
+* would be nice if -t showed NCs: PRESENT as word:1,word:2 - ..
+
+* assigning unique numbers to source/clue names would speed up validator. and
+  would consume less memory. could potentially integrate that into ncList/
+  primaryNameSrcList as well.
+
 * clue-manager::add_compound_clue could maybe be integrated into validateSources
   workflow (in index.cpp) depending on conditionals used in TS.
 
@@ -9,37 +23,31 @@
   need to test that combination with any other sources from index 2.
   this may be relevant to --ccc speed.
 
-* RE: tricky situation below, i think the solution might be to add another
-  std::set to KnownSourceMapEntry, something like nc_names which is the set
-  of nc NAMES (including primary) that are collectively used to generate the
-  sourcelist. 
-  I think the key here is that as we walk through each source in a source-list,
-  we'd have to find the KnownSourceMapEntry of that source, in order to access
-  it's nc_names list.
-  * Don't think that will work. Name lookup will be ambiguous because sources
-    (in a merged xor-compatible sourcelist) are (potentially) shared between
-    multiple names; I think the information about the original name it referred
-    to is lost.
-  * Added some comments in build_src_lists that I think describes the problem
-    a bit better.
-  
-* tricky situation that should be fixed (and in general, beyond this specific
-  tricky instance). blue is a synonym of navy in clues 1.  we later go on to
+// ++ Tricky Bidness
+
+* SOLVED (i think)
+  tricky situation that should be fixed (and in general, beyond this specific
+  tricky instance). blue is a synonym of navy in clues 1. we later go on to
   derive "navy" as a solution to "dark,blue".  but if the source of the "blue"
   in this case is the synonym of navy, it should not be allowed.
 
-  to achieve this, it feels like we'll have to (optionally? for components.show)
-  attach the "source/origin component" to variation sources. e.g. "navy" gets
-  attached to that primary synonym "blue", somehow. when --add'ing, check and
-  fail if --add'ed word matches any primary "origin" words.
+* SOLVED (i think)
+  similarly, validateSources(name) -- enforce everywhere, for below
+  validatesources is apparently happy with old:3=not:1,not:1,old:1
+  which is wrong because:
 
-  * similarly, validateSources(name) -- enforce everywhere, for below
-    validatesources is apparently happy with old:3=not:1,not:1,old:1
-    which is wrong because:
-     this is like that weird case with "bird" being the "name" of a clue that had
-     "bird" as a source, and that should be disallowed.
-     clues3.json:  { "name": "old",             "src": "new,not" },
-  * same: polar,bear -> white,bear + bear = bad
+* NOT RESOLVED (but solveable, when i make up my mind)
+  * same: polar,bear -> white,bear + bear = bad?
+  * NOTE that the polar,bear problem is actually different. we're not giving
+    a clue a name that is the same as one of its sources there. we're just
+    combining two clues (polar, bear), and one of the clues (polar) has bear
+    as a source. while I would *like* to disallow this, I can't be certain
+    that this isn't allowed.
+  * there's definitely an argument to be made that merging a single NC with a 
+    name that is the same as a source of another NC is qualitatively different
+    than merging two NCs that have a common source name.
+
+// -- Tricky Bidness
 
 * Precompute is taking longer now with -c2,2 and multiple --xors, did I introduce
   some copying?
@@ -66,9 +74,9 @@
 * while i don't love the idea, it seems like it'd be a lot cleaner to have the
   kernel-launch wrapper code responsible for free'ing device memory. like, we
   typically have to sync to copy results, why not just free stuff then?
-  OR, instead of calling launch wrapper function directly, call from within a
-  lambda that does the freeing afterwards, to keep the alloc/frees a bit more
-  local to each other.
+  ** OR, instead of calling launch wrapper function directly, call from within
+     a lambda that does the freeing afterwards, to keep the alloc/frees a bit
+      more local to each other.
   
 * Timer.pretty() - get nanoseconds() and auto determine best unit and suffix
 

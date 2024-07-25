@@ -14,23 +14,14 @@ const Native      = require('../../../build/experiment.node');
 const Assert      = require('assert');
 const Debug       = require('debug')('components');
 const Expect      = require('should/as-function');
-//const Path        = require('path');
-//const Peco        = require('../../modules/peco');
-//const Readlines   = require('n-readlines');
 const JStringify  = require('javascript-stringify').stringify;
-//const Timing      = require('debug')('timing');
 
-//import * as Clue from '../types/clue';
 import * as ClueList from '../types/clue-list';
 import * as ClueManager from './clue-manager';
 import * as NameCount from '../types/name-count';
 import * as PreCompute from './cm-precompute';
-//import * as Source from './source';
 
 export const addRemove = (names: string[], counts: number[], options: any): number => {
-    // NOTE: explicit undefined check here is necessary.
-    // TODO: probably should enforce w/AddRemoveOptions type
-    const save = _.isUndefined(options.save) ? true : options.save;
     const count = ClueManager.addRemoveOrReject({
         add:      options.add,
         remove:   options.remove,
@@ -38,14 +29,30 @@ export const addRemove = (names: string[], counts: number[], options: any): numb
         reject:   options.reject
     */
     }, names, counts, {
-        save,
+        save : options.save,
         addMax: options.max ? Number(options.max) : 30,
         removeMin: 0
     });
     if (options.add || options.remove) {
-        console.log(`${options.add ? "added" : "removed"} ${count} clues`);
+        console.log(`${options.add ? "added" : "removed"} ${count} clues` +
+            ` ${options.save ? "[SAVED]": ""}`);
     }
     return count;
+};
+
+const addClues = (names: string[], nc_list: NameCount.List, options: any): void => {
+    let num_added = 0;
+    while (nc_list.length) {
+        const add = nc_list[0].name;
+        const counts = nc_list.filter(nc => nc.name === add).map(nc => nc.count);
+        num_added += addRemove(names, counts, {
+            add,
+            save: options.save,
+            addMax: options.max_sources,
+            removeMin: 0
+        });
+        nc_list = nc_list.filter(nc => nc.name !== add);
+    }
 };
 
 export const show = (options: any): any => {
@@ -70,6 +77,7 @@ export const show = (options: any): any => {
     const pc_result = PreCompute.preCompute(2, options.max_sources, pc_args);
     if (pc_result) {
         const counts = Native.showComponents(nameList);
+        options.save = true; // hacky
         addRemove(nameList, counts, options);
     } else {
         console.error(`Precompute failed.`);
@@ -105,18 +113,17 @@ export const consistency_check = (options: any): void => {
     let v2_results: ConsistencyResultMap;
     for (let combo of combos) {
         const nameList = combo.split(',').sort();
-        const pc_args = {
-            xor: nameList,
-            merge_only: true,
-            max: 2,
-            max_sources: options.max_sources,
-            quiet: true,
-            verbose: options.verbose,
-            ignoreErrors: options.ignoreErrors
-        };
         let valid = true;
         if (version === 1) {
-            //console.error(`name_list: ${combo}`);
+            const pc_args = {
+                xor: nameList,
+                merge_only: true,
+                max: 2,
+                max_sources: options.max_sources,
+                quiet: true,
+                verbose: options.verbose,
+                ignoreErrors: options.ignoreErrors
+            };
             valid = PreCompute.preCompute(2, options.max_sources, pc_args);
             if (!valid) {
                 console.error(`\nConsistency::Precompute failed at ${combo}.`);
@@ -127,7 +134,7 @@ export const consistency_check = (options: any): void => {
                 if (version === 1) v1_results.add(combo);
             }
         }
-        if (!options.quiet && !options.verbose) {
+        if (valid && !options.quiet && !options.verbose) {
             process.stderr.write('.');
         }
     }
@@ -146,6 +153,7 @@ export const consistency_check = (options: any): void => {
             for (let source_csv of Object.keys(v2_results!)) {
                 const nc_list = v2_results![source_csv];
                 console.error(`${source_csv}: ${NameCount.listToString(nc_list)}`);
+                addClues(source_csv.split(','), nc_list, options);
             }
         }
     } else {

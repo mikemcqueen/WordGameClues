@@ -19,7 +19,7 @@ auto old_consistency_check(const std::vector<std::string>& name_list,
     const SourceList& xor_src_list) -> bool;
 
 void consistency_check(
-    const std::vector<std::string>&& name_list, int max_sources);
+    std::vector<std::string>&& name_list, int max_sources);
 
 auto get_consistency_check_results()
     -> const std::unordered_map<std::string, NameCountList>&;

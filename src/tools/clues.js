@@ -65,10 +65,10 @@ const CmdLineOptions = Opt.create(_.concat(Clues.Options, [
     ['',  'any',                               '  any match (uh, probably should not use this)'],
     ['',  'production',                        'use production note store'],
     ['',  'sort-all-clues',                    'sort all clue data files by src'],
-    ['m', 'max-sources=COUNT',                 'enforce COUUNT max primary sources for a single clue; default 20;' +
-                                               ' impacts clue loading, combo generation, consistency checking, etc.'],
+    ['m', 'max-sources=COUNT',                 'enforce COUNT max primary sources for a single clue; default 19\n' +
+        '                                            impacts clue loading, combo generation, consistency checking, etc.'],
     ['R', 'remove-all-invalid',                'remove all invalid (validation error) clues'],
-    ['',  'ccc',                               'clue (source) consistency check'],
+    ['',  'ccc',                               'clue (source) consistency check (--save to save results)'],
     ['',  'show-pairs',                        'show unique known source pairs'],
     ['',  'flip',                              '  include flipped (reversed) pairs in results'],
     ['z', 'flags=OPTION+',                     'flags: 2=ignoreErrors,3=cccV2' ],
