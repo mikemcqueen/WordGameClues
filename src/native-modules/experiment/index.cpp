@@ -236,7 +236,7 @@ void show_clue_manager_durations(){
   static bool shown = false;
   if (!shown) {
     std::cerr << "(delayed clue_manager durations)\n"
-              << " validateSources - " << (validate_ns / 1e6) << "ms\n";
+              << " validateSources - " << int(validate_ns / 1e6) << "ms\n";
     show_validator_durations();
     shown = true;
   }
@@ -306,7 +306,7 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   show_clue_manager_durations();
   auto xor_src_lists = build_src_lists(nc_data_lists);
   if (log_level(Normal)) {
-    // std::cerr << "build xor_src_lists(" << xor_src_lists.size() << ")\n";
+    //std::cerr << "build xor_src_lists(" << xor_src_lists.size() << ")\n";
   }
 #if 0
   for (const auto& src_list: xor_src_lists) {
@@ -328,7 +328,7 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
     num_compatible = MFD.host.merged_xor_src_list.size();
     host_memory_dump(MFD.host);
   } else {
-    if (get_merge_data(xor_src_lists, MFD.host, MFD.device, merge_only)) {
+    if (get_merge_data(xor_src_lists, MFD.host, MFD.device)) {
       num_compatible = MFD.host.combo_indices.size();
       // filter needs this later
       MFD.host.xor_src_lists = std::move(xor_src_lists);
@@ -337,21 +337,23 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   return Number::New(env, num_compatible);
 }
 
+/*
 void validate_marked_or_sources(
     const OrArgList& or_arg_list, const std::vector<result_t>& mark_results) {
   auto arg_idx = int{0};
-  auto results_begin = mark_results.cbegin();
-  for (const auto& or_arg: or_arg_list) {
-    auto results_end = results_begin + or_arg.or_src_list.size();
-    if (std::find(results_begin, results_end, 1) == results_end) {
+  auto begin = mark_results.cbegin();
+  for (const auto& or_arg : or_arg_list) {
+    auto end = begin + or_arg.or_src_list.size();
+    if (std::find(begin, end, 1) == end) {
       std::cerr << "or_arg_idx " << arg_idx << " is not compatible"
                 << std::endl;
       assert(0);
     }
-    results_begin = results_end;
+    begin = end;
     ++arg_idx;
   }
 }
+*/
 
 void set_or_args(const std::vector<NCDataList>& nc_data_lists) {
   using namespace std::chrono;
@@ -374,22 +376,19 @@ void set_or_args(const std::vector<NCDataList>& nc_data_lists) {
     // So, a container can be marked compatible if and only if there are no
     // no remaining XOR-compatible sourceLists.
     // TODO: markAllANDCompatibleOrSources(xorSourceList, orSourceList);
+    /*
     if (num_or_sources) {
-#if 0
-      markAllXorCompatibleOrSources(MFD.host.or_arg_list,
-        MFD.host.xor_src_lists, MFD.host.compat_idx_lists,
-        MFD.host.combo_indices);
-#endif
       // TODO: name change. this doesn't mark anything. 
       auto mark_results = cuda_markAllXorCompatibleOrSources(MFD);
       validate_marked_or_sources(MFD.host.or_arg_list, mark_results);
       MFD.device.num_or_sources =
         move_marked_or_sources(MFD.device.or_src_list, mark_results);
     }
+    */
   }
   if (log_level(Verbose)) {
     t.stop();
-    std::cerr << " build/mark/move or_args(" << MFD.host.or_arg_list.size() << ")"
+    std::cerr << " build or_args(" << MFD.host.or_arg_list.size() << ")"
               << ", or_sources(" << MFD.device.num_or_sources << ") - "
               << t.microseconds() << "us" << std::endl;
   }

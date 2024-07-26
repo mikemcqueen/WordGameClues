@@ -258,22 +258,6 @@ const buildOrArgDataList = (sourceLists: Source.List[]): OrArgDataList => {
     return orArgDataList;
 };
 
-/*
-// Given a list of XorSources, and a list of OrSources, TODO
-//
-const markAllXorCompatibleOrSources = (xorSourceList: Source.List,
-    orArgDataList: OrArgDataList): void =>
-{
-    for (let orArgData of orArgDataList) {
-        for (let orSource of orArgData.orSourceList) {
-            if (Source.isXorCompatibleWithAnySource(orSource.source, xorSourceList)) {
-                orSource.xorCompatible = true;
-            }
-        }
-    }
-};
-*/
-
 export const preCompute = (first: number, last: number, args: any): boolean => {
     const maxSum = args.max_sources;// - 1;
     const merge_only = args.merge_only || false;
@@ -289,9 +273,10 @@ export const preCompute = (first: number, last: number, args: any): boolean => {
     const num_indices: number = 
         Native.mergeCompatibleXorSourceCombinations(xorNcDataLists, merge_only);
     if (args.xor && !num_indices) {
-        console.error(`!num_indices`);
+        console.error(`no compatible XOR sources`);
         return false;
     }
+    console.error(`compatible XOR sources: ${num_indices}`);
     if (merge_only) return true;
 
     // OR next

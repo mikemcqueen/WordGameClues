@@ -133,7 +133,7 @@ void dumpSentenceVariationIndices(
     }
   }
   const auto MB = (total_indices * 8) / 1'000'000;
-  std::cerr << "variationIndices: " << total_indices << " (" << MB << ")\n";
+  std::cerr << "variationIndices: " << total_indices << " (" << MB << "MB)\n";
   if (MB > 2000) {
     std::cerr << "**** WARNING: variationIndices is getting big! ****\n";
   }

@@ -1,3 +1,21 @@
+++NEWPERF:
+
+* copy/process combo indices is slowwwww. i wonder how much of that is due
+  to vector reallocation & copying. maybe i could have a vector of vectors,
+  and process, say, ~100k (800KB) indices at a time, then when it fills,
+  just push_back another vector?
+
+* assigning unique numbers to source/clue names would speed up validator. and
+  would consume less memory. could potentially integrate that into ncList/
+  primaryNameSrcList as well.
+
+--NEWPERF
+
+* set --max-sources to N(-1) (if not otherwise specified) when -cM,N ?
+
+* make -t x,y,z show VALID entries even if they exceed max_sources (maybe
+  separated by a -- line)
+
 * try adding testcase to moveable repo for return optional<pair<obj,obj>>
 
 * i need --ccc to run through the same centralized logic as validator to
@@ -8,9 +26,6 @@
 
 * would be nice if -t showed NCs: PRESENT as word:1,word:2 - ..
 
-* assigning unique numbers to source/clue names would speed up validator. and
-  would consume less memory. could potentially integrate that into ncList/
-  primaryNameSrcList as well.
 
 * clue-manager::add_compound_clue could maybe be integrated into validateSources
   workflow (in index.cpp) depending on conditionals used in TS.

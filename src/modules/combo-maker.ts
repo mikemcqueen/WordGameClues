@@ -206,8 +206,9 @@ const getCombosForUseNcLists = (sum: number, max: number, args: any): void => {
     Debug(`sum(${sum}) combos(${comboCount}) variations(${totalVariations})` +
         ` -${duration}ms`);
 
-    if (args.verbose) {
-        console.error(`sum(${sum}) combos(${comboCount})` +
+    // enhancing visibility of JS duration coz it's starting to matter
+    if (1 || args.verbose) {
+        console.error(`sum(${sum}) consider(JS) - combos(${comboCount})` +
             ` variations(${totalVariations}) - ${duration}ms `);
         /*
         const cs = Native.getCandidateStatsForSum(sum);

@@ -104,15 +104,20 @@ void dump_flat_indices(
 
 void sync_copy_results(std::vector<result_t>& results, unsigned num_results,
   result_t* device_results, cudaStream_t stream) {
-  // TODO: I don't remember what my logic was here in using events to synchronize.
-  CudaEvent temp1;
-  temp1.synchronize();
+  // TODO: I don't remember what my logic was here in using events to
+  // synchronize.
+  // CudaEvent temp1;
+  // temp1.synchronize();
+  cudaError_t err = cudaStreamSynchronize(stream);
+  assert_cuda_success(err, "merge copy pre-sync");
   const auto results_bytes = num_results * sizeof(result_t);
-  cudaError_t err = cudaMemcpyAsync(results.data(), device_results, results_bytes,
+  err = cudaMemcpyAsync(results.data(), device_results, results_bytes,
     cudaMemcpyDeviceToHost, stream);
   assert_cuda_success(err, "merge copy results");
-  CudaEvent temp2;
-  temp2.synchronize();
+  err = cudaStreamSynchronize(stream);
+  assert_cuda_success(err, "merge copy post-sync");
+  // CudaEvent temp2;
+  // temp2.synchronize();
 }
 
 void add_compat_sources(std::vector<SourceCompatibilityData>& compat_sources,
@@ -297,26 +302,31 @@ auto run_get_compat_combos_task(const result_t* device_compat_matrices,
   using namespace std::chrono;
   using namespace std::experimental::fundamentals_v3;
   constexpr auto logging = false;
+
   const auto stream = cudaStreamPerThread;
-  uint64_t first_combo{};
-  uint64_t num_combos{600'000'000}; // chunk size
+  const uint64_t chunk_size = 600'000'000;
+  uint64_t num_combos{chunk_size};
   auto device_results =
       cuda_alloc_results(num_combos, stream, "get_compat_combos results");
   scope_exit free_results{[device_results]() { cuda_free(device_results); }};
   std::vector<result_t> host_results(num_combos);
   std::vector<uint64_t> result_indices;
+  CudaEvent gcc_start;
   long gcc_elapsed_total{};
-  long cpr_elapsed_total{};
+  long copy_elapsed_total{};
+  long proc_elapsed_total{};
   uint64_t total_hits{};
-  for (int n{};; ++n, first_combo += num_combos) {
+  int idx{};
+  uint64_t first_combo{};
+  for (;; ++idx, first_combo += num_combos) {
     num_combos = std::min(num_combos, max_combos - first_combo);
     if (!num_combos) break;
     if constexpr (logging) {
-      std::cerr << "  launching get_compat_combos_kernel " << n << " for ["
+      std::cerr << "  launching get_compat_combos_kernel " << idx << " for ["
                 << first_combo << ", " << first_combo + num_combos << "]"
                 << std::endl;
     }
-    CudaEvent gcc_start;
+    if (log_level(Verbose)) gcc_start.record();
     run_get_compat_combos_kernel(first_combo, num_combos,
       device_compat_matrices, num_compat_matrices,
       device_compat_matrix_start_indices, device_idx_list_sizes,
@@ -326,30 +336,39 @@ auto run_get_compat_combos_task(const result_t* device_compat_matrices,
       auto gcc_elapsed = gcc_stop.synchronize(gcc_start);
       gcc_elapsed_total += gcc_elapsed;
       if (log_level(ExtraVerbose)) {
-        std::cerr << "  completed get_compat_combos_kernel " << n << " - " << gcc_elapsed
-                  << "ms" << std::endl;
+        std::cerr << "  completed get_compat_combos_kernel " << idx << " - "
+                  << gcc_elapsed << "ms" << std::endl;
       }
     }
-    auto cpr0 = high_resolution_clock::now();
+
+    auto t_copy = util::Timer::start_timer();
     sync_copy_results(host_results, num_combos, device_results, stream);
+    if (log_level(Verbose)) {
+      t_copy.stop();
+      copy_elapsed_total += t_copy.count();
+    }
+
+    auto t_proc = util::Timer::start_timer();
     auto num_hits =
         process_results(host_results, first_combo, num_combos, result_indices);
-    total_hits += num_hits;
     if (log_level(Verbose)) {
-      auto cpr1 = high_resolution_clock::now();
-      auto cpr_elapsed = duration_cast<milliseconds>(cpr1 - cpr0).count();
-      cpr_elapsed_total += cpr_elapsed;
+      t_proc.stop();
+      proc_elapsed_total += t_proc.count();
       if (log_level(ExtraVerbose)) {
-        std::cerr << "  copy/process results, hits: " << num_hits << " - "
-                  << cpr_elapsed << "ms" << std::endl;
+        std::cerr << "  copy/process results, hits: " << num_hits
+                  << ", copy: " << t_copy.count() << "ms"
+                  << ", process: " << t_proc.count() << "ms" << std::endl;
       }
     }
+    total_hits += num_hits;
   }
   if (log_level(Verbose)) {
-    std::cerr << " get_compat_combos_kernel total - " << gcc_elapsed_total
+    std::cerr << " get_compat_combos_kernel total " << idx << " runs of "
+              << chunk_size / 1'000'000 << "M - " << gcc_elapsed_total
               << "ms\n";
-    std::cerr << " copy/process results total hits: " << total_hits << " - "
-              << cpr_elapsed_total << "ms\n";
+    std::cerr << " copy/process results total hits: " << total_hits
+              << ", copy: " << copy_elapsed_total << "ms"
+              << ", process: " << proc_elapsed_total << "ms" << std::endl;
   }
   return result_indices;
 }
@@ -617,7 +636,8 @@ auto xor_merge_sources(const std::vector<SourceList>& src_lists,
 ///////////////////////////////////////////////////////////////////////////////
 
 auto get_merge_data(const std::vector<SourceList>& src_lists,
-    MergeData::Host& host, MergeData::Device& device, bool merge_only) -> bool {
+    MergeData::Host& host, MergeData::Device& device,
+    bool merge_only /* = false */) -> bool {
   // TODO: support for single-list compat indices (??)
   auto compat_idx_lists = get_compatible_indices(src_lists);
   if (!merge_only || log_level(Verbose)) {
@@ -630,7 +650,8 @@ auto get_merge_data(const std::vector<SourceList>& src_lists,
   const auto idx_list_sizes = util::make_list_sizes(compat_idx_lists);
   device.idx_list_sizes = cuda_alloc_copy_list_sizes(idx_list_sizes);
   const auto level = merge_only ? ExtraVerbose : Normal;
-  if (util::LogDuration ld("get combo_indices", level); true) {
+  {
+    util::LogDuration ld("get combo_indices", level);
     host.combo_indices =
         cuda_get_compat_xor_src_indices(src_lists, device.src_lists,
             compat_idx_lists, device.idx_lists, device.idx_list_sizes);
