@@ -1,3 +1,14 @@
+* i need to know candidate sources count because I'm going to re-write the
+  OR compatibility kernel, and similar to how (iirc) the XOR kernel uses
+  one block per "source" then one thread per xor-source, i'm going to want
+  to probably use one block per "source" and one thread per or_source.
+  (or maybe reverse that, not sure). I'm really not sure what I was thinking
+  to be honest. are the candidate sources already copied to the kernel?
+  is that done in one of the xor_kernel_task functions? probably I'll need
+  to move that out to filter_candidates_cuda or something, or (yet another)
+  intermediate wrapper function around the whole filter mess, that wraps both
+  XOR and OR filter kernel tasks.
+
 * I want to know how many candidates (and sources) are considered (log message)
   from c++ probably better as that whole JS loop should move to c++.
   * a little better now. could still count & save the number of "consider" calls
