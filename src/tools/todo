@@ -1,3 +1,16 @@
+* OR kernel
+  * DONE rip OR-compat checking out of xor-kernel.
+  * DONE generate out.xor output for 4 input variations (2,2, 2,10)(--xor, --xor + --or)
+  * DONE verify xor + or matches xor, and both match out.orig.xor
+  * DONE commit? on a branch?
+  * remove "xor" from name of filter task wrapper functions i think.
+  * figure out where i'm going to plug in the OR kernel execution.
+  * make sure sources are already allocated at that spot, if not, move
+    allocation to correct spot.
+  * write new OR kernel
+  * ??
+  * PROFIT
+
 * shoud display max variation count (sentence with max # of variations)
   on load, and assert if > whatever limit i temporarily impose for XOR/OR
   combo_idx compatibility (128 for example). can always increase the limit
@@ -9,19 +22,22 @@
   one block per "source" then one thread per xor-source, i'm going to want
   to probably use one block per "source" and one thread per or_source.
   (or maybe reverse that, not sure). I'm really not sure what I was thinking
-  to be honest. are the candidate sources already copied to the kernel?
-  is that done in one of the xor_kernel_task functions? probably I'll need
-  to move that out to filter_candidates_cuda or something, or (yet another)
-  intermediate wrapper function around the whole filter mess, that wraps both
-  XOR and OR filter kernel tasks.
+  to be honest.
+  * are the candidate sources already copied to the kernel? is that done in
+    one of the xor_kernel_task functions? probably I'll need to move that out
+    to filter_candidates_cuda or something, or (yet another) intermediate
+    wrapper function around the whole filter mess, that wraps both XOR and OR
+    filter kernel tasks.
 
-* I want to know how many candidates (and sources) are considered (log message)
+* I want to know how many candidates (and sources) are considered (log message).
   from c++ probably better as that whole JS loop should move to c++.
-  * a little better now. could still count & save the number of "consider" calls
-    that was made. that info is getting lost, along with the # of considered
-    sources that are a) duplicate, b) incompatible, c) both - but both is just
-    an internal optimization, ultimately "incompatible" wins. and i'm not
-    sure duplicate is more than an implementation detail either.
+  * DONE - a little better now. could still count & save the number of "consider"
+    calls that were made. that info is getting lost.
+  * DONE - for incompatible. along with the # of considered sources that are
+    a) duplicate, b) incompatible, c) both - but both is just an internal
+    optimization, ultimately "incompatible" wins. and i'm not sure duplicate
+    is more than an implementation detail either.
+  * need to VERIFY counts are accurate and actually display them somewhere.
 
 * std::move into promise in filter-support
 
