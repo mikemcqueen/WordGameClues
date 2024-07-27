@@ -2,7 +2,7 @@
 #include <chrono>
 #include <numeric>
 #include <iostream>
-#include <memory>
+//#include <memory>
 #include <napi.h>
 #include <set>
 #include <string>
@@ -315,6 +315,7 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
 #endif
   //--
   uint32_t num_compatible{};
+
   // temporarily handle merge_only case until it's eliminated
   if (merge_only) {
     // merge-only=true is used for showComponents() and consistencyCheck V1,
@@ -327,7 +328,8 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
     }
     num_compatible = MFD.host.merged_xor_src_list.size();
     host_memory_dump(MFD.host);
-  } else {
+  }
+  else {
     if (get_merge_data(xor_src_lists, MFD.host, MFD.device)) {
       num_compatible = MFD.host.combo_indices.size();
       // filter needs this later
@@ -468,21 +470,16 @@ auto make_source_descriptor_pairs(
   return src_desc_pairs;
 }
 
-void set_incompatible_sources(
-    const SourceCompatibilitySet& incompatible_sources) {
-  // TODO: FIXMENOW remove
-  //if (incompatible_sources.empty()) return;
-
+void set_incompatible_sources(const SourceCompatibilitySet& incompat_sources) {
   // empty set technically possible; disallowed here as a canary
-  assert(!incompatible_sources.empty());
-  assert(MFD.host.incompatible_src_desc_pairs.empty());
-  assert(!MFD.device.incompatible_src_desc_pairs);
+  assert(!incompat_sources.empty());
+  assert(MFD.host.incompat_src_desc_pairs.empty());
+  assert(!MFD.device.incompat_src_desc_pairs);
 
-  MFD.host.incompatible_src_desc_pairs =
-    std::move(make_source_descriptor_pairs(incompatible_sources));
-  MFD.device.incompatible_src_desc_pairs =
-    cuda_alloc_copy_source_descriptor_pairs(MFD.host.incompatible_src_desc_pairs);
-  MFD.device.num_incompatible_sources = incompatible_sources.size();
+  MFD.host.incompat_src_desc_pairs =
+      std::move(make_source_descriptor_pairs(incompat_sources));
+  MFD.device.incompat_src_desc_pairs =
+      cuda_alloc_copy_source_descriptor_pairs(MFD.host.incompat_src_desc_pairs);
 }
 
 Value filterCandidatesForSum(const CallbackInfo& info) {
@@ -501,11 +498,17 @@ Value filterCandidatesForSum(const CallbackInfo& info) {
   auto iters = info[4].As<Number>().Int32Value();
   auto synchronous = info[5].As<Boolean>().Value();
   // --
-  auto opt_incompatible_sources = filter_candidates_cuda(
-    MFD, sum, threads_per_block, streams, stride, iters, synchronous);
-  assert(synchronous == opt_incompatible_sources.has_value());
-  if (opt_incompatible_sources.has_value()) {
-    set_incompatible_sources(opt_incompatible_sources.value());
+  // this function signifies the end of calls to consider_candidate() for a
+  // particular sum. filter_candidates_cuda() will clear candidate data to
+  // free memory. now is a good opportunity to save candidate counts for this
+  // sum so we can access it later.
+  save_current_candidate_counts(sum);
+
+  auto opt_incompat_sources = filter_candidates_cuda(
+      MFD, sum, threads_per_block, streams, stride, iters, synchronous);
+  assert(synchronous == opt_incompat_sources.has_value());
+  if (opt_incompat_sources.has_value()) {
+    set_incompatible_sources(opt_incompat_sources.value());
   }
   // NOTE: can only free device data here after synchronous call. 
   return env.Null();
@@ -516,7 +519,7 @@ Value filterCandidatesForSum(const CallbackInfo& info) {
 //
 Value getResult(const CallbackInfo& info) {
   Env env = info.Env();
-  auto result = get_filter_result(MFD);
+  auto result = get_filter_result();
   // free all the filter-stage device data
   MFD.device.cuda_free();
   cuda_memory_dump("filter complete");

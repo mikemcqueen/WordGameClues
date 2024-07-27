@@ -171,9 +171,9 @@ const getCombosForUseNcLists = (sum: number, max: number, args: any): void => {
     const MILLY = 1000000n;
     const start = process.hrtime.bigint();
 
-    // Given a sum, such as 4, and a max # of numbers to combine, such as 2, generate
+    // Given a sum, such as 4, and a max # of numbers to combine, such as 4, generate
     // an array of addend arrays ("count lists"), for each 2 <= N <= max, that add up
-    // to that sum, such as [ [1, 3], [2, 2] ]
+    // to that sum, such as [ [1, 3], [2, 2], [1, 1, 2], [1, 1, 1, 1] ]
     let countListArray: number[][] = Peco.makeNew({ sum, max }).getCombinations(); 
 
     let candidateCount = 0;

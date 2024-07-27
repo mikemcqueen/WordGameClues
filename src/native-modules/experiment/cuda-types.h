@@ -28,8 +28,8 @@ using ComboIndexSpanPair = std::pair<ComboIndexSpan, ComboIndexSpan>;
 
 // functions
 
-void cuda_malloc_async(void** ptr, size_t bytes, cudaStream_t stream,
-    std::string_view category);  // cl-format
+void cuda_malloc_async(
+    void** ptr, size_t bytes, cudaStream_t stream, std::string_view tag);
 void cuda_free(void* ptr);
 void cuda_memory_dump(std::string_view header = "cuda_memory_dump");
 size_t cuda_get_free_mem();
@@ -44,13 +44,13 @@ inline void assert_cuda_success(cudaError err, std::string_view sv) {
 template <typename T = result_t>
 [[nodiscard]] inline auto cuda_alloc_results(size_t num_results,
     cudaStream_t stream = cudaStreamPerThread,
-    std::string_view category = "results") {
+    std::string_view tag = "results") {
   // alloc results
   auto results_bytes = num_results * sizeof(T);
   T* device_results;
   // cudaError_t err = cudaMallocAsync((void**)&device_results, results_bytes, stream);
   // assert_cuda_success(err, "alloc results");
-  cuda_malloc_async((void**)&device_results, results_bytes, stream, category);
+  cuda_malloc_async((void**)&device_results, results_bytes, stream, tag);
   return device_results;
 }
 

@@ -15,12 +15,18 @@ namespace cm {
 
 using SourceCompatibilityLists = std::vector<SourceCompatibilityList>;
 
+struct CandidateCounts {
+  size_t num_considers;
+  size_t num_incompat;
+  size_t num_candidates;
+  size_t num_sources;
+};
+
 struct CandidateData {
   std::reference_wrapper<const SourceCompatibilityList> src_list_cref;
   std::set<std::string> combos;  // TODO: why is this a set vs. unordered_set?
 };
 using CandidateList = std::vector<CandidateData>;
-using CandidateMap = std::unordered_map<int, CandidateList>;
 
 // functions
 
@@ -28,11 +34,13 @@ void consider_candidate(const NameCountList& ncList);
 
 void clear_candidates(int sum);
 
-int count_candidates(const CandidateList& candidates);
+auto get_candidates(int sum) -> const CandidateList&;
 
-// globals
+auto get_num_candidate_sources(const CandidateList& candidates) -> size_t;
 
-inline CandidateMap allSumsCandidateData{};
+void save_current_candidate_counts(int sum);
+
+auto get_candidate_counts(int sum) -> CandidateCounts;
 
 }  // namespace cm
 

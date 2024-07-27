@@ -1,31 +1,39 @@
-++NEWPERF:
+* I want to know how many candidates (and sources) are considered (log message)
+  from c++ probably better as that whole JS loop should move to c++.
+  * a little better now. could still count & save the number of "consider" calls
+    that was made. that info is getting lost, along with the # of considered
+    sources that are a) duplicate, b) incompatible, c) both - but both is just
+    an internal optimization, ultimately "incompatible" wins. and i'm not
+    sure duplicate is more than an implementation detail either.
 
-* copy/process combo indices is slowwwww. i wonder how much of that is due
-  to vector reallocation & copying. maybe i could have a vector of vectors,
-  and process, say, ~100k (800KB) indices at a time, then when it fills,
-  just push_back another vector?
+* std::move into promise in filter-support
 
-* assigning unique numbers to source/clue names would speed up validator. and
-  would consume less memory. could potentially integrate that into ncList/
-  primaryNameSrcList as well.
+* my understanding of std::move might have regressed for non-initializing 
+  assignment of a variable to a function that returns by value. i think i
+  need move in those cases, and I think I removed some recently.
+  * good testcase for moveable repo
+* try adding testcase to moveable repo for return optional<pair<obj,obj>>
 
---NEWPERF
+* cuda_device_ptr_t
 
 * set --max-sources to N(-1) (if not otherwise specified) when -cM,N ?
 
 * make -t x,y,z show VALID entries even if they exceed max_sources (maybe
   separated by a -- line)
 
-* try adding testcase to moveable repo for return optional<pair<obj,obj>>
-
 * i need --ccc to run through the same centralized logic as validator to
   determine if an NC can be assigned to the combination of two sources.
   currently that's just "is the NC name the same as a source name" but that
   may change at some point, and I want it to change for everything when it
   does.
+  * i think i determined this is bogus? every source saved (in, e.g., a
+    knownSourceMap src-list) and associated with a particular name, has
+    already been determined to be compatible with that name. all i'm
+    doing is adding additional names to sources that were already deemed
+    compatible with those names elsewhere. (I think!). If I'm wrong,
+    validator will let me know (hasn't happened yet).
 
 * would be nice if -t showed NCs: PRESENT as word:1,word:2 - ..
-
 
 * clue-manager::add_compound_clue could maybe be integrated into validateSources
   workflow (in index.cpp) depending on conditionals used in TS.
@@ -117,6 +125,7 @@
   XOR compatible with an XorSource then I test if it is OR compatible with at least
   one source of each OR arg.  But shouldn't I also check if the XOR source it was XOR
   compatible with, is also OR-compatible with the candidate OR source?
+  * No. OR arg sources don't need to be tested vs. XOR arg sources.
 
 * is_source_XOR_and_OR_compatible:
   so i'm wondering, once one thread determines that it's (both XOR and) OR compatible,
@@ -128,7 +137,7 @@
 
 * fix variable names in filter-support::cuda_allocCopySentenceVariationIndices()
 
-CM:
+// CM:
 
 * cm: shouldn't i filter out retired pairs in pairs(.sh) ?
   * and for that matter, would a filter-retired(.sh) script be useful for
@@ -140,6 +149,18 @@ CM:
       (a single letter, at least in initial implementation)
 * cm: ensure words.json is sorted
 
+// ++NEWPERF:
+
+* copy/process combo indices is slowwwww. i wonder how much of that is due
+  to vector reallocation & copying. maybe i could have a vector of vectors,
+  and process, say, ~100k (800KB) indices at a time, then when it fills,
+  just push_back another vector?
+
+* assigning unique numbers to source/clue names would speed up validator. and
+  would consume less memory. could potentially integrate that into ncList/
+  primaryNameSrcList as well.
+
+// --NEWPERF
 
 ++PERF
 

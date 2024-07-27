@@ -13,8 +13,9 @@
 #include <tuple>
 #include <utility> // pair
 #include <cuda_runtime.h>
-#include "candidates.h"
-#include "filter.h"
+//#include "candidates.h"
+#include "filter.cuh"
+#include "filter-types.h"
 #include "merge-filter-data.h"
 
 //#define LOGGING

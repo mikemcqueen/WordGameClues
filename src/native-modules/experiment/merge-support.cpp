@@ -22,10 +22,9 @@ auto getNumEmptySublists(const std::vector<SourceList>& src_lists) {
 }
 
 auto anyCompatibleXorSources(const SourceData& source,
-  const Peco::IndexList& indexList, const SourceList& sourceList) {
-  //
-  for (auto it = indexList.begin(); it != indexList.end(); ++it) {
-    if (source.isXorCompatibleWith(sourceList[*it])) {
+    const Peco::IndexList& indexList, const SourceList& sourceList) {
+  for (auto idx : indexList) {
+    if (source.isXorCompatibleWith(sourceList.at(idx))) {
       return true;
     }
   }
@@ -56,8 +55,7 @@ bool xor_filter_all_indices(Peco::IndexListVector& idx_lists,
   if (idx_lists.size() < 2u) {
     return true;
   }
-  using namespace std::chrono;
-  const auto t0 = high_resolution_clock::now();
+  auto t = util::Timer::start_timer();
   for (size_t first{}; first < idx_lists.size(); ++first) {
     for (size_t second{}; second < idx_lists.size(); ++second) {
       if (first == second)
@@ -68,9 +66,8 @@ bool xor_filter_all_indices(Peco::IndexListVector& idx_lists,
     }
   }
   if (log_level(Verbose)) {
-    const auto t1 = high_resolution_clock::now();
-    const auto t_dur = duration_cast<milliseconds>(t1 - t0).count();
-    std::cerr << "  filter incompatible - " << t_dur << "ms" << std::endl;
+    t.stop();
+    std::cerr << "  filter incompatible - " << t.count() << "ms" << std::endl;
   }
   return true;
 }
@@ -247,8 +244,7 @@ void host_show_num_compat_combos(const uint64_t first_combo,
     const std::vector<std::vector<result_t>>& compat_matrices,
     const IndexList& list_sizes) {
   assert(list_sizes.size() == compat_matrices.size());
-  using namespace std::chrono;
-  auto t0 = high_resolution_clock::now();
+  auto t = util::Timer::start_timer();
   IndexList row_indices(10);
   int num_compat{};
   for (auto idx{first_combo}; idx < num_combos; ++idx) {
@@ -274,11 +270,10 @@ void host_show_num_compat_combos(const uint64_t first_combo,
       ++num_compat;
     }
   }
-  auto t1 = high_resolution_clock::now();
-  auto t_dur = duration_cast<milliseconds>(t1 - t0).count();
+  t.stop();
   std::cerr << " host_show_num_compat_combos "
             << " for [" << first_combo << ", " << num_combos
-            << "]: " << num_compat << " - " << t_dur << "ms" << std::endl;
+            << "]: " << num_compat << " - " << t.count() << "ms" << std::endl;
 }
 
 //
@@ -512,10 +507,9 @@ auto cuda_get_compat_xor_src_indices(const std::vector<SourceList>& src_lists,
     const index_t* device_idx_list_sizes) -> std::vector<uint64_t> {
   assert(!src_lists.empty() && !idx_lists.empty()
          && !getNumEmptySublists(src_lists) && "cuda_merge: invalid param");
-  using namespace std::chrono;
   using namespace std::experimental::fundamentals_v3;
   const auto stream = cudaStreamPerThread;
-  auto t0 = high_resolution_clock::now();
+  auto t = util::Timer::start_timer();
   auto src_list_start_indices = make_start_indices(src_lists);
   auto idx_list_start_indices = make_start_indices(idx_lists);
   size_t num_bytes{};
@@ -526,13 +520,11 @@ auto cuda_get_compat_xor_src_indices(const std::vector<SourceList>& src_lists,
       make_compat_matrix_start_indices(idx_lists);
 
   if constexpr (0) {
-    // sync if we want accurate timing
     auto err = cudaStreamSynchronize(stream);
+    t.stop();
     assert_cuda_success(err, "cudaStreamSynchronize");
-    auto t1 = high_resolution_clock::now();
-    auto t_dur = duration_cast<milliseconds>(t1 - t0).count();
-    std::cerr << "  alloc/copy complete, allocated: " << num_bytes << " - "
-              << t_dur << "ms" << std::endl;
+    std::cerr << "  compat matrix alloc/copy complete, allocated: " << num_bytes
+              << " - " << t.count() << "ms" << std::endl;
   }
   //CudaEvent lp_start;
   // run list_pair_compat kernels
@@ -597,6 +589,7 @@ XorSource merge_sources(const std::vector<index_t>& src_indices,
   UsedSources usedSources{};
   for (size_t i{}; i < src_indices.size(); ++i) {
     const auto& src = src_lists.at(i).at(src_indices.at(i));
+    // TODO: std::ranges::copy
     const auto& pnsl = src.primaryNameSrcList;
     primaryNameSrcList.insert(
         primaryNameSrcList.end(), pnsl.begin(), pnsl.end());  // copy
@@ -649,28 +642,22 @@ auto get_merge_data(const std::vector<SourceList>& src_lists,
   device.idx_lists = cuda_alloc_copy_idx_lists(compat_idx_lists);
   const auto idx_list_sizes = util::make_list_sizes(compat_idx_lists);
   device.idx_list_sizes = cuda_alloc_copy_list_sizes(idx_list_sizes);
-  const auto level = merge_only ? ExtraVerbose : Normal;
-  {
-    util::LogDuration ld("get combo_indices", level);
-    host.combo_indices =
-        cuda_get_compat_xor_src_indices(src_lists, device.src_lists,
-            compat_idx_lists, device.idx_lists, device.idx_list_sizes);
-  }
   host.compat_idx_lists = std::move(compat_idx_lists);
+  const auto level = merge_only ? ExtraVerbose : Normal;
+  util::LogDuration ld("get combo_indices", level);
+  host.combo_indices =
+      cuda_get_compat_xor_src_indices(src_lists, device.src_lists,
+          host.compat_idx_lists, device.idx_lists, device.idx_list_sizes);
   return true;
 }
 
 auto merge_xor_compatible_src_lists(
     const std::vector<SourceList>& src_lists) -> SourceList {
   assert(src_lists.size() > 1);
-  SourceList merged_src_list;
   MergeData md;
-  if (get_merge_data(src_lists, md.host, md.device, true)) {
-    merged_src_list = xor_merge_sources(
-        src_lists, md.host.compat_idx_lists, md.host.combo_indices);
-    md.device.cuda_free();
-  }
-  return merged_src_list;
+  if (!get_merge_data(src_lists, md.host, md.device, true)) return {};
+  return xor_merge_sources(
+      src_lists, md.host.compat_idx_lists, md.host.combo_indices);
 }
 
 }  // namespace cm
