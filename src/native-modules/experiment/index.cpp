@@ -375,8 +375,7 @@ auto cuda_alloc_copy_or_args(const OrArgList& or_arg_list, cudaStream_t stream) 
   return true;
 }
 
-void alloc_copy_combo_indices(const MergeData::Host& host,
-    MergeData::Device& device, cudaStream_t stream) {
+void alloc_copy_combo_indices(cudaStream_t stream) {
   assert(!MFD.host_xor.combo_indices.empty());
   using namespace std::chrono;
   util::LogDuration ld("alloc_copy_xor_combo_indices", Verbose);
@@ -408,21 +407,24 @@ Value filterPreparation(const CallbackInfo& info) {
   // --
   // process OR-args first. incompatibility may cause us to bail early.
   auto stream = cudaStreamPerThread;
-  auto compat = false;
+  auto compat{true};
   MFD.host_or.src_lists = build_src_lists(nc_data_lists);
   MFD.host_or.arg_list = std::move(build_or_arg_list(MFD.host_or.src_lists));
   if (MFD.host_or.arg_list.size()) {
     cuda_alloc_copy_or_args(MFD.host_or.arg_list, stream);
-    if (get_merge_data(MFD.host_or.src_lists, MFD.host_or, MFD.device_or,
-            MergeType::OR, stream)) {
-      // num_compatible = MFD.host_or.combo_indices.size();
-      //?? filter needs this later
-      //  ?? MFD.host_or.src_lists = std::move(or_src_lists);
+    compat = get_merge_data(MFD.host_or.src_lists, MFD.host_or, MFD.device_or,
+        MergeType::OR, stream);
+    if (!compat) {
+      std::cerr << "failed to merge OR args" << std::endl;
     }
+    // ?? num_compatible = MFD.host_or.combo_indices.size();
+    // ?? filter needs this later
+    // ?? MFD.host_or.src_lists = std::move(or_src_lists);
   }
-  alloc_copy_combo_indices(MFD.host_xor, MFD.device_xor, stream);
-  cuda_memory_dump("filter preparation:");
-
+  if (compat) {
+    alloc_copy_combo_indices(stream);
+    cuda_memory_dump("filter preparation:");
+  }
   return Boolean::New(env, compat);
 }
 

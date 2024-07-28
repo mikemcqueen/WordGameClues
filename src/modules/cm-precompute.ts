@@ -285,7 +285,12 @@ export const preCompute = (first: number, last: number, args: any): boolean => {
     const orNcDataLists = args.or ? buildAllUseNcDataLists("or", maxSum, args) : [ [] ];
     if (listIsEmpty(orNcDataLists)) return false;
 
-    Native.filterPreparation(orNcDataLists);
+    // TODO: call mergeCompatible here for OR args same as above?
+
+    if (!Native.filterPreparation(orNcDataLists)) {
+        console.error(`no compatible OR sources`);
+        return false;
+    }
 
     const d = new Duration(begin, new Date()).milliseconds;
     console.error(`--Precompute - ${PrettyMs(d)}`);
