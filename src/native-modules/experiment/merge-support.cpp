@@ -276,7 +276,21 @@ void host_show_num_compat_combos(const uint64_t first_combo,
             << "]: " << num_compat << " - " << t.count() << "ms" << std::endl;
 }
 
-//
+auto log_copy_process(
+    util::Timer& copy_t, util::Timer& proc_t, uint64_t num_hits, level = Verbose) {
+  long elapsed;
+  if (log_level(level)) {
+    t_proc.stop();
+    elapsed = t_proc.count();
+    if (log_level(ExtraVerbose)) {
+      std::cerr << "  copy/process results, hits: " << num_hits
+                << ", copy: " << t_copy.count() << "ms"
+                << ", process: " << t_proc.count() << "ms" << std::endl;
+    }
+  }
+  return elapsed;
+}
+
 auto process_results(const std::vector<result_t>& results, uint64_t start_idx,
     uint64_t num_results, std::vector<uint64_t>& result_indices) {
   uint64_t hits{};
@@ -289,7 +303,19 @@ auto process_results(const std::vector<result_t>& results, uint64_t start_idx,
   return hits;
 }
 
-//
+auto log_compat_combos_kernel(int idx, CudaEvent& start, LogLevel level = Verbose) {
+  long elapsed{};
+  if (log_level(level)) {
+    CudaEvent stop;
+    elapsed = stop.synchronize(start);
+    if (log_level(ExtraVerbose)) {
+      std::cerr << "  completed get_compat_combos_kernel " << idx << " - "
+                << elapsed << "ms" << std::endl;
+    }
+  }
+  return elapsed;
+}
+
 auto run_get_compat_combos_task(const result_t* device_compat_matrices,
     unsigned num_compat_matrices,
     const index_t* device_compat_matrix_start_indices,
@@ -304,12 +330,13 @@ auto run_get_compat_combos_task(const result_t* device_compat_matrices,
   auto device_results =
       cuda_alloc_results(num_combos, stream, "get_compat_combos results");
   scope_exit free_results{[device_results]() { cuda_free(device_results); }};
+
   std::vector<result_t> host_results(num_combos);
   std::vector<uint64_t> result_indices;
   CudaEvent gcc_start;
-  long gcc_elapsed_total{};
-  long copy_elapsed_total{};
-  long proc_elapsed_total{};
+  long gcc_elapsed{};
+  long copy_elapsed{};
+  long proc_elapsed{};
   uint64_t total_hits{};
   int idx{};
   uint64_t first_combo{};
@@ -323,47 +350,29 @@ auto run_get_compat_combos_task(const result_t* device_compat_matrices,
     }
     if (log_level(Verbose)) gcc_start.record();
     run_get_compat_combos_kernel(first_combo, num_combos,
-      device_compat_matrices, num_compat_matrices,
-      device_compat_matrix_start_indices, device_idx_list_sizes,
-      device_results);
-    if (log_level(Verbose)) {
-      CudaEvent gcc_stop;
-      auto gcc_elapsed = gcc_stop.synchronize(gcc_start);
-      gcc_elapsed_total += gcc_elapsed;
-      if (log_level(ExtraVerbose)) {
-        std::cerr << "  completed get_compat_combos_kernel " << idx << " - "
-                  << gcc_elapsed << "ms" << std::endl;
-      }
-    }
+        device_compat_matrices, num_compat_matrices,
+        device_compat_matrix_start_indices, device_idx_list_sizes,
+        device_results);
+    gcc_elapsed += log_compat_combos_kernel(idx, gcc_start);
 
+    // TODO: sync_copy could return event.elapsed
     auto t_copy = util::Timer::start_timer();
     sync_copy_results(host_results, num_combos, device_results, stream);
-    if (log_level(Verbose)) {
-      t_copy.stop();
-      copy_elapsed_total += t_copy.count();
-    }
+    t_copy.stop();
+    copy_elapsed += t_copy.count();
 
     auto t_proc = util::Timer::start_timer();
     auto num_hits =
         process_results(host_results, first_combo, num_combos, result_indices);
-    if (log_level(Verbose)) {
-      t_proc.stop();
-      proc_elapsed_total += t_proc.count();
-      if (log_level(ExtraVerbose)) {
-        std::cerr << "  copy/process results, hits: " << num_hits
-                  << ", copy: " << t_copy.count() << "ms"
-                  << ", process: " << t_proc.count() << "ms" << std::endl;
-      }
-    }
+    proc_elapsed += log_copy_processs(t_copy, t_proc, num_hits);
     total_hits += num_hits;
   }
   if (log_level(Verbose)) {
     std::cerr << " get_compat_combos_kernel total " << idx << " runs of "
-              << chunk_size / 1'000'000 << "M - " << gcc_elapsed_total
-              << "ms\n";
+              << chunk_size / 1'000'000 << "M - " << gcc_elapsed << "ms\n";
     std::cerr << " copy/process results total hits: " << total_hits
-              << ", copy: " << copy_elapsed_total << "ms"
-              << ", process: " << proc_elapsed_total << "ms" << std::endl;
+              << ", copy: " << copy_elapsed << "ms"
+              << ", process: " << proc_elapsed << "ms" << std::endl;
   }
   return result_indices;
 }
@@ -383,8 +392,8 @@ auto get_src_indices(
 // each source list, each containing indices for every source in each list.
 // Then filter out all xor-incompatible, and return a vector of compatible
 // index lists.
-auto get_compatible_indices(const std::vector<SourceList>& src_lists)
-    -> std::vector<IndexList> {
+auto get_compatible_indices(
+    const std::vector<SourceList>& src_lists) -> std::vector<IndexList> {
   std::vector<size_t> lengths;
   lengths.reserve(src_lists.size());
   for (const auto& sl : src_lists) {
@@ -407,15 +416,12 @@ auto get_compatible_indices(const std::vector<SourceList>& src_lists)
               << ", valid: " << std::boolalpha << valid << std::endl;
   }
   // "valid" means all resulting index lists have non-zero length
-  if (!valid) {
-    return {};
-  }
+  if (!valid) { return {}; }
   return Peco::to_vectors(idx_lists);
 }
 
 SourceCompatibilityData* cuda_alloc_copy_src_lists(
-    const std::vector<SourceList>& src_lists,
-    size_t* num_bytes = nullptr) {
+    const std::vector<SourceList>& src_lists, size_t* num_bytes = nullptr) {
   // alloc sources
   const auto stream = cudaStreamPerThread;
   const auto num_sources = util::sum_sizes(src_lists);
@@ -427,7 +433,7 @@ SourceCompatibilityData* cuda_alloc_copy_src_lists(
   // copy sources
   std::vector<SourceCompatibilityData> src_compat_list;
   src_compat_list.reserve(num_sources);
-  //std::cerr << "  building src_compat_lists..." << std::endl;
+  // std::cerr << "  building src_compat_lists..." << std::endl;
   for (const auto& src_list : src_lists) {
     // this is somewhat braindead. i'm basically "slicing" each SourceData
     // into a subset of itself (SourceCompatibilityData) and shoving it into
@@ -441,15 +447,12 @@ SourceCompatibilityData* cuda_alloc_copy_src_lists(
     // pnsl/ncList from SourceCompatibilityData.
     add_compat_sources(src_compat_list, src_list);
   }
-  //std::cerr << "  copying src_compat_lists..." << std::endl;
   err = cudaMemcpyAsync(device_sources, src_compat_list.data(), sources_bytes,
-    cudaMemcpyHostToDevice, stream);
+      cudaMemcpyHostToDevice, stream);
   assert_cuda_success(err, "merge copy sources");
   CudaEvent temp;
   temp.synchronize();
-  if (num_bytes) {
-    *num_bytes = sources_bytes;
-  }
+  if (num_bytes) { *num_bytes = sources_bytes; }
   return device_sources;
 }
 
@@ -467,15 +470,13 @@ index_t* cuda_alloc_copy_idx_lists(
   size_t index{};
   for (const auto& idx_list : idx_lists) {
     err = cudaMemcpyAsync(&device_indices[index], idx_list.data(),
-      idx_list.size() * sizeof(index_t), cudaMemcpyHostToDevice, stream);
+        idx_list.size() * sizeof(index_t), cudaMemcpyHostToDevice, stream);
     assert_cuda_success(err, "merge copy idx_lists");
     index += idx_list.size();
   }
   CudaEvent temp;
   temp.synchronize();
-  if (num_bytes) {
-    *num_bytes = indices_bytes;
-  }
+  if (num_bytes) { *num_bytes = indices_bytes; }
   return device_indices;
 }
 
@@ -495,9 +496,7 @@ index_t* cuda_alloc_copy_list_sizes(
   assert_cuda_success(err, "copy list sizes");
   CudaEvent temp;
   temp.synchronize();
-  if (num_bytes) {
-    *num_bytes = list_sizes_bytes;
-  }
+  if (num_bytes) { *num_bytes = list_sizes_bytes; }
   return device_list_sizes;
 }
 
@@ -526,22 +525,19 @@ auto cuda_get_compat_xor_src_indices(const std::vector<SourceList>& src_lists,
     std::cerr << "  compat matrix alloc/copy complete, allocated: " << num_bytes
               << " - " << t.count() << "ms" << std::endl;
   }
-  //CudaEvent lp_start;
-  // run list_pair_compat kernels
-  // the only unnecessary capture here is src_lists
+  // CudaEvent lp_start;
+  //  run list_pair_compat kernels
+  //  the only unnecessary capture here is src_lists
   for_each_list_pair(idx_lists, [&](size_t i, size_t j, size_t n) {
     if constexpr (0) {
       std::cerr << "  launching list_pair_compat_kernel " << n << " for [" << i
                 << ", " << j << "]" << std::endl;
     }
-    run_list_pair_compat_kernel(
-      &device_src_lists[src_list_start_indices.at(i)],
-      &device_src_lists[src_list_start_indices.at(j)],
-      &device_idx_lists[idx_list_start_indices.at(i)],
-      idx_lists.at(i).size(),
-      &device_idx_lists[idx_list_start_indices.at(j)],
-      idx_lists.at(j).size(),
-      &device_compat_matrices[compat_matrix_start_indices.at(n)]);
+    run_list_pair_compat_kernel(&device_src_lists[src_list_start_indices.at(i)],
+        &device_src_lists[src_list_start_indices.at(j)],
+        &device_idx_lists[idx_list_start_indices.at(i)], idx_lists.at(i).size(),
+        &device_idx_lists[idx_list_start_indices.at(j)], idx_lists.at(j).size(),
+        &device_compat_matrices[compat_matrix_start_indices.at(n)]);
   });
   /*
   if constexpr (0) {
@@ -560,12 +556,12 @@ auto cuda_get_compat_xor_src_indices(const std::vector<SourceList>& src_lists,
   scope_exit free_start_indices([device_compat_matrix_start_indices]() {
     cuda_free(device_compat_matrix_start_indices);
   });
-  const uint64_t max_combos{
+  const auto max_combos{
       util::multiply_with_overflow_check(util::make_list_sizes(idx_lists))};
-  auto combo_indices =
-      run_get_compat_combos_task(device_compat_matrices, idx_lists.size(),
-          device_compat_matrix_start_indices, device_idx_list_sizes,
-          max_combos);  // clang-format
+  auto combo_indices = run_get_compat_combos_task(device_compat_matrices,
+      idx_lists.size(), device_compat_matrix_start_indices,
+      device_idx_list_sizes, max_combos);
+
 #if defined(HOST_SIDE_COMPARISON)
   // host-side compat combo counter for debugging/comparison. slow.
   // TODO: if i ever enable this again, consider not passing get_compat_matrices

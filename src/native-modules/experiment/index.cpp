@@ -2,7 +2,6 @@
 #include <chrono>
 #include <numeric>
 #include <iostream>
-//#include <memory>
 #include <napi.h>
 #include <set>
 #include <string>
@@ -26,7 +25,7 @@
 
 namespace {
 
-// aliases
+// using
 
 using namespace Napi;
 using namespace cm;

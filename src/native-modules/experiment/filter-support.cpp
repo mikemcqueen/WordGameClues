@@ -2,6 +2,7 @@
 
 #include <experimental/scope>
 #include <future>
+#include <limits>
 #include <numeric>
 #include <optional>
 #include <semaphore>
@@ -495,10 +496,9 @@ auto async_filter_task(MergeFilterData& mfd, int sum,
 
 // TODO: same as sum_sizes
 auto countIndices(const VariationIndicesList& variationIndices) {
-  return std::accumulate(variationIndices.begin(), variationIndices.end(), 0,
-      [](int total, const auto& indices) {
-        total += indices.size();
-        return total;
+  return std::accumulate(variationIndices.begin(), variationIndices.end(), 0u,
+      [](size_t total, const auto& indices) {
+        return total + indices.size();
       });
 }
 
@@ -701,10 +701,8 @@ cuda_allocCopyOrSources(const OrArgList& orArgList) {
     size_t offset{};
     for (const auto& combo_indices : variation_indices) {
       variation_offsets.push_back(offset);
+      assert(combo_indices.size() < std::numeric_limits<index_t>::max());
       num_combo_indices.push_back(combo_indices.size());
-      // NOTE: Async. I'm going to need to preserve
-      // sentenceVariationIndices until copy is complete - (kernel
-      // execution/synchronize?)
       const auto indices_bytes = combo_indices.size() * sizeof(combo_index_t);
       err = cudaMemcpyAsync(&device_indices.combo_indices[offset],
           combo_indices.data(), indices_bytes, cudaMemcpyHostToDevice,

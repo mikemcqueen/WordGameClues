@@ -1,3 +1,9 @@
+* shoud display max variation count (sentence with max # of variations)
+  on load, and assert if > whatever limit i temporarily impose for XOR/OR
+  combo_idx compatibility (128 for example). can always increase the limit
+  later. 64-bits (8 bytes) gets me 128 variation max. 18 bytes (9 x 16-bit)
+  gets me 65535 which is variation_t and as high as it'll ever need to go.
+
 * i need to know candidate sources count because I'm going to re-write the
   OR compatibility kernel, and similar to how (iirc) the XOR kernel uses
   one block per "source" then one thread per xor-source, i'm going to want
@@ -162,10 +168,20 @@
 
 // ++NEWPERF:
 
+* had an idea about doubling the stride in streamswarm/indexstates if the
+  moving average was 0. i could store 3x 10 bit (1024) kernel-time ms values
+  in a 32-bit word and <<10 out the oldest and add on the (newest&1023)>>20.
+  so after 3 streams if that value (or the moving average of them) is zero,
+  double the stride. actually make sure i have accurate timings on all of
+  (fill + copy + copy + update). kernel runtime should be greater than sum
+  of all of those. i suppose i could store last 3 values for the sum of all
+  of those and calculate the moving average of that as well.
+
 * copy/process combo indices is slowwwww. i wonder how much of that is due
   to vector reallocation & copying. maybe i could have a vector of vectors,
   and process, say, ~100k (800KB) indices at a time, then when it fills,
   just push_back another vector?
+  * looks like not the case. just a huge amount of memory being copied.
 
 * assigning unique numbers to source/clue names would speed up validator. and
   would consume less memory. could potentially integrate that into ncList/

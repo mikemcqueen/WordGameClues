@@ -27,16 +27,10 @@ inline auto make_list_sizes(const std::vector<cm::IndexList>& idx_lists) {
   return sizes;
 }
 
+// TODO: 2nd return type template param, overflow check boolean function param
 template <typename T> inline auto sum_sizes(const std::vector<T>& v) {
   return std::accumulate(v.begin(), v.end(), 0u,
       [](size_t total, const T& t) { return total + t.size(); });
-  /*
-  size_t sum{};
-  for (const auto& v : vecs) {
-    sum += v.size();
-  }
-  return sum;
-  */
 }
 
 template <typename T>
@@ -54,13 +48,14 @@ template <typename T, typename R = T>
 // TODO: is_integral_type<T>
 R sum(const std::vector<T>& vals) {
   return std::accumulate(vals.begin(), vals.end(), 0, [](R total, T val) {
-    total += val;
-    return total;
+    return total + val;
   });
 }
 
+// TOOD: "product"
 template <typename T, typename R = uint64_t>
 R multiply_with_overflow_check(const std::vector<T>& values) {
+  // TODO: std::accumulate
   R total{1};
   for (auto v : values) {
     if (v > std::numeric_limits<R>::max() / total) {
@@ -71,6 +66,7 @@ R multiply_with_overflow_check(const std::vector<T>& values) {
   return total;
 }
 
+#if 0
 template <typename T>
 typename std::vector<T>::const_iterator move_append(
     std::vector<T>& dst, std::vector<T>&& src) {
@@ -86,6 +82,7 @@ typename std::vector<T>::const_iterator move_append(
   //src.shrink_to_fit();
   return result;
 }
+#endif
 
 template <typename T, template <typename> class C>
   requires std::is_same_v<std::string, T>
