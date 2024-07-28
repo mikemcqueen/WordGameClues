@@ -114,7 +114,7 @@ auto get_compatible_sources_results(int sum,
   const auto stream = cudaStreamPerThread;
   CudaEvent alloc_event;
   auto device_results = cuda_alloc_results<compat_src_result_t>(
-      num_sources, stream, "get_compatible_sources results");
+      num_sources, stream, "get_compat_sources results");
   cuda_zero_results<compat_src_result_t>(device_results, num_sources);
   CudaEvent start_event;
   run_get_compatible_sources_kernel(device_sources, num_sources,
@@ -250,9 +250,10 @@ void log_xor_kernel(int sum, const StreamData& stream,
     const std::vector<result_t>& results, unsigned num_compat,
     unsigned total_compat) {
   if (log_level(ExtraVerbose)) {
-    auto kernel_duration = stream.kernel_stop.synchronize(stream.kernel_start);
+    auto xor_kernel_duration =
+        stream.xor_kernel_stop.synchronize(stream.xor_kernel_start);
     std::cerr << " " << sum << ": stream " << stream.stream_idx
-              << " xor_kernel took " << kernel_duration << "ms" << std::endl;
+              << " xor_kernel " << xor_kernel_duration << "ms" << std::endl;
   }
   if (log_level(Ludicrous)) {
     auto num_actual_compat = std::accumulate(results.begin(), results.end(), 0,
@@ -265,7 +266,7 @@ void log_xor_kernel(int sum, const StreamData& stream,
 }
 
 //
-// This is the innermost filter "task" function.
+// This is the innermost filter kernel function wrapper.
 //
 // Divide device_sources up into chunks, and run multiple xor_kernels
 // concurrently on different streams, with each stream processing one
@@ -274,9 +275,9 @@ void log_xor_kernel(int sum, const StreamData& stream,
 // Returns a pair<int, int>, consisting of the number of processed sources
 // and the number of xor-compatible sources. (TODO: compatible with what)
 //
-auto run_xor_filter_task(int sum, StreamSwarm& streams, int threads_per_block,
-    IndexStates& idx_states, const MergeFilterData& mfd,
-    const SourceCompatibilityData* device_sources,
+auto run_concurrent_filter_kernels(int sum, StreamSwarm& streams,
+    int threads_per_block, IndexStates& idx_states, const MergeFilterData& mfd,
+    const SourceCompatibilityData* device_src_list,
     const compat_src_result_t* device_compat_src_results,
     result_t* device_results, const index_t* device_start_indices,
     std::vector<result_t>& results) {
@@ -294,7 +295,7 @@ auto run_xor_filter_task(int sum, StreamSwarm& streams, int threads_per_block,
       t.stop();
       log_fill(sum, stream, idx_states, t.microseconds());
       stream.alloc_copy_source_indices(idx_states);
-      run_xor_kernel(stream, threads_per_block, mfd, device_sources,
+      run_filter_kernels(threads_per_block, stream, mfd, device_src_list,
           device_compat_src_results, device_results, device_start_indices);
       continue;
     }
@@ -327,7 +328,7 @@ std::unordered_set<std::string> get_compat_combos(
   return compat_combos;
 }
 
-void log_xor_filter_task(int sum, int num_processed, int num_compat,
+void log_filter_sources(int sum, int num_processed, int num_compat,
     int num_results, const SourceCompatibilitySet& incompat_sources,
     int num_incompat_sources, std::chrono::milliseconds::rep duration_ms) {
   // diagnostic to clue me in
@@ -352,7 +353,8 @@ void log_xor_filter_task(int sum, int num_processed, int num_compat,
 }
 
 //
-// This is the intermediate filter "task" function.
+// This is the intermediate filter "task" function, which takes a device
+// array of sources to filter.
 //
 // Additional preparation and post-processing surrounding the call to
 // run_xor_filter_task.
@@ -373,7 +375,7 @@ void log_xor_filter_task(int sum, int num_processed, int num_compat,
 //
 // Returns a pair<compat_combo_string_set, incompat_sources_set>
 //
-filter_task_result_t xor_filter_task(const MergeFilterData& mfd,
+filter_task_result_t filter_sources(const MergeFilterData& mfd,
     const SourceCompatibilityData* device_sources,
     const compat_src_result_t* device_compat_src_results,
     const CandidateList& candidates, int sum, int threads_per_block,
@@ -408,18 +410,17 @@ filter_task_result_t xor_filter_task(const MergeFilterData& mfd,
               << std::endl;
   }
   auto t = util::Timer::start_timer();
-  auto [num_processed, num_compat] = run_xor_filter_task(sum, streams,
-      threads_per_block, idx_states, mfd, device_sources,
+  auto [num_processed, num_compat] = run_concurrent_filter_kernels(sum,
+      streams, threads_per_block, idx_states, mfd, device_sources,
       device_compat_src_results, device_results, device_start_indices, results);
   t.stop();
-  //  cuda_memory_dump();
   SourceCompatibilitySet incompat_sources;
   int num_incompat_sources{};
   if (synchronous) {
     num_incompat_sources =
         idx_states.get_incompatible_sources(candidates, incompat_sources);
   }
-  log_xor_filter_task(sum, num_processed, num_compat, results.size(),
+  log_filter_sources(sum, num_processed, num_compat, results.size(),
       incompat_sources, num_incompat_sources, t.count());
 
   return std::make_pair(get_compat_combos(candidates, results, num_processed),
@@ -474,7 +475,7 @@ auto filter_task(const MergeFilterData& mfd, int sum,
         device_sources, num_sources, mfd.device.incompat_src_desc_pairs,
         mfd.host.incompat_src_desc_pairs.size());
   }
-  auto filter_result = xor_filter_task(mfd, device_sources,
+  auto filter_result = filter_sources(mfd, device_sources,
       device_compat_src_results, candidates, sum, threads_per_block,
       num_streams, stride, iters, synchronous);
   // free host memory associated with candidates

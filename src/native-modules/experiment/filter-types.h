@@ -250,8 +250,6 @@ private:
   std::forward_list<index_t>::iterator fill_iter_;
 };  // class IndexStates
 
-//////////
-
 // the pointers in this are allocated in device memory
 struct StreamData {
 private:
@@ -265,12 +263,9 @@ public:
   }
 
   StreamData(int idx, cudaStream_t stream, int stride)
-      : stream_idx(idx),
-        cuda_stream(stream),
-        kernel_start(stream, false),
-        kernel_stop(stream, false),
-        num_list_indices(stride) {
-  }
+      : stream_idx(idx), cuda_stream(stream), xor_kernel_start(stream, false),
+        xor_kernel_stop(stream, false), or_kernel_start(stream, false),
+        or_kernel_stop(stream, false), num_list_indices(stride) {}
 
   int num_ready(const IndexStates& indexStates) const {
     return indexStates.num_ready(0, num_list_indices);
@@ -296,22 +291,18 @@ public:
       src_indices.at(idx) = opt_src_idx.value();
     }
     if (log_level(ExtraVerbose)) {
-      // std::cerr << "ending next_fill_idx: " << idx_states.next_fill_idx
-      //           << std::endl;
       const auto first =
           (src_indices.empty() ? -1 : (int)src_indices.front().listIndex);
       const auto last =
           (src_indices.empty() ? -1 : (int)src_indices.back().listIndex);
-      std::cerr << "stream " << stream_idx << " filled "
-                << src_indices.size() << " of " << max_idx
-                << ", first = " << first << ", last = " << last << std::endl;
-      //<< ", done: " << std::boolalpha << idx_states.done
+      std::cerr << "stream " << stream_idx << " filled " << src_indices.size()
+                << " of " << max_idx << ", first = " << first
+                << ", last = " << last << std::endl;
     }
     return !src_indices.empty();
   }
 
   bool fill_source_indices(IndexStates& idx_states) {
-    //, const std::vector<result_t>& compat_src_results) {
     return fill_source_indices(idx_states, num_list_indices);
   }
 
@@ -321,8 +312,6 @@ public:
     auto indices_bytes = src_indices.size() * sizeof(SourceIndex);
     // alloc source indices
     if (!device_src_indices) {
-      //err = cudaMallocAsync((void**)&device_src_indices, indices_bytes, cuda_stream);
-      //assert_cuda_success(err, "alloc src_indices");
       cuda_malloc_async((void**)&device_src_indices, indices_bytes, cuda_stream,
           "src_indices");
     }
@@ -339,14 +328,17 @@ public:
   void dump() const {
     std::cerr << "kernel " << stream_idx << ", is_running: " << std::boolalpha
               << is_running << ", src_indices: " << src_indices.size()
-              << ", num_list_indices: " << num_list_indices
-              << std::endl;
+              << ", num_list_indices: " << num_list_indices << std::endl;
   }
 
   int stream_idx{-1};
   cudaStream_t cuda_stream{};
-  CudaEvent kernel_start;
-  CudaEvent kernel_stop;
+  // this could be a std::array of kernel start/stop pairs possibly.
+  // initialization might be a tiny bit hairy.
+  CudaEvent xor_kernel_start;
+  CudaEvent xor_kernel_stop;
+  CudaEvent or_kernel_start;
+  CudaEvent or_kernel_stop;
 
   int sequence_num{};
   bool is_running{false};  // is running (true until results retrieved)
@@ -480,7 +472,7 @@ public:
 
 private:
   std::vector<StreamData> streams_;
-};
+}; // class StreamSwarm
 
 }  // namespace cm
 

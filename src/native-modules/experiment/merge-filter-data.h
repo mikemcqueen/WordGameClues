@@ -43,7 +43,7 @@ struct MergeData {
   struct Device {
   private:
     void reset_pointers() {
-      src_lists = nullptr;
+      xor_src_lists = nullptr;
       idx_lists = nullptr;
       idx_list_sizes = nullptr;
     }
@@ -55,13 +55,13 @@ struct MergeData {
     Device(Device&&) = delete; // disable mvoe
 
     void cuda_free() {
-      cm::cuda_free(src_lists);
+      cm::cuda_free(xor_src_lists);
       cm::cuda_free(idx_lists);
       cm::cuda_free(idx_list_sizes);
       reset_pointers();
     }
 
-    SourceCompatibilityData* src_lists{};
+    SourceCompatibilityData* xor_src_lists{};
     index_t* idx_lists{};
     index_t* idx_list_sizes{};
   } device;
@@ -75,8 +75,11 @@ struct MergeFilterData {
     // updated to do everything on c++ side, obviating the need for this.
     SourceList merged_xor_src_list;
 
+    // XOR kernel
     std::vector<UsedSources::SourceDescriptorPair> incompat_src_desc_pairs;
     std::vector<SourceList> xor_src_lists;
+
+    // OR kernel
     OrArgList or_arg_list;
   } host;
 
@@ -99,6 +102,7 @@ struct MergeFilterData {
       reset_pointers();
     }
 
+    // XOR kernel
     UsedSources::SourceDescriptorPair* incompat_src_desc_pairs{};
 
     index_t* src_list_start_indices{};
@@ -107,6 +111,7 @@ struct MergeFilterData {
     device::VariationIndices* variation_indices{};
     unsigned num_variation_indices{};
 
+    // OR kernel
     device::OrSourceData* or_src_list{};
     unsigned num_or_sources{};
   } device;

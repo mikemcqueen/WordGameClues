@@ -394,7 +394,7 @@ export const buildAllCandidates = (sentence: Type, variations: Variations, args:
     const sortedText = stripAndSort(sentence.text);
     for (const combo of sentence.combinations) {
         const nameListMap = buildCandidateNameListMap(combo.split(' '), sentence.components);
-        if (args.verbose) {
+        if (args.verbose > 1) {
             console.error(` nameListMap(${nameListMap.size}) :`);
             for (let list of nameListMap.values()) {
                 console.error(`  ${list}`);

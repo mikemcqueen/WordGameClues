@@ -223,7 +223,7 @@ export const loadClueList = (count: number,
 };
 
 const loadSentence = (num: number, args: any): number => {
-    if (args.verbose) {
+    if (args.verbose > 1) {
         console.error(`loading sentence ${num}`);
     }
     let maxClues = 0;// TODO
@@ -413,7 +413,7 @@ const primaryClueListPostProcessing = (args: any): void => {
     let uniqueComponentNames = new Set<string>();
     for (let i = 1; i < sentences.length; ++i) {
         const sentence = sentences[i];
-        if (args.verbose) {
+        if (args.verbose > 1) {
             // just info, but i want it output to stderr
             console.error(`sentence ${i}:`);
         }
@@ -422,7 +422,7 @@ const primaryClueListPostProcessing = (args: any): void => {
         names.forEach(name => uniqueComponentNames.add(name));
         const container = Sentence.buildAllCandidates(sentence, variations, args);
         State.allCandidates[i] = container;
-        if (args.verbose) {
+        if (args.verbose > 1) {
             console.error(` names: ${names.size}, variations: ${container.candidates.length}`);
         }
     }
@@ -460,7 +460,6 @@ export const loadAllClues = function (args: any): void {
     autoSource(primaryClueList, args);
     // if using -t, add primary variations to uniqueNames
     primaryClueListPostProcessing(args);
-    const t0 = new Date();
     for (let count = 2; count <= args.max_sources; ++count) {
         let clueList: ClueList.Compound = loadClueList(count);
         State.clueListArray[count] = clueList;
@@ -475,10 +474,8 @@ export const loadAllClues = function (args: any): void {
             My.getChar();
         }
     }
-    const t_dur = new Duration(t0, new Date()).milliseconds;
     if (args.verbose) {
-        console.error(`addCompound max(${args.max_sources}) - ${PrettyMs(t_dur)}` +
-            `, num_validates(${num_validates}) - ${PrettyMs(validate_duration)}`);
+        console.error(` validatesSources(${num_validates} calls) - ${PrettyMs(validate_duration)}`);
     }
     State.loaded = true;
 };

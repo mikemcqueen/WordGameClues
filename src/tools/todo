@@ -1,13 +1,19 @@
+* i think the existence of compat_src_indices means that we can be smarter
+  about IndexStates list/index allocation? to eliminate (known) incompatible
+  indices from the list? 
+
+* see if i can get rid of that num_list_indices in StreamData while i'm at it
+
 * OR kernel
   * DONE rip OR-compat checking out of xor-kernel.
   * DONE generate out.xor output for 4 input variations (2,2, 2,10)(--xor, --xor + --or)
   * DONE verify xor + or matches xor, and both match out.orig.xor
   * DONE commit? on a branch?
-  * remove "xor" from name of filter task wrapper functions i think.
-  * figure out where i'm going to plug in the OR kernel execution.
-  * make sure sources are already allocated at that spot, if not, move
+  * DONE remove "xor" from name of filter task wrapper functions i think.
+  * IN PROGESS figure out where i'm going to plug in the OR kernel execution.
+  * DONE make sure sources are already allocated at that spot, if not, move
     allocation to correct spot.
-  * write new OR kernel
+  * IN PROGRESS SORTA write new OR kernel
   * ??
   * PROFIT
 
