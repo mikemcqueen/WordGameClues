@@ -282,7 +282,7 @@ auto run_concurrent_filter_kernels(int sum, StreamSwarm& streams,
     result_t* device_results, const index_t* device_start_indices,
     std::vector<result_t>& results) {
   using namespace std::chrono;
-  int num_processed{};
+  int total_processed{};
   int total_compat{};
   int current_stream{-1};
   while (streams.get_next_available(current_stream)) {
@@ -302,16 +302,16 @@ auto run_concurrent_filter_kernels(int sum, StreamSwarm& streams,
     stream.has_run = true;
     stream.is_running = false;
     cuda_copy_results(results, device_results, stream.cuda_stream);
-    auto num_compat =
-        idx_states.update(stream.src_indices, results, stream.stream_idx);
+    auto num_compat = idx_states.update(stream, results);
+    // idx_states.update(stream.src_indices, results, stream.stream_idx);
     total_compat += num_compat;
-    num_processed += stream.src_indices.size();
+    total_processed += stream.src_indices.size();
     log_xor_kernel(sum, stream, results, num_compat, total_compat);
     if (log_level(Ludicrous)) {
       //host::xor_filter(sum, stream, mfd);
     }
   }
-  return std::make_pair(num_processed, total_compat);
+  return std::make_pair(total_processed, total_compat);
 }
 
 std::unordered_set<std::string> get_compat_combos(

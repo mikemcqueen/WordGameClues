@@ -28,9 +28,6 @@ using filter_result_t = std::unordered_set<std::string>;
 //using hr_time_point_t = decltype(std::chrono::high_resolution_clock::now());
 
 struct SourceIndex {
-  index_t listIndex{};
-  index_t index{};
-
   constexpr bool operator<(const SourceIndex& rhs) const {
     return (listIndex < rhs.listIndex)
            || ((listIndex == rhs.listIndex) && (index < rhs.index));
@@ -40,11 +37,37 @@ struct SourceIndex {
     sprintf(buf, "%d:%d", listIndex, index);
     return buf;
   }
+
+  index_t listIndex{};
+  index_t index{};
+};
+
+struct StreamBase {
+  StreamBase() = delete;
+  StreamBase(int idx, cudaStream_t stream)
+      : stream_idx(idx), cuda_stream(stream), xor_kernel_start(stream, false),
+        xor_kernel_stop(stream, false), or_kernel_start(stream, false),
+        or_kernel_stop(stream, false) {}
+
+  int stream_idx{-1};
+  cudaStream_t cuda_stream{};
+  // this could be a std::array of kernel start/stop pairs possibly.
+  // initialization might be a tiny bit hairy.
+  CudaEvent xor_kernel_start;
+  CudaEvent xor_kernel_stop;
+  CudaEvent or_kernel_start;
+  CudaEvent or_kernel_stop;
+
+  int sequence_num{};
+  bool is_running{false};  // is running (true until results retrieved)
+  bool has_run{false};     // has run at least once
+  SourceIndex* device_src_indices{};
+  std::vector<SourceIndex> src_indices;
 };
 
 class IndexStates {
 public:
-  enum class State {
+  enum class Status {
     ready,
     compatible,
     done
@@ -52,20 +75,20 @@ public:
 
   struct Data {
     constexpr auto ready_state() const {
-      return state == State::ready;
+      return state == Status::ready;
     }
 
     constexpr auto is_compatible() const {
-      return state == State::compatible;
+      return state == Status::compatible;
     }
 
     void reset() {
       sourceIndex.index = 0;
-      state = State::ready;
+      state = Status::ready;
     }
 
     SourceIndex sourceIndex;
-    State state = State::ready;
+    Status state = Status::ready;
   };
 
   IndexStates() = delete;
@@ -115,20 +138,20 @@ public:
   }
 
   auto num_ready(int first, int count) const {
-    return num_in_state(first, count, State::ready);
+    return num_in_state(first, count, Status::ready);
   }
 
   auto num_done(int first, int count) const {
-    return num_in_state(first, count, State::done);
+    return num_in_state(first, count, Status::done);
   }
 
   auto num_compatible(int first, int count) const {
-    return num_in_state(first, count, State::compatible);
+    return num_in_state(first, count, Status::compatible);
   }
 
   auto update(const std::vector<SourceIndex>& src_indices,
       const std::vector<result_t>& results, int stream_idx) {
-    int num_compatible{};
+    int num_compat{};
     int num_done{};
     int num_not_ready{};
     for (size_t i{}; i < src_indices.size(); ++i) {
@@ -139,23 +162,27 @@ public:
         continue;
       }
       if (results.at(src_idx.listIndex)) {
-        idx_state.state = State::compatible;
-        ++num_compatible;
+        idx_state.state = Status::compatible;
+        ++num_compat;
       } else if (src_idx.index == list_sizes_.at(src_idx.listIndex) - 1) {
         // if this is the result for the last source in a sourcelist,
         // mark the list (indexState) as done.
-        idx_state.state = State::done;
+        idx_state.state = Status::done;
         ++num_done;
       }
     }
     if (log_level(ExtraVerbose)) {
       std::cerr << "stream " << stream_idx << " update"
                 << ", total: " << src_indices.size()
-                << ", compat: " << num_compatible
-                << ", not ready: " << num_not_ready << ", done: " << num_done
-                << std::endl;
+                << ", not ready: " << num_not_ready  //
+                << ", compat: " << num_compat
+                << ", done: " << num_done << std::endl;
     }
     return num_compatible;
+  }
+
+  auto update(StreamBase& stream, const std::vector<result_t>& results) {
+    return update(stream.src_indices, results, stream.stream_idx);
   }
 
   auto get(index_t list_index) const {
@@ -212,14 +239,14 @@ public:
 
   void mark_compatible(const IndexList& list_indices) {
     for (auto idx : list_indices) {
-      list_.at(idx).state = State::compatible;
+      list_.at(idx).state = Status::compatible;
     }
   }
 
   void dump_compatible() {
     int count{};
     for (size_t i{}; i < list_.size(); ++i) {
-      if (list_.at(i).state == State::compatible) {
+      if (list_.at(i).state == Status::compatible) {
         std::cout << i << ",";
         if (!(++count % 10)) {
           std::cout << std::endl;
@@ -251,7 +278,7 @@ private:
 };  // class IndexStates
 
 // the pointers in this are allocated in device memory
-struct StreamData {
+struct StreamData : public StreamBase {
 private:
   static const auto num_cores = 1280;
   static const auto max_chunks = 20ul;
@@ -263,9 +290,7 @@ public:
   }
 
   StreamData(int idx, cudaStream_t stream, int stride)
-      : stream_idx(idx), cuda_stream(stream), xor_kernel_start(stream, false),
-        xor_kernel_stop(stream, false), or_kernel_start(stream, false),
-        or_kernel_stop(stream, false), num_list_indices(stride) {}
+      : StreamBase(idx, stream), num_list_indices(stride) {}
 
   int num_ready(const IndexStates& indexStates) const {
     return indexStates.num_ready(0, num_list_indices);
@@ -295,9 +320,9 @@ public:
           (src_indices.empty() ? -1 : (int)src_indices.front().listIndex);
       const auto last =
           (src_indices.empty() ? -1 : (int)src_indices.back().listIndex);
-      std::cerr << "stream " << stream_idx << " filled " << src_indices.size()
-                << " of " << max_idx << ", first = " << first
-                << ", last = " << last << std::endl;
+      std::cerr << "stream " << stream_idx  //
+                << " filled " << src_indices.size() << " of " << max_idx
+                << ", first: " << first << ", last: " << last << std::endl;
     }
     return !src_indices.empty();
   }
@@ -330,21 +355,6 @@ public:
               << is_running << ", src_indices: " << src_indices.size()
               << ", num_list_indices: " << num_list_indices << std::endl;
   }
-
-  int stream_idx{-1};
-  cudaStream_t cuda_stream{};
-  // this could be a std::array of kernel start/stop pairs possibly.
-  // initialization might be a tiny bit hairy.
-  CudaEvent xor_kernel_start;
-  CudaEvent xor_kernel_stop;
-  CudaEvent or_kernel_start;
-  CudaEvent or_kernel_stop;
-
-  int sequence_num{};
-  bool is_running{false};  // is running (true until results retrieved)
-  bool has_run{false};     // has run at least once
-  SourceIndex* device_src_indices{};
-  std::vector<SourceIndex> src_indices;
 
   int num_list_indices;    // TODO: this doesn't belong here
 };  // struct StreamData
