@@ -256,18 +256,18 @@ void display(const std::vector<NCDataList>& nc_data_lists) {
 }
 
 void host_memory_dump(
-    const MergeFilterData::Host& host, std::string_view header = "post merge") {
+    const MergeFilterData::HostXor& host_xor, std::string_view header = "post merge") {
   if (!log_level(MemoryDumps)) return;
 
   // MergeData
   // std::vector<IndexList> compat_idx_lists;
   // ComboIndexList combo_indices;
   auto idx_lists_size =
-      host.compat_idx_lists.size() * sizeof(IndexList::value_type);
+      host_xor.compat_idx_lists.size() * sizeof(IndexList::value_type);
   auto combo_indices_size =
-      host.combo_indices.size() * sizeof(ComboIndexList::value_type);
+      host_xor.combo_indices.size() * sizeof(ComboIndexList::value_type);
   auto merged_src_list_size =
-      host.merged_xor_src_list.size() * sizeof(SourceList::value_type);
+      host_xor.merged_xor_src_list.size() * sizeof(SourceList::value_type);
 
   std::cerr << "host memory dump " << header << std::endl
             << " idx_lists  :     " << util::pretty_bytes(idx_lists_size)
@@ -320,19 +320,20 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
     // merge-only=true is used for showComponents() and consistencyCheck V1,
     // both of which can be eliminated.
     if (xor_src_lists.size() > 1) {
-      MFD.host.merged_xor_src_list =
+      MFD.host_xor.merged_xor_src_list =
           merge_xor_compatible_src_lists(xor_src_lists);
     } else {
-      MFD.host.merged_xor_src_list = std::move(xor_src_lists.back());
+      MFD.host_xor.merged_xor_src_list = std::move(xor_src_lists.back());
     }
-    num_compatible = MFD.host.merged_xor_src_list.size();
-    host_memory_dump(MFD.host);
+    num_compatible = MFD.host_xor.merged_xor_src_list.size();
+    host_memory_dump(MFD.host_xor);
   }
   else {
-    if (get_merge_data(xor_src_lists, MFD.host, MFD.device)) {
-      num_compatible = MFD.host.combo_indices.size();
+    if (get_merge_data(
+            xor_src_lists, MFD.host_xor, MFD.device_xor, MergeType::XOR)) {
+      num_compatible = MFD.host_xor.combo_indices.size();
       // filter needs this later
-      MFD.host.xor_src_lists = std::move(xor_src_lists);
+      MFD.host_xor.src_lists = std::move(xor_src_lists);
     }
   }
   return Number::New(env, num_compatible);
@@ -356,58 +357,40 @@ void validate_marked_or_sources(
 }
 */
 
-void set_or_args(const std::vector<NCDataList>& nc_data_lists) {
+auto cuda_alloc_copy_or_args(
+    const std::vector<NCDataList>& nc_data_lists, cudaStream_t stream) {
   using namespace std::chrono;
   auto t = util::Timer::start_timer();
-  MFD.host.or_arg_list =
+  MFD.host_or.arg_list =
     std::move(buildOrArgList(build_src_lists(nc_data_lists)));
-  if (MFD.host.or_arg_list.size()) {
-    // TODO: to eliminate sync call in allocCopyOrSources
-    auto [device_or_src_list, num_or_sources] =
-      cuda_allocCopyOrSources(MFD.host.or_arg_list);
-    MFD.device.or_src_list = device_or_src_list;
-    MFD.device.num_or_sources = num_or_sources;
-
-    // Thoughts on AND compatibility of OrSources:
-    // Just because (one sourceList of) an OrSource is AND compatible with an
-    // XorSource doesn't mean the OrSource is redundant and can be ignored
-    // (i.e., the container cannot be marked as "compatible.") We still need
-    // to check the possibility that any of the other XOR-but-not-AND-compatible
-    // sourceLists could be AND-compatible with the generated-combo sourceList.
-    // So, a container can be marked compatible if and only if there are no
-    // no remaining XOR-compatible sourceLists.
-    // TODO: markAllANDCompatibleOrSources(xorSourceList, orSourceList);
-    /*
-    if (num_or_sources) {
-      // TODO: name change. this doesn't mark anything. 
-      auto mark_results = cuda_markAllXorCompatibleOrSources(MFD);
-      validate_marked_or_sources(MFD.host.or_arg_list, mark_results);
-      MFD.device.num_or_sources =
-        move_marked_or_sources(MFD.device.or_src_list, mark_results);
-    }
-    */
-  }
+  if (!MFD.host_or.arg_list.size()) return false;
+  // TODO: to eliminate sync call in allocCopyOrSources
+  auto [device_or_src_list, num_or_sources] =
+      cuda_allocCopyOrSources(MFD.host_or.arg_list, stream);
+  MFD.device_or.src_list = device_or_src_list;
+  MFD.device_or.num_sources = num_or_sources;
   if (log_level(Verbose)) {
     t.stop();
-    std::cerr << " build or_args(" << MFD.host.or_arg_list.size() << ")"
-              << ", or_sources(" << MFD.device.num_or_sources << ") - "
+    std::cerr << " alloc_copy_or_args(" << MFD.host_or.arg_list.size() << ")"
+              << ", or_sources(" << MFD.device_or.num_sources << ") - "
               << t.microseconds() << "us" << std::endl;
   }
+  return true;
 }
 
 void alloc_copy_filter_indices(cudaStream_t stream) {
-  assert(!MFD.host.combo_indices.empty());
+  assert(!MFD.host_xor.combo_indices.empty());
   using namespace std::chrono;
   util::LogDuration ld("alloc_copy_filter_indices", Verbose);
-  auto src_list_start_indices = make_start_indices(MFD.host.xor_src_lists);
-  MFD.device.src_list_start_indices = cuda_alloc_copy_start_indices(
+  auto src_list_start_indices = make_start_indices(MFD.host_xor.src_lists);
+  MFD.device_xor.src_list_start_indices = cuda_alloc_copy_start_indices(
       src_list_start_indices, stream, "src_list_start_indices");
-  auto idx_list_start_indices = make_start_indices(MFD.host.compat_idx_lists);
-  MFD.device.idx_list_start_indices = cuda_alloc_copy_start_indices(
+  auto idx_list_start_indices = make_start_indices(MFD.host_xor.compat_idx_lists);
+  MFD.device_xor.idx_list_start_indices = cuda_alloc_copy_start_indices(
       idx_list_start_indices, stream, "idx_list_start_indices");
   auto variation_indices = buildSentenceVariationIndices(
-    MFD.host.xor_src_lists, MFD.host.compat_idx_lists, MFD.host.combo_indices);
-  MFD.device.variation_indices =
+    MFD.host_xor.src_lists, MFD.host_xor.compat_idx_lists, MFD.host_xor.combo_indices);
+  MFD.device_xor.variation_indices =
     cuda_allocCopySentenceVariationIndices(variation_indices, stream);
 }
 
@@ -425,8 +408,9 @@ Value filterPreparation(const CallbackInfo& info) {
   // arg0
   auto nc_data_lists = makeNcDataLists(env, info[0].As<Array>());
   // --
-  alloc_copy_filter_indices(cudaStreamPerThread);
-  set_or_args(nc_data_lists);
+  auto stream = cudaStreamPerThread;
+  alloc_copy_filter_indices(stream);
+  cuda_alloc_copy_or_args(nc_data_lists, stream);
   cuda_memory_dump("filter preparation:");
   return env.Null();
 }
@@ -469,16 +453,18 @@ auto make_source_descriptor_pairs(
   return src_desc_pairs;
 }
 
-void set_incompatible_sources(const SourceCompatibilitySet& incompat_sources) {
+void set_incompatible_sources(
+    const SourceCompatibilitySet& incompat_sources, cudaStream_t stream) {
   // empty set technically possible; disallowed here as a canary
   assert(!incompat_sources.empty());
-  assert(MFD.host.incompat_src_desc_pairs.empty());
-  assert(!MFD.device.incompat_src_desc_pairs);
+  assert(MFD.host_xor.incompat_src_desc_pairs.empty());
+  assert(!MFD.device_xor.incompat_src_desc_pairs);
 
-  MFD.host.incompat_src_desc_pairs =
+  MFD.host_xor.incompat_src_desc_pairs =
       std::move(make_source_descriptor_pairs(incompat_sources));
-  MFD.device.incompat_src_desc_pairs =
-      cuda_alloc_copy_source_descriptor_pairs(MFD.host.incompat_src_desc_pairs);
+  MFD.device_xor.incompat_src_desc_pairs =
+      cuda_alloc_copy_source_descriptor_pairs(
+          MFD.host_xor.incompat_src_desc_pairs, stream);
 }
 
 Value filterCandidatesForSum(const CallbackInfo& info) {
@@ -507,7 +493,8 @@ Value filterCandidatesForSum(const CallbackInfo& info) {
       MFD, sum, threads_per_block, streams, stride, iters, synchronous);
   assert(synchronous == opt_incompat_sources.has_value());
   if (opt_incompat_sources.has_value()) {
-    set_incompatible_sources(opt_incompat_sources.value());
+    auto stream = cudaStreamPerThread;
+    set_incompatible_sources(opt_incompat_sources.value(), stream);
   }
   // NOTE: can only free device data here after synchronous call. 
   return env.Null();
@@ -519,8 +506,9 @@ Value filterCandidatesForSum(const CallbackInfo& info) {
 Value getResult(const CallbackInfo& info) {
   Env env = info.Env();
   auto result = get_filter_result();
-  // free all the filter-stage device data
-  MFD.device.cuda_free();
+  // free all device data
+  MFD.device_xor.cuda_free();
+  MFD.device_or.cuda_free();
   cuda_memory_dump("filter complete");
   return wrap(env, result);
 }
@@ -539,7 +527,7 @@ Value showComponents(const CallbackInfo& info) {
   // arg0:
   auto name_list = makeStringList(env, info[0].As<Array>());
   // --
-  auto sums = components::show(name_list, MFD.host.merged_xor_src_list);
+  auto sums = components::show(name_list, MFD.host_xor.merged_xor_src_list);
   return wrap(env, sums);
 }
 
@@ -561,7 +549,7 @@ Value checkClueConsistency(const CallbackInfo& info) {
   switch (version) {
   case 1:
     result = components::old_consistency_check(
-        name_list, MFD.host.merged_xor_src_list);
+        name_list, MFD.host_xor.merged_xor_src_list);
     break;
   case 2:
     components::consistency_check(std::move(name_list), max_sources);

@@ -356,6 +356,14 @@ struct SourceCompatibilityData {
     return usedSources.isCompatibleSubsetOf(other.usedSources, check_variations);
   }
 
+  constexpr auto hasSameVariationsAs(
+      const SourceCompatibilityData& other) const {
+    // TODO: add hasSameVariationsAs() member function (non-static) to
+    // UsedSources?
+    return UsedSources::allVariationsMatch(
+        usedSources.variations, other.usedSources.variations);
+  }
+
   // OR == XOR || AND
   // Another optimization is that rather than testing Xor + And
   // separately, we have new bitset function something like
@@ -366,12 +374,8 @@ struct SourceCompatibilityData {
   // bitset function, (and a variations check), rather than
   // calling two separate Xor/And functions here.
   constexpr auto isOrCompatibleWith(
-    const SourceCompatibilityData& other) const {
-    // TODO: add allVariationsMatch() member function (non-static) to UsedSources
-    if (!UsedSources::allVariationsMatch(
-          usedSources.variations, other.usedSources.variations)) {
-      return false;
-    }
+      const SourceCompatibilityData& other) const {
+    if (!hasSameVariationsAs(other)) return false;
     return isXorCompatibleWith(other, false)
            || isCompatibleSubsetOf(other, false);
   }

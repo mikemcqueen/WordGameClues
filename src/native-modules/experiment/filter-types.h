@@ -75,20 +75,20 @@ public:
 
   struct Data {
     constexpr auto ready_state() const {
-      return state == Status::ready;
+      return status == Status::ready;
     }
 
     constexpr auto is_compatible() const {
-      return state == Status::compatible;
+      return status == Status::compatible;
     }
 
     void reset() {
       sourceIndex.index = 0;
-      state = Status::ready;
+      status = Status::ready;
     }
 
     SourceIndex sourceIndex;
-    Status state = Status::ready;
+    Status status = Status::ready;
   };
 
   IndexStates() = delete;
@@ -127,10 +127,10 @@ public:
     return list_sizes_.at(list_index);
   }
 
-  auto num_in_state(int first, int count, State state) const {
+  auto num_in_state(int first, int count, Status status) const {
     int total{};
     for (int i{}; i < count; ++i) {
-      if (list_.at(first + i).state == state) {
+      if (list_.at(first + i).status == status) {
         ++total;
       }
     }
@@ -162,12 +162,12 @@ public:
         continue;
       }
       if (results.at(src_idx.listIndex)) {
-        idx_state.state = Status::compatible;
+        idx_state.status = Status::compatible;
         ++num_compat;
       } else if (src_idx.index == list_sizes_.at(src_idx.listIndex) - 1) {
         // if this is the result for the last source in a sourcelist,
         // mark the list (indexState) as done.
-        idx_state.state = Status::done;
+        idx_state.status = Status::done;
         ++num_done;
       }
     }
@@ -178,7 +178,7 @@ public:
                 << ", compat: " << num_compat
                 << ", done: " << num_done << std::endl;
     }
-    return num_compatible;
+    return num_compat;
   }
 
   auto update(StreamBase& stream, const std::vector<result_t>& results) {
@@ -239,14 +239,14 @@ public:
 
   void mark_compatible(const IndexList& list_indices) {
     for (auto idx : list_indices) {
-      list_.at(idx).state = Status::compatible;
+      list_.at(idx).status = Status::compatible;
     }
   }
 
   void dump_compatible() {
     int count{};
     for (size_t i{}; i < list_.size(); ++i) {
-      if (list_.at(i).state == Status::compatible) {
+      if (list_.at(i).status == Status::compatible) {
         std::cout << i << ",";
         if (!(++count % 10)) {
           std::cout << std::endl;

@@ -4,6 +4,7 @@
 #pragma once
 #include "combo-maker.h"
 #include "cuda-types.h"
+#include "merge-type.h"
 
 namespace cm {
 
@@ -43,7 +44,7 @@ struct MergeData {
   struct Device {
   private:
     void reset_pointers() {
-      xor_src_lists = nullptr;
+      src_lists = nullptr;
       idx_lists = nullptr;
       idx_list_sizes = nullptr;
     }
@@ -55,41 +56,37 @@ struct MergeData {
     Device(Device&&) = delete; // disable mvoe
 
     void cuda_free() {
-      cm::cuda_free(xor_src_lists);
+      cm::cuda_free(src_lists);
       cm::cuda_free(idx_lists);
       cm::cuda_free(idx_list_sizes);
       reset_pointers();
     }
 
-    SourceCompatibilityData* xor_src_lists{};
+    SourceCompatibilityData* src_lists{};
     index_t* idx_lists{};
     index_t* idx_list_sizes{};
   } device;
 };
 
 struct MergeFilterData {
-  struct Host : MergeData::Host {
+  // XOR kernel
+  struct HostXor : MergeData::Host {
     // merge-only
     // currently used by showComponents (-t) and conistency check v1.
     // consistency check v1 can be removed, and showComponents can be
     // updated to do everything on c++ side, obviating the need for this.
     SourceList merged_xor_src_list;
 
-    // XOR kernel
     std::vector<UsedSources::SourceDescriptorPair> incompat_src_desc_pairs;
-    std::vector<SourceList> xor_src_lists;
+    std::vector<SourceList> src_lists;
+  } host_xor;
 
-    // OR kernel
-    OrArgList or_arg_list;
-  } host;
-
-  struct Device : MergeData::Device {
+  struct DeviceXor : MergeData::Device {
   private:
     void reset_pointers() {
       incompat_src_desc_pairs = nullptr;
       src_list_start_indices = nullptr;
       idx_list_start_indices = nullptr;
-      or_src_list = nullptr;
     }
 
   public:
@@ -98,11 +95,9 @@ struct MergeFilterData {
       cm::cuda_free(incompat_src_desc_pairs);
       cm::cuda_free(src_list_start_indices);
       cm::cuda_free(idx_list_start_indices);
-      cm::cuda_free(or_src_list);
       reset_pointers();
     }
 
-    // XOR kernel
     UsedSources::SourceDescriptorPair* incompat_src_desc_pairs{};
 
     index_t* src_list_start_indices{};
@@ -110,11 +105,30 @@ struct MergeFilterData {
 
     device::VariationIndices* variation_indices{};
     unsigned num_variation_indices{};
+  } device_xor;
 
-    // OR kernel
-    device::OrSourceData* or_src_list{};
-    unsigned num_or_sources{};
-  } device;
+  // OR kernel
+  struct HostOr : MergeData::Host {
+    OrArgList arg_list;
+  } host_or;
+
+  struct DeviceOr : MergeData::Device {
+  private:
+    void reset_pointers() {
+      src_list = nullptr;
+    }
+
+  public:
+    void cuda_free() {
+      MergeData::Device::cuda_free();
+      cm::cuda_free(src_list);
+      reset_pointers();
+    }
+
+    device::OrSourceData* src_list{};
+    unsigned num_sources{};
+  } device_or;
+
 };  // struct MergeFilterData
 
 }  // namespace cm

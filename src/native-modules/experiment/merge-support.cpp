@@ -21,26 +21,29 @@ auto getNumEmptySublists(const std::vector<SourceList>& src_lists) {
   return count;
 }
 
-auto anyCompatibleXorSources(const SourceData& source,
-    const Peco::IndexList& indexList, const SourceList& sourceList) {
-  for (auto idx : indexList) {
-    if (source.isXorCompatibleWith(sourceList.at(idx))) {
-      return true;
+auto any_compatible_sources(const SourceData& source,
+    const Peco::IndexList& idx_list, const SourceList& src_list,
+    MergeType merge_type) {
+  for (auto idx : idx_list) {
+    if (merge_type == MergeType::XOR) {
+      if (source.isXorCompatibleWith(src_list.at(idx))) return true;
+    } else { // MergeType::OR
+      if (source.hasSameVariationsAs(src_list.at(idx))) return true;
     }
   }
   return false;
 }
 
 // TODO: comment this. code is tricky, but fast.
-auto xor_filter_indices(Peco::IndexListVector& index_lists,
-    int first_list_idx, int second_list_idx,
-    const std::vector<SourceList>& src_lists) {
+auto filter_indices(Peco::IndexListVector& index_lists, int first_list_idx,
+    int second_list_idx, const std::vector<SourceList>& src_lists,
+    MergeType merge_type) {
   Peco::IndexList& first_list = index_lists[first_list_idx];
   for (auto it_first = first_list.before_begin();
        std::next(it_first) != first_list.end();) {
     const auto& first_src = src_lists[first_list_idx][*std::next(it_first)];
-    bool any_compat = anyCompatibleXorSources(
-      first_src, index_lists[second_list_idx], src_lists[second_list_idx]);
+    bool any_compat = any_compatible_sources(first_src,
+        index_lists[second_list_idx], src_lists[second_list_idx], merge_type);
     if (!any_compat) {
       first_list.erase_after(it_first);
     } else {
@@ -50,24 +53,18 @@ auto xor_filter_indices(Peco::IndexListVector& index_lists,
   return !first_list.empty();
 }
 
-bool xor_filter_all_indices(Peco::IndexListVector& idx_lists,
-    const std::vector<SourceList>& src_lists) {
-  if (idx_lists.size() < 2u) {
-    return true;
-  }
-  auto t = util::Timer::start_timer();
+auto filter_all_indices(Peco::IndexListVector& idx_lists,
+    const std::vector<SourceList>& src_lists, MergeType merge_type) {
+  // TODO: or, assert? is this the right place for this check?
+  if (idx_lists.size() < 2u) return true;
+  util::LogDuration ld("  filter incompatible", Verbose);
   for (size_t first{}; first < idx_lists.size(); ++first) {
     for (size_t second{}; second < idx_lists.size(); ++second) {
-      if (first == second)
-        continue;
-      if (!xor_filter_indices(idx_lists, first, second, src_lists)) {
+      if (first == second) continue;
+      if (!filter_indices(idx_lists, first, second, src_lists, merge_type)) {
         return false;
       }
     }
-  }
-  if (log_level(Verbose)) {
-    t.stop();
-    std::cerr << "  filter incompatible - " << t.count() << "ms" << std::endl;
   }
   return true;
 }
@@ -87,8 +84,7 @@ auto get_flat_indices(Peco& peco, int num_combinations, bool first = false) {
 }
 
 void dump_flat_indices(
-  const std::vector<index_t>& flat_indices, size_t row_size) {
-  //
+    const std::vector<index_t>& flat_indices, size_t row_size) {
   for (size_t i{}; i < flat_indices.size(); i += row_size) {
     for (size_t j{}; j < row_size; ++j) {
       if (j)
@@ -99,22 +95,15 @@ void dump_flat_indices(
   }
 }
 
-void sync_copy_results(std::vector<result_t>& results, unsigned num_results,
-  result_t* device_results, cudaStream_t stream) {
-  // TODO: I don't remember what my logic was here in using events to
-  // synchronize.
-  // CudaEvent temp1;
-  // temp1.synchronize();
-  cudaError_t err = cudaStreamSynchronize(stream);
-  assert_cuda_success(err, "merge copy pre-sync");
+auto sync_copy_compat_results(std::vector<result_t>& results,
+    unsigned num_results, result_t* device_results, cudaStream_t stream) {
   const auto results_bytes = num_results * sizeof(result_t);
-  err = cudaMemcpyAsync(results.data(), device_results, results_bytes,
+  CudaEvent start(stream);
+  auto err = cudaMemcpyAsync(results.data(), device_results, results_bytes,
     cudaMemcpyDeviceToHost, stream);
   assert_cuda_success(err, "merge copy results");
-  err = cudaStreamSynchronize(stream);
-  assert_cuda_success(err, "merge copy post-sync");
-  // CudaEvent temp2;
-  // temp2.synchronize();
+  CudaEvent stop;
+  return stop.synchronize(start);
 }
 
 void add_compat_sources(std::vector<SourceCompatibilityData>& compat_sources,
@@ -276,7 +265,7 @@ void host_show_num_compat_combos(const uint64_t first_combo,
             << "]: " << num_compat << " - " << t.count() << "ms" << std::endl;
 }
 
-auto log_copy_process(util::Timer& t_copy, util::Timer& t_proc,
+auto log_compat_copy_process(util::Timer& t_copy, util::Timer& t_proc,
     uint64_t num_hits, LogLevel level = Verbose) {
   long elapsed{};
   if (log_level(level)) {
@@ -355,16 +344,17 @@ auto run_get_compat_combos_task(const result_t* device_compat_matrices,
         device_results);
     gcc_elapsed += log_compat_combos_kernel(idx, gcc_start);
 
-    // TODO: sync_copy could return event.elapsed
+    // TODO: sync_copy_results returns event.elapsed but precision is low
+    // does it matter? could return a timer instead
     auto t_copy = util::Timer::start_timer();
-    sync_copy_results(host_results, num_combos, device_results, stream);
+    sync_copy_compat_results(host_results, num_combos, device_results, stream);
     t_copy.stop();
     copy_elapsed += t_copy.count();
 
     auto t_proc = util::Timer::start_timer();
     auto num_hits =
         process_results(host_results, first_combo, num_combos, result_indices);
-    proc_elapsed += log_copy_process(t_copy, t_proc, num_hits);
+    proc_elapsed += log_compat_copy_process(t_copy, t_proc, num_hits);
     total_hits += num_hits;
   }
   if (log_level(Verbose)) {
@@ -390,10 +380,10 @@ auto get_src_indices(
 
 // Given a vector of source lists, generate a vector of index lists: one for
 // each source list, each containing indices for every source in each list.
-// Then filter out all xor-incompatible, and return a vector of compatible
-// index lists.
-auto get_compatible_indices(
-    const std::vector<SourceList>& src_lists) -> std::vector<IndexList> {
+// Then filter out all incompatible, and return a vector of compatible index
+// lists.
+auto get_compatible_indices(const std::vector<SourceList>& src_lists,
+    MergeType merge_type) -> std::vector<IndexList> {
   std::vector<size_t> lengths;
   lengths.reserve(src_lists.size());
   for (const auto& sl : src_lists) {
@@ -405,7 +395,7 @@ auto get_compatible_indices(
               << std::endl;
   }
   auto idx_lists = Peco::initial_indices(lengths);
-  bool valid = xor_filter_all_indices(idx_lists, src_lists);
+  bool valid = filter_all_indices(idx_lists, src_lists, merge_type);
   if (log_level(Verbose)) {
     lengths.clear();
     for (const auto& il : idx_lists) {
@@ -416,7 +406,7 @@ auto get_compatible_indices(
               << ", valid: " << std::boolalpha << valid << std::endl;
   }
   // "valid" means all resulting index lists have non-zero length
-  if (!valid) { return {}; }
+  if (!valid) return {};
   return Peco::to_vectors(idx_lists);
 }
 
@@ -426,7 +416,6 @@ SourceCompatibilityData* cuda_alloc_copy_src_lists(
   const auto stream = cudaStreamPerThread;
   const auto num_sources = util::sum_sizes(src_lists);
   const auto sources_bytes = num_sources * sizeof(SourceCompatibilityData);
-  cudaError_t err{};
   SourceCompatibilityData* device_sources;
   cuda_malloc_async((void**)&device_sources, sources_bytes, stream,
       "merge src_lists");  // cl-format
@@ -447,10 +436,10 @@ SourceCompatibilityData* cuda_alloc_copy_src_lists(
     // pnsl/ncList from SourceCompatibilityData.
     add_compat_sources(src_compat_list, src_list);
   }
-  err = cudaMemcpyAsync(device_sources, src_compat_list.data(), sources_bytes,
-      cudaMemcpyHostToDevice, stream);
+  auto err = cudaMemcpyAsync(device_sources, src_compat_list.data(),
+      sources_bytes, cudaMemcpyHostToDevice, stream);
   assert_cuda_success(err, "merge copy sources");
-  CudaEvent temp;
+  CudaEvent temp(stream);
   temp.synchronize();
   if (num_bytes) { *num_bytes = sources_bytes; }
   return device_sources;
@@ -487,9 +476,8 @@ index_t* cuda_alloc_copy_list_sizes(
   const auto list_sizes_bytes = list_sizes.size() * sizeof(index_t);
   cudaError_t err{};
   index_t* device_list_sizes;
-  cuda_malloc_async((void**)&device_list_sizes, list_sizes_bytes, stream,
-      "merge list_sizes");  // cl-format
-
+  cuda_malloc_async((void**)&device_list_sizes, list_sizes_bytes, stream,  //
+      "merge list_sizes");
   // copy list sizes
   err = cudaMemcpyAsync(device_list_sizes, list_sizes.data(), list_sizes_bytes,
       cudaMemcpyHostToDevice, stream);
@@ -500,10 +488,11 @@ index_t* cuda_alloc_copy_list_sizes(
   return device_list_sizes;
 }
 
-auto cuda_get_compat_xor_src_indices(const std::vector<SourceList>& src_lists,
+auto cuda_get_compatible_combo_indices(const std::vector<SourceList>& src_lists,
     const SourceCompatibilityData* device_src_lists,
     const std::vector<IndexList>& idx_lists, const index_t* device_idx_lists,
-    const index_t* device_idx_list_sizes) -> std::vector<uint64_t> {
+    const index_t* device_idx_list_sizes,
+    MergeType merge_type) -> std::vector<uint64_t> {
   assert(!src_lists.empty() && !idx_lists.empty()
          && !getNumEmptySublists(src_lists) && "cuda_merge: invalid param");
   using namespace std::experimental::fundamentals_v3;
@@ -526,8 +515,8 @@ auto cuda_get_compat_xor_src_indices(const std::vector<SourceList>& src_lists,
               << " - " << t.count() << "ms" << std::endl;
   }
   // CudaEvent lp_start;
-  //  run list_pair_compat kernels
-  //  the only unnecessary capture here is src_lists
+  // run list_pair_compat kernels
+  // the only unnecessary capture here is src_lists
   for_each_list_pair(idx_lists, [&](size_t i, size_t j, size_t n) {
     if constexpr (0) {
       std::cerr << "  launching list_pair_compat_kernel " << n << " for [" << i
@@ -537,7 +526,7 @@ auto cuda_get_compat_xor_src_indices(const std::vector<SourceList>& src_lists,
         &device_src_lists[src_list_start_indices.at(j)],
         &device_idx_lists[idx_list_start_indices.at(i)], idx_lists.at(i).size(),
         &device_idx_lists[idx_list_start_indices.at(j)], idx_lists.at(j).size(),
-        &device_compat_matrices[compat_matrix_start_indices.at(n)]);
+        &device_compat_matrices[compat_matrix_start_indices.at(n)], merge_type);
   });
   /*
   if constexpr (0) {
@@ -625,25 +614,25 @@ auto xor_merge_sources(const std::vector<SourceList>& src_lists,
 ///////////////////////////////////////////////////////////////////////////////
 
 auto get_merge_data(const std::vector<SourceList>& src_lists,
-    MergeData::Host& host, MergeData::Device& device,
+    MergeData::Host& host, MergeData::Device& device, MergeType merge_type,
     bool merge_only /* = false */) -> bool {
   // TODO: support for single-list compat indices (??)
-  auto compat_idx_lists = get_compatible_indices(src_lists);
+  auto compat_idx_lists = get_compatible_indices(src_lists, merge_type);
   if (!merge_only || log_level(Verbose)) {
     std::cerr << "compat_idx_lists(" << compat_idx_lists.size() << ")"
               << std::endl;
   }
   if (compat_idx_lists.empty()) return false;
-  device.xor_src_lists = cuda_alloc_copy_src_lists(src_lists);
+  device.src_lists = cuda_alloc_copy_src_lists(src_lists);
   device.idx_lists = cuda_alloc_copy_idx_lists(compat_idx_lists);
   const auto idx_list_sizes = util::make_list_sizes(compat_idx_lists);
   device.idx_list_sizes = cuda_alloc_copy_list_sizes(idx_list_sizes);
   host.compat_idx_lists = std::move(compat_idx_lists);
   const auto level = merge_only ? ExtraVerbose : Normal;
   util::LogDuration ld("get combo_indices", level);
-  host.combo_indices =
-      cuda_get_compat_xor_src_indices(src_lists, device.xor_src_lists,
-          host.compat_idx_lists, device.idx_lists, device.idx_list_sizes);
+  host.combo_indices = cuda_get_compatible_combo_indices(src_lists,
+      device.src_lists, host.compat_idx_lists, device.idx_lists,
+      device.idx_list_sizes, merge_type);
   return true;
 }
 
@@ -651,7 +640,9 @@ auto merge_xor_compatible_src_lists(
     const std::vector<SourceList>& src_lists) -> SourceList {
   assert(src_lists.size() > 1);
   MergeData md;
-  if (!get_merge_data(src_lists, md.host, md.device, true)) return {};
+  if (!get_merge_data(src_lists, md.host, md.device, MergeType::XOR, true)) {
+    return {};
+  }
   return xor_merge_sources(
       src_lists, md.host.compat_idx_lists, md.host.combo_indices);
 }

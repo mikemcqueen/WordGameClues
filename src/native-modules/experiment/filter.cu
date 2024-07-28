@@ -364,10 +364,10 @@ void run_filter_kernels(int threads_per_block, StreamData& stream,
   dim3 block_dim(block_size);
   stream.xor_kernel_start.record();
   xor_kernel_new<<<grid_dim, block_dim, shared_bytes, stream.cuda_stream>>>(
-      device_src_list, stream.src_indices.size(), mfd.device.xor_src_lists,
-      mfd.device.src_list_start_indices, mfd.device.idx_lists,
-      mfd.device.idx_list_start_indices, mfd.device.idx_list_sizes,
-      mfd.host.compat_idx_lists.size(), mfd.device.variation_indices,
+      device_src_list, stream.src_indices.size(), mfd.device_xor.src_lists,
+      mfd.device_xor.src_list_start_indices, mfd.device_xor.idx_lists,
+      mfd.device_xor.idx_list_start_indices, mfd.device_xor.idx_list_sizes,
+      mfd.host_xor.compat_idx_lists.size(), mfd.device_xor.variation_indices,
       stream.device_src_indices, device_list_start_indices,
       device_compat_src_results, device_results, stream.stream_idx);
   stream.xor_kernel_stop.record();

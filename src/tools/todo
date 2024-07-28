@@ -1,21 +1,19 @@
-* i think the existence of compat_src_indices means that we can be smarter
-  about IndexStates list/index allocation? to eliminate (known) incompatible
-  indices from the list? 
-
-* see if i can get rid of that num_list_indices in StreamData while i'm at it
-
 * OR kernel
   * DONE rip OR-compat checking out of xor-kernel.
   * DONE generate out.xor output for 4 input variations (2,2, 2,10)(--xor, --xor + --or)
   * DONE verify xor + or matches xor, and both match out.orig.xor
   * DONE commit? on a branch?
   * DONE remove "xor" from name of filter task wrapper functions i think.
-  * IN PROGESS figure out where i'm going to plug in the OR kernel execution.
   * DONE make sure sources are already allocated at that spot, if not, move
-    allocation to correct spot.
-  * IN PROGRESS SORTA write new OR kernel
-  * ??
+         allocation to correct spot.
+  * make get_compat_combo kernel work with OR sources (variation checking only).
+  * host-side slow version of XOR+OR combo index compatibility checking.
+  * device-side XOR+OR compatibility checking if it makes sense
+  * figure out where i'm going to plug in the OR kernel execution.
+  * write OR kernel
   * PROFIT
+
+* see if i can get rid of that num_list_indices in StreamData while i'm at it
 
 * shoud display max variation count (sentence with max # of variations)
   on load, and assert if > whatever limit i temporarily impose for XOR/OR
@@ -176,19 +174,11 @@
 
 * fix variable names in filter-support::cuda_allocCopySentenceVariationIndices()
 
-// CM:
+// NEW PERF:
 
-* cm: shouldn't i filter out retired pairs in pairs(.sh) ?
-  * and for that matter, would a filter-retired(.sh) script be useful for
-    per-letter pairs?
-  * maybe i should make cm pairs -l the per-letter pair option, and -c
-    the "show letter counts" option
-    * reasoning: it will be useful to have a general-purpose script for
-      generating per-letter pairs.  -l would take a required argument
-      (a single letter, at least in initial implementation)
-* cm: ensure words.json is sorted
-
-// ++NEWPERF:
+* i think the existence of compat_src_indices means that we can be smarter
+  about IndexStates list/index allocation? to eliminate (known) incompatible
+  indices from the list? 
 
 * had an idea about doubling the stride in streamswarm/indexstates if the
   moving average was 0. i could store 3x 10 bit (1024) kernel-time ms values
@@ -209,9 +199,21 @@
   would consume less memory. could potentially integrate that into ncList/
   primaryNameSrcList as well.
 
-// --NEWPERF
+* considerCandidate loop to C++.
 
-++PERF
+// CM:
+
+* cm: shouldn't i filter out retired pairs in pairs(.sh) ?
+  * and for that matter, would a filter-retired(.sh) script be useful for
+    per-letter pairs?
+  * maybe i should make cm pairs -l the per-letter pair option, and -c
+    the "show letter counts" option
+    * reasoning: it will be useful to have a general-purpose script for
+      generating per-letter pairs.  -l would take a required argument
+      (a single letter, at least in initial implementation)
+* cm: ensure words.json is sorted
+
+// OLD PERF
 
 * elimination of event sync'ing by storing of host-side data in MFD during copies.
   * deletion of appropriate host data after launch of associated kernel.
