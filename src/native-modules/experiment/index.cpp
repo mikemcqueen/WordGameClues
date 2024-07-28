@@ -313,7 +313,7 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   }
 #endif
   //--
-  uint32_t num_compatible{};
+  uint32_t num_compat{};
 
   // temporarily handle merge_only case until it's eliminated
   if (merge_only) {
@@ -325,18 +325,19 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
     } else {
       MFD.host_xor.merged_xor_src_list = std::move(xor_src_lists.back());
     }
-    num_compatible = MFD.host_xor.merged_xor_src_list.size();
+    num_compat = MFD.host_xor.merged_xor_src_list.size();
     host_memory_dump(MFD.host_xor);
   }
   else {
-    if (get_merge_data(
-            xor_src_lists, MFD.host_xor, MFD.device_xor, MergeType::XOR)) {
-      num_compatible = MFD.host_xor.combo_indices.size();
+    auto stream = cudaStreamPerThread;
+    if (get_merge_data(xor_src_lists, MFD.host_xor, MFD.device_xor,
+            MergeType::XOR, stream)) {
+      num_compat = MFD.host_xor.combo_indices.size();
       // filter needs this later
       MFD.host_xor.src_lists = std::move(xor_src_lists);
     }
   }
-  return Number::New(env, num_compatible);
+  return Number::New(env, num_compat);
 }
 
 /*
@@ -357,31 +358,28 @@ void validate_marked_or_sources(
 }
 */
 
-auto cuda_alloc_copy_or_args(
-    const std::vector<NCDataList>& nc_data_lists, cudaStream_t stream) {
+auto cuda_alloc_copy_or_args(const OrArgList& or_arg_list, cudaStream_t stream) {
   using namespace std::chrono;
   auto t = util::Timer::start_timer();
-  MFD.host_or.arg_list =
-    std::move(buildOrArgList(build_src_lists(nc_data_lists)));
-  if (!MFD.host_or.arg_list.size()) return false;
   // TODO: to eliminate sync call in allocCopyOrSources
   auto [device_or_src_list, num_or_sources] =
-      cuda_allocCopyOrSources(MFD.host_or.arg_list, stream);
+      cuda_allocCopyOrSources(or_arg_list, stream);
   MFD.device_or.src_list = device_or_src_list;
   MFD.device_or.num_sources = num_or_sources;
   if (log_level(Verbose)) {
     t.stop();
-    std::cerr << " alloc_copy_or_args(" << MFD.host_or.arg_list.size() << ")"
+    std::cerr << " alloc_copy_or_args(" << or_arg_list.size() << ")"
               << ", or_sources(" << MFD.device_or.num_sources << ") - "
               << t.microseconds() << "us" << std::endl;
   }
   return true;
 }
 
-void alloc_copy_filter_indices(cudaStream_t stream) {
+void alloc_copy_combo_indices(const MergeData::Host& host,
+    MergeData::Device& device, cudaStream_t stream) {
   assert(!MFD.host_xor.combo_indices.empty());
   using namespace std::chrono;
-  util::LogDuration ld("alloc_copy_filter_indices", Verbose);
+  util::LogDuration ld("alloc_copy_xor_combo_indices", Verbose);
   auto src_list_start_indices = make_start_indices(MFD.host_xor.src_lists);
   MFD.device_xor.src_list_start_indices = cuda_alloc_copy_start_indices(
       src_list_start_indices, stream, "src_list_start_indices");
@@ -408,11 +406,24 @@ Value filterPreparation(const CallbackInfo& info) {
   // arg0
   auto nc_data_lists = makeNcDataLists(env, info[0].As<Array>());
   // --
+  // process OR-args first. incompatibility may cause us to bail early.
   auto stream = cudaStreamPerThread;
-  alloc_copy_filter_indices(stream);
-  cuda_alloc_copy_or_args(nc_data_lists, stream);
+  auto compat = false;
+  MFD.host_or.src_lists = build_src_lists(nc_data_lists);
+  MFD.host_or.arg_list = std::move(build_or_arg_list(MFD.host_or.src_lists));
+  if (MFD.host_or.arg_list.size()) {
+    cuda_alloc_copy_or_args(MFD.host_or.arg_list, stream);
+    if (get_merge_data(MFD.host_or.src_lists, MFD.host_or, MFD.device_or,
+            MergeType::OR, stream)) {
+      // num_compatible = MFD.host_or.combo_indices.size();
+      //?? filter needs this later
+      //  ?? MFD.host_or.src_lists = std::move(or_src_lists);
+    }
+  }
+  alloc_copy_combo_indices(MFD.host_xor, MFD.device_xor, stream);
   cuda_memory_dump("filter preparation:");
-  return env.Null();
+
+  return Boolean::New(env, compat);
 }
 
 // considerCandidate

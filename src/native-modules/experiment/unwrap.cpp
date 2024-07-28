@@ -173,6 +173,7 @@ NameSourcesMap makeNameSourcesMap(Env& env, const Array& jsList) {
   return map;
 }
 
+/*
 SourceCompatibilityData makeSourceCompatibilityDataFromSourceData(
     Env& env, const Object& jsSourceData) {
   // TODO: addPnslToCompatData(jsSouceData, compatData);
@@ -225,12 +226,12 @@ SourceCompatibilityList makeSourceCompatibilityListFromMergedSourcesList(
 }
 
 OrSourceData makeOrSource(Env& env, const Object& jsObject) {
-  OrSourceData orSource;
-  orSource.src = std::move(makeSourceCompatibilityDataFromSourceData(
-    env, jsObject["source"].As<Object>()));
-  orSource.is_xor_compat = jsObject["xorCompatible"].As<Boolean>();
-  //  orSource.and_compat = jsObject["andCompatible"].As<Boolean>();
-  return orSource;
+OrSourceData orSource;
+orSource.src = std::move(makeSourceCompatibilityDataFromSourceData(
+  env, jsObject["source"].As<Object>()));
+orSource.is_xor_compat = jsObject["xorCompatible"].As<Boolean>();
+//  orSource.and_compat = jsObject["andCompatible"].As<Boolean>();
+return orSource;
 }
 
 OrSourceList makeOrSourceList(Env& env, const Array& jsList) {
@@ -268,5 +269,6 @@ OrArgList makeOrArgList(Env& env, const Array& jsList) {
   }
   return orArgList;
 }
+*/
 
 }  // namespace cm

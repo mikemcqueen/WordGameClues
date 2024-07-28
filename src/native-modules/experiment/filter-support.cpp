@@ -174,9 +174,9 @@ auto is_OR_compatible(
   int or_arg_idx{};
   for (const auto& or_arg: mfd.host_or.arg_list) {
     bool compat_arg{};
-    for (const auto& or_src: or_arg.or_src_list) {
+    for (const auto& or_src: or_arg.src_list_cref.get()) {
       // TODO: ignoring "marked" is_xor_compat flag for now
-      if (or_src.src.isOrCompatibleWith(source)) {
+      if (or_src.isOrCompatibleWith(source)) {
         compat_arg = true;
       } else {
         incompat_or_args[or_arg_idx] = true;
@@ -658,8 +658,8 @@ cuda_allocCopyOrSources(const OrArgList& orArgList, cudaStream_t stream) {
   std::vector<device::OrSourceData> or_src_list;
   for (unsigned arg_idx{}; arg_idx < orArgList.size(); ++arg_idx) {
     const auto& or_arg = orArgList.at(arg_idx);
-    for (const auto& or_src : or_arg.or_src_list) {
-      or_src_list.emplace_back(device::OrSourceData{or_src.src, arg_idx});
+    for (const auto& or_src : or_arg.src_list_cref.get()) {
+      or_src_list.emplace_back(device::OrSourceData{or_src, arg_idx});
     }
   }
   const auto or_src_bytes = or_src_list.size() * sizeof(device::OrSourceData);

@@ -1,3 +1,5 @@
+* i'm using cref_list in OrArgData. OrArgData might be unnecessary.
+
 * OR kernel
   * DONE rip OR-compat checking out of xor-kernel.
   * DONE generate out.xor output for 4 input variations (2,2, 2,10)(--xor, --xor + --or)

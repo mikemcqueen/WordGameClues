@@ -25,16 +25,15 @@ import * as NameCount from '../types/name-count';
 import * as Sentence from '../types/sentence';
 import * as Source from './source';
 
-/////////
-
+/*
 interface StringBoolMap {
     [key: string]: boolean; // for now; eventually maybe array of string (sorted primary nameSrcCsv)
 }
 
 interface OrSourceData {
     source: Source.Data;
-    xorCompatible: boolean;
-    andCompatible: boolean;
+//    xorCompatible: boolean;
+//    andCompatible: boolean;
 }
 type OrSourceList = OrSourceData[];
 
@@ -42,9 +41,10 @@ type OrSourceList = OrSourceData[];
 //
 interface OrArgData {
     orSourceList: OrSourceList;
-    compatible: boolean;
+//    compatible: boolean;
 }
 type OrArgDataList = OrArgData[];
+*/
 
 export interface Data {
     xor: Source.List|number;
@@ -225,18 +225,19 @@ const listCandidateCount = (ncList: NameCount.List): number => {
     return count;
 };
 
+/*
 const initOrSource = (source: Source.Data): OrSourceData => {
     return {
         source,
-        xorCompatible: false,
-        andCompatible: false
+//        xorCompatible: false,
+//        andCompatible: false
     };
 };
 
 const initOrArgData = (): OrArgData => {
     return {
         orSourceList: [],
-        compatible: false
+//        compatible: false
     };
 };
 
@@ -257,6 +258,7 @@ const buildOrArgDataList = (sourceLists: Source.List[]): OrArgDataList => {
     }
     return orArgDataList;
 };
+*/
 
 export const preCompute = (first: number, last: number, args: any): boolean => {
     const maxSum = args.max_sources;// - 1;

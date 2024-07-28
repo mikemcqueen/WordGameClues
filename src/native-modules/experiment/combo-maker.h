@@ -649,18 +649,21 @@ using SourceListMap = std::unordered_map<std::string, SourceList>;
 using XorSource = SourceData;
 using XorSourceList = std::vector<XorSource>;
 
+  /*
 struct OrSourceData {
   SourceCompatibilityData src;
-  bool is_xor_compat{false};
+  // bool is_xor_compat{false};
   // bool is_and_compat{false};
 };
 using OrSourceList = std::vector<OrSourceData>;
+  */
 
 // One OrArgData contains all of the data for a single --or argument.
 //
 struct OrArgData {
-  OrSourceList or_src_list;
-  bool compat{false};
+  SourceListCRef src_list_cref;
+  //OrSourceList or_src_list;
+  //  bool compat{false};
 };
 using OrArgList = std::vector<OrArgData>;
 

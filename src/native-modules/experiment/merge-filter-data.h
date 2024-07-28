@@ -37,6 +37,7 @@ struct MergeData {
     Host(const Host&) = delete; // disable copy
     Host(Host&&) = delete; // disable move
 
+    std::vector<SourceList> src_lists;
     std::vector<IndexList> compat_idx_lists;
     ComboIndexList combo_indices;
   } host;
@@ -78,7 +79,6 @@ struct MergeFilterData {
     SourceList merged_xor_src_list;
 
     std::vector<UsedSources::SourceDescriptorPair> incompat_src_desc_pairs;
-    std::vector<SourceList> src_lists;
   } host_xor;
 
   struct DeviceXor : MergeData::Device {
