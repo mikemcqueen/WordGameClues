@@ -50,7 +50,7 @@ auto build_primary_name_sources_map(
   for (auto& [name, idx_list] : name_src_indices_map) {
     std::vector<std::string> sources;
     for (auto idx : idx_list) {
-      sources.emplace_back(std::to_string(idx));
+      sources.push_back(std::move(std::to_string(idx)));
     }
     auto [_, success] = name_sources_map.emplace(name, std::move(sources));
     assert(success);
@@ -65,7 +65,7 @@ auto& get_known_source_map(int count, bool force_create = false) {
   // allow force-creates exactly in-sequence only, or throw an exception
   const auto idx = count - 1;
   if (force_create && ((int)knownSourceMaps.size() == idx)) {
-    knownSourceMaps.emplace_back(KnownSourceMap{});
+    knownSourceMaps.push_back(KnownSourceMap{});
   }
   return knownSourceMaps.at(idx);
 }
@@ -108,7 +108,7 @@ void init_primary_known_source_map(
 
 void populate_unique_clue_names(StringCRefList& name_cref_list, int count) {
   for (const auto& [name, _] : get_name_sources_map(count)) {
-    name_cref_list.emplace_back(std::cref(name));
+    name_cref_list.push_back(std::cref(name));
   }
 }
 
@@ -185,7 +185,7 @@ void set_name_sources_map(int count, NameSourcesMap&& name_sources_map) {
   auto idx = count - 1;
   // allow sets exactly in-sequence only, or throw an exception
   assert((int)nameSourcesMaps.size() == idx);
-  nameSourcesMaps.emplace_back(std::move(name_sources_map));
+  nameSourcesMaps.push_back(std::move(name_sources_map));
 }
 
 bool is_known_name_count(const std::string& name, int count) {
@@ -249,7 +249,7 @@ auto get_known_source_map_entries(const std::string& name, int count)  //
   const auto& name_sources_map = get_name_sources_map(count);
   for (const auto& source : name_sources_map.at(name)) {
     const auto& key = count > 1 ? source : append(name, ":", source);
-    cref_entries.emplace_back(
+    cref_entries.push_back(
         std::cref(get_known_source_map_entry(count, key)));
   }
   return cref_entries;
@@ -294,7 +294,7 @@ inline void for_each_source_map_entry(
 auto make_src_list(const NameCount& nc) -> cm::SourceList {
   SourceList src_list;
   for_each_nc_source(nc, [&src_list](const SourceData& src) {
-    src_list.emplace_back(src);
+    src_list.push_back(src);
   });  // cl-format
   return src_list;
 }
@@ -303,7 +303,7 @@ auto make_src_cref_list(
     const std::string& name, int count) -> cm::SourceCRefList {
   SourceCRefList src_cref_list;
   for_each_nc_source(name, count, [&src_cref_list](const SourceData& src) {
-    src_cref_list.emplace_back(std::cref(src));
+    src_cref_list.push_back(std::cref(src));
   });
   return src_cref_list;
 }

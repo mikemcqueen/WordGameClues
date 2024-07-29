@@ -294,7 +294,7 @@ auto filter_valid_addend_perms(std::vector<std::vector<int>>& addends,
   for (auto& count_list : addends) {
     do {
       if (clue_manager::are_known_name_counts(name_list, count_list)) {
-        result.emplace_back(std::move(count_list));
+        result.push_back(std::move(count_list));
         // once we get one valid perm for a count_list, we can break out,
         // because the NC (name:sum_of_counts) will be the same.
         break;
@@ -312,9 +312,9 @@ auto make_nc_data_lists(const std::vector<std::vector<int>>& addends,
     for (size_t i{}; i < name_list.size(); ++i) {
       NCData nc_data;
       nc_data.ncList.emplace_back(name_list.at(i), count_list.at(i));
-      nc_data_list.emplace_back(std::move(nc_data));
+      nc_data_list.push_back(std::move(nc_data));
     }
-    result.emplace_back(std::move(nc_data_list));
+    result.push_back(std::move(nc_data_list));
   }
   return result;
 }

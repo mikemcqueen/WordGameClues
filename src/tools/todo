@@ -197,6 +197,11 @@
 
 // NEW PERF:
 
+* could swarm + potentially threadpool the copy/process part of list_pair_compat
+  kernel. either divide the 600M chunk into 4 x 150M subchunks and interleave
+  copy/process of subchunks, or have 2 x 600M buffers and interleave kernel/copy.
+  or both.
+
 * i think the existence of compat_src_indices means that we can be smarter
   about IndexStates list/index allocation? to eliminate (known) incompatible
   indices from the list? 

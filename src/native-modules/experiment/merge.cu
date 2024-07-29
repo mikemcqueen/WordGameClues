@@ -42,11 +42,6 @@ __global__ void list_pair_compat_kernel(const SourceCompatibilityData* sources1,
         compat = src1.isXorCompatibleWith(src2);
       } else {  // MergeType::OR
         compat = src1.hasSameVariationsAs(src2);
-        if (flag && (idx1 == 3) && (idx2 == 0)) {
-          src1.usedSources.dump("src1");
-          src2.usedSources.dump("src2");
-          printf("idx: %d, result: %d\n", int(result_idx), int(compat));
-        }
       }
       compat_results[result_idx] = compat ? 1 : 0;
     }
@@ -65,30 +60,24 @@ __global__ void get_compat_combos_kernel(uint64_t first_combo,
   const unsigned threads_per_grid = gridDim.x * blockDim.x;
   const unsigned thread_idx = blockIdx.x * blockDim.x + threadIdx.x;
   for (uint64_t idx{thread_idx}; idx < num_combos; idx += threads_per_grid) {
-    // TODO: i can do away with this storage since it need not be reversed.
-    // can calculate indices iteratively in below loop.
-    index_t indices[kMaxMatrices];
-    auto combo_idx = first_combo + idx;
-    for (unsigned i{}; i < num_compat_matrices; ++i) {
-      const auto idx_list_size = idx_list_sizes[i];
-      indices[i] = combo_idx % idx_list_size;
-      combo_idx /= idx_list_size;
-    }
     bool compat = true;
+    auto i_combo_idx = first_combo + idx;
     for (size_t i{}, n{}; compat && (i < num_compat_matrices - 1); ++i) {
+      const auto i_list_size = idx_list_sizes[i];
+      const auto row = i_combo_idx % i_list_size;
+      i_combo_idx /= i_list_size;
+      auto j_combo_idx = i_combo_idx;
       for (size_t j{i + 1}; j < num_compat_matrices; ++j, ++n) {
-        const auto offset = indices[i] * idx_list_sizes[j] + indices[j];
+        const auto j_list_size = idx_list_sizes[j]; // aka: num_cols
+        const auto col = j_combo_idx % j_list_size;
+        const auto offset = row * j_list_size + col;
         if (!compat_matrices[compat_matrix_start_indices[n] + offset]) {
           compat = false;
           break;
         }
+        j_combo_idx /= j_list_size;
       }
     }
-#if 0
-    if (flag && compat /*&& ((first_combo + idx) < 1'000'000)*/) {
-      printf("%d\n", int(first_combo + idx));
-    }
-#endif
     results[idx] = compat ? 1 : 0;
   }
 }

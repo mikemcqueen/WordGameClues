@@ -302,6 +302,7 @@ public:
       auto word = bits.word(i);
       while (word) {
         auto new_word = word & (word - 1);  // word with LSB removed
+        // probably should have commented this when i did it.
         int bit_pos = lrint(log2(word ^ new_word));
         SourceDescriptor sd{ i + 1, bit_pos, getVariation(i + 1)};
         if (!first.sentence) {

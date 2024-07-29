@@ -55,7 +55,7 @@ auto validateSourceNamesAtCounts(const std::string& clue_name,
         // replace ncList with supplied names/counts
         merged_src.ncList.clear();
         merged_src.ncList.emplace_back(clue_name, util::sum(count_list));
-        src_list.emplace_back(std::move(merged_src));
+        src_list.push_back(std::move(merged_src));
       }
     }
   }

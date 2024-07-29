@@ -35,7 +35,7 @@ auto mergeCompatibleSourceLists(
   for (const auto& src : src_list) {
     for (const auto& src_cref : src_cref_list) {
       if (src.isXorCompatibleWith(src_cref.get())) {
-        result.emplace_back(mergeSources(src, src_cref.get()));
+        result.push_back(std::move(mergeSources(src, src_cref.get())));
       }
     }
   }
@@ -89,21 +89,20 @@ bool every_combo_idx(combo_index_t combo_idx,
   return true;
 }
 
-  /*
+/*
 auto build_or_arg(const SourceList& src_list) {
-  OrArgData or_arg;
-  for (const auto& src : src_list) {
-    or_arg.or_src_list.emplace_back(OrSourceData{ std::move(src) });
-  }
-  return or_arg;
+OrArgData or_arg;
+for (const auto& src : src_list) {
+  or_arg.or_src_list.emplace_back(OrSourceData{ std::move(src) });
+}
+return or_arg;
 };
-  */
+*/
 
 auto count_or_sources(const OrArgList& or_arg_list) {
   // TODO: std::accumulate
   uint32_t total{};
   for (const auto& or_arg : or_arg_list) {
-    //total += or_arg.or_src_list.size();
     total += or_arg.src_list_cref.get().size();
   }
   return total;
@@ -212,7 +211,7 @@ auto build_src_lists(const std::vector<NCDataList>& nc_data_lists)
           continue;
         }
         hashList[i][key] = StringSet{}; // TODO: emplace? std::move?
-        sourceLists[i].emplace_back(std::move(source));
+        sourceLists[i].push_back(std::move(source));
       }
     }
   }
@@ -231,7 +230,6 @@ auto build_or_arg_list(const std::vector<SourceList>& or_src_lists) -> OrArgList
   OrArgList or_arg_list;
   auto t = util::Timer::start_timer();
   for (const auto& src_list : or_src_lists) {
-    //    or_arg_list.emplace_back(build_or_arg(src_list));
     or_arg_list.emplace_back(std::cref(src_list));
   }
   if (or_arg_list.size() && log_level(Verbose)) {
@@ -250,7 +248,7 @@ auto buildSentenceVariationIndices(const std::vector<SourceList>& xor_src_lists,
   for (size_t i{}; i < compat_indices.size(); ++i) {
     std::array<int, kNumSentences> variations = {
       -1, -1, -1, -1, -1, -1, -1, -1, -1};
-    // TODO: this is some kind of merge_variations?
+    // TODO: is this a duplication of UsedSources.merge_variations?
     every_combo_idx(compat_indices.at(i), compat_idx_lists,
       [&xor_src_lists, &variations](index_t list_idx, index_t src_idx) {
         for (const auto& nc :

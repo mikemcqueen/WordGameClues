@@ -61,7 +61,7 @@ Value setPrimaryNameSrcIndicesMap(const CallbackInfo& info) {
         .ThrowAsJavaScriptException();
       return {};
     }
-    idx_lists.emplace_back(makeIndexList(env, js_idx_lists[i].As<Array>()));
+    idx_lists.push_back(makeIndexList(env, js_idx_lists[i].As<Array>()));
   }
   // --
   clue_manager::init_primary_clues(std::move(name_list), std::move(idx_lists));
@@ -443,26 +443,16 @@ auto get_variations(const MergeData::Host& host) {
     auto combo_idx = orig_combo_idx;
     for (size_t i{}; i < host.compat_idx_lists.size(); ++i) {
       const auto& src = get_source(host, combo_idx, i);
-      UsedSources::Variations copy = v;
+      //UsedSources::Variations copy = v;
       auto success =
           UsedSources::merge_variations(v, src.usedSources.variations);
-#if 0
-      if (orig_combo_idx == 3) {
-        if (v.at(2) != -1) {
-          std::cerr << "combo_idx " << orig_combo_idx << ", v[2] = " << v.at(2)
-                    << " after merging\n"
-                    << util::join(src.usedSources.variations, ","s) << " of "
-                    << NameCount::listToString(src.primaryNameSrcList)
-                    << std::endl;
-        }
-      }
-#endif
       if (!success) {
         std::cerr << "failed merging variations of " << orig_combo_idx
                   << std::endl
                   << util::join(src.usedSources.variations, ","s) << " of "
-                  << NameCount::listToString(src.primaryNameSrcList) << " to:\n"
-                  << util::join(copy, ","s) << ", after merge:\n"
+                  << NameCount::listToString(src.primaryNameSrcList)
+                  << " to:\n"
+                  //<< util::join(copy, ","s) << ", after merge:\n"
                   << util::join(v, ","s) << std::endl;
         show_all_sources(host, orig_combo_idx);
       }
@@ -470,7 +460,7 @@ auto get_variations(const MergeData::Host& host) {
       auto& idx_list = host.compat_idx_lists.at(i);
       combo_idx /= idx_list.size();
     }
-    variations.emplace_back(v);
+    variations.push_back(std::move(v));
   }
   return variations;
 }
@@ -545,16 +535,7 @@ auto make_source_descriptor_pairs(
   std::vector<UsedSources::SourceDescriptorPair> src_desc_pairs;
   src_desc_pairs.reserve(incompatible_sources.size());
   for (const auto& src: incompatible_sources) {
-    if constexpr (0) {
-      auto pair = src.usedSources.get_source_descriptor_pair();
-      printf("---\n");
-      src.usedSources.dump();
-      pair.first.dump();
-      pair.second.dump();
-      src_desc_pairs.emplace_back(pair);
-    } else {
-      src_desc_pairs.emplace_back(src.usedSources.get_source_descriptor_pair());
-    }
+    src_desc_pairs.push_back(src.usedSources.get_source_descriptor_pair());
   }
   return src_desc_pairs;
 }

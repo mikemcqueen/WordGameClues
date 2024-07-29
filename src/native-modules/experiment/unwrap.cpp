@@ -15,7 +15,7 @@ std::vector<int> makeIntList(Env& env, const Array& jsList) {
         .ThrowAsJavaScriptException();
       return {};
     }
-    int_list.emplace_back(jsList[i].As<Number>().Int32Value());
+    int_list.push_back(jsList[i].As<Number>().Int32Value());
   }
   return int_list;
 }
@@ -28,7 +28,7 @@ IndexList makeIndexList(Env& env, const Array& jsList) {
         .ThrowAsJavaScriptException();
       return {};
     }
-    idx_list.emplace_back(jsList[i].As<Number>().Uint32Value());
+    idx_list.push_back(jsList[i].As<Number>().Uint32Value());
   }
   return idx_list;
 }
@@ -41,7 +41,7 @@ std::vector<std::string> makeStringList(Env& env, const Array& jsList) {
         .ThrowAsJavaScriptException();
       return {};
     }
-    list.emplace_back(std::move(jsList[i].As<String>().Utf8Value()));
+    list.push_back(std::move(jsList[i].As<String>().Utf8Value()));
   }
   return list;
 }
@@ -67,7 +67,7 @@ NameCountList makeNameCountList(Env& env, const Array& jsList) {
         .ThrowAsJavaScriptException();
       return {};
     }
-    ncList.emplace_back(std::move(makeNameCount(env, jsList[i].As<Object>())));
+    ncList.push_back(std::move(makeNameCount(env, jsList[i].As<Object>())));
   }
   return ncList;
 }
@@ -109,7 +109,7 @@ SourceList makeSourceList(Env& env, const Array& jsList,
         .ThrowAsJavaScriptException();
       return {};
     }
-    sourceList.emplace_back(
+    sourceList.push_back(
       std::move(makeSourceData(env, jsList[i].As<Object>(), nameSrcList)));
   }
   return sourceList;
@@ -133,7 +133,7 @@ NCDataList makeNcDataList(Env& env, const Array& jsList) {
         .ThrowAsJavaScriptException();
       return {};
     }
-    list.emplace_back(std::move(makeNcData(env, jsList[i].As<Object>())));
+    list.push_back(std::move(makeNcData(env, jsList[i].As<Object>())));
   }
   return list;
 }
@@ -146,7 +146,7 @@ std::vector<NCDataList> makeNcDataLists(Env& env, const Array& jsList) {
         .ThrowAsJavaScriptException();
       return {};
     }
-    lists.emplace_back(std::move(makeNcDataList(env, jsList[i].As<Array>())));
+    lists.push_back(std::move(makeNcDataList(env, jsList[i].As<Array>())));
   }
   return lists;
 }
@@ -220,7 +220,7 @@ SourceCompatibilityList makeSourceCompatibilityListFromMergedSourcesList(
     auto jsSourceList = jsList[i].As<Object>().Get("sourceList").As<Array>();
     SourceCompatibilityData compatData =
       makeSourceCompatibilityDataFromSourceList(env, jsSourceList);
-    sourceCompatList.emplace_back(std::move(compatData));
+    sourceCompatList.push_back(std::move(compatData));
   }
   return sourceCompatList;
 }
@@ -242,7 +242,7 @@ OrSourceList makeOrSourceList(Env& env, const Array& jsList) {
         .ThrowAsJavaScriptException();
       return {};
     }
-    orSourceList.emplace_back(
+    orSourceList.push_back(
       std::move(makeOrSource(env, jsList[i].As<Object>())));
   }
   return orSourceList;
@@ -264,7 +264,7 @@ OrArgList makeOrArgList(Env& env, const Array& jsList) {
         .ThrowAsJavaScriptException();
       return {};
     }
-    orArgList.emplace_back(
+    orArgList.push_back(
       std::move(makeOrArgData(env, jsList[i].As<Object>())));
   }
   return orArgList;

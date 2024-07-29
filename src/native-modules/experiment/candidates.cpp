@@ -68,7 +68,7 @@ auto get_src_compat_list(const NameCount& nc) {
   SourceCompatibilityList src_list;
   clue_manager::for_each_nc_source(
       nc, [&src_list](const SourceCompatibilityData& src) {
-        src_list.emplace_back(src);
+        src_list.push_back(src);
       });
   return src_list;
 }
@@ -77,7 +77,7 @@ auto get_src_compat_cref_list(const NameCount& nc) {
   SourceCompatibilityCRefList src_cref_list;
   clue_manager::for_each_nc_source(
       nc, [&src_cref_list](const SourceCompatibilityData& src) {
-        src_cref_list.emplace_back(std::cref(src));
+        src_cref_list.push_back(std::cref(src));
       });
   return src_cref_list;
 }
@@ -89,11 +89,10 @@ auto make_merge_list(const SourceCompatibilityList& merged_src_list,
     SourceCompatibilityCRefList compat_src_cref_list;
     for (const auto& src_cref : src_cref_list) {
       if (merged_src.isXorCompatibleWith(src_cref.get())) {
-        compat_src_cref_list.emplace_back(src_cref);
+        compat_src_cref_list.push_back(src_cref);
       }
     }
     if (!compat_src_cref_list.empty()) {
-      //merge_list.push_back(MergeData{merged_src, std::move(compat_src_cref_list)});
       merge_list.emplace_back(merged_src, std::move(compat_src_cref_list));
     }
   }
@@ -104,8 +103,8 @@ auto make_merged_src_list(const std::vector<MergeData>& merge_list) {
   SourceCompatibilityList merged_src_list;
   for (const auto& merge_data : merge_list) {
     for (const auto src_cref : merge_data.src_cref_list) {
-      merged_src_list.emplace_back(
-        merge_data.merged_src.copyMerge(src_cref.get()));
+      merged_src_list.push_back(
+          std::move(merge_data.merged_src.copyMerge(src_cref.get())));
     }
   }
   return merged_src_list;
@@ -138,7 +137,7 @@ auto add_candidate(int sum, std::string&& combo, int index) {
   // get_candidates() accessor.
   Lock lk(candidate_map_semaphore_);
   auto& candidates = candidate_map_.find(sum)->second;
-  candidates.at(index).combos.emplace(std::move(combo));
+  candidates.at(index).combos.insert(std::move(combo));
   return index;
 }
 
@@ -146,22 +145,22 @@ int add_candidate(int sum, std::string&& combo,
     std::reference_wrapper<const SourceCompatibilityList> src_list_cref) {
   Lock lk(candidate_map_semaphore_);
   if (!candidate_map_.contains(sum)) {
-    auto [_, success] = candidate_map_.emplace(std::make_pair(sum, CandidateList{}));
+    auto [_, success] = candidate_map_.emplace(sum, CandidateList{});
     assert(success);
   }
   std::set<std::string> combos{};
-  combos.emplace(std::move(combo));
+  combos.insert(std::move(combo));
   // can't use get_candidates() here due to owning lock already, and because
   // it returns a const reference.
   auto& candidates = candidate_map_.find(sum)->second;
-  candidates.emplace_back(CandidateData{src_list_cref, std::move(combos)});
+  candidates.emplace_back(std::move(src_list_cref), std::move(combos));
   return candidates.size() - 1;
 }
 
 auto get_candidate_counts_ref(int sum) -> CandidateCounts& {
   Lock lk(candidate_counts_semaphore_);
   if (!candidate_counts_.contains(sum)) {
-    candidate_counts_.emplace(std::make_pair(sum, CandidateCounts{0, 0, 0, 0}));
+    candidate_counts_.emplace(sum, CandidateCounts{0, 0, 0, 0});
   }
   return candidate_counts_.find(sum)->second;
 }
@@ -173,12 +172,14 @@ void consider_candidate(const NameCountList& nc_list) {
     [](int total, const NameCount& nc) { return total + nc.count; });
   auto& candidate_repo = get_candidate_repo(sum);
   // no lock necessary to modify repo map for a particular sum
+  // TODO: auto& repo_value = repo_get_or_add(nc_list)
+  // that way we can std::move(key), and only one lookup
   auto key = NameCount::listToString(nc_list);
   if (!candidate_repo.contains(key)) {
     CandidateRepoValue repo_value;
     repo_value.merged_src_list =
       std::move(merge_all_compatible_sources(nc_list));
-    candidate_repo.emplace(std::make_pair(key, std::move(repo_value)));
+    candidate_repo.emplace(key, std::move(repo_value));
   }
   auto& cc = get_candidate_counts_ref(sum);
   cc.num_considers++;

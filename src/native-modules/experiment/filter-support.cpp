@@ -35,7 +35,7 @@ std::vector<std::future<filter_task_result_t>> filter_futures_;
 // functions
 
 void add_filter_future(std::future<filter_task_result_t>&& filter_future) {
-  filter_futures_.emplace_back(std::move(filter_future));
+  filter_futures_.push_back(std::move(filter_future));
 }
 
 [[nodiscard]] auto cuda_alloc_copy_sources(int sum,
@@ -660,7 +660,7 @@ cuda_allocCopyOrSources(const OrArgList& orArgList, cudaStream_t stream) {
   for (unsigned arg_idx{}; arg_idx < orArgList.size(); ++arg_idx) {
     const auto& or_arg = orArgList.at(arg_idx);
     for (const auto& or_src : or_arg.src_list_cref.get()) {
-      or_src_list.emplace_back(device::OrSourceData{or_src, arg_idx});
+      or_src_list.emplace_back(or_src, arg_idx);
     }
   }
   const auto or_src_bytes = or_src_list.size() * sizeof(device::OrSourceData);
