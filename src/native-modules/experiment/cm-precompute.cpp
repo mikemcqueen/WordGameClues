@@ -79,7 +79,7 @@ auto mergeAllCompatibleSources(const NameCountList& ncList) -> SourceList {
 
 bool every_combo_idx(combo_index_t combo_idx,
     const std::vector<IndexList>& idx_lists, const auto& fn) {
-  for (int i{(int)idx_lists.size() - 1}; i >= 0; --i) {
+  for (index_t i{}; i < idx_lists.size(); ++i) {
     const auto& idx_list = idx_lists.at(i);
     auto src_idx = idx_list.at(combo_idx % idx_list.size());
     if (!fn(i, src_idx))
@@ -250,6 +250,7 @@ auto buildSentenceVariationIndices(const std::vector<SourceList>& xor_src_lists,
   for (size_t i{}; i < compat_indices.size(); ++i) {
     std::array<int, kNumSentences> variations = {
       -1, -1, -1, -1, -1, -1, -1, -1, -1};
+    // TODO: this is some kind of merge_variations?
     every_combo_idx(compat_indices.at(i), compat_idx_lists,
       [&xor_src_lists, &variations](index_t list_idx, index_t src_idx) {
         for (const auto& nc :
@@ -268,7 +269,7 @@ auto buildSentenceVariationIndices(const std::vector<SourceList>& xor_src_lists,
       });
     for (int s{}; s < kNumSentences; ++s) {
       auto& variationIndicesList = sentenceVariationIndices.at(s);
-      const size_t variation_idx = variations.at(s) + 1;
+      const auto variation_idx = variations.at(s) + 1u;
       if (variationIndicesList.size() <= variation_idx) {
         variationIndicesList.resize(variation_idx + 1);
       }

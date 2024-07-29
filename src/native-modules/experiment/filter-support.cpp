@@ -10,13 +10,14 @@
 #include <unordered_set>
 #include <utility>
 #include <vector>
-#include "filter.h"
-#include "filter.cuh"
-#include "merge-filter-common.h"
-#include "merge-filter-data.h"
 #include "candidates.h"
 #include "cuda-types.h"
+#include "filter.cuh"
+#include "filter.h"
+#include "merge-filter-common.h"
+#include "merge-filter-data.h"
 #include "log.h"
+#include "util.h"
 
 namespace cm {
 

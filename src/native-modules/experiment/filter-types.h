@@ -17,7 +17,7 @@
 #include "cuda-types.h"
 #include "candidates.h"
 #include "merge-filter-common.h"
-#include "util.h"
+//#include "util.h"
 #include "log.h"
 
 namespace cm {

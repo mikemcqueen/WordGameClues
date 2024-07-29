@@ -127,8 +127,8 @@ void for_each_list_pair(
   }
 }
 
-auto alloc_compat_matrices(
-  const std::vector<IndexList>& idx_lists, size_t* num_bytes = nullptr) {
+auto alloc_compat_matrices(const std::vector<IndexList>& idx_lists,
+    cudaStream_t stream, size_t* num_bytes = nullptr) {
   size_t num_iterated_list_pairs{};
   uint64_t num_results{};
   for_each_list_pair(idx_lists, [&](size_t i, size_t j, size_t n) {
@@ -143,7 +143,6 @@ auto alloc_compat_matrices(
          && "num_list_pairs mismatch");
 
   const auto matrix_bytes = num_results * sizeof(result_t);
-  auto stream = cudaStreamPerThread;
   result_t* device_compat_matrices;
   cuda_malloc_async((void**)&device_compat_matrices, matrix_bytes, stream,
       "compat_matrices");  // cl-format
@@ -308,12 +307,12 @@ auto log_compat_combos_kernel(int idx, CudaEvent& start, LogLevel level = Verbos
 auto run_get_compat_combos_task(const result_t* device_compat_matrices,
     unsigned num_compat_matrices,
     const index_t* device_compat_matrix_start_indices,
-    const index_t* device_idx_list_sizes, uint64_t max_combos) {
+    const index_t* device_idx_list_sizes, uint64_t max_combos,
+    MergeType merge_type, cudaStream_t stream) {
   using namespace std::chrono;
   using namespace std::experimental::fundamentals_v3;
   constexpr auto logging = false;
 
-  const auto stream = cudaStreamPerThread;
   const uint64_t chunk_size = 600'000'000;
   uint64_t num_combos{chunk_size};
   auto device_results =
@@ -328,8 +327,7 @@ auto run_get_compat_combos_task(const result_t* device_compat_matrices,
   long proc_elapsed{};
   uint64_t total_hits{};
   int idx{};
-  uint64_t first_combo{};
-  for (;; ++idx, first_combo += num_combos) {
+  for (uint64_t first_combo{};; ++idx, first_combo += num_combos) {
     num_combos = std::min(num_combos, max_combos - first_combo);
     if (!num_combos) break;
     if constexpr (logging) {
@@ -341,7 +339,7 @@ auto run_get_compat_combos_task(const result_t* device_compat_matrices,
     run_get_compat_combos_kernel(first_combo, num_combos,
         device_compat_matrices, num_compat_matrices,
         device_compat_matrix_start_indices, device_idx_list_sizes,
-        device_results);
+        device_results, stream, merge_type == MergeType::OR);
     gcc_elapsed += log_compat_combos_kernel(idx, gcc_start);
 
     // TODO: sync_copy_results returns event.elapsed but precision is low
@@ -396,14 +394,21 @@ auto get_compatible_indices(const std::vector<SourceList>& src_lists,
   }
   auto idx_lists = Peco::initial_indices(lengths);
   bool valid = filter_all_indices(idx_lists, src_lists, merge_type);
-  if (log_level(Verbose)) {
+  uint64_t product{};
+  if (valid) {
     lengths.clear();
     for (const auto& il : idx_lists) {
       lengths.push_back(std::distance(il.begin(), il.end()));
     }
+    product = util::multiply_with_overflow_check(lengths);
+  }
+  if (log_level(Verbose)) {
     std::cerr << "  filtered lengths: " << util::vec_to_string(lengths)
-              << ", product: " << util::multiply_with_overflow_check(lengths)
+              << ", product: " << product  //
               << ", valid: " << std::boolalpha << valid << std::endl;
+  }
+  if (product > 500'000'000) {
+    std::cerr << "product too large, refine your parameters, aborting";
   }
   // "valid" means all resulting index lists have non-zero length
   if (!valid) return {};
@@ -491,6 +496,50 @@ index_t* cuda_alloc_copy_list_sizes(
   return device_list_sizes;
 }
 
+void check_list_pair_results(combo_index_t combo_idx, result_t* device_results,
+    size_t num_bytes, const std::vector<IndexList>& idx_lists,
+    const IndexList& start_indices, cudaStream_t stream) {
+
+
+  std::cerr << "check_list_pairs: " << start_indices.size()
+            << ", num_bytes: " << num_bytes << std::endl;
+  std::vector<result_t> results(num_bytes);
+  sync_copy_compat_results(results, num_bytes, device_results, stream);
+#if 0
+  for_each_list_pair(idx_lists, [&](size_t i, size_t j, size_t n) {
+    std::cerr << "list_pair " << n << " is [" << i << ", " << j << "]"
+              << std::endl;
+  });
+#endif
+  // HAND SET THESE VALUES
+  // 1068
+  auto list1 = 0;
+  auto list2 = 1;
+  auto matrix = 0; // [0,1]
+
+  index_t row{};
+  index_t col{};
+  auto val = combo_idx;
+  for (int i{}; i <= list2; ++i) {
+    auto size = idx_lists.at(i).size();
+    auto idx = val % size;
+    if (i == list1) {
+      row = idx;
+    } else if (i == list2) {
+      col = idx;
+    }
+    val /= size;
+  }
+
+  auto start = start_indices.at(matrix);
+  auto width = idx_lists.at(list2).size();
+  auto offset = row * width + col;
+  std::cerr << "idx: " << combo_idx << ", matrix " << matrix
+            << ", rowcol: " << row << "," << col << "  start: " << start
+            << ", width: " << width << ", offset: " << offset
+            << ", result: " << (int)results.at(offset) << std::endl;
+}
+
 auto cuda_get_compatible_combo_indices(const std::vector<SourceList>& src_lists,
     const SourceCompatibilityData* device_src_lists,
     const std::vector<IndexList>& idx_lists, const index_t* device_idx_lists,
@@ -503,7 +552,8 @@ auto cuda_get_compatible_combo_indices(const std::vector<SourceList>& src_lists,
   auto src_list_start_indices = make_start_indices(src_lists);
   auto idx_list_start_indices = make_start_indices(idx_lists);
   size_t num_bytes{};
-  auto device_compat_matrices = alloc_compat_matrices(idx_lists, &num_bytes);
+  auto device_compat_matrices =
+      alloc_compat_matrices(idx_lists, stream, &num_bytes);
   scope_exit free_compat_matrices(
       [device_compat_matrices]() { cuda_free(device_compat_matrices); });
   auto compat_matrix_start_indices =
@@ -524,18 +574,27 @@ auto cuda_get_compatible_combo_indices(const std::vector<SourceList>& src_lists,
       std::cerr << "  launching list_pair_compat_kernel " << n << " for [" << i
                 << ", " << j << "]" << std::endl;
     }
+    bool flag = (merge_type == MergeType::OR) && (n == 3);
+
     run_list_pair_compat_kernel(&device_src_lists[src_list_start_indices.at(i)],
         &device_src_lists[src_list_start_indices.at(j)],
         &device_idx_lists[idx_list_start_indices.at(i)], idx_lists.at(i).size(),
         &device_idx_lists[idx_list_start_indices.at(j)], idx_lists.at(j).size(),
-        &device_compat_matrices[compat_matrix_start_indices.at(n)], merge_type);
+        &device_compat_matrices[compat_matrix_start_indices.at(n)], merge_type,
+        stream, flag);
   });
-  /*
-  if constexpr (0) {
-    CudaEvent lp_stop;
-    auto lp_dur = lp_stop.synchronize(lp_start);
-    std::cerr << "  list_pair_compat_kernels complete - " << lp_dur << "ms\n";
+  if (merge_type == MergeType::OR) {
+    check_list_pair_results(1068u, device_compat_matrices, num_bytes, idx_lists,
+        compat_matrix_start_indices, stream);
   }
+
+  /*
+   if constexpr (0) {
+       CudaEvent lp_stop;
+        auto lp_dur = lp_stop.synchronize(lp_start);
+        std::cerr << "  list_pair_compat_kernels complete - " << lp_dur <<
+      "ms\n";
+      }
   */
   // debugging
   // debug_copy_show_compat_matrix_hit_count(device_compat_matrices,
@@ -547,11 +606,11 @@ auto cuda_get_compatible_combo_indices(const std::vector<SourceList>& src_lists,
   scope_exit free_start_indices([device_compat_matrix_start_indices]() {
     cuda_free(device_compat_matrix_start_indices);
   });
-  const auto max_combos{
-      util::multiply_with_overflow_check(util::make_list_sizes(idx_lists))};
+  const auto max_combos =
+      util::multiply_with_overflow_check(util::make_list_sizes(idx_lists));
   auto combo_indices = run_get_compat_combos_task(device_compat_matrices,
       idx_lists.size(), device_compat_matrix_start_indices,
-      device_idx_list_sizes, max_combos);
+      device_idx_list_sizes, max_combos, merge_type, stream);
 
 #if defined(HOST_SIDE_COMPARISON)
   // host-side compat combo counter for debugging/comparison. slow.

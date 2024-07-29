@@ -31,11 +31,15 @@ constexpr auto make_array(T value) -> std::array<T, N> {
 }
 
 namespace Source {
-  constexpr inline auto isCandidate(int src) noexcept { return src >= 1'000'000; }
-  constexpr inline auto getSentence(int src) noexcept { return src / 1'000'000; }
-  constexpr inline auto getSource(int src) noexcept { return src % 1'000'000; }
-  constexpr inline auto getVariation(int src) noexcept { return getSource(src) / 100; }
-  constexpr inline auto getIndex(int src) noexcept { return getSource(src) % 100; }
+
+// clang-format off
+constexpr inline auto isCandidate(int src) noexcept  { return src >= 1'000'000; }
+constexpr inline auto getSentence(int src) noexcept  { return src / 1'000'000; }
+constexpr inline auto getSource(int src) noexcept    { return src % 1'000'000; }
+constexpr inline auto getVariation(int src) noexcept { return getSource(src) / 100; }
+constexpr inline auto getIndex(int src) noexcept     { return getSource(src) % 100; }
+// clang-format on
+
 }  // namespace Source
 
 struct UsedSources {
@@ -137,11 +141,15 @@ private:
 
 public:
   static auto merge_one_variation(
-      Variations& variations, int sentence, variation_index_t vi) {
-    auto& v = variations.at(sentence - 1);
-    if ((v > -1) && (v != vi)) return false;
-    v = vi;
-    return true;
+      Variations& to, int sentence, variation_index_t from_value) {
+    if (from_value == -1) return true;
+    sentence -= 1;
+    auto to_value = to.at(sentence);
+    if (to_value == -1) {
+      to.at(sentence) = from_value;
+      return true;
+    }
+    return from_value == to_value;
   }
 
   static auto merge_one_variation(Variations& to, int src) {
@@ -151,15 +159,14 @@ public:
 
   static auto merge_variations(Variations& to, const Variations& from) {
     for (int sentence{1}; sentence <= kNumSentences; ++sentence) {
-      auto& vi = from.at(sentence - 1);
-      if (vi == -1) continue;
-      if (!merge_one_variation(to, sentence, vi)) return false;
+      auto from_value = from.at(sentence - 1);
+      if (!merge_one_variation(to, sentence, from_value)) return false;
     }
     return true;
   }
 
   constexpr static auto allVariationsMatch(
-    const Variations& v1, const Variations& v2) {
+      const Variations& v1, const Variations& v2) {
     for (size_t i{}; i < v1.size(); ++i) {
       if ((v1[i] > -1) && (v2[i] > -1) && (v1[i] != v2[i])) {
         return false;
@@ -168,21 +175,20 @@ public:
     return true;
   }
 
-#if 0
-  constexpr static bool allVariationsMatch2(
-    const Variations& v1, const Variations& v2) {
-    int mismatches{};
-    for (auto i{ 0u }; i < v1.size(); ++i) {
-      auto first = v1[i] + 1;
-      auto second = v2[i] + 1;
-      mismatches += first && second && (first != second);
+#if 1
+  constexpr static auto allVariationsMatch2(
+      const Variations& v1, const Variations& v2) {
+    for (size_t i{}; i < v1.size(); ++i) {
+      const auto first = v1[i] + 1;
+      const auto second = v2[i] + 1;
+      if (first && second && (first != second)) return false;
     }
-    return !mismatches;
+    return true;
   }
 #endif
 
   constexpr auto isXorCompatibleWith(
-    const UsedSources& other, bool check_variations = true) const {
+      const UsedSources& other, bool check_variations = true) const {
     // compare bits
     if (getBits().intersects(other.getBits()))
       return false;
@@ -194,7 +200,7 @@ public:
 
   // NB! order of (a,b) in a.is(b) here matters!
   constexpr auto isCompatibleSubsetOf(
-    const UsedSources& other, bool check_variations = true) const {
+      const UsedSources& other, bool check_variations = true) const {
     if (!getBits().is_subset_of(other.getBits()))
       return false;
     // compare variations
@@ -346,13 +352,13 @@ struct SourceCompatibilityData {
       : usedSources(std::move(usedSources)) {
   }
 
-  constexpr auto isXorCompatibleWith(
-    const SourceCompatibilityData& other, bool check_variations = true) const {
+  constexpr auto isXorCompatibleWith(const SourceCompatibilityData& other,
+      bool check_variations = true) const {
     return usedSources.isXorCompatibleWith(other.usedSources, check_variations);
   }
 
-  constexpr auto isCompatibleSubsetOf(
-    const SourceCompatibilityData& other, bool check_variations = true) const {
+  constexpr auto isCompatibleSubsetOf(const SourceCompatibilityData& other,
+      bool check_variations = true) const {
     return usedSources.isCompatibleSubsetOf(other.usedSources, check_variations);
   }
 
@@ -360,7 +366,7 @@ struct SourceCompatibilityData {
       const SourceCompatibilityData& other) const {
     // TODO: add hasSameVariationsAs() member function (non-static) to
     // UsedSources?
-    return UsedSources::allVariationsMatch(
+    return UsedSources::allVariationsMatch2(
         usedSources.variations, other.usedSources.variations);
   }
 
@@ -547,11 +553,10 @@ using SourceCRefList = std::vector<SourceCRef>;
 struct SourceData : SourceCompatibilityData {
   SourceData() = default;
   SourceData(NameCountList&& primaryNameSrcList, NameCountList&& ncList,
-    UsedSources&& usedSources)
+      UsedSources&& usedSources)
       : SourceCompatibilityData(std::move(usedSources)),
         primaryNameSrcList(std::move(primaryNameSrcList)),
-        ncList(std::move(ncList)) {
-  }
+        ncList(std::move(ncList)) {}
 
   // constructor for list.emplace
   // used_sources is const-ref because it doesn't benefit from move

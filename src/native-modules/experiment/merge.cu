@@ -24,7 +24,8 @@ constexpr auto kMaxMatrices = 10u;
 __global__ void list_pair_compat_kernel(const SourceCompatibilityData* sources1,
     const SourceCompatibilityData* sources2, const index_t* src1_indices,
     unsigned num_src1_indices, const index_t* src2_indices,
-    unsigned num_src2_indices, result_t* compat_results, MergeType merge_type) {
+    unsigned num_src2_indices, result_t* compat_results, MergeType merge_type,
+    bool flag) {
   // for each source1 (one block per row)
   for (unsigned idx1{blockIdx.x}; idx1 < num_src1_indices; idx1 += gridDim.x) {
     const auto src1_idx = src1_indices[idx1];
@@ -41,6 +42,11 @@ __global__ void list_pair_compat_kernel(const SourceCompatibilityData* sources1,
         compat = src1.isXorCompatibleWith(src2);
       } else {  // MergeType::OR
         compat = src1.hasSameVariationsAs(src2);
+        if (flag && (idx1 == 3) && (idx2 == 0)) {
+          src1.usedSources.dump("src1");
+          src2.usedSources.dump("src2");
+          printf("idx: %d, result: %d\n", int(result_idx), int(compat));
+        }
       }
       compat_results[result_idx] = compat ? 1 : 0;
     }
@@ -55,27 +61,34 @@ __global__ void list_pair_compat_kernel(const SourceCompatibilityData* sources1,
 __global__ void get_compat_combos_kernel(uint64_t first_combo,
     uint64_t num_combos, const result_t* compat_matrices,
     const index_t* compat_matrix_start_indices, unsigned num_compat_matrices,
-    const index_t* idx_list_sizes, result_t* results) {
+    const index_t* idx_list_sizes, result_t* results, bool flag) {
   const unsigned threads_per_grid = gridDim.x * blockDim.x;
   const unsigned thread_idx = blockIdx.x * blockDim.x + threadIdx.x;
   for (uint64_t idx{thread_idx}; idx < num_combos; idx += threads_per_grid) {
-    index_t row_indices[kMaxMatrices];
-    auto combo_idx{first_combo + idx};
-    for (int i{(int)num_compat_matrices - 1}; i >= 0; --i) {
+    // TODO: i can do away with this storage since it need not be reversed.
+    // can calculate indices iteratively in below loop.
+    index_t indices[kMaxMatrices];
+    auto combo_idx = first_combo + idx;
+    for (unsigned i{}; i < num_compat_matrices; ++i) {
       const auto idx_list_size = idx_list_sizes[i];
-      row_indices[i] = combo_idx % idx_list_size;
+      indices[i] = combo_idx % idx_list_size;
       combo_idx /= idx_list_size;
     }
     bool compat = true;
     for (size_t i{}, n{}; compat && (i < num_compat_matrices - 1); ++i) {
       for (size_t j{i + 1}; j < num_compat_matrices; ++j, ++n) {
-        auto offset = row_indices[i] * idx_list_sizes[j] + row_indices[j];
+        const auto offset = indices[i] * idx_list_sizes[j] + indices[j];
         if (!compat_matrices[compat_matrix_start_indices[n] + offset]) {
           compat = false;
           break;
         }
       }
     }
+#if 0
+    if (flag && compat /*&& ((first_combo + idx) < 1'000'000)*/) {
+      printf("%d\n", int(first_combo + idx));
+    }
+#endif
     results[idx] = compat ? 1 : 0;
   }
 }
@@ -107,12 +120,13 @@ int run_list_pair_compat_kernel(const SourceCompatibilityData* device_sources1,
     const SourceCompatibilityData* device_sources2,
     const index_t* device_indices1, unsigned num_device_indices1,
     const index_t* device_indices2, unsigned num_device_indices2,
-    result_t* device_compat_results, MergeType merge_type) {
+    result_t* device_compat_results, MergeType merge_type, cudaStream_t stream,
+    bool flag) {
   int num_sm;
   cudaDeviceGetAttribute(&num_sm, cudaDevAttrMultiProcessorCount, 0);
   int threads_per_sm;
   cudaDeviceGetAttribute(&threads_per_sm, cudaDevAttrMaxThreadsPerMultiProcessor, 0);
-  auto block_size = 256;
+  auto block_size = 256; // should be variable probably
   auto blocks_per_sm = threads_per_sm / block_size;
   assert(blocks_per_sm * block_size == threads_per_sm);
   auto grid_size = num_sm * blocks_per_sm;  // aka blocks per grid
@@ -120,20 +134,21 @@ int run_list_pair_compat_kernel(const SourceCompatibilityData* device_sources1,
 
   dim3 grid_dim(grid_size);
   dim3 block_dim(block_size);
-  cudaStream_t stream = cudaStreamPerThread;
-  //cudaStreamSynchronize(cudaStreamPerThread);
   list_pair_compat_kernel<<<grid_dim, block_dim, shared_bytes, stream>>>(
       device_sources1, device_sources2, device_indices1, num_device_indices1,
-      device_indices2, num_device_indices2, device_compat_results, merge_type);
+      device_indices2, num_device_indices2, device_compat_results, merge_type,
+      flag);
   return 0;
 }
 
 int run_get_compat_combos_kernel(uint64_t first_combo, uint64_t num_combos,
     const result_t* device_compat_matrices, unsigned num_compat_matrices,
     const index_t* device_compat_matrix_start_indices,
-    const index_t* device_idx_list_sizes, result_t* device_results) {
+    const index_t* device_idx_list_sizes, result_t* device_results,
+    cudaStream_t stream, bool flag) {
   assert((num_compat_matrices <= kMaxMatrices)
          && "max compat matrix count exceeded (easy fix)");
+
   int num_sm;
   cudaDeviceGetAttribute(&num_sm, cudaDevAttrMultiProcessorCount, 0);
   int threads_per_sm;
@@ -146,12 +161,10 @@ int run_get_compat_combos_kernel(uint64_t first_combo, uint64_t num_combos,
 
   dim3 grid_dim(grid_size);
   dim3 block_dim(block_size);
-  cudaStream_t stream = cudaStreamPerThread;
-  //cudaStreamSynchronize(cudaStreamPerThread);
   get_compat_combos_kernel<<<grid_dim, block_dim, shared_bytes, stream>>>(
       first_combo, num_combos, device_compat_matrices,
       device_compat_matrix_start_indices, num_compat_matrices,
-      device_idx_list_sizes, device_results);
+      device_idx_list_sizes, device_results, flag);
   return 0;
 }
 

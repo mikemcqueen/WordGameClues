@@ -301,8 +301,19 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   auto merge_only = info[1].As<Boolean>();
   if (merge_only) the_log_args_.quiet = true;
   // --
+
   // arbitrary, want to do it somewhere
   show_clue_manager_durations();
+
+#if 1
+  static bool fifo_initialized{false};
+  if (!fifo_initialized) {
+    auto err = cudaDeviceSetLimit(cudaLimitPrintfFifoSize, 50'000'000);
+    assert_cuda_success(err, "get_compat_combos set fifo size");
+    fifo_initialized = true;
+  }
+#endif
+
   auto xor_src_lists = build_src_lists(nc_data_lists);
   if (log_level(Normal)) {
     //std::cerr << "build xor_src_lists(" << xor_src_lists.size() << ")\n";
@@ -391,6 +402,87 @@ void alloc_copy_combo_indices(cudaStream_t stream) {
     cuda_allocCopySentenceVariationIndices(variation_indices, stream);
 }
 
+
+void dump_combos(const MergeData::Host& host) {
+  std::vector<UsedSources::Variations> variations;
+  for (auto orig_combo_idx : host.combo_indices) {
+    std::cerr << "host: " << orig_combo_idx << std::endl;
+  }
+}
+
+const auto& get_source(
+    const MergeData::Host& host, combo_index_t combo_idx, size_t list_idx) {
+  auto& idx_list = host.compat_idx_lists.at(list_idx);
+  auto src_idx = idx_list.at(combo_idx % idx_list.size());
+  return host.src_lists.at(list_idx).at(src_idx);
+}
+
+void show_all_sources(const MergeData::Host& host, combo_index_t combo_idx) {
+  using namespace std::literals;
+  UsedSources::Variations v = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
+  std::cerr << "all sources:\n";
+  for (size_t i{}; i < host.compat_idx_lists.size(); ++i) {
+    const auto& src = get_source(host, combo_idx, i);
+    auto success = UsedSources::merge_variations(v, src.usedSources.variations);
+    std::cerr << NameCount::listToString(src.primaryNameSrcList) << std::endl
+              << "  merged as: " << util::join(v, ","s)
+              << " - success: " << std::boolalpha << success << std::endl;
+    auto& idx_list = host.compat_idx_lists.at(i);
+    combo_idx /= idx_list.size();
+  }
+}
+
+auto get_variations(const MergeData::Host& host) {
+  using namespace std::literals;
+  std::vector<UsedSources::Variations> variations;
+  for (auto orig_combo_idx : host.combo_indices) {
+    UsedSources::Variations v = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
+    for (int i{}; i < kNumSentences; ++i) {
+      v.at(i) = -1;
+    }
+    auto combo_idx = orig_combo_idx;
+    for (size_t i{}; i < host.compat_idx_lists.size(); ++i) {
+      const auto& src = get_source(host, combo_idx, i);
+      UsedSources::Variations copy = v;
+      auto success =
+          UsedSources::merge_variations(v, src.usedSources.variations);
+#if 0
+      if (orig_combo_idx == 3) {
+        if (v.at(2) != -1) {
+          std::cerr << "combo_idx " << orig_combo_idx << ", v[2] = " << v.at(2)
+                    << " after merging\n"
+                    << util::join(src.usedSources.variations, ","s) << " of "
+                    << NameCount::listToString(src.primaryNameSrcList)
+                    << std::endl;
+        }
+      }
+#endif
+      if (!success) {
+        std::cerr << "failed merging variations of " << orig_combo_idx
+                  << std::endl
+                  << util::join(src.usedSources.variations, ","s) << " of "
+                  << NameCount::listToString(src.primaryNameSrcList) << " to:\n"
+                  << util::join(copy, ","s) << ", after merge:\n"
+                  << util::join(v, ","s) << std::endl;
+        show_all_sources(host, orig_combo_idx);
+      }
+      assert(success);
+      auto& idx_list = host.compat_idx_lists.at(i);
+      combo_idx /= idx_list.size();
+    }
+    variations.emplace_back(v);
+  }
+  return variations;
+}
+
+void do_xor_or_compare() {
+  //  dump_combos(MFD.host_or);
+  auto or_variations = get_variations(MFD.host_or);
+  std::cerr << "OR variations: " << or_variations.size() << std::endl;
+  auto xor_variations = get_variations(MFD.host_xor);
+  std::cerr << "XOR variations: " << xor_variations.size() << std::endl;
+}
+
 //
 // filterPreparation
 //
@@ -417,6 +509,7 @@ Value filterPreparation(const CallbackInfo& info) {
     if (!compat) {
       std::cerr << "failed to merge OR args" << std::endl;
     }
+    do_xor_or_compare();
     // ?? num_compatible = MFD.host_or.combo_indices.size();
     // ?? filter needs this later
     // ?? MFD.host_or.src_lists = std::move(or_src_lists);

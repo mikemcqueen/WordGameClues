@@ -3,6 +3,7 @@
 
 #pragma once
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <format>
 #include <iostream>
@@ -94,13 +95,14 @@ inline std::string join(const C<T>& strings, const std::string& delim) {
     return *strings.begin();
   }
   return std::accumulate(std::next(strings.begin()), strings.end(), *strings.begin(),
-    [delim](const std::string& acc, const std::string& elem) {
+    [&delim](const std::string& acc, const std::string& elem) {
       return acc + delim + elem;
     });
 }
 
-inline std::string join(
-  const std::vector<int>& nums, const std::string& delim) {
+template <typename T, template <typename> class C>
+//  requires std::is_integral_v<T>
+inline std::string join(const C<T>& nums, const std::string& delim) {
   if (nums.empty()) {
     return {};
   }
@@ -108,9 +110,22 @@ inline std::string join(
     return std::to_string(nums.front());
   }
   return std::accumulate(std::next(nums.begin()), nums.end(),
-    std::to_string(nums.front()), [delim](const std::string& acc, int num) {
-      // well i think this is probably more expensive than multiple += followed
-      // by a return. would like to profile.
+    std::to_string(nums.front()), [&delim](const std::string& acc, int num) {
+      return acc + delim + std::to_string(num);
+    });
+}
+
+template <typename T, size_t N>
+inline std::string join(
+    const std::array<T, N>& nums, const std::string& delim) {
+  if (nums.empty()) {
+    return {};
+  }
+  if (nums.size() == 1u) {
+    return std::to_string(nums.front());
+  }
+  return std::accumulate(std::next(nums.begin()), nums.end(),
+    std::to_string(nums.front()), [&delim](const std::string& acc, int num) {
       return acc + delim + std::to_string(num);
     });
 }
