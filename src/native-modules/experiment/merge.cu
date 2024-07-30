@@ -30,7 +30,6 @@ __global__ void list_pair_compat_kernel(const SourceCompatibilityData* sources1,
   for (unsigned idx1{blockIdx.x}; idx1 < num_src1_indices; idx1 += gridDim.x) {
     const auto src1_idx = src1_indices[idx1];
     const auto& src1 = sources1[src1_idx];
-
     // for each source2 (one thread per column)
     for (unsigned idx2{threadIdx.x}; idx2 < num_src2_indices;
          idx2 += blockDim.x) {
@@ -41,7 +40,7 @@ __global__ void list_pair_compat_kernel(const SourceCompatibilityData* sources1,
       if (merge_type == MergeType::XOR) {
         compat = src1.isXorCompatibleWith(src2);
       } else {  // MergeType::OR
-        compat = src1.hasSameVariationsAs(src2);
+        compat = src1.hasCompatibleVariationsWith(src2);
       }
       compat_results[result_idx] = compat ? 1 : 0;
     }

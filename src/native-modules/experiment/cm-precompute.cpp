@@ -11,7 +11,7 @@
 #include <vector>
 #include "clue-manager.h"
 #include "cm-precompute.h"
-#include "merge.h"
+//#include "merge.h"
 #include "log.h"
 #include "util.h"
 #include "cm-hash.h"
@@ -76,18 +76,6 @@ auto mergeAllCompatibleSources(const NameCountList& ncList) -> SourceList {
     if (src_list.empty()) break;
   }
   return src_list;
-}
-
-bool every_combo_idx(combo_index_t combo_idx,
-    const std::vector<IndexList>& idx_lists, const auto& fn) {
-  for (index_t i{}; i < idx_lists.size(); ++i) {
-    const auto& idx_list = idx_lists.at(i);
-    auto src_idx = idx_list.at(combo_idx % idx_list.size());
-    if (!fn(i, src_idx))
-      return false;
-    combo_idx /= idx_list.size();
-  }
-  return true;
 }
 
 /*
@@ -250,22 +238,22 @@ auto buildSentenceVariationIndices(const std::vector<SourceList>& xor_src_lists,
     std::array<int, kNumSentences> variations = {
       -1, -1, -1, -1, -1, -1, -1, -1, -1};
     // TODO: is this a duplication of UsedSources.merge_variations?
-    every_combo_idx(compat_indices.at(i), compat_idx_lists,
-      [&xor_src_lists, &variations](index_t list_idx, index_t src_idx) {
-        for (const auto& nc :
-          xor_src_lists.at(list_idx).at(src_idx).primaryNameSrcList) {
-          using namespace Source;
-          assert(isCandidate(nc.count));
-          auto nc_variation = getVariation(nc.count);
-          if (auto& variation = variations.at(getSentence(nc.count) - 1);
-              variation < 0) {
-            variation = nc_variation;
-          } else {
-            assert(variation == nc_variation);
+    for_each_combo_index(compat_indices.at(i), compat_idx_lists,
+        [&xor_src_lists, &variations](index_t list_idx, index_t src_idx) {
+          for (const auto& nc :
+              xor_src_lists.at(list_idx).at(src_idx).primaryNameSrcList) {
+            using namespace Source;
+            assert(isCandidate(nc.count));
+            auto nc_variation = getVariation(nc.count);
+            if (auto& variation = variations.at(getSentence(nc.count) - 1);
+                variation < 0) {
+              variation = nc_variation;
+            } else {
+              assert(variation == nc_variation);
+            }
           }
-        }
-        return true;
-      });
+          return true;
+        });
     for (int s{}; s < kNumSentences; ++s) {
       auto& variationIndicesList = sentenceVariationIndices.at(s);
       const auto variation_idx = variations.at(s) + 1u;

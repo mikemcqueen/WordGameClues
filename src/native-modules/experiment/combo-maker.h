@@ -91,6 +91,7 @@ struct UsedSources {
   // 32 bits per sentence * 9 sentences = 288 bits, 36 bytes
   using SourceBits = mme::bitset<kMaxSourcesPerSentence * kNumSentences>;
   using Variations = std::array<variation_index_t, kNumSentences>;
+  using VariationsSet = std::unordered_set<Variations>;
 
   constexpr static auto getFirstBitIndex(int sentence) {
     assert(sentence > 0);
@@ -176,7 +177,7 @@ public:
   }
 
 #if 1
-  constexpr static auto allVariationsMatch2(
+  constexpr static auto are_variations_compatible(
       const Variations& v1, const Variations& v2) {
     for (size_t i{}; i < v1.size(); ++i) {
       const auto first = v1[i] + 1;
@@ -360,14 +361,15 @@ struct SourceCompatibilityData {
 
   constexpr auto isCompatibleSubsetOf(const SourceCompatibilityData& other,
       bool check_variations = true) const {
-    return usedSources.isCompatibleSubsetOf(other.usedSources, check_variations);
+    return usedSources.isCompatibleSubsetOf(
+        other.usedSources, check_variations);
   }
 
-  constexpr auto hasSameVariationsAs(
+  constexpr auto hasCompatibleVariationsWith(
       const SourceCompatibilityData& other) const {
-    // TODO: add hasSameVariationsAs() member function (non-static) to
+    // TODO: add hasCompatibleVariationsWith() member function (non-static) to
     // UsedSources?
-    return UsedSources::allVariationsMatch2(
+    return UsedSources::are_variations_compatible(
         usedSources.variations, other.usedSources.variations);
   }
 
@@ -382,7 +384,7 @@ struct SourceCompatibilityData {
   // calling two separate Xor/And functions here.
   constexpr auto isOrCompatibleWith(
       const SourceCompatibilityData& other) const {
-    if (!hasSameVariationsAs(other)) return false;
+    if (!hasCompatibleVariationsWith(other)) return false;
     return isXorCompatibleWith(other, false)
            || isCompatibleSubsetOf(other, false);
   }

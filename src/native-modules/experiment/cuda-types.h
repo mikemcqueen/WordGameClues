@@ -63,15 +63,22 @@ inline void cuda_zero_results(
   assert_cuda_success(err, "zero results");
 }
 
-  /*
-char* cuda_strcpy(char* dest, const char* src);
-char* cuda_strcat(char* dest, const char* src);
-int cuda_itoa(int value, char *sp, int radix = 10);
-  */
+// every_combo_index is actually a better name due to predicate fn
+inline bool for_each_combo_index(combo_index_t combo_idx,
+    const std::vector<IndexList>& idx_lists, const auto& pred) {
+  for (index_t list_idx{}; list_idx < idx_lists.size(); ++list_idx) {
+    const auto& idx_list = idx_lists.at(list_idx);
+    auto src_idx = idx_list.at(combo_idx % idx_list.size());
+    if (!pred(list_idx, src_idx)) return false;
+    combo_idx /= idx_list.size();
+  }
+  return true;
+}
 
 class CudaEvent {
 public:
-  CudaEvent(const cudaStream_t stream = cudaStreamPerThread, bool record_now = true) : stream_(stream) {
+  CudaEvent(cudaStream_t stream = cudaStreamPerThread, bool record_now = true)
+      : stream_(stream) {
     auto err = cudaEventCreate(&event_);
     assert_cuda_success(err, "cudaEventCreate");
     if (record_now) {

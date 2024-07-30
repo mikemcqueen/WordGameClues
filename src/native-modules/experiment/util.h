@@ -29,13 +29,15 @@ inline auto make_list_sizes(const std::vector<cm::IndexList>& idx_lists) {
 }
 
 // TODO: 2nd return type template param, overflow check boolean function param
-template <typename T> inline auto sum_sizes(const std::vector<T>& v) {
+template <typename T>
+requires requires(T t) { t.size(); }
+inline auto sum_sizes(const std::vector<T>& v) {
   return std::accumulate(v.begin(), v.end(), 0u,
       [](size_t total, const T& t) { return total + t.size(); });
 }
 
 template <typename T>
-// TODO: is_integral_type<T>
+requires std::is_integral_v<T>
 inline std::string vec_to_string(const std::vector<T>& v) {
   std::string result{};
   for (T i : v) {
@@ -46,7 +48,7 @@ inline std::string vec_to_string(const std::vector<T>& v) {
 }
 
 template <typename T, typename R = T>
-// TODO: is_integral_type<T>
+requires std::is_integral_v<T> && std::is_integral_v<R>
 R sum(const std::vector<T>& vals) {
   return std::accumulate(vals.begin(), vals.end(), 0, [](R total, T val) {
     return total + val;
@@ -55,6 +57,7 @@ R sum(const std::vector<T>& vals) {
 
 // TOOD: "product"
 template <typename T, typename R = uint64_t>
+requires std::is_integral_v<T> && std::is_integral_v<R>
 R multiply_with_overflow_check(const std::vector<T>& values) {
   // TODO: std::accumulate
   R total{1};
@@ -101,7 +104,7 @@ inline std::string join(const C<T>& strings, const std::string& delim) {
 }
 
 template <typename T, template <typename> class C>
-//  requires std::is_integral_v<T>
+requires std::is_integral_v<T>
 inline std::string join(const C<T>& nums, const std::string& delim) {
   if (nums.empty()) {
     return {};
@@ -116,6 +119,7 @@ inline std::string join(const C<T>& nums, const std::string& delim) {
 }
 
 template <typename T, size_t N>
+requires std::is_integral_v<T>
 inline std::string join(
     const std::array<T, N>& nums, const std::string& delim) {
   if (nums.empty()) {

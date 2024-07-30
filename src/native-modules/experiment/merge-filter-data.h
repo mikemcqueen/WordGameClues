@@ -116,17 +116,21 @@ struct MergeFilterData {
   private:
     void reset_pointers() {
       src_list = nullptr;
+      combo_indices = nullptr;
     }
 
   public:
     void cuda_free() {
       MergeData::Device::cuda_free();
       cm::cuda_free(src_list);
+      cm::cuda_free(combo_indices);
       reset_pointers();
     }
 
     device::OrSourceData* src_list{};
     unsigned num_sources{};
+    combo_index_t* combo_indices;
+    unsigned num_combo_indices;
   } device_or;
 
 };  // struct MergeFilterData

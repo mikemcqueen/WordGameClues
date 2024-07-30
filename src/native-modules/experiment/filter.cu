@@ -14,7 +14,6 @@
 #include <utility> // pair
 #include <cuda_runtime.h>
 #include "filter.cuh"
-//#include "filter-types.h"
 #include "stream-data.h"
 #include "merge-filter-data.h"
 
@@ -170,14 +169,10 @@ __device__ bool is_source_XOR_compatible(const SourceCompatibilityData& source,
   for (int list_idx{(int)num_idx_lists - 1}; list_idx >= 0; --list_idx) {
     const auto idx_list = &xor_idx_lists[xor_idx_list_start_indices[list_idx]];
     const auto idx_list_size = xor_idx_list_sizes[list_idx];
-    // TODO: mod operator is slow? also mixing scalar unit types
     const auto xor_src_idx = idx_list[combo_idx % idx_list_size];
-    // const auto& here and no address-of intead?
     const auto xor_src_list =
         &xor_src_lists[xor_src_list_start_indices[list_idx]];
-    if (!source.isXorCompatibleWith(xor_src_list[xor_src_idx])) {
-      return false;
-    }
+    if (!source.isXorCompatibleWith(xor_src_list[xor_src_idx])) return false;
     combo_idx /= idx_list_size;
   }
   return true;
@@ -378,7 +373,7 @@ __global__ void xor_kernel_new(
 
 }  // anonymous namespace
 
-void run_filter_kernels(int threads_per_block, StreamData& stream,
+void run_filter_kernel(int threads_per_block, StreamData& stream,
     const MergeFilterData& mfd, const SourceCompatibilityData* device_src_list,
     const compat_src_result_t* device_compat_src_results,
     result_t* device_results, const index_t* device_list_start_indices) {

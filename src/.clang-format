@@ -1,6 +1,13 @@
+
 BasedOnStyle: Google
 Language: Cpp
 ColumnLimit: 80
+
+RequiresClausePosition: OwnLine
+IndentRequiresClause: false
+SeparateDefinitionBlocks: Always
+AllowShortCompoundRequirementOnASingleLine: true
+RequiresExpressionIndentation: OuterScope
 
 BraceWrapping:
  # class definition behind

@@ -290,13 +290,11 @@ auto run_concurrent_filter_kernels(int sum, StreamSwarm& streams,
     auto& stream = streams.at(current_stream);
     if (!stream.is_running) {
       auto t = util::Timer::start_timer();
-      if (!stream.fill_source_indices(idx_states)) {
-        continue;
-      }
+      if (!stream.fill_source_indices(idx_states)) continue;
       t.stop();
       log_fill(sum, stream, idx_states, t.microseconds());
       stream.alloc_copy_source_indices(idx_states);
-      run_filter_kernels(threads_per_block, stream, mfd, device_src_list,
+      run_filter_kernel(threads_per_block, stream, mfd, device_src_list,
           device_compat_src_results, device_results, device_start_indices);
       continue;
     }
@@ -304,7 +302,6 @@ auto run_concurrent_filter_kernels(int sum, StreamSwarm& streams,
     stream.is_running = false;
     cuda_copy_results(results, device_results, stream.cuda_stream);
     auto num_compat = idx_states.update(stream, results);
-    // idx_states.update(stream.src_indices, results, stream.stream_idx);
     total_compat += num_compat;
     total_processed += stream.src_indices.size();
     log_xor_kernel(sum, stream, results, num_compat, total_compat);
@@ -383,7 +380,6 @@ filter_task_result_t filter_sources(const MergeFilterData& mfd,
     int num_streams, int stride, int iters, bool synchronous) {
   using namespace std::experimental::fundamentals_v3;
   using namespace std::chrono;
-  // err = cudaDeviceSetLimit(cudaLimitPrintfFifoSize, 7'500'000);
 
   // TODO: FIXMENOW: streams = 3
   num_streams = num_streams ? num_streams : 1;
@@ -404,8 +400,7 @@ filter_task_result_t filter_sources(const MergeFilterData& mfd,
   StreamSwarm streams(num_streams, stride);
   std::vector<result_t> results(candidates.size());
   cuda_zero_results(device_results, results.size());
-  if ((synchronous && log_level(Normal))
-      || (!synchronous && log_level(Verbose))) {
+  if (synchronous || log_level(Verbose)) {
     std::cerr << " " << sum << ": src_lists: " << candidates.size()
               << ", streams: " << num_streams << ", stride: " << stride
               << std::endl;
@@ -423,8 +418,8 @@ filter_task_result_t filter_sources(const MergeFilterData& mfd,
   }
   log_filter_sources(sum, num_processed, num_compat, results.size(),
       incompat_sources, num_incompat_sources, t.count());
-
-  return std::make_pair(get_compat_combos(candidates, results, num_processed),
+  return std::make_pair(
+      std::move(get_compat_combos(candidates, results, num_processed)),
       std::move(incompat_sources));
 }
 
@@ -687,7 +682,8 @@ cuda_allocCopyOrSources(const OrArgList& orArgList, cudaStream_t stream) {
     const auto num_variations{variation_indices.size()};
     // clever: n * sizeof(combo_index_t) == 2 * n * sizeof(index_t)
     const auto device_data_bytes =
-        (countIndices(variation_indices) + num_variations)
+        //(countIndices(variation_indices) + num_variations)
+        (util::sum_sizes(variation_indices) + num_variations)
         * sizeof(combo_index_t);
     auto& device_indices = device_indices_array.at(s);
     cuda_malloc_async((void**)&device_indices.device_data, device_data_bytes,

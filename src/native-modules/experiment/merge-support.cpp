@@ -28,7 +28,7 @@ auto any_compatible_sources(const SourceData& source,
     if (merge_type == MergeType::XOR) {
       if (source.isXorCompatibleWith(src_list.at(idx))) return true;
     } else { // MergeType::OR
-      if (source.hasSameVariationsAs(src_list.at(idx))) return true;
+      if (source.hasCompatibleVariationsWith(src_list.at(idx))) return true;
     }
   }
   return false;
@@ -226,6 +226,8 @@ void host_show_num_compat_combos(const uint64_t first_combo,
   int num_compat{};
   for (auto idx{first_combo}; idx < num_combos; ++idx) {
     auto tmp_idx{idx};
+    // TODO: this is wrong/backwards
+    assert(false && "bad code");
     for (int i{(int)list_sizes.size() - 1}; i >= 0; --i) {
       auto list_size = list_sizes.at(i);
       row_indices.at(i) = tmp_idx % list_size;
@@ -374,13 +376,20 @@ auto run_get_compat_combos_task(const result_t* device_compat_matrices,
 }
 
 auto get_src_indices(
-    uint64_t combo_idx, const std::vector<IndexList>& idx_lists) {
+    combo_index_t combo_idx, const std::vector<IndexList>& idx_lists) {
   std::vector<index_t> src_indices(idx_lists.size());
+  /*
   for (int i{(int)idx_lists.size() - 1}; i >= 0; --i) {
     const auto& idx_list = idx_lists.at(i);
     src_indices.at(i) = idx_list.at(combo_idx % idx_list.size());
     combo_idx /= idx_list.size();
   }
+  */
+  for_each_combo_index(combo_idx, idx_lists,  //
+      [&src_indices](index_t list_idx, index_t src_idx) {
+        src_indices.at(list_idx) = src_idx;
+        return true;
+      });
   return src_indices;
 }
 
