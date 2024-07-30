@@ -9,15 +9,16 @@
   * DONE make get_compat_combo kernel work with OR sources (variation checking only).
   * DONE host-side slow version of XOR+OR combo index compatibility checking.
   * EH device-side XOR+OR compatibility checking if it makes sense
-  * how do i restrict the OR kernel to comparing only those OR variations that
-    are compatible with with the XOR variations with which the source is compatible?
-    * is this even a worthwhile goal? maybe cuda can blast them all out anyway,
-      resulting in *all* compatible OR variations, then afterward we can post-
-      process. 
-
-  * figure out where i'm going to plug in the OR kernel execution.
+  * DONE figure out where i'm going to plug in the OR kernel execution.
+  * DONE how do i restrict the OR kernel to comparing only those OR variations that
+         are compatible with with the XOR variations with which the source is compatible?
   * write OR kernel
+  * consider using method in get_smallest_index_spans return logic in old kernel for
+    OR-only compat checking
   * PROFIT
+
+
+* PackedIndex<T=uint64_t>
 
 * specifying a lot of --or args can grow the combo_idx list length beyond a
   reasonable size. this is especially true for or-args froms sentences that

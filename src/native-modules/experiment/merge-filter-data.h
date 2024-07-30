@@ -129,7 +129,7 @@ struct MergeFilterData {
 
     device::OrSourceData* src_list{};
     unsigned num_sources{};
-    combo_index_t* combo_indices;
+    combo_index_t* combo_indices; // packed variation indices
     unsigned num_combo_indices;
   } device_or;
 
