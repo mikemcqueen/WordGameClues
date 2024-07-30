@@ -2,7 +2,7 @@
 #include <chrono>
 #include <iostream>
 #include <cuda_runtime.h>
-#include "filter-types.h"
+#include "combo-maker.h"
 #include "merge.cuh"
 #include "peco.h"
 

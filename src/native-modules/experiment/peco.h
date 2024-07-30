@@ -1,6 +1,7 @@
-#ifndef include_peco_h
-#define include_peco_h
+#ifndef INCLUDE_PECO_H
+#define INCLUDE_PECO_H
 
+#pragma once
 #include <algorithm>
 #include <cassert>
 #include <cstdint>
@@ -25,7 +26,7 @@ private:
   static void initialize_list(IndexList& idx_list, T size) {
     idx_list.clear();
     for (int i{(int)size - 1}; i >= 0; --i) {
-      idx_list.emplace_front(i);
+      idx_list.push_front(i);
     }
   }
 
@@ -76,7 +77,7 @@ public:
   static auto make_index_list(const IndexVector& idx_vec) {
     IndexList idx_list;
     for (auto i : idx_vec | std::views::reverse) {
-      idx_list.emplace_front(i);
+      idx_list.push_front(i);
     }
     return idx_list;
   }
@@ -143,4 +144,4 @@ private:
   bool done_;
 };
 
-#endif //  include_peco_h
+#endif //  INCLUDE_PECO_H

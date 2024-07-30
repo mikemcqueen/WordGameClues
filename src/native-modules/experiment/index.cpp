@@ -305,7 +305,7 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   // arbitrary, want to do it somewhere
   show_clue_manager_durations();
 
-#if 1
+#if 0
   static bool fifo_initialized{false};
   if (!fifo_initialized) {
     auto err = cudaDeviceSetLimit(cudaLimitPrintfFifoSize, 50'000'000);
@@ -467,10 +467,33 @@ auto get_variations(const MergeData::Host& host) {
 
 void do_xor_or_compare() {
   //  dump_combos(MFD.host_or);
-  auto or_variations = get_variations(MFD.host_or);
-  std::cerr << "OR variations: " << or_variations.size() << std::endl;
+  auto or_variations_list = get_variations(MFD.host_or);
+  std::unordered_set<UsedSources::Variations> or_variations;
+  for (const auto& v : or_variations_list) {
+    or_variations.insert(v);
+  }
+  std::cerr << "OR variations: " << or_variations_list.size()
+            << ", unique: " << or_variations.size() << std::endl;
   auto xor_variations = get_variations(MFD.host_xor);
   std::cerr << "XOR variations: " << xor_variations.size() << std::endl;
+
+  int num_incompat{};
+  for (auto& xor_v : xor_variations) {
+    auto match{false};
+    for (auto& or_v : or_variations) {
+      if (UsedSources::allVariationsMatch2(xor_v, or_v)) {
+        match = true;
+        break;
+      }
+    }
+    if (!match) ++num_incompat;
+  }
+  if (num_incompat) {
+    std::cerr << num_incompat
+              << " XOR variations are not compatible with any OR variation\n";
+  } else {
+    std::cerr << "All XOR variations are compatible with an OR variation\n";
+  }
 }
 
 //

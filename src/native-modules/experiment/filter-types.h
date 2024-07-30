@@ -14,56 +14,20 @@
 #include <utility>
 #include <vector>
 #include <cuda_runtime.h>
+#include "cm-hash.h"
 #include "cuda-types.h"
 #include "candidates.h"
 #include "merge-filter-common.h"
-//#include "util.h"
+#include "stream-data.h"
 #include "log.h"
 
 namespace cm {
 
-// types
+// using
 
 using filter_result_t = std::unordered_set<std::string>;
-//using hr_time_point_t = decltype(std::chrono::high_resolution_clock::now());
 
-struct SourceIndex {
-  constexpr bool operator<(const SourceIndex& rhs) const {
-    return (listIndex < rhs.listIndex)
-           || ((listIndex == rhs.listIndex) && (index < rhs.index));
-  }
-
-  constexpr const char* as_string(char* buf) const {
-    sprintf(buf, "%d:%d", listIndex, index);
-    return buf;
-  }
-
-  index_t listIndex{};
-  index_t index{};
-};
-
-struct StreamBase {
-  StreamBase() = delete;
-  StreamBase(int idx, cudaStream_t stream)
-      : stream_idx(idx), cuda_stream(stream), xor_kernel_start(stream, false),
-        xor_kernel_stop(stream, false), or_kernel_start(stream, false),
-        or_kernel_stop(stream, false) {}
-
-  int stream_idx{-1};
-  cudaStream_t cuda_stream{};
-  // this could be a std::array of kernel start/stop pairs possibly.
-  // initialization might be a tiny bit hairy.
-  CudaEvent xor_kernel_start;
-  CudaEvent xor_kernel_stop;
-  CudaEvent or_kernel_start;
-  CudaEvent or_kernel_stop;
-
-  int sequence_num{};
-  bool is_running{false};  // is running (true until results retrieved)
-  bool has_run{false};     // has run at least once
-  SourceIndex* device_src_indices{};
-  std::vector<SourceIndex> src_indices;
-};
+// types
 
 class IndexStates {
 public:
@@ -276,88 +240,6 @@ private:
   std::forward_list<index_t> fill_indices_;
   std::forward_list<index_t>::iterator fill_iter_;
 };  // class IndexStates
-
-// the pointers in this are allocated in device memory
-struct StreamData : public StreamBase {
-private:
-  static const auto num_cores = 1280;
-  static const auto max_chunks = 20ul;
-
-public:
-  static int next_sequence_num() {
-    static int sequence_num{};
-    return sequence_num++;
-  }
-
-  StreamData(int idx, cudaStream_t stream, int stride)
-      : StreamBase(idx, stream), num_list_indices(stride) {}
-
-  int num_ready(const IndexStates& indexStates) const {
-    return indexStates.num_ready(0, num_list_indices);
-  }
-
-  int num_done(const IndexStates& indexStates) const {
-    return indexStates.num_done(0, num_list_indices);
-  }
-
-  int num_compatible(const IndexStates& indexStates) const {
-    return indexStates.num_compatible(0, num_list_indices);
-  }
-
-  auto fill_source_indices(IndexStates& idx_states, int max_idx) {
-    // iters hackery (TODO: better comment)
-    src_indices.resize(idx_states.has_fill_indices() ? max_idx : 0);
-    for (size_t idx{}; idx < src_indices.size(); ++idx) {
-      auto opt_src_idx = idx_states.get_next_fill_idx();
-      if (!opt_src_idx.has_value()) {
-        src_indices.resize(idx);
-        break;
-      }
-      src_indices.at(idx) = opt_src_idx.value();
-    }
-    if (log_level(ExtraVerbose)) {
-      const auto first =
-          (src_indices.empty() ? -1 : (int)src_indices.front().listIndex);
-      const auto last =
-          (src_indices.empty() ? -1 : (int)src_indices.back().listIndex);
-      std::cerr << "stream " << stream_idx  //
-                << " filled " << src_indices.size() << " of " << max_idx
-                << ", first: " << first << ", last: " << last << std::endl;
-    }
-    return !src_indices.empty();
-  }
-
-  bool fill_source_indices(IndexStates& idx_states) {
-    return fill_source_indices(idx_states, num_list_indices);
-  }
-
-  void alloc_copy_source_indices(
-      [[maybe_unused]] const IndexStates& idx_states) {
-    cudaError_t err = cudaSuccess;
-    auto indices_bytes = src_indices.size() * sizeof(SourceIndex);
-    // alloc source indices
-    if (!device_src_indices) {
-      cuda_malloc_async((void**)&device_src_indices, indices_bytes, cuda_stream,
-          "src_indices");
-    }
-    // copy source indices
-    err = cudaMemcpyAsync(device_src_indices, src_indices.data(),
-      indices_bytes, cudaMemcpyHostToDevice, cuda_stream);
-    assert_cuda_success(err, "copy src_indices");
-  }
-
-  auto hasWorkRemaining() const {
-    return !src_indices.empty();
-  }
-
-  void dump() const {
-    std::cerr << "kernel " << stream_idx << ", is_running: " << std::boolalpha
-              << is_running << ", src_indices: " << src_indices.size()
-              << ", num_list_indices: " << num_list_indices << std::endl;
-  }
-
-  int num_list_indices;    // TODO: this doesn't belong here
-};  // struct StreamData
 
 class StreamSwarm {
   inline static std::vector<cudaStream_t> cuda_streams;

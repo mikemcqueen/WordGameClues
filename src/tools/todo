@@ -1,6 +1,23 @@
-* maybe i can copy the pair results from list_pairs kernel to host and verify
-  (or not) that that combo_idx 3 (3, 0, 0, ...) is all set.  if so, seems like
-  i have a pairs kernel bug, or perhaps get_compat_combos_kernel bug.
+* OR kernel
+  * DONE rip OR-compat checking out of xor-kernel.
+  * DONE generate out.xor output for 4 input variations (2,2, 2,10)(--xor, --xor + --or)
+  * DONE verify xor + or matches xor, and both match out.orig.xor
+  * DONE commit? on a branch?
+  * DONE remove "xor" from name of filter task wrapper functions i think.
+  * DONE make sure sources are already allocated at that spot, if not, move
+         allocation to correct spot.
+  * DONE make get_compat_combo kernel work with OR sources (variation checking only).
+  * DONE host-side slow version of XOR+OR combo index compatibility checking.
+  * EH device-side XOR+OR compatibility checking if it makes sense
+  * how do i restrict the OR kernel to comparing only those OR variations that
+    are compatible with with the XOR variations with which the source is compatible?
+    * is this even a worthwhile goal? maybe cuda can blast them all out anyway,
+      resulting in *all* compatible OR variations, then afterward we can post-
+      process. 
+
+  * figure out where i'm going to plug in the OR kernel execution.
+  * write OR kernel
+  * PROFIT
 
 * specifying a lot of --or args can grow the combo_idx list length beyond a
   reasonable size. this is especially true for or-args froms sentences that
@@ -18,21 +35,6 @@
   sentence that follows the 's', in this case, 4."
 
 * i'm using list_cref in OrArgData. OrArgData might be unnecessary.
-
-* OR kernel
-  * DONE rip OR-compat checking out of xor-kernel.
-  * DONE generate out.xor output for 4 input variations (2,2, 2,10)(--xor, --xor + --or)
-  * DONE verify xor + or matches xor, and both match out.orig.xor
-  * DONE commit? on a branch?
-  * DONE remove "xor" from name of filter task wrapper functions i think.
-  * DONE make sure sources are already allocated at that spot, if not, move
-         allocation to correct spot.
-  * DONE make get_compat_combo kernel work with OR sources (variation checking only).
-  * host-side slow version of XOR+OR combo index compatibility checking.
-  * device-side XOR+OR compatibility checking if it makes sense
-  * figure out where i'm going to plug in the OR kernel execution.
-  * write OR kernel
-  * PROFIT
 
 * see if i can get rid of that num_list_indices in StreamData while i'm at it
 
@@ -69,8 +71,9 @@
 * my understanding of std::move might have regressed for non-initializing 
   assignment of a variable to a function that returns by value. i think i
   need move in those cases, and I think I removed some recently.
-  * good testcase for moveable repo
-* try adding testcase to moveable repo for return optional<pair<obj,obj>>
+  * good testcase for lifetime repo
+  * try adding testcase to lifetime repo for return optional<pair<obj,obj>>
+  * test case for emplace_back(copy, move)
 
 * cuda_device_ptr_t
 

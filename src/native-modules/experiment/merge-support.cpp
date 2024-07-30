@@ -95,17 +95,6 @@ void dump_flat_indices(
   }
 }
 
-auto sync_copy_compat_results(std::vector<result_t>& results,
-    unsigned num_results, result_t* device_results, cudaStream_t stream) {
-  const auto results_bytes = num_results * sizeof(result_t);
-  CudaEvent start(stream);
-  auto err = cudaMemcpyAsync(results.data(), device_results, results_bytes,
-    cudaMemcpyDeviceToHost, stream);
-  assert_cuda_success(err, "merge copy results");
-  CudaEvent stop;
-  return stop.synchronize(start);
-}
-
 void add_compat_sources(std::vector<SourceCompatibilityData>& compat_sources,
     const SourceList& src_list) {
   for (const auto& src : src_list) {
@@ -264,6 +253,20 @@ void host_show_num_compat_combos(const uint64_t first_combo,
             << "]: " << num_compat << " - " << t.count() << "ms" << std::endl;
 }
 
+
+auto log_compat_combos_kernel(int idx, CudaEvent& start, LogLevel level = Verbose) {
+  long elapsed{};
+  if (log_level(level)) {
+    CudaEvent stop;
+    elapsed = stop.synchronize(start);
+    if (log_level(ExtraVerbose)) {
+      std::cerr << "  completed get_compat_combos_kernel " << idx << " - "
+                << elapsed << "ms" << std::endl;
+    }
+  }
+  return elapsed;
+}
+
 auto log_compat_copy_process(util::Timer& t_copy, util::Timer& t_proc,
     uint64_t num_hits, LogLevel level = Verbose) {
   long elapsed{};
@@ -279,6 +282,17 @@ auto log_compat_copy_process(util::Timer& t_copy, util::Timer& t_proc,
   return elapsed;
 }
 
+auto sync_copy_compat_results(std::vector<result_t>& results,
+    unsigned num_results, result_t* device_results, cudaStream_t stream) {
+  const auto results_bytes = num_results * sizeof(result_t);
+  CudaEvent start(stream);
+  auto err = cudaMemcpyAsync(results.data(), device_results, results_bytes,
+    cudaMemcpyDeviceToHost, stream);
+  assert_cuda_success(err, "merge copy results");
+  CudaEvent stop;
+  return stop.synchronize(start);
+}
+
 auto process_results(const std::vector<result_t>& results, uint64_t start_idx,
     uint64_t num_results, std::vector<uint64_t>& result_indices) {
   uint64_t hits{};
@@ -288,20 +302,14 @@ auto process_results(const std::vector<result_t>& results, uint64_t start_idx,
       ++hits;
     }
   }
-  return hits;
-}
-
-auto log_compat_combos_kernel(int idx, CudaEvent& start, LogLevel level = Verbose) {
-  long elapsed{};
-  if (log_level(level)) {
-    CudaEvent stop;
-    elapsed = stop.synchronize(start);
-    if (log_level(ExtraVerbose)) {
-      std::cerr << "  completed get_compat_combos_kernel " << idx << " - "
-                << elapsed << "ms" << std::endl;
-    }
+  if (result_indices.size() > 500'000'000) {
+    // 500M * 8-byte combo_index_t = 4GB. that's an acceptable limit for
+    // choking at this time.
+    std::cerr << "too many combo_indices: " << result_indices.size()
+              << ", refine your parameters, terminating\n";
+    std::terminate();
   }
-  return elapsed;
+  return hits;
 }
 
 auto run_get_compat_combos_task(const result_t* device_compat_matrices,
@@ -388,28 +396,12 @@ auto get_compatible_indices(const std::vector<SourceList>& src_lists,
     lengths.push_back(sl.size());
   }
   if (log_level(Verbose)) {
-    std::cerr << "  initial lengths: " << util::vec_to_string(lengths)
-              << ", product: " << util::multiply_with_overflow_check(lengths)
+    std::cerr << "  initial lengths: " << util::join(lengths, ",")
+              << " product: " << util::multiply_with_overflow_check(lengths)
               << std::endl;
   }
   auto idx_lists = Peco::initial_indices(lengths);
   bool valid = filter_all_indices(idx_lists, src_lists, merge_type);
-  uint64_t product{};
-  if (valid) {
-    lengths.clear();
-    for (const auto& il : idx_lists) {
-      lengths.push_back(std::distance(il.begin(), il.end()));
-    }
-    product = util::multiply_with_overflow_check(lengths);
-  }
-  if (log_level(Verbose)) {
-    std::cerr << "  filtered lengths: " << util::vec_to_string(lengths)
-              << ", product: " << product  //
-              << ", valid: " << std::boolalpha << valid << std::endl;
-  }
-  if (product > 500'000'000) {
-    std::cerr << "product too large, refine your parameters, aborting";
-  }
   // "valid" means all resulting index lists have non-zero length
   if (!valid) return {};
   return Peco::to_vectors(idx_lists);
@@ -582,24 +574,21 @@ auto cuda_get_compatible_combo_indices(const std::vector<SourceList>& src_lists,
         &device_compat_matrices[compat_matrix_start_indices.at(n)], merge_type,
         stream, flag);
   });
+  // debugging
   /*
   if (merge_type == MergeType::OR) {
     check_list_pair_results(1068u, device_compat_matrices, num_bytes, idx_lists,
         compat_matrix_start_indices, stream);
   }
-  */
-
-  /*
-   if constexpr (0) {
-       CudaEvent lp_stop;
-        auto lp_dur = lp_stop.synchronize(lp_start);
-        std::cerr << "  list_pair_compat_kernels complete - " << lp_dur <<
+  if constexpr (0) {
+    CudaEvent lp_stop;
+    auto lp_dur = lp_stop.synchronize(lp_start);
+    std::cerr << "  list_pair_compat_kernels complete - " << lp_dur <<
       "ms\n";
-      }
+  }
+  debug_copy_show_compat_matrix_hit_count(device_compat_matrices,
+    num_compat_matrix_bytes);
   */
-  // debugging
-  // debug_copy_show_compat_matrix_hit_count(device_compat_matrices,
-  // num_compat_matrix_bytes);
 
   // alloc/copy start indices
   auto device_compat_matrix_start_indices = cuda_alloc_copy_start_indices(
@@ -671,6 +660,23 @@ auto xor_merge_sources(const std::vector<SourceList>& src_lists,
   return xorSourceList;
 }
 
+void log_compat_indices(const std::vector<IndexList>& idx_lists,
+    MergeType merge_type, bool merge_only) {
+  std::vector<size_t> lengths;
+  for (const auto& idx_list : idx_lists) {
+    lengths.push_back(idx_list.size());
+  }
+  uint64_t product = util::multiply_with_overflow_check(lengths);
+  if (log_level(Verbose)) {
+    std::cerr << "  filtered lengths: " << util::join(lengths, ",")
+              << " product: " << product << std::endl;
+  }
+  if (!merge_only || log_level(Verbose)) {
+    std::cerr << (merge_type == MergeType::XOR ? "XOR" : "OR")
+              << " compat_idx_lists(" << idx_lists.size() << ")" << std::endl;
+  }
+}
+
 }  // anonymous namespace
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -679,11 +685,9 @@ auto get_merge_data(const std::vector<SourceList>& src_lists,
     MergeData::Host& host, MergeData::Device& device, MergeType merge_type,
     cudaStream_t stream, bool merge_only /* = false */) -> bool {
   // TODO: support for single-list compat indices (??)
-  auto compat_idx_lists = get_compatible_indices(src_lists, merge_type);
-  if (!merge_only || log_level(Verbose)) {
-    std::cerr << "compat_idx_lists(" << compat_idx_lists.size() << ")"
-              << std::endl;
-  }
+  auto compat_idx_lists =
+    get_compatible_indices(src_lists, merge_type);
+  log_compat_indices(compat_idx_lists, merge_type, merge_only);
   if (compat_idx_lists.empty()) return false;
   device.src_lists = cuda_alloc_copy_src_lists(src_lists, stream);
   device.idx_lists = cuda_alloc_copy_idx_lists(compat_idx_lists, stream);

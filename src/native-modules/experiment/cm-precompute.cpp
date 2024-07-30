@@ -14,6 +14,7 @@
 #include "merge.h"
 #include "log.h"
 #include "util.h"
+#include "cm-hash.h"
 
 namespace cm {
 

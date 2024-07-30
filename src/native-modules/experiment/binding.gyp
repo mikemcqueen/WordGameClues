@@ -26,6 +26,7 @@
       'filter-support.cpp',
       'index.cpp',
       'merge-support.cpp',
+      'stream-data.cpp',
       'validator.cpp',
       'unwrap.cpp',
       'wrap.cpp'
