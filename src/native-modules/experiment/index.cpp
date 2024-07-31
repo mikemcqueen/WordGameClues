@@ -369,16 +369,22 @@ void validate_marked_or_sources(
 }
 */
 
-void cuda_alloc_copy_XOR_filter_data(
+void alloc_copy_start_indices(MergeData::Host& host,
+    MergeFilterData::DeviceCommon& device, cudaStream_t stream) {
+  auto src_list_start_indices = make_start_indices(host.src_lists);
+  device.src_list_start_indices = cuda_alloc_copy_start_indices(
+      src_list_start_indices, stream);  // "src_list_start_indices"
+  auto idx_list_start_indices = make_start_indices(host.compat_idx_lists);
+  device.idx_list_start_indices = cuda_alloc_copy_start_indices(
+      idx_list_start_indices, stream);  // "idx_list_start_indices"
+}
+
+void alloc_copy_filter_data(
     MergeFilterData& mfd, cudaStream_t stream) {
   assert(!mfd.host_xor.combo_indices.empty());
-  util::LogDuration ld("alloc_copy_XOR_filter_data", Verbose);
-  auto src_list_start_indices = make_start_indices(mfd.host_xor.src_lists);
-  mfd.device_xor.src_list_start_indices = cuda_alloc_copy_start_indices(
-      src_list_start_indices, stream, "src_list_start_indices");
-  auto idx_list_start_indices = make_start_indices(mfd.host_xor.compat_idx_lists);
-  mfd.device_xor.idx_list_start_indices = cuda_alloc_copy_start_indices(
-      idx_list_start_indices, stream, "idx_list_start_indices");
+  util::LogDuration ld("alloc_copy_filter_data", Verbose);
+  alloc_copy_start_indices(mfd.host_xor, mfd.device_xor, stream);
+  alloc_copy_start_indices(mfd.host_or, mfd.device_or, stream);
   auto variation_indices = buildSentenceVariationIndices(
     mfd.host_xor.src_lists, mfd.host_xor.compat_idx_lists, mfd.host_xor.combo_indices);
   mfd.device_xor.variation_indices =
@@ -518,7 +524,7 @@ auto get_combo_indices(const UsedSources::VariationsSet& variations) {
                   << kMaxVariationIdx << ", terminating\n";
         std::terminate();
       }
-      if (combo_idx > 0u) combo_idx *= kMaxVariationIdx;
+      if (combo_idx) combo_idx *= kMaxVariationIdx;
       combo_idx += idx;
     }
     combo_indices.push_back(combo_idx);
@@ -558,7 +564,7 @@ Value filterPreparation(const CallbackInfo& info) {
     }
   }
   if (compat) {
-    cuda_alloc_copy_XOR_filter_data(MFD, stream);
+    alloc_copy_filter_data(MFD, stream);
     // TODO: seems i could just use the same list start indices as XOR
     // cuda_alloc_copy_OR_args(host.arg_list, stream);
     cuda_alloc_copy_combo_indices(host, device, stream);

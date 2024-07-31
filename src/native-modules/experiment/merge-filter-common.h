@@ -21,7 +21,7 @@ auto make_start_indices(const std::vector<T>& vecs) {
 }
 
 [[nodiscard]] inline auto cuda_alloc_copy_start_indices(
-    const IndexList& start_indices, cudaStream_t stream = cudaStreamPerThread,
+    const IndexList& start_indices, cudaStream_t stream,
     std::string_view malloc_tag = "start_indices") {
   cudaError_t err{};
   // alloc indices
