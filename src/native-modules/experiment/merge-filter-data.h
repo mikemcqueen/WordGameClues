@@ -43,7 +43,7 @@ struct MergeData {
   } host;
 
   struct Device {
-  private:
+  protected:
     void reset_pointers() {
       src_lists = nullptr;
       idx_lists = nullptr;
@@ -70,21 +70,13 @@ struct MergeData {
 };
 
 struct MergeFilterData {
-  // XOR kernel
-  struct HostXor : MergeData::Host {
-    // merge-only
-    // currently used by showComponents (-t) and conistency check v1.
-    // consistency check v1 can be removed, and showComponents can be
-    // updated to do everything on c++ side, obviating the need for this.
-    SourceList merged_xor_src_list;
-
-    std::vector<UsedSources::SourceDescriptorPair> incompat_src_desc_pairs;
-  } host_xor;
-
-  struct DeviceXor : MergeData::Device {
-  private:
+  //
+  // Common
+  //
+  struct DeviceCommon : MergeData::Device {
+  protected:
     void reset_pointers() {
-      incompat_src_desc_pairs = nullptr;
+      MergeData::Device::reset_pointers();
       src_list_start_indices = nullptr;
       idx_list_start_indices = nullptr;
     }
@@ -92,43 +84,71 @@ struct MergeFilterData {
   public:
     void cuda_free() {
       MergeData::Device::cuda_free();
-      cm::cuda_free(incompat_src_desc_pairs);
       cm::cuda_free(src_list_start_indices);
       cm::cuda_free(idx_list_start_indices);
       reset_pointers();
     }
 
-    UsedSources::SourceDescriptorPair* incompat_src_desc_pairs{};
-
     index_t* src_list_start_indices{};
     index_t* idx_list_start_indices{};
+  };
 
+  //
+  // XOR
+  //
+  struct HostXor : MergeData::Host {
+    // merge-only
+    // currently used by showComponents (-t) and conistency check v1.
+    // consistency check v1 can be removed, and showComponents can be
+    // updated to do everything on c++ side, obviating the need for this.
+    SourceList merged_xor_src_list;
+    std::vector<UsedSources::SourceDescriptorPair> incompat_src_desc_pairs;
+  } host_xor;
+
+  struct DeviceXor : MergeFilterData::DeviceCommon {
+  private:
+    void reset_pointers() {
+      DeviceCommon::reset_pointers();
+      incompat_src_desc_pairs = nullptr;
+    }
+
+  public:
+    void cuda_free() {
+      DeviceCommon::cuda_free();
+      cm::cuda_free(incompat_src_desc_pairs);
+      reset_pointers();
+    }
+
+    UsedSources::SourceDescriptorPair* incompat_src_desc_pairs{};
     device::VariationIndices* variation_indices{};
     unsigned num_variation_indices{};
   } device_xor;
 
-  // OR kernel
+  //
+  // OR
+  //
   struct HostOr : MergeData::Host {
-    OrArgList arg_list;
+    OrArgList arg_list; // REMOVE
   } host_or;
 
-  struct DeviceOr : MergeData::Device {
+  struct DeviceOr : DeviceCommon {
   private:
     void reset_pointers() {
-      src_list = nullptr;
+      DeviceCommon::reset_pointers();
+      src_list = nullptr; // REMOVE
       combo_indices = nullptr;
     }
 
   public:
     void cuda_free() {
-      MergeData::Device::cuda_free();
-      cm::cuda_free(src_list);
+      DeviceCommon::cuda_free();
+      cm::cuda_free(src_list); // REMOVE
       cm::cuda_free(combo_indices);
       reset_pointers();
     }
 
-    device::OrSourceData* src_list{};
-    unsigned num_sources{};
+    device::OrSourceData* src_list{}; // REMOVE
+    unsigned num_sources{}; // REMOVE
     combo_index_t* combo_indices; // packed variation indices
     unsigned num_combo_indices;
   } device_or;

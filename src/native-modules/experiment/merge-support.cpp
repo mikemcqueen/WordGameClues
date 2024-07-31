@@ -69,6 +69,7 @@ auto filter_all_indices(Peco::IndexListVector& idx_lists,
   return true;
 }
 
+/*
 auto get_flat_indices(Peco& peco, int num_combinations, bool first = false) {
   auto indexList = first ? peco.first_combination() : peco.next_combination();
   const auto row_size = indexList->size();
@@ -94,6 +95,7 @@ void dump_flat_indices(
     std::cerr << std::endl;
   }
 }
+*/
 
 void add_compat_sources(std::vector<SourceCompatibilityData>& compat_sources,
     const SourceList& src_list) {

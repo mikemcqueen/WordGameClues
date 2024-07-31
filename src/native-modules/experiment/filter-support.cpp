@@ -237,8 +237,8 @@ void xor_filter(int sum, const StreamData& stream, const MergeFilterData& mfd) {
 
 }  // namespace host
 
-void log_fill(int sum, const StreamData& stream, const IndexStates& idx_states,
-    long duration) {
+void log_fill_indices(int sum, const StreamData& stream,
+    const IndexStates& idx_states, long duration) {
   if (log_level(Ludicrous)) {
     std::cerr << " " << sum << ": stream " << stream.stream_idx
               << " source_indices: " << stream.src_indices.size()
@@ -247,7 +247,7 @@ void log_fill(int sum, const StreamData& stream, const IndexStates& idx_states,
   }
 }
 
-void log_xor_kernel(int sum, const StreamData& stream,
+void log_filter_kernel(int sum, const StreamData& stream,
     const std::vector<result_t>& results, unsigned num_compat,
     unsigned total_compat) {
   if (log_level(ExtraVerbose)) {
@@ -292,7 +292,7 @@ auto run_concurrent_filter_kernels(int sum, StreamSwarm& streams,
       auto t = util::Timer::start_timer();
       if (!stream.fill_source_indices(idx_states)) continue;
       t.stop();
-      log_fill(sum, stream, idx_states, t.microseconds());
+      log_fill_indices(sum, stream, idx_states, t.microseconds());
       stream.alloc_copy_source_indices(idx_states);
       run_filter_kernel(threads_per_block, stream, mfd, device_src_list,
           device_compat_src_results, device_results, device_start_indices);
@@ -304,7 +304,7 @@ auto run_concurrent_filter_kernels(int sum, StreamSwarm& streams,
     auto num_compat = idx_states.update(stream, results);
     total_compat += num_compat;
     total_processed += stream.src_indices.size();
-    log_xor_kernel(sum, stream, results, num_compat, total_compat);
+    log_filter_kernel(sum, stream, results, num_compat, total_compat);
     if (log_level(Ludicrous)) {
       //host::xor_filter(sum, stream, mfd);
     }

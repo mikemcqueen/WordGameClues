@@ -560,7 +560,7 @@ Value filterPreparation(const CallbackInfo& info) {
   if (compat) {
     cuda_alloc_copy_XOR_filter_data(MFD, stream);
     // TODO: seems i could just use the same list start indices as XOR
-    cuda_alloc_copy_OR_args(host.arg_list, stream);
+    // cuda_alloc_copy_OR_args(host.arg_list, stream);
     cuda_alloc_copy_combo_indices(host, device, stream);
     cuda_memory_dump("filter preparation:");
   }
