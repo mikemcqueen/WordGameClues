@@ -276,9 +276,9 @@ void host_show_num_compat_combos(const uint64_t first_combo,
             << "]: " << num_compat << " - " << t.count() << "ms" << std::endl;
 }
 
-auto log_copy_process(
-    util::Timer& copy_t, util::Timer& proc_t, uint64_t num_hits, level = Verbose) {
-  long elapsed;
+auto log_copy_process(util::Timer& t_copy, util::Timer& t_proc,
+    uint64_t num_hits, LogLevel level = Verbose) {
+  long elapsed{};
   if (log_level(level)) {
     t_proc.stop();
     elapsed = t_proc.count();
@@ -364,7 +364,7 @@ auto run_get_compat_combos_task(const result_t* device_compat_matrices,
     auto t_proc = util::Timer::start_timer();
     auto num_hits =
         process_results(host_results, first_combo, num_combos, result_indices);
-    proc_elapsed += log_copy_processs(t_copy, t_proc, num_hits);
+    proc_elapsed += log_copy_process(t_copy, t_proc, num_hits);
     total_hits += num_hits;
   }
   if (log_level(Verbose)) {
