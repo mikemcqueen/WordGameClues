@@ -66,7 +66,7 @@ R multiply_with_overflow_check(const std::vector<T>& values) {
   return total;
 }
 
-#if 0
+#if 1
 template <typename T>
 typename std::vector<T>::const_iterator move_append(
     std::vector<T>& dst, std::vector<T>&& src) {
