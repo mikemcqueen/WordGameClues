@@ -12,11 +12,16 @@
   * DONE figure out where i'm going to plug in the OR kernel execution.
   * DONE how do i restrict the OR kernel to comparing only those OR variations that
          are compatible with with the XOR variations with which the source is compatible?
-  * write OR kernel
-  * consider using method in get_smallest_index_spans return logic in old kernel for
-    OR-only compat checking
-  * PROFIT
-
+  * WHAT consider using method in get_smallest_index_spans return logic in old kernel for
+         OR-only compat checking
+  * DONE debug why --xor arg only results changed (no --or args).
+  * IN-PROGRESS write OR kernel
+    * implement variation compatibility check with XOR source.
+  * Seems like the device_side or_variations was unnecessary. I need to test compatibility
+    of a specific OR-source with a specific XOR-source. A set of unique or_variations
+    doesn't seem to help here.
+  * remove shared/syncs from get_next_XOR_sources chunk, similar to OR?
+  * Make dynamic shared indices uint64_t.
 
 * PackedIndex<T=uint64_t>
 

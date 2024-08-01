@@ -149,8 +149,8 @@ struct MergeFilterData {
 
     device::OrSourceData* src_list{}; // REMOVE
     unsigned num_sources{}; // REMOVE
-    combo_index_t* combo_indices; // packed variation indices
-    unsigned num_combo_indices;
+    combo_index_t* combo_indices{}; // packed variation indices
+    unsigned num_combo_indices{};
   } device_or;
 
 };  // struct MergeFilterData

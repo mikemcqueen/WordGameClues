@@ -408,7 +408,7 @@ void cuda_alloc_copy_OR_args(const OrArgList& or_arg_list, cudaStream_t stream) 
 
 void cuda_alloc_copy_combo_indices(MergeFilterData::HostOr& host,
     MergeFilterData::DeviceOr& device, cudaStream_t stream) {
-  assert(!host.combo_indices.empty());
+  if (host.combo_indices.empty()) return;
   const auto indices_bytes = host.combo_indices.size() * sizeof(combo_index_t);
   cuda_malloc_async((void**)&device.combo_indices, indices_bytes, stream,  //
       "filter combo_indices");

@@ -108,7 +108,7 @@ void dumpSentenceVariationIndices(
           [](uint64_t total, const ComboIndexList& indices) {
             return total + indices.size();
           });
-      if (log_level(Verbose)) {
+      if (log_level(ExtraVerbose)) {
         std::cerr << "S" << s + 1 << ": variations("
                   << variationIndicesList.size() << "), indices(" << num_indices
                   << ")" << std::endl;
