@@ -11,7 +11,6 @@
 #include <vector>
 #include "clue-manager.h"
 #include "cm-precompute.h"
-//#include "merge.h"
 #include "log.h"
 #include "util.h"
 #include "cm-hash.h"
@@ -76,25 +75,6 @@ auto mergeAllCompatibleSources(const NameCountList& ncList) -> SourceList {
     if (src_list.empty()) break;
   }
   return src_list;
-}
-
-/*
-auto build_or_arg(const SourceList& src_list) {
-OrArgData or_arg;
-for (const auto& src : src_list) {
-  or_arg.or_src_list.emplace_back(OrSourceData{ std::move(src) });
-}
-return or_arg;
-};
-*/
-
-auto count_or_sources(const OrArgList& or_arg_list) {
-  // TODO: std::accumulate
-  uint32_t total{};
-  for (const auto& or_arg : or_arg_list) {
-    total += or_arg.src_list_cref.get().size();
-  }
-  return total;
 }
 
 void dumpSentenceVariationIndices(
@@ -215,21 +195,6 @@ auto build_src_lists(const std::vector<NCDataList>& nc_data_lists)
   return sourceLists;
 }
 
-auto build_or_arg_list(const std::vector<SourceList>& or_src_lists) -> OrArgList {
-  OrArgList or_arg_list;
-  auto t = util::Timer::start_timer();
-  for (const auto& src_list : or_src_lists) {
-    or_arg_list.emplace_back(std::cref(src_list));
-  }
-  if (or_arg_list.size() && log_level(Verbose)) {
-    t.stop();
-    std::cerr << " buildOrArgList args(" << or_arg_list.size() << ")"
-              << ", sources(" << count_or_sources(or_arg_list) << ") - "
-              << t.microseconds() << "us" << std::endl;
-  }
-  return or_arg_list;
-}
-
 auto buildSentenceVariationIndices(const std::vector<SourceList>& xor_src_lists,
     const std::vector<IndexList>& compat_idx_lists,
     const ComboIndexList& compat_indices) -> SentenceVariationIndices {
@@ -278,49 +243,5 @@ auto buildSentenceVariationIndices(const std::vector<SourceList>& xor_src_lists,
   dumpSentenceVariationIndices(sentenceVariationIndices);
   return sentenceVariationIndices;
 }
-
-
-/*
-bool isXorCompatibleWithAnySource(const OrSourceData& or_src,
-    const std::vector<SourceList>& xor_src_lists,
-    const std::vector<IndexList>& compat_idx_lists,
-    const ComboIndexList& compat_indices) {
-  for (size_t i{}; i < compat_indices.size(); ++i) {
-    if (every_combo_idx(compat_indices.at(i), compat_idx_lists,
-          [&src = or_src.src, &xor_src_lists](
-            index_t list_idx, index_t src_idx) {
-            return src.isXorCompatibleWith(
-              xor_src_lists.at(list_idx).at(src_idx));
-          })) {
-      return true;
-    }
-  }
-  return false;
-}
-
-void markAllXorCompatibleOrSources(OrArgList& or_arg_list,
-    const std::vector<SourceList>& xor_src_lists,
-    const std::vector<IndexList>& compat_idx_lists,
-    const ComboIndexList& compat_indices) {
-  uint32_t total{};
-  uint32_t num_compat{};
-  using namespace std::chrono;
-  auto t0 = high_resolution_clock::now();
-  for (auto& or_arg : or_arg_list) {
-    for (auto& or_src : or_arg.or_src_list) {
-      ++total;
-      if (isXorCompatibleWithAnySource(
-            or_src, xor_src_lists, compat_idx_lists, compat_indices)) {
-        or_src.is_xor_compat = true;
-        ++num_compat;
-      }
-    }
-  }
-  auto t1 = high_resolution_clock::now();
-  [[maybe_unused]] auto t_dur = duration_cast<milliseconds>(t1 - t0).count();
-  std::cerr << "  host marked " << num_compat << " of " << total << " - "
-            << t_dur << "ms" << std::endl;
-}
-*/
 
 }  // namespace cm

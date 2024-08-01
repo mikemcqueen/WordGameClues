@@ -460,8 +460,8 @@ index_t* cuda_alloc_copy_idx_lists(
   const auto indices_bytes = util::sum_sizes(idx_lists) * sizeof(index_t);
   cudaError_t err{};
   index_t* device_indices;
-  cuda_malloc_async((void**)&device_indices, indices_bytes, stream,
-      "merge idx_lists");  // cl-format
+  cuda_malloc_async((void**)&device_indices, indices_bytes, stream,  //
+      "const index/size data");  // "merge idx_lists"
 
   // copy indices
   size_t index{};
@@ -485,7 +485,7 @@ index_t* cuda_alloc_copy_list_sizes(
   cudaError_t err{};
   index_t* device_list_sizes;
   cuda_malloc_async((void**)&device_list_sizes, list_sizes_bytes, stream,  //
-      "merge list_sizes");
+      "const index/size data");  // "merge list_sizes"
   // copy list sizes
   err = cudaMemcpyAsync(device_list_sizes, list_sizes.data(), list_sizes_bytes,
       cudaMemcpyHostToDevice, stream);
@@ -587,10 +587,6 @@ auto cuda_get_compatible_combo_indices(const std::vector<SourceList>& src_lists,
   });
   // debugging
   /*
-  if (merge_type == MergeType::OR) {
-    check_list_pair_results(1068u, device_compat_matrices, num_bytes, idx_lists,
-        compat_matrix_start_indices, stream);
-  }
   if constexpr (0) {
     CudaEvent lp_stop;
     auto lp_dur = lp_stop.synchronize(lp_start);
@@ -706,10 +702,12 @@ auto get_merge_data(const std::vector<SourceList>& src_lists,
   device.idx_list_sizes = cuda_alloc_copy_list_sizes(idx_list_sizes, stream);
   host.compat_idx_lists = std::move(compat_idx_lists);
   const auto level = merge_only ? ExtraVerbose : Normal;
-  util::LogDuration ld("cuda_get_combo_indices", level);
-  host.combo_indices = cuda_get_compatible_combo_indices(src_lists,
-      device.src_lists, host.compat_idx_lists, device.idx_lists,
-      device.idx_list_sizes, merge_type, stream);
+  if ((merge_type != MergeType::OR) || log_level(OrVariations)) {
+    util::LogDuration ld("cuda_get_combo_indices", level);
+    host.combo_indices = cuda_get_compatible_combo_indices(src_lists,
+        device.src_lists, host.compat_idx_lists, device.idx_lists,
+        device.idx_list_sizes, merge_type, stream);
+  }
   return true;
 }
 

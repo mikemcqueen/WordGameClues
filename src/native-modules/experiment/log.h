@@ -6,6 +6,7 @@
 namespace cm {
 
 enum class LogLevel : int {
+  OrVariations = -3,
   MemoryAllocations = -2,
   MemoryDumps = -1,
   //
@@ -18,6 +19,7 @@ using enum LogLevel;
 
 struct LogOptions {
   bool quiet{};
+  bool or_variations{};
   bool mem_dumps{};
   bool mem_allocs{};
   LogLevel level{};
@@ -25,15 +27,10 @@ struct LogOptions {
 
 inline LogOptions the_log_args_;
 
-/*
-inline const auto Normal = 1;
-inline const auto Verbose = 2;
-inline const auto ExtraVerbose = 3;
-inline const auto Ludicrous = 4;
-*/
-
 inline bool log_level(LogLevel level) {
   switch (level) {
+  case OrVariations:
+    return the_log_args_.or_variations;
   case MemoryAllocations:
     return the_log_args_.mem_allocs;
   case MemoryDumps:
@@ -48,15 +45,6 @@ inline bool log_level(LogLevel level) {
 
 inline void set_log_options(const LogOptions& args) {
   the_log_args_ = args;
-  /*
-  if (args.quiet) {
-    the_log_level = 0;
-  } else if (!args.verbose) {
-    the_log_level = Normal;
-  } else {
-    the_log_level = args.verbose;
-  }
-  */
 }
 
 }  // namespace cm

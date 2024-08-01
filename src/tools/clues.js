@@ -77,6 +77,7 @@ const CmdLineOptions = Opt.create(_.concat(Clues.Options, [
     ['',  'vvv',                               'MOAR' ],
     ['',  'memory',                            'output memory dumps' ],
     ['',  'allocations',                       'output memory allocations' ],
+    ['',  'or-variations',                     'generate unique OR arg variations' ],
     ['q', 'quiet',                             'less output'],
     ['h', 'help',                              'this screen']
 ])).bindHelp();
@@ -451,6 +452,7 @@ async function main () {
             quiet:    options.quiet,
             memory:   options.memory,
             allocations: options.allocations,
+            or_variations: options['or-variations'],
             ignoreErrors: options.ignoreErrors,
             max_sources: options.max_sources,
             tpb: options.tpb ? Number(options.tpb) : 0,

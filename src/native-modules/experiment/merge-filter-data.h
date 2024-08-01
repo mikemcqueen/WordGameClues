@@ -10,11 +10,6 @@ namespace cm {
 
 namespace device {  // on-device data structures
 
-struct OrSourceData {
-  SourceCompatibilityData src;
-  unsigned or_arg_idx;
-};
-
 struct VariationIndices {
   combo_index_t* device_data;  // one chunk of allocated data; other pointers
                                // below point inside this chunk.
@@ -110,12 +105,14 @@ struct MergeFilterData {
     void reset_pointers() {
       DeviceCommon::reset_pointers();
       incompat_src_desc_pairs = nullptr;
+      variation_indices = nullptr;
     }
 
   public:
     void cuda_free() {
       DeviceCommon::cuda_free();
       cm::cuda_free(incompat_src_desc_pairs);
+      cm::cuda_free(variation_indices);
       reset_pointers();
     }
 
@@ -128,29 +125,19 @@ struct MergeFilterData {
   // OR
   //
   struct HostOr : MergeData::Host {
-    OrArgList arg_list; // REMOVE
   } host_or;
 
   struct DeviceOr : DeviceCommon {
   private:
     void reset_pointers() {
       DeviceCommon::reset_pointers();
-      src_list = nullptr; // REMOVE
-      combo_indices = nullptr;
     }
 
   public:
     void cuda_free() {
       DeviceCommon::cuda_free();
-      cm::cuda_free(src_list); // REMOVE
-      cm::cuda_free(combo_indices);
       reset_pointers();
     }
-
-    device::OrSourceData* src_list{}; // REMOVE
-    unsigned num_sources{}; // REMOVE
-    combo_index_t* combo_indices{}; // packed variation indices
-    unsigned num_combo_indices{};
   } device_or;
 
 };  // struct MergeFilterData

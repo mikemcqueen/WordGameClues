@@ -141,13 +141,13 @@ private:
   }
 
 public:
-  static auto merge_one_variation(
+  static constexpr auto merge_one_variation(
       Variations& to, int sentence, variation_index_t from_value) {
     if (from_value == -1) return true;
     sentence -= 1;
-    auto to_value = to.at(sentence);
+    const auto to_value = to[sentence];
     if (to_value == -1) {
-      to.at(sentence) = from_value;
+      to[sentence] = from_value;
       return true;
     }
     return from_value == to_value;
@@ -158,15 +158,16 @@ public:
         to, Source::getSentence(src), Source::getVariation(src));
   }
 
-  static auto merge_variations(Variations& to, const Variations& from) {
+  // TODO: maybe should have a fast version fo this for CUDA
+  static constexpr auto merge_variations(Variations& to, const Variations& from) {
     for (int sentence{1}; sentence <= kNumSentences; ++sentence) {
-      auto from_value = from.at(sentence - 1);
+      const auto from_value = from[sentence - 1];
       if (!merge_one_variation(to, sentence, from_value)) return false;
     }
     return true;
   }
 
-  constexpr static auto allVariationsMatch(
+  static constexpr auto allVariationsMatch(
       const Variations& v1, const Variations& v2) {
     for (size_t i{}; i < v1.size(); ++i) {
       if ((v1[i] > -1) && (v2[i] > -1) && (v1[i] != v2[i])) {
@@ -177,7 +178,7 @@ public:
   }
 
 #if 1
-  constexpr static auto are_variations_compatible(
+  static constexpr auto are_variations_compatible(
       const Variations& v1, const Variations& v2) {
     for (size_t i{}; i < v1.size(); ++i) {
       const auto first = v1[i] + 1;
@@ -656,24 +657,6 @@ using SourceListMap = std::unordered_map<std::string, SourceList>;
 
 using XorSource = SourceData;
 using XorSourceList = std::vector<XorSource>;
-
-  /*
-struct OrSourceData {
-  SourceCompatibilityData src;
-  // bool is_xor_compat{false};
-  // bool is_and_compat{false};
-};
-using OrSourceList = std::vector<OrSourceData>;
-  */
-
-// One OrArgData contains all of the data for a single --or argument.
-//
-struct OrArgData {
-  SourceListCRef src_list_cref;
-  //OrSourceList or_src_list;
-  //  bool compat{false};
-};
-using OrArgList = std::vector<OrArgData>;
 
 // TODO comment
 // These are precomputed on xorSourceList, to identify only those sources

@@ -5,7 +5,6 @@ namespace cm {
 using namespace Napi;
 using namespace cm;
 using namespace cm::clue_manager;
-//using namespace cm::validator;
 
 std::vector<int> makeIntList(Env& env, const Array& jsList) {
   std::vector<int> int_list{};
@@ -172,103 +171,5 @@ NameSourcesMap makeNameSourcesMap(Env& env, const Array& jsList) {
   }
   return map;
 }
-
-/*
-SourceCompatibilityData makeSourceCompatibilityDataFromSourceData(
-    Env& env, const Object& jsSourceData) {
-  // TODO: addPnslToCompatData(jsSouceData, compatData);
-  SourceCompatibilityData compatData{};
-  const auto jsPnsl = jsSourceData.Get("primaryNameSrcList").As<Array>();
-  for (size_t i{}; i < jsPnsl.Length(); ++i) {
-    const auto count =
-      jsPnsl[i].As<Object>().Get("count").As<Number>().Int32Value();
-    compatData.addSource(count);
-  }
-  return compatData;
-}
-
-SourceCompatibilityData makeSourceCompatibilityDataFromSourceList(
-    Env& env, const Array& jsSourceList) {
-  SourceCompatibilityData compatData{};
-  for (size_t i{}; i < jsSourceList.Length(); ++i) {
-    if (!jsSourceList[i].IsObject()) {
-      TypeError::New(env, "makeSourceCompatibilityData: non-object element")
-        .ThrowAsJavaScriptException();
-      return {};
-    }
-    // TODO: addPnslToCompatData(jsSourceList[i].As<Object>(), compatData);
-    const auto jsPnsl =
-      jsSourceList[i].As<Object>().Get("primaryNameSrcList").As<Array>();
-    for (size_t j{}; j < jsPnsl.Length(); ++j) {
-      const auto count =
-        jsPnsl[j].As<Object>().Get("count").As<Number>().Int32Value();
-      compatData.addSource(count);
-    }
-  }
-  return compatData;
-}
-
-SourceCompatibilityList makeSourceCompatibilityListFromMergedSourcesList(
-    Env& env, const Array& jsList) {
-  SourceCompatibilityList sourceCompatList{};
-  for (size_t i{}; i < jsList.Length(); ++i) {
-    if (!jsList[i].IsObject()) {
-      TypeError::New(env, "makeSourceCompatibiltyList: non-object element")
-        .ThrowAsJavaScriptException();
-      return {};
-    }
-    auto jsSourceList = jsList[i].As<Object>().Get("sourceList").As<Array>();
-    SourceCompatibilityData compatData =
-      makeSourceCompatibilityDataFromSourceList(env, jsSourceList);
-    sourceCompatList.push_back(std::move(compatData));
-  }
-  return sourceCompatList;
-}
-
-OrSourceData makeOrSource(Env& env, const Object& jsObject) {
-OrSourceData orSource;
-orSource.src = std::move(makeSourceCompatibilityDataFromSourceData(
-  env, jsObject["source"].As<Object>()));
-orSource.is_xor_compat = jsObject["xorCompatible"].As<Boolean>();
-//  orSource.and_compat = jsObject["andCompatible"].As<Boolean>();
-return orSource;
-}
-
-OrSourceList makeOrSourceList(Env& env, const Array& jsList) {
-  OrSourceList orSourceList{};
-  for (size_t i{}; i < jsList.Length(); ++i) {
-    if (!jsList[i].IsObject()) {
-      TypeError::New(env, "makeOrSourceList: non-object element")
-        .ThrowAsJavaScriptException();
-      return {};
-    }
-    orSourceList.push_back(
-      std::move(makeOrSource(env, jsList[i].As<Object>())));
-  }
-  return orSourceList;
-}
-
-OrArgData makeOrArgData(Env& env, const Object& jsObject) {
-  OrArgData orArgData{};
-  orArgData.or_src_list =
-    std::move(makeOrSourceList(env, jsObject["orSourceList"].As<Array>()));
-  orArgData.compat = jsObject["compatible"].As<Boolean>();
-  return orArgData;
-}
-
-OrArgList makeOrArgList(Env& env, const Array& jsList) {
-  OrArgList orArgList{};
-  for (size_t i{}; i < jsList.Length(); ++i) {
-    if (!jsList[i].IsObject()) {
-      TypeError::New(env, "makeOrArgDataList: non-object element")
-        .ThrowAsJavaScriptException();
-      return {};
-    }
-    orArgList.push_back(
-      std::move(makeOrArgData(env, jsList[i].As<Object>())));
-  }
-  return orArgList;
-}
-*/
 
 }  // namespace cm

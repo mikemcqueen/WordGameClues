@@ -35,25 +35,4 @@ std::vector<NCDataList> makeNcDataLists(
 clue_manager::NameSourcesMap makeNameSourcesMap(
     Napi::Env& env, const Napi::Array& jsList);
 
-/*
-SourceCompatibilityData makeSourceCompatibilityDataFromSourceData(
-  Napi::Env& env, const Napi::Object& jsSourceData);
-
-SourceCompatibilityData makeSourceCompatibilityDataFromSourceList(
-  Napi::Env& env, const Napi::Array& jsSourceList);
-
-SourceCompatibilityList makeSourceCompatibilityListFromMergedSourcesList(
-  Napi::Env& env, const Napi::Array& jsList);
-*/
-
-/*
-OrSourceData makeOrSource(Napi::Env& env, const Napi::Object& jsObject);
-
-OrSourceList makeOrSourceList(Napi::Env& env, const Napi::Array& jsList);
-
-OrArgData makeOrArgData(Napi::Env& env, const Napi::Object& jsObject);
-
-OrArgList makeOrArgList(Napi::Env& env, const Napi::Array& jsList);
-*/
-
 }  // namespace cm

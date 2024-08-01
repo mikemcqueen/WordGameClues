@@ -28,9 +28,6 @@ cuda_alloc_copy_source_descriptor_pairs(
     const std::vector<UsedSources::SourceDescriptorPair>& src_desc_pairs,
     cudaStream_t stream);
 
-[[nodiscard]] std::pair<device::OrSourceData*, unsigned>
-cuda_allocCopyOrSources(const OrArgList& orArgList, cudaStream_t stream);
-
 [[nodiscard]] auto cuda_allocCopySentenceVariationIndices(
     const SentenceVariationIndices& sentenceVariationIndices,
     cudaStream_t stream) -> device::VariationIndices*;

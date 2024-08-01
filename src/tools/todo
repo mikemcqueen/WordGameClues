@@ -15,13 +15,37 @@
   * WHAT consider using method in get_smallest_index_spans return logic in old kernel for
          OR-only compat checking
   * DONE debug why --xor arg only results changed (no --or args).
-  * IN-PROGRESS write OR kernel
-    * implement variation compatibility check with XOR source.
-  * Seems like the device_side or_variations was unnecessary. I need to test compatibility
-    of a specific OR-source with a specific XOR-source. A set of unique or_variations
-    doesn't seem to help here.
-  * remove shared/syncs from get_next_XOR_sources chunk, similar to OR?
-  * Make dynamic shared indices uint64_t.
+  * DONE Make dynamic shared indices uint64_t.
+  * DONE remove shared/syncs from get_next_XOR_sources chunk, similar to OR?
+  * DONE Templatize is_OR_source_compatible/is_XOR_source_compatible with tags & if constexpr
+  * DONE don't create combo indices for OR args. some kind of flag (already present?) to
+         get_merge_data(). well i do some valdation with these. i should have an option to turn
+         this off. defaults to off, need to add option to turn on.
+  * DONE Seems like the device_side or_variations was unnecessary. I need to test compatibility
+         of a specific OR-source with a specific XOR-source. A set of unique or_variations
+         doesn't seem to help here.
+  * DONE implement variation compatibility check with XOR source.
+  * DONE write OR kernel
+  * IN-PROGRESS fix bugs in OR kernel
+    * fix OR combo_idx generation (??) or variation merge bug, whatever the root cause
+    * I think "num_or_sources" is wrong. that should be num_or_combinations. and very much
+      a uint64_t. result of multiply_with_overflow_check(). probably need a new version that
+      uses lengths of containers vs. container of lengths: multiply_sizes_with_overflow_check().
+
+* with log_level(Memory) on, keep track of maximum extent of various allocation tags,
+  and display them next to the current value when dumping memory. i want this info
+  for potentially moving some index/size data to constant memory, and is kinda helpful
+  to have available anyway.
+
+* get_compatible_sources sync-check errors with -c2,N N>2, log.get_compat_sync_errors
+
+* move considerCandidate loop to C++.
+
+* Pack all the idx_list stuff into a single device-allocated structure. will certainly
+  make the code a lot easier to read (and also will facilitate allocating it in constant
+  memory).
+
+* StreamData (or Swarm) should free src_indices
 
 * PackedIndex<T=uint64_t>
 
@@ -39,28 +63,16 @@
   to interpret that as "the presence of the 's' prefix in the count 'field' 
   indicates that the word is a primary source, and that it must come from the
   sentence that follows the 's', in this case, 4."
+  * another option is a --list-variations [sentence] and the ability to
+    --allow-variations 3:1,3,5  [allow variations 1,3,5 of sentence 3]
 
 * i'm using list_cref in OrArgData. OrArgData might be unnecessary.
-
-* see if i can get rid of that num_list_indices in StreamData while i'm at it
 
 * shoud display max variation count (sentence with max # of variations)
   on load, and assert if > whatever limit i temporarily impose for XOR/OR
   combo_idx compatibility (128 for example). can always increase the limit
   later. 64-bits (8 bytes) gets me 128 variation max. 18 bytes (9 x 16-bit)
   gets me 65535 which is variation_t and as high as it'll ever need to go.
-
-* i need to know candidate sources count because I'm going to re-write the
-  OR compatibility kernel, and similar to how (iirc) the XOR kernel uses
-  one block per "source" then one thread per xor-source, i'm going to want
-  to probably use one block per "source" and one thread per or_source.
-  (or maybe reverse that, not sure). I'm really not sure what I was thinking
-  to be honest.
-  * are the candidate sources already copied to the kernel? is that done in
-    one of the xor_kernel_task functions? probably I'll need to move that out
-    to filter_candidates_cuda or something, or (yet another) intermediate
-    wrapper function around the whole filter mess, that wraps both XOR and OR
-    filter kernel tasks.
 
 * I want to know how many candidates (and sources) are considered (log message).
   from c++ probably better as that whole JS loop should move to c++.
@@ -124,7 +136,6 @@
 * SOLVED (i think)
   similarly, validateSources(name) -- enforce everywhere, for below
   validatesources is apparently happy with old:3=not:1,not:1,old:1
-  which is wrong because:
 
 * NOT RESOLVED (but solveable, when i make up my mind)
   * same: polar,bear -> white,bear + bear = bad?
@@ -179,21 +190,6 @@
   "compatible" xor_sources, if that means anything, or post-merged count,
   or something.
 
-* don't use the same result buffer for multiple streams. maybe make it part
-  of the StreamData struct?
-
-* is_source_OR_compatible kernel function:
-  We're doing some pretty rudimentary check to ensure that at least one source from
-  each or_arg is compatible, but what if different args refer to the same sentence,
-  and the compatible source found for each arg have different variations? maybe I
-  can write a test case to demonstrate this, and see what should happen.
-
-* another thought about OR compatibility.  I determine if a particular source is
-  XOR compatible with an XorSource then I test if it is OR compatible with at least
-  one source of each OR arg.  But shouldn't I also check if the XOR source it was XOR
-  compatible with, is also OR-compatible with the candidate OR source?
-  * No. OR arg sources don't need to be tested vs. XOR arg sources.
-
 * is_source_XOR_and_OR_compatible:
   so i'm wondering, once one thread determines that it's (both XOR and) OR compatible,
   couldn't I short-circuit the rest of the kernel? like, after the __synchtreads()
@@ -205,6 +201,16 @@
 * fix variable names in filter-support::cuda_allocCopySentenceVariationIndices()
 
 // NEW PERF:
+
+* Turn on streaming:
+  * don't use the same result buffer for multiple streams. maybe make it part
+    of the StreamData struct?
+  * see if i can get rid of that num_list_indices in StreamData while i'm at it
+
+* Experiment with different block sizes for filter-kernel?
+
+* Move filter_kernel results arrays to global mem? is something else better off
+  in shared? figure out exactly how much shared mem i get per SM or per device.
 
 * could swarm + potentially threadpool the copy/process part of list_pair_compat
   kernel. either divide the 600M chunk into 4 x 150M subchunks and interleave
@@ -234,7 +240,10 @@
   would consume less memory. could potentially integrate that into ncList/
   primaryNameSrcList as well.
 
-* considerCandidate loop to C++.
+* as the dataset grows and things slow down, doing either a) more synchrous
+  filters (e.g. for count=3) and including those incompatible results into
+  the icompat_sources, or figuring out how to merge asynchronously completed
+  results into the incompatible sources will probably speed things up.
 
 // CM:
 

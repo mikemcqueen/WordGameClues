@@ -22,7 +22,6 @@
 #include "unwrap.h"
 #include "wrap.h"
 #include "log.h"
-//#include "cuda-types.h" // can remove after moving some functions to filter-support
 
 namespace {
 
@@ -141,64 +140,6 @@ Value addCompoundClue(const CallbackInfo& info) {
 
   return env.Null();
 }
-
-  /*
-Value getSourcesForNc(const CallbackInfo& info) {
-  Env env = info.Env();
-  if (!info[0].IsObject()) {
-    TypeError::New(env, "getSourcesForNc: invalid parameter type")
-      .ThrowAsJavaScriptException();
-    return env.Null();
-  }
-  // arg0
-  auto nc = makeNameCount(env, info[0].As<Object>());
-  // --
-  assert(nc.count == 1);  // assert only known use case.
-  return wrap(env, clue_manager::get_nc_sources(nc));
-}
-
-Value getSourceListsForNc(const CallbackInfo& info) {
-  Env env = info.Env();
-  if (!info[0].IsObject()) {
-    TypeError::New(env, "getSourceListForNc: invalid parameter type")
-      .ThrowAsJavaScriptException();
-    return env.Null();
-  }
-  // arg0
-  auto nc = makeNameCount(env, info[0].As<Object>());
-  // --
-  // assert(nc.count == 1);  // assert only known use case.
-#if 0
-  if (!clue_manager::is_known_name_count(nc.name, nc.count)) {
-    std::cerr << "invalid nc" << std::endl;
-    return env.Null();
-  }
-  const auto& nc_sources = clue_manager::get_nc_sources(nc);
-  for (const auto& source_csv : nc_sources) {
-
-  }
-#endif
-  auto cref_entries = clue_manager::get_known_source_map_entries(nc);
-  return wrap(env, cref_entries);
-}
-  */
-  
-//
-// Validator
-//
-
-/*
-Value getNumNcResults(const CallbackInfo& info) {
-  Env env = info.Env();
-  if (!info[0].IsObject()) {
-    TypeError::New(env, "getNumNcResults: invalid parameter type")
-      .ThrowAsJavaScriptException();
-    return env.Null();
-  }
-  auto nc = makeNameCount(env, info[0].As<Object>());
-  return Number::New(env, clue_manager::get_num_nc_sources(nc));
-}
-*/
 
 long validate_ns = 0;
 
@@ -351,24 +292,6 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   return Number::New(env, num_compat);
 }
 
-/*
-void validate_marked_or_sources(
-    const OrArgList& or_arg_list, const std::vector<result_t>& mark_results) {
-  auto arg_idx = int{0};
-  auto begin = mark_results.cbegin();
-  for (const auto& or_arg : or_arg_list) {
-    auto end = begin + or_arg.or_src_list.size();
-    if (std::find(begin, end, 1) == end) {
-      std::cerr << "or_arg_idx " << arg_idx << " is not compatible"
-                << std::endl;
-      assert(0);
-    }
-    begin = end;
-    ++arg_idx;
-  }
-}
-*/
-
 void alloc_copy_start_indices(MergeData::Host& host,
     MergeFilterData::DeviceCommon& device, cudaStream_t stream) {
   auto src_list_start_indices = make_start_indices(host.src_lists);
@@ -391,21 +314,7 @@ void alloc_copy_filter_data(
     cuda_allocCopySentenceVariationIndices(variation_indices, stream);
 }
 
-void cuda_alloc_copy_OR_args(const OrArgList& or_arg_list, cudaStream_t stream) {
-  auto t = util::Timer::start_timer();
-  // TODO: to eliminate sync call in allocCopyOrSources
-  auto [device_or_src_list, num_or_sources] =
-      cuda_allocCopyOrSources(or_arg_list, stream);
-  MFD.device_or.src_list = device_or_src_list;
-  MFD.device_or.num_sources = num_or_sources;
-  if (log_level(Verbose)) {
-    t.stop();
-    std::cerr << " alloc_copy_OR_args(" << or_arg_list.size() << ")"
-              << ", or_sources(" << MFD.device_or.num_sources << ") - "
-              << t.microseconds() << "us" << std::endl;
-  }
-}
-
+/*
 void cuda_alloc_copy_combo_indices(MergeFilterData::HostOr& host,
     MergeFilterData::DeviceOr& device, cudaStream_t stream) {
   if (host.combo_indices.empty()) return;
@@ -416,6 +325,7 @@ void cuda_alloc_copy_combo_indices(MergeFilterData::HostOr& host,
       indices_bytes, cudaMemcpyHostToDevice, stream);
   assert_cuda_success(err, "copy combo_indices");
 }
+*/
 
 void dump_combos(const MergeData::Host& host) {
   std::vector<UsedSources::Variations> variations;
@@ -448,10 +358,13 @@ void show_all_sources(const MergeData::Host& host, combo_index_t combo_idx) {
       });
 }
 
-auto get_variations(const MergeData::Host& host) {
+auto get_variations(
+    const MergeData::Host& host, std::optional<uint64_t> test = std::nullopt) {
   using namespace std::literals;
   std::vector<UsedSources::Variations> variations;
+  bool test_found = false;
   for (auto combo_idx : host.combo_indices) {
+    if (test.has_value() && test.value() == combo_idx) test_found = true;
     UsedSources::Variations v = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
     for_each_combo_index(combo_idx, host.compat_idx_lists,  //
         [&host, &v, combo_idx](index_t list_idx, index_t src_idx) {
@@ -472,11 +385,15 @@ auto get_variations(const MergeData::Host& host) {
         });
     variations.push_back(std::move(v));
   }
+  if (test.has_value()) {
+    std::cerr << "test combo_idx " << test.value()
+              << " found: " << std::boolalpha << test_found << std::endl;
+  }
   return variations;
 }
 
 auto get_unique_OR_variations(const MergeData::Host& host_or) {
-  auto variations_list = get_variations(host_or);
+  auto variations_list = get_variations(host_or, 12382272); // 10613376
   UsedSources::VariationsSet variations;
   for (auto& v : variations_list) {
     variations.insert(v);
@@ -551,24 +468,21 @@ Value filterPreparation(const CallbackInfo& info) {
   auto& host = MFD.host_or;
   auto& device = MFD.device_or;
   host.src_lists = std::move(build_src_lists(nc_data_lists));
-  host.arg_list = std::move(build_or_arg_list(host.src_lists));
-  if (host.arg_list.size()) {
-    if ((compat = get_merge_data(host.src_lists, host, device,  //
-             MergeType::OR, stream))) {
-      auto or_variations = get_unique_OR_variations(host);
-      check_XOR_compatibility(MFD, or_variations);
-      // re-assign combo indices to unique variations
-      host.combo_indices = std::move(get_combo_indices(or_variations));
+  if (host.src_lists.size()) {
+    if (get_merge_data(host.src_lists, host, device, MergeType::OR, stream)) {
+      if (log_level(OrVariations)) {
+        auto or_variations = get_unique_OR_variations(host);
+        check_XOR_compatibility(MFD, or_variations);
+      }
     } else {
       std::cerr << "failed to merge OR args" << std::endl;
+      compat = false;
     }
   }
   if (compat) {
     alloc_copy_filter_data(MFD, stream);
     // TODO: seems i could just use the same list start indices as XOR
-    // cuda_alloc_copy_OR_args(host.arg_list, stream);
-    cuda_alloc_copy_combo_indices(host, device, stream);
-    cuda_memory_dump("filter preparation:");
+    cuda_memory_dump("filter preparation");
   }
   return Boolean::New(env, compat);
 }
@@ -743,6 +657,15 @@ LogOptions makeLogOptions(Env& env, const Object& jsObject) {
     }
     log_args.mem_allocs = jsAllocs.As<Boolean>();
   }
+  auto jsOrVariations = jsObject.Get("or-variations");
+  if (!jsOrVariations.IsUndefined()) {
+    if (!jsOrVariations.IsBoolean()) {
+      TypeError::New(env, "makeLogOptions: invalid or_variations arg")
+        .ThrowAsJavaScriptException();
+      return {};
+    }
+    log_args.or_variations = jsOrVariations.As<Boolean>();
+  }
   auto jsVerbose = jsObject.Get("verbose");
   if (!jsVerbose.IsUndefined()) {
     if (!jsVerbose.IsNumber()) {
@@ -792,14 +715,11 @@ Value dumpMemory(const CallbackInfo& info) {
 Object Init(Env env, Object exports) {
   // clue-manager
   //
-  // exports["getNumNcResults"] = Function::New(env, getNumNcResults);
   exports["setPrimaryNameSrcIndicesMap"] =
       Function::New(env, setPrimaryNameSrcIndicesMap);
   exports["setCompoundClueNameSourcesMap"] =
       Function::New(env, setCompoundClueNameSourcesMap);
   exports["isKnownSourceMapEntry"] = Function::New(env, isKnownSourceMapEntry);
-  // exports["getSourcesForNc"] = Function::New(env, getSourcesForNc);
-  // exports["getSourceListsForNc"] = Function::New(env, getSourceListsForNc);
   exports["addCompoundClue"] = Function::New(env, addCompoundClue);
 
   // validator

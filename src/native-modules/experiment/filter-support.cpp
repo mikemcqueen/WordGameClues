@@ -146,6 +146,7 @@ auto get_compatible_sources_results(int sum,
 // TODO: host-filter.cpp/host.h
 namespace host {
 
+/*
 #define MAX_OR_ARGS 20
 int incompatible_or_arg_counts[MAX_OR_ARGS] = {0};
 
@@ -195,6 +196,7 @@ auto is_OR_compatible(
   }
   return compat;
 }
+*/
 
 auto is_XOR_compatible(const SourceCompatibilityData& source,
     const std::vector<SourceList>& xor_src_lists) {
@@ -224,7 +226,7 @@ void xor_filter(int sum, const StreamData& stream, const MergeFilterData& mfd) {
     const auto& source = src_list.at(src_idx.index);
     if (is_XOR_compatible(source, xor_src_lists)) {
       ++num_xor_compat;
-      if (is_OR_compatible(source, mfd)) {
+      if (1) {// is_OR_compatible(source, mfd)) {
         ++num_compat;
       }
     }
@@ -232,7 +234,7 @@ void xor_filter(int sum, const StreamData& stream, const MergeFilterData& mfd) {
   std::cerr << "HOST compatible sources " << num_compat << " of "
             << stream.src_indices.size() << std::endl;
   std::cerr << "HOST xor-compatible sources: " << num_xor_compat << std::endl;
-  show_incompat_or_args(mfd.host_or.arg_list.size());
+  // show_incompat_or_args(mfd.host_or.arg_list.size());
 }
 
 }  // namespace host
@@ -585,48 +587,6 @@ filter_result_t get_filter_result() {
   return unique_combos;
 }
 
-/*
-auto cuda_markAllXorCompatibleOrSources(const MergeFilterData& mfd)
-    -> std::vector<result_t> {
-  // alloc/zero results
-  const auto stream = cudaStreamPerThread;
-  auto device_results = cuda_alloc_results(mfd.device.num_or_sources, stream,
-      "mark_or_sources results");  // cl-format
-  cuda_zero_results(device_results, mfd.device.num_or_sources);
-  run_mark_or_sources_kernel(mfd, device_results);
-  auto results = cuda_copy_results(device_results, mfd.device.num_or_sources);
-  if (log_level(Verbose)) {
-    auto num_marked = std::accumulate(results.begin(), results.end(), 0,
-        [](int total, result_t val) { return total + val; });
-    std::cerr << " marked " << num_marked << " of " << mfd.device.num_or_sources
-              << " or sources" << std::endl;
-  }
-  return results;
-}
-
-// This "compacts" the device_or_src_list by moving all "compatible" sources
-// to the front of the array, and returns the compatible source count.
-unsigned move_marked_or_sources(device::OrSourceData* device_or_src_list,
-    const std::vector<result_t>& mark_results) {
-  size_t dst_idx{};
-  size_t src_idx{};
-  // skip over any marked (and therefore correctly placed) results at beginning
-  for (; (src_idx < mark_results.size()) && mark_results[src_idx];
-       ++src_idx, ++dst_idx)
-    ;
-  // move any remaining marked (and therefore incorrectly placed) results
-  for (; src_idx < mark_results.size(); ++src_idx) {
-    if (mark_results[src_idx]) {
-      auto err = cudaMemcpyAsync(&device_or_src_list[dst_idx++],
-          &device_or_src_list[src_idx], sizeof(device::OrSourceData),
-          cudaMemcpyDeviceToDevice);
-      assert_cuda_success(err, "move_marked_or_sources memcpy");
-    }
-  }
-  return dst_idx;
-}
-*/
-
 [[nodiscard]] UsedSources::SourceDescriptorPair*
 cuda_alloc_copy_source_descriptor_pairs(
     const std::vector<UsedSources::SourceDescriptorPair>& src_desc_pairs,
@@ -640,32 +600,6 @@ cuda_alloc_copy_source_descriptor_pairs(
       pairs_bytes, cudaMemcpyHostToDevice, stream);
   assert_cuda_success(err, "copy src_desc_pairs");
   return device_src_desc_pairs;
-}
-
-[[nodiscard]] std::pair<device::OrSourceData*, unsigned>
-cuda_allocCopyOrSources(const OrArgList& orArgList, cudaStream_t stream) {
-  // build host-side vector of compatible device::OrSourceData that we can
-  // blast to device with one copy.
-  // TODO: while this method is faster kernel-side, it's also uses more memory,
-  // at one index per or_src (maybe index can be reduced to one byte? depends on
-  // size/alignment of or_src probably).
-  // Or, just blast these out in chunks, per or_arg. Will need to alloc/copy a
-  // device_or_arg_sizes and pass num_or_args as well in that case.
-  std::vector<device::OrSourceData> or_src_list;
-  for (unsigned arg_idx{}; arg_idx < orArgList.size(); ++arg_idx) {
-    const auto& or_arg = orArgList.at(arg_idx);
-    for (const auto& or_src : or_arg.src_list_cref.get()) {
-      or_src_list.emplace_back(or_src, arg_idx);
-    }
-  }
-  const auto or_src_bytes = or_src_list.size() * sizeof(device::OrSourceData);
-  device::OrSourceData* device_or_src_list;
-  cuda_malloc_async((void**)&device_or_src_list, or_src_bytes, stream,  //
-      "filter or_src_list");
-  auto err = cudaMemcpyAsync(device_or_src_list, or_src_list.data(),
-      or_src_bytes, cudaMemcpyHostToDevice, stream);
-  assert_cuda_success(err, "copy or_src_list");
-  return std::make_pair(device_or_src_list, or_src_list.size());
 }
 
 [[nodiscard]] auto cuda_allocCopySentenceVariationIndices(
