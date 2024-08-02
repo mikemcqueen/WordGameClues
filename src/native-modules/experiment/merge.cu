@@ -35,13 +35,14 @@ __global__ void list_pair_compat_kernel(const SourceCompatibilityData* sources1,
          idx2 += blockDim.x) {
       const auto src2_idx = src2_indices[idx2];
       const auto& src2 = sources2[src2_idx];
-      const auto result_idx = idx1 * num_src2_indices + idx2;
       bool compat{};
       if (merge_type == MergeType::XOR) {
         compat = src1.isXorCompatibleWith(src2);
       } else {  // MergeType::OR
         compat = src1.hasCompatibleVariationsWith(src2);
       }
+      // aka: row * num_cols_per_row + col
+      const auto result_idx = idx1 * num_src2_indices + idx2;
       compat_results[result_idx] = compat ? 1 : 0;
     }
   }
@@ -52,29 +53,48 @@ __global__ void list_pair_compat_kernel(const SourceCompatibilityData* sources1,
 // of compatible results, representing combinations of compatible sources to
 // be merged.
 //
-__global__ void get_compat_combos_kernel(uint64_t first_combo,
-    uint64_t num_combos, const result_t* compat_matrices,
-    const index_t* compat_matrix_start_indices, unsigned num_compat_matrices,
-    const index_t* idx_list_sizes, result_t* results, bool flag) {
-  const unsigned threads_per_grid = gridDim.x * blockDim.x;
-  const unsigned thread_idx = blockIdx.x * blockDim.x + threadIdx.x;
-  for (uint64_t idx{thread_idx}; idx < num_combos; idx += threads_per_grid) {
-    bool compat = true;
-    auto i_combo_idx = first_combo + idx;
-    for (size_t i{}, n{}; compat && (i < num_compat_matrices - 1); ++i) {
-      const auto i_list_size = idx_list_sizes[i];
-      const auto row = i_combo_idx % i_list_size;
-      i_combo_idx /= i_list_size;
-      auto j_combo_idx = i_combo_idx;
-      for (size_t j{i + 1}; j < num_compat_matrices; ++j, ++n) {
-        const auto j_list_size = idx_list_sizes[j]; // aka: num_cols
-        const auto col = j_combo_idx % j_list_size;
-        const auto offset = row * j_list_size + col;
-        if (!compat_matrices[compat_matrix_start_indices[n] + offset]) {
+// The logic in this function is dependent on the order that pairs are fed to
+// list_pair_compat_kernel via for_each_list_pair(), and the order of,,,
+// both of  which are intentional and
+// important, and ensure that the mapping of a "flat" (linear) index to a
+// particular combination of index lists is in a specific order. There is logic
+// outside of this function depends on this order.
+//
+// Ex: for the 2 index lists: [[0, 1], [0, 1, 2]], the flat-index order
+// of their combinations is:
+//
+// 0:[0, 0], 1:[0, 1], 2:[0, 2], 3:[1,0], 4:[1, 1], 5:[1,2]
+//
+// Ex: list-pair order for 4 matrices stored in compat_matrics:
+//
+// [2,3],[1,3],[0,3],[1,2],[0,2],[0,1]
+//
+__global__ void get_compat_combos_kernel(uint64_t first_idx,
+    uint64_t num_indices, const result_t* compat_matrices,
+    const index_t* compat_matrix_start_indices, const index_t* idx_list_sizes,
+    unsigned num_idx_lists, result_t* results, bool flag) {
+  const auto grid_size = gridDim.x * blockDim.x;
+  const auto thread_idx = blockIdx.x * blockDim.x + threadIdx.x;
+  for (auto idx{thread_idx}; idx < num_indices; idx += grid_size) {
+    bool compat{true};
+    auto col_flat_idx = first_idx + idx;
+    for (int col_list_idx{int(num_idx_lists) - 1}, matrix_idx{};
+        compat && (col_list_idx > 0); --col_list_idx) {
+      const auto col_list_size = idx_list_sizes[col_list_idx];
+      const auto col = col_flat_idx % col_list_size;
+      col_flat_idx /= col_list_size;
+      auto row_flat_idx = col_flat_idx;
+      for (auto row_list_idx{col_list_idx - 1}; row_list_idx >= 0;
+          --row_list_idx, ++matrix_idx) {
+        const auto row_list_size = idx_list_sizes[row_list_idx];
+        const auto row = row_flat_idx % row_list_size;
+        const auto offset = row * col_list_size + col;
+        const auto matrix_start_idx = compat_matrix_start_indices[matrix_idx];
+        if (!compat_matrices[matrix_start_idx + offset]) {
           compat = false;
           break;
         }
-        j_combo_idx /= j_list_size;
+        row_flat_idx /= row_list_size;
       }
     }
     results[idx] = compat ? 1 : 0;
@@ -87,6 +107,7 @@ struct ComboIndex {
   index_t elem2_idx;  // second element of the combination
 };
 
+  /*
 __device__ void get_combo_index(unsigned idx, unsigned row_size,
   unsigned combos_per_row, ComboIndex& result) {
   // Calculate sublist idx
@@ -101,6 +122,7 @@ __device__ void get_combo_index(unsigned idx, unsigned row_size,
   }
   result.elem2_idx = result.elem1_idx + r + 1;
 }
+  */
 
 }  // anonymous namespace
 
@@ -129,14 +151,13 @@ int run_list_pair_compat_kernel(const SourceCompatibilityData* device_sources1,
   return 0;
 }
 
-int run_get_compat_combos_kernel(uint64_t first_combo, uint64_t num_combos,
-    const result_t* device_compat_matrices, unsigned num_compat_matrices,
+int run_get_compat_combos_kernel(uint64_t first_idx, uint64_t num_indices,
+    const result_t* device_compat_matrices,
     const index_t* device_compat_matrix_start_indices,
-    const index_t* device_idx_list_sizes, result_t* device_results,
-    cudaStream_t stream, bool flag) {
-  assert((num_compat_matrices <= kMaxMatrices)
+    const index_t* device_idx_list_sizes, unsigned num_idx_lists,
+    result_t* device_results, cudaStream_t stream, bool flag) {
+  assert((num_idx_lists <= kMaxMatrices)
          && "max compat matrix count exceeded (easy fix)");
-
   int num_sm;
   cudaDeviceGetAttribute(&num_sm, cudaDevAttrMultiProcessorCount, 0);
   int threads_per_sm;
@@ -150,9 +171,9 @@ int run_get_compat_combos_kernel(uint64_t first_combo, uint64_t num_combos,
   dim3 grid_dim(grid_size);
   dim3 block_dim(block_size);
   get_compat_combos_kernel<<<grid_dim, block_dim, shared_bytes, stream>>>(
-      first_combo, num_combos, device_compat_matrices,
-      device_compat_matrix_start_indices, num_compat_matrices,
-      device_idx_list_sizes, device_results, flag);
+      first_idx, num_indices, device_compat_matrices,
+      device_compat_matrix_start_indices, device_idx_list_sizes, num_idx_lists,
+      device_results, flag);
   return 0;
 }
 

@@ -28,6 +28,16 @@ inline auto make_list_sizes(const std::vector<cm::IndexList>& idx_lists) {
   return sizes;
 }
 
+inline auto for_each_source_index(uint64_t flat_idx,
+    const std::vector<IndexList>& idx_lists, const auto& func) {
+  for (int list_idx{int(idx_lists.size()) - 1}; list_idx >= 0; --list_idx) {
+    const auto& idx_list = idx_lists.at(list_idx);
+    const auto src_idx = idx_list.at(flat_idx % idx_list.size());
+    func(list_idx, src_idx);
+    flat_idx /= idx_list.size();
+  }
+}
+
 // TODO: 2nd return type template param, overflow check boolean function param
 template <typename T>
 requires requires(T t) { t.size(); }
@@ -66,6 +76,20 @@ R multiply_with_overflow_check(const std::vector<T>& values) {
       throw std::overflow_error("Multiplication overflow");
     }
     total *= v;
+  }
+  return total;
+}
+
+//
+template <typename... T, template <typename...> class C>  // , typename R = uint64_t>
+uint64_t multiply_sizes_with_overflow_check(const C<T...>& containers) {
+  using R = uint64_t;
+  R total{1};
+  for (auto c : containers) {
+    if (c.size() > std::numeric_limits<R>::max() / total) {
+      throw std::overflow_error("Multiplication overflow");
+    }
+    total *= c.size();
   }
   return total;
 }

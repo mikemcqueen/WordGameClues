@@ -207,7 +207,7 @@ void host_memory_dump(
   auto idx_lists_size =
       host_xor.compat_idx_lists.size() * sizeof(IndexList::value_type);
   auto combo_indices_size =
-      host_xor.combo_indices.size() * sizeof(ComboIndexList::value_type);
+      host_xor.compat_flat_indices.size() * sizeof(uint64_t);
   auto merged_src_list_size =
       host_xor.merged_xor_src_list.size() * sizeof(SourceList::value_type);
 
@@ -284,7 +284,7 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
     auto stream = cudaStreamPerThread;
     if (get_merge_data(xor_src_lists, MFD.host_xor, MFD.device_xor,
             MergeType::XOR, stream)) {
-      num_compat = MFD.host_xor.combo_indices.size();
+      num_compat = MFD.host_xor.compat_flat_indices.size();
       // filter needs this later
       MFD.host_xor.src_lists = std::move(xor_src_lists);
     }
@@ -304,12 +304,12 @@ void alloc_copy_start_indices(MergeData::Host& host,
 
 void alloc_copy_filter_data(
     MergeFilterData& mfd, cudaStream_t stream) {
-  assert(!mfd.host_xor.combo_indices.empty());
+  assert(!mfd.host_xor.compat_flat_indices.empty());
   util::LogDuration ld("alloc_copy_filter_data", Verbose);
   alloc_copy_start_indices(mfd.host_xor, mfd.device_xor, stream);
   alloc_copy_start_indices(mfd.host_or, mfd.device_or, stream);
-  auto variation_indices = buildSentenceVariationIndices(
-    mfd.host_xor.src_lists, mfd.host_xor.compat_idx_lists, mfd.host_xor.combo_indices);
+  auto variation_indices = buildSentenceVariationIndices(mfd.host_xor.src_lists,
+      mfd.host_xor.compat_idx_lists, mfd.host_xor.compat_flat_indices);
   mfd.device_xor.variation_indices =
     cuda_allocCopySentenceVariationIndices(variation_indices, stream);
 }
@@ -327,11 +327,30 @@ void cuda_alloc_copy_combo_indices(MergeFilterData::HostOr& host,
 }
 */
 
-void dump_combos(const MergeData::Host& host) {
-  std::vector<UsedSources::Variations> variations;
-  for (auto orig_combo_idx : host.combo_indices) {
-    std::cerr << "host: " << orig_combo_idx << std::endl;
+auto combo_to_str(combo_index_t combo_idx, const IndexList& list_sizes) {
+  std::string s;
+  for (size_t i{}; i < list_sizes.size(); ++i) {
+    const auto list_size = list_sizes.at(i);
+    auto idx = combo_idx % list_size;
+    combo_idx /= list_size;
+    if (!s.empty()) s += " ";
+    s += std::to_string(idx);
   }
+  return s;
+}
+
+void dump_combos(const MergeData::Host& host, const MergeData::Device& device) {
+  std::vector<UsedSources::Variations> variations;
+  const auto list_sizes = util::make_list_sizes(host.compat_idx_lists);
+  std::cout << "list_sizes: ";
+  for (auto s : list_sizes) std::cout << s << " ";
+  std::cout << std::endl;
+  /*
+  for (auto combo_idx : host.combo_indices) {
+    std::cout << "host: " << combo_idx
+              << " [" << combo_to_str(combo_idx, list_sizes) << "]" << std::endl;
+  }
+  */
 }
 
 const auto& get_source(
@@ -341,12 +360,20 @@ const auto& get_source(
   return host.src_lists.at(list_idx).at(src_idx);
 }
 
-void show_all_sources(const MergeData::Host& host, combo_index_t combo_idx) {
+void show_all_sources(const MergeData::Host& host, uint64_t flat_idx) {
   using namespace std::literals;
   UsedSources::Variations v = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
-  std::cerr << "all sources:\n";
-  for_each_combo_index(combo_idx, host.compat_idx_lists,  //
+  //  auto orig_flat_idx = flat_idx;
+  std::cerr << "all sources for flat_idx: " << flat_idx << std::endl;
+  util::for_each_source_index(flat_idx, host.compat_idx_lists,  //
       [&](index_t list_idx, index_t src_idx) {
+        /*
+        printf("list_idx: %d, list_size: %u"
+               ", remain_flat_idx: %lu, idx: %d, src_idx: %u into:\n",
+            list_idx, idx_list_size, flat_idx, int(idx), src_idx);
+        */
+        fprintf(stderr, "list_idx: %u, src_idx: %u:\n", list_idx, src_idx);
+
         const auto& src = host.src_lists.at(list_idx).at(src_idx);
         auto success =
             UsedSources::merge_variations(v, src.usedSources.variations);
@@ -354,46 +381,37 @@ void show_all_sources(const MergeData::Host& host, combo_index_t combo_idx) {
                   << std::endl
                   << "  merged as: " << util::join(v, ","s)
                   << " - success: " << std::boolalpha << success << std::endl;
-        return true;
       });
 }
 
-auto get_variations(
-    const MergeData::Host& host, std::optional<uint64_t> test = std::nullopt) {
+auto get_variations(const MergeData::Host& host) {
   using namespace std::literals;
   std::vector<UsedSources::Variations> variations;
-  bool test_found = false;
-  for (auto combo_idx : host.combo_indices) {
-    if (test.has_value() && test.value() == combo_idx) test_found = true;
+  for (auto flat_idx : host.compat_flat_indices) {
     UsedSources::Variations v = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
-    for_each_combo_index(combo_idx, host.compat_idx_lists,  //
-        [&host, &v, combo_idx](index_t list_idx, index_t src_idx) {
+    util::for_each_source_index(flat_idx, host.compat_idx_lists,  //
+        [&host, &v, flat_idx](index_t list_idx, index_t src_idx) {
           const auto& src = host.src_lists.at(list_idx).at(src_idx);
           // UsedSources::Variations copy = v;
           if (UsedSources::merge_variations(v, src.usedSources.variations)) {
             return true;
           }
-          std::cerr << "failed merging variations of " << combo_idx
-                    << std::endl
+          std::cerr << "failed merging variations of " << flat_idx << std::endl
                     << util::join(src.usedSources.variations, ","s) << " of "
                     << NameCount::listToString(src.primaryNameSrcList)
                     << " to:\n"
                     //<< util::join(copy, ","s) << ", after merge:\n"
                     << util::join(v, ","s) << std::endl;
-          show_all_sources(host, combo_idx);
+          show_all_sources(host, flat_idx);
           assert(false);
         });
     variations.push_back(std::move(v));
-  }
-  if (test.has_value()) {
-    std::cerr << "test combo_idx " << test.value()
-              << " found: " << std::boolalpha << test_found << std::endl;
   }
   return variations;
 }
 
 auto get_unique_OR_variations(const MergeData::Host& host_or) {
-  auto variations_list = get_variations(host_or, 12382272); // 10613376
+  auto variations_list = get_variations(host_or);
   UsedSources::VariationsSet variations;
   for (auto& v : variations_list) {
     variations.insert(v);
@@ -405,7 +423,7 @@ auto get_unique_OR_variations(const MergeData::Host& host_or) {
 
 auto check_XOR_compatibility(const MergeFilterData& mfd,
     const UsedSources::VariationsSet& or_variations) {
-  // dump_combos(mfd.host_or);
+  dump_combos(mfd.host_or, mfd.device_or);
   auto xor_variations = get_variations(mfd.host_xor);
   std::cerr << "XOR variations: " << xor_variations.size() << std::endl;
   int num_incompat{};
@@ -429,6 +447,7 @@ auto check_XOR_compatibility(const MergeFilterData& mfd,
   return true;
 }
 
+#if 0
 auto get_combo_indices(const UsedSources::VariationsSet& variations) {
   const auto kMaxVariationIdx = 138u;  // 138^9 fits in uint64_t
   ComboIndexList combo_indices;
@@ -448,6 +467,7 @@ auto get_combo_indices(const UsedSources::VariationsSet& variations) {
   }
   return combo_indices;
 }
+#endif
 
 //
 // filterPreparation

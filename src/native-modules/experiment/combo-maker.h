@@ -658,12 +658,12 @@ using SourceListMap = std::unordered_map<std::string, SourceList>;
 using XorSource = SourceData;
 using XorSourceList = std::vector<XorSource>;
 
-// TODO comment
+// TODO comment/rename
 // These are precomputed on xorSourceList, to identify only those sources
 // which share the same per-sentence variation.
 // One list of indices per variation, plus '-1' (no) variation.
 // indices are offset by 1; variation -1 is index 0.
-using VariationIndicesList = std::vector<ComboIndexList>;
+using VariationIndicesList = std::vector<std::vector<uint64_t>>;
 // one variationIndicesLists per sentence
 using SentenceVariationIndices =
     std::array<VariationIndicesList, kNumSentences>;

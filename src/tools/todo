@@ -31,6 +31,21 @@
     * I think "num_or_sources" is wrong. that should be num_or_combinations. and very much
       a uint64_t. result of multiply_with_overflow_check(). probably need a new version that
       uses lengths of containers vs. container of lengths: multiply_sizes_with_overflow_check().
+    * seems like there might be an issue with multiple blocks comparing the same OR + XOR
+      sources in variation compat check. Saw:
+      block 66, tid 224, flat_idx: 224, list_idx: 5, idx: 0, src_idx: 0 into:
+      and seemed odd that block 66 would be handling flat_idx 224. of course this was
+      likely based on "or_chunk_idx 0", but are multiple blocks handling the same chunk?
+      might be the same XOR flat_idx being used by every thread in block, and constantly
+      recalculating the variations for it.  maybe see if we can calc once and pass the
+      variations instead of the index?
+      * upon further review, it looks like multiple *blocks* may be using the same
+        xor_idx. maybe put a printf in !threadIdx.x scope in for the 1 XOR version of
+        bool get_next_compatible_OR_sources()
+
+* should look into using libcu++ for standard library such as std::array, std::copy in
+  kernels. coz.. i might just be gettting lucky. and i'm not sure how to control which
+  version of std::array variations will use, for example.
 
 * with log_level(Memory) on, keep track of maximum extent of various allocation tags,
   and display them next to the current value when dumping memory. i want this info

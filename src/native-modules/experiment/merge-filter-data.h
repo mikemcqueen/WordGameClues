@@ -34,7 +34,7 @@ struct MergeData {
 
     std::vector<SourceList> src_lists;
     std::vector<IndexList> compat_idx_lists;
-    ComboIndexList combo_indices;
+    std::vector<uint64_t> compat_flat_indices;
   } host;
 
   struct Device {

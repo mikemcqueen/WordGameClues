@@ -83,11 +83,7 @@ void dumpSentenceVariationIndices(
   for (int s{}; s < kNumSentences; ++s) {
     const auto& variationIndicesList = sentenceVariationIndices.at(s);
     if (!variationIndicesList.empty()) {
-      const auto num_indices = std::accumulate(variationIndicesList.begin(),
-          variationIndicesList.end(), 0,
-          [](uint64_t total, const ComboIndexList& indices) {
-            return total + indices.size();
-          });
+      const auto num_indices = util::sum_sizes(variationIndicesList);
       if (log_level(ExtraVerbose)) {
         std::cerr << "S" << s + 1 << ": variations("
                   << variationIndicesList.size() << "), indices(" << num_indices
@@ -197,27 +193,19 @@ auto build_src_lists(const std::vector<NCDataList>& nc_data_lists)
 
 auto buildSentenceVariationIndices(const std::vector<SourceList>& xor_src_lists,
     const std::vector<IndexList>& compat_idx_lists,
-    const ComboIndexList& compat_indices) -> SentenceVariationIndices {
+    const std::vector<uint64_t>& compat_flat_indices)
+    -> SentenceVariationIndices {
   SentenceVariationIndices sentenceVariationIndices;
-  for (size_t i{}; i < compat_indices.size(); ++i) {
-    std::array<int, kNumSentences> variations = {
-      -1, -1, -1, -1, -1, -1, -1, -1, -1};
-    // TODO: is this a duplication of UsedSources.merge_variations?
-    for_each_combo_index(compat_indices.at(i), compat_idx_lists,
+  for (auto flat_idx : compat_flat_indices) {
+    UsedSources::Variations variations = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
+    util::for_each_source_index(flat_idx, compat_idx_lists,
         [&xor_src_lists, &variations](index_t list_idx, index_t src_idx) {
-          for (const auto& nc :
-              xor_src_lists.at(list_idx).at(src_idx).primaryNameSrcList) {
-            using namespace Source;
-            assert(isCandidate(nc.count));
-            auto nc_variation = getVariation(nc.count);
-            if (auto& variation = variations.at(getSentence(nc.count) - 1);
-                variation < 0) {
-              variation = nc_variation;
-            } else {
-              assert(variation == nc_variation);
-            }
+          const auto& src = xor_src_lists.at(list_idx).at(src_idx);
+          for (const auto& nc : src.primaryNameSrcList) {
+            assert(Source::isCandidate(nc.count));
+            auto b = UsedSources::merge_one_variation(variations, nc.count);
+            assert(b);
           }
-          return true;
         });
     for (int s{}; s < kNumSentences; ++s) {
       auto& variationIndicesList = sentenceVariationIndices.at(s);
@@ -225,7 +213,7 @@ auto buildSentenceVariationIndices(const std::vector<SourceList>& xor_src_lists,
       if (variationIndicesList.size() <= variation_idx) {
         variationIndicesList.resize(variation_idx + 1);
       }
-      variationIndicesList.at(variation_idx).push_back(compat_indices.at(i));
+      variationIndicesList.at(variation_idx).push_back(flat_idx);
     }
   }
   // When the list of xor_sources is very small, there may be no xor_source

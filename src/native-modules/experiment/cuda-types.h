@@ -21,7 +21,7 @@ using index_t = uint32_t;
 using combo_index_t = uint64_t;
 
 using IndexList = std::vector<index_t>;
-using ComboIndexList = std::vector<combo_index_t>;
+//using ComboIndexList = std::vector<combo_index_t>;
 
 using ComboIndexSpan = std::span<const combo_index_t>;
 using ComboIndexSpanPair = std::pair<ComboIndexSpan, ComboIndexSpan>;
@@ -63,8 +63,9 @@ inline void cuda_zero_results(
   assert_cuda_success(err, "zero results");
 }
 
+#if 0
 // every_combo_index is actually a better name due to predicate fn
-inline bool for_each_combo_index(combo_index_t combo_idx,
+inline auto for_each_combo_index(combo_index_t combo_idx,
     const std::vector<IndexList>& idx_lists, const auto& pred) {
   for (index_t list_idx{}; list_idx < idx_lists.size(); ++list_idx) {
     const auto& idx_list = idx_lists.at(list_idx);
@@ -74,6 +75,7 @@ inline bool for_each_combo_index(combo_index_t combo_idx,
   }
   return true;
 }
+#endif
 
 class CudaEvent {
 public:

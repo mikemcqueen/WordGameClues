@@ -14,8 +14,9 @@ auto build_src_lists(
     const std::vector<NCDataList>& nc_data_lists) -> std::vector<SourceList>;
 
 auto buildSentenceVariationIndices(const std::vector<SourceList>& xor_src_lists,
-  const std::vector<IndexList>& compat_idx_lists,
-  const ComboIndexList& compat_indices) -> SentenceVariationIndices;
+    const std::vector<IndexList>& compat_idx_lists,
+    const std::vector<uint64_t>& compat_flat_indices)
+    -> SentenceVariationIndices;
 }
 
 #endif // INCLUDE_CM_PRECOMPUTE_H
