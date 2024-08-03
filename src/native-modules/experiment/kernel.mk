@@ -13,12 +13,12 @@ NVCC_COMPILE_FLAGS := -Xcompiler -fPIC \
 	-Xcompiler -Wextra \
 	-Xcudafe --diag_suppress=declared_but_not_referenced \
 	--expt-relaxed-constexpr \
-	-maxrregcount=40 \
 	-O3 \
 	-dopt=on \
 	-Xptxas=-v \
 	-lineinfo \
-	-std=c++20
+	-std=c++20 \
+#	-maxrregcount=60
 
 NVCC_LINK_FLAGS := -Xcompiler -fPIC
 

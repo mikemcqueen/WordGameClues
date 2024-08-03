@@ -35,6 +35,12 @@ filter_result_t get_filter_result();
     const VariationIndices& host_variation_indices,
     cudaStream_t stream) -> device::VariationIndices*;
 
+void alloc_copy_filter_data(MergeFilterData& mfd,
+    const UsedSources::VariationsList& or_variations_list, cudaStream_t stream);
+
+void alloc_copy_start_indices(MergeData::Host& host,
+    MergeFilterData::DeviceCommon& device, cudaStream_t stream);
+
 }  // namespace cm
 
 #endif  // INCLUDE_FILTER_H

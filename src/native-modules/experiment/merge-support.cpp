@@ -695,6 +695,7 @@ auto get_merge_data(const std::vector<SourceList>& src_lists,
   device.idx_lists = cuda_alloc_copy_idx_lists(compat_idx_lists, stream);
   const auto idx_list_sizes = util::make_list_sizes(compat_idx_lists);
   device.idx_list_sizes = cuda_alloc_copy_list_sizes(idx_list_sizes, stream);
+  device.num_idx_lists = compat_idx_lists.size();
   host.compat_idx_lists = std::move(compat_idx_lists);
   const auto level = merge_only ? ExtraVerbose : Normal;
   util::LogDuration ld("cuda_get_compatible_indices", level);

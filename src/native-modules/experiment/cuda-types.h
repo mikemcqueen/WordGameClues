@@ -42,6 +42,8 @@ struct VariationIndices {
   }
 };
 
+struct SourceCompatibilityData;
+
 }  // namespace device
 
 // functions

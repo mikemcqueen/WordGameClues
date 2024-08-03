@@ -291,37 +291,6 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   }
   return Number::New(env, num_compat);
 }
-
-void alloc_copy_start_indices(MergeData::Host& host,
-    MergeFilterData::DeviceCommon& device, cudaStream_t stream) {
-  auto src_list_start_indices = make_start_indices(host.src_lists);
-  device.src_list_start_indices = cuda_alloc_copy_start_indices(
-      src_list_start_indices, stream);  // "src_list_start_indices"
-  auto idx_list_start_indices = make_start_indices(host.compat_idx_lists);
-  device.idx_list_start_indices = cuda_alloc_copy_start_indices(
-      idx_list_start_indices, stream);  // "idx_list_start_indices"
-}
-
-void alloc_copy_filter_data(MergeFilterData& mfd,
-    const UsedSources::VariationsList& or_variations_list,
-    cudaStream_t stream) {
-  assert(!mfd.host_xor.compat_indices.empty()); // arbitrary
-  util::LogDuration ld("alloc_copy_filter_data", Verbose);
-  alloc_copy_start_indices(mfd.host_xor, mfd.device_xor, stream);
-  auto xor_indices = buildSentenceVariationIndices(mfd.host_xor.src_lists,
-      mfd.host_xor.compat_idx_lists, mfd.host_xor.compat_indices);
-  mfd.device_xor.variation_indices =
-    cuda_allocCopySentenceVariationIndices(xor_indices, stream);
-
-  if (!mfd.host_or.compat_indices.empty()) {
-    alloc_copy_start_indices(mfd.host_or, mfd.device_or, stream);
-    auto or_indices = build_variation_indices(or_variations_list,  //
-        mfd.host_or.compat_indices);
-    mfd.device_or.variation_indices =
-        cuda_alloc_copy_variation_indices(or_indices, stream);
-  }
-}
-
 /*
 void cuda_alloc_copy_combo_indices(MergeFilterData::HostOr& host,
     MergeFilterData::DeviceOr& device, cudaStream_t stream) {
@@ -431,7 +400,7 @@ auto get_unique_OR_variations(/*const MergeData::Host& host_or,*/
 
 auto check_XOR_compatibility(const MergeFilterData& mfd,
     const UsedSources::VariationsSet& or_variations) {
-  dump_combos(mfd.host_or, mfd.device_or);
+  //dump_combos(mfd.host_or, mfd.device_or);
   auto xor_variations = get_variations_list(mfd.host_xor);
   std::cerr << "XOR variations: " << xor_variations.size() << std::endl;
   int num_incompat{};

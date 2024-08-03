@@ -11,6 +11,7 @@
 #include <utility>
 #include <vector>
 #include "candidates.h"
+#include "cm-precompute.h"
 #include "cuda-types.h"
 #include "filter.cuh"
 #include "filter.h"
@@ -712,6 +713,55 @@ filter_result_t get_filter_result() {
   CudaEvent temp(stream);
   temp.synchronize();
   return device_variation_indices;
+}
+
+
+void alloc_copy_start_indices(MergeData::Host& host,
+    MergeFilterData::DeviceCommon& device, cudaStream_t stream) {
+  auto src_list_start_indices = make_start_indices(host.src_lists);
+  device.src_list_start_indices = cuda_alloc_copy_start_indices(
+      src_list_start_indices, stream);  // "src_list_start_indices"
+  auto idx_list_start_indices = make_start_indices(host.compat_idx_lists);
+  device.idx_list_start_indices = cuda_alloc_copy_start_indices(
+      idx_list_start_indices, stream);  // "idx_list_start_indices"
+}
+
+void alloc_copy_filter_indices(MergeFilterData& mfd,
+    const UsedSources::VariationsList& or_variations_list,
+    cudaStream_t stream) {
+  assert(!mfd.host_xor.compat_indices.empty()); // arbitrary
+  util::LogDuration ld("alloc_copy_filter_indices", Verbose);
+  alloc_copy_start_indices(mfd.host_xor, mfd.device_xor, stream);
+  auto xor_indices = buildSentenceVariationIndices(mfd.host_xor.src_lists,
+      mfd.host_xor.compat_idx_lists, mfd.host_xor.compat_indices);
+  mfd.device_xor.variation_indices =
+    cuda_allocCopySentenceVariationIndices(xor_indices, stream);
+
+  if (!mfd.host_or.compat_indices.empty()) {
+    alloc_copy_start_indices(mfd.host_or, mfd.device_or, stream);
+    auto or_indices = build_variation_indices(or_variations_list,  //
+        mfd.host_or.compat_indices);
+    mfd.device_or.variation_indices =
+        cuda_alloc_copy_variation_indices(or_indices, stream);
+  }
+}
+
+void alloc_copy_filter_data(MergeFilterData& mfd,
+    const UsedSources::VariationsList& or_variations_list,
+    cudaStream_t stream) {
+  alloc_copy_filter_indices(mfd, or_variations_list, stream);
+
+  const auto common_bytes = sizeof(MergeFilterData::DeviceCommon);
+  cudaError_t err{};
+  cuda_malloc_async((void**)&mfd.device_xor_data, common_bytes, stream, "filter data");
+  err = cudaMemcpyAsync(mfd.device_xor_data, &mfd.device_xor, common_bytes,  //
+      cudaMemcpyHostToDevice);
+  assert_cuda_success(err, "copy filter data");
+
+  cuda_malloc_async((void**)&mfd.device_or_data, common_bytes, stream, "filter data");
+  err = cudaMemcpyAsync(mfd.device_or_data, &mfd.device_or, common_bytes,  //
+      cudaMemcpyHostToDevice);
+  assert_cuda_success(err, "copy filter data");
 }
 
 }  // namespace cm

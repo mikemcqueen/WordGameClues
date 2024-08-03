@@ -43,6 +43,7 @@ struct MergeData {
     SourceCompatibilityData* src_lists{};
     index_t* idx_lists{};
     index_t* idx_list_sizes{};
+    unsigned num_idx_lists{};
   } device;
 };
 
@@ -73,6 +74,9 @@ struct MergeFilterData {
     device::VariationIndices* variation_indices{};
     unsigned num_variation_indices{};
   };
+
+  DeviceCommon* device_xor_data;
+  DeviceCommon* device_or_data;
 
   //
   // XOR

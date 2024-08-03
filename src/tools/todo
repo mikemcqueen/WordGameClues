@@ -26,11 +26,12 @@
          doesn't seem to help here.
   * DONE implement variation compatibility check with XOR source.
   * DONE write OR kernel
-  * IN-PROGRESS fix bugs in OR kernel
-    * fix OR combo_idx generation (??) or variation merge bug, whatever the root cause
-    * I think "num_or_sources" is wrong. that should be num_or_combinations. and very much
-      a uint64_t. result of multiply_with_overflow_check(). probably need a new version that
-      uses lengths of containers vs. container of lengths: multiply_sizes_with_overflow_check().
+  * DONE fix OR combo_idx generation (??) or variation merge bug, whatever the root cause
+  * DONE precompute XOR variations. 
+  * DONE idx_list/size consolidation into a struct. will reduce parameter count.
+  * IN-PROGRESS fix issues in OR kernel
+    * different block sizes yield different results. 1024 and 128 for example. fix this,
+      as 128 goes really fast, it'd be nice if it were also accurate.
     * seems like there might be an issue with multiple blocks comparing the same OR + XOR
       sources in variation compat check. Saw:
       block 66, tid 224, flat_idx: 224, list_idx: 5, idx: 0, src_idx: 0 into:
@@ -42,6 +43,14 @@
       * upon further review, it looks like multiple *blocks* may be using the same
         xor_idx. maybe put a printf in !threadIdx.x scope in for the 1 XOR version of
         bool get_next_compatible_OR_sources()
+    * maybe i could have some kind of shared "last_xor_idx" then I wouldn't have to
+      determine the variations if it hasn't changed. for precomputed variations.
+    * register spill now in filter_kernel. it's actually running a bit faster at half
+      occupancy and more register than it does at full occupancy and 40 registers. some
+      ideas for register pressure:
+      * fewer intermediate local variable declarations when extracting a src out of an
+        idx_list/src_list from a flat_idx.
+      * allocate or_variations to populate num_or_sources even if zero
 
 * should look into using libcu++ for standard library such as std::array, std::copy in
   kernels. coz.. i might just be gettting lucky. and i'm not sure how to control which
