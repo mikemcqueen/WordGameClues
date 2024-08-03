@@ -16,15 +16,33 @@ namespace cm {
 // aliases
 
 using result_t = uint8_t;
-using compat_src_result_t = result_t;
 using index_t = uint32_t;
-using combo_index_t = uint64_t;
+using fat_index_t = uint64_t;
 
 using IndexList = std::vector<index_t>;
-//using ComboIndexList = std::vector<combo_index_t>;
+using FatIndexList = std::vector<fat_index_t>;
 
-using ComboIndexSpan = std::span<const combo_index_t>;
-using ComboIndexSpanPair = std::pair<ComboIndexSpan, ComboIndexSpan>;
+using FatIndexSpan = std::span<const fat_index_t>;
+using FatIndexSpanPair = std::pair<FatIndexSpan, FatIndexSpan>;
+
+namespace device {  // on-device data structures
+
+struct VariationIndices {
+  fat_index_t* device_data;    // one chunk of allocated data; other pointers
+                               // below point inside this chunk.
+  fat_index_t* indices;
+  index_t num_indices;         // size of indices array
+  index_t num_variations;      // size of the following two arrays
+  index_t* num_indices_per_variation;
+  index_t* variation_offsets;  // offsets into indices
+
+  constexpr FatIndexSpan get_index_span(int variation) const {
+    return {&indices[variation_offsets[variation]],
+      num_indices_per_variation[variation]};
+  }
+};
+
+}  // namespace device
 
 // functions
 

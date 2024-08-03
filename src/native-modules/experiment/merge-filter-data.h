@@ -8,24 +8,6 @@
 
 namespace cm {
 
-namespace device {  // on-device data structures
-
-struct VariationIndices {
-  combo_index_t* device_data;  // one chunk of allocated data; other pointers
-                               // below point inside this chunk.
-  combo_index_t* combo_indices;
-  index_t* num_combo_indices;  // per variation
-  index_t* variation_offsets;  // offsets into combo_indices
-  index_t num_variations;
-
-  constexpr ComboIndexSpan get_index_span(int variation) const {
-    return {&combo_indices[variation_offsets[variation]],
-      num_combo_indices[variation]};
-  }
-};
-
-}  // namespace device
-
 struct MergeData {
   struct Host {
     Host() = default;
@@ -34,7 +16,7 @@ struct MergeData {
 
     std::vector<SourceList> src_lists;
     std::vector<IndexList> compat_idx_lists;
-    std::vector<uint64_t> compat_flat_indices;
+    FatIndexList compat_indices;
   } host;
 
   struct Device {
@@ -74,6 +56,7 @@ struct MergeFilterData {
       MergeData::Device::reset_pointers();
       src_list_start_indices = nullptr;
       idx_list_start_indices = nullptr;
+      variation_indices = nullptr;
     }
 
   public:
@@ -81,11 +64,14 @@ struct MergeFilterData {
       MergeData::Device::cuda_free();
       cm::cuda_free(src_list_start_indices);
       cm::cuda_free(idx_list_start_indices);
+      cm::cuda_free(variation_indices);
       reset_pointers();
     }
 
     index_t* src_list_start_indices{};
     index_t* idx_list_start_indices{};
+    device::VariationIndices* variation_indices{};
+    unsigned num_variation_indices{};
   };
 
   //
@@ -105,20 +91,16 @@ struct MergeFilterData {
     void reset_pointers() {
       DeviceCommon::reset_pointers();
       incompat_src_desc_pairs = nullptr;
-      variation_indices = nullptr;
     }
 
   public:
     void cuda_free() {
       DeviceCommon::cuda_free();
       cm::cuda_free(incompat_src_desc_pairs);
-      cm::cuda_free(variation_indices);
       reset_pointers();
     }
 
     UsedSources::SourceDescriptorPair* incompat_src_desc_pairs{};
-    device::VariationIndices* variation_indices{};
-    unsigned num_variation_indices{};
   } device_xor;
 
   //

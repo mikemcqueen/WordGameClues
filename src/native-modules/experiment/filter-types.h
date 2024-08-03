@@ -29,6 +29,12 @@ using filter_result_t = std::unordered_set<std::string>;
 
 // types
 
+struct VariationIndices {
+  FatIndexList indices;
+  IndexList num_indices;
+  IndexList offsets;
+};
+
 class IndexStates {
 public:
   enum class Status {

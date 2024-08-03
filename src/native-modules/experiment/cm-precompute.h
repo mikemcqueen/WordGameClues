@@ -5,6 +5,7 @@
 #include <vector>
 #include "combo-maker.h"
 #include "cuda-types.h"
+#include "filter-types.h"
 
 namespace cm {
 
@@ -17,6 +18,9 @@ auto buildSentenceVariationIndices(const std::vector<SourceList>& xor_src_lists,
     const std::vector<IndexList>& compat_idx_lists,
     const std::vector<uint64_t>& compat_flat_indices)
     -> SentenceVariationIndices;
+
+auto build_variation_indices(const UsedSources::VariationsList& variations_list,
+    const FatIndexList& compat_indices) -> VariationIndices;
 }
 
 #endif // INCLUDE_CM_PRECOMPUTE_H

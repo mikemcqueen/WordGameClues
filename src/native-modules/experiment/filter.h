@@ -23,13 +23,16 @@ auto filter_candidates_cuda(const MergeFilterData& mfd, int sum,
 
 filter_result_t get_filter_result();
 
-[[nodiscard]] UsedSources::SourceDescriptorPair*
-cuda_alloc_copy_source_descriptor_pairs(
+[[nodiscard]] auto cuda_alloc_copy_source_descriptor_pairs(
     const std::vector<UsedSources::SourceDescriptorPair>& src_desc_pairs,
-    cudaStream_t stream);
+    cudaStream_t stream) -> UsedSources::SourceDescriptorPair*;
 
 [[nodiscard]] auto cuda_allocCopySentenceVariationIndices(
     const SentenceVariationIndices& sentenceVariationIndices,
+    cudaStream_t stream) -> device::VariationIndices*;
+
+[[nodiscard]] auto cuda_alloc_copy_variation_indices(
+    const VariationIndices& host_variation_indices,
     cudaStream_t stream) -> device::VariationIndices*;
 
 }  // namespace cm

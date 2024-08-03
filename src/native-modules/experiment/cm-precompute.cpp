@@ -232,4 +232,29 @@ auto buildSentenceVariationIndices(const std::vector<SourceList>& xor_src_lists,
   return sentenceVariationIndices;
 }
 
+auto build_variation_indices(const UsedSources::VariationsList& variations_list,
+    const FatIndexList& compat_indices) -> VariationIndices {
+  std::unordered_map<UsedSources::Variations, FatIndexList> variations_map;
+  for (index_t i{}; i < (index_t)variations_list.size(); ++i) {
+    const auto& variation = variations_list.at(i);
+    auto idx = compat_indices.at(i);
+    auto it = variations_map.find(variation);
+    if (it == variations_map.end()) {
+      FatIndexList idx_list{idx};
+      auto [_, success] = variations_map.emplace(variation, idx_list);
+      assert(success);
+    } else {
+      it->second.push_back(idx);
+    }
+  }
+  VariationIndices vi;
+  for (index_t offset{}; const auto& [_, idx_list] : variations_map) {
+    std::ranges::copy(idx_list, std::back_inserter(vi.indices));
+    vi.num_indices.push_back(idx_list.size());
+    vi.offsets.push_back(offset);
+    offset += idx_list.size();
+  }
+  return vi;
+}
+
 }  // namespace cm

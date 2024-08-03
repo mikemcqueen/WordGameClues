@@ -91,6 +91,7 @@ struct UsedSources {
   // 32 bits per sentence * 9 sentences = 288 bits, 36 bytes
   using SourceBits = mme::bitset<kMaxSourcesPerSentence * kNumSentences>;
   using Variations = std::array<variation_index_t, kNumSentences>;
+  using VariationsList = std::vector<Variations>;
   using VariationsSet = std::unordered_set<Variations>;
 
   constexpr static auto getFirstBitIndex(int sentence) {
@@ -663,7 +664,7 @@ using XorSourceList = std::vector<XorSource>;
 // which share the same per-sentence variation.
 // One list of indices per variation, plus '-1' (no) variation.
 // indices are offset by 1; variation -1 is index 0.
-using VariationIndicesList = std::vector<std::vector<uint64_t>>;
+using VariationIndicesList = std::vector<FatIndexList>;
 // one variationIndicesLists per sentence
 using SentenceVariationIndices =
     std::array<VariationIndicesList, kNumSentences>;
