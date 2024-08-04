@@ -393,17 +393,19 @@ __device__ bool is_any_OR_source_compatible(
     const FatIndexSpanPair& idx_spans,
     const MergeFilterData::DeviceCommon* RESTRICT or_data) {
   const auto block_size = blockDim.x;
-  const auto num_xor_indices = idx_spans.first.size() + idx_spans.second.size();
   fat_index_t* xor_results_idx_ptr = &dynamic_shared[kXorResultsIdx];
   __shared__ bool any_or_compat;
   if (!threadIdx.x) {
     *xor_results_idx_ptr = next_xor_result_idx(0, xor_results);
     any_or_compat = false;
   }
-  //const auto first_xor_idx = blockDim.x * xor_chunk_idx;
+  const auto num_xor_indices = idx_spans.first.size() + idx_spans.second.size();
+  auto max_results = num_xor_indices - blockDim.x * xor_chunk_idx;
+  if (max_results > block_size) max_results = block_size;
   __syncthreads();
-  auto xor_results_idx = *xor_results_idx_ptr;
-  while (xor_results_idx < block_size) {
+  //auto xor_results_idx = *xor_results_idx_ptr;
+  //while (xor_results_idx < block_size) {
+  for (unsigned xor_results_idx{}; xor_results_idx < max_results;) {
     // for (;;) {
     // __syncthreads();
     // if (*xor_results_idx_ptr >= block_size) break; // old
@@ -448,7 +450,7 @@ __device__ bool is_any_OR_source_compatible(
     *xor_results_idx_ptr = 0;
   }
   return false;
-  }
+}
 
   /*
 __device__ bool is_any_OR_source_compatible(
