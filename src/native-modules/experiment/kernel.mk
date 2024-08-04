@@ -18,7 +18,8 @@ NVCC_COMPILE_FLAGS := -Xcompiler -fPIC \
 	-Xptxas=-v \
 	-lineinfo \
 	-std=c++20 \
-	-maxrregcount=40
+#	-maxrregcount=40
+
 
 NVCC_LINK_FLAGS := -Xcompiler -fPIC
 

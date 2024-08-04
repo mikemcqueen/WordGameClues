@@ -212,14 +212,18 @@ public:
     return true;
   }
 
+  constexpr auto isOrCompatibleWith(const UsedSources& other) const {
+    return are_variations_compatible(variations, other.variations)
+           && (getBits().intersects(other.getBits())
+               || getBits().is_subset_of(other.getBits()));
+  }
+
   bool addSource(int src, bool nothrow = false) {
     auto sentence = Source::getSentence(src);
     assert(sentence > 0);
     auto variation = Source::getVariation(src);
     if (hasVariation(sentence) && (getVariation(sentence) != variation)) {
-      if (nothrow) {
-        return false;
-      }
+      if (nothrow) { return false; }
       std::cerr << "sentence " << sentence
                 << " variation: " << getVariation(sentence)
                 << ", src variation: " << variation << std::endl;
@@ -233,9 +237,7 @@ public:
     // bits
     auto bit_pos = Source::getIndex(src) + getFirstBitIndex(sentence);
     if (bits.test(bit_pos)) {
-      if (nothrow) {
-        return false;
-      }
+      if (nothrow) { return false; }
       assert(0 && "addSource: bit already set");
     }
     bits.set(bit_pos);
@@ -266,7 +268,7 @@ public:
           cuda_strcat(buf, "\n");
           first = false;
         }
-        //sprintf(smolbuf, "  s%d v%d:", s, (int)getVariation(s));
+        // sprintf(smolbuf, "  s%d v%d:", s, (int)getVariation(s));
         cuda_strcat(buf, "s");
         cuda_itoa(s, smolbuf);
         cuda_strcat(buf, smolbuf);
@@ -276,7 +278,7 @@ public:
         cuda_strcat(buf, ":");
         for (int i{}; i < kMaxSourcesPerSentence; ++i) {
           if (bits.test((s - 1) * kMaxSourcesPerSentence + i)) {
-            //sprintf(smolbuf, " %d", i);
+            // sprintf(smolbuf, " %d", i);
             cuda_strcat(buf, " ");
             cuda_itoa(i, smolbuf);
             cuda_strcat(buf, smolbuf);
@@ -285,16 +287,14 @@ public:
         cuda_strcat(buf, "\n");
       }
     }
-    if (first) {
-      cuda_strcat(buf, " none");
-    }
+    if (first) { cuda_strcat(buf, " none"); }
     printf("%s", buf);
   }
 
   constexpr void assert_valid() const {
     for (int s{1}; s <= kNumSentences; ++s) {
       if (hasVariation(s)) {
-        assert(bits.count() > 0); // sources[Source::getFirstIndex(s)] != -1);
+        assert(bits.count() > 0);  // sources[Source::getFirstIndex(s)] != -1);
       }
     }
   }
@@ -307,7 +307,7 @@ public:
         auto new_word = word & (word - 1);  // word with LSB removed
         // probably should have commented this when i did it.
         int bit_pos = lrint(log2(word ^ new_word));
-        SourceDescriptor sd{ i + 1, bit_pos, getVariation(i + 1)};
+        SourceDescriptor sd{i + 1, bit_pos, getVariation(i + 1)};
         if (!first.sentence) {
           first = sd;
         } else {

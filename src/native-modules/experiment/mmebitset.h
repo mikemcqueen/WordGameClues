@@ -77,13 +77,13 @@ public:
   constexpr auto count() const {
     int n{};
     for (int i{}; i < wc(); ++i) {
-#ifndef __CUDA_ARCH__ // v- host code
+#ifndef __CUDA_ARCH__    // v- host code
       auto w = bits[i];
       while (w) {
         w &= (w - 1);
         n++;
       }
-#else // v- device code  ^- host code
+#else // v- device code ^- host code
       n += __popc(bits[i]);
 #endif
     }
@@ -94,6 +94,15 @@ public:
     for (int i{}; i < wc(); ++i)
       bits[i] |= other.bits[i];
     return *this;
+  }
+
+  // test "OR compatibility" in one pass (!intersects || is_subset_of)
+  constexpr bool is_disjoint_or_subset(const bitset<size>& other) const {
+    for (int i{}; i < wc(); ++i) {
+      auto w = bits[i] & other.bits[i];
+      if (w && (w != bits[i])) return false;
+    }
+    return true;
   }
 
   // test "XOR compatibility" without constructing new object

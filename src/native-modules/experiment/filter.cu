@@ -52,6 +52,13 @@ __device__ auto are_xor_compatible(const UsedSources& a, const UsedSources& b) {
   return true;
 }
 
+__device__ auto are_or_compatible(const UsedSources& a, const UsedSources& b) {
+  return UsedSources::are_variations_compatible(a.variations, b.variations)
+         && a.getBits().is_disjoint_or_subset(b.getBits());
+  // a.getBits().intersects(b.getBits()) ||
+  // a.getBits().is_subset_of(b.getBits()))
+}
+
 /*
 template <typename T> __device__ __forceinline__ T load(const T* addr) {
   return *(const volatile T*)addr;
@@ -231,11 +238,14 @@ __device__ bool is_source_compatible(T tag,
       if (!src.isXorCompatibleWith(source)) return false;
 #endif
     } else if constexpr (std::is_same_v<T, tag::OR>) {
-      if (!src.isOrCompatibleWith(source)) return false;
+      //if (!src.isOrCompatibleWith(source)) return false;
+      //src.usedSources.isOrCompatibleWith(source.usedSources)) return false;
+      if (!are_xor_compatible(src.usedSources, source.usedSources))
+        return false;
     }
     flat_idx /= data->idx_list_sizes[list_idx];
   }
-    return true;
+  return true;
 }
 
 __device__ void dump_variation(
@@ -283,7 +293,7 @@ __device__ UsedSources::variation_index_t get_one_variation(int sentence,
 
 __device__ unsigned variation_merge_failure = 0;
 
-// probably faster than UsedSources version
+// faster than UsedSources version
 __device__ auto merge_variations(UsedSources::Variations& to,
     const UsedSources::Variations& from, bool force = false) {
   for (int s{0}; s < kNumSentences; ++s) {
@@ -321,6 +331,16 @@ __device__ bool get_OR_sources_chunk(const SourceCompatibilityData& source,
     unsigned or_chunk_idx, const UsedSources::Variations& xor_variations,
     const MergeFilterData::DeviceCommon* RESTRICT or_data) {
   const auto num_or_indices = or_data->variation_indices->num_indices;
+
+  // TODO: if i could use a cooperative group of 9 threads here,
+  // ideally 3 cta's per warp with 5 dead threads per warp
+  // then i could do or_variation building variation compat
+  // checking using 1 thread per variation index.
+  // and i could do source compat checking using 1 thread per
+  // variation index.
+  // and perhaps even 1 bitset word per sentence
+
+  // one thread per variation_idx
   const auto or_variation_idx = get_flat_idx(or_chunk_idx);
   if (or_variation_idx < num_or_indices) {
 
