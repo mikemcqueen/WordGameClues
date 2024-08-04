@@ -102,7 +102,7 @@ public:
     auto max = std::min(first + count, int(num_lists()));
     int total{};
     for (int i{first}; i < max; ++i) {
-      if (list_.at(first + i).status == status) {
+      if (list_.at(i).status == status) {
         ++total;
       }
     }
