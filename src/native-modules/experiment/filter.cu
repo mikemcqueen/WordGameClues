@@ -195,7 +195,7 @@ __device__ auto get_xor_combo_index(
     fat_index_t flat_idx, const FatIndexSpanPair& idx_spans) {
   if (flat_idx < idx_spans.first.size()) return idx_spans.first[flat_idx];
   flat_idx -= idx_spans.first.size();
-  assert(flat_idx < idx_spans.second.size());
+  //  assert(flat_idx < idx_spans.second.size());
   return idx_spans.second[flat_idx];
 }
 
@@ -283,14 +283,24 @@ __device__ UsedSources::variation_index_t get_one_variation(int sentence,
 
 __device__ unsigned variation_merge_failure = 0;
 
+// probably faster than UsedSources version
+__device__ auto merge_variations(UsedSources::Variations& to,
+    const UsedSources::Variations& from, bool force = false) {
+  for (int s{0}; s < kNumSentences; ++s) {
+    if (force || (to[s] == -1)) to[s] = from[s];
+  }
+  return true;
+}
+
 __device__ auto build_variations(
     fat_index_t flat_idx, const MergeFilterData::DeviceCommon* RESTRICT data) {
-  UsedSources::Variations v = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
+  UsedSources::Variations v; //  = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
+  bool force = true;
   for (int list_idx{int(data->num_idx_lists) - 1}; list_idx >= 0; --list_idx) {
     const auto& src = data->get_source(flat_idx, list_idx);
     flat_idx /= data->idx_list_sizes[list_idx];
-    const auto b = UsedSources::merge_variations(v, src.usedSources.variations);
-    assert(b);
+    merge_variations(v, src.usedSources.variations, force);
+    force = false;
   }
   return v;
 }
@@ -311,7 +321,6 @@ __device__ bool get_OR_sources_chunk(const SourceCompatibilityData& source,
     unsigned or_chunk_idx, const UsedSources::Variations& xor_variations,
     const MergeFilterData::DeviceCommon* RESTRICT or_data) {
   const auto num_or_indices = or_data->variation_indices->num_indices;
-  //or_results[threadIdx.x] = 0;
   const auto or_variation_idx = get_flat_idx(or_chunk_idx);
   if (or_variation_idx < num_or_indices) {
 
@@ -319,7 +328,8 @@ __device__ bool get_OR_sources_chunk(const SourceCompatibilityData& source,
     atomicInc(&count_or_src_considered, BIG);
     #endif
 
-    const auto or_flat_idx = or_data->variation_indices->indices[or_variation_idx];
+    const auto or_flat_idx =
+        or_data->variation_indices->indices[or_variation_idx];
     if (are_variations_compatible(xor_variations, or_flat_idx, or_data)) {
 
       #ifdef DEBUG_OR_COUNTS
@@ -332,7 +342,6 @@ __device__ bool get_OR_sources_chunk(const SourceCompatibilityData& source,
         atomicInc(&count_or_src_compat, BIG);
         #endif
 
-        //or_results[threadIdx.x] = 1;
         return true;
       }
     }
@@ -367,6 +376,7 @@ __device__ bool get_next_compatible_OR_sources(
       any_or_compat = true;
     }
     __syncthreads();
+
     // Or compatibility here is "success" for the supplied source and will
     // result in an exit out of is_compat_loop.
     if (any_or_compat) return true;
@@ -377,6 +387,7 @@ __device__ bool get_next_compatible_OR_sources(
   return false;
 }
 
+// not the fastest function in the world. but keeps GPU busy at least.
 __device__ auto next_xor_result_idx(
     unsigned result_idx, const result_t* RESTRICT xor_results) {
   const auto block_size = blockDim.x;
@@ -393,24 +404,14 @@ __device__ bool is_any_OR_source_compatible(
     const FatIndexSpanPair& idx_spans,
     const MergeFilterData::DeviceCommon* RESTRICT or_data) {
   const auto block_size = blockDim.x;
-  fat_index_t* xor_results_idx_ptr = &dynamic_shared[kXorResultsIdx];
   __shared__ bool any_or_compat;
-  if (!threadIdx.x) {
-    *xor_results_idx_ptr = next_xor_result_idx(0, xor_results);
-    any_or_compat = false;
-  }
+  if (!threadIdx.x) any_or_compat = false;
   const auto num_xor_indices = idx_spans.first.size() + idx_spans.second.size();
   auto max_results = num_xor_indices - blockDim.x * xor_chunk_idx;
   if (max_results > block_size) max_results = block_size;
   __syncthreads();
-  //auto xor_results_idx = *xor_results_idx_ptr;
-  //while (xor_results_idx < block_size) {
   for (unsigned xor_results_idx{}; xor_results_idx < max_results;) {
-    // for (;;) {
-    // __syncthreads();
-    // if (*xor_results_idx_ptr >= block_size) break; // old
-    // if (first_xor_idx + *xor_results_idx_ptr >= num_xor_indices) break; // new, fails
-    const auto xor_flat_idx = get_flat_idx(xor_chunk_idx, xor_results_idx); // *xor_results_idx_ptr);
+    const auto xor_flat_idx = get_flat_idx(xor_chunk_idx, xor_results_idx);
     const auto xor_combo_idx = get_xor_combo_index(xor_flat_idx, idx_spans);
     if (get_next_compatible_OR_sources(source, xor_combo_idx, xor_data,  //
             or_data)) {
@@ -433,52 +434,11 @@ __device__ bool is_any_OR_source_compatible(
     // Or compatibility failure means we have exhausted all OR source chunks
     // for this XOR result; proceed to next XOR result.
     xor_results_idx = next_xor_result_idx(xor_results_idx + 1, xor_results);
-
-    //if (!threadIdx.x) {
-    //  *xor_results_idx_ptr =
-    //      next_xor_result_idx(*xor_results_idx_ptr + 1, xor_results);
-    //}
   }
   // No XOR results in this XOR chunk were compatible. The next call to this
-  // function for this block will be with a new XOR chunk, and an OR chunk
-  // index of zero, which will result in xor_result_idx being reset on entry.
-  //
-  // So technically we don't need to reset it here. But we do need to signal
-  // to the calling function that it's time for a new chunk, and that's what
-  // this does.
-  if (!threadIdx.x) {
-    *xor_results_idx_ptr = 0;
-  }
+  // function for this block will be with a new XOR chunk.
   return false;
 }
-
-  /*
-__device__ bool is_any_OR_source_compatible(
-    const SourceCompatibilityData& source, unsigned xor_chunk_idx,
-    const result_t* RESTRICT xor_results,
-    const MergeFilterData::DeviceCommon* RESTRICT xor_data,
-    const FatIndexSpanPair& idx_spans,
-    const MergeFilterData::DeviceCommon* RESTRICT or_data) {
-
-  if (get_next_compatible_OR_sources(source, 0, xor_chunk_idx, xor_results,
-          xor_data, idx_spans, or_data)) {
-    any_or_compat = true;
-  }
-  __syncthreads();
-  if (any_or_compat) return true;
-
-#if 1
-    if (!threadIdx.x) {
-      // A zero xor_results_idx signals its time for a new XOR chunk.
-      //if (!*xor_results_idx_ptr) {
-        (*xor_chunk_idx_ptr)++;
-      //}
-    }
-    // TODO: could move this to beginning of loop?
-    //__syncthreads();
-#endif
-}
-  */
 
 // Get the next block-sized chunk of XOR sources and test them for 
 // compatibility with the supplied source.
