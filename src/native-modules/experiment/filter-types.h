@@ -101,7 +101,7 @@ public:
     // hack
     auto max = std::min(first + count, int(num_lists()));
     int total{};
-    for (int i{}; i < max; ++i) {
+    for (int i{first}; i < max; ++i) {
       if (list_.at(first + i).status == status) {
         ++total;
       }
