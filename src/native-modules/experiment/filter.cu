@@ -550,7 +550,7 @@ __device__ bool is_compat_loop(const SourceCompatibilityData& source,
   __shared__ bool any_or_compat;
   const auto num_xor_indices = idx_spans.first.size() + idx_spans.second.size();
   const auto num_or_indices =
-      or_data ? or_data->variation_indices->num_indices : 0;
+      or_data->variation_indices ? or_data->variation_indices->num_indices : 0;
   if (!threadIdx.x) {
     *xor_chunk_idx_ptr = 0;
     any_xor_compat = false;

@@ -98,8 +98,10 @@ public:
   }
 
   auto num_in_state(int first, int count, Status status) const {
+    // hack
+    auto max = std::min(first + count, int(num_lists()));
     int total{};
-    for (int i{}; i < count; ++i) {
+    for (int i{}; i < max; ++i) {
       if (list_.at(first + i).status == status) {
         ++total;
       }
