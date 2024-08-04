@@ -13,17 +13,21 @@ namespace cm {
 
 namespace {
 
+#if 1
+#define RESTRICT __restrict__
+#else
+#define RESTRICT
+#endif
+  
 const unsigned BIG = 2'100'000'000;
   //#define DEBUG_OR_COUNTS
-  //#define DEBUG_XOR_COUNTS
-  //#define DISABLE_OR
-  //#define FORCE_XOR_COMPAT
-  //#define FORCE_ALL_XOR
-  //#define ONLY_ONE_SOURCE
-
-
-
-  //#define USE_LOCAL_XOR_COMPAT
+//#define DEBUG_XOR_COUNTS
+// #define DISABLE_OR
+// #define FORCE_XOR_COMPAT
+// #define FORCE_ALL_XOR
+//#define MAX_SOURCES 2
+// #define USE_LOCAL_XOR_COMPAT
+//#define PRINTF
 
 #if defined(DEBUG_XOR_COUNTS) || defined(DEBUG_OR_COUNTS)
 __device__ unsigned count_xor_src_considered = 0;
@@ -62,7 +66,7 @@ template <typename T> __device__ __forceinline__ void store(T* addr, T val) {
 // by any of the supplied source descriptor pairs.
 __device__ bool source_contains_any_descriptor_pair(
     const SourceCompatibilityData& source,
-    const UsedSources::SourceDescriptorPair* __restrict__ src_desc_pairs,
+    const UsedSources::SourceDescriptorPair* RESTRICT src_desc_pairs,
     const unsigned num_src_desc_pairs) {
 
   __shared__ bool contains_both;
@@ -82,11 +86,11 @@ __device__ bool source_contains_any_descriptor_pair(
 }
 
 __global__ void get_compatible_sources_kernel(
-    const SourceCompatibilityData* __restrict__ sources,
+    const SourceCompatibilityData* RESTRICT sources,
     const unsigned num_sources,
     const UsedSources::
-        SourceDescriptorPair* __restrict__ incompat_src_desc_pairs,
-    const unsigned num_src_desc_pairs, result_t* __restrict__ results) {
+        SourceDescriptorPair* RESTRICT incompat_src_desc_pairs,
+    const unsigned num_src_desc_pairs, result_t* RESTRICT results) {
   // one block per source
   for (unsigned idx{blockIdx.x}; idx < num_sources; idx += gridDim.x) {
     const auto& source = sources[idx];
@@ -104,11 +108,16 @@ __global__ void get_compatible_sources_kernel(
 
 extern __shared__ fat_index_t dynamic_shared[];
 
-struct SmallestSpansResult {
-  bool skip;
-  FatIndexSpanPair spans;
+enum class Compat {
+  All,
+  None,
+  Some
 };
-using smallest_spans_result_t = SmallestSpansResult;
+
+struct SmallestSpansResult {
+  Compat compat;
+  FatIndexSpanPair pair;
+};
 
 // variation_indices is an optimization. it allows us to restrict comparisons
 // of a candidate source to only those xor_sources that have the same (or no)
@@ -128,9 +137,10 @@ using smallest_spans_result_t = SmallestSpansResult;
 // the answer: the one with the fewest indices! (which results in the fewest
 // comparisons). that's what this function determines.
 //
-__device__ smallest_spans_result_t get_smallest_src_index_spans(
+__device__ SmallestSpansResult get_smallest_src_index_spans(
     const SourceCompatibilityData& source,
-    const device::VariationIndices* __restrict__ variation_indices) {
+    const device::VariationIndices* RESTRICT variation_indices) {
+  using enum Compat;
   index_t fewest_indices{std::numeric_limits<index_t>::max()};
   int sentence_with_fewest{-1};
   for (int s{}; s < kNumSentences; ++s) {
@@ -160,19 +170,19 @@ __device__ smallest_spans_result_t get_smallest_src_index_spans(
     // there are no sentences from which both the candidate source and any
     // xor_source contain a primary source. we can skip xor-compat checks
     // since they will all succeed.
-    return {true};
+    return {All};
   }
   if (!fewest_indices) {
     // both the candidate source and all xor_sources contain a primary source
     // from sentence_with_fewest, but all xor_sources use a different variation
     // than the candidate source. we can skip all xor-compat checks since they
     // will all fail due to variation mismatch.
-    return {true};
+    return {None};
   }
   const auto variation =
       source.usedSources.variations[sentence_with_fewest] + 1;
   const auto& vi = variation_indices[sentence_with_fewest];
-  return {false,  //
+  return {Some,  //
       std::make_pair(vi.get_index_span(0), vi.get_index_span(variation))};
 }
 
@@ -203,8 +213,7 @@ template <typename T>
 requires std::is_same_v<T, tag::XOR> || std::is_same_v<T, tag::OR>
 __device__ bool is_source_compatible(T tag,
     const SourceCompatibilityData& source, fat_index_t flat_idx,
-    const SourceCompatibilityData* __restrict__ src_lists,
-    const MergeFilterData::DeviceCommon* __restrict__ data) {
+    const MergeFilterData::DeviceCommon* RESTRICT data) {
 
 #ifdef DISABLE_OR
   if constexpr (std::is_same_v<T, tag::OR>) return false;
@@ -214,24 +223,17 @@ __device__ bool is_source_compatible(T tag,
 #endif
 
   for (int list_idx{int(data->num_idx_lists) - 1}; list_idx >= 0; --list_idx) {
-    const auto src_list = &data->src_lists[data->src_list_start_indices[list_idx]];
-    const auto idx_list =
-        &data->idx_lists[data->idx_list_start_indices[list_idx]];
-    const auto idx_list_size = data->idx_list_sizes[list_idx];
-    const auto src_idx = idx_list[flat_idx % idx_list_size];
-    const auto& src = src_list[src_idx];
+    const auto& src = data->get_source(flat_idx, list_idx);
     if constexpr (std::is_same_v<T, tag::XOR>) {
-
 #ifdef USE_LOCAL_XOR_COMPAT
       if (!are_xor_compatible(src.usedSources, source.usedSources)) return false;
 #else
       if (!src.isXorCompatibleWith(source)) return false;
 #endif
-
     } else if constexpr (std::is_same_v<T, tag::OR>) {
       if (!src.isOrCompatibleWith(source)) return false;
     }
-    flat_idx /= idx_list_size;
+    flat_idx /= data->idx_list_sizes[list_idx];
   }
     return true;
 }
@@ -243,11 +245,11 @@ __device__ void dump_variation(
 }
 
 __device__ void dump_all_sources(fat_index_t flat_idx,
-    const SourceCompatibilityData* __restrict__ src_lists,
-    const index_t* __restrict__ src_list_start_indices,
-    const index_t* __restrict__ idx_lists,
-    const index_t* __restrict__ idx_list_start_indices,
-    const index_t* __restrict__ idx_list_sizes, unsigned num_idx_lists) {
+    const SourceCompatibilityData* RESTRICT src_lists,
+    const index_t* RESTRICT src_list_start_indices,
+    const index_t* RESTRICT idx_lists,
+    const index_t* RESTRICT idx_list_start_indices,
+    const index_t* RESTRICT idx_list_sizes, unsigned num_idx_lists) {
   UsedSources::Variations v = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
   printf("all sources:\n");
   auto orig_flat_idx = flat_idx;
@@ -269,104 +271,65 @@ __device__ void dump_all_sources(fat_index_t flat_idx,
 }
 
 __device__ UsedSources::variation_index_t get_one_variation(int sentence,
-    fat_index_t flat_idx, const SourceCompatibilityData* __restrict__ src_lists,
-    const MergeFilterData::DeviceCommon* __restrict__ data) {
+    fat_index_t flat_idx, const MergeFilterData::DeviceCommon* RESTRICT data) {
   for (int list_idx{int(data->num_idx_lists) - 1}; list_idx >= 0; --list_idx) {
-    const auto src_list = &src_lists[data->src_list_start_indices[list_idx]];
-    const auto idx_list = &data->idx_lists[data->idx_list_start_indices[list_idx]];
-    const auto idx_list_size = data->idx_list_sizes[list_idx];
-    const auto src_idx = idx_list[flat_idx % idx_list_size];
-    const auto& src = src_list[src_idx];
-    const auto variation  = src.usedSources.getVariation(sentence);
+    const auto& src = data->get_source(flat_idx, list_idx);
+    const auto variation = src.usedSources.getVariation(sentence);
     if (variation > -1) return variation;
-    flat_idx /= idx_list_size;
+    flat_idx /= data->idx_list_sizes[list_idx];
   }
   return -1;
 }
 
 __device__ unsigned variation_merge_failure = 0;
 
-__device__ auto build_variations(fat_index_t flat_idx,
-    const SourceCompatibilityData* __restrict__ src_lists,
-    const MergeFilterData::DeviceCommon* __restrict__ data, bool xor_flag,
-    bool& fail) {
-  auto orig_flat_idx = flat_idx;
-  //  printf("block: %d, flat: %lu, xor: %d\n", blockIdx.x, flat_idx, xor_flag ? 1 : 0);
+__device__ auto build_variations(
+    fat_index_t flat_idx, const MergeFilterData::DeviceCommon* RESTRICT data) {
   UsedSources::Variations v = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
   for (int list_idx{int(data->num_idx_lists) - 1}; list_idx >= 0; --list_idx) {
-    const auto src_list = &data->src_lists[data->src_list_start_indices[list_idx]];
-    const auto idx_list = &data->idx_lists[data->idx_list_start_indices[list_idx]];
-    const auto idx_list_size = data->idx_list_sizes[list_idx];
-    const auto idx = flat_idx % idx_list_size;
-    const auto src_idx = idx_list[idx];
-    const auto& src = src_list[src_idx];
-    flat_idx /= idx_list_size;
-    auto b = UsedSources::merge_variations(v, src.usedSources.variations);
+    const auto& src = data->get_source(flat_idx, list_idx);
+    flat_idx /= data->idx_list_sizes[list_idx];
+    const auto b = UsedSources::merge_variations(v, src.usedSources.variations);
     assert(b);
-    if (!b) {
-      fail = true;
-      break;
-    }
-#if 0
-    if (!b && !atomicCAS(&variation_merge_failure, 0, 1)) {
-      fail = true;
-      src.dump("failed merging");
-      printf("block %d, tid %d, orig_flat_idx: %lu, list_idx: %d, list_size: %u"
-             ", remain_flat_idx: %lu, idx: %d, src_idx: %u into:\n",
-          blockIdx.x, threadIdx.x, orig_flat_idx, list_idx, idx_list_size,
-          flat_idx, int(idx), src_idx);
-      dump_variation(v);
-      dump_all_sources(orig_flat_idx, src_lists, src_list_start_indices,
-          idx_lists, idx_list_start_indices, idx_list_sizes, num_idx_lists);
-    }
-#endif
   }
   return v;
 }
 
 __device__ auto are_variations_compatible(
-    const UsedSources::Variations& xor_variations_param,
+    const UsedSources::Variations& xor_variations,
     const fat_index_t or_flat_idx,
-    const SourceCompatibilityData* __restrict__ or_src_lists,
-    const MergeFilterData::DeviceCommon* __restrict__ or_data) {
-  bool fail{};
-  const auto& xor_variations = xor_variations_param;
-  auto or_variations =
-      build_variations(or_flat_idx, or_src_lists, or_data, false, fail);
-  if (fail) printf("OR flat_idx failed: %lu\n", or_flat_idx);
-  assert(!fail);
+    const MergeFilterData::DeviceCommon* RESTRICT or_data) {
+  const auto or_variations = build_variations(or_flat_idx, or_data);
   return UsedSources::are_variations_compatible(xor_variations, or_variations);
 }
 
-// Get the next block-sized chunk of OR sources and test them for variation-
-// compatibililty with the XOR source specified by the supplied xor_combo_index,
-// and for OR-compatibility with the supplied source.
+// Get a block-sized chunk of OR sources and test them for variation-
+// compatibililty with the XOR source specified by the supplied
+// xor_combo_index, and for OR-compatibility with the supplied source.
 // Return true if at least one OR source is compatible.
-__device__ bool get_next_OR_sources_chunk(const SourceCompatibilityData& source,
+__device__ bool get_OR_sources_chunk(const SourceCompatibilityData& source,
     unsigned or_chunk_idx, const UsedSources::Variations& xor_variations,
-    const SourceCompatibilityData* __restrict__ or_src_lists,
-    const MergeFilterData::DeviceCommon* __restrict__ or_data,
-    const unsigned num_or_sources, result_t* __restrict__ or_results) {
+    const MergeFilterData::DeviceCommon* RESTRICT or_data,
+    result_t* RESTRICT or_results) {
+  const auto num_or_indices = or_data->variation_indices->num_indices;
   or_results[threadIdx.x] = 0;
   const auto or_variation_idx = get_flat_idx(or_chunk_idx);
-  if (or_variation_idx < num_or_sources) {
+  if (or_variation_idx < num_or_indices) {
 
     #ifdef DEBUG_OR_COUNTS
     atomicInc(&count_or_src_considered, BIG);
     #endif
 
     const auto or_flat_idx = or_data->variation_indices->indices[or_variation_idx];
-    if (are_variations_compatible(
-            xor_variations, or_flat_idx, or_src_lists, or_data)) {
+    if (are_variations_compatible(xor_variations, or_flat_idx, or_data)) {
 
-#ifdef DEBUG_OR_COUNTS
+      #ifdef DEBUG_OR_COUNTS
       atomicInc(&count_or_xor_compat, BIG);
       #endif
 
-      if (is_source_compatible(
-              tag::OR{}, source, or_flat_idx, or_src_lists, or_data)) {
+      if (is_source_compatible(tag::OR{}, source, or_flat_idx, or_data)) {
 
-#ifdef DEBUG_OR_COUNTS
+        #ifdef DEBUG_OR_COUNTS
         atomicInc(&count_or_src_compat, BIG);
         #endif
 
@@ -378,39 +341,47 @@ __device__ bool get_next_OR_sources_chunk(const SourceCompatibilityData& source,
   return false;
 }
 
-// For one XOR source
+// For one XOR source.
+// Walk through OR-sources one block-sized chunk at a time, until we find
+// a chunk that contains at least one OR source that is variation-compatible
+// with the XOR source indentified by the supplied xor_combo_idx, and
+// OR-compatible with the supplied source.
 __device__ bool get_next_compatible_OR_sources(
     const SourceCompatibilityData& source, unsigned or_chunk_idx,
     fat_index_t xor_combo_idx,
-    const SourceCompatibilityData* __restrict__ xor_src_lists,
-    const MergeFilterData::DeviceCommon* __restrict__ xor_data,
-    const SourceCompatibilityData* __restrict__ or_src_lists,
-    const MergeFilterData::DeviceCommon* __restrict__ or_data,
-    const unsigned num_or_sources, result_t* __restrict__ or_results) {
+    const MergeFilterData::DeviceCommon* RESTRICT xor_data,
+    const MergeFilterData::DeviceCommon* RESTRICT or_data,
+    result_t* RESTRICT or_results) {
   const auto block_size = blockDim.x;
   fat_index_t* or_chunk_idx_ptr = &dynamic_shared[kOrChunkIdx];
   __shared__ bool any_or_compat;
   __shared__ UsedSources::Variations xor_variations;
+  const auto num_or_indices = or_data->variation_indices->num_indices;
   if (threadIdx.x < xor_variations.size()) {
     if (!threadIdx.x) any_or_compat = false;
-    xor_variations[threadIdx.x] = get_one_variation(
-        threadIdx.x + 1, xor_combo_idx, xor_src_lists, xor_data);
+    xor_variations[threadIdx.x] =
+        get_one_variation(threadIdx.x + 1, xor_combo_idx, xor_data);
   }
   __syncthreads();
-  for (; or_chunk_idx * block_size < num_or_sources; ++or_chunk_idx) {
-    if (get_next_OR_sources_chunk(source, or_chunk_idx, xor_variations,
-            or_src_lists, or_data, num_or_sources, or_results)) {
+  for (; or_chunk_idx * block_size < num_or_indices; ++or_chunk_idx) {
+    if (get_OR_sources_chunk(source, or_chunk_idx, xor_variations,  //
+            or_data, or_results)) {
       any_or_compat = true;
     }
     __syncthreads();
-    if (any_or_compat) break;
+    // Or compatibility here is "success" for the supplied source and will
+    // result in an exit out of is_compat_loop.
+    if (any_or_compat) return true;
   }
-  if (!threadIdx.x) *or_chunk_idx_ptr = or_chunk_idx + 1;
-  return any_or_compat;
+  // No OR sources were compatible with both the supplied xor_combo_idx and
+  // the supplied source. Reset or_chunk_idx to zero because we'll be called
+  // next with a new xor_combo_idx.
+  if (!threadIdx.x) *or_chunk_idx_ptr = 0; // or_chunk_idx + 1;
+  return false;
 }
 
 __device__ auto next_xor_result_idx(
-    unsigned result_idx, const result_t* __restrict__ xor_results) {
+    unsigned result_idx, const result_t* RESTRICT xor_results) {
   const auto block_size = blockDim.x;
   while ((result_idx < block_size) && !xor_results[result_idx])
     result_idx++;
@@ -420,13 +391,11 @@ __device__ auto next_xor_result_idx(
 // For all XOR results
 __device__ bool get_next_compatible_OR_sources(
     const SourceCompatibilityData& source, unsigned or_chunk_idx,
-    unsigned xor_chunk_idx, const result_t* __restrict__ xor_results,
-    const SourceCompatibilityData* __restrict__ xor_src_lists,
-    const MergeFilterData::DeviceCommon* __restrict__ xor_data,
+    unsigned xor_chunk_idx, const result_t* RESTRICT xor_results,
+    const MergeFilterData::DeviceCommon* RESTRICT xor_data,
     const FatIndexSpanPair& idx_spans,
-    const SourceCompatibilityData* __restrict__ or_src_lists,
-    const MergeFilterData::DeviceCommon* __restrict__ or_data,
-    const unsigned num_or_sources, result_t* __restrict__ or_results) {
+    const MergeFilterData::DeviceCommon* RESTRICT or_data,
+    result_t* RESTRICT or_results) {
   const auto block_size = blockDim.x;
   fat_index_t* xor_results_idx_ptr = &dynamic_shared[kXorResultsIdx];
   fat_index_t* or_chunk_idx_ptr = &dynamic_shared[kOrChunkIdx];
@@ -434,45 +403,57 @@ __device__ bool get_next_compatible_OR_sources(
   if (!threadIdx.x) {
     if (!or_chunk_idx) {
       // First or_chunk resets xor_results_idx to the first valid results index.
+
+      // TODO: could i move this to is_compat_loop initialization? then i could
+      // move __syncthreads to inside loop.
       *xor_results_idx_ptr = next_xor_result_idx(0, xor_results);
     }
     any_or_compat = false;
   }
   __syncthreads();
   auto xor_results_idx = *xor_results_idx_ptr;
-
-#if 0
-  const auto num_xor_indices = idx_spans.first.size() + idx_spans.second.size();
-  auto max_results_idx = block_size;
-  if (block_size * xor_chunk_idx + block_size >= num_xor_indices) {
-    printf ("max\n");
-    max_results_idx = num_xor_indices - block_size * blockIdx.x;
-  }
-#endif
-
   while (xor_results_idx < block_size) {
     const auto xor_flat_idx = get_flat_idx(xor_chunk_idx, xor_results_idx);
     const auto xor_combo_idx = get_xor_combo_index(xor_flat_idx, idx_spans);
-    if (get_next_compatible_OR_sources(source, or_chunk_idx, xor_combo_idx,
-            xor_src_lists, xor_data, or_src_lists, or_data, num_or_sources,
-            or_results)) {
+    if (get_next_compatible_OR_sources(source, *or_chunk_idx_ptr, xor_combo_idx,
+            xor_data, or_data, or_results)) {
       any_or_compat = true;
     }
     __syncthreads();
-    if (any_or_compat) break;
-    xor_results_idx = next_xor_result_idx(xor_results_idx + 1, xor_results);
-  }
-  if (!threadIdx.x) {
-    if (xor_results_idx < block_size) {
-      *xor_results_idx_ptr = xor_results_idx;
-    } else {
-      // If all valid xor_results have evaluated by this block, reset the
-      // xor_results_idx.
-      *xor_results_idx_ptr = 0;
-      //*or_chunk_idx_ptr = 0; // not actually sure about this.
+
+#ifdef PRINTF
+    if (/*!blockIdx.x &&*/ !threadIdx.x) {
+      printf("  block: %u get_next_OR xor_chunk_idx: %u, or_chunk_idx: %u, "
+             "xor_results_idx: %lu, compat: %d\n",
+          blockIdx.x, xor_chunk_idx, or_chunk_idx, xor_results_idx,
+          any_or_compat ? 1 : 0);
     }
+#endif
+
+    // Or compatibility success ends the search for this source and results
+    // in an exit out of is_compat_loop.
+    if (any_or_compat) return true;
+    // Or compatibility failure means we have exhausted all OR source chunks
+    // for this XOR result; proceed to next XOR result.
+    xor_results_idx = next_xor_result_idx(xor_results_idx + 1, xor_results);
+    // Every time xor_results_idx changes we must reset or_chunk_idx to zero.
+    // TODO: this is unnecessary we set it in get_next_compatible_OR.
+    //       so the sync is unnecessary also.
+    *or_chunk_idx_ptr = 0;
+    // TODO: could move this inside top of loop. see comment above.
+    __syncthreads();
   }
-  return any_or_compat;
+  // No XOR results in this XOR chunk were compatible. The next call to this
+  // function for this block will be with a new XOR chunk, and an OR chunk
+  // index of zero, which will result in xor_result_idx being reset on entry.
+  //
+  // So technically we don't need to reset it here. But we do need to signal
+  // to the calling function that it's time for a new chunk, and that's what
+  // this does.
+  if (!threadIdx.x) {
+    *xor_results_idx_ptr = 0;
+  }
+  return false;
 }
 
 // Get the next block-sized chunk of XOR sources and test them for 
@@ -480,9 +461,8 @@ __device__ bool get_next_compatible_OR_sources(
 // Return true if at least one XOR source is compatible.
 __device__ bool get_next_XOR_sources_chunk(
     const SourceCompatibilityData& source, const unsigned xor_chunk_idx,
-    const SourceCompatibilityData* __restrict__ xor_src_lists,
-    const MergeFilterData::DeviceCommon* __restrict__ xor_data,
-    const FatIndexSpanPair& idx_spans, result_t* __restrict__ xor_results) {
+    const MergeFilterData::DeviceCommon* RESTRICT xor_data,
+    const FatIndexSpanPair& idx_spans, result_t* RESTRICT xor_results) {
   const auto block_size = blockDim.x;
   const auto num_xor_indices = idx_spans.first.size() + idx_spans.second.size();
   xor_results[threadIdx.x] = 0;
@@ -494,8 +474,7 @@ __device__ bool get_next_XOR_sources_chunk(
     #endif
 
     const auto xor_combo_idx = get_xor_combo_index(xor_flat_idx, idx_spans);
-    if (is_source_compatible(
-            tag::XOR{}, source, xor_combo_idx, xor_src_lists, xor_data)) {
+    if (is_source_compatible(tag::XOR{}, source, xor_combo_idx, xor_data)) {
 
 #if defined(DEBUG_XOR_COUNTS)
       atomicInc(&count_xor_src_compat, BIG);
@@ -509,14 +488,13 @@ __device__ bool get_next_XOR_sources_chunk(
 }
 
 // Loop through block-sized chunks of XOR sources until we find one that 
-// contains at leasst one XOR source that is compatibile with the supplied
+// contains at least one XOR source that is XOR-compatibile with the supplied
 // source, or until all XOR sources are exhausted.
 // Return true if at least one XOR source is compatible.
 __device__ bool get_next_compatible_XOR_sources(
     const SourceCompatibilityData& source, unsigned xor_chunk_idx,
-    const SourceCompatibilityData* __restrict__ xor_src_lists,
-    const MergeFilterData::DeviceCommon* __restrict__ xor_data,
-    const FatIndexSpanPair& idx_spans, result_t* __restrict__ xor_results) {
+    const MergeFilterData::DeviceCommon* RESTRICT xor_data,
+    const FatIndexSpanPair& idx_spans, result_t* RESTRICT xor_results) {
   const auto block_size = blockDim.x;
   const auto num_indices = idx_spans.first.size() + idx_spans.second.size();
   fat_index_t* xor_chunk_idx_ptr = &dynamic_shared[kXorChunkIdx];
@@ -524,16 +502,24 @@ __device__ bool get_next_compatible_XOR_sources(
   if (!threadIdx.x) any_xor_compat = false;
   __syncthreads();
   for (; xor_chunk_idx * block_size < num_indices; ++xor_chunk_idx) {
-    if (get_next_XOR_sources_chunk(source, xor_chunk_idx, xor_src_lists,
-            xor_data, idx_spans, xor_results)) {
+    if (get_next_XOR_sources_chunk(source, xor_chunk_idx, xor_data,  //
+            idx_spans, xor_results)) {
 #ifndef FORCE_ALL_XOR
       any_xor_compat = true;
 #endif
     }
     __syncthreads();
+
+#ifdef PRINTF
+    if (/*!blockIdx.x && */!threadIdx.x) {
+      printf(" block: %u get_next_XOR xor_chunk_idx: %u, compat: %d\n", blockIdx.x,
+          xor_chunk_idx, any_xor_compat ? 1 : 0);
+    }
+#endif
+
     if (any_xor_compat) break;
   }
-  if (!threadIdx.x) *xor_chunk_idx_ptr = xor_chunk_idx + 1;
+  if (!threadIdx.x) *xor_chunk_idx_ptr = xor_chunk_idx;
   return any_xor_compat;
 }
 
@@ -548,21 +534,20 @@ __device__ bool get_next_compatible_XOR_sources(
 //     If OR source is OR-compatible with Source
 //       is_compat = true;
 __device__ bool is_compat_loop(const SourceCompatibilityData& source,
-    const SourceCompatibilityData* __restrict__ xor_src_lists,
-    const MergeFilterData::DeviceCommon* __restrict__ xor_data,
+    const MergeFilterData::DeviceCommon* RESTRICT xor_data,
     const FatIndexSpanPair& idx_spans,
-    const SourceCompatibilityData* __restrict__ or_src_lists,
-    const MergeFilterData::DeviceCommon* __restrict__ or_data,
-    const unsigned num_or_sources) {
+    const MergeFilterData::DeviceCommon* RESTRICT or_data) {
   const auto block_size = blockDim.x;
   fat_index_t* xor_chunk_idx_ptr = &dynamic_shared[kXorChunkIdx];
   fat_index_t* or_chunk_idx_ptr = &dynamic_shared[kOrChunkIdx];
+  fat_index_t* xor_results_idx_ptr = &dynamic_shared[kXorResultsIdx];
   result_t* xor_results = (result_t*)&dynamic_shared[kNumSharedIndices];
   result_t* or_results = (result_t*)&xor_results[block_size];
   __shared__ bool any_xor_compat;
   __shared__ bool any_or_compat;
-  const unsigned num_xor_indices =
-      idx_spans.first.size() + idx_spans.second.size();
+  const auto num_xor_indices = idx_spans.first.size() + idx_spans.second.size();
+  const auto num_or_indices =
+      or_data ? or_data->variation_indices->num_indices : 0;
   if (!threadIdx.x) {
     *xor_chunk_idx_ptr = 0;
     *or_chunk_idx_ptr = 0;
@@ -573,27 +558,33 @@ __device__ bool is_compat_loop(const SourceCompatibilityData& source,
   for (;;) {
     if (!any_xor_compat) {
       if (*xor_chunk_idx_ptr * block_size >= num_xor_indices) return false;
-      if (get_next_compatible_XOR_sources(source, *xor_chunk_idx_ptr,
-              xor_src_lists, xor_data, idx_spans, xor_results)) {
+      if (get_next_compatible_XOR_sources(source, *xor_chunk_idx_ptr,  //
+              xor_data, idx_spans, xor_results)) {
         any_xor_compat = true;
       }
     }
     __syncthreads();
-    if (any_xor_compat && !num_or_sources) return true;
-    if (any_xor_compat && !any_or_compat) {
-      if (*or_chunk_idx_ptr * block_size >= num_or_sources) {
+    if (any_xor_compat) {
+      if (!num_or_indices) return true;
+      if (get_next_compatible_OR_sources(source, *or_chunk_idx_ptr,
+              *xor_chunk_idx_ptr, xor_results, xor_data, idx_spans, or_data,
+              or_results)) {
+        any_or_compat = true;
+      }
+    }
+    __syncthreads();
+    if (any_or_compat) return true;
+#if 1
+    if (!threadIdx.x) {
+      // A zero xor_results_idx signals its time for a new XOR chunk.
+      if (!*xor_results_idx_ptr) {
         any_xor_compat = false;
-      } else {
-        if (get_next_compatible_OR_sources(source, *or_chunk_idx_ptr,
-                *xor_chunk_idx_ptr, xor_results, xor_src_lists, xor_data,
-                idx_spans, or_src_lists, or_data, num_or_sources, or_results)) {
-          any_or_compat = true;
-        }
+        (*xor_chunk_idx_ptr)++;
       }
     }
     // TODO: could move this to beginning of loop?
     __syncthreads();
-    if (any_or_compat) return true;
+#endif
   }
   return false;
 }
@@ -605,42 +596,72 @@ __device__ bool is_compat_loop(const SourceCompatibilityData& source,
 // * variation-compatible with the XOR source.
 //
 // Find compatible XOR source -> compare with variation-compatible OR sources.
-__global__ void filter_kernel(
-    const SourceCompatibilityData* __restrict__ src_list, unsigned num_sources,
-    const SourceCompatibilityData* __restrict__ xor_src_lists,
-    const MergeFilterData::DeviceCommon* __restrict__ xor_data,
-    const SourceIndex* __restrict__ src_indices,
-    const index_t* __restrict__ src_list_start_indices,
-    const result_t* __restrict__ compat_src_results,
-    const SourceCompatibilityData* __restrict__ or_src_lists,
-    const MergeFilterData::DeviceCommon* __restrict__ or_data,
-    const unsigned num_or_sources, result_t* __restrict__ results,
-    int stream_idx) {
+__global__ void filter_kernel(const SourceCompatibilityData* RESTRICT src_list,
+    unsigned num_sources,
+    const MergeFilterData::DeviceCommon* RESTRICT xor_data,
+    const SourceIndex* RESTRICT src_indices,
+    const index_t* RESTRICT src_list_start_indices,
+    const result_t* RESTRICT compat_src_results,
+    const MergeFilterData::DeviceCommon* RESTRICT or_data,
+    result_t* RESTRICT results, int stream_idx) {
   const auto block_size = blockDim.x;
-  // TODO __global__ compat int, cuda_memset to zero before launching kernel
-  //result_t* compat_results = (result_t*)&dynamic_shared[kNumSharedIndices];
   __shared__ bool is_compat;
   if (!threadIdx.x) is_compat = false;
-  if (!blockIdx.x && !threadIdx.x) printf("blocks: %u\n", gridDim.x);
+
+#ifdef PRINTF
+  if (!blockIdx.x && !threadIdx.x) {
+    printf("+++kernel+++ blocks: %u\n", gridDim.x);
+    if (or_data && or_data->variation_indices) {
+      printf(" num_or_indices: %u\n",
+          or_data->variation_indices->num_indices);
+    }
+  }
+#endif
+
+  const auto num_or_indices = (or_data && or_data->variation_indices)
+                                  ? or_data->variation_indices->num_indices
+                                  : 0;
   // for each source (one block per source)
-#ifdef ONLY_ONE_SOURCE
-  num_sources = 1;
+#if MAX_SOURCES
+  num_sources = num_sources < MAX_SOURCES ? num_sources : MAX_SOURCES;
 #endif
   for (unsigned idx{blockIdx.x}; idx < num_sources; idx += gridDim.x) {
     __syncthreads();
     const auto src_idx = src_indices[idx];
     const auto flat_idx =
         src_list_start_indices[src_idx.listIndex] + src_idx.index;
+    // TODO: understand if this is right (bounds)
     if (compat_src_results && !compat_src_results[flat_idx]) continue;
     const auto& source = src_list[flat_idx];
-    auto smallest = get_smallest_src_index_spans(source, xor_data->variation_indices);
-    if (smallest.skip) continue;
-    if (is_compat_loop(source, xor_src_lists, xor_data, smallest.spans,
-            or_src_lists, or_data, num_or_sources)) {
+    auto spans_result =
+        get_smallest_src_index_spans(source, xor_data->variation_indices);
+
+#ifdef PRINTF
+    if (!threadIdx.x && (idx == num_sources - 1)) {
+      auto num_xor_indices =
+          spans_result.pair.first.size() + spans_result.pair.second.size();
+      printf(" block: %u, spans.compat = %d, num_xor_indices: %lu, chunks: %u\n",
+          blockIdx.x, int(spans_result.compat), num_xor_indices,
+          unsigned(num_xor_indices / blockDim.x));
+    }
+#endif
+
+    if (spans_result.compat == Compat::None) continue;
+    if ((spans_result.compat == Compat::All) && !num_or_indices) {
+      results[src_idx.listIndex] = 1;
+      continue;
+    }
+    if (is_compat_loop(source, xor_data, spans_result.pair, or_data)) {
       is_compat = true;
     }
     __syncthreads();
     if (is_compat && !threadIdx.x) {
+
+#ifdef PRINTF
+      printf(" block %u, compat list_index: %u\n", blockIdx.x,  //
+          src_idx.listIndex);
+#endif
+
       results[src_idx.listIndex] = 1;
       is_compat = false;
     }
@@ -649,9 +670,10 @@ __global__ void filter_kernel(
 
 void init_counts() {
   unsigned value = 0;
+  cudaError_t err{};
 
 #ifdef DEBUG_XOR_COUNTS
-  auto err = cudaMemcpyToSymbol(count_xor_src_considered, &value, sizeof(unsigned));
+  err = cudaMemcpyToSymbol(count_xor_src_considered, &value, sizeof(unsigned));
   assert_cuda_success(err, "init count");
 
   err = cudaMemcpyToSymbol(count_xor_src_compat, &value, sizeof(unsigned));
@@ -682,11 +704,13 @@ void init_counts() {
 }
 
 void display_counts() {
+  cudaError_t err{};
+
 #ifdef DEBUG_XOR_COUNTS
   unsigned considered_xor_count;
   unsigned compat_xor_count;
 
-  auto err = cudaMemcpyFromSymbol(
+  err = cudaMemcpyFromSymbol(
       &considered_xor_count, count_xor_src_considered, sizeof(unsigned));
   assert_cuda_success(err, "display count");
 
@@ -713,7 +737,7 @@ void display_counts() {
   unsigned compat_or_xor_count;  // variations
   unsigned compat_or_count;
 
-  auto err = cudaMemcpyFromSymbol(
+  err = cudaMemcpyFromSymbol(
       &considered_or_count, count_or_src_considered, sizeof(unsigned));
   assert_cuda_success(err, "display count");
 
@@ -742,7 +766,6 @@ void display_counts() {
 #endif
       << std::endl;
 }
-
 
 }  // anonymous namespace
 
@@ -783,14 +806,15 @@ void run_filter_kernel(int threads_per_block, StreamData& stream,
       // Sources
       device_src_list, stream.src_indices.size(),
       // XOR sources
-      mfd.device_xor.src_lists, mfd.device_xor_data,
+      mfd.device_xor_data,
       // Sources again
       stream.device_src_indices, device_list_start_indices,
       // XOR sources again i think, for count > 2
       device_compat_src_results,
       // OR sources
-      mfd.device_or.src_lists, mfd.device_or_data,
-      mfd.host_or.compat_indices.size(), device_results, stream.stream_idx);
+      mfd.device_or_data,
+      device_results, stream.stream_idx);
+  assert_cuda_success(cudaPeekAtLastError(), "filter kernel launch failed");
   stream.xor_kernel_stop.record();
 #if defined(DEBUG_XOR_COUNTS) || defined(DEBUG_OR_COUNTS)
   display_counts();

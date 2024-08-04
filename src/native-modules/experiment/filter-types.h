@@ -31,8 +31,8 @@ using filter_result_t = std::unordered_set<std::string>;
 
 struct VariationIndices {
   FatIndexList indices;
-  IndexList num_indices;
-  IndexList offsets;
+  IndexList num_indices_per_variation_list;
+  IndexList variation_offsets_list;
 };
 
 class IndexStates {

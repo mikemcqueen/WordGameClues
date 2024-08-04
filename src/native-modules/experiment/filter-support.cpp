@@ -673,14 +673,16 @@ filter_result_t get_filter_result() {
   static_assert(sizeof(fat_index_t) == sizeof(index_t) * 2);
   cudaError_t err{};
   device::VariationIndices device_vi;
-  const auto num_variations{host_vi.offsets.size()};
+  const auto num_variations{host_vi.variation_offsets_list.size()};
   const auto indices_bytes = host_vi.indices.size() * sizeof(fat_index_t);
   const auto device_data_bytes =
       indices_bytes + 2 * num_variations * sizeof(index_t);
   cuda_malloc_async((void**)&device_vi.device_data, device_data_bytes,
       stream, "variation_indices");
+  device_vi.num_indices = host_vi.indices.size();
   device_vi.num_variations = num_variations;
 
+  // tricky offset here: base type is fat_index. 1 x fat = 2 x index
   device_vi.indices = &device_vi.device_data[num_variations];
   err = cudaMemcpyAsync(&device_vi.indices[0], host_vi.indices.data(),
       indices_bytes, cudaMemcpyHostToDevice, stream);
@@ -690,16 +692,17 @@ filter_result_t get_filter_result() {
   device_vi.variation_offsets = (index_t*)device_vi.device_data;
   const auto offsets_bytes = num_variations * sizeof(index_t);
   err = cudaMemcpyAsync(device_vi.variation_offsets,
-      host_vi.offsets.data(), offsets_bytes, cudaMemcpyHostToDevice, stream);
+      host_vi.variation_offsets_list.data(), offsets_bytes,
+      cudaMemcpyHostToDevice, stream);
   assert_cuda_success(err, "copy variation_offsets");
 
   // copy num indices
   device_vi.num_indices_per_variation =
       &((index_t*)device_vi.device_data)[num_variations];
-  const auto num_indices_bytes = host_vi.num_indices.size() * sizeof(index_t);
+  const auto num_indices_bytes = num_variations * sizeof(index_t);
   err = cudaMemcpyAsync(device_vi.num_indices_per_variation,
-      host_vi.num_indices.data(), num_indices_bytes, cudaMemcpyHostToDevice,
-      stream);
+      host_vi.num_indices_per_variation_list.data(), num_indices_bytes,
+      cudaMemcpyHostToDevice, stream);
   assert_cuda_success(err, "copy num_indices_per_variation");
 
   const auto variation_indices_bytes = sizeof(device::VariationIndices);
@@ -732,17 +735,18 @@ void alloc_copy_filter_indices(MergeFilterData& mfd,
   assert(!mfd.host_xor.compat_indices.empty()); // arbitrary
   util::LogDuration ld("alloc_copy_filter_indices", Verbose);
   alloc_copy_start_indices(mfd.host_xor, mfd.device_xor, stream);
-  auto xor_indices = buildSentenceVariationIndices(mfd.host_xor.src_lists,
+  auto xor_vi = buildSentenceVariationIndices(mfd.host_xor.src_lists,
       mfd.host_xor.compat_idx_lists, mfd.host_xor.compat_indices);
   mfd.device_xor.variation_indices =
-    cuda_allocCopySentenceVariationIndices(xor_indices, stream);
+    cuda_allocCopySentenceVariationIndices(xor_vi, stream);
 
   if (!mfd.host_or.compat_indices.empty()) {
     alloc_copy_start_indices(mfd.host_or, mfd.device_or, stream);
-    auto or_indices = build_variation_indices(or_variations_list,  //
+    auto or_vi = build_variation_indices(or_variations_list,  //
         mfd.host_or.compat_indices);
     mfd.device_or.variation_indices =
-        cuda_alloc_copy_variation_indices(or_indices, stream);
+        cuda_alloc_copy_variation_indices(or_vi, stream);
+    mfd.device_or.num_variation_indices = or_vi.indices.size();
   }
 }
 
@@ -762,6 +766,7 @@ void alloc_copy_filter_data(MergeFilterData& mfd,
   err = cudaMemcpyAsync(mfd.device_or_data, &mfd.device_or, common_bytes,  //
       cudaMemcpyHostToDevice);
   assert_cuda_success(err, "copy filter data");
+  std::cerr << "OR variation indices: " << mfd.device_or.num_variation_indices << std::endl;
 }
 
 }  // namespace cm

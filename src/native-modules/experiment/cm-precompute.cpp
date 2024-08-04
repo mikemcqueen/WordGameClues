@@ -100,7 +100,7 @@ void dumpSentenceVariationIndices(
     }
   }
   const auto MB = (total_indices * 8) / 1'000'000;
-  std::cerr << "variationIndices: " << total_indices << " (" << MB << "MB)\n";
+  std::cerr << "XOR variation indices: " << total_indices << " (" << MB << "MB)\n";
   if (MB > 2000) {
     std::cerr << "**** WARNING: variationIndices is getting big! ****\n";
   }
@@ -241,7 +241,7 @@ auto build_variation_indices(const UsedSources::VariationsList& variations_list,
     auto it = variations_map.find(variation);
     if (it == variations_map.end()) {
       FatIndexList idx_list{idx};
-      auto [_, success] = variations_map.emplace(variation, idx_list);
+      auto [_, success] = variations_map.emplace(variation, std::move(idx_list));
       assert(success);
     } else {
       it->second.push_back(idx);
@@ -250,8 +250,8 @@ auto build_variation_indices(const UsedSources::VariationsList& variations_list,
   VariationIndices vi;
   for (index_t offset{}; const auto& [_, idx_list] : variations_map) {
     std::ranges::copy(idx_list, std::back_inserter(vi.indices));
-    vi.num_indices.push_back(idx_list.size());
-    vi.offsets.push_back(offset);
+    vi.num_indices_per_variation_list.push_back(idx_list.size());
+    vi.variation_offsets_list.push_back(offset);
     offset += idx_list.size();
   }
   return vi;

@@ -32,17 +32,6 @@
   * IN-PROGRESS fix issues in OR kernel
     * different block sizes yield different results. 1024 and 128 for example. fix this,
       as 128 goes really fast, it'd be nice if it were also accurate.
-    * seems like there might be an issue with multiple blocks comparing the same OR + XOR
-      sources in variation compat check. Saw:
-      block 66, tid 224, flat_idx: 224, list_idx: 5, idx: 0, src_idx: 0 into:
-      and seemed odd that block 66 would be handling flat_idx 224. of course this was
-      likely based on "or_chunk_idx 0", but are multiple blocks handling the same chunk?
-      might be the same XOR flat_idx being used by every thread in block, and constantly
-      recalculating the variations for it.  maybe see if we can calc once and pass the
-      variations instead of the index?
-      * upon further review, it looks like multiple *blocks* may be using the same
-        xor_idx. maybe put a printf in !threadIdx.x scope in for the 1 XOR version of
-        bool get_next_compatible_OR_sources()
     * maybe i could have some kind of shared "last_xor_idx" then I wouldn't have to
       determine the variations if it hasn't changed. for precomputed variations.
     * register spill now in filter_kernel. it's actually running a bit faster at half
@@ -51,6 +40,8 @@
       * fewer intermediate local variable declarations when extracting a src out of an
         idx_list/src_list from a flat_idx.
       * allocate or_variations to populate num_or_sources even if zero
+
+* handle "Compat::All" case w/OR args. no need to do XOR compare, just set all results to 1.
 
 * should look into using libcu++ for standard library such as std::array, std::copy in
   kernels. coz.. i might just be gettting lucky. and i'm not sure how to control which

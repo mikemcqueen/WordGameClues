@@ -69,14 +69,23 @@ struct MergeFilterData {
       reset_pointers();
     }
 
+    constexpr const auto& get_source(
+        fat_index_t flat_idx, index_t list_idx) const {
+      const auto src_list = &src_lists[src_list_start_indices[list_idx]];
+      const auto idx_list = &idx_lists[idx_list_start_indices[list_idx]];
+      const auto idx_list_size = idx_list_sizes[list_idx];
+      const auto src_idx = idx_list[flat_idx % idx_list_size];
+      return src_list[src_idx];
+    }
+
     index_t* src_list_start_indices{};
     index_t* idx_list_start_indices{};
     device::VariationIndices* variation_indices{};
     unsigned num_variation_indices{};
   };
 
-  DeviceCommon* device_xor_data;
-  DeviceCommon* device_or_data;
+  DeviceCommon* device_xor_data{};
+  DeviceCommon* device_or_data{};
 
   //
   // XOR
