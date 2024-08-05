@@ -17,7 +17,7 @@ struct FilterArgs {
   bool synchronous{};
 };
 
-auto filter_candidates_cuda(const MergeFilterData& mfd, int sum,
+auto filter_candidates_cuda(const FilterData& mfd, int sum,
     int threads_per_block, int num_streams, int stride, int iters,
     bool synchronous) -> std::optional<SourceCompatibilitySet>;
 
@@ -29,17 +29,25 @@ filter_result_t get_filter_result();
 
 [[nodiscard]] auto cuda_allocCopySentenceVariationIndices(
     const SentenceVariationIndices& sentenceVariationIndices,
-    cudaStream_t stream) -> device::VariationIndices*;
+    cudaStream_t stream) -> device::FatVariationIndices*;
 
 [[nodiscard]] auto cuda_alloc_copy_variation_indices(
     const VariationIndices& host_variation_indices,
     cudaStream_t stream) -> device::VariationIndices*;
 
-void alloc_copy_filter_data(MergeFilterData& mfd,
+void alloc_copy_filter_data(FilterData& mfd,
     const UsedSources::VariationsList& or_variations_list, cudaStream_t stream);
 
+template <typename T>
 void alloc_copy_start_indices(MergeData::Host& host,
-    MergeFilterData::DeviceCommon& device, cudaStream_t stream);
+    FilterData::DeviceCommon<T>& device, cudaStream_t stream) {
+  auto src_list_start_indices = make_start_indices(host.src_lists);
+  device.src_list_start_indices = cuda_alloc_copy_start_indices(
+      src_list_start_indices, stream);  // "src_list_start_indices"
+  auto idx_list_start_indices = make_start_indices(host.compat_idx_lists);
+  device.idx_list_start_indices = cuda_alloc_copy_start_indices(
+      idx_list_start_indices, stream);  // "idx_list_start_indices"
+}
 
 }  // namespace cm
 

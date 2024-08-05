@@ -34,7 +34,7 @@ using namespace cm::validator;
 
 // globals
 
-MergeFilterData MFD;
+FilterData MFD;
 
 // functions
 
@@ -198,7 +198,7 @@ void display(const std::vector<NCDataList>& nc_data_lists) {
 }
 
 void host_memory_dump(
-    const MergeFilterData::HostXor& host_xor, std::string_view header = "post merge") {
+    const FilterData::HostXor& host_xor, std::string_view header = "post merge") {
   if (!log_level(MemoryDumps)) return;
 
   // MergeData
@@ -291,18 +291,6 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   }
   return Number::New(env, num_compat);
 }
-/*
-void cuda_alloc_copy_combo_indices(MergeFilterData::HostOr& host,
-    MergeFilterData::DeviceOr& device, cudaStream_t stream) {
-  if (host.combo_indices.empty()) return;
-  const auto indices_bytes = host.combo_indices.size() * sizeof(combo_index_t);
-  cuda_malloc_async((void**)&device.combo_indices, indices_bytes, stream,  //
-      "filter combo_indices");
-  auto err = cudaMemcpyAsync(device.combo_indices, host.combo_indices.data(),
-      indices_bytes, cudaMemcpyHostToDevice, stream);
-  assert_cuda_success(err, "copy combo_indices");
-}
-*/
 
 auto combo_to_str(fat_index_t combo_idx, const IndexList& list_sizes) {
   std::string s;
@@ -398,7 +386,7 @@ auto get_unique_OR_variations(/*const MergeData::Host& host_or,*/
   return variations;
 }
 
-auto check_XOR_compatibility(const MergeFilterData& mfd,
+auto check_XOR_compatibility(const FilterData& mfd,
     const UsedSources::VariationsSet& or_variations) {
   //dump_combos(mfd.host_or, mfd.device_or);
   auto xor_variations = get_variations_list(mfd.host_xor);

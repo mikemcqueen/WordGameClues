@@ -7,6 +7,7 @@
 #include <iostream>
 #include <span>
 #include <string_view>
+#include <type_traits>
 #include <utility>
 #include <vector>
 #include <cuda_runtime.h>
@@ -19,28 +20,43 @@ using result_t = uint8_t;
 using index_t = uint32_t;
 using fat_index_t = uint64_t;
 
-using IndexList = std::vector<index_t>;
-using FatIndexList = std::vector<fat_index_t>;
+template <typename T> using IndexListBase = std::vector<T>;
 
-using FatIndexSpan = std::span<const fat_index_t>;
-using FatIndexSpanPair = std::pair<FatIndexSpan, FatIndexSpan>;
+using IndexList = IndexListBase<index_t>;
+using FatIndexList = IndexListBase<fat_index_t>;
+
+template <typename T>
+requires std::is_same_v<T, index_t> || std::is_same_v<T, fat_index_t>
+using IndexSpan = std::span<const T>;
+
+template <typename T>
+using IndexSpanPairBase = std::pair<IndexSpan<T>, IndexSpan<T>>;
+
+using IndexSpanPair = IndexSpanPairBase<index_t>;
+
+//using FatIndexSpan = IndexSpan<fat_index_t>;
+using FatIndexSpanPair = IndexSpanPairBase<fat_index_t>;
 
 namespace device {  // on-device data structures
 
-struct VariationIndices {
-  fat_index_t* device_data;    // one chunk of allocated data; other pointers
+template <typename T>  //
+struct VariationIndexData {
+  T* device_data;              // one chunk of allocated data; other pointers
                                // below point inside this chunk.
-  fat_index_t* indices;
+  T* indices;
   index_t num_indices;         // size of indices array
   index_t num_variations;      // size of the following two arrays
   index_t* num_indices_per_variation;
   index_t* variation_offsets;  // offsets into indices
 
-  constexpr FatIndexSpan get_index_span(int variation) const {
+  constexpr IndexSpan<T> get_index_span(int variation) const {
     return {&indices[variation_offsets[variation]],
       num_indices_per_variation[variation]};
   }
 };
+
+using VariationIndices = VariationIndexData<index_t>;
+using FatVariationIndices = VariationIndexData<fat_index_t>;
 
 struct SourceCompatibilityData;
 

@@ -6,7 +6,7 @@
 
 namespace cm {
 
-struct MergeFilterData;
+struct FilterData;
 struct StreamData;
 
 void run_get_compatible_sources_kernel(
@@ -15,7 +15,7 @@ void run_get_compatible_sources_kernel(
     unsigned num_src_desc_pairs, result_t* device_results);
 
 void run_filter_kernel(int threads_per_block, StreamData& stream,
-    const MergeFilterData& mfd, const SourceCompatibilityData* device_src_list,
+    const FilterData& mfd, const SourceCompatibilityData* device_src_list,
     const result_t* device_compat_src_results,
     result_t* device_results, const index_t* device_list_start_indices);
 
