@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <chrono>
 #include <functional>
@@ -14,6 +15,7 @@
 #include "log.h"
 #include "util.h"
 #include "cm-hash.h"
+#include "filter-types.h"
 
 namespace cm {
 
@@ -77,11 +79,10 @@ auto mergeAllCompatibleSources(const NameCountList& ncList) -> SourceList {
   return src_list;
 }
 
-void dumpSentenceVariationIndices(
-    const SentenceVariationIndices& sentenceVariationIndices) {
+void dumpSentenceVariationIndices(const SentenceXorVariationIndices& svi) {
   uint64_t total_indices{};
   for (int s{}; s < kNumSentences; ++s) {
-    const auto& variationIndicesList = sentenceVariationIndices.at(s);
+    const auto& variationIndicesList = svi.at(s);
     if (!variationIndicesList.empty()) {
       const auto num_indices = util::sum_sizes(variationIndicesList);
       if (log_level(ExtraVerbose)) {
@@ -194,8 +195,8 @@ auto build_src_lists(const std::vector<NCDataList>& nc_data_lists)
 auto buildSentenceVariationIndices(const std::vector<SourceList>& xor_src_lists,
     const std::vector<IndexList>& compat_idx_lists,
     const std::vector<uint64_t>& compat_flat_indices)
-    -> SentenceVariationIndices {
-  SentenceVariationIndices sentenceVariationIndices;
+    -> SentenceXorVariationIndices {
+  SentenceXorVariationIndices svi;
   for (auto flat_idx : compat_flat_indices) {
     UsedSources::Variations variations = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
     util::for_each_source_index(flat_idx, compat_idx_lists,
@@ -208,7 +209,7 @@ auto buildSentenceVariationIndices(const std::vector<SourceList>& xor_src_lists,
           }
         });
     for (int s{}; s < kNumSentences; ++s) {
-      auto& variationIndicesList = sentenceVariationIndices.at(s);
+      auto& variationIndicesList = svi.at(s);
       const auto variation_idx = variations.at(s) + 1u;
       if (variationIndicesList.size() <= variation_idx) {
         variationIndicesList.resize(variation_idx + 1);
@@ -221,40 +222,53 @@ auto buildSentenceVariationIndices(const std::vector<SourceList>& xor_src_lists,
   // variationIndicesLists for those sentences with no variations, since they
   // only contain a single element (index 0) representing the "-1" or "no"
   // variation, that contains all indices. It's redundant and unnecessary data.
-  // TODO: for (auto& variationIndicesList : sentenceVariationIndices) {
-  std::for_each(sentenceVariationIndices.begin(),
-    sentenceVariationIndices.end(), [](auto& variationIndicesList) {
+  // TODO: for (auto& variationIndicesList : svi) {
+  std::for_each(svi.begin(),
+    svi.end(), [](auto& variationIndicesList) {
       if (variationIndicesList.size() == 1) {
         variationIndicesList.clear();
       }
     });
-  dumpSentenceVariationIndices(sentenceVariationIndices);
-  return sentenceVariationIndices;
+  dumpSentenceVariationIndices(svi);
+  return svi;
 }
 
-auto build_variation_indices(const UsedSources::VariationsList& variations_list,
-    const FatIndexList& compat_indices) -> VariationIndices {
-  std::unordered_map<UsedSources::Variations, FatIndexList> variations_map;
-  for (index_t i{}; i < (index_t)variations_list.size(); ++i) {
-    const auto& variation = variations_list.at(i);
-    auto idx = compat_indices.at(i);
-    auto it = variations_map.find(variation);
-    if (it == variations_map.end()) {
-      FatIndexList idx_list{idx};
-      auto [_, success] = variations_map.emplace(variation, std::move(idx_list));
-      assert(success);
-    } else {
-      it->second.push_back(idx);
-    }
+// get list of indices into variations_list sorted by variation index for
+// supplied sentence. supplied sentence is in range [0,kNumSentences).
+auto get_indices_sorted_by_variation(
+    const UsedSources::VariationsList& variations_list, int s) {
+  IndexList indices(variations_list.size());
+  std::iota(indices.begin(), indices.end(), 0);
+  std::sort(indices.begin(), indices.end(), [&](index_t a, index_t b) {
+    return variations_list.at(a).at(s) < variations_list.at(b).at(s);
+  });
+  return indices;
+}
+
+// supplied sentence is in range [0,kNumSentences).
+auto get_variation_index_offsets(const IndexList& idx_list,
+    const UsedSources::VariationsList& variations_list, int sentence) {
+  std::vector<VariationIndexOffset> vi_offsets;
+  variation_index_t last_vi{-2};  // intentional impossible value
+  for (index_t idx{}; idx < idx_list.size(); ++idx) {
+    auto vi = variations_list.at(idx_list.at(idx)).at(sentence);
+    if (vi != last_vi) vi_offsets.emplace_back(vi, idx);
   }
-  VariationIndices vi;
-  for (index_t offset{}; const auto& [_, idx_list] : variations_map) {
-    std::ranges::copy(idx_list, std::back_inserter(vi.indices));
-    vi.num_indices_per_variation_list.push_back(idx_list.size());
-    vi.variation_offsets_list.push_back(offset);
-    offset += idx_list.size();
+  return vi_offsets;
+}
+
+auto build_OR_variation_indices(
+    const UsedSources::VariationsList& variations_list,
+    const FatIndexList& compat_indices)
+    -> SentenceOrVariationIndices {
+  SentenceOrVariationIndices all_or_vi;
+  for (int s{}; s < kNumSentences; ++s) {
+    auto& or_vi = all_or_vi.at(s);
+    or_vi.indices = std::move(get_indices_sorted_by_variation(variations_list, s));
+    or_vi.index_offsets =
+        std::move(get_variation_index_offsets(or_vi.indices, variations_list, s));
   }
-  return vi;
+  return all_or_vi;
 }
 
 }  // namespace cm

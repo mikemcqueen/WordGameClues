@@ -17,10 +17,13 @@ auto build_src_lists(
 auto buildSentenceVariationIndices(const std::vector<SourceList>& xor_src_lists,
     const std::vector<IndexList>& compat_idx_lists,
     const std::vector<uint64_t>& compat_flat_indices)
-    -> SentenceVariationIndices;
+    -> SentenceXorVariationIndices;
 
-auto build_variation_indices(const UsedSources::VariationsList& variations_list,
-    const FatIndexList& compat_indices) -> VariationIndices;
-}
+auto build_OR_variation_indices(
+    const UsedSources::VariationsList& variations_list,
+    const FatIndexList& compat_indices)
+  -> SentenceOrVariationIndices;
+
+}  // namespace cm
 
 #endif // INCLUDE_CM_PRECOMPUTE_H

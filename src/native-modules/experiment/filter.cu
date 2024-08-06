@@ -245,7 +245,7 @@ struct SmallestSpansResult {
 //
 __device__ SmallestSpansResult get_smallest_src_index_spans(
     const SourceCompatibilityData& source,
-    const device::FatVariationIndices* RESTRICT variation_indices) {
+    const device::XorVariationIndices* RESTRICT variation_indices) {
   using enum Compat;
   index_t fewest_indices{std::numeric_limits<index_t>::max()};
   int sentence_with_fewest{-1};
@@ -381,7 +381,7 @@ __device__ void dump_all_sources(fat_index_t flat_idx,
 }
 
 // only used for XOR variations currently
-__device__ UsedSources::variation_index_t get_one_variation(int sentence,
+__device__ variation_index_t get_one_variation(int sentence,
     fat_index_t flat_idx, const FilterData::DeviceXor::Base* RESTRICT data) {
   for (int list_idx{int(data->num_idx_lists) - 1}; list_idx >= 0; --list_idx) {
     const auto& src = data->get_source(flat_idx, list_idx);
@@ -698,7 +698,7 @@ __global__ void filter_kernel(const SourceCompatibilityData* RESTRICT src_list,
   __shared__ bool is_compat;
   if (!threadIdx.x) is_compat = false;
 
-#ifdef PRINTF
+  #ifdef PRINTF
   if (!blockIdx.x && !threadIdx.x) {
     printf("+++kernel+++ blocks: %u\n", gridDim.x);
     if (or_data && or_data->variation_indices) {
@@ -706,7 +706,7 @@ __global__ void filter_kernel(const SourceCompatibilityData* RESTRICT src_list,
           or_data->num_compat_indices);
     }
   }
-#endif
+  #endif
 
   //  const auto num_or_indices = (or_data && or_data->variation_indices)
   //                                 ? or_data->variation_indices->num_indices
@@ -727,7 +727,7 @@ __global__ void filter_kernel(const SourceCompatibilityData* RESTRICT src_list,
     auto spans_result =
         get_smallest_src_index_spans(source, xor_data->variation_indices);
 
-#ifdef PRINTF
+    #ifdef PRINTF
     if (!threadIdx.x && (idx == num_sources - 1)) {
       auto num_xor_indices =
           spans_result.pair.first.size() + spans_result.pair.second.size();
@@ -735,7 +735,7 @@ __global__ void filter_kernel(const SourceCompatibilityData* RESTRICT src_list,
           blockIdx.x, int(spans_result.compat), num_xor_indices,
           unsigned(num_xor_indices / blockDim.x));
     }
-#endif
+    #endif
 
     if (spans_result.compat == Compat::None) continue;
     if ((spans_result.compat == Compat::All) && !or_data->num_compat_indices) {
@@ -748,10 +748,10 @@ __global__ void filter_kernel(const SourceCompatibilityData* RESTRICT src_list,
     __syncthreads();
     if (is_compat && !threadIdx.x) {
 
-#ifdef PRINTF
+      #ifdef PRINTF
       printf(" block %u, compat list_index: %u\n", blockIdx.x,  //
           src_idx.listIndex);
-#endif
+      #endif
 
       results[src_idx.listIndex] = 1;
       is_compat = false;
@@ -776,16 +776,16 @@ void run_filter_kernel(int threads_per_block, StreamData& stream,
 
   auto block_size = threads_per_block ? threads_per_block : 768;
   auto blocks_per_sm = threads_per_sm / block_size;
-  //assert(blocks_per_sm * block_size == threads_per_sm); // allow 1024 tpb
+  // assert(blocks_per_sm * block_size == threads_per_sm); // allow 1024 tpb
   auto grid_size = num_sm * blocks_per_sm;  // aka blocks per grid
   // xor_chunk_idx, or_chunk_idx, xor_result_idx, xor_results
   // results could probably be moved to global
   auto shared_bytes = 
       kNumSharedIndices * sizeof(fat_index_t) + block_size * sizeof(result_t);
   // ensure any async alloc/copies are complete on main thread stream
-#if defined(DEBUG_XOR_COUNTS) || defined(DEBUG_OR_COUNTS)
+  #if defined(DEBUG_XOR_COUNTS) || defined(DEBUG_OR_COUNTS)
   init_counts();
-#endif 
+  #endif 
   cudaError_t err = cudaStreamSynchronize(cudaStreamPerThread);
   assert_cuda_success(err, "run_filter_kernel sync");
   dim3 grid_dim(grid_size);
@@ -808,9 +808,9 @@ void run_filter_kernel(int threads_per_block, StreamData& stream,
       device_results, stream.stream_idx);
   assert_cuda_success(cudaPeekAtLastError(), "filter kernel launch failed");
   stream.xor_kernel_stop.record();
-#if defined(DEBUG_XOR_COUNTS) || defined(DEBUG_OR_COUNTS)
+  #if defined(DEBUG_XOR_COUNTS) || defined(DEBUG_OR_COUNTS)
   display_counts();
-#endif 
+  #endif 
   if constexpr (0) {
     std::cerr << "stream " << stream.stream_idx << " XOR kernel started with "
               << grid_size << " blocks of " << block_size << " threads"

@@ -88,7 +88,7 @@ struct FilterData {
 
     index_t* src_list_start_indices{};
     index_t* idx_list_start_indices{};
-    device::VariationIndexData<T>* variation_indices{};
+    device::VariationIndices<T>* variation_indices{};
     unsigned num_variation_indices{};
   };
 

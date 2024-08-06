@@ -43,7 +43,7 @@ constexpr inline auto getIndex(int src) noexcept     { return getSource(src) % 1
 }  // namespace Source
 
 struct UsedSources {
-  using variation_index_t = int16_t;
+  //  using variation_index_t = int16_t;
 
   struct SourceDescriptor {
     SourceDescriptor() = default;
@@ -659,15 +659,18 @@ using SourceListMap = std::unordered_map<std::string, SourceList>;
 using XorSource = SourceData;
 using XorSourceList = std::vector<XorSource>;
 
+  /*
 // TODO comment/rename
 // These are precomputed on xorSourceList, to identify only those sources
 // which share the same per-sentence variation.
 // One list of indices per variation, plus '-1' (no) variation.
 // indices are offset by 1; variation -1 is index 0.
-using VariationIndicesList = std::vector<FatIndexList>;
-// one variationIndicesLists per sentence
+// one vector of IndexLists per sentence
 using SentenceVariationIndices =
-    std::array<VariationIndicesList, kNumSentences>;
+    std::array<std::vector<IndexList>, kNumSentences>;
+using FatSentenceVariationIndices =
+    std::array<std::vector<FatIndexList>, kNumSentences>;
+  */
 
 struct MergedSources : SourceCompatibilityData {
   MergedSources() = default;

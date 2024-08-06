@@ -28,12 +28,12 @@ filter_result_t get_filter_result();
     cudaStream_t stream) -> UsedSources::SourceDescriptorPair*;
 
 [[nodiscard]] auto cuda_allocCopySentenceVariationIndices(
-    const SentenceVariationIndices& sentenceVariationIndices,
-    cudaStream_t stream) -> device::FatVariationIndices*;
+    const SentenceXorVariationIndices& xor_svi,
+    cudaStream_t stream) -> device::XorVariationIndices*;
 
 [[nodiscard]] auto cuda_alloc_copy_variation_indices(
-    const VariationIndices& host_variation_indices,
-    cudaStream_t stream) -> device::VariationIndices*;
+    const SentenceOrVariationIndices& or_svi,
+    cudaStream_t stream) -> device::OrVariationIndices*;
 
 void alloc_copy_filter_data(FilterData& mfd,
     const UsedSources::VariationsList& or_variations_list, cudaStream_t stream);

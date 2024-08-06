@@ -3,7 +3,9 @@
 #ifndef INCLUDE_FILTER_TYPES_H
 #define INCLUDE_FILTER_TYPES_H
 
+#pragma once
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <forward_list>
 #include <iostream>
@@ -29,11 +31,24 @@ using filter_result_t = std::unordered_set<std::string>;
 
 // types
 
-struct VariationIndices {
+/*
+struct XorVariationIndices {
   FatIndexList indices;
   IndexList num_indices_per_variation_list;
   IndexList variation_offsets_list;
 };
+*/
+
+struct OrVariationIndices {
+  IndexList indices;
+  std::vector<VariationIndexOffset> index_offsets;
+};
+
+using SentenceOrVariationIndices =
+    std::array<OrVariationIndices, kNumSentences>;
+
+using SentenceXorVariationIndices =
+    std::array<std::vector<FatIndexList>, kNumSentences>;
 
 class IndexStates {
 public:

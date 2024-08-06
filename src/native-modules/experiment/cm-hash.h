@@ -29,10 +29,9 @@ template <> struct equal_to<cm::UsedSources::Variations> {
 
 template <> struct hash<cm::UsedSources::Variations> {
   size_t operator()(const cm::UsedSources::Variations& variations) const noexcept {
-    using variation_index_t = cm::UsedSources::variation_index_t;
     size_t seed = 0;
     for (const auto v: variations) {
-      cm::hash_combine(seed, hash<variation_index_t>()(v));
+      cm::hash_combine(seed, hash<cm::variation_index_t>()(v));
     }
     return seed;
   }
