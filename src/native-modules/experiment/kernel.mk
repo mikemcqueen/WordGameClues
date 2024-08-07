@@ -14,10 +14,10 @@ NVCC_COMPILE_FLAGS := -Xcompiler -fPIC \
 	-Xcudafe --diag_suppress=declared_but_not_referenced \
 	--expt-relaxed-constexpr \
 	-O3 \
-	-dopt=on \
 	-Xptxas=-v \
 	-lineinfo \
 	-std=c++20 \
+	-dopt=on \
 #	-maxrregcount=40
 
 

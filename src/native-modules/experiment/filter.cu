@@ -340,7 +340,7 @@ __device__ bool is_source_compatible(TagT tag,
     } else if constexpr (std::is_same_v<TagT, tag::OR>) {
       //if (!src.isOrCompatibleWith(source)) return false;
       //src.usedSources.isOrCompatibleWith(source.usedSources)) return false;
-      if (!are_xor_compatible(src.usedSources, source.usedSources))
+      if (!are_or_compatible(src.usedSources, source.usedSources))
         return false;
     }
     flat_idx /= data->idx_list_sizes[list_idx];
