@@ -28,11 +28,6 @@ struct MergeData {
     }
 
   public:
-    Device() = default;
-    ~Device() { cuda_free(); }
-    Device(const Device&) = delete; // disable copy
-    Device(Device&&) = delete; // disable mvoe
-
     void cuda_free() {
       cm::cuda_free(src_lists);
       cm::cuda_free(idx_lists);
@@ -40,10 +35,10 @@ struct MergeData {
       reset_pointers();
     }
 
-    SourceCompatibilityData* src_lists{};
-    index_t* idx_lists{};
-    index_t* idx_list_sizes{};
-    unsigned num_idx_lists{};
+    SourceCompatibilityData* src_lists;
+    index_t* idx_lists;
+    index_t* idx_list_sizes;
+    unsigned num_idx_lists;
   } device;
 };
 
@@ -86,10 +81,10 @@ struct FilterData {
 #endif
     }
 
-    index_t* src_list_start_indices{};
-    index_t* idx_list_start_indices{};
-    device::VariationIndices<T>* variation_indices{};
-    unsigned num_variation_indices{};
+    index_t* src_list_start_indices;
+    index_t* idx_list_start_indices;
+    device::VariationIndices<T>* variation_indices;
+    unsigned num_variation_indices;
   };
 
   //
@@ -143,8 +138,8 @@ struct FilterData {
       reset_pointers();
     }
 
-    fat_index_t* compat_indices{};
-    index_t num_compat_indices{};
+    fat_index_t* compat_indices;
+    index_t num_compat_indices;
   } device_or;
 
 

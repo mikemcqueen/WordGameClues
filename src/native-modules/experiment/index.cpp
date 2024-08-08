@@ -12,6 +12,7 @@
 #include "combo-maker.h"
 #include "cm-precompute.h"
 #include "dump.h"
+#include "filter.cuh"
 #include "filter.h"
 #include "merge.h"
 #include "merge-filter-common.h"
@@ -463,7 +464,8 @@ Value filterPreparation(const CallbackInfo& info) {
       auto variations_set = get_unique_OR_variations(variations_list);
       check_XOR_compatibility(MFD, variations_set);
     }
-    alloc_copy_filter_data(MFD, variations_list, stream);
+    alloc_copy_filter_indices(MFD, variations_list, stream);
+    /*alloc_*/copy_filter_data(MFD); // , variations_list, stream);
     cuda_memory_dump("filter preparation");
   }
   return Boolean::New(env, compat);

@@ -14,6 +14,8 @@ void run_get_compatible_sources_kernel(
     const UsedSources::SourceDescriptorPair* device_incompatible_src_desc_pairs,
     unsigned num_src_desc_pairs, result_t* device_results);
 
+void copy_filter_data(FilterData& mfd);
+
 void run_filter_kernel(int threads_per_block, StreamData& stream,
     const FilterData& mfd, const SourceCompatibilityData* device_src_list,
     const result_t* device_compat_src_results,

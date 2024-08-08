@@ -35,6 +35,9 @@ filter_result_t get_filter_result();
     const SentenceOrVariationIndices& or_svi,
     cudaStream_t stream) -> device::OrVariationIndices*;
 
+void alloc_copy_filter_indices(FilterData& mfd,
+    const UsedSources::VariationsList& or_variations_list, cudaStream_t stream);
+
 void alloc_copy_filter_data(FilterData& mfd,
     const UsedSources::VariationsList& or_variations_list, cudaStream_t stream);
 

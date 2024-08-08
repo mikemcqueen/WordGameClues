@@ -57,23 +57,23 @@ struct VariationIndicesBase {
 template <typename T> struct VariationIndices;
 
 template <> struct VariationIndices<index_t> : VariationIndicesBase<index_t> {
-  VariationIndexOffset* variation_index_offsets;
-
   constexpr IndexSpan<index_t> get_index_span(int variation) const {
     assert(0);
     return {&indices[variation_index_offsets[variation].offset],
         num_indices_per_variation[variation]};
   }
+
+  VariationIndexOffset* variation_index_offsets;
 };
 
 template <>
 struct VariationIndices<fat_index_t> : VariationIndicesBase<fat_index_t> {
-  index_t* variation_offsets;  // offsets into indices
-
   constexpr IndexSpan<fat_index_t> get_index_span(int variation) const {
     return {&indices[variation_offsets[variation]],
       num_indices_per_variation[variation]};
   }
+
+  index_t* variation_offsets;  // offsets into indices
 };
 
 using OrVariationIndices = VariationIndices<index_t>;
