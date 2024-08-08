@@ -778,6 +778,9 @@ void alloc_copy_filter_indices(FilterData& mfd,
         cuda_alloc_copy_variation_indices(or_vi, stream);
     */
     alloc_copy_compat_indices(mfd.host_or, mfd.device_or, stream);
+  } else {
+    // TOOD: cuda_free(), assuming we reset_pointers somewhere earlier.
+    mfd.device_or.reset_pointers();
   }
 }
 

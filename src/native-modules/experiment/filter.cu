@@ -5,11 +5,15 @@
 #include <limits>
 #include <cuda_runtime.h>
 #include "filter.cuh"
+#include "or-filter.cuh"
 #include "stream-data.h"
 #include "merge-filter-data.h"
 #include "util.h"
 
 namespace cm {
+
+__constant__ FilterData::DeviceCommon<fat_index_t> xor_data;
+__constant__ FilterData::DeviceOr or_data;
 
 namespace {
 
@@ -140,8 +144,7 @@ void display_counts() {
       << std::endl;
 }
 
-__constant__ FilterData::DeviceCommon<fat_index_t> xor_data;
-__constant__ FilterData::DeviceOr or_data;
+extern __shared__ fat_index_t dynamic_shared[];
 
 __device__ auto are_xor_compatible(const UsedSources& a, const UsedSources& b) {
   // compare bits
@@ -152,13 +155,6 @@ __device__ auto are_xor_compatible(const UsedSources& a, const UsedSources& b) {
     return false;
   // atomicInc(&count_xor_variations_compat, BIG);
   return true;
-}
-
-__device__ auto are_or_compatible(const UsedSources& a, const UsedSources& b) {
-  return UsedSources::are_variations_compatible(a.variations, b.variations)
-         && a.getBits().is_disjoint_or_subset(b.getBits());
-  // a.getBits().intersects(b.getBits()) ||
-  // a.getBits().is_subset_of(b.getBits()))
 }
 
 /*
@@ -215,8 +211,6 @@ __global__ void get_compatible_sources_kernel(
     }
   }
 }
-
-extern __shared__ fat_index_t dynamic_shared[];
 
 enum class Compat {
   All,
@@ -294,6 +288,7 @@ __device__ SmallestSpansResult get_smallest_src_index_spans(
       std::make_pair(vi.get_index_span(0), vi.get_index_span(variation + 1))};
 }
 
+  /*
 __device__ fat_index_t get_flat_idx(
     fat_index_t block_idx, unsigned thread_idx = threadIdx.x) {
   return block_idx * fat_index_t(blockDim.x) + thread_idx;
@@ -307,11 +302,8 @@ __device__ auto get_xor_combo_index(
   assert(flat_idx < idx_spans.second.size());
   return idx_spans.second[flat_idx];
 }
+  */
 
-const int kXorChunkIdx = 0;
-const int kOrChunkIdx = 1;
-const int kXorResultsIdx = 2;
-const int kNumSharedIndices = 3;
 
 namespace tag {
 struct XOR {};  // XOR;
@@ -324,7 +316,7 @@ __device__ bool is_source_compatible(
     TagT tag, const SourceCompatibilityData& source, fat_index_t flat_idx) {
   FilterData::DeviceCommon<IndexT> const* data{};
   if constexpr (std::is_same_v<TagT, tag::XOR>) data = &xor_data;
-  else if constexpr (std::is_same_v<TagT, tag::OR>) data = &or_data;
+  //  else if constexpr (std::is_same_v<TagT, tag::OR>) data = &or_data;
 
 #ifdef DISABLE_OR
   if constexpr (std::is_same_v<TagT, tag::OR>) return false;
@@ -353,6 +345,7 @@ __device__ bool is_source_compatible(
   return true;
 }
 
+/*
 __device__ void dump_variation(
     const UsedSources::Variations& v, const char* p = "") {
   printf("%d,%d,%d,%d,%d,%d,%d,%d,%d %s\n", (int)v[0], (int)v[1], (int)v[2], (int)v[3],
@@ -384,7 +377,9 @@ __device__ void dump_all_sources(fat_index_t flat_idx,
     dump_variation(v, b ? "- success" : "- failed");
   }
 }
+*/
 
+/*
 // only used for XOR variations currently
 __device__ variation_index_t get_one_variation(
     int sentence, fat_index_t flat_idx) {
@@ -528,14 +523,14 @@ __device__ bool is_any_OR_source_compatible(
     }
     __syncthreads();
 
-#ifdef PRINTF
-    if (/*!blockIdx.x &&*/ !threadIdx.x) {
+    #ifdef PRINTF
+    if (!threadIdx.x) {
       printf("  block: %u get_next_OR xor_chunk_idx: %u, or_chunk_idx: %u, "
              "xor_results_idx: %lu, compat: %d\n",
           blockIdx.x, xor_chunk_idx, or_chunk_idx, xor_results_idx,
           any_or_compat ? 1 : 0);
-}
-#endif
+    }
+    #endif
 
     // Or compatibility success ends the search for this source and results
     // in an exit out of is_compat_loop.
@@ -548,6 +543,7 @@ __device__ bool is_any_OR_source_compatible(
   // function for this block will be with a new XOR chunk.
   return false;
 }
+*/
 
 // Get the next block-sized chunk of XOR sources and test them for 
 // compatibility with the supplied source.
@@ -651,7 +647,7 @@ __device__ bool is_compat_loop(const SourceCompatibilityData& source,
 
     if (any_xor_compat) {
       if (!or_data.num_compat_indices) return true;
-#if 0
+#if 1
       if (is_any_OR_source_compatible(source, *xor_chunk_idx_ptr,  //
               xor_idx_spans)) {
         any_or_compat = true;

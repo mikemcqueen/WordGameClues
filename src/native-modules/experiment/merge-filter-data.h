@@ -125,13 +125,12 @@ struct FilterData {
 
   struct DeviceOr : DeviceCommon<index_t> {
     using Base = DeviceCommon<index_t>;
-  private:
+  public:
     void reset_pointers() {
       Base::reset_pointers();
       compat_indices = nullptr;
     }
 
-  public:
     void cuda_free() {
       Base::cuda_free();
       cm::cuda_free(compat_indices);

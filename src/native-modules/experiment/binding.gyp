@@ -39,46 +39,66 @@
       '/usr/local/cuda/lib64'
     ],
     'libraries': [ '-lcudart', '-lcudadevrt' ],
-    'dependencies': [ 'kernels' ],
+    'dependencies': [ 'kernels_lib' ],
     'defines': [ 'NAPI_CPP_EXCEPTIONS' ]
   },
   {
-    'target_name': 'kernels',
+    'target_name': 'kernels_lib',
     'type': 'static_library',
     'sources': [
        'merge.cu',
-       'filter.cu'
+       'filter.cu',
+       'or-filter.cu',
+       '<(SHARED_INTERMEDIATE_DIR)/kernels_dlink.o',
     ],
     'rules': [{
       'extension': 'cu',
-      'rule_name': 'kernel lib',
-      'message': 'CUDA static lib',
+      'rule_name': 'kernels lib',
+      'message': 'create CUDA kernels static library',
       'inputs': [ '<(RULE_INPUT_PATH)' ],
       'outputs': [
         '<(SHARED_INTERMEDIATE_DIR)/<(RULE_INPUT_ROOT).o',
-        '<(SHARED_INTERMEDIATE_DIR)/<(RULE_INPUT_ROOT)_dlink.o'
-       ],
+      ],
       'process_outputs_as_sources': 1,
       'action': []
+    },
+    {
+      'extension': 'o',
+      'rule_name': 'device link kernels',
+      'message': 'device link kernels on linux',
+      'inputs': [
+#         '<(SHARED_INTERMEDIATE_DIR)/merge.o',
+#         '<(SHARED_INTERMEDIATE_DIR)/filter.o',
+#         '<(SHARED_INTERMEDIATE_DIR)/or-filter.o',
+       ],
+#'<(RULE_INPUT_PATH)' ],
+      'outputs': [ '<(SHARED_INTERMEDIATE_DIR)/kernels_dlink.o' ],
+#'<(RULE_INPUT_ROOT)_dummy_output' ],
+      'action': [
+          'env', 'DIR=<(SHARED_INTERMEDIATE_DIR)',
+          'make', '-sf', 'kernel.mk', 'dlink_all'
+      ]
     }],
-    'dependencies': [ 'build_kernels' ]
+    'dependencies': [ 'compile_kernels' ]
   },
   {
-    'target_name': 'build_kernels',
+    'target_name': 'compile_kernels',
     'type': 'none',
     'sources': [
+        'merge.cu',
+        'or-filter.cu',
         'filter.cu',
-        'merge.cu'
     ],
     'rules': [{
       'extension': 'cu',           
-      'rule_name': 'compile kernel',
-      'message': 'compile and device link CUDA file on linux',
+      'rule_name': 'compile kernels',
+      'message': 'compile CUDA kernels on linux',
       'inputs': [ '<(RULE_INPUT_PATH)' ],
-      'outputs': [ '<(RULE_INPUT_ROOT)_dummy_output' ],
+      'outputs': [ '<(SHARED_INTERMEDIATE_DIR)/<(RULE_INPUT_ROOT).o' ],
+#'<(RULE_INPUT_ROOT)_dummy_output' ],
       'action': [
           'env', 'DIR=<(SHARED_INTERMEDIATE_DIR)', 'FILE=<(RULE_INPUT_ROOT)',
-          'make', '-sf', 'kernel.mk', 'build'
+          'make', '-sf', 'kernel.mk', 'compile'
       ]
     }]
   }]
