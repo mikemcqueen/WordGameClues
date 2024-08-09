@@ -1,13 +1,10 @@
 // filter.cu
 
-//#include <algorithm>
 #include <type_traits>
 #include <cuda_runtime.h>
 #include "combo-maker.h"
 #include "merge-filter-data.h"
 #include "or-filter.cuh"
-//#include "stream-data.h"
-//#include "util.h"
 
 #define RESTRICT __restrict__
 
@@ -20,7 +17,7 @@ namespace {
 
 extern __shared__ fat_index_t dynamic_shared[];
 
-__device__ auto are_or_compatible(const UsedSources& a, const UsedSources& b) {
+__device__ __forceinline__ auto are_or_compatible(const UsedSources& a, const UsedSources& b) {
   return UsedSources::are_variations_compatible(a.variations, b.variations)
          && a.getBits().is_disjoint_or_subset(b.getBits());
   // a.getBits().intersects(b.getBits()) ||
@@ -42,7 +39,6 @@ __device__ bool is_source_compatible(
 // only used for XOR variations currently
 __device__ variation_index_t get_one_variation(
     int sentence, fat_index_t flat_idx) {
-  // const FilterData::DeviceXor::Base* RESTRICT data) {
   for (int list_idx{int(xor_data.num_idx_lists) - 1}; list_idx >= 0; --list_idx) {
     const auto& src = xor_data.get_source(flat_idx, list_idx);
     const auto variation = src.usedSources.getVariation(sentence);
@@ -52,10 +48,8 @@ __device__ variation_index_t get_one_variation(
   return -1;
 }
 
-__device__ unsigned variation_merge_failure = 0;
-
 // faster than UsedSources version
-__device__ auto merge_variations(UsedSources::Variations& to,
+__device__ __forceinline__ auto merge_variations(UsedSources::Variations& to,
     const UsedSources::Variations& from, bool force = false) {
   for (int s{0}; s < kNumSentences; ++s) {
     if (force || (to[s] == -1)) to[s] = from[s];
@@ -77,7 +71,7 @@ __device__ auto build_variations(fat_index_t flat_idx) {
   return v;
 }
 
-__device__ auto are_variations_compatible(
+__device__ __forceinline__ auto are_variations_compatible(
     const UsedSources::Variations& xor_variations,
     const fat_index_t or_flat_idx) {
   const auto or_variations = build_variations(or_flat_idx);
@@ -153,7 +147,7 @@ __device__ bool get_next_compatible_OR_sources(
 }
 
 // not the fastest function in the world. but keeps GPU busy at least.
-__device__ auto next_xor_result_idx(unsigned result_idx) {
+__device__ __forceinline__ auto next_xor_result_idx(unsigned result_idx) {
   result_t* xor_results = (result_t*)&dynamic_shared[kNumSharedIndices];
   const auto block_size = blockDim.x;
   while ((result_idx < block_size) && !xor_results[result_idx])
@@ -190,7 +184,7 @@ __device__ bool is_any_OR_source_compatible(
              "xor_results_idx: %lu, compat: %d\n",
           blockIdx.x, xor_chunk_idx, or_chunk_idx, xor_results_idx,
           any_or_compat ? 1 : 0);
-}
+    }
 #endif
 
     // Or compatibility success ends the search for this source and results
@@ -199,7 +193,7 @@ __device__ bool is_any_OR_source_compatible(
     // Or compatibility failure means we have exhausted all OR source chunks
     // for this XOR result; proceed to next XOR result.
     xor_results_idx = next_xor_result_idx(xor_results_idx + 1);
-    }
+  }
   // No XOR results in this XOR chunk were compatible. The next call to this
   // function for this block will be with a new XOR chunk.
   return false;

@@ -1,4 +1,5 @@
--include $(DIR)/$(FILE).d
+-include $(DIR)/$(FILE).d                        # compile pre-reqs
+-include $(patsubst %.o,$(DIR)/%.d,$(OBJ_FILES)) # dlink pre-reqs
 
 # '-Xcompiler', '-pedantic', '-Werror' : options i couldn't get working
 # -g # debug
@@ -28,10 +29,10 @@ compile: $(DIR)/$(FILE).o
 # %_dlink.o: $(patsubst %,$(*D)/%,$(OBJ_FILES)) 
 
 $(DIR)/%_dlink.o: $(patsubst %,$(DIR)/%,$(OBJ_FILES))
-	echo "Device linking $@"
+	echo "Device linking $@..."
 	nvcc $(ARCH) $(NVCC_LINK_FLAGS) -dlink $^ -o $@
 
 $(DIR)/%.o: %.cu
 	@mkdir -p $(*D)
-	echo "Compiling $<"
-	nvcc $(ARCH) -MP -MMD -MF $*.d $(NVCC_COMPILE_FLAGS) -dc $< -o $@
+	echo "Compiling $<..."
+	nvcc $(ARCH) -MP -MMD -MF $(DIR)/$*.d $(NVCC_COMPILE_FLAGS) -dc $< -o $@

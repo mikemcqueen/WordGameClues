@@ -29,7 +29,7 @@
       'stream-data.cpp',
       'validator.cpp',
       'unwrap.cpp',
-      'wrap.cpp'
+      'wrap.cpp',
     ],
     'include_dirs': [
       '<!@(node -p \'require("node-addon-api").include\')',
@@ -46,10 +46,10 @@
     'target_name': 'kernels_lib',
     'type': 'static_library',
     'sources': [
-       '<(SHARED_INTERMEDIATE_DIR)/merge.o',
-       '<(SHARED_INTERMEDIATE_DIR)/filter.o',
-       '<(SHARED_INTERMEDIATE_DIR)/or-filter.o',
-       '<(SHARED_INTERMEDIATE_DIR)/kernels_dlink.o',
+      '<(SHARED_INTERMEDIATE_DIR)/merge.o',
+      '<(SHARED_INTERMEDIATE_DIR)/filter.o',
+      '<(SHARED_INTERMEDIATE_DIR)/or-filter.o',
+      '<(SHARED_INTERMEDIATE_DIR)/kernels_dlink.o',
     ],
     'rules': [{
       'extension': 'o',
@@ -62,8 +62,7 @@
           'or-filter.o',
         ]
       },
-      'inputs': [
-      ],
+      'inputs': [],
       'outputs': [ '<(SHARED_INTERMEDIATE_DIR)/kernels_dlink.o' ],
       'process_outputs_as_sources': 1,
       'action': [
@@ -76,9 +75,9 @@
     'target_name': 'compile_kernels',
     'type': 'none',
     'sources': [
-        'merge.cu',
-        'or-filter.cu',
-        'filter.cu',
+      'merge.cu',
+      'or-filter.cu',
+      'filter.cu',
     ],
     'rules': [{
       'extension': 'cu',           

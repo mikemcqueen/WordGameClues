@@ -11,7 +11,7 @@ inline const int kOrChunkIdx = 1;
 inline const int kXorResultsIdx = 2;
 inline const int kNumSharedIndices = 3;
 
-__device__ inline auto get_xor_combo_index(
+__device__ __forceinline__ /*inline*/ auto get_xor_combo_index(
     fat_index_t flat_idx, const FatIndexSpanPair& idx_spans) {
   if (flat_idx < idx_spans.first.size()) return idx_spans.first[flat_idx];
   flat_idx -= idx_spans.first.size();

@@ -21,6 +21,4 @@ void run_filter_kernel(int threads_per_block, StreamData& stream,
     const result_t* device_compat_src_results,
     result_t* device_results, const index_t* device_list_start_indices);
 
-// void show_or_arg_counts(unsigned num_or_args);
-
 }  // namespace cm
