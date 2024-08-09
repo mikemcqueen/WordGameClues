@@ -4,6 +4,15 @@
 
 namespace cm {
 
+// #define DEBUG_OR_COUNTS
+// #define DEBUG_XOR_COUNTS
+// #define DISABLE_OR
+// #define FORCE_XOR_COMPAT
+// #define FORCE_ALL_XOR
+// #define MAX_SOURCES 2
+// #define USE_LOCAL_XOR_COMPAT
+// #define PRINTF
+
 class SourceCompatibilityData;
 
 inline const int kXorChunkIdx = 0;

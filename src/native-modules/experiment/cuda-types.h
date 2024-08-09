@@ -20,6 +20,7 @@ using result_t = uint8_t;
 using variation_index_t = int16_t;
 using index_t = uint32_t;
 using fat_index_t = uint64_t;
+using atomic64_t = unsigned long long int;
 
 template <typename T> using IndexListBase = std::vector<T>;
 

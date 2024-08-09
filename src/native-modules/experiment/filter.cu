@@ -15,6 +15,20 @@ namespace cm {
 __constant__ FilterData::DeviceCommon<fat_index_t> xor_data;
 __constant__ FilterData::DeviceOr or_data;
 
+const unsigned BIG = 2'100'000'000;
+
+#if defined(DEBUG_XOR_COUNTS) || defined(DEBUG_OR_COUNTS)
+__device__ atomic64_t count_xor_src_considered = 0;
+__device__ atomic64_t count_xor_src_compat = 0;
+
+__device__ atomic64_t count_or_src_considered = 0;
+__device__ atomic64_t count_or_xor_compat = 0;
+__device__ atomic64_t count_or_src_compat = 0;
+
+__device__ atomic64_t count_xor_bits_compat;
+__device__ atomic64_t count_xor_variations_compat;
+#endif
+
 namespace {
 
 #if 1
@@ -23,59 +37,37 @@ namespace {
 #define RESTRICT
 #endif
   
-const unsigned BIG = 2'100'000'000;
-  //#define DEBUG_OR_COUNTS
-//#define DEBUG_XOR_COUNTS
-// #define DISABLE_OR
-// #define FORCE_XOR_COMPAT
-// #define FORCE_ALL_XOR
-//#define MAX_SOURCES 2
-// #define USE_LOCAL_XOR_COMPAT
-//#define PRINTF
-
-#if defined(DEBUG_XOR_COUNTS) || defined(DEBUG_OR_COUNTS)
-__device__ unsigned count_xor_src_considered = 0;
-__device__ unsigned count_xor_src_compat = 0;
-
-__device__ unsigned count_or_src_considered = 0;
-__device__ unsigned count_or_xor_compat = 0;
-__device__ unsigned count_or_src_compat = 0;
-
-__device__ unsigned count_xor_bits_compat;
-__device__ unsigned count_xor_variations_compat;
-#endif
-
 void init_counts() {
-  unsigned value = 0;
+  atomic64_t value = 0;
   cudaError_t err{};
 
 #ifdef DEBUG_XOR_COUNTS
-  err = cudaMemcpyToSymbol(count_xor_src_considered, &value, sizeof(unsigned));
+  err = cudaMemcpyToSymbol(count_xor_src_considered, &value, sizeof(atomic64_t));
   assert_cuda_success(err, "init count");
 
-  err = cudaMemcpyToSymbol(count_xor_src_compat, &value, sizeof(unsigned));
+  err = cudaMemcpyToSymbol(count_xor_src_compat, &value, sizeof(atomic64_t));
   assert_cuda_success(err, "init count");
 #endif
 
 
 #ifdef USE_LOCAL_XOR_COMPAT
-  err = cudaMemcpyToSymbol(count_xor_bits_compat, &value, sizeof(unsigned));
+  err = cudaMemcpyToSymbol(count_xor_bits_compat, &value, sizeof(atomic64_t));
   assert_cuda_success(err, "init count");
 
   err = cudaMemcpyToSymbol(count_xor_variations_compat, &value,  //
-      sizeof(unsigned));
+      sizeof(atomic64_t));
   assert_cuda_success(err, "init count");
 #endif
 
 
 #ifdef DEBUG_OR_COUNTS
-  err = cudaMemcpyToSymbol(count_or_src_considered, &value, sizeof(unsigned));
+  err = cudaMemcpyToSymbol(count_or_src_considered, &value, sizeof(atomic64_t));
   assert_cuda_success(err, "init count");
 
-  err = cudaMemcpyToSymbol(count_or_src_compat, &value, sizeof(unsigned));
+  err = cudaMemcpyToSymbol(count_or_src_compat, &value, sizeof(atomic64_t));
   assert_cuda_success(err, "init count");
 
-  err = cudaMemcpyToSymbol(count_or_xor_compat, &value, sizeof(unsigned));
+  err = cudaMemcpyToSymbol(count_or_xor_compat, &value, sizeof(atomic64_t));
   assert_cuda_success(err, "init count");
 #endif
 }
@@ -84,46 +76,46 @@ void display_counts() {
   cudaError_t err{};
 
 #ifdef DEBUG_XOR_COUNTS
-  unsigned considered_xor_count;
-  unsigned compat_xor_count;
+  atomic64_t considered_xor_count;
+  atomic64_t compat_xor_count;
 
   err = cudaMemcpyFromSymbol(
-      &considered_xor_count, count_xor_src_considered, sizeof(unsigned));
+      &considered_xor_count, count_xor_src_considered, sizeof(atomic64_t));
   assert_cuda_success(err, "display count");
 
   err = cudaMemcpyFromSymbol(
-      &compat_xor_count, count_xor_src_compat, sizeof(unsigned));
+      &compat_xor_count, count_xor_src_compat, sizeof(atomic64_t));
   assert_cuda_success(err, "display count");
 #endif
 
 #ifdef USE_LOCAL_XOR_COMPAT
-  unsigned compat_xor_bits_count;
-  unsigned compat_xor_variations_count;
+  atomic64_t compat_xor_bits_count;
+  atomic64_t compat_xor_variations_count;
 
   err = cudaMemcpyFromSymbol(
-      &compat_xor_bits_count, count_xor_bits_compat, sizeof(unsigned));
+      &compat_xor_bits_count, count_xor_bits_compat, sizeof(atomic64_t));
   assert_cuda_success(err, "display count");
 
   err = cudaMemcpyFromSymbol(
-      &compat_xor_variations_count, count_xor_variations_compat, sizeof(unsigned));
+      &compat_xor_variations_count, count_xor_variations_compat, sizeof(atomic64_t));
   assert_cuda_success(err, "display count");
 #endif
 
 #ifdef DEBUG_OR_COUNTS
-  unsigned considered_or_count;
-  unsigned compat_or_xor_count;  // variations
-  unsigned compat_or_count;
+  atomic64_t considered_or_count;
+  atomic64_t compat_or_xor_count;  // variations
+  atomic64_t compat_or_count;
 
   err = cudaMemcpyFromSymbol(
-      &considered_or_count, count_or_src_considered, sizeof(unsigned));
+      &considered_or_count, count_or_src_considered, sizeof(atomic64_t));
   assert_cuda_success(err, "display count");
 
   err = cudaMemcpyFromSymbol(
-      &compat_or_xor_count, count_or_xor_compat, sizeof(unsigned));
+      &compat_or_xor_count, count_or_xor_compat, sizeof(atomic64_t));
   assert_cuda_success(err, "display count");
 
   err = cudaMemcpyFromSymbol(
-      &compat_or_count, count_or_src_compat, sizeof(unsigned));
+      &compat_or_count, count_or_src_compat, sizeof(atomic64_t));
   assert_cuda_success(err, "display count");
 #endif
 
@@ -318,22 +310,21 @@ __device__ bool is_source_compatible(
   if constexpr (std::is_same_v<TagT, tag::XOR>) data = &xor_data;
   //  else if constexpr (std::is_same_v<TagT, tag::OR>) data = &or_data;
 
-#ifdef DISABLE_OR
+  #ifdef DISABLE_OR
   if constexpr (std::is_same_v<TagT, tag::OR>) return false;
-#endif
-#ifdef FORCE_XOR_COMPAT
-  else if constexpr (std::is_same_v<TagT, tag::XOR>)
-    return true;
-#endif
+  #endif
+  #ifdef FORCE_XOR_COMPAT
+  else if constexpr (std::is_same_v<TagT, tag::XOR>) return true;
+  #endif
 
   for (int list_idx{int(data->num_idx_lists) - 1}; list_idx >= 0; --list_idx) {
     const auto& src = data->get_source(flat_idx, list_idx);
     if constexpr (std::is_same_v<TagT, tag::XOR>) {
-#ifdef USE_LOCAL_XOR_COMPAT
+      #ifdef USE_LOCAL_XOR_COMPAT
       if (!are_xor_compatible(src.usedSources, source.usedSources)) return false;
-#else
+      #else
       if (!src.isXorCompatibleWith(source)) return false;
-#endif
+      #endif
     } else if constexpr (std::is_same_v<TagT, tag::OR>) {
       //if (!src.isOrCompatibleWith(source)) return false;
       //src.usedSources.isOrCompatibleWith(source.usedSources)) return false;
@@ -560,14 +551,14 @@ __device__ bool get_next_XOR_sources_chunk(
   if (xor_flat_idx < num_xor_indices) {
 
     #ifdef DEBUG_XOR_COUNTS
-    atomicInc(&count_xor_src_considered, BIG);
+    atomicAdd(&count_xor_src_considered, 1);
     #endif
 
     const auto xor_combo_idx = get_xor_combo_index(xor_flat_idx, xor_idx_spans);
     if (is_source_compatible<fat_index_t>(tag::XOR{}, source, xor_combo_idx)) {
 
-#if defined(DEBUG_XOR_COUNTS)
-      atomicInc(&count_xor_src_compat, BIG);
+      #if defined(DEBUG_XOR_COUNTS)
+      atomicAdd(&count_xor_src_compat, 1);
       #endif
 
       xor_results[threadIdx.x] = 1;
@@ -593,7 +584,7 @@ __device__ bool get_next_compatible_XOR_sources(
   __syncthreads();
   for (; xor_chunk_idx * block_size < num_xor_indices; ++xor_chunk_idx) {
     if (get_next_XOR_sources_chunk(source, xor_chunk_idx, xor_idx_spans)) {
-#ifndef FORCE_ALL_XOR
+      #ifndef FORCE_ALL_XOR
       any_xor_compat = true;
       #endif
     }

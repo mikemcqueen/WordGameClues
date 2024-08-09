@@ -13,6 +13,12 @@ namespace cm {
 extern __constant__ FilterData::DeviceCommon<fat_index_t> xor_data;
 extern __constant__ FilterData::DeviceOr or_data;
 
+#ifdef DEBUG_OR_COUNTS
+extern __device__ atomic64_t count_or_src_considered;
+extern __device__ atomic64_t count_or_xor_compat;
+extern __device__ atomic64_t count_or_src_compat;
+#endif
+
 namespace {
 
 extern __shared__ fat_index_t dynamic_shared[];
@@ -86,38 +92,34 @@ __device__ bool get_OR_sources_chunk(const SourceCompatibilityData& source,
     unsigned or_chunk_idx, const UsedSources::Variations& xor_variations) {
   // one thread per compat_idx
   const auto or_compat_idx = get_flat_idx(or_chunk_idx);
-  if (or_compat_idx < or_data.num_compat_indices) {
+  if (or_compat_idx >= or_data.num_compat_indices) return false;
 
-    #ifdef DEBUG_OR_COUNTS
-    atomicInc(&count_or_src_considered, BIG);
-    #endif
+  #ifdef DEBUG_OR_COUNTS
+  atomicAdd(&count_or_src_considered, 1);
+  #endif
 
-    const auto or_flat_idx = or_data.compat_indices[or_compat_idx];
-    if (are_variations_compatible(xor_variations, or_flat_idx)) {
+  const auto or_flat_idx = or_data.compat_indices[or_compat_idx];
+  if (!are_variations_compatible(xor_variations, or_flat_idx)) return false;
 
-      #ifdef DEBUG_OR_COUNTS
-      atomicInc(&count_or_xor_compat, BIG);
-      #endif
+  #ifdef DEBUG_OR_COUNTS
+  atomicAdd(&count_or_xor_compat, 1);
+  #endif
 
-      if (is_source_compatible(source, or_flat_idx)) {
+  if (!is_source_compatible(source, or_flat_idx)) return false;
 
-        #ifdef DEBUG_OR_COUNTS
-        atomicInc(&count_or_src_compat, BIG);
-        #endif
+  #ifdef DEBUG_OR_COUNTS
+  atomicAdd(&count_or_src_compat, 1);
+  #endif
 
-        return true;
-      }
-    }
-  }
-  return false;
+  return true;
 }
 
-// For one XOR source.
+// With the XOR source identified by the supplied xor_combo_idx.
 // Walk through OR-sources one block-sized chunk at a time, until we find
 // a chunk that contains at least one OR source that is variation-compatible
 // with the XOR source indentified by the supplied xor_combo_idx, and
 // OR-compatible with the supplied source.
-__device__ bool get_next_compatible_OR_sources(
+__device__ bool is_any_OR_source_compatible(
     const SourceCompatibilityData& source, fat_index_t xor_combo_idx) {
   const auto block_size = blockDim.x;
   fat_index_t* or_chunk_idx_ptr = &dynamic_shared[kOrChunkIdx];
@@ -157,7 +159,7 @@ __device__ __forceinline__ auto next_xor_result_idx(unsigned result_idx) {
 
 }  // namespace
 
-// For all XOR results
+// With any XOR results in the specified chunk
 __device__ bool is_any_OR_source_compatible(
     const SourceCompatibilityData& source, unsigned xor_chunk_idx,
     const FatIndexSpanPair& xor_idx_spans) {
@@ -173,19 +175,19 @@ __device__ bool is_any_OR_source_compatible(
   for (unsigned xor_results_idx{}; xor_results_idx < max_results;) {
     const auto xor_flat_idx = get_flat_idx(xor_chunk_idx, xor_results_idx);
     const auto xor_combo_idx = get_xor_combo_index(xor_flat_idx, xor_idx_spans);
-    if (get_next_compatible_OR_sources(source, xor_combo_idx)) {
+    if (is_any_OR_source_compatible(source, xor_combo_idx)) {
       any_or_compat = true;
     }
     __syncthreads();
 
-#ifdef PRINTF
-    if (/*!blockIdx.x &&*/ !threadIdx.x) {
+    #ifdef PRINTF
+    if (!threadIdx.x) {
       printf("  block: %u get_next_OR xor_chunk_idx: %u, or_chunk_idx: %u, "
              "xor_results_idx: %lu, compat: %d\n",
           blockIdx.x, xor_chunk_idx, or_chunk_idx, xor_results_idx,
           any_or_compat ? 1 : 0);
     }
-#endif
+    #endif
 
     // Or compatibility success ends the search for this source and results
     // in an exit out of is_compat_loop.

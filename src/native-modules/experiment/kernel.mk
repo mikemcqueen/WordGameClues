@@ -1,5 +1,6 @@
--include $(DIR)/$(FILE).d                        # compile pre-reqs
--include $(patsubst %.o,$(DIR)/%.d,$(OBJ_FILES)) # dlink pre-reqs
+# compile pre-reqs
+-include $(OBJ_DIR)/*.d 
+#-include $(patsubst %.o,$(DIR)/%.d,$(OBJ_FILES)) # dlink pre-reqs
 
 # '-Xcompiler', '-pedantic', '-Werror' : options i couldn't get working
 # -g # debug
@@ -23,16 +24,19 @@ NVCC_LINK_FLAGS := -Xcompiler -fPIC
 
 .PHONY: compile
 
-compile: $(DIR)/$(FILE).o
+compile: $(OBJ_DIR)/$(FILE).o
 
 # would like something like this but make doesn't match due to no directory
 # %_dlink.o: $(patsubst %,$(*D)/%,$(OBJ_FILES)) 
 
-$(DIR)/%_dlink.o: $(patsubst %,$(DIR)/%,$(OBJ_FILES))
+$(OBJ_DIR)/%_dlink.a: $(LIB_DIR)/%_lib.a 
 	echo "Device linking $@..."
 	nvcc $(ARCH) $(NVCC_LINK_FLAGS) -dlink $^ -o $@
+	cp $@ $(LIB_DIR)
 
-$(DIR)/%.o: %.cu
+$(LIB_DIR)/%_lib.a: $(OBJ_DIR)/*.o
+
+$(OBJ_DIR)/%.o: %.cu
 	@mkdir -p $(*D)
 	echo "Compiling $<..."
-	nvcc $(ARCH) -MP -MMD -MF $(DIR)/$*.d $(NVCC_COMPILE_FLAGS) -dc $< -o $@
+	nvcc $(ARCH) -MP -MMD -MF $(OBJ_DIR)/$*.d $(NVCC_COMPILE_FLAGS) -dc $< -o $@
