@@ -67,12 +67,10 @@
       'outputs': [ '<(SHARED_INTERMEDIATE_DIR)/kernels_dlink.o' ],
       'process_outputs_as_sources': 1,
       'action': [
-        'env', 'DIR=<(SHARED_INTERMEDIATE_DIR)',
-               'FILE=kernels_dlink.o',
-               'OBJ_FILES=<@(obj_files)',
-        'make', '-sf', 'kernel.mk', 'dlink'
+        'env', 'DIR=<(SHARED_INTERMEDIATE_DIR)', 'OBJ_FILES=<@(obj_files)',
+        'make', '-sf', 'kernel.mk', '<(SHARED_INTERMEDIATE_DIR)/kernels_dlink.o'
       ]
-    }], # end rules
+    }],
   },
   {
     'target_name': 'compile_kernels',
@@ -90,8 +88,8 @@
       'outputs': [ '<(SHARED_INTERMEDIATE_DIR)/<(RULE_INPUT_ROOT).o' ],
       'action': [
           'env', 'DIR=<(SHARED_INTERMEDIATE_DIR)', 'FILE=<(RULE_INPUT_ROOT)',
-          'make', '-isf', 'kernel.mk', 'compile'
+          'make', '-sf', 'kernel.mk', 'compile'
       ]
     }]
-  }] # end targets
+  }]
 }

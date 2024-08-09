@@ -20,11 +20,12 @@ NVCC_COMPILE_FLAGS := -Xcompiler -fPIC \
 
 NVCC_LINK_FLAGS := -Xcompiler -fPIC
 
-.PHONY: compile dlink
+.PHONY: compile
 
 compile: $(DIR)/$(FILE).o
 
-dlink: $(DIR)/kernels_dlink.o
+# would like something like this but make doesn't match due to no directory
+# %_dlink.o: $(patsubst %,$(*D)/%,$(OBJ_FILES)) 
 
 $(DIR)/%_dlink.o: $(patsubst %,$(DIR)/%,$(OBJ_FILES))
 	echo "Device linking $@"
