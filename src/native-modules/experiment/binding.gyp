@@ -46,40 +46,33 @@
     'target_name': 'kernels_lib',
     'type': 'static_library',
     'sources': [
-       'merge.cu',
-       'filter.cu',
-       'or-filter.cu',
+       '<(SHARED_INTERMEDIATE_DIR)/merge.o',
+       '<(SHARED_INTERMEDIATE_DIR)/filter.o',
+       '<(SHARED_INTERMEDIATE_DIR)/or-filter.o',
        '<(SHARED_INTERMEDIATE_DIR)/kernels_dlink.o',
     ],
     'rules': [{
-      'extension': 'cu',
-      'rule_name': 'kernels lib',
-      'message': 'create CUDA kernels static library',
-      'inputs': [ '<(RULE_INPUT_PATH)' ],
-      'outputs': [
-        '<(SHARED_INTERMEDIATE_DIR)/<(RULE_INPUT_ROOT).o',
-      ],
-      'process_outputs_as_sources': 1,
-      'action': []
-    },
-    {
       'extension': 'o',
       'rule_name': 'device link kernels',
       'message': 'device link kernels on linux',
+      'variables': {
+        'obj_files': [
+          'merge.o',
+          'filter.o',
+          'or-filter.o',
+        ]
+      },
       'inputs': [
-#         '<(SHARED_INTERMEDIATE_DIR)/merge.o',
-#         '<(SHARED_INTERMEDIATE_DIR)/filter.o',
-#         '<(SHARED_INTERMEDIATE_DIR)/or-filter.o',
-       ],
-#'<(RULE_INPUT_PATH)' ],
+      ],
       'outputs': [ '<(SHARED_INTERMEDIATE_DIR)/kernels_dlink.o' ],
-#'<(RULE_INPUT_ROOT)_dummy_output' ],
+      'process_outputs_as_sources': 1,
       'action': [
-          'env', 'DIR=<(SHARED_INTERMEDIATE_DIR)',
-          'make', '-sf', 'kernel.mk', 'dlink_all'
+        'env', 'DIR=<(SHARED_INTERMEDIATE_DIR)',
+               'FILE=kernels_dlink.o',
+               'OBJ_FILES=<@(obj_files)',
+        'make', '-sf', 'kernel.mk', 'dlink'
       ]
-    }],
-    'dependencies': [ 'compile_kernels' ]
+    }], # end rules
   },
   {
     'target_name': 'compile_kernels',
@@ -95,11 +88,10 @@
       'message': 'compile CUDA kernels on linux',
       'inputs': [ '<(RULE_INPUT_PATH)' ],
       'outputs': [ '<(SHARED_INTERMEDIATE_DIR)/<(RULE_INPUT_ROOT).o' ],
-#'<(RULE_INPUT_ROOT)_dummy_output' ],
       'action': [
           'env', 'DIR=<(SHARED_INTERMEDIATE_DIR)', 'FILE=<(RULE_INPUT_ROOT)',
-          'make', '-sf', 'kernel.mk', 'compile'
+          'make', '-isf', 'kernel.mk', 'compile'
       ]
     }]
-  }]
+  }] # end targets
 }
