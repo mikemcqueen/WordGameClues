@@ -23,6 +23,7 @@ __device__ atomic64_t count_xor_src_compat = 0;
 
 __device__ atomic64_t count_or_src_considered = 0;
 __device__ atomic64_t count_or_xor_compat = 0;
+__device__ atomic64_t count_or_src_variation_compat = 0;
 __device__ atomic64_t count_or_src_compat = 0;
 
 __device__ atomic64_t count_xor_bits_compat;
@@ -64,10 +65,14 @@ void init_counts() {
   err = cudaMemcpyToSymbol(count_or_src_considered, &value, sizeof(atomic64_t));
   assert_cuda_success(err, "init count");
 
-  err = cudaMemcpyToSymbol(count_or_src_compat, &value, sizeof(atomic64_t));
+  err = cudaMemcpyToSymbol(count_or_xor_compat, &value, sizeof(atomic64_t));
   assert_cuda_success(err, "init count");
 
-  err = cudaMemcpyToSymbol(count_or_xor_compat, &value, sizeof(atomic64_t));
+  err = cudaMemcpyToSymbol(count_or_src_variation_compat, &value,  //
+      sizeof(atomic64_t));
+  assert_cuda_success(err, "init count");
+
+  err = cudaMemcpyToSymbol(count_or_src_compat, &value, sizeof(atomic64_t));
   assert_cuda_success(err, "init count");
 #endif
 }
@@ -104,6 +109,7 @@ void display_counts() {
 #ifdef DEBUG_OR_COUNTS
   atomic64_t considered_or_count;
   atomic64_t compat_or_xor_count;  // variations
+  atomic64_t compat_or_src_variation_count;
   atomic64_t compat_or_count;
 
   err = cudaMemcpyFromSymbol(
@@ -117,6 +123,10 @@ void display_counts() {
   err = cudaMemcpyFromSymbol(
       &compat_or_count, count_or_src_compat, sizeof(atomic64_t));
   assert_cuda_success(err, "display count");
+
+  err = cudaMemcpyFromSymbol(
+      &compat_or_src_variation_count, count_or_src_variation_compat, sizeof(atomic64_t));
+  assert_cuda_success(err, "display count");
 #endif
 
   std::cerr
@@ -127,6 +137,7 @@ void display_counts() {
 #ifdef DEBUG_OR_COUNTS
       << " or_considered: " << considered_or_count
       << " or_xor_compat: " << compat_or_xor_count
+      << " or_src_variation_compat: " << compat_or_src_variation_count
       << " or_compat: " << compat_or_count
 #endif
 #ifdef USE_LOCAL_XOR_COMPAT

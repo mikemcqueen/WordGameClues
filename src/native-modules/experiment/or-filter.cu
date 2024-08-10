@@ -16,6 +16,7 @@ extern __constant__ FilterData::DeviceOr or_data;
 #ifdef DEBUG_OR_COUNTS
 extern __device__ atomic64_t count_or_src_considered;
 extern __device__ atomic64_t count_or_xor_compat;
+extern __device__ atomic64_t count_or_src_variation_compat;
 extern __device__ atomic64_t count_or_src_compat;
 #endif
 
@@ -23,19 +24,50 @@ namespace {
 
 extern __shared__ fat_index_t dynamic_shared[];
 
+template <typename T> __device__ __forceinline__ auto count(const T& bits) {
+  int n{};
+  for (int i{}; i < T::wc(); ++i) {
+    n += __popc(bits.word(i));
+  }
+  return n;
+}
+
+using ll_t = unsigned long long int;
+
+// test "OR compatibility" in one pass (!intersects || is_subset_of)
+template <typename T>
+__device__ __forceinline__ bool is_disjoint_or_subset2(const T& a, const T& b) {
+  uint64_t a_count{};
+  uint64_t and_count{};
+  for (int i{}; i < T::wc() / 2; ++i) {
+    and_count += __popcll(a.long_word(i) & b.long_word(i));
+    a_count += __popcll(a.long_word(i));
+  }
+  return a_count == and_count;
+}
+
+// test "OR compatibility" in one pass (!intersects || is_subset_of)
+template <typename T>
+__device__ __forceinline__ bool is_disjoint_or_subset(const T& a, const T& b) {
+  for (int i{}; i < T::wc() / 2; ++i) {
+    const auto w = a.long_word(i) & b.long_word(i);
+    if (w && (w != a.long_word(i))) return false;
+  }
+  for (int i{}; i < T::wc() - (T::wc() / 2) * 2; ++i) {
+    const auto w = a.word(i) & b.word(i);
+    if (w && (w != a.word(i))) return false;
+  }
+  return true;
+}
+
 __device__ __forceinline__ auto are_or_compatible(const UsedSources& a, const UsedSources& b) {
-  return UsedSources::are_variations_compatible(a.variations, b.variations)
-         && a.getBits().is_disjoint_or_subset(b.getBits());
-  // a.getBits().intersects(b.getBits()) ||
-  // a.getBits().is_subset_of(b.getBits()))
+  return is_disjoint_or_subset(a.getBits(), b.getBits());
 }
 
 __device__ bool is_source_compatible(
     const SourceCompatibilityData& source, fat_index_t flat_idx) {
   for (int list_idx{int(or_data.num_idx_lists) - 1}; list_idx >= 0; --list_idx) {
     const auto& src = or_data.get_source(flat_idx, list_idx);
-      //if (!src.isOrCompatibleWith(source)) return false;
-      //src.usedSources.isOrCompatibleWith(source.usedSources)) return false;
     if (!are_or_compatible(src.usedSources, source.usedSources)) return false;
     flat_idx /= or_data.idx_list_sizes[list_idx];
   }
@@ -57,7 +89,7 @@ __device__ variation_index_t get_one_variation(
 // faster than UsedSources version
 __device__ __forceinline__ auto merge_variations(UsedSources::Variations& to,
     const UsedSources::Variations& from, bool force = false) {
-  for (int s{0}; s < kNumSentences; ++s) {
+  for (int s{}; s < kNumSentences; ++s) {
     if (force || (to[s] == -1)) to[s] = from[s];
   }
   return true;
@@ -77,12 +109,12 @@ __device__ auto build_variations(fat_index_t flat_idx) {
   return v;
 }
 
+#if 0
 __device__ __forceinline__ auto are_variations_compatible(
     const UsedSources::Variations& xor_variations,
     const fat_index_t or_flat_idx) {
-  const auto or_variations = build_variations(or_flat_idx);
-  return UsedSources::are_variations_compatible(xor_variations, or_variations);
 }
+#endif
 
 // Get a block-sized chunk of OR sources and test them for variation-
 // compatibililty with the XOR source specified by the supplied
@@ -99,10 +131,20 @@ __device__ bool get_OR_sources_chunk(const SourceCompatibilityData& source,
   #endif
 
   const auto or_flat_idx = or_data.compat_indices[or_compat_idx];
-  if (!are_variations_compatible(xor_variations, or_flat_idx)) return false;
+  const auto or_variations = build_variations(or_flat_idx);
+  if (!UsedSources::are_variations_compatible(xor_variations, or_variations))
+    return false;
 
   #ifdef DEBUG_OR_COUNTS
   atomicAdd(&count_or_xor_compat, 1);
+  #endif
+
+  if (!UsedSources::are_variations_compatible(source.usedSources.variations,  //
+          or_variations))
+    return false;
+
+  #ifdef DEBUG_OR_COUNTS
+  atomicAdd(&count_or_src_variation_compat, 1);
   #endif
 
   if (!is_source_compatible(source, or_flat_idx)) return false;

@@ -23,6 +23,7 @@
 #ifndef _MMEBITSET_H
 #define _MMEBITSET_H 1
 
+#pragma once
 #ifndef assert
 #include <assert.h>
 #endif // assert
@@ -31,9 +32,6 @@
 #include <cuda_runtime.h>
 #endif
 #include <cstdint>
-//#include 
-
-//typedef unsigned int uint32_t;
 
 namespace mme {
 
@@ -49,17 +47,10 @@ inline void hash_combine(SizeT& seed, SizeT value) {
 template <int size>
 class bitset {
 public:
-  using word_type = uint32_t;
+  using word_type = unsigned;
   //constexpr int word_count = (size+31)/32;
 
   constexpr bitset() { reset(); }
-
-    /*
-    explicit bitset(uint32_t b) {
-        reset();
-        bits[0] = b;
-    }
-    */
 
   // word count
   constexpr inline static auto wc() {
@@ -99,12 +90,12 @@ public:
   // test "OR compatibility" in one pass (!intersects || is_subset_of)
   constexpr bool is_disjoint_or_subset(const bitset<size>& other) const {
     for (int i{}; i < wc(); ++i) {
-      auto w = bits[i] & other.bits[i];
+      const auto w = bits[i] & other.bits[i];
       if (w && (w != bits[i])) return false;
     }
     return true;
   }
-
+  
   // test "XOR compatibility" without constructing new object
   constexpr bool intersects(const bitset<size>& other) const {
     for (int i{}; i < wc(); ++i) {
@@ -137,6 +128,10 @@ public:
 
   constexpr word_type word(int i) const {
     return bits[i];
+  }
+
+  constexpr auto long_word(int i) const {
+    return reinterpret_cast<const unsigned long long int*>(bits)[i];
   }
 
   void reset() {
@@ -198,7 +193,7 @@ public:
     return rv;
   }
   
-  bool operator == (const bitset<size> &x) const {
+  constexpr bool operator == (const bitset<size> &x) const {
     for (int i=0; i<wc(); i++)
       if (bits[i] != x.bits[i])
         return false;

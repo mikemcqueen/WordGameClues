@@ -4,7 +4,7 @@
 
 namespace cm {
 
-// #define DEBUG_OR_COUNTS
+#define DEBUG_OR_COUNTS
 // #define DEBUG_XOR_COUNTS
 // #define DISABLE_OR
 // #define FORCE_XOR_COMPAT
