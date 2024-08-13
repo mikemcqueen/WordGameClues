@@ -214,7 +214,8 @@ __device__ bool is_any_OR_source_compatible(
   auto max_results = num_xor_indices - blockDim.x * xor_chunk_idx;
   if (max_results > block_size) max_results = block_size;
   __syncthreads();
-  for (unsigned xor_results_idx{}; xor_results_idx < max_results;) {
+  for (unsigned xor_results_idx{next_xor_result_idx(0)};
+      xor_results_idx < max_results;) {
     const auto xor_flat_idx = get_flat_idx(xor_chunk_idx, xor_results_idx);
     const auto xor_combo_idx = get_xor_combo_index(xor_flat_idx, xor_idx_spans);
     if (is_any_OR_source_compatible(source, xor_combo_idx)) {
