@@ -136,7 +136,7 @@ void display_counts() {
 #endif
 #ifdef DEBUG_OR_COUNTS
       << " or_considered: " << considered_or_count
-      << " or_xor_compat: " << compat_or_xor_count
+      << " or_xor_compat: " << compat_or_xor_count << std::endl
       << " or_src_variation_compat: " << compat_or_src_variation_count
       << " or_compat: " << compat_or_count
 #endif
