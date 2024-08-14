@@ -31,14 +31,6 @@ using filter_result_t = std::unordered_set<std::string>;
 
 // types
 
-/*
-struct XorVariationIndices {
-  FatIndexList indices;
-  IndexList num_indices_per_variation_list;
-  IndexList variation_offsets_list;
-};
-*/
-
 struct OrVariationIndices {
   IndexList indices;
   std::vector<VariationIndexOffset> index_offsets;

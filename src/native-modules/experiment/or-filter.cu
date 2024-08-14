@@ -46,29 +46,13 @@ __device__ __forceinline__ bool is_disjoint_or_subset2(const T& a, const T& b) {
   return a_count == and_count;
 }
 
-// test "OR compatibility" in one pass (!intersects || is_subset_of)
-template <typename T>
-__device__ __forceinline__ bool is_disjoint_or_subset(const T& a, const T& b) {
-  for (int i{}; i < T::wc() / 2; ++i) {
-    const auto w = a.long_word(i) & b.long_word(i);
-    if (w && (w != a.long_word(i))) return false;
-  }
-  for (int i{}; i < T::wc() - (T::wc() / 2) * 2; ++i) {
-    const auto w = a.word(i) & b.word(i);
-    if (w && (w != a.word(i))) return false;
-  }
-  return true;
-}
-
-__device__ __forceinline__ auto are_or_compatible(const UsedSources& a, const UsedSources& b) {
-  return is_disjoint_or_subset(a.getBits(), b.getBits());
-}
-
 __device__ bool is_source_compatible(
     const SourceCompatibilityData& source, fat_index_t flat_idx) {
   for (int list_idx{int(or_data.num_idx_lists) - 1}; list_idx >= 0; --list_idx) {
-    const auto& src = or_data.get_source(flat_idx, list_idx);
-    if (!are_or_compatible(src.usedSources, source.usedSources)) return false;
+    const auto& or_src = or_data.get_source(flat_idx, list_idx);
+    // NB: order of params matters here
+    if (!source_bits_are_OR_compatible(or_src.usedSources, source.usedSources))
+      return false;
     flat_idx /= or_data.idx_list_sizes[list_idx];
   }
   return true;
@@ -79,7 +63,7 @@ __device__ variation_index_t get_one_variation(
     int sentence, fat_index_t flat_idx) {
   for (int list_idx{int(xor_data.num_idx_lists) - 1}; list_idx >= 0; --list_idx) {
     const auto& src = xor_data.get_source(flat_idx, list_idx);
-    const auto variation = src.usedSources.getVariation(sentence);
+    const auto variation = src.usedSources.variations[sentence];
     if (variation > -1) return variation;
     flat_idx /= xor_data.idx_list_sizes[list_idx];
   }
@@ -108,13 +92,6 @@ __device__ auto build_variations(fat_index_t flat_idx) {
   }
   return v;
 }
-
-#if 0
-__device__ __forceinline__ auto are_variations_compatible(
-    const UsedSources::Variations& xor_variations,
-    const fat_index_t or_flat_idx) {
-}
-#endif
 
 // Get a block-sized chunk of OR sources and test them for variation-
 // compatibililty with the XOR source specified by the supplied
@@ -169,8 +146,7 @@ __device__ bool is_any_OR_source_compatible(
   __shared__ UsedSources::Variations xor_variations;
   if (threadIdx.x < xor_variations.size()) {
     if (!threadIdx.x) any_or_compat = false;
-    xor_variations[threadIdx.x] =
-        get_one_variation(threadIdx.x + 1, xor_combo_idx);
+    xor_variations[threadIdx.x] = get_one_variation(threadIdx.x, xor_combo_idx);
   }
   __syncthreads();
   for (unsigned or_chunk_idx{};

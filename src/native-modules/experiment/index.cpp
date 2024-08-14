@@ -465,7 +465,6 @@ Value filterPreparation(const CallbackInfo& info) {
       check_XOR_compatibility(MFD, variations_set);
     }
     alloc_copy_filter_indices(MFD, variations_list, stream);
-    /*alloc_*/copy_filter_data(MFD); // , variations_list, stream);
     cuda_memory_dump("filter preparation");
   }
   return Boolean::New(env, compat);

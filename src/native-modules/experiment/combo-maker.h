@@ -180,11 +180,17 @@ public:
 
 #if 1
   static constexpr auto are_variations_compatible(
+      variation_index_t vi1, variation_index_t vi2) {
+    vi1 += 1;
+    vi2 += 1;
+    if (vi1 && vi2 && (vi1 != vi2)) return false;
+    return true;
+  }
+
+  static constexpr auto are_variations_compatible(
       const Variations& v1, const Variations& v2) {
     for (size_t i{}; i < v1.size(); ++i) {
-      const auto first = v1[i] + 1;
-      const auto second = v2[i] + 1;
-      if (first && second && (first != second)) return false;
+      if (!are_variations_compatible(v1[i], v2[i])) return false;
     }
     return true;
   }
