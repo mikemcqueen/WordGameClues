@@ -26,17 +26,11 @@ struct StreamBase {
   int sequence_num{};
   bool is_running{false};  // is running (true until results retrieved)
   bool has_run{false};     // has run at least once
-  SourceIndex* device_src_indices{};
+  SourceIndex* device_src_indices{};  // allocated in device memory
   std::vector<SourceIndex> src_indices;
 };
 
-// the pointers in this are allocated in device memory
 struct StreamData : public StreamBase {
-  //private:
-  //  static const auto num_cores = 1280;
-  //  static const auto max_chunks = 20ul;
-
-  //public:
   static int next_sequence_num() {
     static int sequence_num{};
     return sequence_num++;

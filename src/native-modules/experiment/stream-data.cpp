@@ -29,12 +29,12 @@ bool StreamData::fill_source_indices(IndexStates& idx_states, int max_idx) {
   }
   if (log_level(ExtraVerbose)) {
     const auto first =
-        (src_indices.empty() ? -1 : (int)src_indices.front().listIndex);
+        src_indices.empty() ? -1 : (int)src_indices.front().listIndex;
     const auto last =
-        (src_indices.empty() ? -1 : (int)src_indices.back().listIndex);
-    std::cerr << "stream " << stream_idx  //
-              << " filled " << src_indices.size() << " of " << max_idx
-              << ", first: " << first << ", last: " << last << std::endl;
+        src_indices.empty() ? -1 : (int)src_indices.back().listIndex;
+    std::cerr << "stream " << stream_idx << " filled " << src_indices.size()
+              << " of " << max_idx << ", first: " << first << ", last: " << last
+              << std::endl;
   }
   return !src_indices.empty();
 }
@@ -45,8 +45,8 @@ void StreamData::alloc_copy_source_indices(
   auto indices_bytes = src_indices.size() * sizeof(SourceIndex);
   // alloc source indices
   if (!device_src_indices) {
-    cuda_malloc_async(
-        (void**)&device_src_indices, indices_bytes, cuda_stream, "src_indices");
+    cuda_malloc_async((void**)&device_src_indices, indices_bytes,  //
+        cuda_stream, "src_indices");
   }
   // copy source indices
   err = cudaMemcpyAsync(device_src_indices, src_indices.data(), indices_bytes,

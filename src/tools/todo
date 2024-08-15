@@ -1,47 +1,15 @@
-* OR kernel
-  * DONE rip OR-compat checking out of xor-kernel.
-  * DONE generate out.xor output for 4 input variations (2,2, 2,10)(--xor, --xor + --or)
-  * DONE verify xor + or matches xor, and both match out.orig.xor
-  * DONE commit? on a branch?
-  * DONE remove "xor" from name of filter task wrapper functions i think.
-  * DONE make sure sources are already allocated at that spot, if not, move
-         allocation to correct spot.
-  * DONE make get_compat_combo kernel work with OR sources (variation checking only).
-  * DONE host-side slow version of XOR+OR combo index compatibility checking.
-  * EH device-side XOR+OR compatibility checking if it makes sense
-  * DONE figure out where i'm going to plug in the OR kernel execution.
-  * DONE how do i restrict the OR kernel to comparing only those OR variations that
-         are compatible with with the XOR variations with which the source is compatible?
-  * WHAT consider using method in get_smallest_index_spans return logic in old kernel for
-         OR-only compat checking
-  * DONE debug why --xor arg only results changed (no --or args).
-  * DONE Make dynamic shared indices uint64_t.
-  * DONE remove shared/syncs from get_next_XOR_sources chunk, similar to OR?
-  * DONE Templatize is_OR_source_compatible/is_XOR_source_compatible with tags & if constexpr
-  * DONE don't create combo indices for OR args. some kind of flag (already present?) to
-         get_merge_data(). well i do some valdation with these. i should have an option to turn
-         this off. defaults to off, need to add option to turn on.
-  * DONE Seems like the device_side or_variations was unnecessary. I need to test compatibility
-         of a specific OR-source with a specific XOR-source. A set of unique or_variations
-         doesn't seem to help here.
-  * DONE implement variation compatibility check with XOR source.
-  * DONE write OR kernel
-  * DONE fix OR combo_idx generation (??) or variation merge bug, whatever the root cause
-  * DONE precompute XOR variations. 
-  * DONE idx_list/size consolidation into a struct. will reduce parameter count.
-  * IN-PROGRESS fix issues in OR kernel
-    * different block sizes yield different results. 1024 and 128 for example. fix this,
-      as 128 goes really fast, it'd be nice if it were also accurate.
-    * maybe i could have some kind of shared "last_xor_idx" then I wouldn't have to
-      determine the variations if it hasn't changed. for precomputed variations.
-    * register spill now in filter_kernel. it's actually running a bit faster at half
-      occupancy and more register than it does at full occupancy and 40 registers. some
-      ideas for register pressure:
-      * fewer intermediate local variable declarations when extracting a src out of an
-        idx_list/src_list from a flat_idx.
-      * allocate or_variations to populate num_or_sources even if zero
+* get_src_compat_results: custom version of src_bits_are_OR_compatible that takes
+  full sources and only bit-compares if both variation !=  -1
 
-* handle "Compat::All" case w/OR args. no need to do XOR compare, just set all results to 1.
+* consider whether the OR-src_list preprocessing is a superior alternative to the
+  unbounded variationIndices madness i have going on for XOR sources.
+
+* Variations as struct.
+
+* Turn on streaming:
+  * don't use the same result buffer for multiple streams. maybe make it part
+    of the StreamData struct?
+  * see if i can get rid of that num_list_indices in StreamData while i'm at it
 
 * should look into using libcu++ for standard library such as std::array, std::copy in
   kernels. coz.. i might just be gettting lucky. and i'm not sure how to control which
@@ -80,8 +48,6 @@
   sentence that follows the 's', in this case, 4."
   * another option is a --list-variations [sentence] and the ability to
     --allow-variations 3:1,3,5  [allow variations 1,3,5 of sentence 3]
-
-* i'm using list_cref in OrArgData. OrArgData might be unnecessary.
 
 * shoud display max variation count (sentence with max # of variations)
   on load, and assert if > whatever limit i temporarily impose for XOR/OR
@@ -216,11 +182,6 @@
 * fix variable names in filter-support::cuda_allocCopySentenceVariationIndices()
 
 // NEW PERF:
-
-* Turn on streaming:
-  * don't use the same result buffer for multiple streams. maybe make it part
-    of the StreamData struct?
-  * see if i can get rid of that num_list_indices in StreamData while i'm at it
 
 * Experiment with different block sizes for filter-kernel?
 

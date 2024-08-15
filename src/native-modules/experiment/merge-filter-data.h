@@ -38,8 +38,8 @@ struct MergeData {
     SourceCompatibilityData* src_lists;
     index_t* idx_lists;
     index_t* idx_list_sizes;
-    unsigned num_sources;
     unsigned num_idx_lists;
+    unsigned sum_idx_list_sizes;
   } device;
 };
 
@@ -130,20 +130,20 @@ struct FilterData {
     void reset_pointers() {
       Base::reset_pointers();
       compat_indices = nullptr;
-      compat_src_results = nullptr;
+      src_compat_results = nullptr;
     }
 
     void cuda_free() {
       Base::cuda_free();
-      cm::cuda_free(compat_src_results);
+      cm::cuda_free(src_compat_results);
       cm::cuda_free(compat_indices);
       reset_pointers();
     }
 
-
-    result_t* compat_src_results;
+    result_t* src_compat_results;
     fat_index_t* compat_indices;
     index_t num_compat_indices;
+    // index_t debug_src_idx;
   } device_or;
 
   DeviceCommon<fat_index_t>* device_xor_data{};

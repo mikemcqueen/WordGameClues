@@ -17,6 +17,7 @@ extern __constant__ FilterData::DeviceOr or_data;
 extern __device__ atomic64_t count_or_src_considered;
 extern __device__ atomic64_t count_or_xor_compat;
 extern __device__ atomic64_t count_or_src_variation_compat;
+extern __device__ atomic64_t count_or_check_src_compat;
 extern __device__ atomic64_t count_or_src_compat;
 #endif
 
@@ -24,35 +25,42 @@ namespace {
 
 extern __shared__ fat_index_t dynamic_shared[];
 
-template <typename T> __device__ __forceinline__ auto count(const T& bits) {
-  int n{};
-  for (int i{}; i < T::wc(); ++i) {
-    n += __popc(bits.word(i));
-  }
-  return n;
+__device__ __forceinline__ auto source_bits_are_OR_compatible(
+    const UsedSources::SourceBits& a, const UsedSources::SourceBits& b,
+    int word_idx) {
+  const auto w = a.word(word_idx) & b.word(word_idx);
+  if (w && (w != a.word(word_idx))) return false;
+  return true;
 }
 
-using ll_t = unsigned long long int;
+// With one supplied OR source
+__device__ auto is_source_OR_compatible(const SourceCompatibilityData& source,
+    const SourceCompatibilityData& or_src) {
+  uint8_t* num_src_sentences = (uint8_t*)&dynamic_shared[kNumSrcSentences];
+  uint8_t* src_sentences = &num_src_sentences[1];
 
-// test "OR compatibility" in one pass (!intersects || is_subset_of)
-template <typename T>
-__device__ __forceinline__ bool is_disjoint_or_subset2(const T& a, const T& b) {
-  uint64_t a_count{};
-  uint64_t and_count{};
-  for (int i{}; i < T::wc() / 2; ++i) {
-    and_count += __popcll(a.long_word(i) & b.long_word(i));
-    a_count += __popcll(a.long_word(i));
+  for (uint8_t idx{}; idx < *num_src_sentences; ++idx) {
+    auto sentence = src_sentences[idx];
+    // we know all source.variations[s] are > -1. no need to compare bits if
+    // or_src.variations[s] == -1.
+    if (or_src.usedSources.variations[sentence] > -1) {
+      // NB: order of bits params matters here
+      if (!source_bits_are_OR_compatible(or_src.usedSources.getBits(),
+              source.usedSources.getBits(), sentence)) {
+        return false;
+      }
+    }
   }
-  return a_count == and_count;
+  return true;
 }
 
-__device__ bool is_source_compatible(
+// With all OR sources identified by flat_idx
+__device__ auto is_source_OR_compatible_with_all(
     const SourceCompatibilityData& source, fat_index_t flat_idx) {
-  for (int list_idx{int(or_data.num_idx_lists) - 1}; list_idx >= 0; --list_idx) {
+  for (int list_idx{int(or_data.num_idx_lists) - 1}; list_idx >= 0;
+      --list_idx) {
     const auto& or_src = or_data.get_source(flat_idx, list_idx);
-    // NB: order of params matters here
-    if (!source_bits_are_OR_compatible(or_src.usedSources, source.usedSources))
-      return false;
+    if (!is_source_OR_compatible(source, or_src)) return false;
     flat_idx /= or_data.idx_list_sizes[list_idx];
   }
   return true;
@@ -93,11 +101,26 @@ __device__ auto build_variations(fat_index_t flat_idx) {
   return v;
 }
 
+__device__ auto check_src_compat_results(
+    fat_index_t flat_idx, const FilterData::DeviceOr& data) {
+  const auto block_start_idx = blockIdx.x * data.sum_idx_list_sizes;
+  index_t list_start_idx{data.sum_idx_list_sizes};
+  for (int list_idx{int(data.num_idx_lists) - 1}; list_idx >= 0; --list_idx) {
+    const auto list_size = data.idx_list_sizes[list_idx];
+    const auto src_idx = flat_idx % list_size;
+    list_start_idx -= list_size;
+    if (!data.src_compat_results[block_start_idx + list_start_idx + src_idx])
+      return false;
+    flat_idx /= list_size;
+  }
+  return true;
+}
+
 // Get a block-sized chunk of OR sources and test them for variation-
 // compatibililty with the XOR source specified by the supplied
 // xor_combo_index, and for OR-compatibility with the supplied source.
 // Return true if at least one OR source is compatible.
-__device__ bool get_OR_sources_chunk(const SourceCompatibilityData& source,
+__device__ auto get_OR_sources_chunk(const SourceCompatibilityData& source,
     unsigned or_chunk_idx, const UsedSources::Variations& xor_variations) {
   // one thread per compat_idx
   const auto or_compat_idx = get_flat_idx(or_chunk_idx);
@@ -124,7 +147,13 @@ __device__ bool get_OR_sources_chunk(const SourceCompatibilityData& source,
   atomicAdd(&count_or_src_variation_compat, 1);
   #endif
 
-  if (!is_source_compatible(source, or_flat_idx)) return false;
+  if (!check_src_compat_results(or_flat_idx, or_data)) return false;
+
+  #ifdef DEBUG_OR_COUNTS
+  atomicAdd(&count_or_check_src_compat, 1);
+  #endif
+
+  if (!is_source_OR_compatible_with_all(source, or_flat_idx)) return false;
 
   #ifdef DEBUG_OR_COUNTS
   atomicAdd(&count_or_src_compat, 1);
@@ -138,10 +167,9 @@ __device__ bool get_OR_sources_chunk(const SourceCompatibilityData& source,
 // a chunk that contains at least one OR source that is variation-compatible
 // with the XOR source indentified by the supplied xor_combo_idx, and
 // OR-compatible with the supplied source.
-__device__ bool is_any_OR_source_compatible(
+__device__ auto is_any_OR_source_compatible(
     const SourceCompatibilityData& source, fat_index_t xor_combo_idx) {
   const auto block_size = blockDim.x;
-  fat_index_t* or_chunk_idx_ptr = &dynamic_shared[kOrChunkIdx];
   __shared__ bool any_or_compat;
   __shared__ UsedSources::Variations xor_variations;
   if (threadIdx.x < xor_variations.size()) {
@@ -168,7 +196,7 @@ __device__ bool is_any_OR_source_compatible(
 
 // not the fastest function in the world. but keeps GPU busy at least.
 __device__ __forceinline__ auto next_xor_result_idx(unsigned result_idx) {
-  result_t* xor_results = (result_t*)&dynamic_shared[kNumSharedIndices];
+  result_t* xor_results = (result_t*)&dynamic_shared[kXorResults];
   const auto block_size = blockDim.x;
   while ((result_idx < block_size) && !xor_results[result_idx])
     result_idx++;
@@ -181,7 +209,7 @@ __device__ __forceinline__ auto next_xor_result_idx(unsigned result_idx) {
 __device__ bool is_any_OR_source_compatible(
     const SourceCompatibilityData& source, unsigned xor_chunk_idx,
     const FatIndexSpanPair& xor_idx_spans) {
-  result_t* xor_results = (result_t*)&dynamic_shared[kNumSharedIndices];
+  result_t* xor_results = (result_t*)&dynamic_shared[kXorResults];
   __shared__ bool any_or_compat;
   if (!threadIdx.x) any_or_compat = false;
   const auto block_size = blockDim.x;

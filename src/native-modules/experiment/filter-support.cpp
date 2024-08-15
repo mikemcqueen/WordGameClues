@@ -788,9 +788,8 @@ void alloc_copy_filter_data(FilterData& mfd,
     const UsedSources::VariationsList& or_variations_list,
     cudaStream_t stream) {
   alloc_copy_filter_indices(mfd, or_variations_list, stream);
-  // this has to be alloc'd in run_filter_kernel because we need to
-  // know block count.
-  mfd.device_or.compat_src_results = nullptr;
+  // this is alloc'd in run_filter_kernel because we need to know block count.
+  mfd.device_or.src_compat_results = nullptr;
 
   const auto xor_bytes = sizeof(FilterData::DeviceXor::Base);
   cudaError_t err{};

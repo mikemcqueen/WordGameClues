@@ -15,10 +15,20 @@ namespace cm {
 
 class SourceCompatibilityData;
 
-inline const int kXorChunkIdx = 0;
-inline const int kOrChunkIdx = 1;
-inline const int kXorResultsIdx = 2;
-inline const int kNumSharedIndices = 3;
+
+inline constexpr auto kSharedIndexCount = 2;
+inline constexpr auto kSharedIndexSize = 8;  // in bytes
+
+inline constexpr auto kXorChunkIdx = 0;
+inline constexpr auto kDebugIdx = 1;
+
+// num source sentences (uint8_t) starts at end of indices
+inline constexpr auto kNumSrcSentences = 2;
+// source sentence data (unit8_t) follows for 9 more bytes
+
+// xor_results (result_t) starts after of sentence data, rounded to 8 bytes
+inline constexpr auto kXorResults = 4;  // 2 + 16/2
+
 
 __device__ __forceinline__ auto get_xor_combo_index(
     fat_index_t flat_idx, const FatIndexSpanPair& idx_spans) {
