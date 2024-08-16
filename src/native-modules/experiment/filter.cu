@@ -171,8 +171,6 @@ void display_counts() {
       << std::endl;
 }
 
-extern __shared__ fat_index_t dynamic_shared[];
-
 __device__ auto are_xor_compatible(const UsedSources& a, const UsedSources& b) {
   // compare bits
   if (a.getBits().intersects(b.getBits())) return false;
@@ -305,15 +303,8 @@ __device__ SmallestSpansResult get_smallest_src_index_spans(
       std::make_pair(vi.get_index_span(0), vi.get_index_span(variation + 1))};
 }
 
-namespace tag {
-
-struct XOR {};  // XOR;
-struct OR {};   // OR;
-
-}  // namespace tag
-
 template <typename IndexT, typename TagT>
-requires std::is_same_v<TagT, tag::XOR> || std::is_same_v<TagT, tag::OR>
+requires std::is_same_v<TagT, tag::XOR> // || std::is_same_v<TagT, tag::OR>
 __device__ bool is_source_compatible(
     TagT tag, const SourceCompatibilityData& source, fat_index_t flat_idx) {
   FilterData::DeviceCommon<IndexT> const* data{};
@@ -435,7 +426,7 @@ __device__ bool get_next_compatible_XOR_sources(
     __syncthreads();
 
     #ifdef PRINTF
-    if (/*!blockIdx.x && */!threadIdx.x) {
+    if (!threadIdx.x) {
       printf(" block: %u get_next_XOR xor_chunk_idx: %u, compat: %d\n", blockIdx.x,
           xor_chunk_idx, any_xor_compat ? 1 : 0);
     }
@@ -459,110 +450,131 @@ __device__ SourceIndex get_source_index(
 }
 
 // Determine which OR sources are compatible with the supplied source.
-__device__ auto get_src_compat_results(const SourceCompatibilityData& source) {
+template <typename TagT, typename T>
+requires std::is_same_v<TagT, tag::XOR> || std::is_same_v<TagT, tag::OR>
+__device__ auto get_src_compat_results(
+    /* TagT tag,*/ const SourceCompatibilityData& source, T& data) {
   fat_index_t* debug_idx_ptr = &dynamic_shared[kDebugIdx];
-  uint8_t* num_src_sentences = (uint8_t*)&dynamic_shared[kNumSrcSentences];
-  uint8_t* src_sentences = &num_src_sentences[1];
   __shared__ result_t any_compat[kMaxOrArgs];
+  __shared__ bool all_compat;
   if (threadIdx.x < kMaxOrArgs) {
     any_compat[threadIdx.x] = false;
+    all_compat = false;
   }
   __syncthreads();
-  for (auto idx{threadIdx.x}; idx < or_data.sum_idx_list_sizes; idx += blockDim.x) {
-    const auto src_idx = get_source_index(idx, or_data);
+  for (auto idx{threadIdx.x}; idx < data.sum_idx_list_sizes;
+      idx += blockDim.x) {
+    const auto src_idx = get_source_index(idx, data);
 #if 0
-    const auto idx_list = &or_data.idx_lists[src_idx.listIndex];
-    //    const auto start_idx = or_data.src_list_start_indices[src_idx.listIndex];
-    const auto or_src_idx = idx_list[src_idx.index];
-    const auto& or_src = or_data.src_lists[or_src_idx];
+    const auto idx_list = &data.idx_lists[src_idx.listIndex];
+    //const auto start_idx = data.src_list_start_indices[src_idx.listIndex];
+    const auto the_src_idx = idx_list[src_idx.index];
+    const auto& src = data.src_lists[the_src_idx];
 #else
     // TODO: i think i need to drill into idx_list first here? maybe?
-    const auto start_idx = or_data.src_list_start_indices[src_idx.listIndex];
-    const auto& or_src = or_data.src_lists[start_idx + src_idx.index];
+    const auto start_idx = data.src_list_start_indices[src_idx.listIndex];
+    const auto& src = data.src_lists[start_idx + src_idx.index];
 #endif
+#if 0
     // TODO: overloads. Variations as struct/class. SourceBits also.
-    // 
-    // TODO: only check bits if variation != -1
-    //
-    const auto compat =
-        UsedSources::are_variations_compatible(
-            or_src.usedSources.variations, source.usedSources.variations)
-        && source_bits_are_OR_compatible(
-            or_src.usedSources, source.usedSources);
-    const auto result_idx = blockIdx.x * or_data.sum_idx_list_sizes + idx;
+    auto compat = UsedSources::are_variations_compatible(
+        src.usedSources.variations, source.usedSources.variations);
+    if (compat) {
+      if constexpr (std::is_same_v<TagT, tag::OR>) {
+        compat = source_bits_are_OR_compatible(
+            src.usedSources.getBits(), source.usedSources.getBits());
+      } else if constexpr (std::is_same_v<TagT, tag::XOR>) {
+        compat = source_bits_are_XOR_compatible(
+            src.usedSources.getBits(), source.usedSources.getBits());
+      }
+    }
+#else
+    const auto compat = is_source_compatible_with<TagT>(source, src);
+#endif
+    const auto result_idx = blockIdx.x * data.sum_idx_list_sizes + idx;
     if (compat) {
       any_compat[src_idx.listIndex] = 1;
-      or_data.src_compat_results[result_idx] = 1;
+      data.src_compat_results[result_idx] = 1;
     } else {
-      or_data.src_compat_results[result_idx] = 0;
+      data.src_compat_results[result_idx] = 0;
     }
   }
   __syncthreads();
   if (!threadIdx.x) {
-    // initialize num_src_sentences and src_sentences for this source
-    *num_src_sentences = 0;
-    for (unsigned idx{}; idx < kNumSentences; ++idx) {
-      if (source.usedSources.variations[idx] > -1) {
-        src_sentences[(*num_src_sentences)++] = idx;
-      }
-    }
-    // determine if source is compatible with one or_src from each or_src_list
+    // determine if source is compatible with one source from each src_list
     int num_compat{};
-    for (unsigned idx{}; idx < or_data.num_idx_lists; ++idx) {
+    for (unsigned idx{}; idx < data.num_idx_lists; ++idx) {
       if (any_compat[idx]) ++num_compat;
     }
-
-#if 1
-    if (*debug_idx_ptr) {
-      source.dump("8090__10");
-      for (unsigned result_idx{}, count{}, list_start_idx{}, list_idx{};
-          result_idx < or_data.sum_idx_list_sizes; ++result_idx) {
-        if (result_idx - list_start_idx == or_data.idx_list_sizes[list_idx]) {
-          list_start_idx = result_idx;
-          ++list_idx;
-          printf("%u: %u  ", list_idx, count);
-          count = 0;
-        }
-        if (or_data.src_compat_results[result_idx]) ++count;
-      }
-      printf("\n");
-    }
-#endif
-    if (num_compat == or_data.num_idx_lists) {
-      #ifdef DEBUG_XOR_COUNTS
-      atomicAdd(&count_or_compat_results, 1);
-      #endif
-      return true;
+    if (num_compat == data.num_idx_lists) {
+      //#if defined(DEBUG_XOR_COUNTS) || defined(DEBUG_OR_COUNTS)
+      //atomicAdd(&count_or_compat_results, 1);
+      //#endif
+      all_compat = true;
     }
   }
-  return false;
+  __syncthreads();
+  return all_compat;
 }
+
+__device__ auto init_source(const SourceCompatibilityData& source) {
+  uint8_t* num_src_sentences = (uint8_t*)&dynamic_shared[kNumSrcSentences];
+  uint8_t* src_sentences = &num_src_sentences[1];
+  if (!threadIdx.x) {
+    // initialize num_src_sentences and src_sentences for this source
+    *num_src_sentences = 0;
+    for (int s{}; s < kNumSentences; ++s) {
+      if (source.usedSources.variations[s] > -1) {
+        src_sentences[(*num_src_sentences)++] = (uint8_t)s;
+      }
+    }
+  }
+  // required __syncthreads() will happen in get_src_compat_data()
+  return get_src_compat_results<tag::XOR>(source, xor_data)
+    && get_src_compat_results<tag::OR>(source, or_data);
+}
+
+/*
+  if (*debug_idx_ptr) {
+    source.dump("8090__10");
+    for (unsigned result_idx{}, count{}, list_start_idx{}, list_idx{};
+        result_idx < data.sum_idx_list_sizes; ++result_idx) {
+      if (result_idx - list_start_idx == data.idx_list_sizes[list_idx]) {
+        list_start_idx = result_idx;
+        ++list_idx;
+        printf("%u: %u  ", list_idx, count);
+        count = 0;
+      }
+      if (data.src_compat_results[result_idx]) ++count;
+    }
+    printf("\n");
+  }
+*/
 
 // Test if the supplied source is:
 // * XOR-compatible with any of the supplied XOR sources
-// * OR-compatible with any of the supplied OR sources which are
+// * OR-compatible with any of the supplied OR sources, which are in turn
 //   variation-compatible with the compatible XOR source.
 //
 // In other words:
 // For each XOR source that is XOR-compatible with Source
 //   For each OR source that is variation-compatible with XOR source
 //     If OR source is OR-compatible with Source
-//       is_compat = true;
+//       is_compat = true
 __device__ bool is_compat_loop(const SourceCompatibilityData& source,
     const FatIndexSpanPair& xor_idx_spans) {
   const auto block_size = blockDim.x;
   fat_index_t* xor_chunk_idx_ptr = &dynamic_shared[kXorChunkIdx];
-  result_t* xor_results = (result_t*)&dynamic_shared[kXorResults];
   __shared__ bool any_xor_compat;
   __shared__ bool any_or_compat;
-  __shared__ bool have_src_compat_results;  // for OR sources
+  __shared__ bool src_init_done; 
   const auto num_xor_indices =
       xor_idx_spans.first.size() + xor_idx_spans.second.size();
   if (!threadIdx.x) {
     *xor_chunk_idx_ptr = 0;
     any_xor_compat = false;
     any_or_compat = false;
-    have_src_compat_results = false;
+    src_init_done = false;
   }
   for (;;) {
     __syncthreads();
@@ -574,13 +586,14 @@ __device__ bool is_compat_loop(const SourceCompatibilityData& source,
     __syncthreads();
     if (any_xor_compat) {
       if (!or_data.num_compat_indices) return true;
-      if (!have_src_compat_results && get_src_compat_results(source)) {
-        have_src_compat_results = true;
+      if (!src_init_done && init_source(source)) {
+        src_init_done = true;
       }
     }
     __syncthreads();
+
     // TODO: try: if !have continue
-    if (have_src_compat_results
+    if (src_init_done
         && is_any_OR_source_compatible(source, *xor_chunk_idx_ptr,  //
             xor_idx_spans)) {
       any_or_compat = true;
@@ -714,17 +727,21 @@ void run_filter_kernel(int threads_per_block, StreamData& stream,
 
   const auto cuda_stream = cudaStreamPerThread;
   // v- Populate any remaining mfd.device_xx values BEFORE copy_filter_data() -v
-  const auto results_bytes =
+  const auto xor_results_bytes =
+      grid_size * mfd.device_xor.sum_idx_list_sizes * sizeof(result_t);
+  cuda_malloc_async((void**)&mfd.device_xor.src_compat_results,
+      xor_results_bytes, cuda_stream, "src_compat_results");
+  const auto or_results_bytes =
       grid_size * mfd.device_or.sum_idx_list_sizes * sizeof(result_t);
-  cuda_malloc_async((void**)&mfd.device_or.src_compat_results, results_bytes,
+  cuda_malloc_async((void**)&mfd.device_or.src_compat_results, or_results_bytes,
       cuda_stream, "src_compat_results");
-  //  mfd.device_or.debug_src_idx = stream.src_indices.front();
   // ^- Populate any reamining mfd.device_xx values BEFORE copy_filter_data() -^
   copy_filter_data(mfd);
-  static bool doit{true};
-  if (doit) {
+
+  static bool log_once{true};
+  if (log_once) {
     cuda_memory_dump("before filter kernel");
-    doit = false;
+    log_once = false;
   }
 
   #if defined(DEBUG_XOR_COUNTS) || defined(DEBUG_OR_COUNTS)
@@ -751,6 +768,7 @@ void run_filter_kernel(int threads_per_block, StreamData& stream,
       stream.stream_idx);
   assert_cuda_success(cudaPeekAtLastError(), "filter kernel launch failed");
   stream.xor_kernel_stop.record();
+
   #if defined(DEBUG_XOR_COUNTS) || defined(DEBUG_OR_COUNTS)
   display_counts();
   #endif 

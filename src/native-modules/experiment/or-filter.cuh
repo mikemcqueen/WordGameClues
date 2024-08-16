@@ -15,7 +15,6 @@ namespace cm {
 
 class SourceCompatibilityData;
 
-
 inline constexpr auto kSharedIndexCount = 2;
 inline constexpr auto kSharedIndexSize = 8;  // in bytes
 
@@ -29,6 +28,14 @@ inline constexpr auto kNumSrcSentences = 2;
 // xor_results (result_t) starts after of sentence data, rounded to 8 bytes
 inline constexpr auto kXorResults = 4;  // 2 + 16/2
 
+extern __shared__ fat_index_t dynamic_shared[];
+
+namespace tag {
+
+struct XOR {};  // XOR;
+struct OR {};   // OR;
+
+}  // namespace tag
 
 __device__ __forceinline__ auto get_xor_combo_index(
     fat_index_t flat_idx, const FatIndexSpanPair& idx_spans) {
@@ -61,13 +68,92 @@ __device__ __forceinline__ bool is_disjoint_or_subset(
 }
 
 __device__ __forceinline__ auto source_bits_are_OR_compatible(
-    const UsedSources& a, const UsedSources& b) {
-  return is_disjoint_or_subset(a.getBits(), b.getBits());
+    const UsedSources::SourceBits& a, const UsedSources::SourceBits& b) {
+  return is_disjoint_or_subset(a, b);
 }
+
+__device__ __forceinline__ auto source_bits_are_XOR_compatible(
+    const UsedSources::SourceBits& a, const UsedSources::SourceBits& b) {
+  using SourceBits = UsedSources::SourceBits;
+  for (int i{}; i < SourceBits::wc() / 2; ++i) {
+    const auto w = a.long_word(i) & b.long_word(i);
+    if (w) return false;
+  }
+  for (int i{}; i < SourceBits::wc() - (SourceBits::wc() / 2) * 2; ++i) {
+    const auto w = a.word(i) & b.word(i);
+    if (w) return false;
+  }
+  return true;
+}
+
+__device__ __forceinline__ auto are_source_bits_OR_compatible(
+    const UsedSources::SourceBits& a, const UsedSources::SourceBits& b,
+    int word_idx) {
+  const auto w = a.word(word_idx) & b.word(word_idx);
+  if (w && (w != a.word(word_idx))) return false;
+  return true;
+}
+
+__device__ __forceinline__ auto are_source_bits_XOR_compatible(
+    const UsedSources::SourceBits& a, const UsedSources::SourceBits& b,
+    int word_idx) {
+  return (a.word(word_idx) & b.word(word_idx)) == 0;
+}
+
+template <typename TagT>
+requires std::is_same_v<TagT, tag::XOR> || std::is_same_v<TagT, tag::OR>
+__device__ inline auto is_source_compatible_with(
+    const SourceCompatibilityData& source,
+    const SourceCompatibilityData& other) {
+  uint8_t* num_src_sentences = (uint8_t*)&dynamic_shared[kNumSrcSentences];
+  uint8_t* src_sentences = &num_src_sentences[1];
+
+  for (uint8_t idx{}; idx < *num_src_sentences; ++idx) {
+    auto sentence = src_sentences[idx];
+    // we know all source.variations[s] are > -1. no need to compare bits if
+    // other.variations[s] == -1.
+    if (other.usedSources.variations[sentence] > -1) {
+      if constexpr (std::is_same_v<TagT, tag::OR>) {
+        // NB: order of params matters here (or_src first)
+        if (!are_source_bits_OR_compatible(other.usedSources.getBits(),
+                source.usedSources.getBits(), sentence)) {
+          return false;
+        }
+      } else if constexpr (std::is_same_v<TagT, tag::XOR>) {
+        if (!are_source_bits_XOR_compatible(other.usedSources.getBits(),
+                source.usedSources.getBits(), sentence)) {
+          return false;
+        }
+      }
+    }
+  }
+  return true;
+}
+
+/*
+__device__ auto is_source_XOR_compatible(const SourceCompatibilityData&
+source, const SourceCompatibilityData& or_src) { uint8_t* num_src_sentences
+= (uint8_t*)&dynamic_shared[kNumSrcSentences]; uint8_t* src_sentences =
+&num_src_sentences[1];
+
+  for (uint8_t idx{}; idx < *num_src_sentences; ++idx) {
+    auto sentence = src_sentences[idx];
+    // we know all source.variations[s] are > -1. no need to compare bits if
+    // or_src.variations[s] == -1.
+    if (or_src.usedSources.variations[sentence] > -1) {
+      // NB: order of bits params matters here
+      if (!source_bits_are_XOR_compatible(or_src.usedSources.getBits(),
+              source.usedSources.getBits(), sentence)) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+*/
 
 __device__ bool is_any_OR_source_compatible(
     const SourceCompatibilityData& source, unsigned xor_chunk_idx,
     const FatIndexSpanPair& xor_idx_spans);
-
 
 }  // namespace cm

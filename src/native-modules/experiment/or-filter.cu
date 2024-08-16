@@ -23,44 +23,13 @@ extern __device__ atomic64_t count_or_src_compat;
 
 namespace {
 
-extern __shared__ fat_index_t dynamic_shared[];
-
-__device__ __forceinline__ auto source_bits_are_OR_compatible(
-    const UsedSources::SourceBits& a, const UsedSources::SourceBits& b,
-    int word_idx) {
-  const auto w = a.word(word_idx) & b.word(word_idx);
-  if (w && (w != a.word(word_idx))) return false;
-  return true;
-}
-
-// With one supplied OR source
-__device__ auto is_source_OR_compatible(const SourceCompatibilityData& source,
-    const SourceCompatibilityData& or_src) {
-  uint8_t* num_src_sentences = (uint8_t*)&dynamic_shared[kNumSrcSentences];
-  uint8_t* src_sentences = &num_src_sentences[1];
-
-  for (uint8_t idx{}; idx < *num_src_sentences; ++idx) {
-    auto sentence = src_sentences[idx];
-    // we know all source.variations[s] are > -1. no need to compare bits if
-    // or_src.variations[s] == -1.
-    if (or_src.usedSources.variations[sentence] > -1) {
-      // NB: order of bits params matters here
-      if (!source_bits_are_OR_compatible(or_src.usedSources.getBits(),
-              source.usedSources.getBits(), sentence)) {
-        return false;
-      }
-    }
-  }
-  return true;
-}
-
 // With all OR sources identified by flat_idx
 __device__ auto is_source_OR_compatible_with_all(
     const SourceCompatibilityData& source, fat_index_t flat_idx) {
   for (int list_idx{int(or_data.num_idx_lists) - 1}; list_idx >= 0;
       --list_idx) {
     const auto& or_src = or_data.get_source(flat_idx, list_idx);
-    if (!is_source_OR_compatible(source, or_src)) return false;
+    if (!is_source_compatible_with<tag::OR>(source, or_src)) return false;
     flat_idx /= or_data.idx_list_sizes[list_idx];
   }
   return true;
@@ -122,6 +91,8 @@ __device__ auto check_src_compat_results(
 // Return true if at least one OR source is compatible.
 __device__ auto get_OR_sources_chunk(const SourceCompatibilityData& source,
     unsigned or_chunk_idx, const UsedSources::Variations& xor_variations) {
+  if (!threadIdx.x) printf("chunk: %u\n", or_chunk_idx);
+
   // one thread per compat_idx
   const auto or_compat_idx = get_flat_idx(or_chunk_idx);
   if (or_compat_idx >= or_data.num_compat_indices) return false;
@@ -165,7 +136,7 @@ __device__ auto get_OR_sources_chunk(const SourceCompatibilityData& source,
 // With the XOR source identified by the supplied xor_combo_idx.
 // Walk through OR-sources one block-sized chunk at a time, until we find
 // a chunk that contains at least one OR source that is variation-compatible
-// with the XOR source indentified by the supplied xor_combo_idx, and
+// with all of the XOR sources identified by the supplied xor_combo_idx, and
 // OR-compatible with the supplied source.
 __device__ auto is_any_OR_source_compatible(
     const SourceCompatibilityData& source, fat_index_t xor_combo_idx) {
