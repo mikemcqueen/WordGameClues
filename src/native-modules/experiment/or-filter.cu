@@ -91,8 +91,6 @@ __device__ auto check_src_compat_results(
 // Return true if at least one OR source is compatible.
 __device__ auto get_OR_sources_chunk(const SourceCompatibilityData& source,
     unsigned or_chunk_idx, const UsedSources::Variations& xor_variations) {
-  if (!threadIdx.x) printf("chunk: %u\n", or_chunk_idx);
-
   // one thread per compat_idx
   const auto or_compat_idx = get_flat_idx(or_chunk_idx);
   if (or_compat_idx >= or_data.num_compat_indices) return false;
