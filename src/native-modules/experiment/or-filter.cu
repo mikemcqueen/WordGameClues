@@ -15,7 +15,7 @@ extern __constant__ FilterData::DeviceOr or_data;
 
 #ifdef DEBUG_OR_COUNTS
 extern __device__ atomic64_t count_or_src_considered;
-extern __device__ atomic64_t count_or_xor_compat;
+extern __device__ atomic64_t count_or_xor_variation_compat;
 extern __device__ atomic64_t count_or_src_variation_compat;
 extern __device__ atomic64_t count_or_check_src_compat;
 extern __device__ atomic64_t count_or_src_compat;
@@ -23,66 +23,16 @@ extern __device__ atomic64_t count_or_src_compat;
 
 namespace {
 
-// With all OR sources identified by flat_idx
-__device__ auto is_source_OR_compatible_with_all(
-    const SourceCompatibilityData& source, fat_index_t flat_idx) {
-  for (int list_idx{int(or_data.num_idx_lists) - 1}; list_idx >= 0;
-      --list_idx) {
-    const auto& or_src = or_data.get_source(flat_idx, list_idx);
-    if (!is_source_compatible_with<tag::OR>(source, or_src)) return false;
-    flat_idx /= or_data.idx_list_sizes[list_idx];
-  }
-  return true;
-}
-
 // only used for XOR variations currently
 __device__ variation_index_t get_one_variation(
-    int sentence, fat_index_t flat_idx) {
+    int sentence, fat_index_t combo_idx) {
   for (int list_idx{int(xor_data.num_idx_lists) - 1}; list_idx >= 0; --list_idx) {
-    const auto& src = xor_data.get_source(flat_idx, list_idx);
+    const auto& src = xor_data.get_source(combo_idx, list_idx);
     const auto variation = src.usedSources.variations[sentence];
     if (variation > -1) return variation;
-    flat_idx /= xor_data.idx_list_sizes[list_idx];
+    combo_idx /= xor_data.idx_list_sizes[list_idx];
   }
   return -1;
-}
-
-// faster than UsedSources version
-__device__ __forceinline__ auto merge_variations(UsedSources::Variations& to,
-    const UsedSources::Variations& from, bool force = false) {
-  for (int s{}; s < kNumSentences; ++s) {
-    if (force || (to[s] == -1)) to[s] = from[s];
-  }
-  return true;
-}
-
-// only used for OR variations currently
-__device__ auto build_variations(fat_index_t flat_idx) {
-  UsedSources::Variations v;
-  bool force = true;
-  for (int list_idx{int(or_data.num_idx_lists) - 1}; list_idx >= 0; --list_idx) {
-    const auto& src = or_data.get_source(flat_idx, list_idx);
-    flat_idx /= or_data.idx_list_sizes[list_idx];
-    // TODO: put UsedSources version of this in an #ifdef ASSERTS block
-    merge_variations(v, src.usedSources.variations, force);
-    force = false;
-  }
-  return v;
-}
-
-__device__ auto check_src_compat_results(
-    fat_index_t flat_idx, const FilterData::DeviceOr& data) {
-  const auto block_start_idx = blockIdx.x * data.sum_idx_list_sizes;
-  index_t list_start_idx{data.sum_idx_list_sizes};
-  for (int list_idx{int(data.num_idx_lists) - 1}; list_idx >= 0; --list_idx) {
-    const auto list_size = data.idx_list_sizes[list_idx];
-    const auto src_idx = flat_idx % list_size;
-    list_start_idx -= list_size;
-    if (!data.src_compat_results[block_start_idx + list_start_idx + src_idx])
-      return false;
-    flat_idx /= list_size;
-  }
-  return true;
 }
 
 // Get a block-sized chunk of OR sources and test them for variation-
@@ -99,13 +49,14 @@ __device__ auto get_OR_sources_chunk(const SourceCompatibilityData& source,
   atomicAdd(&count_or_src_considered, 1);
   #endif
 
-  const auto or_flat_idx = or_data.compat_indices[or_compat_idx];
-  const auto or_variations = build_variations(or_flat_idx);
+  const auto or_combo_idx = or_data.compat_indices[or_compat_idx];
+  const auto or_variations = build_variations(or_combo_idx, or_data);
+  //  if (!check_src_compat_results(xor_combo_idx, xor_data)) return false;
   if (!UsedSources::are_variations_compatible(xor_variations, or_variations))
     return false;
 
   #ifdef DEBUG_OR_COUNTS
-  atomicAdd(&count_or_xor_compat, 1);
+  atomicAdd(&count_or_xor_variation_compat, 1);
   #endif
 
   if (!UsedSources::are_variations_compatible(source.usedSources.variations,  //
@@ -116,13 +67,14 @@ __device__ auto get_OR_sources_chunk(const SourceCompatibilityData& source,
   atomicAdd(&count_or_src_variation_compat, 1);
   #endif
 
-  if (!check_src_compat_results(or_flat_idx, or_data)) return false;
+  if (!check_src_compat_results(or_combo_idx, or_data)) return false;
 
   #ifdef DEBUG_OR_COUNTS
   atomicAdd(&count_or_check_src_compat, 1);
   #endif
 
-  if (!is_source_OR_compatible_with_all(source, or_flat_idx)) return false;
+  if (!is_source_compatible_with_all<tag::OR>(source, or_combo_idx, or_data))
+    return false;
 
   #ifdef DEBUG_OR_COUNTS
   atomicAdd(&count_or_src_compat, 1);

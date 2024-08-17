@@ -397,7 +397,6 @@ auto get_src_indices(
 auto get_compatible_indices(const std::vector<SourceList>& src_lists,
     MergeType merge_type) -> std::vector<IndexList> {
   std::vector<size_t> lengths;
-  lengths.reserve(src_lists.size());
   for (const auto& sl : src_lists) {
     lengths.push_back(sl.size());
   }
@@ -678,6 +677,13 @@ void log_compat_indices(const std::vector<IndexList>& idx_lists,
     std::cerr << (merge_type == MergeType::XOR ? "XOR" : "OR")
               << " compat_idx_lists(" << idx_lists.size() << ")" << std::endl;
   }
+#if 1
+  for (size_t i{}; i < idx_lists.size(); ++i) {
+    const auto& list = idx_lists.at(i);
+    std::cerr << "list[" << i << "][0] = "<<  list.at(0) << " ";
+  }
+  std::cerr << std::endl;
+#endif
 }
 
 }  // anonymous namespace
