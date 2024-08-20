@@ -17,6 +17,17 @@ template struct std::hash<cm::UsedSources::SourceBits>;
 
 namespace std {
 
+// not technically hash related ... but needed for sorting.
+template <> struct less<cm::UsedSources::Variations> {
+  bool operator()(const cm::UsedSources::Variations& lhs,
+      const cm::UsedSources::Variations& rhs) const noexcept {
+    for (size_t i{}; i < lhs.size(); ++i) {
+      if (lhs[i] < rhs[i]) return true;
+    }
+    return false;
+  }
+};
+
 template <> struct equal_to<cm::UsedSources::Variations> {
   bool operator()(const cm::UsedSources::Variations& lhs,
       const cm::UsedSources::Variations& rhs) const noexcept {

@@ -2,6 +2,11 @@
 
 #include <type_traits>
 #include <cuda_runtime.h>
+#include <thrust/execution_policy.h>
+#include <thrust/device_vector.h>
+#include <thrust/scan.h>
+#include <thrust/iterator/counting_iterator.h>
+#include <thrust/copy.h>
 #include "combo-maker.h"
 #include "merge-filter-data.h"
 #include "or-filter.cuh"
@@ -10,16 +15,22 @@
 
 namespace cm {
 
-extern __constant__ FilterData::DeviceCommon<fat_index_t> xor_data;
+extern __constant__ FilterData::DeviceXor xor_data;
 extern __constant__ FilterData::DeviceOr or_data;
 
 #ifdef DEBUG_OR_COUNTS
 extern __device__ atomic64_t count_or_src_considered;
+extern __device__ atomic64_t or_get_compat_idx_clocks;
 extern __device__ atomic64_t count_or_xor_variation_compat;
+extern __device__ atomic64_t or_xor_variation_compat_clocks;
 extern __device__ atomic64_t count_or_src_variation_compat;
+extern __device__ atomic64_t or_src_variation_compat_clocks;
 extern __device__ atomic64_t count_or_check_src_compat;
+extern __device__ atomic64_t or_check_src_compat_clocks;
 extern __device__ atomic64_t count_or_src_compat;
 #endif
+
+  //#define SCAN_PRINTF
 
 namespace {
 
@@ -35,40 +46,268 @@ __device__ variation_index_t get_one_variation(
   return -1;
 }
 
+__device__ auto init_variations_compat_results(
+    const UsedSources::Variations& xor_variations) {
+  __shared__ bool any_compat;
+  if (!threadIdx.x) any_compat = false;
+  __syncthreads();
+  const auto first_results_idx = blockIdx.x * or_data.num_unique_variations;
+  for (auto idx{threadIdx.x}; idx < or_data.num_unique_variations;
+      idx += blockDim.x) {
+    const auto& or_variations = or_data.unique_variations[idx].variations;
+    const auto compat =
+        UsedSources::are_variations_compatible(xor_variations, or_variations);
+    xor_data.variations_compat_results[first_results_idx + idx] =
+        compat ? 1 : 0;
+    if (compat) any_compat = true;
+  }
+  __syncthreads();
+  return any_compat;
+}
+
+__device__ void init_variations_indices(index_t* num_indices) {
+  const auto num_items = or_data.num_unique_variations;
+  const auto offset = blockIdx.x * num_items;
+
+  const auto d_flags = &xor_data.variations_compat_results[offset];
+  auto d_scan_output = &xor_data.variations_scan_results[offset];
+
+  // convert flag array (variations_compat_results) to prefix sums
+  // (variations_scan_results)
+  thrust::device_ptr<const result_t> d_flags_ptr(d_flags);
+  thrust::device_ptr<result_t> d_scan_output_ptr(d_scan_output);
+
+  thrust::exclusive_scan(
+      thrust::device, d_flags_ptr, d_flags_ptr + num_items, d_scan_output_ptr);
+
+  // generate indices from flag array + prefix sums
+  auto d_indices = &xor_data.unique_variations_indices[offset];
+  index_t num_skipped_indices{};
+  thrust::device_ptr<index_t> d_indices_ptr(d_indices);
+  thrust::counting_iterator<int> count_begin(0);
+  thrust::for_each(thrust::device, count_begin, count_begin + num_items,
+      [&num_skipped_indices, d_flags, d_scan_output, d_indices] __device__(
+          const index_t idx) {
+        if (!threadIdx.x) {
+          if (d_flags[idx]) {
+#ifdef SCAN_PRINTF
+            printf("indices[%u] = %u\n",(unsigned)d_scan_output[idx], idx);
+#endif
+            d_indices[d_scan_output[idx]] = idx;
+          } else {
+            ++num_skipped_indices;
+          }
+        }
+      });
+
+  // compute total set flags
+  *num_indices = d_scan_output[num_items - 1] + d_flags[num_items - 1];
+#ifdef SCAN_PRINTF
+  if (!threadIdx.x) { // && blockIdx.x == 0) {
+     printf("unique_variations: %u, indices skipped: %u, total: %u\n",
+         num_items, num_skipped_indices, *num_indices);
+  }
+#endif
+}
+
+__device__ auto init_compat_variations(
+    const UsedSources::Variations& xor_variations, index_t* num_indices) {
+  if (!init_variations_compat_results(xor_variations)) return false;
+  init_variations_indices(num_indices);
+  return true;
+}
+
+#define CHECK_TID  480u
+
+// V1 (very slow): walk or_data.variations_compat_results linearly
+__device__ __forceinline__ index_t get_OR_compat_idx_linear_results(
+    index_t chunk_idx) {
+  const auto first_results_idx = blockIdx.x * or_data.num_unique_variations;
+  auto desired_idx = chunk_idx * blockDim.x + threadIdx.x;
+
+  UniqueVariations const* uv_match{};
+  index_t match{9999999};
+  index_t match_idx{9999999};
+  index_t num_flags{};
+  index_t total{};
+
+  for (index_t idx{}; idx < or_data.num_unique_variations; ++idx) {
+    if (!xor_data.variations_compat_results[first_results_idx + idx]) continue;
+    const auto& uv = or_data.unique_variations[idx];
+
+    //if (!threadIdx.x) printf("idx[%u] = %u \n", num_flags++, idx);
+    total += uv.num_indices;
+
+    if (desired_idx < uv.start_idx + uv.num_indices) {
+      const auto result = uv.first_compat_idx + (desired_idx - uv.start_idx);
+
+      if (threadIdx.x == CHECK_TID) {
+        if (result < match) {
+          match_idx = idx;
+          match = result;
+          uv_match = &uv;
+        }
+#ifdef SCAN_PRINTF
+        continue;
+#endif
+      }
+
+      return result;
+    }
+  }
+  if (threadIdx.x == CHECK_TID) {
+#ifdef SCAN_PRINTF
+    printf("thread %u total_indices: %u, flags: %u, match: %u, match_idx: %u, uv start: %u, first_compat %u, num_indices %u\n",
+           CHECK_TID, total, num_flags, match, match_idx, uv_match->start_idx, uv_match->first_compat_idx, uv_match->num_indices);
+#endif
+    return match;
+  }
+  return or_data.num_compat_indices;
+}
+
+// V2 (theoretically faster) walk xor_data.variations_indices linearly
+__device__ __forceinline__ index_t get_OR_compat_idx_linear_indices(
+    index_t chunk_idx, index_t num_indices) {
+  const auto first_uvi_idx = blockIdx.x * or_data.num_unique_variations;
+  auto desired_idx = chunk_idx * blockDim.x + threadIdx.x;
+
+  UniqueVariations dummy{};
+  dummy.start_idx = 99999;
+  dummy.first_compat_idx = 99999;
+  dummy.num_indices = 99999;
+  UniqueVariations const* uv_match{&dummy};
+  index_t match{9999999};
+  index_t match_idx{9999999};
+  index_t num_flags{};
+  index_t total{};
+
+  for (index_t idx{}; idx < num_indices; ++idx) {
+    const auto uv_idx = xor_data.unique_variations_indices[first_uvi_idx + idx];
+    const auto& uv = or_data.unique_variations[uv_idx];
+
+    total += uv.num_indices;
+
+    if (desired_idx < uv.start_idx + uv.num_indices) {
+      const auto result = uv.first_compat_idx + (desired_idx - uv.start_idx);
+
+      if (threadIdx.x == CHECK_TID) {
+        if (result < match) {
+          match_idx = idx;
+          match = result;
+          uv_match = &uv;
+        }
+#if defined(SCAN_PRINTF)
+        continue;
+#endif
+      }
+
+      return result;
+    }
+  }
+  if (threadIdx.x == CHECK_TID) {
+#if defined(SCAN_PRINTF)
+    printf("tid %u chunk: %u num_idx: %u desired: %u total: %u match: %u "
+           "match_idx: %u uv start: %u first_compat %u num_idx %u\n",
+        CHECK_TID, chunk_idx, num_indices, desired_idx, total, match, match_idx,
+        uv_match->start_idx, uv_match->first_compat_idx, uv_match->num_indices);
+#endif
+    return match;
+  }
+  return or_data.num_compat_indices;
+}
+
+// V3 (theoretically fastest) binary search xor_data.variations_indices
+__device__ __forceinline__ index_t get_OR_compat_idx_logn(
+    index_t chunk_idx, index_t num_indices) {
+  const auto first_idx = blockIdx.x * or_data.num_unique_variations;
+  const index_t desired_idx = chunk_idx * blockDim.x + threadIdx.x;
+  const auto begin = &xor_data.unique_variations_indices[first_idx];
+  auto it = std::lower_bound(begin, begin + num_indices, desired_idx,
+      [&](const index_t a, const index_t b) {
+        // i'm not sure this can be done unless we're
+        return true;  // TODO TODO TODO
+      });
+  // this is allowed if desired_idx >= num_indices.
+  // but maybe i shouldn't bother with lower_bound in that case.
+  // assert(it != begin + num_indices);
+  if (it != begin + num_indices) {
+    const auto& uv = or_data.unique_variations[*it];
+    //if (desired_idx < uv.start_idx + uv.num_indices) {
+    return uv.first_compat_idx + (desired_idx - uv.start_idx);
+  }
+  return or_data.num_compat_indices;
+}
+
 // Get a block-sized chunk of OR sources and test them for variation-
 // compatibililty with the XOR source specified by the supplied
 // xor_combo_index, and for OR-compatibility with the supplied source.
 // Return true if at least one OR source is compatible.
 __device__ auto get_OR_sources_chunk(const SourceCompatibilityData& source,
-    unsigned or_chunk_idx, const UsedSources::Variations& xor_variations) {
+    unsigned or_chunk_idx, const UsedSources::Variations& xor_variations,
+    index_t num_indices) {
   // one thread per compat_idx
-  const auto or_compat_idx = get_flat_idx(or_chunk_idx);
+  auto begin = clock64();
+  //const auto or_compat_idx = get_OR_compat_idx_linear_results(or_chunk_idx);
+  //if (threadIdx.x == CHECK_TID) printf("tid %u getting index, chunk %u\n", threadIdx.x, or_chunk_idx);
+  const auto or_compat_idx = get_OR_compat_idx_linear_indices(or_chunk_idx, num_indices);
+  //if (threadIdx.x == CHECK_TID) printf("tid %u idx %u\n", threadIdx.x, or_chunk_idx, or_compat_idx);
+
+  #ifdef CLOCKS
+  atomicAdd(&or_get_compat_idx_clocks, clock64() - begin);
+  #endif
+
   if (or_compat_idx >= or_data.num_compat_indices) return false;
 
   #ifdef DEBUG_OR_COUNTS
   atomicAdd(&count_or_src_considered, 1);
   #endif
 
+  //__syncwarp(); // NB: BAD
   const auto or_combo_idx = or_data.compat_indices[or_compat_idx];
   const auto or_variations = build_variations(or_combo_idx, or_data);
-  //  if (!check_src_compat_results(xor_combo_idx, xor_data)) return false;
-  if (!UsedSources::are_variations_compatible(xor_variations, or_variations))
-    return false;
+  begin = clock64();
+  auto xor_avc =
+      UsedSources::are_variations_compatible(xor_variations, or_variations);
+
+  #ifdef CLOCKS
+  atomicAdd(&or_xor_variation_compat_clocks, clock64() - begin);
+  #endif
+
+  if (!xor_avc) return false;
 
   #ifdef DEBUG_OR_COUNTS
   atomicAdd(&count_or_xor_variation_compat, 1);
   #endif
 
-  if (!UsedSources::are_variations_compatible(source.usedSources.variations,  //
-          or_variations))
-    return false;
+  begin = clock64();
+  // TODO: can't i use kNumSrcSentences here?
+  // would that even be faster than build_variations + are_variations_compatible?
+  // this way: build unpacks combo_idx, iterating sentences via merge, then iterate over sentences once more
+  // alt1 way: unpack combo_idx, iterating NumSentences, possible short circuit, no final iteration <<-- fastest
+  // alt2 way: build unpacks as above, final iteration = kNumSentences
+  // maybe not significantly.
+  auto or_avc = UsedSources::are_variations_compatible(
+      source.usedSources.variations, or_variations);
+
+  #ifdef CLOCKS
+  atomicAdd(&or_src_variation_compat_clocks, clock64() - begin);
+  #endif
+
+  if (!or_avc) return false;
 
   #ifdef DEBUG_OR_COUNTS
   atomicAdd(&count_or_src_variation_compat, 1);
   #endif
 
-  if (!check_src_compat_results(or_combo_idx, or_data)) return false;
+  begin = clock64();
+  auto ccr = check_src_compat_results(or_combo_idx, or_data);
 
+  #ifdef CLOCKS
+  atomicAdd(&or_check_src_compat_clocks, clock64() - begin);
+  #endif
+
+  if (!ccr) return false;
+  
   #ifdef DEBUG_OR_COUNTS
   atomicAdd(&count_or_check_src_compat, 1);
   #endif
@@ -98,11 +337,14 @@ __device__ auto is_any_OR_source_compatible(
     xor_variations[threadIdx.x] = get_one_variation(threadIdx.x, xor_combo_idx);
   }
   __syncthreads();
+  index_t num_indices{};
+  if (!init_compat_variations(xor_variations, &num_indices)) return false;
   for (unsigned or_chunk_idx{};
       or_chunk_idx * block_size < or_data.num_compat_indices; ++or_chunk_idx) {
-    if (get_OR_sources_chunk(source, or_chunk_idx, xor_variations)) {
+    if (get_OR_sources_chunk(source, or_chunk_idx, xor_variations, num_indices)) {
       any_or_compat = true;
     }
+    //if (or_chunk_idx == 16) printf("tid %u got chunk %u\n", threadIdx.x, or_chunk_idx);
     __syncthreads();
 
     // Or compatibility here is "success" for the supplied source and will
@@ -116,7 +358,7 @@ __device__ auto is_any_OR_source_compatible(
 }
 
 // not the fastest function in the world. but keeps GPU busy at least.
-__device__ __forceinline__ auto next_xor_result_idx(unsigned result_idx) {
+__device__ __forceinline__ auto next_xor_result_idx(index_t result_idx) {
   result_t* xor_results = (result_t*)&dynamic_shared[kXorResults];
   const auto block_size = blockDim.x;
   while ((result_idx < block_size) && !xor_results[result_idx])
@@ -128,32 +370,40 @@ __device__ __forceinline__ auto next_xor_result_idx(unsigned result_idx) {
 
 // With any XOR results in the specified chunk
 __device__ bool is_any_OR_source_compatible(
-    const SourceCompatibilityData& source, unsigned xor_chunk_idx,
+    const SourceCompatibilityData& source, index_t xor_chunk_idx,
     const FatIndexSpanPair& xor_idx_spans) {
   result_t* xor_results = (result_t*)&dynamic_shared[kXorResults];
   __shared__ bool any_or_compat;
   if (!threadIdx.x) any_or_compat = false;
   const auto block_size = blockDim.x;
-  const auto num_xor_indices =
+  const index_t num_xor_indices =
       xor_idx_spans.first.size() + xor_idx_spans.second.size();
   auto max_results = num_xor_indices - blockDim.x * xor_chunk_idx;
   if (max_results > block_size) max_results = block_size;
   __syncthreads();
-  for (unsigned xor_results_idx{next_xor_result_idx(0)};
+  for (index_t xor_results_idx{next_xor_result_idx(0)};
       xor_results_idx < max_results;) {
     const auto xor_flat_idx = get_flat_idx(xor_chunk_idx, xor_results_idx);
     const auto xor_combo_idx = get_xor_combo_index(xor_flat_idx, xor_idx_spans);
-    if (is_any_OR_source_compatible(source, xor_combo_idx)) {
+
+    // if (threadIdx.x == CHECK_TID) printf("got combo_idx\n");
+ 
+   if (is_any_OR_source_compatible(source, xor_combo_idx)) {
       any_or_compat = true;
     }
+
+   //if (threadIdx.x == CHECK_TID) printf("sync...\n");
+
     __syncthreads();
 
-    #ifdef PRINTF
-    if (!threadIdx.x) {
-      printf("  block: %u get_next_OR xor_chunk_idx: %u, or_chunk_idx: %u, "
-             "xor_results_idx: %lu, compat: %d\n",
-          blockIdx.x, xor_chunk_idx, or_chunk_idx, xor_results_idx,
-          any_or_compat ? 1 : 0);
+    //if (threadIdx.x == CHECK_TID) printf("done\n");
+
+    #if defined(PRINTF)
+    if (threadIdx.x == CHECK_TID) {
+      printf("  block: %u num_idx: %u chunk_idx: %u"
+             " results_idx: %u max_results: %u compat: %d\n",
+          blockIdx.x, num_xor_indices, xor_chunk_idx, xor_results_idx,
+          max_results, any_or_compat ? 1 : 0);
     }
     #endif
 

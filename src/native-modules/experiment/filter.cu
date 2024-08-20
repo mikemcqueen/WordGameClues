@@ -12,7 +12,7 @@
 
 namespace cm {
 
-__constant__ FilterData::DeviceCommon<fat_index_t> xor_data;
+__constant__ FilterData::DeviceXor xor_data;
 __constant__ FilterData::DeviceOr or_data;
 
 const unsigned BIG = 2'100'000'000;
@@ -24,10 +24,14 @@ __device__ atomic64_t count_xor_check_src_compat = 0;
 __device__ atomic64_t count_xor_src_compat = 0;
 
 __device__ atomic64_t count_or_compat_results = 0;
+__device__ atomic64_t or_get_compat_idx_clocks = 0;
 __device__ atomic64_t count_or_src_considered = 0;
 __device__ atomic64_t count_or_xor_variation_compat = 0;
+__device__ atomic64_t or_xor_variation_compat_clocks = 0;
 __device__ atomic64_t count_or_src_variation_compat = 0;
+__device__ atomic64_t or_src_variation_compat_clocks = 0;
 __device__ atomic64_t count_or_check_src_compat = 0;
+__device__ atomic64_t or_check_src_compat_clocks = 0;
 __device__ atomic64_t count_or_src_compat = 0;
 #endif
 
@@ -62,18 +66,38 @@ void init_counts() {
   err = cudaMemcpyToSymbol(count_or_compat_results, &value, sizeof(atomic64_t));
   assert_cuda_success(err, "init count");
 
+  err = cudaMemcpyToSymbol(or_get_compat_idx_clocks, &value, sizeof(atomic64_t));
+  assert_cuda_success(err, "init count");
+
   err = cudaMemcpyToSymbol(count_or_src_considered, &value, sizeof(atomic64_t));
   assert_cuda_success(err, "init count");
 
-  err = cudaMemcpyToSymbol(count_or_xor_variation_compat, &value, sizeof(atomic64_t));
+
+  err = cudaMemcpyToSymbol(
+      count_or_xor_variation_compat, &value, sizeof(atomic64_t));
   assert_cuda_success(err, "init count");
 
-  err = cudaMemcpyToSymbol(count_or_src_variation_compat, &value,  //
-      sizeof(atomic64_t));
+  err = cudaMemcpyToSymbol(
+      or_xor_variation_compat_clocks, &value, sizeof(atomic64_t));
   assert_cuda_success(err, "init count");
+
+
+  err = cudaMemcpyToSymbol(
+      count_or_src_variation_compat, &value, sizeof(atomic64_t));
+  assert_cuda_success(err, "init count");
+
+  err = cudaMemcpyToSymbol(
+      or_src_variation_compat_clocks, &value, sizeof(atomic64_t));
+  assert_cuda_success(err, "init count");
+
 
   err = cudaMemcpyToSymbol(count_or_check_src_compat, &value, sizeof(atomic64_t));
   assert_cuda_success(err, "init count");
+
+  err = cudaMemcpyToSymbol(
+      or_check_src_compat_clocks, &value, sizeof(atomic64_t));
+  assert_cuda_success(err, "init count");
+
 
   err = cudaMemcpyToSymbol(count_or_src_compat, &value, sizeof(atomic64_t));
   assert_cuda_success(err, "init count");
@@ -107,10 +131,14 @@ void display_counts() {
 #endif
 #ifdef DEBUG_OR_COUNTS
   atomic64_t compat_or_results_count;
+  atomic64_t get_or_compat_idx_clocks;
   atomic64_t considered_or_count;
-  atomic64_t compat_or_xor_variation_count;  // variations
+  atomic64_t compat_or_xor_variation_count;
+  atomic64_t compat_or_xor_variation_clocks;
   atomic64_t compat_or_src_variation_count;
+  atomic64_t compat_or_src_variation_clocks;
   atomic64_t compat_or_check_src_count;
+  atomic64_t compat_or_check_src_clocks;
   atomic64_t compat_or_count;
 
   err = cudaMemcpyFromSymbol(
@@ -118,20 +146,40 @@ void display_counts() {
   assert_cuda_success(err, "display count");
 
   err = cudaMemcpyFromSymbol(
+      &get_or_compat_idx_clocks, or_get_compat_idx_clocks, sizeof(atomic64_t));
+  assert_cuda_success(err, "display count");
+
+  err = cudaMemcpyFromSymbol(
       &considered_or_count, count_or_src_considered, sizeof(atomic64_t));
   assert_cuda_success(err, "display count");
+
 
   err = cudaMemcpyFromSymbol(
       &compat_or_xor_variation_count, count_or_xor_variation_compat, sizeof(atomic64_t));
   assert_cuda_success(err, "display count");
 
   err = cudaMemcpyFromSymbol(
+      &compat_or_xor_variation_clocks, or_xor_variation_compat_clocks, sizeof(atomic64_t));
+  assert_cuda_success(err, "display count");
+
+
+  err = cudaMemcpyFromSymbol(
       &compat_or_src_variation_count, count_or_src_variation_compat, sizeof(atomic64_t));
   assert_cuda_success(err, "display count");
 
   err = cudaMemcpyFromSymbol(
+      &compat_or_src_variation_clocks, or_src_variation_compat_clocks, sizeof(atomic64_t));
+  assert_cuda_success(err, "display count");
+
+
+  err = cudaMemcpyFromSymbol(
       &compat_or_check_src_count, count_or_check_src_compat, sizeof(atomic64_t));
   assert_cuda_success(err, "display count");
+
+  err = cudaMemcpyFromSymbol(
+      &compat_or_check_src_clocks, or_check_src_compat_clocks, sizeof(atomic64_t));
+  assert_cuda_success(err, "display count");
+
 
   err = cudaMemcpyFromSymbol(
       &compat_or_count, count_or_src_compat, sizeof(atomic64_t));
@@ -148,13 +196,25 @@ void display_counts() {
 #endif
 #ifdef DEBUG_OR_COUNTS
       << std::endl
-      << " or_compat_results: " << compat_or_results_count
+      //<< " or_compat_results: " << compat_or_results_count
+#ifdef CLOCKS
+      << " get_or_compat_idx clocks: " << get_or_compat_idx_clocks
+#endif
       << " or_considered: " << considered_or_count  //
       << std::endl
       << " or_xor_var_compat: " << compat_or_xor_variation_count
+#ifdef CLOCKS
+      << " clocks: " << compat_or_xor_variation_clocks << std::endl
+#endif
       << " or_src_var_compat: " << compat_or_src_variation_count
+#ifdef CLOCKS
+      << " clocks: " << compat_or_src_variation_clocks
+#endif
       << std::endl
       << " or_check_src_compat: " << compat_or_check_src_count
+#ifdef CLOCKS
+      << " clocks: " << compat_or_check_src_clocks << std::endl
+#endif
       << " or_compat: " << compat_or_count
 #endif
       << std::endl;
@@ -491,7 +551,7 @@ __device__ auto get_src_compat_results(
 __device__ auto init_source(const SourceCompatibilityData& source) {
   uint8_t* num_src_sentences = (uint8_t*)&dynamic_shared[kNumSrcSentences];
   uint8_t* src_sentences = &num_src_sentences[1];
-  __shared__ bool xor_compat;
+  //  __shared__ bool xor_compat;
   if (!threadIdx.x) {
     // initialize num_src_sentences and src_sentences for this source
     *num_src_sentences = 0;
@@ -500,14 +560,14 @@ __device__ auto init_source(const SourceCompatibilityData& source) {
         src_sentences[(*num_src_sentences)++] = (uint8_t)s;
       }
     }
-    xor_compat = false;
+    //xor_compat = false;
   }
-  __syncthreads();
-  if (get_src_compat_results<tag::XOR>(source, xor_data)) {
-    xor_compat = true;
-  }
-  __syncthreads();
-  return xor_compat && get_src_compat_results<tag::OR>(source, or_data);
+  // __syncthreads();
+  // if (get_src_compat_results<tag::XOR>(source, xor_data)) {
+  //  xor_compat = true;
+  // }
+  // __syncthreads();
+  return /*xor_compat && */ get_src_compat_results<tag::OR>(source, or_data);
 }
 
 /*
@@ -618,7 +678,6 @@ __global__ void filter_kernel(const SourceCompatibilityData* RESTRICT src_list,
     const auto src_idx = src_indices[idx];
     const auto flat_idx =
         src_list_start_indices[src_idx.listIndex] + src_idx.index;
-    // TODO: understand if this is right (bounds)
     if (compat_src_results && !compat_src_results[flat_idx]) continue;
     const auto& source = src_list[flat_idx];
     auto spans_result = get_smallest_src_index_spans(source);
@@ -665,7 +724,7 @@ __global__ void filter_kernel(const SourceCompatibilityData* RESTRICT src_list,
 void copy_filter_data(const FilterData& mfd) {
   cudaError_t err{};
 
-  const auto xor_bytes = sizeof(FilterData::DeviceXor::Base);
+  const auto xor_bytes = sizeof(FilterData::DeviceXor);
   err = cudaMemcpyToSymbol(xor_data, &mfd.device_xor, xor_bytes);
   assert_cuda_success(err, "copy xor filter data");
 
@@ -701,17 +760,24 @@ void run_filter_kernel(int threads_per_block, StreamData& stream,
 
   const auto cuda_stream = cudaStreamPerThread;
   // v- Populate any remaining mfd.device_xx values BEFORE copy_filter_data() -v
-  if (!mfd.device_xor.src_compat_results) {
+  if (!mfd.device_xor.variations_compat_results) {
     const auto xor_results_bytes =
-        grid_size * mfd.device_xor.sum_idx_list_sizes * sizeof(result_t);
-    cuda_malloc_async((void**)&mfd.device_xor.src_compat_results,
-        xor_results_bytes, cuda_stream, "src_compat_results");
+        grid_size * mfd.device_or.num_unique_variations * sizeof(result_t);
+    cuda_malloc_async((void**)&mfd.device_xor.variations_compat_results,
+        xor_results_bytes, cuda_stream, "xor.variations_compat_results");
+    cuda_malloc_async((void**)&mfd.device_xor.variations_scan_results,
+        xor_results_bytes, cuda_stream, "xor.variations_scan_results");
+    // NB: this has the potential to grow large as num_variations approaches 1M
+    const auto xor_indices_bytes =
+        grid_size * mfd.device_or.num_unique_variations * sizeof(index_t);
+    cuda_malloc_async((void**)&mfd.device_xor.unique_variations_indices,
+        xor_indices_bytes, cuda_stream, "xor.unique_variations_indices");
   }
   if (!mfd.device_or.src_compat_results) {
     const auto or_results_bytes =
         grid_size * mfd.device_or.sum_idx_list_sizes * sizeof(result_t);
     cuda_malloc_async((void**)&mfd.device_or.src_compat_results,
-        or_results_bytes, cuda_stream, "src_compat_results");
+        or_results_bytes, cuda_stream, "or.src_compat_results");
   }
   // ^- Populate any reamining mfd.device_xx values BEFORE copy_filter_data()
   // -^

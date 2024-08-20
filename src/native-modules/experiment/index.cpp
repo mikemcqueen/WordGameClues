@@ -293,6 +293,7 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   return Number::New(env, num_compat);
 }
 
+  /*
 auto combo_to_str(fat_index_t combo_idx, const IndexList& list_sizes) {
   std::string s;
   for (size_t i{}; i < list_sizes.size(); ++i) {
@@ -304,7 +305,8 @@ auto combo_to_str(fat_index_t combo_idx, const IndexList& list_sizes) {
   }
   return s;
 }
-
+  */
+  
 void dump_combos(const MergeData::Host& host, const MergeData::Device& device) {
   std::vector<UsedSources::Variations> variations;
   const auto list_sizes = util::make_list_sizes(host.compat_idx_lists);
@@ -318,13 +320,36 @@ void dump_combos(const MergeData::Host& host, const MergeData::Device& device) {
   }
   */
 }
+  /*
+auto get_combo_indices(const UsedSources::VariationsSet& variations) {
+  const auto kMaxVariationIdx = 138u;  // 138^9 fits in fat_index_t
+  ComboIndexList combo_indices;
+  for (const auto& v : variations) {
+    combo_index_t combo_idx{};
+    for (auto idx_int : v | std::views::reverse) {
+      auto idx = static_cast<index_t>(idx_int + 1);  // because -1 is valid
+      if (idx >= kMaxVariationIdx) {                 // 137 is largest allowed
+        std::cerr << "variation index " << idx << " exceeds maximum of "
+                  << kMaxVariationIdx << ", terminating\n";
+        std::terminate();
+      }
+      if (combo_idx) combo_idx *= kMaxVariationIdx;
+      combo_idx += idx;
+    }
+    combo_indices.push_back(combo_idx);
+  }
+  return combo_indices;
+}
+  */
 
+  /*
 const auto& get_source(
     const MergeData::Host& host, fat_index_t combo_idx, size_t list_idx) {
   auto& idx_list = host.compat_idx_lists.at(list_idx);
   auto src_idx = idx_list.at(combo_idx % idx_list.size());
   return host.src_lists.at(list_idx).at(src_idx);
 }
+  */
 
 void show_all_sources(const MergeData::Host& host, fat_index_t flat_idx) {
   using namespace std::literals;
@@ -350,33 +375,42 @@ void show_all_sources(const MergeData::Host& host, fat_index_t flat_idx) {
       });
 }
 
-auto get_variations_list(const MergeData::Host& host) {
+struct VariationsIndex {
+  UsedSources::Variations variations{-1, -1, -1, -1, -1, -1, -1, -1, -1};
+  index_t index{};
+};
+
+auto get_variations_index_list(const MergeData::Host& host) {  // host_or
   using namespace std::literals;
-  UsedSources::VariationsList variations;
-  for (auto flat_idx : host.compat_indices) {
-    UsedSources::Variations v = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
-    util::for_each_source_index(flat_idx, host.compat_idx_lists,  //
-        [&host, &v, flat_idx](index_t list_idx, index_t src_idx) {
+  std::vector<VariationsIndex> variations_idx_list;
+  for (index_t idx{}; auto combo_idx : host.compat_indices) {
+    VariationsIndex vi;
+    util::for_each_source_index(combo_idx, host.compat_idx_lists,
+        [&host, &v = vi.variations, combo_idx](
+            index_t list_idx, index_t src_idx) {
           const auto& src = host.src_lists.at(list_idx).at(src_idx);
-          // UsedSources::Variations copy = v;
           if (UsedSources::merge_variations(v, src.usedSources.variations)) {
             return true;
           }
-          std::cerr << "failed merging variations of " << flat_idx << std::endl
+          std::cerr << "failed merging variations of " << combo_idx << std::endl
                     << util::join(src.usedSources.variations, ","s) << " of "
                     << NameCount::listToString(src.primaryNameSrcList)
                     << " to:\n"
                     //<< util::join(copy, ","s) << ", after merge:\n"
                     << util::join(v, ","s) << std::endl;
-          show_all_sources(host, flat_idx);
+          show_all_sources(host, combo_idx);
           assert(false);
         });
-    variations.push_back(std::move(v));
+    vi.index = idx++;
+    variations_idx_list.push_back(std::move(vi));
   }
-  return variations;
+  return variations_idx_list;
 }
 
-auto get_unique_OR_variations(/*const MergeData::Host& host_or,*/
+/*
+ * NOTE: maybe keep around some of this for a while.
+ *
+auto get_unique_OR_variations(
     const UsedSources::VariationsList& variations_list) {
   UsedSources::VariationsSet variations;
   for (auto& v : variations_list) {
@@ -412,28 +446,34 @@ auto check_XOR_compatibility(const FilterData& mfd,
   }
   return true;
 }
+*/
 
-#if 0
-auto get_combo_indices(const UsedSources::VariationsSet& variations) {
-  const auto kMaxVariationIdx = 138u;  // 138^9 fits in fat_index_t
-  ComboIndexList combo_indices;
-  for (const auto& v : variations) {
-    combo_index_t combo_idx{};
-    for (auto idx_int : v | std::views::reverse) {
-      auto idx = static_cast<index_t>(idx_int + 1);  // because -1 is valid
-      if (idx >= kMaxVariationIdx) {                 // 137 is largest allowed
-        std::cerr << "variation index " << idx << " exceeds maximum of "
-                  << kMaxVariationIdx << ", terminating\n";
-        std::terminate();
-      }
-      if (combo_idx) combo_idx *= kMaxVariationIdx;
-      combo_idx += idx;
-    }
-    combo_indices.push_back(combo_idx);
+auto get_sorted_compat_indices(const FatIndexList& compat_indices,
+    const std::vector<VariationsIndex>& sorted_variations_idx_list) {
+  FatIndexList sorted_indices;
+  for (const auto& vi : sorted_variations_idx_list) {
+    sorted_indices.push_back(compat_indices.at(vi.index));
   }
-  return combo_indices;
+  return sorted_indices;
 }
-#endif
+
+auto get_unique_variations(const std::vector<VariationsIndex>& sorted_vi_list) {
+  std::vector<UniqueVariations> unique_variations;
+  index_t sum_of_indices{};
+  for (auto it = sorted_vi_list.cbegin(); it != sorted_vi_list.cend();) {
+    auto range_end = std::find_if_not(it, sorted_vi_list.end(),  //
+        [&first_vi = *it](const VariationsIndex& vi) {
+          return std::equal_to{}(first_vi.variations, vi.variations);
+        });
+    const auto num_indices = std::distance(it, range_end);
+    unique_variations.emplace_back(it->variations, sum_of_indices,
+        std::distance(sorted_vi_list.begin(), it), num_indices);
+    sum_of_indices += num_indices;
+    it = range_end;
+
+  }
+  return unique_variations;
+}
 
 //
 // filterPreparation
@@ -449,25 +489,37 @@ Value filterPreparation(const CallbackInfo& info) {
   auto nc_data_lists = makeNcDataLists(env, info[0].As<Array>());
   // --
   auto stream = cudaStreamPerThread;
-  auto compat{true};
+  auto or_merge_fail{false};
   MFD.host_or.src_lists = std::move(build_src_lists(nc_data_lists));
   if (MFD.host_or.src_lists.size()) {
     if (!get_merge_data(MFD.host_or.src_lists, MFD.host_or, MFD.device_or,
             MergeType::OR, stream)) {
       std::cerr << "failed to merge OR args" << std::endl;
-      compat = false;
+      or_merge_fail = true;
+    } else {
+      auto variations_idx_list = get_variations_index_list(MFD.host_or);
+      std::ranges::sort(variations_idx_list,
+          [](const VariationsIndex& a, const VariationsIndex& b) {
+            return std::less{}(a.variations, b.variations);
+          });
+      MFD.host_or.compat_indices = std::move(get_sorted_compat_indices(
+          MFD.host_or.compat_indices, variations_idx_list));
+      MFD.host_or.unique_variations = std::move(get_unique_variations(  //
+          variations_idx_list));
+      /*
+      // legacy code, fairly easy to make it work with new data type
+      if (log_level(OrVariations)) {
+        auto variations_set = get_unique_OR_variations(variations_list);
+        check_XOR_compatibility(MFD, variations_set);
+      }
+      */
     }
   }
-  if (compat) {
-    auto variations_list = get_variations_list(MFD.host_or);
-    if (log_level(OrVariations)) {
-      auto variations_set = get_unique_OR_variations(variations_list);
-      check_XOR_compatibility(MFD, variations_set);
-    }
-    alloc_copy_filter_indices(MFD, variations_list, stream);
+  if (!or_merge_fail) {
+    alloc_copy_filter_indices(MFD, stream);
     cuda_memory_dump("filter preparation");
   }
-  return Boolean::New(env, compat);
+  return Boolean::New(env, !or_merge_fail);
 }
 
 // considerCandidate

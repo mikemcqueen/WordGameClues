@@ -679,8 +679,6 @@ auto get_variation_lengths(
 }
 
 /*
-*/
-
 [[nodiscard]] auto cuda_alloc_copy_variation_indices(
     const SentenceOrVariationIndices& host_svi,
     cudaStream_t stream) -> device::OrVariationIndices* {
@@ -745,22 +743,35 @@ auto get_variation_lengths(
   temp.synchronize();
   return device_variation_indices;
 }
+*/
 
 void alloc_copy_compat_indices(FilterData::HostOr& host,
     FilterData::DeviceOr& device, cudaStream_t stream) {
-  if (host.compat_indices.empty()) return;
+  assert(!host.compat_indices.empty());
   const auto indices_bytes = host.compat_indices.size() * sizeof(fat_index_t);
   cuda_malloc_async((void**)&device.compat_indices, indices_bytes, stream,  //
-      "filter or_compat_indices");
+      "filter or.compat_indices");
   auto err = cudaMemcpyAsync(device.compat_indices, host.compat_indices.data(),
       indices_bytes, cudaMemcpyHostToDevice, stream);
-  assert_cuda_success(err, "copy or_compat_indices");
+  assert_cuda_success(err, "copy or.compat_indices");
   device.num_compat_indices = host.compat_indices.size();
 }
 
-void alloc_copy_filter_indices(FilterData& mfd,
-    const UsedSources::VariationsList& or_variations_list,
-    cudaStream_t stream) {
+void alloc_copy_unique_variations(FilterData::HostOr& host,
+    FilterData::DeviceOr& device, cudaStream_t stream) {
+  assert(!host.unique_variations.empty());
+  const auto variations_bytes =
+      host.unique_variations.size() * sizeof(UniqueVariations);
+  cuda_malloc_async((void**)&device.unique_variations, variations_bytes, stream,  //
+      "filter or.unique_variations");
+  auto err = cudaMemcpyAsync(device.unique_variations, host.unique_variations.data(),
+      variations_bytes, cudaMemcpyHostToDevice, stream);
+  assert_cuda_success(err, "copy or.unique_variations");
+  device.num_unique_variations = host.unique_variations.size();
+}
+
+void alloc_copy_filter_indices(FilterData& mfd, cudaStream_t stream) {
+  // const UsedSources::VariationsList& or_variations_list,
   assert(!mfd.host_xor.compat_indices.empty()); // arbitrary
   util::LogDuration ld("alloc_copy_filter_indices", Verbose);
   alloc_copy_start_indices(mfd.host_xor, mfd.device_xor, stream);
@@ -778,12 +789,21 @@ void alloc_copy_filter_indices(FilterData& mfd,
         cuda_alloc_copy_variation_indices(or_vi, stream);
     */
     alloc_copy_compat_indices(mfd.host_or, mfd.device_or, stream);
+    alloc_copy_unique_variations(mfd.host_or, mfd.device_or, stream);
   } else {
     // TOOD: cuda_free(), assuming we reset_pointers somewhere earlier.
     mfd.device_or.reset_pointers();
   }
+
+  // these all get allocated within the run_kernel function because they
+  // are dependent on grid_size.
+  mfd.device_xor.variations_compat_results = nullptr;
+  mfd.device_xor.variations_scan_results = nullptr;
+  mfd.device_xor.unique_variations_indices = nullptr;
+  mfd.device_or.src_compat_results = nullptr;
 }
 
+  /*
 void alloc_copy_filter_data(FilterData& mfd,
     const UsedSources::VariationsList& or_variations_list,
     cudaStream_t stream) {
@@ -808,5 +828,6 @@ void alloc_copy_filter_data(FilterData& mfd,
   std::cerr << "OR variation indices: " << mfd.device_or.num_variation_indices
             << std::endl;
 }
+  */
 
 }  // namespace cm

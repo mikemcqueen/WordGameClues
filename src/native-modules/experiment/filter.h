@@ -31,15 +31,19 @@ filter_result_t get_filter_result();
     const SentenceXorVariationIndices& xor_svi,
     cudaStream_t stream) -> device::XorVariationIndices*;
 
+  /*
 [[nodiscard]] auto cuda_alloc_copy_variation_indices(
     const SentenceOrVariationIndices& or_svi,
     cudaStream_t stream) -> device::OrVariationIndices*;
+  */
 
-void alloc_copy_filter_indices(FilterData& mfd,
-    const UsedSources::VariationsList& or_variations_list, cudaStream_t stream);
+void alloc_copy_filter_indices(FilterData& mfd, cudaStream_t stream);
+// const UsedSources::VariationsList& or_variations_list,
 
+/*
 void alloc_copy_filter_data(FilterData& mfd,
-    const UsedSources::VariationsList& or_variations_list, cudaStream_t stream);
+  const UsedSources::VariationsList& or_variations_list, cudaStream_t stream);
+*/
 
 template <typename T>
 void alloc_copy_start_indices(MergeData::Host& host,
