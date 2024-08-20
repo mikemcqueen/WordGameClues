@@ -470,7 +470,6 @@ auto get_unique_variations(const std::vector<VariationsIndex>& sorted_vi_list) {
         std::distance(sorted_vi_list.begin(), it), num_indices);
     sum_of_indices += num_indices;
     it = range_end;
-
   }
   return unique_variations;
 }
