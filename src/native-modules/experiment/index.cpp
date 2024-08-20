@@ -407,6 +407,23 @@ auto get_variations_index_list(const MergeData::Host& host) {  // host_or
   return variations_idx_list;
 }
 
+void show_unique_XOR_variations(const MergeData::Host& host) {  // host_xor
+  UsedSources::VariationsSet variations;
+  for (auto combo_idx : host.compat_indices) {
+    UsedSources::Variations v{-1, -1, -1, -1, -1, -1, -1, -1, -1};
+    util::for_each_source_index(combo_idx, host.compat_idx_lists,
+        [&host, &v, combo_idx](index_t list_idx, index_t src_idx) {
+          const auto& src = host.src_lists.at(list_idx).at(src_idx);
+          if (UsedSources::merge_variations(v, src.usedSources.variations)) {
+            return true;
+          }
+          assert(false);
+        });
+    variations.insert(v);
+  }
+  std::cerr << "XOR unique variations: " << variations.size() << std::endl;
+}
+
 /*
  * NOTE: maybe keep around some of this for a while.
  *
@@ -471,6 +488,10 @@ auto get_unique_variations(const std::vector<VariationsIndex>& sorted_vi_list) {
     sum_of_indices += num_indices;
     it = range_end;
   }
+  if (log_level(Verbose)) {
+    std::cerr << "OR unique variations: " << unique_variations.size()
+              << std::endl;
+  }
   return unique_variations;
 }
 
@@ -505,13 +526,12 @@ Value filterPreparation(const CallbackInfo& info) {
           MFD.host_or.compat_indices, variations_idx_list));
       MFD.host_or.unique_variations = std::move(get_unique_variations(  //
           variations_idx_list));
-      /*
-      // legacy code, fairly easy to make it work with new data type
       if (log_level(OrVariations)) {
-        auto variations_set = get_unique_OR_variations(variations_list);
-        check_XOR_compatibility(MFD, variations_set);
+        show_unique_XOR_variations(MFD.host_xor);
+        // legacy code, fairly easy to make it work with new data type
+        //  auto variations_set = get_unique_OR_variations(variations_list);
+        //  check_XOR_compatibility(MFD, variations_set);
       }
-      */
     }
   }
   if (!or_merge_fail) {

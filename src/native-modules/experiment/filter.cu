@@ -15,23 +15,21 @@ namespace cm {
 __constant__ FilterData::DeviceXor xor_data;
 __constant__ FilterData::DeviceOr or_data;
 
-const unsigned BIG = 2'100'000'000;
-
 #if defined(DEBUG_XOR_COUNTS) || defined(DEBUG_OR_COUNTS)
 __device__ atomic64_t count_xor_src_considered = 0;
 __device__ atomic64_t count_xor_src_variation_compat = 0;
 __device__ atomic64_t count_xor_check_src_compat = 0;
 __device__ atomic64_t count_xor_src_compat = 0;
 
-__device__ atomic64_t count_or_compat_results = 0;
+__device__ atomic64_t get_next_xor_compat_clocks = 0;
+__device__ atomic64_t init_src_clocks = 0;
+__device__ atomic64_t is_any_or_compat_clocks = 0;
+__device__ atomic64_t or_init_compat_variations_clocks = 0;
 __device__ atomic64_t or_get_compat_idx_clocks = 0;
+
 __device__ atomic64_t count_or_src_considered = 0;
-__device__ atomic64_t count_or_xor_variation_compat = 0;
-__device__ atomic64_t or_xor_variation_compat_clocks = 0;
 __device__ atomic64_t count_or_src_variation_compat = 0;
-__device__ atomic64_t or_src_variation_compat_clocks = 0;
 __device__ atomic64_t count_or_check_src_compat = 0;
-__device__ atomic64_t or_check_src_compat_clocks = 0;
 __device__ atomic64_t count_or_src_compat = 0;
 #endif
 
@@ -46,6 +44,25 @@ namespace {
 void init_counts() {
   atomic64_t value = 0;
   cudaError_t err{};
+
+#ifdef CLOCKS
+  err = cudaMemcpyToSymbol(
+      get_next_xor_compat_clocks, &value, sizeof(atomic64_t));
+  assert_cuda_success(err, "init count");
+
+  err = cudaMemcpyToSymbol(init_src_clocks, &value, sizeof(atomic64_t));
+  assert_cuda_success(err, "init count");
+
+  err = cudaMemcpyToSymbol(is_any_or_compat_clocks, &value, sizeof(atomic64_t));
+  assert_cuda_success(err, "init count");
+
+  err = cudaMemcpyToSymbol(
+      or_init_compat_variations_clocks, &value, sizeof(atomic64_t));
+  assert_cuda_success(err, "init count");
+
+  err = cudaMemcpyToSymbol(or_get_compat_idx_clocks, &value, sizeof(atomic64_t));
+  assert_cuda_success(err, "init count");
+#endif
 
 #ifdef DEBUG_XOR_COUNTS
   err = cudaMemcpyToSymbol(count_xor_src_considered, &value, sizeof(atomic64_t));
@@ -63,41 +80,15 @@ void init_counts() {
 #endif
 
 #ifdef DEBUG_OR_COUNTS
-  err = cudaMemcpyToSymbol(count_or_compat_results, &value, sizeof(atomic64_t));
-  assert_cuda_success(err, "init count");
-
-  err = cudaMemcpyToSymbol(or_get_compat_idx_clocks, &value, sizeof(atomic64_t));
-  assert_cuda_success(err, "init count");
-
   err = cudaMemcpyToSymbol(count_or_src_considered, &value, sizeof(atomic64_t));
   assert_cuda_success(err, "init count");
-
-
-  err = cudaMemcpyToSymbol(
-      count_or_xor_variation_compat, &value, sizeof(atomic64_t));
-  assert_cuda_success(err, "init count");
-
-  err = cudaMemcpyToSymbol(
-      or_xor_variation_compat_clocks, &value, sizeof(atomic64_t));
-  assert_cuda_success(err, "init count");
-
 
   err = cudaMemcpyToSymbol(
       count_or_src_variation_compat, &value, sizeof(atomic64_t));
   assert_cuda_success(err, "init count");
 
-  err = cudaMemcpyToSymbol(
-      or_src_variation_compat_clocks, &value, sizeof(atomic64_t));
-  assert_cuda_success(err, "init count");
-
-
   err = cudaMemcpyToSymbol(count_or_check_src_compat, &value, sizeof(atomic64_t));
   assert_cuda_success(err, "init count");
-
-  err = cudaMemcpyToSymbol(
-      or_check_src_compat_clocks, &value, sizeof(atomic64_t));
-  assert_cuda_success(err, "init count");
-
 
   err = cudaMemcpyToSymbol(count_or_src_compat, &value, sizeof(atomic64_t));
   assert_cuda_success(err, "init count");
@@ -107,6 +98,34 @@ void init_counts() {
 void display_counts() {
   cudaError_t err{};
 
+#ifdef CLOCKS
+  atomic64_t l_get_next_xor_compat_clocks;
+  atomic64_t l_init_src_clocks;
+  atomic64_t l_is_any_or_compat_clocks;   
+  atomic64_t init_or_compat_variations_clocks;
+  atomic64_t get_or_compat_idx_clocks;
+
+  err = cudaMemcpyFromSymbol(&l_get_next_xor_compat_clocks,
+      get_next_xor_compat_clocks, sizeof(atomic64_t));
+  assert_cuda_success(err, "display count");
+
+  err = cudaMemcpyFromSymbol(&l_init_src_clocks,
+      init_src_clocks, sizeof(atomic64_t));
+  assert_cuda_success(err, "display count");
+
+  err = cudaMemcpyFromSymbol(&l_is_any_or_compat_clocks,
+      is_any_or_compat_clocks, sizeof(atomic64_t));
+  assert_cuda_success(err, "display count");
+
+  err = cudaMemcpyFromSymbol(&init_or_compat_variations_clocks,
+      or_init_compat_variations_clocks, sizeof(atomic64_t));
+  assert_cuda_success(err, "display count");
+
+  err = cudaMemcpyFromSymbol(
+      &get_or_compat_idx_clocks, or_get_compat_idx_clocks, sizeof(atomic64_t));
+  assert_cuda_success(err, "display count");
+#endif
+  
 #ifdef DEBUG_XOR_COUNTS
   atomic64_t considered_xor_count;
   atomic64_t compat_xor_src_variation_count;
@@ -129,57 +148,24 @@ void display_counts() {
       &compat_xor_count, count_xor_src_compat, sizeof(atomic64_t));
   assert_cuda_success(err, "display count");
 #endif
+
 #ifdef DEBUG_OR_COUNTS
-  atomic64_t compat_or_results_count;
-  atomic64_t get_or_compat_idx_clocks;
   atomic64_t considered_or_count;
-  atomic64_t compat_or_xor_variation_count;
-  atomic64_t compat_or_xor_variation_clocks;
   atomic64_t compat_or_src_variation_count;
-  atomic64_t compat_or_src_variation_clocks;
   atomic64_t compat_or_check_src_count;
-  atomic64_t compat_or_check_src_clocks;
   atomic64_t compat_or_count;
-
-  err = cudaMemcpyFromSymbol(
-      &compat_or_results_count, count_or_compat_results, sizeof(atomic64_t));
-  assert_cuda_success(err, "display count");
-
-  err = cudaMemcpyFromSymbol(
-      &get_or_compat_idx_clocks, or_get_compat_idx_clocks, sizeof(atomic64_t));
-  assert_cuda_success(err, "display count");
 
   err = cudaMemcpyFromSymbol(
       &considered_or_count, count_or_src_considered, sizeof(atomic64_t));
   assert_cuda_success(err, "display count");
-
-
-  err = cudaMemcpyFromSymbol(
-      &compat_or_xor_variation_count, count_or_xor_variation_compat, sizeof(atomic64_t));
-  assert_cuda_success(err, "display count");
-
-  err = cudaMemcpyFromSymbol(
-      &compat_or_xor_variation_clocks, or_xor_variation_compat_clocks, sizeof(atomic64_t));
-  assert_cuda_success(err, "display count");
-
 
   err = cudaMemcpyFromSymbol(
       &compat_or_src_variation_count, count_or_src_variation_compat, sizeof(atomic64_t));
   assert_cuda_success(err, "display count");
 
   err = cudaMemcpyFromSymbol(
-      &compat_or_src_variation_clocks, or_src_variation_compat_clocks, sizeof(atomic64_t));
-  assert_cuda_success(err, "display count");
-
-
-  err = cudaMemcpyFromSymbol(
       &compat_or_check_src_count, count_or_check_src_compat, sizeof(atomic64_t));
   assert_cuda_success(err, "display count");
-
-  err = cudaMemcpyFromSymbol(
-      &compat_or_check_src_clocks, or_check_src_compat_clocks, sizeof(atomic64_t));
-  assert_cuda_success(err, "display count");
-
 
   err = cudaMemcpyFromSymbol(
       &compat_or_count, count_or_src_compat, sizeof(atomic64_t));
@@ -187,34 +173,31 @@ void display_counts() {
 #endif
 
   std::cerr
+#ifdef CLOCKS
+      << " is_compat_loop: " << std::endl
+      << "   get_next_xor_compat_clocks: " << l_get_next_xor_compat_clocks
+      << std::endl
+      << "   init_src_clocks: " << l_init_src_clocks  //
+      << std::endl
+      << "   is_any_or_compat_clocks: " << l_is_any_or_compat_clocks  //
+      << std::endl
+      << " init_or_compat_var clocks: " << init_or_compat_variations_clocks
+      << std::endl
+      << " get_or_compat_idx clocks: " << get_or_compat_idx_clocks  //
+      << std::endl
+#endif
 #ifdef DEBUG_XOR_COUNTS
       << " xor_considered: " << considered_xor_count
-      << " xor_src_variation_compat: " << compat_xor_src_variation_count
-      << std::endl
-      << " xor_check_src_compat: " << compat_xor_check_src_count
-      << " xor_compat: " << compat_xor_count
+      //<< " xor_src_variation_compat: " << compat_xor_src_variation_count
+      //<< std::endl
+      //<< " xor_check_src_compat: " << compat_xor_check_src_count
+      << " xor_compat: " << compat_xor_count << std::endl
 #endif
 #ifdef DEBUG_OR_COUNTS
-      << std::endl
-      //<< " or_compat_results: " << compat_or_results_count
-#ifdef CLOCKS
-      << " get_or_compat_idx clocks: " << get_or_compat_idx_clocks
-#endif
-      << " or_considered: " << considered_or_count  //
-      << std::endl
-      << " or_xor_var_compat: " << compat_or_xor_variation_count
-#ifdef CLOCKS
-      << " clocks: " << compat_or_xor_variation_clocks << std::endl
-#endif
-      << " or_src_var_compat: " << compat_or_src_variation_count
-#ifdef CLOCKS
-      << " clocks: " << compat_or_src_variation_clocks
-#endif
+      << " or_considered: " << considered_or_count
+      << " or_src_var_compat: " << compat_or_src_variation_count  //
       << std::endl
       << " or_check_src_compat: " << compat_or_check_src_count
-#ifdef CLOCKS
-      << " clocks: " << compat_or_check_src_clocks << std::endl
-#endif
       << " or_compat: " << compat_or_count
 #endif
       << std::endl;
@@ -615,23 +598,47 @@ __device__ bool is_compat_loop(const SourceCompatibilityData& source,
   for (;;) {
     __syncthreads();
     if (*xor_chunk_idx_ptr * block_size >= num_xor_indices) return false;
+
+    auto begin = clock64();
     if (get_next_compatible_XOR_sources(source, *xor_chunk_idx_ptr,  //
             xor_idx_spans)) {
       any_xor_compat = true;
     }
+
+    #ifdef CLOCKS
+    atomicAdd(&get_next_xor_compat_clocks, clock64() - begin);
+    #endif
+
     __syncthreads();
+
     if (any_xor_compat) {
       if (!or_data.num_compat_indices) return true;
+
+      begin = clock64();
       if (!src_init_done && init_source(source)) {
         src_init_done = true;
       }
+
+      #ifdef CLOCKS
+      atomicAdd(&init_src_clocks, clock64() - begin);
+      #endif
+
     }
     __syncthreads();
-    if (src_init_done
-        && is_any_OR_source_compatible(source, *xor_chunk_idx_ptr,  //
-            xor_idx_spans)) {
-      any_or_compat = true;
+
+    if (src_init_done) {
+
+      begin = clock64();
+      if (is_any_OR_source_compatible(
+              source, *xor_chunk_idx_ptr, xor_idx_spans)) {
+        any_or_compat = true;
+      }
+
+      #ifdef CLOCKS
+      atomicAdd(&is_any_or_compat_clocks, clock64() - begin);
+      #endif
     }
+
     __syncthreads();
     if (any_or_compat) return true;
 

@@ -4,10 +4,12 @@
 
 namespace cm {
 
+#if 1
 #define CLOCKS
 #define DEBUG_OR_COUNTS
 #define DEBUG_XOR_COUNTS
-  //#define MAX_SOURCES 1
+#endif
+//#define MAX_SOURCES 1
 // #define DISABLE_OR
 // #define FORCE_XOR_COMPAT
 // #define FORCE_ALL_XOR
