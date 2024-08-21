@@ -23,9 +23,8 @@ auto filter_candidates_cuda(const FilterData& mfd, int sum,
 
 filter_result_t get_filter_result();
 
-[[nodiscard]] auto cuda_alloc_copy_source_descriptor_pairs(
-    const std::vector<UsedSources::SourceDescriptorPair>& src_desc_pairs,
-    cudaStream_t stream) -> UsedSources::SourceDescriptorPair*;
+void set_incompatible_sources(FilterData& mfd,
+    const SourceCompatibilitySet& incompat_sources, cudaStream_t stream);
 
 void alloc_copy_filter_indices(FilterData& mfd, cudaStream_t stream);
 

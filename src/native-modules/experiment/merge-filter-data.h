@@ -56,6 +56,10 @@ struct FilterData {
   //
   // Common
   //
+  struct HostCommon : MergeData::Host {
+    std::vector<UniqueVariations> unique_variations;
+  };
+
   struct DeviceCommon : MergeData::Device {
   protected:
     void reset_pointers() {
@@ -63,7 +67,7 @@ struct FilterData {
       src_list_start_indices = nullptr;
       idx_list_start_indices = nullptr;
       compat_indices = nullptr;
-      variation_indices = nullptr;
+      unique_variations = nullptr;
     }
 
   public:
@@ -72,7 +76,7 @@ struct FilterData {
       cm::cuda_free(src_list_start_indices);
       cm::cuda_free(idx_list_start_indices);
       cm::cuda_free(compat_indices);
-      cm::cuda_free(variation_indices);
+      cm::cuda_free(unique_variations);
       reset_pointers();
     }
 
@@ -88,15 +92,16 @@ struct FilterData {
     index_t* src_list_start_indices;
     index_t* idx_list_start_indices;
     fat_index_t* compat_indices;
-    device::VariationIndices* variation_indices;
+    UniqueVariations* unique_variations;
+    unsigned num_variation_indices;
     index_t num_compat_indices;
-    index_t num_variation_indices;
+    index_t num_unique_variations;
   };
 
   //
   // XOR
   //
-  struct HostXor : MergeData::Host {
+  struct HostXor : HostCommon {
     // merge-only
     // currently used by showComponents (-t) and conistency check v1.
     // consistency check v1 can be removed, and showComponents can be
@@ -111,6 +116,7 @@ struct FilterData {
     void reset_pointers() {
       Base::reset_pointers();
       incompat_src_desc_pairs = nullptr;
+      variation_indices = nullptr;
       variations_compat_results = nullptr;
       variations_scan_results = nullptr;
       unique_variations_indices = nullptr;
@@ -120,6 +126,7 @@ struct FilterData {
     void cuda_free() {
       Base::cuda_free();
       cm::cuda_free(incompat_src_desc_pairs);
+      cm::cuda_free(variation_indices);
       cm::cuda_free(variations_compat_results);
       cm::cuda_free(variations_scan_results);
       cm::cuda_free(unique_variations_indices);
@@ -127,6 +134,7 @@ struct FilterData {
     }
 
     UsedSources::SourceDescriptorPair* incompat_src_desc_pairs;
+    device::VariationIndices<fat_index_t>* variation_indices;
     // flag array (0/1) of compatible entries or_data.unique_variations
     result_t* variations_compat_results;
     // exclusive_scan results
@@ -138,8 +146,7 @@ struct FilterData {
   //
   // OR
   //
-  struct HostOr : MergeData::Host {
-    std::vector<UniqueVariations> unique_variations;
+  struct HostOr : HostCommon {
   } host_or;
 
   struct DeviceOr : DeviceCommon {
@@ -147,20 +154,19 @@ struct FilterData {
   public:
     void reset_pointers() {
       Base::reset_pointers();
-      unique_variations = nullptr;
       src_compat_results = nullptr;
+      uv_compat_bitset = nullptr;
     }
 
     void cuda_free() {
       Base::cuda_free();
-      cm::cuda_free(unique_variations);
       cm::cuda_free(src_compat_results);
+      cm::cuda_free(uv_compat_bitset);
       reset_pointers();
     }
 
-    UniqueVariations* unique_variations;
     result_t* src_compat_results;
-    index_t num_unique_variations;
+    unsigned* uv_compat_bitset;
   } device_or;
 
   DeviceXor* device_xor_data{};

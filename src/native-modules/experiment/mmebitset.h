@@ -246,6 +246,32 @@ protected:
   word_type bits[wc()];
 };
 
+class ptr_bitset {
+public:
+  using word_type = unsigned;
+
+  ptr_bitset() = default;
+  ptr_bitset(word_type* bits) : bits(bits) {}
+
+  void set(unsigned int bit, bool value = true) {
+    unsigned int mask = 1 << (bit & 0x1F);
+    if (value) bits[bit/32] |= mask;
+    else bits[bit/32] &= ~mask;
+  }
+  
+  constexpr bool test(int word, unsigned int relative_bit) const {
+    unsigned int mask = 1 << relative_bit;
+    return (bits[word] & mask) ? true : false;
+  }
+
+  constexpr bool test(unsigned int bit) const {
+    unsigned int mask = 1 << (bit & 0x1F);
+    return (bits[bit/32] & mask) ? true : false;
+  }
+
+protected:
+  word_type* bits{};
+};
 
 } // namespace mme
 

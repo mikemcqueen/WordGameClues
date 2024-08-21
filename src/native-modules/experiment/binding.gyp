@@ -27,8 +27,9 @@
       'index.cpp',
       'merge-support.cpp',
       'stream-data.cpp',
-      'validator.cpp',
+      'unique-variations.cpp',
       'unwrap.cpp',
+      'validator.cpp',
       'wrap.cpp',
     ],
     'include_dirs': [

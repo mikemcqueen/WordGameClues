@@ -1,9 +1,10 @@
 #include <cassert>
-#include <numeric>
 #include <iostream>
+#include <memory>
 #include <napi.h>
-#include <set>
+#include <numeric>
 #include <ranges>
+#include <set>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -19,6 +20,7 @@
 #include "merge-filter-data.h"
 #include "components.h"
 #include "util.h"
+#include "unique-variations.h"
 #include "validator.h"
 #include "unwrap.h"
 #include "wrap.h"
@@ -351,62 +353,6 @@ const auto& get_source(
 }
   */
 
-void show_all_sources(const MergeData::Host& host, fat_index_t flat_idx) {
-  using namespace std::literals;
-  UsedSources::Variations v = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
-  //  auto orig_flat_idx = flat_idx;
-  std::cerr << "all sources for flat_idx: " << flat_idx << std::endl;
-  util::for_each_source_index(flat_idx, host.compat_idx_lists,  //
-      [&](index_t list_idx, index_t src_idx) {
-        /*
-        printf("list_idx: %d, list_size: %u"
-               ", remain_flat_idx: %lu, idx: %d, src_idx: %u into:\n",
-            list_idx, idx_list_size, flat_idx, int(idx), src_idx);
-        */
-        fprintf(stderr, "list_idx: %u, src_idx: %u:\n", list_idx, src_idx);
-
-        const auto& src = host.src_lists.at(list_idx).at(src_idx);
-        auto success =
-            UsedSources::merge_variations(v, src.usedSources.variations);
-        std::cerr << NameCount::listToString(src.primaryNameSrcList)
-                  << std::endl
-                  << "  merged as: " << util::join(v, ","s)
-                  << " - success: " << std::boolalpha << success << std::endl;
-      });
-}
-
-struct VariationsIndex {
-  UsedSources::Variations variations{-1, -1, -1, -1, -1, -1, -1, -1, -1};
-  index_t index{};
-};
-
-auto get_variations_index_list(const MergeData::Host& host) {  // host_or
-  using namespace std::literals;
-  std::vector<VariationsIndex> variations_idx_list;
-  for (index_t idx{}; auto combo_idx : host.compat_indices) {
-    VariationsIndex vi;
-    util::for_each_source_index(combo_idx, host.compat_idx_lists,
-        [&host, &v = vi.variations, combo_idx](
-            index_t list_idx, index_t src_idx) {
-          const auto& src = host.src_lists.at(list_idx).at(src_idx);
-          if (UsedSources::merge_variations(v, src.usedSources.variations)) {
-            return true;
-          }
-          std::cerr << "failed merging variations of " << combo_idx << std::endl
-                    << util::join(src.usedSources.variations, ","s) << " of "
-                    << NameCount::listToString(src.primaryNameSrcList)
-                    << " to:\n"
-                    //<< util::join(copy, ","s) << ", after merge:\n"
-                    << util::join(v, ","s) << std::endl;
-          show_all_sources(host, combo_idx);
-          assert(false);
-        });
-    vi.index = idx++;
-    variations_idx_list.push_back(std::move(vi));
-  }
-  return variations_idx_list;
-}
-
 void show_unique_XOR_variations(const MergeData::Host& host) {  // host_xor
   UsedSources::VariationsSet variations;
   for (auto combo_idx : host.compat_indices) {
@@ -465,39 +411,10 @@ auto check_XOR_compatibility(const FilterData& mfd,
 }
 */
 
-auto get_sorted_compat_indices(const FatIndexList& compat_indices,
-    const std::vector<VariationsIndex>& sorted_variations_idx_list) {
-  FatIndexList sorted_indices;
-  for (const auto& vi : sorted_variations_idx_list) {
-    sorted_indices.push_back(compat_indices.at(vi.index));
-  }
-  return sorted_indices;
-}
-
-auto get_unique_variations(const std::vector<VariationsIndex>& sorted_vi_list) {
-  std::vector<UniqueVariations> unique_variations;
-  index_t sum_of_indices{};
-  for (auto it = sorted_vi_list.cbegin(); it != sorted_vi_list.cend();) {
-    auto range_end = std::find_if_not(it, sorted_vi_list.end(),  //
-        [&first_vi = *it](const VariationsIndex& vi) {
-          return std::equal_to{}(first_vi.variations, vi.variations);
-        });
-    const auto num_indices = std::distance(it, range_end);
-    unique_variations.emplace_back(it->variations, sum_of_indices,
-        std::distance(sorted_vi_list.begin(), it), num_indices);
-    sum_of_indices += num_indices;
-    it = range_end;
-  }
-  if (log_level(Verbose)) {
-    std::cerr << "OR unique variations: " << unique_variations.size()
-              << std::endl;
-  }
-  return unique_variations;
-}
-
 //
 // filterPreparation
 //
+
 Value filterPreparation(const CallbackInfo& info) {
   Env env = info.Env();
   if (!info[0].IsArray()) {
@@ -517,24 +434,11 @@ Value filterPreparation(const CallbackInfo& info) {
       std::cerr << "failed to merge OR args" << std::endl;
       or_merge_fail = true;
     } else {
-      auto variations_idx_list = get_variations_index_list(MFD.host_or);
-      std::ranges::sort(variations_idx_list,
-          [](const VariationsIndex& a, const VariationsIndex& b) {
-            return std::less{}(a.variations, b.variations);
-          });
-      MFD.host_or.compat_indices = std::move(get_sorted_compat_indices(
-          MFD.host_or.compat_indices, variations_idx_list));
-      MFD.host_or.unique_variations = std::move(get_unique_variations(  //
-          variations_idx_list));
-      if (log_level(OrVariations)) {
-        show_unique_XOR_variations(MFD.host_xor);
-        // legacy code, fairly easy to make it work with new data type
-        //  auto variations_set = get_unique_OR_variations(variations_list);
-        //  check_XOR_compatibility(MFD, variations_set);
-      }
+      build_unique_variations(MFD.host_or, "OR");
     }
   }
   if (!or_merge_fail) {
+    build_unique_variations(MFD.host_xor, "XOR");
     alloc_copy_filter_indices(MFD, stream);
     cuda_memory_dump("filter preparation");
   }
@@ -559,30 +463,6 @@ Value considerCandidate(const CallbackInfo& info) {
 //
 // filterCandidatesForSum
 //
-
-auto make_source_descriptor_pairs(
-    const SourceCompatibilitySet& incompatible_sources) {
-  std::vector<UsedSources::SourceDescriptorPair> src_desc_pairs;
-  src_desc_pairs.reserve(incompatible_sources.size());
-  for (const auto& src: incompatible_sources) {
-    src_desc_pairs.push_back(src.usedSources.get_source_descriptor_pair());
-  }
-  return src_desc_pairs;
-}
-
-void set_incompatible_sources(
-    const SourceCompatibilitySet& incompat_sources, cudaStream_t stream) {
-  // empty set technically possible; disallowed here as a canary
-  assert(!incompat_sources.empty());
-  assert(MFD.host_xor.incompat_src_desc_pairs.empty());
-  assert(!MFD.device_xor.incompat_src_desc_pairs);
-
-  MFD.host_xor.incompat_src_desc_pairs =
-      std::move(make_source_descriptor_pairs(incompat_sources));
-  MFD.device_xor.incompat_src_desc_pairs =
-      cuda_alloc_copy_source_descriptor_pairs(
-          MFD.host_xor.incompat_src_desc_pairs, stream);
-}
 
 Value filterCandidatesForSum(const CallbackInfo& info) {
   Env env = info.Env();
@@ -611,7 +491,7 @@ Value filterCandidatesForSum(const CallbackInfo& info) {
   assert(synchronous == opt_incompat_sources.has_value());
   if (opt_incompat_sources.has_value()) {
     auto stream = cudaStreamPerThread;
-    set_incompatible_sources(opt_incompat_sources.value(), stream);
+    set_incompatible_sources(MFD, opt_incompat_sources.value(), stream);
   }
   // NOTE: can only free device data here after synchronous call. 
   return env.Null();

@@ -10,6 +10,7 @@
 #include "combo-maker.h"
 #include "merge-filter-data.h"
 #include "or-filter.cuh"
+#include "mmebitset.h"
 
 #define RESTRICT __restrict__
 
@@ -120,7 +121,7 @@ __device__ __forceinline__ index_t get_OR_compat_idx_linear_results(
   return or_data.num_compat_indices;
 }
 
-// V2 (faster) linear walk of xor_data.variations_indices
+// V2 (faster) linear walk of xor_data.unique_variations_indices
 __device__ __forceinline__ auto get_OR_compat_idx_linear_indices(
     index_t chunk_idx, index_t num_uv_indices) {
   const auto first_uvi_idx = blockIdx.x * or_data.num_unique_variations;
@@ -136,7 +137,7 @@ __device__ __forceinline__ auto get_OR_compat_idx_linear_indices(
   return or_data.num_compat_indices;
 }
 
-// V3 (fastest) binary search of xor_data.variations_indices
+// V3 (fastest) binary search of xor_data.unique_variations_indices
 __device__ auto get_OR_compat_idx(
     index_t chunk_idx, index_t num_uv_indices) {
   const auto desired_idx = chunk_idx * blockDim.x + threadIdx.x;
