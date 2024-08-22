@@ -56,13 +56,13 @@ struct FilterData {
   //
   // Common
   //
-  template <typename T>
   struct DeviceCommon : MergeData::Device {
   protected:
     void reset_pointers() {
       MergeData::Device::reset_pointers();
       src_list_start_indices = nullptr;
       idx_list_start_indices = nullptr;
+      compat_indices = nullptr;
       variation_indices = nullptr;
     }
 
@@ -71,23 +71,26 @@ struct FilterData {
       MergeData::Device::cuda_free();
       cm::cuda_free(src_list_start_indices);
       cm::cuda_free(idx_list_start_indices);
+      cm::cuda_free(compat_indices);
       cm::cuda_free(variation_indices);
       reset_pointers();
     }
 
     constexpr const auto& get_source(
-        fat_index_t flat_idx, index_t list_idx) const {
+        fat_index_t combo_idx, index_t list_idx) const {
       const auto src_list = &src_lists[src_list_start_indices[list_idx]];
       const auto idx_list = &idx_lists[idx_list_start_indices[list_idx]];
       const auto idx_list_size = idx_list_sizes[list_idx];
-      const auto src_idx = idx_list[flat_idx % idx_list_size];
+      const auto src_idx = idx_list[combo_idx % idx_list_size];
       return src_list[src_idx];
     }
 
     index_t* src_list_start_indices;
     index_t* idx_list_start_indices;
-    device::VariationIndices<T>* variation_indices;
-    unsigned num_variation_indices;
+    fat_index_t* compat_indices;
+    device::VariationIndices* variation_indices;
+    index_t num_compat_indices;
+    index_t num_variation_indices;
   };
 
   //
@@ -102,8 +105,8 @@ struct FilterData {
     std::vector<UsedSources::SourceDescriptorPair> incompat_src_desc_pairs;
   } host_xor;
 
-  struct DeviceXor : DeviceCommon<fat_index_t> {
-    using Base = DeviceCommon<fat_index_t>;
+  struct DeviceXor : DeviceCommon {
+    using Base = DeviceCommon;
   private:
     void reset_pointers() {
       Base::reset_pointers();
@@ -139,28 +142,24 @@ struct FilterData {
     std::vector<UniqueVariations> unique_variations;
   } host_or;
 
-  struct DeviceOr : DeviceCommon<index_t> {
-    using Base = DeviceCommon<index_t>;
+  struct DeviceOr : DeviceCommon {
+    using Base = DeviceCommon;
   public:
     void reset_pointers() {
       Base::reset_pointers();
-      compat_indices = nullptr;
       unique_variations = nullptr;
       src_compat_results = nullptr;
     }
 
     void cuda_free() {
       Base::cuda_free();
-      cm::cuda_free(compat_indices);
       cm::cuda_free(unique_variations);
       cm::cuda_free(src_compat_results);
       reset_pointers();
     }
 
-    fat_index_t* compat_indices;
     UniqueVariations* unique_variations;
     result_t* src_compat_results;
-    index_t num_compat_indices;
     index_t num_unique_variations;
   } device_or;
 

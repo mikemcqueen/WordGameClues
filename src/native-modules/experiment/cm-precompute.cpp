@@ -194,12 +194,12 @@ auto build_src_lists(const std::vector<NCDataList>& nc_data_lists)
 
 auto buildSentenceVariationIndices(const std::vector<SourceList>& xor_src_lists,
     const std::vector<IndexList>& compat_idx_lists,
-    const std::vector<uint64_t>& compat_flat_indices)
+    const FatIndexList& compat_indices)
     -> SentenceXorVariationIndices {
   SentenceXorVariationIndices svi;
-  for (auto flat_idx : compat_flat_indices) {
+  for (size_t idx{}; idx < compat_indices.size(); ++idx) {
     UsedSources::Variations variations = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
-    util::for_each_source_index(flat_idx, compat_idx_lists,
+    util::for_each_source_index(compat_indices.at(idx), compat_idx_lists,
         [&xor_src_lists, &variations](index_t list_idx, index_t src_idx) {
           const auto& src = xor_src_lists.at(list_idx).at(src_idx);
           for (const auto& nc : src.primaryNameSrcList) {
@@ -211,10 +211,10 @@ auto buildSentenceVariationIndices(const std::vector<SourceList>& xor_src_lists,
     for (int s{}; s < kNumSentences; ++s) {
       auto& variationIndicesList = svi.at(s);
       const auto variation_idx = variations.at(s) + 1u;
-      if (variationIndicesList.size() <= variation_idx) {
-        variationIndicesList.resize(variation_idx + 1);
+      if (variation_idx >= variationIndicesList.size()) {
+        variationIndicesList.resize(variation_idx + 1u);
       }
-      variationIndicesList.at(variation_idx).push_back(flat_idx);
+      variationIndicesList.at(variation_idx).push_back(idx);
     }
   }
   // When the list of xor_sources is very small, there may be no xor_source

@@ -1,6 +1,7 @@
 #pragma once
 #include <cassert>
 #include "cuda-types.h"
+#include "merge-filter-data.h"
 
 namespace cm {
 
@@ -40,18 +41,26 @@ struct OR {};
 
 }  // namespace tag
 
+extern __constant__ FilterData::DeviceXor xor_data;
+extern __constant__ FilterData::DeviceOr or_data;
+
 __device__ __forceinline__ auto get_xor_combo_index(
-    fat_index_t flat_idx, const FatIndexSpanPair& idx_spans) {
-  if (flat_idx < idx_spans.first.size()) return idx_spans.first[flat_idx];
-  flat_idx -= idx_spans.first.size();
-  // TODO #ifdef ASSERTS
-  assert(flat_idx < idx_spans.second.size());
-  return idx_spans.second[flat_idx];
+    index_t flat_idx, const IndexSpanPair& idx_spans) {
+  index_t compat_idx{};
+  if (flat_idx < idx_spans.first.size()) {
+    compat_idx = idx_spans.first[flat_idx];
+  } else {
+    flat_idx -= idx_spans.first.size();
+    // TODO #ifdef ASSERTS
+    assert(flat_idx < idx_spans.second.size());
+    compat_idx = idx_spans.second[flat_idx];
+  }
+  return xor_data.compat_indices[compat_idx];
 }
 
-__device__ __forceinline__ fat_index_t get_flat_idx(
-    fat_index_t block_idx, unsigned thread_idx = threadIdx.x) {
-  return block_idx * fat_index_t(blockDim.x) + thread_idx;
+__device__ __forceinline__ index_t get_flat_idx(
+    index_t block_idx, index_t thread_idx = threadIdx.x) {
+  return block_idx * blockDim.x + thread_idx;
 }
 
 /*
@@ -200,6 +209,6 @@ __device__ auto build_variations(fat_index_t combo_idx, const T& data) {
 
 __device__ bool is_any_OR_source_compatible(
     const SourceCompatibilityData& source, unsigned xor_chunk_idx,
-    const FatIndexSpanPair& xor_idx_spans);
+    const IndexSpanPair& xor_idx_spans);
 
 }  // namespace cm

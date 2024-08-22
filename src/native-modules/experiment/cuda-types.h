@@ -27,15 +27,8 @@ template <typename T> using IndexListBase = std::vector<T>;
 using IndexList = IndexListBase<index_t>;
 using FatIndexList = IndexListBase<fat_index_t>;
 
-template <typename T>
-requires std::is_same_v<T, index_t> || std::is_same_v<T, fat_index_t>
-using IndexSpan = std::span<const T>;
-
-template <typename T>
-using IndexSpanPairBase = std::pair<IndexSpan<T>, IndexSpan<T>>;
-
-using IndexSpanPair = IndexSpanPairBase<index_t>;
-using FatIndexSpanPair = IndexSpanPairBase<fat_index_t>;
+using IndexSpan = std::span<const index_t>;
+using IndexSpanPair = std::pair<IndexSpan, IndexSpan>;
 
 struct VariationIndexOffset {
   variation_index_t variation_index;
@@ -47,7 +40,7 @@ namespace device {  // on-device data structures
 
 template <typename T>
 struct VariationIndicesBase {
-  T* device_data;        // one chunk of allocated data; other pointers
+  T* device_data;              // one chunk of allocated data; other pointers
                                // below point inside this chunk.
   T* indices;
   index_t num_indices;         // size of indices array
@@ -55,21 +48,24 @@ struct VariationIndicesBase {
   index_t* num_indices_per_variation;
 };
 
+// this was all some attempt at supporting OrVariationIndices, an idea which
+// has died on the vine and which I should have left relegated to an orphan
+// branch. Lots of unnecessary template noise leftover here.
+/*
 template <typename T> struct VariationIndices;
-
 template <> struct VariationIndices<index_t> : VariationIndicesBase<index_t> {
-  constexpr IndexSpan<index_t> get_index_span(int variation) const {
-    assert(0);
-    return {&indices[variation_index_offsets[variation].offset],
-        num_indices_per_variation[variation]};
-  }
+constexpr IndexSpan<index_t> get_index_span(int variation) const {
+  assert(0);
+  return {&indices[variation_index_offsets[variation].offset],
+      num_indices_per_variation[variation]};
+}
 
-  VariationIndexOffset* variation_index_offsets;
+VariationIndexOffset* variation_index_offsets;
 };
+*/
 
-template <>
-struct VariationIndices<fat_index_t> : VariationIndicesBase<fat_index_t> {
-  constexpr IndexSpan<fat_index_t> get_index_span(int variation) const {
+struct VariationIndices : VariationIndicesBase<index_t> {
+  constexpr IndexSpan get_index_span(int variation) const {
     return {&indices[variation_offsets[variation]],
       num_indices_per_variation[variation]};
   }
@@ -77,8 +73,8 @@ struct VariationIndices<fat_index_t> : VariationIndicesBase<fat_index_t> {
   index_t* variation_offsets;  // offsets into indices
 };
 
-using OrVariationIndices = VariationIndices<index_t>;
-using XorVariationIndices = VariationIndices<fat_index_t>;
+//using OrVariationIndices = VariationIndices<index_t>;
+using XorVariationIndices = VariationIndices;
 
 struct SourceCompatibilityData;
 

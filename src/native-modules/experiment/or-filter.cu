@@ -15,8 +15,10 @@
 
 namespace cm {
 
+  /*
 extern __constant__ FilterData::DeviceXor xor_data;
 extern __constant__ FilterData::DeviceOr or_data;
+  */  
 
 #ifdef DEBUG_OR_COUNTS
 extern __device__ atomic64_t or_init_compat_variations_clocks;
@@ -266,7 +268,7 @@ __device__ __forceinline__ auto next_xor_result_idx(index_t result_idx) {
 // With any XOR results in the specified chunk
 __device__ bool is_any_OR_source_compatible(
     const SourceCompatibilityData& source, index_t xor_chunk_idx,
-    const FatIndexSpanPair& xor_idx_spans) {
+    const IndexSpanPair& xor_idx_spans) {
   result_t* xor_results = (result_t*)&dynamic_shared[kXorResults];
   __shared__ bool any_or_compat;
   if (!threadIdx.x) any_or_compat = false;

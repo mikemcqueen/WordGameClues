@@ -16,7 +16,7 @@ auto build_src_lists(
 
 auto buildSentenceVariationIndices(const std::vector<SourceList>& xor_src_lists,
     const std::vector<IndexList>& compat_idx_lists,
-    const std::vector<uint64_t>& compat_flat_indices)
+    const FatIndexList& compat_indices)
     -> SentenceXorVariationIndices;
 
 auto build_OR_variation_indices(

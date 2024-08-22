@@ -256,7 +256,7 @@ enum class Compat {
 
 struct SmallestSpansResult {
   Compat compat;
-  FatIndexSpanPair pair;
+  IndexSpanPair pair;
 };
 
 // variation_indices is an optimization. it allows us to restrict comparisons
@@ -381,13 +381,13 @@ __device__ void dump_all_sources(fat_index_t flat_idx,
 // Return true if at least one XOR source is compatible.
 __device__ bool get_next_XOR_sources_chunk(
     const SourceCompatibilityData& source, const unsigned xor_chunk_idx,
-    const FatIndexSpanPair& xor_idx_spans) {
+    const IndexSpanPair& xor_idx_spans) {
   result_t* xor_results = (result_t*)&dynamic_shared[kXorResults];
   const auto block_size = blockDim.x;
   const auto num_xor_indices =
       xor_idx_spans.first.size() + xor_idx_spans.second.size();
   xor_results[threadIdx.x] = 0;
-  // one thrad per xor_flat_idx
+  // one thread per xor_flat_idx
   const auto xor_flat_idx = get_flat_idx(xor_chunk_idx);
   if (xor_flat_idx >= num_xor_indices) return false;
 
@@ -431,10 +431,11 @@ __device__ bool get_next_XOR_sources_chunk(
 // Return true if at least one XOR source is compatible.
 __device__ bool get_next_compatible_XOR_sources(
     const SourceCompatibilityData& source, unsigned xor_chunk_idx,
-    const FatIndexSpanPair& xor_idx_spans) {
+    const IndexSpanPair& xor_idx_spans) {
   result_t* xor_results = (result_t*)&dynamic_shared[kXorResults];
   const auto block_size = blockDim.x;
-  const auto num_xor_indices = xor_idx_spans.first.size() + xor_idx_spans.second.size();
+  const auto num_xor_indices =
+      xor_idx_spans.first.size() + xor_idx_spans.second.size();
   fat_index_t* xor_chunk_idx_ptr = &dynamic_shared[kXorChunkIdx];
   __shared__ bool any_xor_compat;
   if (!threadIdx.x) any_xor_compat = false;
@@ -581,7 +582,7 @@ __device__ auto init_source(const SourceCompatibilityData& source) {
 //     If OR source is OR-compatible with Source
 //       is_compat = true
 __device__ bool is_compat_loop(const SourceCompatibilityData& source,
-    const FatIndexSpanPair& xor_idx_spans) {
+    const IndexSpanPair& xor_idx_spans) {
   const auto block_size = blockDim.x;
   fat_index_t* xor_chunk_idx_ptr = &dynamic_shared[kXorChunkIdx];
   __shared__ bool any_xor_compat;
@@ -670,9 +671,6 @@ __global__ void filter_kernel(const SourceCompatibilityData* RESTRICT src_list,
   #if 1 || defined(PRINTF)
   if (!blockIdx.x && !threadIdx.x) {
     printf("+++kernel+++ blocks: %u\n", gridDim.x);
-    if (or_data.variation_indices) {
-      printf(" num_or_indices: %u\n", or_data.num_compat_indices);
-    }
   }
   #endif
 
@@ -680,7 +678,7 @@ __global__ void filter_kernel(const SourceCompatibilityData* RESTRICT src_list,
   #if MAX_SOURCES
   num_sources = num_sources < MAX_SOURCES ? num_sources : MAX_SOURCES;
   #endif
-  for (unsigned idx{blockIdx.x}; idx < num_sources; idx += gridDim.x) {
+  for (index_t idx{blockIdx.x}; idx < num_sources; idx += gridDim.x) {
     __syncthreads();
     const auto src_idx = src_indices[idx];
     const auto flat_idx =
@@ -689,20 +687,13 @@ __global__ void filter_kernel(const SourceCompatibilityData* RESTRICT src_list,
     const auto& source = src_list[flat_idx];
     auto spans_result = get_smallest_src_index_spans(source);
 
-    #if 1 // DEBUG
-    if (!threadIdx.x) {
-      *debug_idx_ptr = (src_idx.listIndex == 8090 || src_idx.listIndex == 10);
-      //if (*debug_idx_ptr) source.dump("8090or10");
-    }
-    #endif
-
     #ifdef PRINTF
     if (!threadIdx.x && (idx == num_sources - 1)) {
-      auto num_xor_indices =
+      auto num_indices =
           spans_result.pair.first.size() + spans_result.pair.second.size();
-      printf(" block: %u, spans.compat = %d, num_xor_indices: %lu, chunks: %u\n",
-          blockIdx.x, int(spans_result.compat), num_xor_indices,
-          unsigned(num_xor_indices / blockDim.x));
+      printf(" block: %u spans.compat = %d, num_xor_indices: %lu, chunks: %u\n",
+          blockIdx.x, int(spans_result.compat), num_indices,
+          unsigned(num_indices / blockDim.x));
     }
     #endif
 

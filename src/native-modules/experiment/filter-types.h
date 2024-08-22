@@ -40,7 +40,7 @@ using SentenceOrVariationIndices =
     std::array<OrVariationIndices, kNumSentences>;
 
 using SentenceXorVariationIndices =
-    std::array<std::vector<FatIndexList>, kNumSentences>;
+    std::array<std::vector<IndexList>, kNumSentences>;
 
 class IndexStates {
 public:

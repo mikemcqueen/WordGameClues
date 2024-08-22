@@ -27,34 +27,7 @@ filter_result_t get_filter_result();
     const std::vector<UsedSources::SourceDescriptorPair>& src_desc_pairs,
     cudaStream_t stream) -> UsedSources::SourceDescriptorPair*;
 
-[[nodiscard]] auto cuda_allocCopySentenceVariationIndices(
-    const SentenceXorVariationIndices& xor_svi,
-    cudaStream_t stream) -> device::XorVariationIndices*;
-
-  /*
-[[nodiscard]] auto cuda_alloc_copy_variation_indices(
-    const SentenceOrVariationIndices& or_svi,
-    cudaStream_t stream) -> device::OrVariationIndices*;
-  */
-
 void alloc_copy_filter_indices(FilterData& mfd, cudaStream_t stream);
-// const UsedSources::VariationsList& or_variations_list,
-
-/*
-void alloc_copy_filter_data(FilterData& mfd,
-  const UsedSources::VariationsList& or_variations_list, cudaStream_t stream);
-*/
-
-template <typename T>
-void alloc_copy_start_indices(MergeData::Host& host,
-    FilterData::DeviceCommon<T>& device, cudaStream_t stream) {
-  auto src_list_start_indices = make_start_indices(host.src_lists);
-  device.src_list_start_indices = cuda_alloc_copy_start_indices(
-      src_list_start_indices, stream);  // "src_list_start_indices"
-  auto idx_list_start_indices = make_start_indices(host.compat_idx_lists);
-  device.idx_list_start_indices = cuda_alloc_copy_start_indices(
-      idx_list_start_indices, stream);  // "idx_list_start_indices"
-}
 
 }  // namespace cm
 

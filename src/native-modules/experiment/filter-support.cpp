@@ -534,6 +534,187 @@ void dump_src_list(const SourceCompatibilityList& src_list) {
   }
 }
 
+
+[[nodiscard]] auto cuda_allocCopySentenceVariationIndices(
+    const SentenceXorVariationIndices& svi,
+    cudaStream_t stream) -> device::XorVariationIndices* {
+  // assumption made throughout
+  static_assert(sizeof(fat_index_t) == sizeof(index_t) * 2);
+  using DeviceVariationIndicesArray =
+      std::array<device::XorVariationIndices, kNumSentences>;
+  DeviceVariationIndicesArray device_indices_array;
+  cudaError_t err{};
+  for (int s{}; s < kNumSentences; ++s) {
+    const auto& variation_idx_lists = svi.at(s);
+    const auto num_variations{variation_idx_lists.size()};
+    // clever: n * sizeof(fat_index_t) == 2 * n * sizeof(index_t)
+    const auto device_data_bytes =
+        ((num_variations * 2)  // num_indices_per_variation, variation offsets
+            + util::sum_sizes(variation_idx_lists))  // the indices
+        * sizeof(index_t);
+    auto& device_indices = device_indices_array.at(s);
+    cuda_malloc_async((void**)&device_indices.device_data, device_data_bytes,
+        stream, "variation_indices");
+    device_indices.num_variations = num_variations;
+    // copy combo indices first, populating offsets and num_combo_indices
+    device_indices.indices = &device_indices.device_data[num_variations];
+    std::vector<index_t> variation_offsets;
+    std::vector<index_t> num_indices;
+    for (size_t offset{}; const auto& idx_list : variation_idx_lists) {
+      variation_offsets.push_back(offset);
+      num_indices.push_back(idx_list.size());
+      const auto indices_bytes = idx_list.size() * sizeof(index_t);
+      err = cudaMemcpyAsync(&device_indices.indices[offset],
+          idx_list.data(), indices_bytes, cudaMemcpyHostToDevice, stream);
+      assert_cuda_success(err, "copy variation indices");
+      offset += idx_list.size();
+      assert(offset < std::numeric_limits<index_t>::max());
+    }
+    assert(num_indices.size() == variation_offsets.size());
+    // copy variation offsets
+    device_indices.variation_offsets = (index_t*)device_indices.device_data;
+    const auto offsets_bytes = variation_offsets.size() * sizeof(index_t);
+    err = cudaMemcpyAsync(device_indices.variation_offsets,
+        variation_offsets.data(), offsets_bytes, cudaMemcpyHostToDevice,
+        stream);
+    assert_cuda_success(err, "copy variation_offsets");
+    // copy num combo indices
+    device_indices.num_indices_per_variation =
+      &((index_t*)device_indices.device_data)[num_variations];
+    const auto num_indices_bytes = num_indices.size() * sizeof(index_t);
+    err = cudaMemcpyAsync(device_indices.num_indices_per_variation,
+        num_indices.data(), num_indices_bytes, cudaMemcpyHostToDevice, stream);
+    assert_cuda_success(err, "copy num_indices_per_variation");
+  }
+  const auto variation_indices_bytes =
+      kNumSentences * sizeof(device::XorVariationIndices);
+  device::XorVariationIndices* device_variation_indices;
+  cuda_malloc_async((void**)&device_variation_indices, variation_indices_bytes,
+      stream, "variation_indices");
+  err = cudaMemcpyAsync(device_variation_indices, device_indices_array.data(),
+      variation_indices_bytes, cudaMemcpyHostToDevice, stream);
+  assert_cuda_success(err, "copy variation_indices");
+
+  // TODO: be nice to get rid of this
+  // just to be sure, due to lifetime problems of local host-side memory
+  // solution: cram stuff into MFD
+  CudaEvent temp(stream);
+  temp.synchronize();
+  return device_variation_indices;
+}
+
+/*
+auto get_variation_lengths(
+    const std::vector<VariationIndexOffset>& vi_offsets) {
+  IndexList lengths;
+  for (index_t idx{1u}; idx < vi_offsets.size(); ++idx) {
+    lengths.push_back(
+        vi_offsets.at(idx).offset - vi_offsets.at(idx - 1).offset);
+  }
+  return lengths;
+}
+
+[[nodiscard]] auto cuda_alloc_copy_variation_indices(
+    const SentenceOrVariationIndices& host_svi,
+    cudaStream_t stream) -> device::OrVariationIndices* {
+  static_assert(sizeof(VariationIndexOffset) == sizeof(index_t) * 2);
+  using DeviceSentenceOrVariationIndices =
+      std::array<device::OrVariationIndices, kNumSentences>;
+  DeviceSentenceOrVariationIndices device_svi;
+  cudaError_t err{};
+  for (int s{}; s < kNumSentences; ++s) {
+    const auto& host_vi = host_svi.at(s);
+    const auto num_variations{host_vi.index_offsets.size()};
+    auto& device_vi = device_svi.at(s);
+    const auto device_data_bytes =  // TODO: device_vi.calc_size(host_vi)
+        host_vi.indices.size() * sizeof(index_t) +       // indices
+        2 * sizeof(index_t) +                            // num_indices/num_vars
+        num_variations * sizeof(VariationIndexOffset) +  // var_index_offets
+        num_variations * sizeof(index_t);                // num_idx_per_var
+    cuda_malloc_async((void**)&device_vi.device_data, device_data_bytes, stream,
+        "or variation_indices");
+    device_vi.num_variations = num_variations;
+
+    // copy indices first, populating offsets and num_indices
+    // per above static assert: index_t + 2 * index_t = 3 * index_t
+    device_vi.indices = &device_vi.device_data[num_variations * 3];
+    const auto indices_bytes = host_vi.indices.size() * sizeof(index_t);
+    // TODO: questionable destination address
+    err = cudaMemcpyAsync(device_vi.indices, host_vi.indices.data(),
+        indices_bytes, cudaMemcpyHostToDevice, stream);
+    assert_cuda_success(err, "copy or variation indices");
+
+    // copy variation index offsets
+    device_vi.variation_index_offsets =
+        (VariationIndexOffset*)device_vi.device_data;
+    const auto index_offsets_bytes =
+        host_vi.index_offsets.size() * sizeof(VariationIndexOffset);
+    err = cudaMemcpyAsync(device_vi.variation_index_offsets,
+        host_vi.index_offsets.data(), index_offsets_bytes,
+        cudaMemcpyHostToDevice, stream);
+    assert_cuda_success(err, "copy or variation_index_offsets");
+
+    // copy num indices
+    auto lengths = get_variation_lengths(host_vi.index_offsets);
+    device_vi.num_indices_per_variation =
+        &device_vi.device_data[num_variations * 2];
+    const auto num_indices_bytes = lengths.size() * sizeof(index_t);
+    err = cudaMemcpyAsync(device_vi.num_indices_per_variation, lengths.data(),
+        num_indices_bytes, cudaMemcpyHostToDevice, stream);
+    assert_cuda_success(err, "copy or num_indices_per_variation");
+  }
+  const auto vi_bytes = kNumSentences * sizeof(device::OrVariationIndices);
+  device::OrVariationIndices* device_variation_indices;
+  cuda_malloc_async((void**)&device_variation_indices, vi_bytes, stream,  //
+      "or variation_indices");
+  err = cudaMemcpyAsync(device_variation_indices, device_svi.data(), vi_bytes,
+      cudaMemcpyHostToDevice, stream);
+  assert_cuda_success(err, "copy or variation_indices");
+
+  // TODO: be nice to get rid of this
+  // just to be sure, due to lifetime problems of local host-side memory
+  // solution: cram stuff into MFD
+  CudaEvent temp(stream);
+  temp.synchronize();
+  return device_variation_indices;
+}
+*/
+
+void alloc_copy_start_indices(MergeData::Host& host,
+    FilterData::DeviceCommon& device, cudaStream_t stream) {
+  auto src_list_start_indices = make_start_indices(host.src_lists);
+  device.src_list_start_indices = cuda_alloc_copy_start_indices(
+      src_list_start_indices, stream);  // "src_list_start_indices"
+  auto idx_list_start_indices = make_start_indices(host.compat_idx_lists);
+  device.idx_list_start_indices = cuda_alloc_copy_start_indices(
+      idx_list_start_indices, stream);  // "idx_list_start_indices"
+}
+
+void alloc_copy_compat_indices(MergeData::Host& host,
+    FilterData::DeviceCommon& device, cudaStream_t stream) {
+  assert(!host.compat_indices.empty());
+  const auto indices_bytes = host.compat_indices.size() * sizeof(fat_index_t);
+  cuda_malloc_async((void**)&device.compat_indices, indices_bytes, stream,  //
+      "filter or.compat_indices");
+  auto err = cudaMemcpyAsync(device.compat_indices, host.compat_indices.data(),
+      indices_bytes, cudaMemcpyHostToDevice, stream);
+  assert_cuda_success(err, "copy or.compat_indices");
+  device.num_compat_indices = host.compat_indices.size();
+}
+
+void alloc_copy_unique_variations(FilterData::HostOr& host,
+    FilterData::DeviceOr& device, cudaStream_t stream) {
+  assert(!host.unique_variations.empty());
+  const auto variations_bytes =
+      host.unique_variations.size() * sizeof(UniqueVariations);
+  cuda_malloc_async((void**)&device.unique_variations, variations_bytes, stream,  //
+      "filter or.unique_variations");
+  auto err = cudaMemcpyAsync(device.unique_variations, host.unique_variations.data(),
+      variations_bytes, cudaMemcpyHostToDevice, stream);
+  assert_cuda_success(err, "copy or.unique_variations");
+  device.num_unique_variations = host.unique_variations.size();
+}
+
 }  // anonymous namespace
 
 auto filter_candidates_cuda(const FilterData& mfd, int sum,
@@ -602,179 +783,12 @@ filter_result_t get_filter_result() {
   return device_src_desc_pairs;
 }
 
-[[nodiscard]] auto cuda_allocCopySentenceVariationIndices(
-    const SentenceXorVariationIndices& svi,
-    cudaStream_t stream) -> device::XorVariationIndices* {
-  // assumption made throughout
-  static_assert(sizeof(fat_index_t) == sizeof(index_t) * 2);
-  using DeviceVariationIndicesArray =
-      std::array<device::XorVariationIndices, kNumSentences>;
-  DeviceVariationIndicesArray device_indices_array;
-  cudaError_t err{};
-  for (int s{}; s < kNumSentences; ++s) {
-    const auto& variation_indices = svi.at(s);
-    const auto num_variations{variation_indices.size()};
-    // clever: n * sizeof(fat_index_t) == 2 * n * sizeof(index_t)
-    const auto device_data_bytes =
-        (util::sum_sizes(variation_indices) + num_variations)
-        * sizeof(fat_index_t);
-    auto& device_indices = device_indices_array.at(s);
-    cuda_malloc_async((void**)&device_indices.device_data, device_data_bytes,
-        stream, "variation_indices");
-    device_indices.num_variations = num_variations;
-    // copy combo indices first, populating offsets and num_combo_indices
-    device_indices.indices = &device_indices.device_data[num_variations];
-    std::vector<index_t> variation_offsets;
-    std::vector<index_t> num_indices;
-    for (size_t offset{}; const auto& fat_idx_list : variation_indices) {
-      variation_offsets.push_back(offset);
-      num_indices.push_back(fat_idx_list.size());
-      const auto indices_bytes = fat_idx_list.size() * sizeof(fat_index_t);
-      err = cudaMemcpyAsync(&device_indices.indices[offset],
-          fat_idx_list.data(), indices_bytes, cudaMemcpyHostToDevice, stream);
-      assert_cuda_success(err, "copy variation indices");
-      offset += fat_idx_list.size();
-      assert(offset < std::numeric_limits<index_t>::max());
-    }
-    // copy variation offsets
-    device_indices.variation_offsets = (index_t*)device_indices.device_data;
-    const auto offsets_bytes = variation_offsets.size() * sizeof(index_t);
-    err = cudaMemcpyAsync(device_indices.variation_offsets,
-        variation_offsets.data(), offsets_bytes, cudaMemcpyHostToDevice,
-        stream);
-    assert_cuda_success(err, "copy variation_offsets");
-    // copy num combo indices
-    device_indices.num_indices_per_variation =
-      &((index_t*)device_indices.device_data)[num_variations];
-    const auto num_indices_bytes = num_indices.size() * sizeof(index_t);
-    err = cudaMemcpyAsync(device_indices.num_indices_per_variation,
-        num_indices.data(), num_indices_bytes, cudaMemcpyHostToDevice, stream);
-    assert_cuda_success(err, "copy num_indices_per_variation");
-  }
-  const auto variation_indices_bytes =
-      kNumSentences * sizeof(device::XorVariationIndices);
-  device::XorVariationIndices* device_variation_indices;
-  cuda_malloc_async((void**)&device_variation_indices, variation_indices_bytes,
-      stream, "variation_indices");
-  err = cudaMemcpyAsync(device_variation_indices, device_indices_array.data(),
-      variation_indices_bytes, cudaMemcpyHostToDevice, stream);
-  assert_cuda_success(err, "copy variation_indices");
-
-  // TODO: be nice to get rid of this
-  // just to be sure, due to lifetime problems of local host-side memory
-  // solution: cram stuff into MFD
-  CudaEvent temp(stream);
-  temp.synchronize();
-  return device_variation_indices;
-}
-
-auto get_variation_lengths(
-    const std::vector<VariationIndexOffset>& vi_offsets) {
-  IndexList lengths;
-  for (index_t idx{1u}; idx < vi_offsets.size(); ++idx) {
-    lengths.push_back(
-        vi_offsets.at(idx).offset - vi_offsets.at(idx - 1).offset);
-  }
-  return lengths;
-}
-
-/*
-[[nodiscard]] auto cuda_alloc_copy_variation_indices(
-    const SentenceOrVariationIndices& host_svi,
-    cudaStream_t stream) -> device::OrVariationIndices* {
-  static_assert(sizeof(VariationIndexOffset) == sizeof(index_t) * 2);
-  using DeviceSentenceOrVariationIndices =
-      std::array<device::OrVariationIndices, kNumSentences>;
-  DeviceSentenceOrVariationIndices device_svi;
-  cudaError_t err{};
-  for (int s{}; s < kNumSentences; ++s) {
-    const auto& host_vi = host_svi.at(s);
-    const auto num_variations{host_vi.index_offsets.size()};
-    auto& device_vi = device_svi.at(s);
-    const auto device_data_bytes =  // TODO: device_vi.calc_size(host_vi)
-        host_vi.indices.size() * sizeof(index_t) +       // indices
-        2 * sizeof(index_t) +                            // num_indices/num_vars
-        num_variations * sizeof(VariationIndexOffset) +  // var_index_offets
-        num_variations * sizeof(index_t);                // num_idx_per_var
-    cuda_malloc_async((void**)&device_vi.device_data, device_data_bytes, stream,
-        "or variation_indices");
-    device_vi.num_variations = num_variations;
-
-    // copy indices first, populating offsets and num_indices
-    // per above static assert: index_t + 2 * index_t = 3 * index_t
-    device_vi.indices = &device_vi.device_data[num_variations * 3];
-    const auto indices_bytes = host_vi.indices.size() * sizeof(index_t);
-    // TODO: questionable destination address
-    err = cudaMemcpyAsync(device_vi.indices, host_vi.indices.data(),
-        indices_bytes, cudaMemcpyHostToDevice, stream);
-    assert_cuda_success(err, "copy or variation indices");
-
-    // copy variation index offsets
-    device_vi.variation_index_offsets =
-        (VariationIndexOffset*)device_vi.device_data;
-    const auto index_offsets_bytes =
-        host_vi.index_offsets.size() * sizeof(VariationIndexOffset);
-    err = cudaMemcpyAsync(device_vi.variation_index_offsets,
-        host_vi.index_offsets.data(), index_offsets_bytes,
-        cudaMemcpyHostToDevice, stream);
-    assert_cuda_success(err, "copy or variation_index_offsets");
-
-    // copy num indices
-    auto lengths = get_variation_lengths(host_vi.index_offsets);
-    device_vi.num_indices_per_variation =
-        &device_vi.device_data[num_variations * 2];
-    const auto num_indices_bytes = lengths.size() * sizeof(index_t);
-    err = cudaMemcpyAsync(device_vi.num_indices_per_variation, lengths.data(),
-        num_indices_bytes, cudaMemcpyHostToDevice, stream);
-    assert_cuda_success(err, "copy or num_indices_per_variation");
-  }
-  const auto vi_bytes = kNumSentences * sizeof(device::OrVariationIndices);
-  device::OrVariationIndices* device_variation_indices;
-  cuda_malloc_async((void**)&device_variation_indices, vi_bytes, stream,  //
-      "or variation_indices");
-  err = cudaMemcpyAsync(device_variation_indices, device_svi.data(), vi_bytes,
-      cudaMemcpyHostToDevice, stream);
-  assert_cuda_success(err, "copy or variation_indices");
-
-  // TODO: be nice to get rid of this
-  // just to be sure, due to lifetime problems of local host-side memory
-  // solution: cram stuff into MFD
-  CudaEvent temp(stream);
-  temp.synchronize();
-  return device_variation_indices;
-}
-*/
-
-void alloc_copy_compat_indices(FilterData::HostOr& host,
-    FilterData::DeviceOr& device, cudaStream_t stream) {
-  assert(!host.compat_indices.empty());
-  const auto indices_bytes = host.compat_indices.size() * sizeof(fat_index_t);
-  cuda_malloc_async((void**)&device.compat_indices, indices_bytes, stream,  //
-      "filter or.compat_indices");
-  auto err = cudaMemcpyAsync(device.compat_indices, host.compat_indices.data(),
-      indices_bytes, cudaMemcpyHostToDevice, stream);
-  assert_cuda_success(err, "copy or.compat_indices");
-  device.num_compat_indices = host.compat_indices.size();
-}
-
-void alloc_copy_unique_variations(FilterData::HostOr& host,
-    FilterData::DeviceOr& device, cudaStream_t stream) {
-  assert(!host.unique_variations.empty());
-  const auto variations_bytes =
-      host.unique_variations.size() * sizeof(UniqueVariations);
-  cuda_malloc_async((void**)&device.unique_variations, variations_bytes, stream,  //
-      "filter or.unique_variations");
-  auto err = cudaMemcpyAsync(device.unique_variations, host.unique_variations.data(),
-      variations_bytes, cudaMemcpyHostToDevice, stream);
-  assert_cuda_success(err, "copy or.unique_variations");
-  device.num_unique_variations = host.unique_variations.size();
-}
-
 void alloc_copy_filter_indices(FilterData& mfd, cudaStream_t stream) {
   // const UsedSources::VariationsList& or_variations_list,
   assert(!mfd.host_xor.compat_indices.empty()); // arbitrary
   util::LogDuration ld("alloc_copy_filter_indices", Verbose);
   alloc_copy_start_indices(mfd.host_xor, mfd.device_xor, stream);
+  alloc_copy_compat_indices(mfd.host_xor, mfd.device_xor, stream);
   auto xor_vi = buildSentenceVariationIndices(mfd.host_xor.src_lists,
       mfd.host_xor.compat_idx_lists, mfd.host_xor.compat_indices);
   mfd.device_xor.variation_indices =
@@ -782,16 +796,10 @@ void alloc_copy_filter_indices(FilterData& mfd, cudaStream_t stream) {
 
   if (!mfd.host_or.compat_indices.empty()) {
     alloc_copy_start_indices(mfd.host_or, mfd.device_or, stream);
-    /*
-    auto or_vi = build_variation_indices(or_variations_list,  //
-        mfd.host_or.compat_indices);
-    mfd.device_or.variation_indices =
-        cuda_alloc_copy_variation_indices(or_vi, stream);
-    */
     alloc_copy_compat_indices(mfd.host_or, mfd.device_or, stream);
     alloc_copy_unique_variations(mfd.host_or, mfd.device_or, stream);
   } else {
-    // TOOD: cuda_free(), assuming we reset_pointers somewhere earlier.
+    // TODO: cuda_free(), assuming we reset_pointers somewhere earlier.
     mfd.device_or.reset_pointers();
   }
 
@@ -802,32 +810,5 @@ void alloc_copy_filter_indices(FilterData& mfd, cudaStream_t stream) {
   mfd.device_xor.unique_variations_indices = nullptr;
   mfd.device_or.src_compat_results = nullptr;
 }
-
-  /*
-void alloc_copy_filter_data(FilterData& mfd,
-    const UsedSources::VariationsList& or_variations_list,
-    cudaStream_t stream) {
-  alloc_copy_filter_indices(mfd, or_variations_list, stream);
-  // this is alloc'd in run_filter_kernel because we need to know block count.
-  mfd.device_or.src_compat_results = nullptr;
-
-  const auto xor_bytes = sizeof(FilterData::DeviceXor::Base);
-  cudaError_t err{};
-  cuda_malloc_async((void**)&mfd.device_xor_data, xor_bytes, stream,  //
-      "filter data");
-  err = cudaMemcpyAsync(mfd.device_xor_data, &mfd.device_xor, xor_bytes,  //
-      cudaMemcpyHostToDevice);
-  assert_cuda_success(err, "copy filter data");
-
-  const auto or_bytes = sizeof(FilterData::DeviceOr);
-  cuda_malloc_async((void**)&mfd.device_or_data, or_bytes, stream,  //
-      "filter data");
-  err = cudaMemcpyAsync(mfd.device_or_data, &mfd.device_or, or_bytes,  //
-      cudaMemcpyHostToDevice);
-  assert_cuda_success(err, "copy filter data");
-  std::cerr << "OR variation indices: " << mfd.device_or.num_variation_indices
-            << std::endl;
-}
-  */
 
 }  // namespace cm

@@ -20,6 +20,8 @@ auto make_start_indices(const std::vector<T>& vecs) {
   return start_indices;
 }
 
+// this is probably a duplicate of the one in filter-support.cpp.
+// it's used by filter-types.h
 [[nodiscard]] inline auto cuda_alloc_copy_start_indices(
     const IndexList& start_indices, cudaStream_t stream,
     std::string_view malloc_tag = "const index/size data") {  // "start_indices"
@@ -34,7 +36,7 @@ auto make_start_indices(const std::vector<T>& vecs) {
   assert_cuda_success(err, "copy start indices");
   return device_indices;
 }
-
+  
 }  // namespace cm
 
 #endif // INCLUDE_MERGE_FILTER_COMMON_H
