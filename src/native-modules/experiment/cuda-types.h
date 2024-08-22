@@ -38,14 +38,21 @@ struct VariationIndexOffset {
 
 namespace device {  // on-device data structures
 
-template <typename T>
-struct VariationIndicesBase {
-  T* device_data;              // one chunk of allocated data; other pointers
+struct VariationIndices {
+  constexpr IndexSpan get_index_span(index_t variation) const {
+    // TODO: ifdef ASSERTS
+    assert(variation < num_variations);
+    return {&indices[variation_offsets[variation]],
+        num_indices_per_variation[variation]};
+  }
+
+  index_t* device_data;        // one chunk of allocated data; other pointers
                                // below point inside this chunk.
-  T* indices;
-  index_t num_indices;         // size of indices array
-  index_t num_variations;      // size of the following two arrays
+  index_t* indices;
   index_t* num_indices_per_variation;
+  index_t* variation_offsets;  // offsets into indices
+  index_t num_indices;         // size of indices array (unused i think)
+  index_t num_variations;      // size of num_indices & variation_offsets arrays
 };
 
 // this was all some attempt at supporting OrVariationIndices, an idea which
@@ -62,7 +69,6 @@ constexpr IndexSpan<index_t> get_index_span(int variation) const {
 
 VariationIndexOffset* variation_index_offsets;
 };
-*/
 
 struct VariationIndices : VariationIndicesBase<index_t> {
   constexpr IndexSpan get_index_span(int variation) const {
@@ -70,10 +76,10 @@ struct VariationIndices : VariationIndicesBase<index_t> {
       num_indices_per_variation[variation]};
   }
 
-  index_t* variation_offsets;  // offsets into indices
 };
+using OrVariationIndices = VariationIndices<index_t>;
+*/
 
-//using OrVariationIndices = VariationIndices<index_t>;
 using XorVariationIndices = VariationIndices;
 
 struct SourceCompatibilityData;

@@ -79,24 +79,27 @@ auto mergeAllCompatibleSources(const NameCountList& ncList) -> SourceList {
   return src_list;
 }
 
-void dumpSentenceVariationIndices(const SentenceXorVariationIndices& svi) {
+void dumpSentenceVariationIndices(const SentenceVariationIndices& svi) {
   uint64_t total_indices{};
   for (int s{}; s < kNumSentences; ++s) {
-    const auto& variationIndicesList = svi.at(s);
-    if (!variationIndicesList.empty()) {
-      const auto num_indices = util::sum_sizes(variationIndicesList);
+    const auto& variation_idx_lists = svi.at(s);
+    if (!variation_idx_lists.empty()) {
+      const auto num_indices = util::sum_sizes(variation_idx_lists);
       if (log_level(ExtraVerbose)) {
         std::cerr << "S" << s + 1 << ": variations("
-                  << variationIndicesList.size() << "), indices(" << num_indices
+                  << variation_idx_lists.size() << "), indices(" << num_indices
                   << ")" << std::endl;
       }
       total_indices += num_indices;
-      if constexpr (0) {
-        for (int v{}; v < (int)variationIndicesList.size(); ++v) {
-          const auto& indices = variationIndicesList.at(v);
-          std::cerr << "  v" << v - 1 << ": indices(" << indices.size() << ")"
+      if constexpr (1) {
+        size_t sum{};
+        for (size_t i{}; i < variation_idx_lists.size(); ++i) {
+          const auto& idx_list = variation_idx_lists.at(i);
+          std::cerr << "  v" << int(i) - 1 << ": indices(" << idx_list.size() << ")"
                     << std::endl;
+          sum += idx_list.size();
         }
+        std::cerr << "  sum(" << sum << ")" << std::endl;
       }
     }
   }
@@ -195,9 +198,10 @@ auto build_src_lists(const std::vector<NCDataList>& nc_data_lists)
 auto buildSentenceVariationIndices(const std::vector<SourceList>& xor_src_lists,
     const std::vector<IndexList>& compat_idx_lists,
     const FatIndexList& compat_indices)
-    -> SentenceXorVariationIndices {
-  SentenceXorVariationIndices svi;
+    -> SentenceVariationIndices {
+  SentenceVariationIndices svi;
   for (size_t idx{}; idx < compat_indices.size(); ++idx) {
+    // = make_array<variation_index_t, kNumSentences>(-1);
     UsedSources::Variations variations = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
     util::for_each_source_index(compat_indices.at(idx), compat_idx_lists,
         [&xor_src_lists, &variations](index_t list_idx, index_t src_idx) {
@@ -209,24 +213,24 @@ auto buildSentenceVariationIndices(const std::vector<SourceList>& xor_src_lists,
           }
         });
     for (int s{}; s < kNumSentences; ++s) {
-      auto& variationIndicesList = svi.at(s);
+      auto& variation_idx_lists = svi.at(s);
       const auto variation_idx = variations.at(s) + 1u;
-      if (variation_idx >= variationIndicesList.size()) {
-        variationIndicesList.resize(variation_idx + 1u);
+      if (variation_idx >= variation_idx_lists.size()) {
+        variation_idx_lists.resize(variation_idx + 1u);
       }
-      variationIndicesList.at(variation_idx).push_back(idx);
+      variation_idx_lists.at(variation_idx).push_back(idx);
     }
   }
   // When the list of xor_sources is very small, there may be no xor_source
   // that contain a primary source from one or more sentences. Destroy the
-  // variationIndicesLists for those sentences with no variations, since they
+  // variation_idx_listss for those sentences with no variations, since they
   // only contain a single element (index 0) representing the "-1" or "no"
   // variation, that contains all indices. It's redundant and unnecessary data.
-  // TODO: for (auto& variationIndicesList : svi) {
+  // TODO: for (auto& variation_idx_lists : svi) {
   std::for_each(svi.begin(),
-    svi.end(), [](auto& variationIndicesList) {
-      if (variationIndicesList.size() == 1) {
-        variationIndicesList.clear();
+    svi.end(), [](auto& variation_idx_lists) {
+      if (variation_idx_lists.size() == 1) {
+        variation_idx_lists.clear();
       }
     });
   dumpSentenceVariationIndices(svi);
@@ -257,6 +261,7 @@ auto get_variation_index_offsets(const IndexList& idx_list,
   return vi_offsets;
 }
 
+  /*
 auto build_OR_variation_indices(
     const UsedSources::VariationsList& variations_list,
     const FatIndexList& compat_indices)
@@ -270,5 +275,6 @@ auto build_OR_variation_indices(
   }
   return all_or_vi;
 }
+  */
 
 }  // namespace cm

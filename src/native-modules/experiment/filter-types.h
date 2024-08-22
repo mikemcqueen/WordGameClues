@@ -31,6 +31,7 @@ using filter_result_t = std::unordered_set<std::string>;
 
 // types
 
+/*
 struct OrVariationIndices {
   IndexList indices;
   std::vector<VariationIndexOffset> index_offsets;
@@ -38,8 +39,9 @@ struct OrVariationIndices {
 
 using SentenceOrVariationIndices =
     std::array<OrVariationIndices, kNumSentences>;
+*/
 
-using SentenceXorVariationIndices =
+using SentenceVariationIndices =
     std::array<std::vector<IndexList>, kNumSentences>;
 
 class IndexStates {

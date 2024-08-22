@@ -283,24 +283,32 @@ __device__ SmallestSpansResult get_smallest_src_index_spans(
   index_t fewest_indices{std::numeric_limits<index_t>::max()};
   int sentence_with_fewest{-1};
   for (int s{}; s < kNumSentences; ++s) {
-    // if there are no xor_sources that contain a primary source from this
+    // if there are no xor sources that contain a primary source from this
     // sentence, skip it. (it would result in num_indices == all_indices which
     // is the worst case).
-    const auto& vi = xor_data.variation_indices[s];
-    if (!vi.num_variations) continue;
+    const auto& xor_vi = xor_data.variation_indices[s];
+    if (!xor_vi.num_variations) continue;
 
-    // if the candidate source has no primary source from this sentence, skip
+    // if the supplied source has no primary source from this sentence, skip
     // it. (same reason as above).
-    const auto variation = source.usedSources.variations[s] + 1;
-    if (!variation) continue;
+    const auto src_variation = source.usedSources.variations[s] + 1;
+    if (!src_variation) continue;
 
-    // sum the xor_src indices that have no variation (index 0), with those
-    // that have the same variation as the candidate source, for this sentence.
+    // sum the xor source indices that have no variation (index 0), with those
+    // that have the same variation as the supplied source, for this sentence.
     // remember the sentence with the smallest sum.
-    const auto num_indices = vi.num_indices_per_variation[0]
-                             + vi.num_indices_per_variation[variation];
-    if (num_indices < fewest_indices) {
-      fewest_indices = num_indices;
+
+    // it's possible the variation of the supplied source is greater than the
+    // number of variations for all xor sources in this sentence.
+    index_t num_xor_indices_with_src_variation{};
+    if (src_variation < xor_vi.num_variations) {
+      num_xor_indices_with_src_variation =
+          xor_vi.num_indices_per_variation[src_variation];
+    }
+    const auto num_xor_indices = xor_vi.num_indices_per_variation[0]
+                                 + num_xor_indices_with_src_variation;
+    if (num_xor_indices < fewest_indices) {
+      fewest_indices = num_xor_indices;
       sentence_with_fewest = s;
       if (!fewest_indices) break;
     }
@@ -318,15 +326,20 @@ __device__ SmallestSpansResult get_smallest_src_index_spans(
     // will all fail due to variation mismatch.
     return {None};
   }
-  const auto variation = source.usedSources.variations[sentence_with_fewest];
-  const auto& vi = xor_data.variation_indices[sentence_with_fewest];
-  return {Some,  //
-      std::make_pair(vi.get_index_span(0), vi.get_index_span(variation + 1))};
+  const auto src_variation =
+      source.usedSources.variations[sentence_with_fewest] + 1;
+  const auto& xor_vi = xor_data.variation_indices[sentence_with_fewest];
+  // check again if the source variation exceeds all xor source variations
+  IndexSpan src_variation_span{};
+  if (src_variation < xor_vi.num_variations) {
+    src_variation_span = xor_vi.get_index_span(src_variation);
+  }
+  return {Some, std::make_pair(xor_vi.get_index_span(0), src_variation_span)};
 }
 
 __device__ bool is_source_compatible(
     const SourceCompatibilityData& source, fat_index_t combo_idx) {
-  #ifdef FORCE_XOR_COMPAT
+#ifdef FORCE_XOR_COMPAT
   return true;
   #endif
 
@@ -340,7 +353,7 @@ __device__ bool is_source_compatible(
     combo_idx /= xor_data.idx_list_sizes[list_idx];
   }
   return true;
-}
+    }
 
 /*
 __device__ void dump_variation(
@@ -386,6 +399,7 @@ __device__ bool get_next_XOR_sources_chunk(
   const auto block_size = blockDim.x;
   const auto num_xor_indices =
       xor_idx_spans.first.size() + xor_idx_spans.second.size();
+  // a __sync will happen in calling function
   xor_results[threadIdx.x] = 0;
   // one thread per xor_flat_idx
   const auto xor_flat_idx = get_flat_idx(xor_chunk_idx);
@@ -477,7 +491,6 @@ template <typename TagT, typename T>
 requires std::is_same_v<TagT, tag::XOR> || std::is_same_v<TagT, tag::OR>
 __device__ auto get_src_compat_results(
     const SourceCompatibilityData& source, T& data) {
-  fat_index_t* debug_idx_ptr = &dynamic_shared[kDebugIdx];
   __shared__ result_t any_compat[kMaxOrArgs];
   if (threadIdx.x < kMaxOrArgs) {
     any_compat[threadIdx.x] = false;
@@ -651,6 +664,51 @@ __device__ bool is_compat_loop(const SourceCompatibilityData& source,
   return false;
 }
 
+__device__ void dump(const device::VariationIndices* dvi_array) {
+  char buf[128];
+  char smolbuf[16];
+  uint64_t total_indices{};
+  for (int s{}; s < kNumSentences; ++s) {
+    const auto& dvi = dvi_array[s];
+    cuda_strcpy(buf, "S");
+    cuda_itoa(s + 1, smolbuf);
+    cuda_strcat(buf, smolbuf);
+    cuda_strcat(buf, ": variations(");
+    cuda_itoa(dvi.num_variations, smolbuf);
+    cuda_strcat(buf, smolbuf);
+    cuda_strcat(buf, "), indices(");
+    cuda_itoa(dvi.num_indices, smolbuf);
+    cuda_strcat(buf, smolbuf);
+    cuda_strcat(buf, ")\n");
+    printf(buf);
+    total_indices += dvi.num_indices;
+    size_t sum{};
+    for (size_t i{0}; i < dvi.num_variations; ++i) {
+      cuda_strcpy(buf, "  v");
+      cuda_itoa(int(i) - 1, smolbuf);
+      cuda_strcat(buf, smolbuf);
+      cuda_strcat(buf, ": indices(");
+      cuda_itoa(dvi.num_indices_per_variation[i], smolbuf);
+      cuda_strcat(buf, smolbuf);
+      cuda_strcat(buf, "), offset: ");
+      cuda_itoa(dvi.variation_offsets[i], smolbuf);
+      cuda_strcat(buf, smolbuf);
+      cuda_strcat(buf, "\n");
+      printf(buf);
+      sum += dvi.num_indices_per_variation[i];
+    }
+    cuda_strcpy(buf, "  sum(");
+    cuda_itoa(sum, smolbuf);
+    cuda_strcat(buf, smolbuf);
+    cuda_strcat(buf, ")\n");
+    printf(buf);
+  }
+}
+
+__device__ void dump(const FilterData::DeviceXor& data) {
+  dump(data.variation_indices);
+}
+
 // explain better:
 // Find sources that are:
 // * XOR compatible with any of the supplied XOR sources, and
@@ -664,9 +722,9 @@ __global__ void filter_kernel(const SourceCompatibilityData* RESTRICT src_list,
     const result_t* RESTRICT compat_src_results, result_t* RESTRICT results,
     int stream_idx) {
   const auto block_size = blockDim.x;
-  fat_index_t* debug_idx_ptr = &dynamic_shared[kDebugIdx];
   __shared__ bool is_compat;
   if (!threadIdx.x) is_compat = false;
+  //if (!threadIdx.x && !blockIdx.x) dump(xor_data);
 
   #if 1 || defined(PRINTF)
   if (!blockIdx.x && !threadIdx.x) {
@@ -777,8 +835,7 @@ void run_filter_kernel(int threads_per_block, StreamData& stream,
     cuda_malloc_async((void**)&mfd.device_or.src_compat_results,
         or_results_bytes, cuda_stream, "or.src_compat_results");
   }
-  // ^- Populate any reamining mfd.device_xx values BEFORE copy_filter_data()
-  // -^
+  // ^- Populate any reamining mfd.device_xx values BEFORE copy_filter_data() -^
   copy_filter_data(mfd);
 
   static bool log_once{true};
@@ -787,7 +844,7 @@ void run_filter_kernel(int threads_per_block, StreamData& stream,
     log_once = false;
   }
 
-  #if defined(DEBUG_XOR_COUNTS) || defined(DEBUG_OR_COUNTS)
+  #if defined(DEBUG_XOR_COUNTS) || defined(DEBUG_OR_COUNTS) || defined(CLOCKS)
   init_counts();
   #endif 
 

@@ -534,61 +534,58 @@ void dump_src_list(const SourceCompatibilityList& src_list) {
   }
 }
 
-
 [[nodiscard]] auto cuda_allocCopySentenceVariationIndices(
-    const SentenceXorVariationIndices& svi,
-    cudaStream_t stream) -> device::XorVariationIndices* {
-  // assumption made throughout
-  static_assert(sizeof(fat_index_t) == sizeof(index_t) * 2);
+    const SentenceVariationIndices& svi,
+    cudaStream_t stream) -> device::VariationIndices* {
   using DeviceVariationIndicesArray =
-      std::array<device::XorVariationIndices, kNumSentences>;
+      std::array<device::VariationIndices, kNumSentences>;
   DeviceVariationIndicesArray device_indices_array;
   cudaError_t err{};
   for (int s{}; s < kNumSentences; ++s) {
     const auto& variation_idx_lists = svi.at(s);
     const auto num_variations{variation_idx_lists.size()};
-    // clever: n * sizeof(fat_index_t) == 2 * n * sizeof(index_t)
+    const auto num_indices{util::sum_sizes(variation_idx_lists)};
     const auto device_data_bytes =
-        ((num_variations * 2)  // num_indices_per_variation, variation offsets
-            + util::sum_sizes(variation_idx_lists))  // the indices
-        * sizeof(index_t);
+        ((num_variations * 2) + num_indices) * sizeof(index_t);
     auto& device_indices = device_indices_array.at(s);
     cuda_malloc_async((void**)&device_indices.device_data, device_data_bytes,
-        stream, "variation_indices");
+        stream, "variation_indices device_data");
+    device_indices.num_indices = num_indices; // probably unused
     device_indices.num_variations = num_variations;
-    // copy combo indices first, populating offsets and num_combo_indices
-    device_indices.indices = &device_indices.device_data[num_variations];
-    std::vector<index_t> variation_offsets;
-    std::vector<index_t> num_indices;
+    // copy combo indices first, populating offsets and num_indices
+    device_indices.indices = &device_indices.device_data[num_variations * 2];
+    IndexList offsets_list;
+    IndexList num_indices_list;
     for (size_t offset{}; const auto& idx_list : variation_idx_lists) {
-      variation_offsets.push_back(offset);
-      num_indices.push_back(idx_list.size());
+      offsets_list.push_back(offset);
+      num_indices_list.push_back(idx_list.size());
       const auto indices_bytes = idx_list.size() * sizeof(index_t);
       err = cudaMemcpyAsync(&device_indices.indices[offset],
           idx_list.data(), indices_bytes, cudaMemcpyHostToDevice, stream);
       assert_cuda_success(err, "copy variation indices");
+      assert(offset + idx_list.size() < std::numeric_limits<index_t>::max());
       offset += idx_list.size();
-      assert(offset < std::numeric_limits<index_t>::max());
     }
-    assert(num_indices.size() == variation_offsets.size());
+    assert(num_indices_list.size() == offsets_list.size());
     // copy variation offsets
-    device_indices.variation_offsets = (index_t*)device_indices.device_data;
-    const auto offsets_bytes = variation_offsets.size() * sizeof(index_t);
+    device_indices.variation_offsets = device_indices.device_data;
+    const auto offsets_bytes = offsets_list.size() * sizeof(index_t);
     err = cudaMemcpyAsync(device_indices.variation_offsets,
-        variation_offsets.data(), offsets_bytes, cudaMemcpyHostToDevice,
+        offsets_list.data(), offsets_bytes, cudaMemcpyHostToDevice,
         stream);
     assert_cuda_success(err, "copy variation_offsets");
     // copy num combo indices
     device_indices.num_indices_per_variation =
-      &((index_t*)device_indices.device_data)[num_variations];
-    const auto num_indices_bytes = num_indices.size() * sizeof(index_t);
+        &device_indices.device_data[num_variations];
+    const auto num_indices_bytes = num_indices_list.size() * sizeof(index_t);
     err = cudaMemcpyAsync(device_indices.num_indices_per_variation,
-        num_indices.data(), num_indices_bytes, cudaMemcpyHostToDevice, stream);
+        num_indices_list.data(), num_indices_bytes, cudaMemcpyHostToDevice,
+        stream);
     assert_cuda_success(err, "copy num_indices_per_variation");
   }
   const auto variation_indices_bytes =
-      kNumSentences * sizeof(device::XorVariationIndices);
-  device::XorVariationIndices* device_variation_indices;
+      kNumSentences * sizeof(device::VariationIndices);
+  device::VariationIndices* device_variation_indices;
   cuda_malloc_async((void**)&device_variation_indices, variation_indices_bytes,
       stream, "variation_indices");
   err = cudaMemcpyAsync(device_variation_indices, device_indices_array.data(),
