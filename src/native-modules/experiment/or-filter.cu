@@ -267,8 +267,6 @@ __device__ __forceinline__ auto next_xor_result_idx(index_t result_idx) {
 __device__ bool is_any_OR_source_compatible(
     const SourceCompatibilityData& source, index_t xor_chunk_idx,
     const IndexSpanPair& xor_idx_spans) {
-  result_t* or_start_uv_idx = &dynamic_shared[kOrStartUvIdx];
-  result_t* or_start_src_idx = &dynamic_shared[kOrStartSrcIdx];
   result_t* xor_results = (result_t*)&dynamic_shared[kXorResults];
   __shared__ bool any_or_compat;
   if (!threadIdx.x) any_or_compat = false;
