@@ -91,7 +91,7 @@ void dumpSentenceVariationIndices(const SentenceVariationIndices& svi) {
                   << ")" << std::endl;
       }
       total_indices += num_indices;
-      if constexpr (1) {
+      if (log_level(Ludicrous)) {
         size_t sum{};
         for (size_t i{}; i < variation_idx_lists.size(); ++i) {
           const auto& idx_list = variation_idx_lists.at(i);

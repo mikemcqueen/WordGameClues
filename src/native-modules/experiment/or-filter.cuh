@@ -19,20 +19,26 @@ namespace cm {
 
 class SourceCompatibilityData;
 
-inline constexpr auto kSharedIndexCount = 2;
-inline constexpr auto kSharedIndexSize = 8;  // in bytes
+using shared_index_t = index_t;
+
+inline constexpr auto kSharedIndexSize = sizeof(shared_index_t);  // in bytes
 
 inline constexpr auto kXorChunkIdx = 0;
-inline constexpr auto kDebugIdx = 1;
+inline constexpr auto kOrStartUvIdx = 1;
+inline constexpr auto kOrStartSrcIdx = 2;
+inline constexpr auto kDebugIdx = 3;
+inline constexpr auto kSharedIndexCount = 4;
 
 // num source sentences (uint8_t) starts at end of indices
-inline constexpr auto kNumSrcSentences = 2;
-// source sentence data (unit8_t) follows for 9 more bytes
+inline constexpr auto kNumSrcSentences = kSharedIndexCount;
+inline constexpr auto kNumSentenceDataBytes = 12;
+// source sentence data (unit8_t) follows for 9 more bytes, round to 12 total
 
-// xor_results (result_t) starts after of sentence data, rounded to 8 bytes
-inline constexpr auto kXorResults = 4;  // 2 + 16/2
+// xor_results (result_t) starts after of sentence data
+inline constexpr auto kXorResults =
+    kNumSrcSentences + (kNumSentenceDataBytes / kSharedIndexSize);
 
-extern __shared__ fat_index_t dynamic_shared[];
+extern __shared__ index_t dynamic_shared[];
 
 namespace tag {
 
@@ -208,7 +214,7 @@ __device__ auto build_variations(fat_index_t combo_idx, const T& data) {
 }
 
 __device__ bool is_any_OR_source_compatible(
-    const SourceCompatibilityData& source, unsigned xor_chunk_idx,
+    const SourceCompatibilityData& source, index_t xor_chunk_idx,
     const IndexSpanPair& xor_idx_spans);
 
 }  // namespace cm

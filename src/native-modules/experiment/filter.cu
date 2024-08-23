@@ -450,7 +450,7 @@ __device__ bool get_next_compatible_XOR_sources(
   const auto block_size = blockDim.x;
   const auto num_xor_indices =
       xor_idx_spans.first.size() + xor_idx_spans.second.size();
-  fat_index_t* xor_chunk_idx_ptr = &dynamic_shared[kXorChunkIdx];
+  index_t* xor_chunk_idx_ptr = &dynamic_shared[kXorChunkIdx];
   __shared__ bool any_xor_compat;
   if (!threadIdx.x) any_xor_compat = false;
   __syncthreads();
@@ -597,7 +597,7 @@ __device__ auto init_source(const SourceCompatibilityData& source) {
 __device__ bool is_compat_loop(const SourceCompatibilityData& source,
     const IndexSpanPair& xor_idx_spans) {
   const auto block_size = blockDim.x;
-  fat_index_t* xor_chunk_idx_ptr = &dynamic_shared[kXorChunkIdx];
+  index_t* xor_chunk_idx_ptr = &dynamic_shared[kXorChunkIdx];
   __shared__ bool any_xor_compat;
   __shared__ bool any_or_compat;
   __shared__ bool src_init_done; 
@@ -810,10 +810,11 @@ void run_filter_kernel(int threads_per_block, StreamData& stream,
   const auto grid_size = num_sm * blocks_per_sm;  // aka blocks per grid
 
   // results could probably be moved to global
-  const auto shared_bytes = kSharedIndexCount * sizeof(fat_index_t)  // indices
-                            + 16 * sizeof(uint8_t)  // src_sentence data
-                            + block_size * sizeof(result_t);  // xor_results
-
+  const auto shared_bytes =
+      kSharedIndexCount * sizeof(shared_index_t)  // indices
+      + kNumSentenceDataBytes * sizeof(uint8_t)   // src_sentence data
+      + block_size * sizeof(result_t)             // xor_results
+      + 32 * sizeof(index_t);                     // OR index producer buffer
   const auto cuda_stream = cudaStreamPerThread;
   // v- Populate any remaining mfd.device_xx values BEFORE copy_filter_data() -v
   if (!mfd.device_xor.variations_compat_results) {

@@ -138,7 +138,7 @@ __device__ __forceinline__ auto get_OR_compat_idx_linear_indices(
 }
 
 // V3 (fastest) binary search of xor_data.unique_variations_indices
-__device__ auto get_OR_compat_idx(
+__device__ auto get_OR_compat_idx_binary_search_uv(
     index_t chunk_idx, index_t num_uv_indices) {
   const auto desired_idx = chunk_idx * blockDim.x + threadIdx.x;
   auto begin_uvi_idx = blockIdx.x * or_data.num_unique_variations;
@@ -172,15 +172,12 @@ __device__ auto get_OR_sources_chunk(const SourceCompatibilityData& source,
     index_t num_uv_indices) {
   // one thread per compat_idx
   auto begin = clock64();
-  //const auto or_compat_idx = get_OR_compat_idx_linear_results(or_chunk_idx);
-  //const auto or_compat_idx = get_OR_compat_idx_linear_indices(or_chunk_idx, num_uv_indices);
-  const auto or_compat_idx = get_OR_compat_idx(or_chunk_idx, num_uv_indices);
+  const auto or_compat_idx = get_OR_compat_idx_binary_search_uv(or_chunk_idx, num_uv_indices);
 
   #ifdef CLOCKS
   atomicAdd(&or_get_compat_idx_clocks, clock64() - begin);
   #endif
 
-  //  __syncwarp(); // doesn't help
   if (or_compat_idx >= or_data.num_compat_indices) return false;
 
   #ifdef DEBUG_OR_COUNTS
@@ -270,6 +267,8 @@ __device__ __forceinline__ auto next_xor_result_idx(index_t result_idx) {
 __device__ bool is_any_OR_source_compatible(
     const SourceCompatibilityData& source, index_t xor_chunk_idx,
     const IndexSpanPair& xor_idx_spans) {
+  result_t* or_start_uv_idx = &dynamic_shared[kOrStartUvIdx];
+  result_t* or_start_src_idx = &dynamic_shared[kOrStartSrcIdx];
   result_t* xor_results = (result_t*)&dynamic_shared[kXorResults];
   __shared__ bool any_or_compat;
   if (!threadIdx.x) any_or_compat = false;

@@ -134,7 +134,7 @@ struct FilterData {
     }
 
     UsedSources::SourceDescriptorPair* incompat_src_desc_pairs;
-    device::VariationIndices<fat_index_t>* variation_indices;
+    device::VariationIndices* variation_indices;
     // flag array (0/1) of compatible entries or_data.unique_variations
     result_t* variations_compat_results;
     // exclusive_scan results
