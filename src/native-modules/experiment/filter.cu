@@ -911,7 +911,7 @@ void run_filter_kernel(int threads_per_block, StreamData& stream,
       kSharedIndexCount * sizeof(shared_index_t)  // indices
       + kNumSentenceDataBytes * sizeof(uint8_t)   // src_sentence data
       + block_size * sizeof(result_t)             // xor_results
-      + 32 * sizeof(index_t);                     // OR index producer buffer
+      + block_size * sizeof(index_t);             // OR index producer buffer
   const auto cuda_stream = cudaStreamPerThread;
   // v- Populate any remaining mfd.device_xx values BEFORE copy_filter_data() -v
   if (!mfd.device_xor.variations_compat_results) {
