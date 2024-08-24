@@ -26,7 +26,12 @@ __device__ atomic64_t init_src_clocks = 0;
 __device__ atomic64_t is_any_or_compat_clocks = 0;
 __device__ atomic64_t or_init_compat_variations_clocks = 0;
 __device__ atomic64_t or_get_compat_idx_clocks = 0;
+__device__ atomic64_t or_build_variation_clocks = 0;
+__device__ atomic64_t or_are_variations_compat_clocks = 0;
+__device__ atomic64_t or_check_src_compat_clocks = 0;
+__device__ atomic64_t or_is_src_compat_clocks = 0;
 
+__device__ atomic64_t count_or_get_compat_idx = 0;
 __device__ atomic64_t count_or_src_considered = 0;
 __device__ atomic64_t count_or_src_variation_compat = 0;
 __device__ atomic64_t count_or_check_src_compat = 0;
@@ -62,6 +67,21 @@ void init_counts() {
 
   err = cudaMemcpyToSymbol(or_get_compat_idx_clocks, &value, sizeof(atomic64_t));
   assert_cuda_success(err, "init count");
+
+  err =
+      cudaMemcpyToSymbol(or_build_variation_clocks, &value, sizeof(atomic64_t));
+  assert_cuda_success(err, "init count");
+
+  err = cudaMemcpyToSymbol(
+      or_are_variations_compat_clocks, &value, sizeof(atomic64_t));
+  assert_cuda_success(err, "init count");
+
+  err = cudaMemcpyToSymbol(
+      or_check_src_compat_clocks, &value, sizeof(atomic64_t));
+  assert_cuda_success(err, "init count");
+
+  err = cudaMemcpyToSymbol(or_is_src_compat_clocks, &value, sizeof(atomic64_t));
+  assert_cuda_success(err, "init count");
 #endif
 
 #ifdef DEBUG_XOR_COUNTS
@@ -80,6 +100,9 @@ void init_counts() {
 #endif
 
 #ifdef DEBUG_OR_COUNTS
+  err = cudaMemcpyToSymbol(count_or_get_compat_idx, &value, sizeof(atomic64_t));
+  assert_cuda_success(err, "init count");
+
   err = cudaMemcpyToSymbol(count_or_src_considered, &value, sizeof(atomic64_t));
   assert_cuda_success(err, "init count");
 
@@ -104,6 +127,10 @@ void display_counts() {
   atomic64_t l_is_any_or_compat_clocks;   
   atomic64_t init_or_compat_variations_clocks;
   atomic64_t get_or_compat_idx_clocks;
+  atomic64_t l_or_build_variation_clocks;
+  atomic64_t l_or_are_variations_compat_clocks;
+  atomic64_t l_or_check_src_compat_clocks;
+  atomic64_t l_or_is_src_compat_clocks;
 
   err = cudaMemcpyFromSymbol(&l_get_next_xor_compat_clocks,
       get_next_xor_compat_clocks, sizeof(atomic64_t));
@@ -123,6 +150,22 @@ void display_counts() {
 
   err = cudaMemcpyFromSymbol(
       &get_or_compat_idx_clocks, or_get_compat_idx_clocks, sizeof(atomic64_t));
+  assert_cuda_success(err, "display count");
+
+  err = cudaMemcpyFromSymbol(
+      &l_or_build_variation_clocks, or_build_variation_clocks, sizeof(atomic64_t));
+  assert_cuda_success(err, "display count");
+
+  err = cudaMemcpyFromSymbol(&l_or_are_variations_compat_clocks,
+      or_are_variations_compat_clocks, sizeof(atomic64_t));
+  assert_cuda_success(err, "display count");
+
+  err = cudaMemcpyFromSymbol(&l_or_check_src_compat_clocks,
+      or_check_src_compat_clocks, sizeof(atomic64_t));
+  assert_cuda_success(err, "display count");
+
+  err = cudaMemcpyFromSymbol(
+      &l_or_is_src_compat_clocks, or_is_src_compat_clocks, sizeof(atomic64_t));
   assert_cuda_success(err, "display count");
 #endif
   
@@ -150,10 +193,15 @@ void display_counts() {
 #endif
 
 #ifdef DEBUG_OR_COUNTS
+  atomic64_t get_or_compat_idx_count;
   atomic64_t considered_or_count;
   atomic64_t compat_or_src_variation_count;
   atomic64_t compat_or_check_src_count;
   atomic64_t compat_or_count;
+
+  err = cudaMemcpyFromSymbol(
+      &get_or_compat_idx_count, count_or_get_compat_idx, sizeof(atomic64_t));
+  assert_cuda_success(err, "display count");
 
   err = cudaMemcpyFromSymbol(
       &considered_or_count, count_or_src_considered, sizeof(atomic64_t));
@@ -183,22 +231,65 @@ void display_counts() {
       << std::endl
       << " init_or_compat_var clocks: " << init_or_compat_variations_clocks
       << std::endl
-      << " get_or_compat_idx clocks: " << get_or_compat_idx_clocks  //
+#endif
+
+#if defined(DEBUG_OR_COUNTS) || defined(CLOCKS)
+      << " get_or_compat_idx"
+#ifdef DEBUG_OR_COUNTS
+      << " count: " << get_or_compat_idx_count
+#endif
+#ifdef CLOCKS
+      << " clocks: " << get_or_compat_idx_clocks
+#endif
       << std::endl
 #endif
+
 #ifdef DEBUG_XOR_COUNTS
       << " xor_considered: " << considered_xor_count
-      //<< " xor_src_variation_compat: " << compat_xor_src_variation_count
-      //<< std::endl
-      //<< " xor_check_src_compat: " << compat_xor_check_src_count
       << " xor_compat: " << compat_xor_count << std::endl
 #endif
+
 #ifdef DEBUG_OR_COUNTS
-      << " or_considered: " << considered_or_count
-      << " or_src_var_compat: " << compat_or_src_variation_count  //
+      << " or_considered: " << considered_or_count << std::endl
+#endif
+
+#ifdef CLOCKS
+      << " build_variation clocks: " << l_or_build_variation_clocks  //
       << std::endl
-      << " or_check_src_compat: " << compat_or_check_src_count
-      << " or_compat: " << compat_or_count
+#endif
+
+#if defined(DEBUG_OR_COUNTS) || defined(CLOCKS)
+      << " or_src_var_compat"
+#ifdef DEBUG_OR_COUNTS
+      << " count: " << compat_or_src_variation_count
+#endif
+#ifdef CLOCKS
+      << " clocks: " << l_or_are_variations_compat_clocks
+#endif
+      << std::endl
+#endif
+
+
+#if defined(DEBUG_OR_COUNTS) || defined(CLOCKS)
+      << " or_check_src_compat"
+#ifdef DEBUG_OR_COUNTS
+      << " count: " << compat_or_check_src_count
+#endif
+#ifdef CLOCKS
+      << " clocks: " << l_or_check_src_compat_clocks
+#endif
+      << std::endl
+#endif
+
+
+#if defined(DEBUG_OR_COUNTS) || defined(CLOCKS)
+      << " or_is_compat"
+#ifdef DEBUG_OR_COUNTS
+      << " count: " << compat_or_count
+#endif
+#ifdef CLOCKS
+      << " clocks: " << l_or_is_src_compat_clocks
+#endif
 #endif
       << std::endl;
 }
@@ -745,6 +836,9 @@ __global__ void filter_kernel(const SourceCompatibilityData* RESTRICT src_list,
     const auto& source = src_list[flat_idx];
     auto spans_result = get_smallest_src_index_spans(source);
 
+    dynamic_shared[kSrcFlatIdx] = src_idx.listIndex;
+    if (!blockIdx.x && (src_idx.listIndex == 5497)) printf("begin: %u\n", flat_idx);
+
     #ifdef PRINTF
     if (!threadIdx.x && (idx == num_sources - 1)) {
       auto num_indices =
@@ -764,6 +858,9 @@ __global__ void filter_kernel(const SourceCompatibilityData* RESTRICT src_list,
       is_compat = true;
     }
     __syncthreads();
+
+    if (!blockIdx.x && (src_idx.listIndex == 5497)) printf("end: %u\n", flat_idx);
+
     if (is_compat && !threadIdx.x) {
 
       #ifdef PRINTF

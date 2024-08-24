@@ -25,7 +25,7 @@ inline constexpr auto kSharedIndexSize = sizeof(shared_index_t);  // in bytes
 
 inline constexpr auto kXorChunkIdx = 0;
 inline constexpr auto kOrStartUvIdx = 1;
-inline constexpr auto kOrStartSrcIdx = 2;
+inline constexpr auto kSrcFlatIdx = 2;
 inline constexpr auto kDebugIdx = 3;
 inline constexpr auto kSharedIndexCount = 4;
 

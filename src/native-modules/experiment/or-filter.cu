@@ -24,7 +24,12 @@ extern __constant__ FilterData::DeviceOr or_data;
 #ifdef DEBUG_OR_COUNTS
 extern __device__ atomic64_t or_init_compat_variations_clocks;
 extern __device__ atomic64_t or_get_compat_idx_clocks;
+extern __device__ atomic64_t or_build_variation_clocks;
+extern __device__ atomic64_t or_are_variations_compat_clocks;
+extern __device__ atomic64_t or_check_src_compat_clocks;
+extern __device__ atomic64_t or_is_src_compat_clocks;
 
+extern __device__ atomic64_t count_or_get_compat_idx;
 extern __device__ atomic64_t count_or_src_considered;
 extern __device__ atomic64_t count_or_src_variation_compat;
 extern __device__ atomic64_t count_or_check_src_compat;
@@ -137,7 +142,7 @@ __device__ __forceinline__ auto get_OR_compat_idx_linear_indices(
   return or_data.num_compat_indices;
 }
 
-// V3 (fastest) binary search of xor_data.unique_variations_indices
+// V3 (even faster) binary search of xor_data.unique_variations_indices
 __device__ auto get_OR_compat_idx_binary_search_uv(
     index_t chunk_idx, index_t num_uv_indices) {
   const auto desired_idx = chunk_idx * blockDim.x + threadIdx.x;
@@ -163,16 +168,95 @@ __device__ auto get_OR_compat_idx_binary_search_uv(
   return or_data.num_compat_indices;
 }
 
+__device__ __forceinline__ fat_index_t pack(index_t hi, index_t lo) {
+  return (fat_index_t{hi} << 32) | lo;
+}
+
+__device__ __forceinline__ index_t loword(fat_index_t idx) {
+  return index_t(idx & 0xffffffff);
+}
+
+__device__ __forceinline__ index_t hiword(fat_index_t idx) {
+  return index_t(idx >> 32);
+}
+
+// V3 (fastest) incremental indexing of xor_data.unique_variations_indices
+__device__ fat_index_t get_OR_compat_idx_incremental_uv(
+    index_t chunk_idx, index_t num_uv_indices) {
+  assert(num_uv_indices > 0);
+  const auto desired_idx = chunk_idx * blockDim.x + threadIdx.x;
+  const auto first_uvi_idx = blockIdx.x * or_data.num_unique_variations;
+  const auto last_uv_idx =
+      xor_data.unique_variations_indices[first_uvi_idx + num_uv_indices - 1];
+  const auto& last_uv = or_data.unique_variations[last_uv_idx];
+  if (desired_idx < last_uv.start_idx + last_uv.num_indices) {
+
+#if 0
+    if ((dynamic_shared[kSrcFlatIdx] == 5497)
+        && (threadIdx.x == blockDim.x - 1)) {
+      printf("chunk: %u, starting uvi_idx: %u, num_uvi %u, num_uv: %u, "
+             "desired_idx: %u, num_idx: %u\n",
+          chunk_idx, dynamic_shared[kOrStartUvIdx], num_uv_indices,
+          or_data.num_unique_variations, desired_idx,
+          or_data.num_compat_indices);
+    }
+#endif
+
+    auto uvi_idx = dynamic_shared[kOrStartUvIdx];
+    for (; uvi_idx < num_uv_indices; ++uvi_idx) {
+      const auto uv_idx =
+          xor_data.unique_variations_indices[first_uvi_idx + uvi_idx];
+      const auto& uv = or_data.unique_variations[uv_idx];
+      if (desired_idx < uv.start_idx) break;
+      if (desired_idx < uv.start_idx + uv.num_indices) {
+        return pack(uvi_idx,
+            uv.first_compat_idx + (desired_idx - uv.start_idx));
+      }
+    }
+    return pack(uvi_idx, or_data.num_compat_indices);
+  }
+  return pack(num_uv_indices, or_data.num_compat_indices);
+}
+
 // Get a block-sized chunk of OR sources and test them for variation-
-// compatibililty with the XOR source specified by the supplied
+// compatibililty with all of the XOR sources identified by the supplied
 // xor_combo_index, and for OR-compatibility with the supplied source.
 // Return true if at least one OR source is compatible.
 __device__ auto get_OR_sources_chunk(const SourceCompatibilityData& source,
     index_t or_chunk_idx, const UsedSources::Variations& xor_variations,
     index_t num_uv_indices) {
+  auto& start_idx = dynamic_shared[kOrStartUvIdx];
+
+  #ifdef DEBUG_OR_COUNTS
+  atomicAdd(&count_or_get_compat_idx, 1);
+  #endif
+
   // one thread per compat_idx
   auto begin = clock64();
-  const auto or_compat_idx = get_OR_compat_idx_binary_search_uv(or_chunk_idx, num_uv_indices);
+#if 0
+  const auto or_compat_idx =
+      get_OR_compat_idx_binary_search_uv(or_chunk_idx, num_uv_indices);
+#else
+  const auto idx_pair =
+      get_OR_compat_idx_incremental_uv(or_chunk_idx, num_uv_indices);
+  __syncthreads();
+
+  // SLOWWWWW for some reason
+  if (threadIdx.x == blockDim.x - 1) {
+    start_idx = hiword(idx_pair);
+  }
+
+#if 0
+  if (dynamic_shared[kSrcFlatIdx] == 5497) {
+    if (!threadIdx.x || (threadIdx.x == blockDim.x - 1)) {
+      printf("tid %u:, chunk: %u, ending uvi_idx: %u\n", threadIdx.x,
+             or_chunk_idx, hiword(idx_pair));
+    }
+  }
+#endif
+
+  const auto or_compat_idx = loword(idx_pair);
+#endif
 
   #ifdef CLOCKS
   atomicAdd(&or_get_compat_idx_clocks, clock64() - begin);
@@ -184,31 +268,58 @@ __device__ auto get_OR_sources_chunk(const SourceCompatibilityData& source,
   atomicAdd(&count_or_src_considered, 1);
   #endif
 
+  begin = clock64();
   const auto or_combo_idx = or_data.compat_indices[or_compat_idx];
   const auto or_variations = build_variations(or_combo_idx, or_data);
+
+  #ifdef CLOCKS
+  atomicAdd(&or_build_variation_clocks, clock64() - begin);
+  #endif
+
   // TODO: can't i use kNumSrcSentences here?
   // current way: build unpacks combo_idx, iterating sentences via merge,
-  //              then iterate over sentences once more
-  // alt1 way: unpack or_combo_idx, iterating NumSentences at each source,
-  //           possible short circuit,no final iteration <<-- fastest
+  //  then iterate over sentences once more to compare
+  // alt1 way: unpack or_combo_idx, iterating NumSentences while comparing
+  //  at each source, possible short circuit, no final iteration <<-- fastest
   // alt2 way: build unpacks as above, final iteration = kNumSentences
+
+  begin = clock64();
   auto or_avc = UsedSources::are_variations_compatible(
       source.usedSources.variations, or_variations);
+
+  #ifdef CLOCKS
+  atomicAdd(&or_are_variations_compat_clocks, clock64() - begin);
+  #endif
+
   if (!or_avc) return false;
 
   #ifdef DEBUG_OR_COUNTS
   atomicAdd(&count_or_src_variation_compat, 1);
   #endif
 
-  auto ccr = check_src_compat_results(or_combo_idx, or_data);
-  if (!ccr) return false;
-  
+  begin = clock64();
+  auto cscr = check_src_compat_results(or_combo_idx, or_data);
+
+  #ifdef CLOCKS
+  atomicAdd(&or_check_src_compat_clocks, clock64() - begin);
+  #endif
+
+  if (!cscr) return false;
+
   #ifdef DEBUG_OR_COUNTS
   atomicAdd(&count_or_check_src_compat, 1);
   #endif
 
-  if (!is_source_compatible_with_all<tag::OR>(source, or_combo_idx, or_data))
-    return false;
+  begin = clock64();
+  auto isc =
+      is_source_compatible_with_all<tag::OR>(source, or_combo_idx, or_data);
+
+
+  #ifdef CLOCKS
+  atomicAdd(&or_is_src_compat_clocks, clock64() - begin);
+  #endif
+
+  if (!isc) return false;
 
   #ifdef DEBUG_OR_COUNTS
   atomicAdd(&count_or_src_compat, 1);
@@ -228,7 +339,10 @@ __device__ auto is_any_OR_source_compatible(
   __shared__ bool any_or_compat;
   __shared__ UsedSources::Variations xor_variations;
   if (threadIdx.x < xor_variations.size()) {
-    if (!threadIdx.x) any_or_compat = false;
+    if (!threadIdx.x) {
+      dynamic_shared[kOrStartUvIdx] = 0;
+      any_or_compat = false;
+    }
     xor_variations[threadIdx.x] = get_one_variation(threadIdx.x, xor_combo_idx);
   }
   __syncthreads();
@@ -245,6 +359,7 @@ __device__ auto is_any_OR_source_compatible(
     // Or compatibility here is "success" for the supplied source and will
     // result in an exit out of is_compat_loop.
     if (any_or_compat) return true;
+    if (dynamic_shared[kOrStartUvIdx] == num_uv_indices) return false;
   }
   // No OR sources were compatible with both the supplied xor_combo_idx and
   // the supplied source. The next call to this function will be with a new
