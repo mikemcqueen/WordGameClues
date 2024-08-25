@@ -6,6 +6,8 @@
 namespace cm {
 
 #if 1
+  //#define LOGGY
+
 #define CLOCKS
 #define DEBUG_OR_COUNTS
 #define DEBUG_XOR_COUNTS
