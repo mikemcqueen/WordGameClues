@@ -187,38 +187,52 @@ __device__ __forceinline__ index_t hiword(fat_index_t idx) {
 __device__ fat_index_t get_OR_compat_idx_incremental_uv(
     index_t chunk_idx, index_t num_uv_indices) {
   assert(num_uv_indices > 0);
-  const auto desired_idx = chunk_idx * blockDim.x + threadIdx.x;
+  auto desired_idx = chunk_idx * blockDim.x + threadIdx.x;
   const auto first_uvi_idx = blockIdx.x * or_data.num_unique_variations;
-  const auto last_uv_idx =
-      xor_data.unique_variations_indices[first_uvi_idx + num_uv_indices - 1];
-  const auto& last_uv = or_data.unique_variations[last_uv_idx];
-  if (desired_idx < last_uv.start_idx + last_uv.num_indices) {
+  // there may be some optimization possible here if we are *in* the last
+  // uv_idx already.
+  //  const auto last_uv_idx =
+  //      xor_data.unique_variations_indices[first_uvi_idx + num_uv_indices - 1];
+  //  const auto& last_uv = or_data.unique_variations[last_uv_idx];
+  //  if (desired_idx < last_uv.start_idx + last_uv.num_indices) {
 
-#if 0
-    if ((dynamic_shared[kSrcFlatIdx] == 5497)
-               && (threadIdx.x == blockDim.x - 1)) {
-      printf("chunk: %u, starting uvi_idx: %u, num_uvi %u, num_uv: %u, "
-             "desired_idx: %u, num_idx: %u\n",
-          chunk_idx, dynamic_shared[kOrStartUvIdx], num_uv_indices,
-          or_data.num_unique_variations, desired_idx,
-          or_data.num_compat_indices);
+  const UniqueVariations* uv{};
+  auto uvi_idx = dynamic_shared[kOrStartUvIdx];
+  auto start_idx = dynamic_shared[kOrStartSrcIdx];
+  for (; uvi_idx < num_uv_indices; ++uvi_idx) {
+    const auto uv_idx =
+        xor_data.unique_variations_indices[first_uvi_idx + uvi_idx];
+    uv = &or_data.unique_variations[uv_idx];
+    if (desired_idx < (uv->num_indices - start_idx)) {
+      //src_idx = uv.first_compat_idx + start_idx + desired_idx;
+      //uv_num_indices = uv.num_indices;
+      break;
     }
-#endif
-
-    auto uvi_idx = dynamic_shared[kOrStartUvIdx];
-    for (; uvi_idx < num_uv_indices; ++uvi_idx) {
-      const auto uv_idx =
-          xor_data.unique_variations_indices[first_uvi_idx + uvi_idx];
-      const auto& uv = or_data.unique_variations[uv_idx];
-      if (desired_idx < uv.start_idx) break;
-      if (desired_idx < uv.start_idx + uv.num_indices) {
-        return pack(uvi_idx,
-            uv.first_compat_idx + (desired_idx - uv.start_idx));
+    desired_idx -= (uv->num_indices - start_idx);
+    start_idx = 0;
+  }
+  __syncthreads();
+  auto result =
+      (uvi_idx < num_uv_indices)
+          ? pack(uvi_idx, uv->first_compat_idx + start_idx + desired_idx)
+          : pack(uvi_idx, or_data.num_compat_indices);
+  if (threadIdx.x == blockDim.x - 1) {
+    if (uvi_idx < num_uv_indices) {
+      start_idx += desired_idx + 1;
+      if (start_idx == uv->num_indices) {
+        uvi_idx++;
+        start_idx = 0;
       }
     }
-    return pack(uvi_idx, or_data.num_compat_indices);
+    // technically unnecessary, just keeps the data clean & consistent
+    // for purposes of debugging a complex implementation
+    if (uvi_idx == num_uv_indices) {
+      start_idx = or_data.num_compat_indices;
+    }
+    dynamic_shared[kOrStartUvIdx] = uvi_idx;
+    dynamic_shared[kOrStartSrcIdx] = start_idx;
   }
-  return pack(num_uv_indices, or_data.num_compat_indices);
+  return result;
 }
 
 
@@ -236,33 +250,19 @@ __device__ auto get_OR_sources_chunk(const SourceCompatibilityData& source,
 
   auto begin = clock64();
   // one thread per compat_idx
-  //const auto or_compat_idx =
-  //    get_OR_compat_idx_binary_search_uv(or_chunk_idx, num_uv_indices);
-  const auto idx_pair =
-      get_OR_compat_idx_incremental_uv(or_chunk_idx, num_uv_indices);
-  __syncthreads();
-
-  // SLOWWWWW for some reason
-  if (threadIdx.x == blockDim.x - 1) {
-    dynamic_shared[kOrStartUvIdx] = hiword(idx_pair);
-  }
-
-#if 0
-  if (dynamic_shared[kSrcFlatIdx] == 5497) {
-    if (!threadIdx.x || (threadIdx.x == blockDim.x - 1)) {
-      printf("tid %u:, chunk: %u, ending uvi_idx: %u\n", threadIdx.x,
-             or_chunk_idx, hiword(idx_pair));
-    }
-  }
-#endif
-
-  const auto or_compat_idx = loword(idx_pair);
+  //const auto or_compat_idx = get_OR_compat_idx_binary_search_uv(or_chunk_idx, num_uv_indices);
+  const auto packed_idx = get_OR_compat_idx_incremental_uv(or_chunk_idx, num_uv_indices);
+  const auto or_compat_idx = loword(packed_idx);
 
   #ifdef CLOCKS
   atomicAdd(&or_get_compat_idx_clocks, clock64() - begin);
   #endif
 
   if (or_compat_idx >= or_data.num_compat_indices) return false;
+
+#ifdef LOGGY
+  printf("%u\n", /*  dynamic_shared[kSrcFlatIdx]*/ or_compat_idx);
+#endif
 
   #ifdef DEBUG_OR_COUNTS
   atomicAdd(&count_or_src_considered, 1);
@@ -341,6 +341,7 @@ __device__ auto is_any_OR_source_compatible_old(
   if (threadIdx.x < xor_variations.size()) {
     if (!threadIdx.x) {
       dynamic_shared[kOrStartUvIdx] = 0;
+      dynamic_shared[kOrStartSrcIdx] = 0;
       any_or_compat = false;
     }
     xor_variations[threadIdx.x] = get_one_variation(threadIdx.x, xor_combo_idx);
@@ -348,10 +349,6 @@ __device__ auto is_any_OR_source_compatible_old(
   __syncthreads();
   index_t num_uv_indices{};
   if (!init_compat_variations(xor_variations, &num_uv_indices)) return false;
-
-  auto tile =
-      cg::tiled_partition<32, cg::thread_block>(cg::this_thread_block());
-
   for (index_t or_chunk_idx{};
       or_chunk_idx * block_size < or_data.num_compat_indices; ++or_chunk_idx) {
     if (get_OR_sources_chunk(source, or_chunk_idx, xor_variations,  //
@@ -363,7 +360,6 @@ __device__ auto is_any_OR_source_compatible_old(
     // Or compatibility here is "success" for the supplied source and will
     // result in an exit out of is_compat_loop.
     if (any_or_compat) return true;
-    if (dynamic_shared[kOrStartUvIdx] == num_uv_indices) return false;
   }
   // No OR sources were compatible with both the supplied xor_combo_idx and
   // the supplied source. The next call to this function will be with a new
@@ -413,11 +409,13 @@ __device__ fat_index_t get_OR_compat_idx_incremental_uv2(index_t chunk_idx,
 
 using warp_tile = cg::thread_block_tile<32, cg::thread_block>;
 
-__device__ int get_OR_sources_chunk(warp_tile tile, index_t num_uv_indices) {
+__device__ int get_OR_sources_block(
+    warp_tile tile, index_t block_idx, index_t num_uv_indices) {
   auto or_idx_buffer = &dynamic_shared[kXorResults + blockDim.x / 4];
   index_t buffer_idx{};
   index_t start_uvi_idx{};
   index_t start_src_idx{};
+  bool any_compat{};
 
   or_idx_buffer[tile.thread_rank()] = or_data.num_compat_indices;
   if (tile.thread_rank() == tile.num_threads() - 1) {
@@ -426,7 +424,7 @@ __device__ int get_OR_sources_chunk(warp_tile tile, index_t num_uv_indices) {
   }
   tile.shfl(start_uvi_idx, tile.num_threads() - 1);
   //tile.shfl(start_src_idx, tile.num_threads() - 1);
-  index_t chunk_idx{};
+  index_t chunk_idx = block_idx * tile.meta_group_size();
   for (; start_uvi_idx < num_uv_indices && buffer_idx < blockDim.x;
       ++chunk_idx) {
     const auto idx_pair = get_OR_compat_idx_incremental_uv2(chunk_idx,
@@ -439,6 +437,7 @@ __device__ int get_OR_sources_chunk(warp_tile tile, index_t num_uv_indices) {
     if (tile.thread_rank() < num_remaining) {
     */
     or_idx_buffer[buffer_idx + tile.thread_rank()] = or_compat_idx;
+    if (or_compat_idx < or_data.num_compat_indices) any_compat = true;
     //}
     start_uvi_idx = uvi_idx;
     tile.shfl(start_uvi_idx, tile.num_threads() - 1);
@@ -452,9 +451,12 @@ __device__ int get_OR_sources_chunk(warp_tile tile, index_t num_uv_indices) {
   }
   if (tile.thread_rank() == tile.num_threads() - 1) {
     dynamic_shared[kOrStartUvIdx] = start_uvi_idx;
+#ifdef LOGGY
+    printf("next start uvi_idx: %u of %u\n", start_uvi_idx, num_uv_indices);
+#endif
   }
   //try: if (chunk_idx > 1) return 1;
-  return or_idx_buffer[tile.thread_rank()] < or_data.num_compat_indices ? 1 : 0;
+  return any_compat ? 1 : 0;
 }
 
 // Process a chunk of OR sources and test them for OR-compatibility with the
@@ -464,6 +466,10 @@ __device__ auto process_OR_sources_chunk(
   auto or_idx_buffer = &dynamic_shared[kXorResults + blockDim.x / 4];
   const auto or_compat_idx = or_idx_buffer[threadIdx.x];
   if (or_compat_idx >= or_data.num_compat_indices) return false;
+
+#ifdef LOGGY
+  printf("%u\n", /*  dynamic_shared[kSrcFlatIdx]*/ or_compat_idx);
+#endif
 
   #ifdef DEBUG_OR_COUNTS
   atomicAdd(&count_or_src_considered, 1);
@@ -543,6 +549,7 @@ __device__ auto is_any_OR_source_compatible(
   if (threadIdx.x < xor_variations.size()) {
     if (!threadIdx.x) {
       dynamic_shared[kOrStartUvIdx] = 0;
+      dynamic_shared[kOrStartSrcIdx] = 0;
       any_sources = false;
       any_or_compat = false;
     }
@@ -555,11 +562,11 @@ __device__ auto is_any_OR_source_compatible(
   auto tile =
       cg::tiled_partition<32, cg::thread_block>(cg::this_thread_block());
 
-  for (index_t or_chunk_idx{};
-      or_chunk_idx * block_size < or_data.num_compat_indices; ++or_chunk_idx) {
+  for (index_t or_block_idx{};
+      or_block_idx * block_size < or_data.num_compat_indices; ++or_block_idx) {
 
     if (!tile.meta_group_rank()) { 
-      any_sources = tile.any(get_OR_sources_chunk(tile, num_uv_indices));
+      any_sources = tile.any(get_OR_sources_block(tile, or_block_idx, num_uv_indices));
     }
     __syncthreads();
     if (any_sources && process_OR_sources_chunk(source)) {
@@ -569,8 +576,15 @@ __device__ auto is_any_OR_source_compatible(
     // Or compatibility here is "success" for the supplied source and will
     // result in an exit out of is_compat_loop.
     if (any_or_compat) return true;
-    if (!any_sources || (dynamic_shared[kOrStartUvIdx] == num_uv_indices))
+    if (!any_sources || (dynamic_shared[kOrStartUvIdx] == num_uv_indices)) {
+#ifdef LOGGY
+      if (!threadIdx.x) {
+        printf("early bail, any_sources: %s, start_uvi_idx: %u\n",
+            any_sources ? "true" : "false", dynamic_shared[kOrStartUvIdx]);
+      }
+#endif
       return false;
+    }
   }
   // No OR sources were compatible with both the supplied xor_combo_idx and
   // the supplied source. The next call to this function will be with a new
@@ -606,10 +620,15 @@ __device__ bool is_any_OR_source_compatible(
       xor_results_idx < max_results;) {
     const auto xor_flat_idx = get_flat_idx(xor_chunk_idx, xor_results_idx);
     const auto xor_combo_idx = get_xor_combo_index(xor_flat_idx, xor_idx_spans);
-    if (is_any_OR_source_compatible(source, xor_combo_idx)) {
+    if (is_any_OR_source_compatible_old(source, xor_combo_idx)) {
       any_or_compat = true;
     }
     __syncthreads();
+
+#ifdef LOGGY
+    if (!blockIdx.x && !threadIdx.x) printf("----\n");
+    __syncthreads();
+#endif
 
     #if defined(PRINTF)
     if (threadIdx.x == CHECK_TID) {

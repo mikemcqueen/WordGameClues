@@ -836,8 +836,10 @@ __global__ void filter_kernel(const SourceCompatibilityData* RESTRICT src_list,
     const auto& source = src_list[flat_idx];
     auto spans_result = get_smallest_src_index_spans(source);
 
+#ifdef LOGGY
     dynamic_shared[kSrcFlatIdx] = src_idx.listIndex;
-    if (!blockIdx.x && (src_idx.listIndex == 5497)) printf("begin: %u\n", flat_idx);
+    if (!blockIdx.x && !threadIdx.x) printf("begin: %u, list_idx %u\n", flat_idx, src_idx.listIndex);
+#endif
 
     #ifdef PRINTF
     if (!threadIdx.x && (idx == num_sources - 1)) {
@@ -859,7 +861,9 @@ __global__ void filter_kernel(const SourceCompatibilityData* RESTRICT src_list,
     }
     __syncthreads();
 
-    if (!blockIdx.x && (src_idx.listIndex == 5497)) printf("end: %u\n", flat_idx);
+#ifdef LOGGY
+    if (!blockIdx.x && !threadIdx.x) printf("end: %u\n", flat_idx);
+#endif
 
     if (is_compat && !threadIdx.x) {
 
