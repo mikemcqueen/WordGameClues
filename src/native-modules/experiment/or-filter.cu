@@ -360,6 +360,7 @@ __device__ auto is_any_OR_source_compatible_old(
     // Or compatibility here is "success" for the supplied source and will
     // result in an exit out of is_compat_loop.
     if (any_or_compat) return true;
+    if (dynamic_shared[kOrStartUvIdx] == num_uv_indices) break;
   }
   // No OR sources were compatible with both the supplied xor_combo_idx and
   // the supplied source. The next call to this function will be with a new
