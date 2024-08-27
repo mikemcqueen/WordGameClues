@@ -928,8 +928,8 @@ void run_filter_kernel(int threads_per_block, StreamData& stream,
     // NB: this has the potential to grow large as num_variations approaches 1M
     const auto xor_indices_bytes =
         grid_size * mfd.device_or.num_unique_variations * sizeof(index_t);
-    cuda_malloc_async((void**)&mfd.device_xor.unique_variations_indices,
-        xor_indices_bytes, cuda_stream, "xor.unique_variations_indices");
+    cuda_malloc_async((void**)&mfd.device_xor.compat_or_uv_indices,
+        xor_indices_bytes, cuda_stream, "xor.compat_or_uv_indices");
   }
   if (!mfd.device_or.src_compat_results) {
     const auto or_results_bytes =

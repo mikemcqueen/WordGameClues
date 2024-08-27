@@ -25,24 +25,23 @@
 
 namespace cm {
 
-// using
+// aliases
 
 using filter_result_t = std::unordered_set<std::string>;
 
-// types
-
-/*
-struct OrVariationIndices {
-  IndexList indices;
-  std::vector<VariationIndexOffset> index_offsets;
-};
-
-using SentenceOrVariationIndices =
-    std::array<OrVariationIndices, kNumSentences>;
-*/
-
 using SentenceVariationIndices =
     std::array<std::vector<IndexList>, kNumSentences>;
+
+// types
+
+struct FilterParams {
+  index_t sum;
+  index_t threads_per_block;
+  index_t num_streams;
+  index_t stride;
+  index_t num_iters;
+  bool synchronous;
+};
 
 class IndexStates {
 public:

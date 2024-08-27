@@ -18,9 +18,9 @@ template struct std::hash<cm::UsedSources::SourceBits>;
 namespace std {
 
 // not technically hash related ... but needed for sorting.
-template <> struct less<cm::UsedSources::Variations> {
-  bool operator()(const cm::UsedSources::Variations& lhs,
-      const cm::UsedSources::Variations& rhs) const noexcept {
+template <> struct less<cm::Variations> {
+  bool operator()(const cm::Variations& lhs,
+      const cm::Variations& rhs) const noexcept {
     for (size_t i{}; i < lhs.size(); ++i) {
       if (lhs[i] < rhs[i]) return true;
     }
@@ -28,9 +28,9 @@ template <> struct less<cm::UsedSources::Variations> {
   }
 };
 
-template <> struct equal_to<cm::UsedSources::Variations> {
-  bool operator()(const cm::UsedSources::Variations& lhs,
-      const cm::UsedSources::Variations& rhs) const noexcept {
+template <> struct equal_to<cm::Variations> {
+  bool operator()(const cm::Variations& lhs,
+      const cm::Variations& rhs) const noexcept {
     for (size_t i{}; i < lhs.size(); ++i) {
       if (lhs[i] != rhs[i]) return false;
     }
@@ -38,8 +38,8 @@ template <> struct equal_to<cm::UsedSources::Variations> {
   }
 };
 
-template <> struct hash<cm::UsedSources::Variations> {
-  size_t operator()(const cm::UsedSources::Variations& variations) const noexcept {
+template <> struct hash<cm::Variations> {
+  size_t operator()(const cm::Variations& variations) const noexcept {
     size_t seed = 0;
     for (const auto v: variations) {
       cm::hash_combine(seed, hash<cm::variation_index_t>()(v));
@@ -75,7 +75,7 @@ template <> struct hash<cm::UsedSources> {
     */
     size_t seed = 0;
     cm::hash_combine(seed, bits_seed);
-    cm::hash_combine(seed, hash<cm::UsedSources::Variations>()(us.variations)); // variation_seed);
+    cm::hash_combine(seed, hash<cm::Variations>()(us.variations)); // variation_seed);
     return seed;
   }
 };

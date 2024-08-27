@@ -1,4 +1,5 @@
 #pragma once
+#include <vector>
 #include "cuda-types.h"
 
 namespace cm {
@@ -17,5 +18,7 @@ struct SourceIndex {
   index_t listIndex{};
   index_t index{};
 };
+
+using SourceIndexList = std::vector<SourceIndex>;
 
 }  // namespace cm

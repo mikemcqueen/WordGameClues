@@ -202,7 +202,7 @@ auto buildSentenceVariationIndices(const std::vector<SourceList>& xor_src_lists,
   SentenceVariationIndices svi;
   for (size_t idx{}; idx < compat_indices.size(); ++idx) {
     // = make_array<variation_index_t, kNumSentences>(-1);
-    UsedSources::Variations variations = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
+    Variations variations = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
     util::for_each_source_index(compat_indices.at(idx), compat_idx_lists,
         [&xor_src_lists, &variations](index_t list_idx, index_t src_idx) {
           const auto& src = xor_src_lists.at(list_idx).at(src_idx);
@@ -236,45 +236,5 @@ auto buildSentenceVariationIndices(const std::vector<SourceList>& xor_src_lists,
   dumpSentenceVariationIndices(svi);
   return svi;
 }
-
-// get list of indices into variations_list sorted by variation index for
-// supplied sentence. supplied sentence is in range [0,kNumSentences).
-auto get_indices_sorted_by_variation(
-    const UsedSources::VariationsList& variations_list, int s) {
-  IndexList indices(variations_list.size());
-  std::iota(indices.begin(), indices.end(), 0);
-  std::sort(indices.begin(), indices.end(), [&](index_t a, index_t b) {
-    return variations_list.at(a).at(s) < variations_list.at(b).at(s);
-  });
-  return indices;
-}
-
-// supplied sentence is in range [0,kNumSentences).
-auto get_variation_index_offsets(const IndexList& idx_list,
-    const UsedSources::VariationsList& variations_list, int sentence) {
-  std::vector<VariationIndexOffset> vi_offsets;
-  variation_index_t last_vi{-2};  // intentional impossible value
-  for (index_t idx{}; idx < idx_list.size(); ++idx) {
-    auto vi = variations_list.at(idx_list.at(idx)).at(sentence);
-    if (vi != last_vi) vi_offsets.emplace_back(vi, idx);
-  }
-  return vi_offsets;
-}
-
-  /*
-auto build_OR_variation_indices(
-    const UsedSources::VariationsList& variations_list,
-    const FatIndexList& compat_indices)
-    -> SentenceOrVariationIndices {
-  SentenceOrVariationIndices all_or_vi;
-  for (int s{}; s < kNumSentences; ++s) {
-    auto& or_vi = all_or_vi.at(s);
-    or_vi.indices = std::move(get_indices_sorted_by_variation(variations_list, s));
-    or_vi.index_offsets =
-        std::move(get_variation_index_offsets(or_vi.indices, variations_list, s));
-  }
-  return all_or_vi;
-}
-  */
 
 }  // namespace cm

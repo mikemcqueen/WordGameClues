@@ -8,15 +8,6 @@
 
 namespace cm {
 
-struct UniqueVariations {
-  UsedSources::Variations variations{};
-  // sum of num_indices of all prior UniqueVariations in an array
-  index_t start_idx;
-  // first index into or_data.compat_indices
-  index_t first_compat_idx;
-  index_t num_indices;
-};
-
 struct MergeData {
   struct Host {
     Host() = default;
@@ -119,7 +110,8 @@ struct FilterData {
       variation_indices = nullptr;
       variations_compat_results = nullptr;
       variations_scan_results = nullptr;
-      unique_variations_indices = nullptr;
+      compat_src_uv_indices = nullptr;
+      compat_or_uv_indices = nullptr;
     }
 
   public:
@@ -129,18 +121,22 @@ struct FilterData {
       cm::cuda_free(variation_indices);
       cm::cuda_free(variations_compat_results);
       cm::cuda_free(variations_scan_results);
-      cm::cuda_free(unique_variations_indices);
+      cm::cuda_free(compat_src_uv_indices);
+      cm::cuda_free(compat_or_uv_indices);
       reset_pointers();
     }
 
     UsedSources::SourceDescriptorPair* incompat_src_desc_pairs;
     device::VariationIndices* variation_indices;
-    // flag array (0/1) of compatible entries or_data.unique_variations
+    // flag array (0/1) of compatible entries with source variations and
+    // or_data.unique_variations (dual use, allocated for greater of two)
     result_t* variations_compat_results;
-    // exclusive_scan results
+    // exclusive_scan results, also dual use
     result_t* variations_scan_results;
+    // sorted indices of compatible entries in src_unique_variations
+    index_t* compat_src_uv_indices;
     // sorted indices of compatible entries in or_data.unique_variations
-    index_t* unique_variations_indices;
+    index_t* compat_or_uv_indices;
   } device_xor;
 
   //
@@ -155,18 +151,15 @@ struct FilterData {
     void reset_pointers() {
       Base::reset_pointers();
       src_compat_results = nullptr;
-      uv_compat_bitset = nullptr;
     }
 
     void cuda_free() {
       Base::cuda_free();
       cm::cuda_free(src_compat_results);
-      cm::cuda_free(uv_compat_bitset);
       reset_pointers();
     }
 
     result_t* src_compat_results;
-    unsigned* uv_compat_bitset;
   } device_or;
 
   DeviceXor* device_xor_data{};

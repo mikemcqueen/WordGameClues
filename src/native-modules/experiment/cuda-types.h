@@ -11,13 +11,13 @@
 #include <utility>
 #include <vector>
 #include <cuda_runtime.h>
+#include "variations.h"
 
 namespace cm {
 
 // aliases
 
 using result_t = uint8_t;
-using variation_index_t = int16_t;
 using index_t = uint32_t;
 using fat_index_t = uint64_t;
 using atomic64_t = unsigned long long int;
@@ -34,6 +34,15 @@ struct VariationIndexOffset {
   variation_index_t variation_index;
   variation_index_t padding_;
   index_t offset;
+};
+
+struct UniqueVariations {
+  Variations variations{};
+  // sum of num_indices of all prior UniqueVariations in an array
+  index_t start_idx;
+  // first index into xxx_data.compat_indices
+  index_t first_compat_idx;
+  index_t num_indices;
 };
 
 namespace device {  // on-device data structures
@@ -122,20 +131,6 @@ inline void cuda_zero_results(
   cudaError_t err = cudaMemsetAsync(results, 0, results_bytes, stream);
   assert_cuda_success(err, "zero results");
 }
-
-#if 0
-// every_combo_index is actually a better name due to predicate fn
-inline auto for_each_combo_index(combo_index_t combo_idx,
-    const std::vector<IndexList>& idx_lists, const auto& pred) {
-  for (index_t list_idx{}; list_idx < idx_lists.size(); ++list_idx) {
-    const auto& idx_list = idx_lists.at(list_idx);
-    auto src_idx = idx_list.at(combo_idx % idx_list.size());
-    if (!pred(list_idx, src_idx)) return false;
-    combo_idx /= idx_list.size();
-  }
-  return true;
-}
-#endif
 
 class CudaEvent {
 public:

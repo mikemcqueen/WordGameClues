@@ -11,7 +11,7 @@
 
 namespace cm {
 
-// types
+// aliases/types
 
 using SourceCompatibilityLists = std::vector<SourceCompatibilityList>;
 

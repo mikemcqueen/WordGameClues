@@ -195,8 +195,8 @@ __device__ auto check_src_compat_results(fat_index_t combo_idx, const T& data) {
 }
 
 // faster than UsedSources version
-__device__ __forceinline__ void merge_variations(UsedSources::Variations& to,
-    const UsedSources::Variations& from, bool force = false) {
+__device__ __forceinline__ void merge_variations(
+    Variations& to, const Variations& from, bool force = false) {
   for (int s{}; s < kNumSentences; ++s) {
     if (force || (to[s] == -1)) to[s] = from[s];
   }
@@ -204,7 +204,7 @@ __device__ __forceinline__ void merge_variations(UsedSources::Variations& to,
 
 template <typename T>
 __device__ auto build_variations(fat_index_t combo_idx, const T& data) {
-  UsedSources::Variations v;
+  Variations v;
   bool force = true;
   for (int list_idx{int(data.num_idx_lists) - 1}; list_idx >= 0; --list_idx) {
     const auto& src = data.get_source(combo_idx, list_idx);

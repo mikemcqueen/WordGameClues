@@ -2,24 +2,15 @@
 #define INCLUDE_FILTER_H
 
 #pragma once
-#include <utility>
-#include <vector>
+#include <optional>
+#include <cuda_runtime.h> // cudaStream_t
 #include "filter-types.h"
 #include "merge-filter-data.h"
 
 namespace cm {
 
-struct FilterArgs {
-  int threads_per_block{};
-  int streams{};
-  int stride{};
-  int iters{};
-  bool synchronous{};
-};
-
-auto filter_candidates_cuda(const FilterData& mfd, int sum,
-    int threads_per_block, int num_streams, int stride, int iters,
-    bool synchronous) -> std::optional<SourceCompatibilitySet>;
+auto filter_candidates_cuda(const FilterData& mfd,
+    const FilterParams& params) -> std::optional<SourceCompatibilitySet>;
 
 filter_result_t get_filter_result();
 

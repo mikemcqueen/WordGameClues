@@ -19,13 +19,6 @@ auto buildSentenceVariationIndices(const std::vector<SourceList>& xor_src_lists,
     const FatIndexList& compat_indices)
     -> SentenceVariationIndices;
 
-  /*
-auto build_OR_variation_indices(
-    const UsedSources::VariationsList& variations_list,
-    const FatIndexList& compat_indices)
-  -> SentenceOrVariationIndices;
-  */
-
 }  // namespace cm
 
 #endif // INCLUDE_CM_PRECOMPUTE_H

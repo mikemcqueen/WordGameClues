@@ -12,14 +12,14 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-#include "cuda-types.h"
 #include "cuda-string.h"
 #include "mmebitset.h"
+#include "variations.h"
 
 namespace cm {
 
-constexpr auto kMaxSourcesPerSentence = 32;
-constexpr auto kNumSentences = 9;
+  //constexpr auto kMaxSourcesPerSentence = 32;
+  //constexpr auto kNumSentences = 9;
 
 template<typename T, size_t N>
 constexpr auto make_array(T value) -> std::array<T, N> {
@@ -90,9 +90,6 @@ struct UsedSources {
 
   // 32 bits per sentence * 9 sentences = 288 bits, 36 bytes
   using SourceBits = mme::bitset<kMaxSourcesPerSentence * kNumSentences>;
-  using Variations = std::array<variation_index_t, kNumSentences>;
-  using VariationsList = std::vector<Variations>;
-  using VariationsSet = std::unordered_set<Variations>;
 
   constexpr static auto getFirstBitIndex(int sentence) {
     assert(sentence > 0);

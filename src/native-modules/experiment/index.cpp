@@ -310,7 +310,7 @@ auto combo_to_str(fat_index_t combo_idx, const IndexList& list_sizes) {
   */
   
 void dump_combos(const MergeData::Host& host, const MergeData::Device& device) {
-  std::vector<UsedSources::Variations> variations;
+  std::vector<Variations> variations;
   const auto list_sizes = util::make_list_sizes(host.compat_idx_lists);
   std::cout << "list_sizes: ";
   for (auto s : list_sizes) std::cout << s << " ";
@@ -354,9 +354,9 @@ const auto& get_source(
   */
 
 void show_unique_XOR_variations(const MergeData::Host& host) {  // host_xor
-  UsedSources::VariationsSet variations;
+  VariationsSet variations;
   for (auto combo_idx : host.compat_indices) {
-    UsedSources::Variations v{-1, -1, -1, -1, -1, -1, -1, -1, -1};
+    Variations v{-1, -1, -1, -1, -1, -1, -1, -1, -1};
     util::for_each_source_index(combo_idx, host.compat_idx_lists,
         [&host, &v, combo_idx](index_t list_idx, index_t src_idx) {
           const auto& src = host.src_lists.at(list_idx).at(src_idx);
@@ -472,13 +472,14 @@ Value filterCandidatesForSum(const CallbackInfo& info) {
       .ThrowAsJavaScriptException();
     return env.Null();
   }
-  auto sum = info[0].As<Number>().Int32Value();
+  auto sum = info[0].As<Number>().Uint32Value();
   assert(sum >= 2);
-  auto threads_per_block = info[1].As<Number>().Int32Value();
-  auto streams = info[2].As<Number>().Int32Value();
-  auto stride = info[3].As<Number>().Int32Value();
-  auto iters = info[4].As<Number>().Int32Value();
-  auto synchronous = info[5].As<Boolean>().Value();
+  FilterParams filter_params{sum,         //
+      info[1].As<Number>().Uint32Value(),  // threads_per_block
+      info[2].As<Number>().Uint32Value(),  // num_streams
+      info[3].As<Number>().Uint32Value(),  // stride
+      info[4].As<Number>().Uint32Value(),  // num_iters
+      info[5].As<Boolean>().Value()};     // synchronous
   // --
   // this function signifies the end of calls to consider_candidate() for a
   // particular sum. filter_candidates_cuda() will clear candidate data to
@@ -486,9 +487,8 @@ Value filterCandidatesForSum(const CallbackInfo& info) {
   // sum so we can access it later.
   save_current_candidate_counts(sum);
 
-  auto opt_incompat_sources = filter_candidates_cuda(
-      MFD, sum, threads_per_block, streams, stride, iters, synchronous);
-  assert(synchronous == opt_incompat_sources.has_value());
+  auto opt_incompat_sources = filter_candidates_cuda(MFD, filter_params);
+  assert(filter_params.synchronous == opt_incompat_sources.has_value());
   if (opt_incompat_sources.has_value()) {
     auto stream = cudaStreamPerThread;
     set_incompatible_sources(MFD, opt_incompat_sources.value(), stream);

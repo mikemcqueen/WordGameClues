@@ -54,7 +54,7 @@ __device__ variation_index_t get_one_variation(
 }
 
 __device__ auto init_variations_compat_results(
-    const UsedSources::Variations& xor_variations) {
+    const Variations& xor_variations) {
   __shared__ bool any_compat;
   if (!threadIdx.x) any_compat = false;
   __syncthreads();
@@ -86,7 +86,7 @@ __device__ auto init_variations_indices(index_t* num_uv_indices) {
       thrust::device, d_flags_ptr, d_flags_ptr + num_items, d_scan_output_ptr);
 
   // generate indices from flag array + prefix sums
-  auto d_indices = &xor_data.unique_variations_indices[offset];
+  auto d_indices = &xor_data.compat_or_uv_indices[offset];
   thrust::device_ptr<index_t> d_indices_ptr(d_indices);
   thrust::counting_iterator<int> count_begin(0);
   thrust::for_each(thrust::device, count_begin, count_begin + num_items,
@@ -101,7 +101,7 @@ __device__ auto init_variations_indices(index_t* num_uv_indices) {
 }
 
 __device__ auto init_compat_variations(
-    const UsedSources::Variations& xor_variations, index_t* num_uv_indices) {
+    const Variations& xor_variations, index_t* num_uv_indices) {
   const auto begin = clock64();
   const auto result = init_variations_compat_results(xor_variations)
                       && init_variations_indices(num_uv_indices);
@@ -111,64 +111,6 @@ __device__ auto init_compat_variations(
   #endif
 
   return result;
-}
-
-// V1 (very slow): linear walk of or_data.variations_compat_results
-__device__ __forceinline__ index_t get_OR_compat_idx_linear_results(
-    index_t chunk_idx) {
-  const auto first_results_idx = blockIdx.x * or_data.num_unique_variations;
-  auto desired_idx = chunk_idx * blockDim.x + threadIdx.x;
-
-  for (index_t idx{}; idx < or_data.num_unique_variations; ++idx) {
-    if (!xor_data.variations_compat_results[first_results_idx + idx]) continue;
-    const auto& uv = or_data.unique_variations[idx];
-    if (desired_idx < uv.start_idx + uv.num_indices) {
-      return uv.first_compat_idx + (desired_idx - uv.start_idx);
-    }
-  }
-  return or_data.num_compat_indices;
-}
-
-// V2 (faster) linear walk of xor_data.unique_variations_indices
-__device__ __forceinline__ auto get_OR_compat_idx_linear_indices(
-    index_t chunk_idx, index_t num_uv_indices) {
-  const auto first_uvi_idx = blockIdx.x * or_data.num_unique_variations;
-  auto desired_idx = chunk_idx * blockDim.x + threadIdx.x;
-
-  for (index_t idx{}; idx < num_uv_indices; ++idx) {
-    const auto uv_idx = xor_data.unique_variations_indices[first_uvi_idx + idx];
-    const auto& uv = or_data.unique_variations[uv_idx];
-    if (desired_idx < uv.start_idx + uv.num_indices) {
-      return uv.first_compat_idx + (desired_idx - uv.start_idx);
-    }
-  }
-  return or_data.num_compat_indices;
-}
-
-// V3 (even faster) binary search of xor_data.unique_variations_indices
-__device__ auto get_OR_compat_idx_binary_search_uv(
-    index_t chunk_idx, index_t num_uv_indices) {
-  const auto desired_idx = chunk_idx * blockDim.x + threadIdx.x;
-  auto begin_uvi_idx = blockIdx.x * or_data.num_unique_variations;
-  auto end_uvi_idx = begin_uvi_idx + num_uv_indices;
-  const auto last_uv_idx = xor_data.unique_variations_indices[end_uvi_idx - 1];
-  const auto& last_uv = or_data.unique_variations[last_uv_idx];
-  if (desired_idx < last_uv.start_idx + last_uv.num_indices) {
-    while (begin_uvi_idx < end_uvi_idx) {
-      const auto mid_uvi_idx = begin_uvi_idx + (end_uvi_idx - begin_uvi_idx) / 2;
-      const auto mid_uv_idx = xor_data.unique_variations_indices[mid_uvi_idx];
-      const auto& mid_uv = or_data.unique_variations[mid_uv_idx];
-      if (desired_idx >= mid_uv.start_idx) {
-        if (desired_idx < mid_uv.start_idx + mid_uv.num_indices) {
-          return mid_uv.first_compat_idx + (desired_idx - mid_uv.start_idx);
-        }
-        begin_uvi_idx = mid_uvi_idx + 1;  // right half
-      } else {
-        end_uvi_idx = mid_uvi_idx;  // left half
-      }
-    }
-  }
-  return or_data.num_compat_indices;
 }
 
 __device__ __forceinline__ fat_index_t pack(index_t hi, index_t lo) {
@@ -189,20 +131,12 @@ __device__ fat_index_t get_OR_compat_idx_incremental_uv(
   assert(num_uv_indices > 0);
   auto desired_idx = chunk_idx * blockDim.x + threadIdx.x;
   const auto first_uvi_idx = blockIdx.x * or_data.num_unique_variations;
-  // there may be some optimization possible here if we are *in* the last
-  // uv_idx already.
-  //  const auto last_uv_idx =
-  //      xor_data.unique_variations_indices[first_uvi_idx + num_uv_indices - 1];
-  //  const auto& last_uv = or_data.unique_variations[last_uv_idx];
-  //  if (desired_idx < last_uv.start_idx + last_uv.num_indices) {
-
   const UniqueVariations* uv{};
   auto uvi_idx = dynamic_shared[kOrStartUvIdx];
   auto start_idx = dynamic_shared[kOrStartSrcIdx];
   for (; uvi_idx < num_uv_indices; ++uvi_idx) {
-    const auto uv_idx =
-        xor_data.unique_variations_indices[first_uvi_idx + uvi_idx];
-    uv = &or_data.unique_variations[uv_idx];
+    const auto or_uv_idx = xor_data.compat_or_uv_indices[first_uvi_idx + uvi_idx];
+    uv = &or_data.unique_variations[or_uv_idx];
     if (desired_idx < (uv->num_indices - start_idx)) {
       //src_idx = uv.first_compat_idx + start_idx + desired_idx;
       //uv_num_indices = uv.num_indices;
@@ -241,7 +175,7 @@ __device__ fat_index_t get_OR_compat_idx_incremental_uv(
 // xor_combo_index, and for OR-compatibility with the supplied source.
 // Return true if at least one OR source is compatible.
 __device__ auto get_OR_sources_chunk(const SourceCompatibilityData& source,
-    index_t or_chunk_idx, const UsedSources::Variations& xor_variations,
+    index_t or_chunk_idx, const Variations& xor_variations,
     index_t num_uv_indices) {
 
   #ifdef DEBUG_OR_COUNTS
@@ -333,11 +267,11 @@ __device__ auto get_OR_sources_chunk(const SourceCompatibilityData& source,
 // a chunk that contains at least one OR source that is variation-compatible
 // with all of the XOR sources identified by the supplied xor_combo_idx, and
 // OR-compatible with the supplied source.
-__device__ auto is_any_OR_source_compatible_old(
+__device__ auto is_any_OR_source_compatible(
     const SourceCompatibilityData& source, fat_index_t xor_combo_idx) {
   const auto block_size = blockDim.x;
   __shared__ bool any_or_compat;
-  __shared__ UsedSources::Variations xor_variations;
+  __shared__ Variations xor_variations;
   if (threadIdx.x < xor_variations.size()) {
     if (!threadIdx.x) {
       dynamic_shared[kOrStartUvIdx] = 0;
@@ -380,9 +314,8 @@ __device__ fat_index_t get_OR_compat_idx_incremental_uv2(
   auto start_idx = dynamic_shared[kOrStartSrcIdx];
   auto desired_idx = chunk_idx * tile.num_threads() + tile.thread_rank();
   for (; uvi_idx < num_uv_indices; ++uvi_idx) {
-    const auto uv_idx =
-        xor_data.unique_variations_indices[first_uvi_idx + uvi_idx];
-    uv = &or_data.unique_variations[uv_idx];
+    const auto or_uv_idx = xor_data.compat_or_uv_indices[first_uvi_idx + uvi_idx];
+    uv = &or_data.unique_variations[or_uv_idx];
     if (desired_idx < (uv->num_indices - start_idx)) break;
     desired_idx -= (uv->num_indices - start_idx);
     start_idx = 0;
@@ -523,12 +456,12 @@ __device__ auto process_OR_sources_block(
 // a chunk that contains at least one OR source that is variation-compatible
 // with all of the XOR sources identified by the supplied xor_combo_idx, and
 // OR-compatible with the supplied source.
-__device__ auto is_any_OR_source_compatible(
+__device__ auto is_any_OR_source_compatible_warp(
     const SourceCompatibilityData& source, fat_index_t xor_combo_idx) {
   const auto block_size = blockDim.x;
   __shared__ bool any_sources;
   __shared__ bool any_or_compat;
-  __shared__ UsedSources::Variations xor_variations;
+  __shared__ Variations xor_variations;
   if (threadIdx.x < xor_variations.size()) {
     if (!threadIdx.x) {
       dynamic_shared[kOrStartUvIdx] = 0;
@@ -548,7 +481,7 @@ __device__ auto is_any_OR_source_compatible(
   for (index_t or_block_idx{};
       or_block_idx * block_size < or_data.num_compat_indices; ++or_block_idx) {
 
-    if (!tile.meta_group_rank()) { 
+    if (!tile.meta_group_rank()) {
       any_sources = tile.any(get_OR_sources_block(tile, or_block_idx, num_uv_indices));
     }
     __syncthreads();
