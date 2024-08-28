@@ -830,8 +830,8 @@ __global__ void filter_kernel(const SourceCompatibilityData* RESTRICT src_list,
   for (index_t idx{blockIdx.x}; idx < num_sources; idx += gridDim.x) {
     __syncthreads();
     const auto src_idx = src_indices[idx];
-    const auto flat_idx =
-        src_list_start_indices[src_idx.listIndex] + src_idx.index;
+    const auto flat_idx = src_idx.index;
+    //        src_list_start_indices[src_idx.listIndex] + src_idx.index;
     if (compat_src_results && !compat_src_results[flat_idx]) continue;
     const auto& source = src_list[flat_idx];
     auto spans_result = get_smallest_src_index_spans(source);

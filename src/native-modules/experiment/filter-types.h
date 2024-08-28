@@ -52,7 +52,7 @@ public:
   };
 
   struct Data {
-    constexpr auto ready_state() const {
+    constexpr auto is_ready() const {
       return status == Status::ready;
     }
 
@@ -60,16 +60,20 @@ public:
       return status == Status::compatible;
     }
 
+    /*
     void reset() {
       sourceIndex.index = 0;
       status = Status::ready;
     }
+    */
 
     SourceIndex sourceIndex;
     Status status = Status::ready;
   };
 
   IndexStates() = delete;
+
+  /*
   IndexStates(const CandidateList& candidates) {
     list_.resize(candidates.size());
     for (index_t idx{}; auto& data : list_) {
@@ -85,6 +89,26 @@ public:
     std::iota(fill_indices_.begin(), fill_indices_.end(), 0);
     fill_iter_ = fill_indices_.before_begin();
   }
+  */
+
+  IndexStates(std::vector<IndexList>&& idx_lists)
+      : idx_lists_(std::move(idx_lists)) {
+    list_.resize(idx_lists_.size());
+    for (index_t idx{}; auto& data : list_) {
+      data.sourceIndex.listIndex = idx++;
+    }
+    // this can all go i think
+    for (index_t list_start_idx{}; const auto& idx_list : idx_lists_) {
+      auto list_size = (index_t)idx_list.size();
+      list_sizes_.push_back(list_size);
+      list_start_indices_.push_back(list_start_idx);
+      list_start_idx += list_size;
+    }
+
+    fill_indices_.resize(idx_lists_.size());
+    std::ranges::iota(fill_indices_, 0);
+    fill_iter_ = fill_indices_.before_begin();
+  }
 
   /*
   void reset() {
@@ -97,9 +121,11 @@ public:
   }
   */
 
+  /*
   index_t flat_index(SourceIndex src_index) const {
     return list_start_indices_.at(src_index.listIndex) + src_index.index;
   }
+  */
 
   auto list_size(index_t list_index) const {
     return list_sizes_.at(list_index);
@@ -137,14 +163,14 @@ public:
     for (size_t i{}; i < src_indices.size(); ++i) {
       const auto src_idx = src_indices.at(i);
       auto& idx_state = list_.at(src_idx.listIndex);
-      if (!idx_state.ready_state()) {
+      if (!idx_state.is_ready()) {
         ++num_not_ready;
         continue;
       }
       if (results.at(src_idx.listIndex)) {
         idx_state.status = Status::compatible;
         ++num_compat;
-      } else if (src_idx.index == list_sizes_.at(src_idx.listIndex) - 1) {
+      } else if (src_idx.index == idx_lists_.at(src_idx.listIndex).back()) { // list_sizes_.at(src_idx.listIndex) - 1) {
         // if this is the result for the last source in a sourcelist,
         // mark the list (indexState) as done.
         idx_state.status = Status::done;
@@ -203,23 +229,27 @@ public:
     return list_.size();
   }
 
-  auto get_incompatible_sources(
-      const CandidateList& candidates, SourceCompatibilitySet& src_set) const {
-    int total_incompat{};
+  auto get_incompatible_sources(const CandidateList& candidates,
+      index_t* num_incompat_sources = nullptr) {
+    SourceCompatibilitySet src_set;
+    index_t num_incompat{};
     for (const auto& data : list_) {
       if (!data.is_compatible()) {
         const auto& src_list =
             candidates.at(data.sourceIndex.listIndex).src_list_cref.get();
         src_set.insert(src_list.begin(), src_list.end());
-        total_incompat += src_list.size();
+        num_incompat += src_list.size();
       }
     }
-    return total_incompat;
+    if (num_incompat_sources) {
+      *num_incompat_sources = num_incompat;
+    }
+    return src_set;
   }
 
   void mark_compatible(const IndexList& list_indices) {
-    for (auto idx : list_indices) {
-      list_.at(idx).status = Status::compatible;
+    for (const auto list_idx : list_indices) {
+      list_.at(list_idx).status = Status::compatible;
     }
   }
 
@@ -237,13 +267,14 @@ public:
   }
 
 private:
-  auto get_and_increment_index(index_t list_index)
+  auto get_and_increment_index(index_t list_idx)
       -> std::optional<SourceIndex> {
-    auto& data = list_.at(list_index);
-    if (data.ready_state()
-        && (data.sourceIndex.index < list_sizes_.at(list_index))) {
-      // capture and return value before increment
-      auto capture = std::make_optional(data.sourceIndex);
+    auto& data = list_.at(list_idx);
+    auto& idx_list = idx_lists_.at(list_idx);
+    if (data.is_ready() && (data.sourceIndex.index < idx_list.size())) {      // list_sizes_.at(list_index))) {
+      // capture value before increment
+      auto capture = std::make_optional(SourceIndex{
+          data.sourceIndex.listIndex, idx_list.at(data.sourceIndex.index)});
       ++data.sourceIndex.index;
       return capture;
     }
@@ -251,8 +282,12 @@ private:
   }
 
   std::vector<Data> list_;
+  std::vector<IndexList> idx_lists_;
+
+  // can go
   IndexList list_start_indices_;
   IndexList list_sizes_;
+
   std::forward_list<index_t> fill_indices_;
   std::forward_list<index_t>::iterator fill_iter_;
 };  // class IndexStates
@@ -262,27 +297,27 @@ class StreamSwarm {
 
 public:
   StreamSwarm() = delete;
-  StreamSwarm(unsigned num_streams, unsigned stride) {
+  StreamSwarm(index_t num_streams, index_t stride) {
     init(num_streams, stride);
   }
 
-  void init(unsigned num_streams, unsigned stride) {
+  void init(index_t num_streams, index_t stride) {
     streams_.reserve(num_streams);
-    for (unsigned idx{}; idx < num_streams; ++idx) {
+    for (index_t idx{}; idx < num_streams; ++idx) {
       if (idx == cuda_streams.size()) {
         cudaStream_t cuda_stream;
         auto err = cudaStreamCreate(&cuda_stream);
         assert_cuda_success(err, "cudaStreamCreate");
         cuda_streams.push_back(cuda_stream);
       }
-      streams_.emplace_back(idx, cuda_streams.at(idx), stride);
+      streams_.emplace_back(idx, stride, cuda_streams.at(idx));
     }
     reset();
   }
 
   void reset() {
     for (auto& stream : streams_) {
-      stream.src_indices.resize(stream.num_list_indices);
+      stream.src_indices.resize(stream.stride);
       stream.is_running = false;
       stream.has_run = false;
     }
