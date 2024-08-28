@@ -22,7 +22,6 @@ constexpr char* cuda_strcat(char* dest, const char* src) {
 constexpr int cuda_itoa(int value, char *sp, int radix = 10) {
   char tmp[32];
   char* tp = tmp;
-  int i;
   unsigned v;
 
   int sign = (radix == 10 && value < 0);
@@ -32,15 +31,15 @@ constexpr int cuda_itoa(int value, char *sp, int radix = 10) {
     v = (unsigned)value;
 
   while (v || tp == tmp) {
-    i = v % radix;
+    auto i = v % radix;
     v /= radix;
     if (i < 10)
-      *tp++ = i + '0';
+      *tp++ = (char)i + '0';
     else
-      *tp++ = i + 'a' - 10;
+      *tp++ = (char)i + 'a' - 10;
   }
 
-  int len = tp - tmp;
+  auto len = int(tp - tmp);
 
   if (sign) {
     *sp++ = '-';

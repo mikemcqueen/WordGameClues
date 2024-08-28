@@ -1,4 +1,24 @@
 {
+  'target_defaults': {
+    'default_configuration': 'Release',
+    'configurations': {
+      'Common': {
+        'abstract': 1,
+        'cflags_cc': [ '-fPIC -std=c++23 -Wno-unused-function -Wall -Wextra -pedantic -Werror -Wconversion' ],
+        'cflags!': [ '-fno-exceptions' ],
+        'cflags_cc!': [ '-fno-exceptions' ],
+        'include_dirs': ['../../../wtf-threadpool'], # TODO: some variable for root?
+        'ldflags': [ '-Wl,-rpath,/usr/local/cuda/targets/x86_64-linux/lib' ],
+      },
+      'Debug': {
+        'inherit_from': ['Common'],
+        'defines': [ 'DEBUG', '_DEBUG' ]
+      },
+      'Release': {
+        'inherit_from': ['Common']
+      }
+    }
+  },
   'targets': [{
     'target_name': 'experiment',
     'type': 'none',
@@ -13,10 +33,6 @@
   {
     'target_name': 'build_experiment',
     'product_name': 'experiment',
-    'cflags_cc': [ '-fPIC -std=c++23 -Wno-unused-function -O3 -Wall -pedantic -Werror -I../wtf-threadpool' ],
-    'cflags!': [ '-fno-exceptions' ],
-    'cflags_cc!': [ '-fno-exceptions' ],
-    'ldflags': [ '-Wl,-rpath,/usr/local/cuda/targets/x86_64-linux/lib' ],
     'sources': [
       'candidates.cpp',
       'clue-manager.cpp',

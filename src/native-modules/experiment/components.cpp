@@ -279,7 +279,7 @@ void display(const SourceList& src_list) {
 auto get_addends(const std::vector<std::string>& name_list, int max_sources) {
   std::vector<std::vector<int>> result;
   for (int sum{2}; sum <= max_sources; ++sum) {
-    auto addends = Peco::make_addends(sum, name_list.size());
+    auto addends = Peco::make_addends(sum, int(name_list.size()));
     util::move_append(result, std::move(addends));
   }
   return result;

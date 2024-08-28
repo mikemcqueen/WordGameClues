@@ -35,11 +35,11 @@ using SentenceVariationIndices =
 // types
 
 struct FilterParams {
-  index_t sum;
-  index_t threads_per_block;
-  index_t num_streams;
-  index_t stride;
-  index_t num_iters;
+  int sum;
+  int threads_per_block;
+  int num_streams;
+  int stride;
+  int num_iters;
   bool synchronous;
 };
 
@@ -59,13 +59,6 @@ public:
     constexpr auto is_compatible() const {
       return status == Status::compatible;
     }
-
-    /*
-    void reset() {
-      sourceIndex.index = 0;
-      status = Status::ready;
-    }
-    */
 
     SourceIndex sourceIndex;
     Status status = Status::ready;
@@ -109,23 +102,6 @@ public:
     std::ranges::iota(fill_indices_, 0);
     fill_iter_ = fill_indices_.before_begin();
   }
-
-  /*
-  void reset() {
-    for (auto& data : list_) {
-      data.reset();
-    }
-    todo:
-    fill_indices next_fill_idx = 0;
-    done = false;
-  }
-  */
-
-  /*
-  index_t flat_index(SourceIndex src_index) const {
-    return list_start_indices_.at(src_index.listIndex) + src_index.index;
-  }
-  */
 
   auto list_size(index_t list_index) const {
     return list_sizes_.at(list_index);
@@ -230,15 +206,15 @@ public:
   }
 
   auto get_incompatible_sources(const CandidateList& candidates,
-      index_t* num_incompat_sources = nullptr) {
+      int* num_incompat_sources = nullptr) {
     SourceCompatibilitySet src_set;
-    index_t num_incompat{};
+    int num_incompat{};
     for (const auto& data : list_) {
       if (!data.is_compatible()) {
         const auto& src_list =
             candidates.at(data.sourceIndex.listIndex).src_list_cref.get();
         src_set.insert(src_list.begin(), src_list.end());
-        num_incompat += src_list.size();
+        num_incompat += int(src_list.size());
       }
     }
     if (num_incompat_sources) {
@@ -297,14 +273,14 @@ class StreamSwarm {
 
 public:
   StreamSwarm() = delete;
-  StreamSwarm(index_t num_streams, index_t stride) {
+  StreamSwarm(int num_streams, int stride) {
     init(num_streams, stride);
   }
 
-  void init(index_t num_streams, index_t stride) {
+  void init(int num_streams, int stride) {
     streams_.reserve(num_streams);
-    for (index_t idx{}; idx < num_streams; ++idx) {
-      if (idx == cuda_streams.size()) {
+    for (int idx{}; idx < num_streams; ++idx) {
+      if (idx == int(cuda_streams.size())) {
         cudaStream_t cuda_stream;
         auto err = cudaStreamCreate(&cuda_stream);
         assert_cuda_success(err, "cudaStreamCreate");
@@ -337,7 +313,7 @@ public:
     for (size_t i{}; i < streams_.size(); ++i) {
       const auto& stream = streams_.at(i);
       if (!stream.is_running && stream.hasWorkRemaining()) {
-        index = i;
+        index = int(i);
         return true;
       }
     }
@@ -359,7 +335,7 @@ public:
         if (err == cudaSuccess) {
           if (stream.sequence_num < lowest.value) {
             lowest.value = stream.sequence_num;
-            lowest.index = i;
+            lowest.index = index_t(i);
           }
         } else if (err != cudaErrorNotReady) {
           assert_cuda_success(err, "cudaStreamQuery");

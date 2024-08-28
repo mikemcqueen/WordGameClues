@@ -23,7 +23,7 @@ inline auto make_list_sizes(const std::vector<cm::IndexList>& idx_lists) {
   cm::IndexList sizes;
   sizes.reserve(idx_lists.size());
   for (const auto& idx_list : idx_lists) {
-    sizes.push_back(idx_list.size());
+    sizes.push_back(index_t(idx_list.size()));
   }
   return sizes;
 }
@@ -248,7 +248,7 @@ inline auto pretty_bytes(size_t bytes) {
   suffixes[2] = "MB";
   suffixes[3] = "GB";
   int s = 0;  // which suffix to use
-  double count = bytes;
+  auto count = double(bytes);
   while (count >= 1024.0 && s < 4) {
     s++;
     count /= 1024.0;

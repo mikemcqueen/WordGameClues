@@ -78,7 +78,7 @@ auto validateSources(const std::string& clue_name,
   if (std::ranges::find_if(src_names, pred) != src_names.end()) {
     return result;
   }
-  auto addends = Peco::make_addends(sum, src_names.size());
+  auto addends = Peco::make_addends(sum, int(src_names.size()));
   for (auto& count_list : addends) {
     do {
       if (!clue_manager::are_known_name_counts(src_names, count_list)) continue;

@@ -141,7 +141,7 @@ auto add_candidate(int sum, std::string&& combo, int index) {
   return index;
 }
 
-int add_candidate(int sum, std::string&& combo,
+auto add_candidate(int sum, std::string&& combo,
     std::reference_wrapper<const SourceCompatibilityList> src_list_cref) {
   Lock lk(candidate_map_semaphore_);
   if (!candidate_map_.contains(sum)) {
@@ -154,7 +154,7 @@ int add_candidate(int sum, std::string&& combo,
   // it returns a const reference.
   auto& candidates = candidate_map_.find(sum)->second;
   candidates.emplace_back(std::move(src_list_cref), std::move(combos));
-  return candidates.size() - 1;
+  return (int)candidates.size() - 1;
 }
 
 auto get_candidate_counts_ref(int sum) -> CandidateCounts& {

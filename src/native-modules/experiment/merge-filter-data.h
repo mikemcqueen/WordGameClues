@@ -38,8 +38,8 @@ struct MergeData {
     SourceCompatibilityData* src_lists;
     index_t* idx_lists;
     index_t* idx_list_sizes;
-    unsigned num_idx_lists;
-    unsigned sum_idx_list_sizes;
+    int num_idx_lists;
+    int sum_idx_list_sizes;
   } device;
 };
 
@@ -84,9 +84,9 @@ struct FilterData {
     index_t* idx_list_start_indices;
     fat_index_t* compat_indices;
     UniqueVariations* unique_variations;
-    unsigned num_variation_indices;
-    index_t num_compat_indices;
-    index_t num_unique_variations;
+    int num_variation_indices;
+    int num_compat_indices;
+    int num_unique_variations;
   };
 
   //

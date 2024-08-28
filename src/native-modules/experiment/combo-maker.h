@@ -36,7 +36,7 @@ namespace Source {
 constexpr inline auto isCandidate(int src) noexcept  { return src >= 1'000'000; }
 constexpr inline auto getSentence(int src) noexcept  { return src / 1'000'000; }
 constexpr inline auto getSource(int src) noexcept    { return src % 1'000'000; }
-constexpr inline auto getVariation(int src) noexcept { return getSource(src) / 100; }
+constexpr inline auto getVariation(int src) noexcept { return variation_index_t(getSource(src) / 100); }
 constexpr inline auto getIndex(int src) noexcept     { return getSource(src) % 100; }
 // clang-format on
 
@@ -47,10 +47,10 @@ struct UsedSources {
 
   struct SourceDescriptor {
     SourceDescriptor() = default;
+
     SourceDescriptor(int sentence, int bit_pos, variation_index_t variation)
-        : sentence(sentence),
-          bit_pos(bit_pos),
-          variation(variation) {
+        : sentence{static_cast<int8_t>(sentence)},
+          bit_pos{static_cast<int8_t>(bit_pos)}, variation{variation} {
       validate();
     }
 
@@ -103,7 +103,7 @@ struct UsedSources {
     return variations.at(sentence - 1);
   }
 
-  void setVariation(int sentence, int value) {
+  void setVariation(int sentence, variation_index_t value) {
     variations.at(sentence - 1) = value;
   }
 
@@ -309,7 +309,7 @@ public:
       while (word) {
         auto new_word = word & (word - 1);  // word with LSB removed
         // probably should have commented this when i did it.
-        int bit_pos = lrint(log2(word ^ new_word));
+        auto bit_pos = int(lrint(log2(word ^ new_word)));
         SourceDescriptor sd{i + 1, bit_pos, getVariation(i + 1)};
         if (!first.sentence) {
           first = sd;

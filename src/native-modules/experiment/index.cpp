@@ -58,7 +58,7 @@ Value setPrimaryNameSrcIndicesMap(const CallbackInfo& info) {
   const auto& js_idx_lists = info[1].As<Array>();
   std::vector<IndexList> idx_lists;
   idx_lists.reserve(js_idx_lists.Length());
-  for (size_t i{}; i < js_idx_lists.Length(); ++i) {
+  for (uint32_t i{}; i < js_idx_lists.Length(); ++i) {
     if (!js_idx_lists[i].IsArray()) {
       TypeError::New(env, "setPrimaryClueNameSourcesMap: non-array element")
         .ThrowAsJavaScriptException();
@@ -180,7 +180,7 @@ void show_clue_manager_durations(){
   static bool shown = false;
   if (!shown) {
     std::cerr << "(delayed clue_manager durations)\n"
-              << " validateSources - " << int(validate_ns / 1e6) << "ms\n";
+              << " validateSources - " << int((double)validate_ns / 1e6) << "ms\n";
     show_validator_durations();
     shown = true;
   }
@@ -268,7 +268,7 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   }
 #endif
   //--
-  uint32_t num_compat{};
+  size_t num_compat{};
 
   // temporarily handle merge_only case until it's eliminated
   if (merge_only) {
@@ -292,7 +292,7 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
       MFD.host_xor.src_lists = std::move(xor_src_lists);
     }
   }
-  return Number::New(env, num_compat);
+  return Number::New(env, uint32_t(num_compat));
 }
 
   /*
@@ -472,13 +472,13 @@ Value filterCandidatesForSum(const CallbackInfo& info) {
       .ThrowAsJavaScriptException();
     return env.Null();
   }
-  auto sum = info[0].As<Number>().Uint32Value();
+  auto sum = info[0].As<Number>().Int32Value();
   assert(sum >= 2);
   FilterParams filter_params{sum,         //
-      info[1].As<Number>().Uint32Value(),  // threads_per_block
-      info[2].As<Number>().Uint32Value(),  // num_streams
-      info[3].As<Number>().Uint32Value(),  // stride
-      info[4].As<Number>().Uint32Value(),  // num_iters
+      info[1].As<Number>().Int32Value(),  // threads_per_block
+      info[2].As<Number>().Int32Value(),  // num_streams
+      info[3].As<Number>().Int32Value(),  // stride
+      info[4].As<Number>().Int32Value(),  // num_iters
       info[5].As<Boolean>().Value()};     // synchronous
   // --
   // this function signifies the end of calls to consider_candidate() for a

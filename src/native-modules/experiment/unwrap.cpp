@@ -8,7 +8,7 @@ using namespace cm::clue_manager;
 
 std::vector<int> makeIntList(Env& env, const Array& jsList) {
   std::vector<int> int_list{};
-  for (size_t i{}; i < jsList.Length(); ++i) {
+  for (uint32_t i{}; i < jsList.Length(); ++i) {
     if (!jsList[i].IsNumber()) {
       TypeError::New(env, "makeIntList: non-number element")
         .ThrowAsJavaScriptException();
@@ -21,7 +21,7 @@ std::vector<int> makeIntList(Env& env, const Array& jsList) {
 
 IndexList makeIndexList(Env& env, const Array& jsList) {
   IndexList idx_list{};
-  for (size_t i{}; i < jsList.Length(); ++i) {
+  for (uint32_t i{}; i < jsList.Length(); ++i) {
     if (!jsList[i].IsNumber()) {
       TypeError::New(env, "makeIndexList: non-number element")
         .ThrowAsJavaScriptException();
@@ -34,7 +34,7 @@ IndexList makeIndexList(Env& env, const Array& jsList) {
 
 std::vector<std::string> makeStringList(Env& env, const Array& jsList) {
   std::vector<std::string> list{};
-  for (size_t i{}; i < jsList.Length(); ++i) {
+  for (uint32_t i{}; i < jsList.Length(); ++i) {
     if (!jsList[i].IsString()) {
       TypeError::New(env, "makeStringList: non-string element")
         .ThrowAsJavaScriptException();
@@ -60,7 +60,7 @@ NameCount makeNameCount(Env& env, const Object& jsObject) {
 
 NameCountList makeNameCountList(Env& env, const Array& jsList) {
   NameCountList ncList{};
-  for (size_t i{}; i < jsList.Length(); ++i) {
+  for (uint32_t i{}; i < jsList.Length(); ++i) {
     if (!jsList[i].IsObject()) {
       TypeError::New(env, "makeNameCountList: non-object element")
         .ThrowAsJavaScriptException();
@@ -102,7 +102,7 @@ SourceData makeSourceData(Env& env, const Object& jsSourceData,
 SourceList makeSourceList(Env& env, const Array& jsList,
     std::string_view nameSrcList /*= "primaryNameSrcList"*/) {
   SourceList sourceList{};
-  for (size_t i{}; i < jsList.Length(); ++i) {
+  for (uint32_t i{}; i < jsList.Length(); ++i) {
     if (!jsList[i].IsObject()) {
       TypeError::New(env, "makeSourceList: non-object element")
         .ThrowAsJavaScriptException();
@@ -126,7 +126,7 @@ NCData makeNcData(Env& env, const Object& jsObject) {
 
 NCDataList makeNcDataList(Env& env, const Array& jsList) {
   NCDataList list;
-  for (size_t i{}; i < jsList.Length(); ++i) {
+  for (uint32_t i{}; i < jsList.Length(); ++i) {
     if (!jsList[i].IsObject()) {
       TypeError::New(env, "makeNcDataList: element is non-object type")
         .ThrowAsJavaScriptException();
@@ -139,7 +139,7 @@ NCDataList makeNcDataList(Env& env, const Array& jsList) {
 
 std::vector<NCDataList> makeNcDataLists(Env& env, const Array& jsList) {
   std::vector<NCDataList> lists;  
-  for (size_t i{}; i < jsList.Length(); ++i) {
+  for (uint32_t i{}; i < jsList.Length(); ++i) {
     if (!jsList[i].IsArray()) {
       TypeError::New(env, "makeNcDataLists: element is non-array type")
         .ThrowAsJavaScriptException();
@@ -152,7 +152,7 @@ std::vector<NCDataList> makeNcDataLists(Env& env, const Array& jsList) {
 
 NameSourcesMap makeNameSourcesMap(Env& env, const Array& jsList) {
   NameSourcesMap map;
-  for (size_t i{}; i < jsList.Length(); ++i) {
+  for (uint32_t i{}; i < jsList.Length(); ++i) {
     if (!jsList[i].IsArray()) {
       TypeError::New(env, "makeNameSourcesMap: mapEntry is non-array type")
         .ThrowAsJavaScriptException();

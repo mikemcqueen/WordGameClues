@@ -125,10 +125,10 @@ template <typename T = result_t>
 
 template <typename T = result_t>
 inline void cuda_zero_results(
-  T* results, size_t num_results, cudaStream_t stream = cudaStreamPerThread) {
+  T* results, size_t num_results, cudaStream_t stream) {
   // memset results to zero
-  auto results_bytes = num_results * sizeof(T);
-  cudaError_t err = cudaMemsetAsync(results, 0, results_bytes, stream);
+  auto num_bytes = num_results * sizeof(T);
+  cudaError_t err = cudaMemsetAsync(results, 0, num_bytes, stream);
   assert_cuda_success(err, "zero results");
 }
 

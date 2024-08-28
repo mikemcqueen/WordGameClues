@@ -17,7 +17,7 @@ Object wrap(Env& env, const NameCount& nc) {
 
 Array wrap(Env& env, const NameCountList& ncList) {
   Array jsList = Array::New(env, ncList.size());
-  for (size_t i{}; i < ncList.size(); ++i) {
+  for (uint32_t i{}; i < ncList.size(); ++i) {
     jsList.Set(i, wrap(env, ncList[i]));
   }
   return jsList;
@@ -34,7 +34,7 @@ Array wrap(Env& env, const XorSourceList& xorSourceList) {
   using namespace std::chrono;
   auto t0 = high_resolution_clock::now();
   Array jsList = Array::New(env, xorSourceList.size());
-  for (size_t i{}; i < xorSourceList.size(); ++i) {
+  for (uint32_t i{}; i < xorSourceList.size(); ++i) {
     jsList.Set(i, wrap(env, xorSourceList[i]));
   }
   auto t1 = high_resolution_clock::now();
@@ -50,7 +50,7 @@ Array wrap(Env& env,
   std::vector<clue_manager::KnownSourceMapValueCRef> cref_entries) {
   //
   Array jsList = Array::New(env, cref_entries.size());
-  for (size_t i{}; i < cref_entries.size(); ++i) {
+  for (uint32_t i{}; i < cref_entries.size(); ++i) {
     jsList.Set(i, wrap(env, cref_entries.at(i).get().src_list));
   }
   return jsList;
@@ -78,7 +78,7 @@ Array wrap(Env& env, const std::unordered_set<std::string>& str_set) {
 
 Array wrap(Env& env, const std::vector<std::string>& strList) {
   Array jsList = Array::New(env, strList.size());
-  for (size_t i{}; i < strList.size(); ++i) {
+  for (uint32_t i{}; i < strList.size(); ++i) {
     jsList.Set(i, String::New(env, strList[i]));
   }
   return jsList;

@@ -35,8 +35,8 @@ auto any_compatible_sources(const SourceData& source,
 }
 
 // TODO: comment this. code is tricky, but fast.
-auto filter_indices(Peco::IndexListVector& index_lists, int first_list_idx,
-    int second_list_idx, const std::vector<SourceList>& src_lists,
+auto filter_indices(Peco::IndexListVector& index_lists, size_t first_list_idx,
+    size_t second_list_idx, const std::vector<SourceList>& src_lists,
     MergeType merge_type) {
   Peco::IndexList& first_list = index_lists[first_list_idx];
   for (auto it_first = first_list.before_begin();
@@ -150,9 +150,9 @@ auto alloc_compat_matrices(const std::vector<IndexList>& idx_lists,
 
 auto make_compat_matrix_start_indices(const std::vector<IndexList>& idx_lists) {
   IndexList start_indices{};
-  index_t index{};
+  size_t index{};
   for_each_list_pair(idx_lists, [&](size_t i, size_t j, size_t n) {
-    start_indices.push_back(index);
+    start_indices.push_back(index_t(index));
     index += idx_lists.at(i).size() * idx_lists.at(j).size();
   });
   return start_indices;
@@ -223,8 +223,8 @@ auto get_compat_matrices(const std::vector<SourceList>& src_lists,
 }
 
 //
-void host_show_num_compat_combos(const fat_index_t first_combo,
-    const fat_index_t num_combos,
+void host_show_num_compat_combos(const int first_combo,
+    const int num_combos,
     const std::vector<std::vector<result_t>>& compat_matrices,
     const IndexList& list_sizes) {
   assert(list_sizes.size() == compat_matrices.size());
@@ -292,11 +292,11 @@ auto log_compat_copy_process(util::Timer& t_copy, util::Timer& t_proc,
 }
 
 auto sync_copy_compat_results(std::vector<result_t>& results,
-    unsigned num_results, result_t* device_results, cudaStream_t stream) {
-  const auto results_bytes = num_results * sizeof(result_t);
+    fat_index_t num_results, result_t* device_results, cudaStream_t stream) {
+  const auto num_bytes = num_results * sizeof(result_t);
   CudaEvent start(stream);
-  auto err = cudaMemcpyAsync(results.data(), device_results, results_bytes,
-    cudaMemcpyDeviceToHost, stream);
+  auto err = cudaMemcpyAsync(results.data(), device_results, num_bytes,
+      cudaMemcpyDeviceToHost, stream);
   assert_cuda_success(err, "merge copy results");
   CudaEvent stop;
   return stop.synchronize(start);
@@ -323,7 +323,7 @@ auto process_results(const std::vector<result_t>& results, fat_index_t start_idx
 
 auto run_get_compat_combos_task(const result_t* device_compat_matrices,
     const index_t* device_compat_matrix_start_indices,
-    const index_t* device_idx_list_sizes, unsigned num_idx_lists,
+    const index_t* device_idx_list_sizes, int num_idx_lists,
     fat_index_t max_indices, MergeType merge_type, cudaStream_t stream) {
   using namespace std::chrono;
   using namespace std::experimental::fundamentals_v3;
@@ -574,8 +574,10 @@ auto cuda_get_compatible_indices(const std::vector<SourceList>& src_lists,
 
     run_list_pair_compat_kernel(&device_src_lists[src_list_start_indices.at(i)],
         &device_src_lists[src_list_start_indices.at(j)],
-        &device_idx_lists[idx_list_start_indices.at(i)], idx_lists.at(i).size(),
-        &device_idx_lists[idx_list_start_indices.at(j)], idx_lists.at(j).size(),
+        &device_idx_lists[idx_list_start_indices.at(i)],
+        unsigned(idx_lists.at(i).size()),
+        &device_idx_lists[idx_list_start_indices.at(j)],
+        unsigned(idx_lists.at(j).size()),
         &device_compat_matrices[compat_matrix_start_indices.at(n)], merge_type,
         stream, flag);
   });
@@ -601,7 +603,7 @@ auto cuda_get_compatible_indices(const std::vector<SourceList>& src_lists,
       util::multiply_with_overflow_check(util::make_list_sizes(idx_lists));
   auto compat_indices = run_get_compat_combos_task(device_compat_matrices,
       device_compat_matrix_start_indices, device_idx_list_sizes,
-      idx_lists.size(), max_indices, merge_type, stream);
+      int(idx_lists.size()), max_indices, merge_type, stream);
 
 #if defined(HOST_SIDE_COMPARISON)
   // host-side compat combo counter for debugging/comparison. slow.
@@ -703,7 +705,7 @@ auto get_merge_data(const std::vector<SourceList>& src_lists,
   const auto idx_list_sizes = util::make_list_sizes(compat_idx_lists);
   device.idx_list_sizes = cuda_alloc_copy_list_sizes(idx_list_sizes, stream);
   device.sum_idx_list_sizes = util::sum(idx_list_sizes);
-  device.num_idx_lists = compat_idx_lists.size();
+  device.num_idx_lists = int(compat_idx_lists.size());
   host.compat_idx_lists = std::move(compat_idx_lists);
   const auto level = merge_only ? ExtraVerbose : Normal;
   util::LogDuration ld("cuda_get_compatible_indices", level);

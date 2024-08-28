@@ -271,7 +271,7 @@ bool add_compound_clue(
 //
 
 int get_num_unique_clue_names(int count) {
-  return get_unique_clue_names(count).size();
+  return int(get_unique_clue_names(count).size());
 }
 
 const std::string& get_unique_clue_name(int count, int idx) {

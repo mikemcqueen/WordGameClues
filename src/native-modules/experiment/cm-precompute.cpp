@@ -126,7 +126,7 @@ auto build_src_lists(const std::vector<NCDataList>& nc_data_lists)
   using HashMap = std::unordered_map<SourceCompatibilityData, StringSet>;
 
   srand(-1); // why? hash?
-  int total_sources = 0;
+  size_t total_sources{};
   int hash_hits = 0;
   // all nc_data_lists are the same length, so just grab length of first
   const auto size = nc_data_lists[0].size();
@@ -200,7 +200,7 @@ auto buildSentenceVariationIndices(const std::vector<SourceList>& xor_src_lists,
     const FatIndexList& compat_indices)
     -> SentenceVariationIndices {
   SentenceVariationIndices svi;
-  for (size_t idx{}; idx < compat_indices.size(); ++idx) {
+  for (index_t idx{}; idx < compat_indices.size(); ++idx) {
     // = make_array<variation_index_t, kNumSentences>(-1);
     Variations variations = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
     util::for_each_source_index(compat_indices.at(idx), compat_idx_lists,

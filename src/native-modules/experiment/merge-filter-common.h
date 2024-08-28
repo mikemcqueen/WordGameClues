@@ -15,7 +15,7 @@ auto make_start_indices(const std::vector<T>& vecs) {
   for (const auto& v : vecs) {
     start_indices.push_back(index);
     // TODO: assert(index + v.size() < std::numeric_limits<index_t>::max());
-    index += v.size();
+    index += index_t(v.size());
   }
   return start_indices;
 }

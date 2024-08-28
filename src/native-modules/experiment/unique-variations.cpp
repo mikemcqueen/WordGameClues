@@ -75,14 +75,14 @@ auto make_sorted_compat_indices(const FatIndexList& compat_indices,
 
 auto make_unique_variations(const std::vector<VariationsIndex>& sorted_vi_list) {
   std::vector<UniqueVariations> unique_variations;
-  index_t sum_of_indices{};
+  size_t sum_of_indices{};
   for (auto it = sorted_vi_list.cbegin(); it != sorted_vi_list.cend();) {
     auto range_end = std::find_if_not(it, sorted_vi_list.end(),  //
         [&first_vi = *it](const VariationsIndex& vi) {
           return std::equal_to{}(first_vi.variations, vi.variations);
         });
     const auto num_indices = std::distance(it, range_end);
-    unique_variations.emplace_back(it->variations, sum_of_indices,
+    unique_variations.emplace_back(it->variations, index_t(sum_of_indices),
         std::distance(sorted_vi_list.begin(), it), num_indices);
     sum_of_indices += num_indices;
     it = range_end;
@@ -116,7 +116,7 @@ auto make_idx_lists(const CandidateList& candidates,
     idx_lists.at(list_idx).resize(
         candidates.at(list_idx).src_list_cref.get().size());
   }
-  for (size_t idx{}; idx < src_compat_cref_src_idx_list.size(); ++idx) {
+  for (index_t idx{}; idx < src_compat_cref_src_idx_list.size(); ++idx) {
     const auto src_idx = src_compat_cref_src_idx_list.at(idx).src_idx;
     idx_lists.at(src_idx.listIndex).at(src_idx.index) = idx;
   }
@@ -171,7 +171,7 @@ auto make_src_compat_list(const CandidateList& candidates,
 auto make_unique_variations(const SourceCompatibilityList& sorted_src_compat_list)
     -> std::vector<UniqueVariations> {
   std::vector<UniqueVariations> unique_variations;
-  index_t sum_of_indices{};
+  size_t sum_of_indices{};
   for (auto it = sorted_src_compat_list.cbegin();
       it != sorted_src_compat_list.cend();) {
     auto range_end = std::find_if_not(it, sorted_src_compat_list.end(),  //
@@ -180,7 +180,7 @@ auto make_unique_variations(const SourceCompatibilityList& sorted_src_compat_lis
               first_src.usedSources.variations, src.usedSources.variations);
         });
     const auto num_indices = std::distance(it, range_end);
-    unique_variations.emplace_back(it->usedSources.variations, sum_of_indices,
+    unique_variations.emplace_back(it->usedSources.variations, index_t(sum_of_indices),
         std::distance(sorted_src_compat_list.begin(), it), num_indices);
     sum_of_indices += num_indices;
     it = range_end;

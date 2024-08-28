@@ -181,7 +181,7 @@ __device__ auto is_source_compatible_with_all(
 template <typename T>
 __device__ auto check_src_compat_results(fat_index_t combo_idx, const T& data) {
   const auto block_start_idx = blockIdx.x * data.sum_idx_list_sizes;
-  index_t list_start_idx{data.sum_idx_list_sizes};
+  auto list_start_idx = index_t(data.sum_idx_list_sizes);
   for (int list_idx{int(data.num_idx_lists) - 1}; list_idx >= 0; --list_idx) {
     const auto list_size = data.idx_list_sizes[list_idx];
     const auto src_idx = combo_idx % list_size;
