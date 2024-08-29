@@ -21,7 +21,6 @@ NVCC_COMPILE_FLAGS := -Xcompiler -fPIC \
 	-dopt=on \
 	-maxrregcount=40
 
-
 NVCC_LINK_FLAGS := -Xcompiler -fPIC
 
 .PHONY: compile

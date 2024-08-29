@@ -134,7 +134,7 @@ inline void cuda_zero_results(
 
 class CudaEvent {
 public:
-  CudaEvent(cudaStream_t stream = cudaStreamPerThread, bool record_now = true)
+  CudaEvent(cudaStream_t stream, bool record_now = true)
       : stream_(stream) {
     auto err = cudaEventCreate(&event_);
     assert_cuda_success(err, "cudaEventCreate");
@@ -150,6 +150,10 @@ public:
 
   auto event() const {
     return event_;
+  }
+
+  auto stream() const {
+    return stream_;
   }
 
   void record() const {

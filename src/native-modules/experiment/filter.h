@@ -9,7 +9,7 @@
 
 namespace cm {
 
-auto filter_candidates_cuda(const FilterData& mfd,
+auto filter_candidates_cuda(FilterData& mfd,
     const FilterParams& params) -> std::optional<SourceCompatibilitySet>;
 
 filter_result_t get_filter_result();

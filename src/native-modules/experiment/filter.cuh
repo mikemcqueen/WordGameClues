@@ -17,8 +17,9 @@ void run_get_compatible_sources_kernel(
     unsigned num_src_desc_pairs, result_t* device_results);
 
 void run_filter_kernel(int threads_per_block, StreamData& stream,
-    const FilterData& mfd, const SourceCompatibilityData* device_src_list,
+    FilterData& mfd, const SourceCompatibilityData* device_src_list,
     const result_t* device_compat_src_results,
+    const UniqueVariations* device_unique_variations, int num_unique_variations,
     result_t* device_results, const index_t* device_list_start_indices);
 
 }  // namespace cm

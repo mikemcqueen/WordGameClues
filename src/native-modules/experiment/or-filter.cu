@@ -3,11 +3,6 @@
 #include <type_traits>
 #include <cuda_runtime.h>
 #include <cooperative_groups.h>
-#include <thrust/execution_policy.h>
-#include <thrust/device_vector.h>
-#include <thrust/scan.h>
-#include <thrust/iterator/counting_iterator.h>
-#include <thrust/copy.h>
 #include "combo-maker.h"
 #include "merge-filter-data.h"
 #include "or-filter.cuh"
@@ -53,64 +48,20 @@ __device__ variation_index_t get_one_variation(
   return -1;
 }
 
-__device__ auto init_variations_compat_results(
-    const Variations& xor_variations) {
-  __shared__ bool any_compat;
-  if (!threadIdx.x) any_compat = false;
-  __syncthreads();
-  const auto first_results_idx = blockIdx.x * or_data.num_unique_variations;
-  for (auto idx{threadIdx.x}; idx < or_data.num_unique_variations;
-      idx += blockDim.x) {
-    const auto& or_variations = or_data.unique_variations[idx].variations;
-    const auto compat =
-        UsedSources::are_variations_compatible(xor_variations, or_variations);
-    xor_data.variations_compat_results[first_results_idx + idx] =
-        compat ? 1 : 0;
-    if (compat) any_compat = true;
-  }
-  __syncthreads();
-  return any_compat;
-}
-
-__device__ auto init_variations_indices(index_t* num_uv_indices) {
-  const auto num_items = or_data.num_unique_variations;
-  const auto offset = blockIdx.x * num_items;
-
-  // convert flag array (variations_compat_results) to prefix sums
-  // (variations_scan_results)
-  const auto d_flags = &xor_data.variations_compat_results[offset];
-  auto d_scan_output = &xor_data.variations_scan_results[offset];
-  thrust::device_ptr<const result_t> d_flags_ptr(d_flags);
-  thrust::device_ptr<result_t> d_scan_output_ptr(d_scan_output);
-  thrust::exclusive_scan(
-      thrust::device, d_flags_ptr, d_flags_ptr + num_items, d_scan_output_ptr);
-
-  // generate indices from flag array + prefix sums
-  auto d_indices = &xor_data.compat_or_uv_indices[offset];
-  thrust::device_ptr<index_t> d_indices_ptr(d_indices);
-  thrust::counting_iterator<int> count_begin(0);
-  thrust::for_each(thrust::device, count_begin, count_begin + num_items,
-      [d_flags, d_scan_output, d_indices] __device__(const index_t idx) {
-        if (!threadIdx.x && d_flags[idx]) {
-          d_indices[d_scan_output[idx]] = idx;
-        }
-      });
-  // compute total set flags
-  *num_uv_indices = d_scan_output[num_items - 1] + d_flags[num_items - 1];
-  return true;
-}
-
-__device__ auto init_compat_variations(
-    const Variations& xor_variations, index_t* num_uv_indices) {
+__device__ auto compute_compat_OR_uv_indices(const Variations& xor_variations) {
   const auto begin = clock64();
-  const auto result = init_variations_compat_results(xor_variations)
-                      && init_variations_indices(num_uv_indices);
+  index_t num_uv_indices{};
+  if (compute_variations_compat_results(
+          xor_variations, or_data, xor_data.variations_results_per_block)) {
+    num_uv_indices = compute_compat_uv_indices(or_data.num_unique_variations,
+        xor_data.or_compat_uv_indices, xor_data.variations_results_per_block);
+  }
 
-  #ifdef CLOCKS
+#ifdef CLOCKS
   atomicAdd(&or_init_compat_variations_clocks, clock64() - begin);
   #endif
 
-  return result;
+  return num_uv_indices;
 }
 
 __device__ __forceinline__ fat_index_t pack(index_t hi, index_t lo) {
@@ -135,7 +86,7 @@ __device__ fat_index_t get_OR_compat_idx_incremental_uv(
   auto uvi_idx = dynamic_shared[kOrStartUvIdx];
   auto start_idx = dynamic_shared[kOrStartSrcIdx];
   for (; uvi_idx < num_uv_indices; ++uvi_idx) {
-    const auto or_uv_idx = xor_data.compat_or_uv_indices[first_uvi_idx + uvi_idx];
+    const auto or_uv_idx = xor_data.or_compat_uv_indices[first_uvi_idx + uvi_idx];
     uv = &or_data.unique_variations[or_uv_idx];
     if (desired_idx < (uv->num_indices - start_idx)) {
       //src_idx = uv.first_compat_idx + start_idx + desired_idx;
@@ -281,8 +232,8 @@ __device__ auto is_any_OR_source_compatible(
     xor_variations[threadIdx.x] = get_one_variation(threadIdx.x, xor_combo_idx);
   }
   __syncthreads();
-  index_t num_uv_indices{};
-  if (!init_compat_variations(xor_variations, &num_uv_indices)) return false;
+  const auto num_uv_indices = compute_compat_OR_uv_indices(xor_variations);
+  if (!num_uv_indices) return false;
   for (index_t or_chunk_idx{};
       or_chunk_idx * block_size < or_data.num_compat_indices; ++or_chunk_idx) {
     if (get_OR_sources_chunk(source, or_chunk_idx, xor_variations,  //
@@ -314,7 +265,7 @@ __device__ fat_index_t get_OR_compat_idx_incremental_uv2(
   auto start_idx = dynamic_shared[kOrStartSrcIdx];
   auto desired_idx = chunk_idx * tile.num_threads() + tile.thread_rank();
   for (; uvi_idx < num_uv_indices; ++uvi_idx) {
-    const auto or_uv_idx = xor_data.compat_or_uv_indices[first_uvi_idx + uvi_idx];
+    const auto or_uv_idx = xor_data.or_compat_uv_indices[first_uvi_idx + uvi_idx];
     uv = &or_data.unique_variations[or_uv_idx];
     if (desired_idx < (uv->num_indices - start_idx)) break;
     desired_idx -= (uv->num_indices - start_idx);
@@ -472,8 +423,8 @@ __device__ auto is_any_OR_source_compatible_warp(
     xor_variations[threadIdx.x] = get_one_variation(threadIdx.x, xor_combo_idx);
   }
   __syncthreads();
-  index_t num_uv_indices{};
-  if (!init_compat_variations(xor_variations, &num_uv_indices)) return false;
+  const auto num_uv_indices = compute_compat_OR_uv_indices(xor_variations);
+  if (!num_uv_indices) return false;
 
   auto tile =
       cg::tiled_partition<32, cg::thread_block>(cg::this_thread_block());

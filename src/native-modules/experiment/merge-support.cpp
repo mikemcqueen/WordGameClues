@@ -166,7 +166,7 @@ void debug_copy_show_compat_matrix_hit_count(
   auto err = cudaMemcpyAsync(results.data(), device_compat_matrices, num_bytes,
     cudaMemcpyDeviceToHost, stream);
   assert_cuda_success(err, "copy compat matrices");
-  CudaEvent temp;
+  CudaEvent temp(stream);
   temp.synchronize();
   fat_index_t num_compat{};
   for (auto result: results) {
@@ -222,7 +222,6 @@ auto get_compat_matrices(const std::vector<SourceList>& src_lists,
   return host_compat_matrices;
 }
 
-//
 void host_show_num_compat_combos(const int first_combo,
     const int num_combos,
     const std::vector<std::vector<result_t>>& compat_matrices,
@@ -262,11 +261,10 @@ void host_show_num_compat_combos(const int first_combo,
             << "]: " << num_compat << " - " << t.count() << "ms" << std::endl;
 }
 
-
 auto log_compat_combos_kernel(int idx, CudaEvent& start, LogLevel level = Verbose) {
   long elapsed{};
   if (log_level(level)) {
-    CudaEvent stop;
+    CudaEvent stop(start.stream());
     elapsed = stop.synchronize(start);
     if (log_level(ExtraVerbose)) {
       std::cerr << "  completed get_compat_combos_kernel " << idx << " - "
@@ -298,7 +296,7 @@ auto sync_copy_compat_results(std::vector<result_t>& results,
   auto err = cudaMemcpyAsync(results.data(), device_results, num_bytes,
       cudaMemcpyDeviceToHost, stream);
   assert_cuda_success(err, "merge copy results");
-  CudaEvent stop;
+  CudaEvent stop(start.stream());
   return stop.synchronize(start);
 }
 
@@ -337,7 +335,7 @@ auto run_get_compat_combos_task(const result_t* device_compat_matrices,
 
   std::vector<result_t> host_results(num_indices);
   std::vector<fat_index_t> result_indices;
-  CudaEvent gcc_start;
+  CudaEvent gcc_start(stream);
   long gcc_elapsed{};
   long copy_elapsed{};
   long proc_elapsed{};
@@ -414,13 +412,12 @@ auto get_compatible_indices(const std::vector<SourceList>& src_lists,
 
 SourceCompatibilityData* cuda_alloc_copy_src_lists(
     const std::vector<SourceList>& src_lists, cudaStream_t stream) {
-  //, size_t* num_bytes = nullptr) {
   // alloc sources
   const auto num_sources = util::sum_sizes(src_lists);
   const auto sources_bytes = num_sources * sizeof(SourceCompatibilityData);
   SourceCompatibilityData* device_sources;
-  cuda_malloc_async((void**)&device_sources, sources_bytes, stream,
-      "merge src_lists");  // cl-format
+  cuda_malloc_async((void**)&device_sources, sources_bytes, stream,  //
+      "merge src_lists");
   // copy sources
   std::vector<SourceCompatibilityData> src_compat_list;
   src_compat_list.reserve(num_sources);
@@ -443,13 +440,11 @@ SourceCompatibilityData* cuda_alloc_copy_src_lists(
   assert_cuda_success(err, "merge copy sources");
   CudaEvent temp(stream);
   temp.synchronize();
-  //  if (num_bytes) { *num_bytes = sources_bytes; }
   return device_sources;
 }
 
 index_t* cuda_alloc_copy_idx_lists(
     const std::vector<IndexList>& idx_lists, cudaStream_t stream) {
-  //, size_t* num_bytes = nullptr) {
   // alloc indices
   const auto indices_bytes = util::sum_sizes(idx_lists) * sizeof(index_t);
   cudaError_t err{};
@@ -465,9 +460,8 @@ index_t* cuda_alloc_copy_idx_lists(
     assert_cuda_success(err, "merge copy idx_lists");
     index += idx_list.size();
   }
-  CudaEvent temp;
+  CudaEvent temp(stream);
   temp.synchronize();
-  //  if (num_bytes) { *num_bytes = indices_bytes; }
   return device_indices;
 }
 
@@ -484,7 +478,7 @@ index_t* cuda_alloc_copy_list_sizes(
   err = cudaMemcpyAsync(device_list_sizes, list_sizes.data(), list_sizes_bytes,
       cudaMemcpyHostToDevice, stream);
   assert_cuda_success(err, "copy list sizes");
-  CudaEvent temp;
+  CudaEvent temp(stream);
   temp.synchronize();
   //  if (num_bytes) { *num_bytes = list_sizes_bytes; }
   return device_list_sizes;
@@ -494,8 +488,6 @@ index_t* cuda_alloc_copy_list_sizes(
 void check_list_pair_results(combo_index_t combo_idx, result_t* device_results,
     size_t num_bytes, const std::vector<IndexList>& idx_lists,
     const IndexList& start_indices, cudaStream_t stream) {
-
-
   std::cerr << "check_list_pairs: " << start_indices.size()
             << ", num_bytes: " << num_bytes << std::endl;
   std::vector<result_t> results(num_bytes);
@@ -525,7 +517,6 @@ void check_list_pair_results(combo_index_t combo_idx, result_t* device_results,
     }
     val /= size;
   }
-
   auto start = start_indices.at(matrix);
   auto width = idx_lists.at(list2).size();
   auto offset = row * width + col;

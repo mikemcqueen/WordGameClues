@@ -1,3 +1,6 @@
+* I should add new host/device structs to FilterData for Source.
+  * and the Device version of it can be allocated in constant memory similar to OR/XOR.
+
 * get_src_compat_results: custom version of src_bits_are_OR_compatible that takes
   full sources and only bit-compares if both variation !=  -1
 
@@ -9,7 +12,8 @@
 * Turn on streaming:
   * don't use the same result buffer for multiple streams. maybe make it part
     of the StreamData struct?
-  * see if i can get rid of that num_list_indices in StreamData while i'm at it
+  * Note this might be trickier than it looks. 8/28 note in notebook about it.
+  * also sum_idx_list_sizes probably needs to change to num_results
 
 * should look into using libcu++ for standard library such as std::array, std::copy in
   kernels. coz.. i might just be gettting lucky. and i'm not sure how to control which

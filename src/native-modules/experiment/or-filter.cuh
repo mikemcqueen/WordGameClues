@@ -1,5 +1,10 @@
 #pragma once
 #include <cassert>
+#include <thrust/execution_policy.h>
+#include <thrust/device_vector.h>
+#include <thrust/scan.h>
+#include <thrust/iterator/counting_iterator.h>
+#include <thrust/copy.h>
 #include "cuda-types.h"
 #include "merge-filter-data.h"
 
@@ -214,6 +219,57 @@ __device__ auto build_variations(fat_index_t combo_idx, const T& data) {
     force = false;
   }
   return v;
+}
+
+// TODO: dst_compat_results param maybe
+__device__ inline auto compute_variations_compat_results(
+    const Variations& xor_variations,
+    const FilterData::DeviceUniqueVariations& uv_data,
+    const index_t num_results_per_block) {
+  __shared__ bool any_compat;
+  if (!threadIdx.x) any_compat = false;
+  __syncthreads();
+  for (auto idx{threadIdx.x}; idx < uv_data.num_unique_variations;
+      idx += blockDim.x) {
+    const auto& src_variations = uv_data.unique_variations[idx].variations;
+    const auto compat =
+        UsedSources::are_variations_compatible(xor_variations, src_variations);
+    const auto results_offset = blockIdx.x * num_results_per_block;
+    xor_data.variations_compat_results[results_offset + idx] = compat ? 1 : 0;
+    if (compat) any_compat = true;
+  }
+  __syncthreads();
+  return any_compat;
+}
+
+__device__ inline auto compute_compat_uv_indices(
+    const index_t num_unique_variations, index_t* dst_uv_indices,
+    const index_t num_results_per_block) {
+  // convert flag array (variations_compat_results) to prefix sums
+  // (variations_scan_results)
+  const auto results_offset = blockIdx.x * num_results_per_block;
+  const auto d_flags = &xor_data.variations_compat_results[results_offset];
+  auto d_scan_output = &xor_data.variations_scan_results[results_offset];
+  thrust::device_ptr<const result_t> d_flags_ptr(d_flags);
+  thrust::device_ptr<result_t> d_scan_output_ptr(d_scan_output);
+  thrust::exclusive_scan(thrust::device, d_flags_ptr,
+      d_flags_ptr + num_unique_variations, d_scan_output_ptr);
+
+  // generate indices from flag array + prefix sums
+  const auto uv_indices_offset = blockIdx.x * num_unique_variations;
+  auto d_indices = &dst_uv_indices[uv_indices_offset];
+  thrust::device_ptr<index_t> d_indices_ptr(d_indices);
+  thrust::counting_iterator<int> count_begin(0);
+  thrust::for_each(thrust::device, count_begin,
+      count_begin + num_unique_variations,
+      [d_flags, d_scan_output, d_indices] __device__(const index_t idx) {
+        if (!threadIdx.x && d_flags[idx]) {
+          d_indices[d_scan_output[idx]] = idx;
+        }
+      });
+  // compute total number of set flags (which is total num indices)
+  const auto last_idx = num_unique_variations - 1;
+  return d_scan_output[last_idx] + d_flags[last_idx];
 }
 
 __device__ bool is_any_OR_source_compatible(
