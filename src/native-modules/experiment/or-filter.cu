@@ -20,7 +20,7 @@ extern __constant__ FilterData::DeviceOr or_data;
 */  
 
 #ifdef DEBUG_OR_COUNTS
-extern __device__ atomic64_t or_init_compat_variations_clocks;
+extern __device__ atomic64_t or_compute_compat_uv_indices_clocks;
 extern __device__ atomic64_t or_get_compat_idx_clocks;
 extern __device__ atomic64_t or_build_variation_clocks;
 extern __device__ atomic64_t or_are_variations_compat_clocks;
@@ -57,8 +57,8 @@ __device__ auto compute_compat_OR_uv_indices(const Variations& xor_variations) {
         xor_data.or_compat_uv_indices, xor_data.variations_results_per_block);
   }
 
-#ifdef CLOCKS
-  atomicAdd(&or_init_compat_variations_clocks, clock64() - begin);
+  #ifdef CLOCKS
+  atomicAdd(&or_compute_compat_uv_indices_clocks, clock64() - begin);
   #endif
 
   return num_uv_indices;
@@ -76,7 +76,7 @@ __device__ __forceinline__ index_t hiword(fat_index_t idx) {
   return index_t(idx >> 32);
 }
 
-// V4 (fastest) incremental indexing of xor_data.unique_variations_indices
+// incremental indexing of xor_data.unique_variations_indices
 __device__ fat_index_t get_OR_compat_idx_incremental_uv(
     index_t chunk_idx, index_t num_uv_indices) {
   assert(num_uv_indices > 0);
@@ -109,8 +109,8 @@ __device__ fat_index_t get_OR_compat_idx_incremental_uv(
         start_idx = 0;
       }
     }
-    // technically unnecessary, just keeps the data clean & consistent
-    // for purposes of debugging a complex implementation
+    // might be technically unnecessary, but it keeps the data clean &
+    // consistent for purposes of debugging a new/complex implementation
     if (uvi_idx == num_uv_indices) {
       start_idx = or_data.num_compat_indices;
     }
@@ -120,14 +120,13 @@ __device__ fat_index_t get_OR_compat_idx_incremental_uv(
   return result;
 }
 
-
 // Process a chunk of OR sources and test them for variation-
 // compatibililty with all of the XOR sources identified by the supplied
 // xor_combo_index, and for OR-compatibility with the supplied source.
 // Return true if at least one OR source is compatible.
 __device__ auto get_OR_sources_chunk(const SourceCompatibilityData& source,
-    index_t or_chunk_idx, const Variations& xor_variations,
-    index_t num_uv_indices) {
+    const index_t or_chunk_idx, const Variations& xor_variations,
+    const index_t num_uv_indices) {
 
   #ifdef DEBUG_OR_COUNTS
   atomicAdd(&count_or_get_compat_idx, 1);
@@ -135,7 +134,6 @@ __device__ auto get_OR_sources_chunk(const SourceCompatibilityData& source,
 
   auto begin = clock64();
   // one thread per compat_idx
-  //const auto or_compat_idx = get_OR_compat_idx_binary_search_uv(or_chunk_idx, num_uv_indices);
   const auto packed_idx = get_OR_compat_idx_incremental_uv(or_chunk_idx, num_uv_indices);
   const auto or_compat_idx = loword(packed_idx);
 

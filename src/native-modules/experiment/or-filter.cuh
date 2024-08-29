@@ -31,11 +31,13 @@ using shared_index_t = index_t;
 inline constexpr auto kSharedIndexSize = sizeof(shared_index_t);  // in bytes
 
 inline constexpr auto kXorChunkIdx = 0;
-inline constexpr auto kOrStartUvIdx = 1;
-inline constexpr auto kOrStartSrcIdx = 2;
-inline constexpr auto kSrcFlatIdx = 3;
-inline constexpr auto kDebugIdx = 4;
-inline constexpr auto kSharedIndexCount = 5;
+inline constexpr auto kXorStartUvIdx = 1;
+inline constexpr auto kXorStartSrcIdx = 2;
+inline constexpr auto kOrStartUvIdx = 3;
+inline constexpr auto kOrStartSrcIdx = 4;
+inline constexpr auto kSrcFlatIdx = 5;
+inline constexpr auto kDebugIdx = 6;
+inline constexpr auto kSharedIndexCount = 7;
 
 // num source sentences (uint8_t) starts at end of indices
 inline constexpr auto kNumSrcSentences = kSharedIndexCount;
@@ -98,8 +100,9 @@ __device__ __forceinline__ auto source_bits_are_OR_compatible(
     const UsedSources::SourceBits& a, const UsedSources::SourceBits& b) {
   return is_disjoint_or_subset(a, b);
 }
+*/
 
-__device__ __forceinline__ auto source_bits_are_XOR_compatible(
+__device__ auto source_bits_are_XOR_compatible(
     const UsedSources::SourceBits& a, const UsedSources::SourceBits& b) {
   using SourceBits = UsedSources::SourceBits;
   for (int i{}; i < SourceBits::wc() / 2; ++i) {
@@ -112,7 +115,6 @@ __device__ __forceinline__ auto source_bits_are_XOR_compatible(
   }
   return true;
 }
-*/
   
 __device__ __forceinline__ auto are_source_bits_OR_compatible(
     const UsedSources::SourceBits& a, const UsedSources::SourceBits& b,
@@ -125,7 +127,7 @@ __device__ __forceinline__ auto are_source_bits_OR_compatible(
 __device__ __forceinline__ auto are_source_bits_XOR_compatible(
     const UsedSources::SourceBits& a, const UsedSources::SourceBits& b,
     int word_idx) {
-  return (a.word(word_idx) & b.word(word_idx)) == 0;
+  return (a.word(word_idx) & b.word(word_idx)) == 0u;
 }
 
 template <typename TagT>
@@ -148,7 +150,7 @@ __device__ inline auto is_source_compatible_with(
           return false;
         }
       } else if constexpr (std::is_same_v<TagT, tag::XOR>) {
-#if 0
+#if 1
         if (!are_source_bits_XOR_compatible(other.usedSources.getBits(),
                 source.usedSources.getBits(), sentence)) {
           return false;
