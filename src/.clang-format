@@ -55,7 +55,7 @@ AlignConsecutiveDeclarations: false
 # Left align backslashes that escape newlines (use backslashes for newlines)
 AlignEscapedNewlinesLeft: true
 # Align the operands of binary and ternary expressions horizontally
-AlignOperands: true
+AlignOperands: false
 # Align consecutive trailing comments
 AlignTrailingComments: true
 # Allow all parameters of the function declaration to be placed on the next line
@@ -137,24 +137,28 @@ MaxEmptyLinesToKeep: 1
 # Namespace indentation: None, Inner (indent the content in the nested namespace), All
 NamespaceIndentation: None
 # Penalty that wraps the function call after call(
-PenaltyBreakBeforeFirstCallParameter: 19
+PenaltyBreakBeforeFirstCallParameter: 50
+# Penalty 
+PenaltyBreakOpenParenthesis: 50
+# Penalty 
+PenaltyBreakAssignment: 50
 # Introduce a penalty for line breaks in a comment
-PenaltyBreakComment: 300
+PenaltyBreakComment: 10
 # The penalty for the first line break before <<
-PenaltyBreakFirstLessLess: 120
+PenaltyBreakFirstLessLess: 10
 # Introduce a penalty for line breaks in a string literal
-PenaltyBreakString: 1000
+PenaltyBreakString: 10
 # Penalty for each character outside the line character limit
-PenaltyExcessCharacter: 1000000
+PenaltyExcessCharacter: 90
 # Put the return type of the function in the penalty of its own line
-PenaltyReturnTypeOnItsOwnLine: 60
+PenaltyReturnTypeOnItsOwnLine: 100
 # Alignment of pointer and reference: Left, Right, Middle
 PointerAlignment: Left
 # Allow retypesetting comments
 ReflowComments: true
 # Allow sorting#include
-SortIncludes: true
-SortUsingDeclarations: true
+SortIncludes: false
+SortUsingDeclarations: false
 # Add space after C style type conversion
 SpaceAfterCStyleCast: false
 # Add a space before the assignment operator
