@@ -51,10 +51,10 @@ struct FilterData {
     std::vector<UniqueVariations> unique_variations;
   };
 
+  /*
   struct DeviceUniqueVariations {
   protected:
     void reset_pointers() {
-      unique_variations = nullptr;
     }
 
   public:
@@ -66,24 +66,27 @@ struct FilterData {
     UniqueVariations* unique_variations;
     int num_unique_variations;
   };
+  */
 
-  struct DeviceCommon : MergeData::Device, DeviceUniqueVariations {
+  struct DeviceCommon : MergeData::Device {  // , DeviceUniqueVariations {
   protected:
     void reset_pointers() {
       MergeData::Device::reset_pointers();
-      DeviceUniqueVariations::reset_pointers();
+      //DeviceUniqueVariations::reset_pointers();
       src_list_start_indices = nullptr;
       idx_list_start_indices = nullptr;
       compat_indices = nullptr;
+      unique_variations = nullptr;
     }
 
   public:
     void cuda_free() {
       MergeData::Device::cuda_free();
-      DeviceUniqueVariations::cuda_free();
+      //DeviceUniqueVariations::cuda_free();
       cm::cuda_free(src_list_start_indices);
       cm::cuda_free(idx_list_start_indices);
       cm::cuda_free(compat_indices);
+      cm::cuda_free(unique_variations);
       reset_pointers();
     }
 
@@ -99,7 +102,9 @@ struct FilterData {
     index_t* src_list_start_indices;
     index_t* idx_list_start_indices;
     fat_index_t* compat_indices;
+    UniqueVariations* unique_variations;
     int num_compat_indices;
+    int num_unique_variations;
   };
 
   //
@@ -176,15 +181,15 @@ struct FilterData {
     result_t* src_compat_results;
   } device_or;
 
-  struct DeviceSources : DeviceUniqueVariations {
+  struct DeviceSources { // : DeviceUniqueVariations {
   protected:
     void reset_pointers() {
-      DeviceUniqueVariations::reset_pointers();
+      //DeviceUniqueVariations::reset_pointers();
     }
 
   public:
     void cuda_free() {
-      DeviceUniqueVariations::cuda_free();
+      //DeviceUniqueVariations::cuda_free();
       reset_pointers();
     }
   } device_sources;

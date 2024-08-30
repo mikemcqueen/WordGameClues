@@ -11,6 +11,7 @@ ARCH := -arch sm_89
 NVCC_COMPILE_FLAGS := -Xcompiler -fPIC \
 	-Xcompiler -Wall \
 	-Xcompiler -Wextra \
+	-Xcompiler -Wconversion \
 	-Xcudafe --diag_suppress=declared_but_not_referenced \
 	--expt-relaxed-constexpr \
 	--extended-lambda \

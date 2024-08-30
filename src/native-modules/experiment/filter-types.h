@@ -254,6 +254,14 @@ private:
       ++data.sourceIndex.index;
       return capture;
     }
+#if 0
+    else {
+      std::cerr << "skipping " << data.sourceIndex.listIndex << "";
+      if (!data.is_ready()) std::cerr << "- not ready";
+      if (data.sourceIndex.index >= idx_list.size()) std::cerr << " - out of bounds";
+      std::cerr << std::endl;
+    }
+#endif
     return std::nullopt;
   }
 

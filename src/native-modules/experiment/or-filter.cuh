@@ -11,18 +11,15 @@
 namespace cm {
 
 #if 1
-  //#define LOGGY
+//#define LOGGY
+//#define XOR_SPANS
 
 #define CLOCKS
 #define DEBUG_OR_COUNTS
 #define DEBUG_XOR_COUNTS
 #endif
 //#define MAX_SOURCES 1
-// #define DISABLE_OR
-// #define FORCE_XOR_COMPAT
-// #define FORCE_ALL_XOR
-// #define USE_LOCAL_XOR_COMPAT
-// #define PRINTF
+//#define PRINTF
 
 class SourceCompatibilityData;
 
@@ -102,20 +99,6 @@ __device__ __forceinline__ auto source_bits_are_OR_compatible(
 }
 */
 
-__device__ auto source_bits_are_XOR_compatible(
-    const UsedSources::SourceBits& a, const UsedSources::SourceBits& b) {
-  using SourceBits = UsedSources::SourceBits;
-  for (int i{}; i < SourceBits::wc() / 2; ++i) {
-    const auto w = a.long_word(i) & b.long_word(i);
-    if (w) return false;
-  }
-  for (int i{}; i < SourceBits::wc() - (SourceBits::wc() / 2) * 2; ++i) {
-    const auto w = a.word(i) & b.word(i);
-    if (w) return false;
-  }
-  return true;
-}
-  
 __device__ __forceinline__ auto are_source_bits_OR_compatible(
     const UsedSources::SourceBits& a, const UsedSources::SourceBits& b,
     int word_idx) {
@@ -225,18 +208,18 @@ __device__ auto build_variations(fat_index_t combo_idx, const T& data) {
 
 // TODO: dst_compat_results param maybe
 __device__ inline auto compute_variations_compat_results(
-    const Variations& xor_variations,
-    const FilterData::DeviceUniqueVariations& uv_data,
+    const Variations& src_variations,
+    const FilterData::DeviceCommon& tgt_uv_data,
     const index_t num_results_per_block) {
+  const auto results_offset = blockIdx.x * num_results_per_block;
   __shared__ bool any_compat;
   if (!threadIdx.x) any_compat = false;
   __syncthreads();
-  for (auto idx{threadIdx.x}; idx < uv_data.num_unique_variations;
+  for (auto idx{threadIdx.x}; idx < tgt_uv_data.num_unique_variations;
       idx += blockDim.x) {
-    const auto& src_variations = uv_data.unique_variations[idx].variations;
-    const auto compat =
-        UsedSources::are_variations_compatible(xor_variations, src_variations);
-    const auto results_offset = blockIdx.x * num_results_per_block;
+    const auto& tgt_variations = tgt_uv_data.unique_variations[idx].variations;
+    const auto compat = UsedSources::are_variations_compatible(src_variations,
+        tgt_variations);
     xor_data.variations_compat_results[results_offset + idx] = compat ? 1 : 0;
     if (compat) any_compat = true;
   }
@@ -275,7 +258,7 @@ __device__ inline auto compute_compat_uv_indices(
 }
 
 __device__ bool is_any_OR_source_compatible(
-    const SourceCompatibilityData& source, index_t xor_chunk_idx,
+    const SourceCompatibilityData& source, const index_t xor_chunk_idx,
     const IndexSpanPair& xor_idx_spans);
 
 }  // namespace cm
