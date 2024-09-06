@@ -26,12 +26,17 @@ extern __device__ atomic64_t or_build_variation_clocks;
 extern __device__ atomic64_t or_are_variations_compat_clocks;
 extern __device__ atomic64_t or_check_src_compat_clocks;
 extern __device__ atomic64_t or_is_src_compat_clocks;
+extern __device__ atomic64_t or_incompat_xor_clocks;
 
 extern __device__ atomic64_t count_or_get_compat_idx;
 extern __device__ atomic64_t count_or_src_considered;
 extern __device__ atomic64_t count_or_src_variation_compat;
 extern __device__ atomic64_t count_or_check_src_compat;
 extern __device__ atomic64_t count_or_src_compat;
+extern __device__ atomic64_t count_or_get_compat_idx;
+extern __device__ atomic64_t count_or_xor_chunks;
+extern __device__ atomic64_t count_or_incompat_xor_chunks;
+extern __device__ atomic64_t count_or_incompat_xor_chunk_sources;
 #endif
 
 namespace {
@@ -64,21 +69,21 @@ __device__ auto compute_compat_OR_uv_indices(const Variations& xor_variations) {
   return num_uv_indices;
 }
 
-__device__ __forceinline__ fat_index_t pack(index_t hi, index_t lo) {
+__device__ __forceinline__ fat_index_t pack(const index_t hi, const index_t lo) {
   return (fat_index_t{hi} << 32) | lo;
 }
 
-__device__ __forceinline__ index_t loword(fat_index_t idx) {
+__device__ __forceinline__ index_t loword(const fat_index_t idx) {
   return index_t(idx & 0xffffffff);
 }
 
-__device__ __forceinline__ index_t hiword(fat_index_t idx) {
+__device__ __forceinline__ index_t hiword(const fat_index_t idx) {
   return index_t(idx >> 32);
 }
 
 // incremental indexing of xor_data.unique_variations_indices
 __device__ fat_index_t get_OR_compat_idx_incremental_uv(
-    index_t chunk_idx, index_t num_uv_indices) {
+    const index_t chunk_idx, const index_t num_uv_indices) {
   assert(num_uv_indices > 0);
   auto desired_idx = chunk_idx * blockDim.x + threadIdx.x;
   const auto first_uvi_idx = blockIdx.x * or_data.num_unique_variations;
@@ -96,11 +101,10 @@ __device__ fat_index_t get_OR_compat_idx_incremental_uv(
     desired_idx -= (uv->num_indices - start_idx);
     start_idx = 0;
   }
-  __syncthreads();
-  auto result =
-      (uvi_idx < num_uv_indices)
-          ? pack(uvi_idx, uv->first_compat_idx + start_idx + desired_idx)
-          : pack(uvi_idx, or_data.num_compat_indices);
+  //  __syncthreads();
+  auto result = (uvi_idx < num_uv_indices)
+      ? pack(uvi_idx, uv->first_compat_idx + start_idx + desired_idx)
+      : pack(uvi_idx, or_data.num_compat_indices);
   if (threadIdx.x == blockDim.x - 1) {
     if (uvi_idx < num_uv_indices) {
       start_idx += desired_idx + 1;
@@ -197,7 +201,6 @@ __device__ auto get_OR_sources_chunk(const SourceCompatibilityData& source,
   auto isc =
       is_source_compatible_with_all<tag::OR>(source, or_combo_idx, or_data);
 
-
   #ifdef CLOCKS
   atomicAdd(&or_is_src_compat_clocks, clock64() - begin);
   #endif
@@ -218,7 +221,7 @@ __device__ auto get_OR_sources_chunk(const SourceCompatibilityData& source,
 // with all of the XOR sources identified by the supplied xor_combo_idx, and
 // OR-compatible with the supplied source.
 __device__ auto is_any_OR_source_compatible(
-    const SourceCompatibilityData& source, fat_index_t xor_combo_idx) {
+    const SourceCompatibilityData& source, const fat_index_t xor_combo_idx) {
   const auto block_size = blockDim.x;
   __shared__ bool any_or_compat;
   __shared__ Variations xor_variations;
@@ -294,6 +297,11 @@ __device__ bool is_any_OR_source_compatible(
       xor_data.num_compat_indices;
 #endif
 
+  #ifdef DEBUG_OR_COUNTS
+  if (!threadIdx.x) atomicAdd(&count_or_xor_chunks, 1);
+  #endif
+  auto begin = clock64();
+
   // TODO: I don't really trust this termination condition for UV.
   // in particular, "xor_data.nuM_compat_indices" is a dumb number to
   // consider as the actual max. the real number is the sum of all of the
@@ -308,8 +316,10 @@ __device__ bool is_any_OR_source_compatible(
   assert(num_xor_indices > block_size * xor_chunk_idx);
   const auto max_results = std::min(block_size,
       num_xor_indices - block_size * xor_chunk_idx);
+  index_t num_sources{};
   for (auto xor_results_idx{next_xor_result_idx(0)};
-      xor_results_idx < max_results;) {
+      xor_results_idx < max_results; ++num_sources) {
+
     const auto xor_flat_idx = get_flat_idx(xor_chunk_idx, xor_results_idx);
 #ifdef XOR_SPANS
     const auto xor_combo_idx = get_xor_combo_index(xor_flat_idx, xor_idx_spans);
@@ -339,6 +349,18 @@ __device__ bool is_any_OR_source_compatible(
   }
   // No XOR results in this XOR chunk were compatible. The next call to this
   // function for this block will be with a new XOR chunk.
+
+  #ifdef DEBUG_OR_COUNTS
+  if (!threadIdx.x) {
+    atomicAdd(&count_or_incompat_xor_chunks, 1);
+    atomicAdd(&count_or_incompat_xor_chunk_sources, num_sources);
+  }
+  #endif
+
+  #ifdef CLOCKS
+  atomicAdd(&or_incompat_xor_clocks, clock64() - begin);
+  #endif
+
   return false;
 }
 

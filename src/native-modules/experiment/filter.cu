@@ -33,12 +33,16 @@ __device__ atomic64_t or_build_variation_clocks = 0;
 __device__ atomic64_t or_are_variations_compat_clocks = 0;
 __device__ atomic64_t or_check_src_compat_clocks = 0;
 __device__ atomic64_t or_is_src_compat_clocks = 0;
+__device__ atomic64_t or_incompat_xor_clocks = 0;
 
 __device__ atomic64_t count_or_get_compat_idx = 0;
 __device__ atomic64_t count_or_src_considered = 0;
 __device__ atomic64_t count_or_src_variation_compat = 0;
 __device__ atomic64_t count_or_check_src_compat = 0;
 __device__ atomic64_t count_or_src_compat = 0;
+__device__ atomic64_t count_or_xor_chunks = 0;
+__device__ atomic64_t count_or_incompat_xor_chunks = 0;
+__device__ atomic64_t count_or_incompat_xor_chunk_sources = 0;
 #endif
 
 namespace {
@@ -85,6 +89,9 @@ void init_counts() {
 
   err = cudaMemcpyToSymbol(or_is_src_compat_clocks, &value, sizeof(atomic64_t));
   assert_cuda_success(err, "init count");
+
+  err = cudaMemcpyToSymbol(or_incompat_xor_clocks, &value, sizeof(atomic64_t));
+  assert_cuda_success(err, "init count");
 #endif
 
 #ifdef DEBUG_XOR_COUNTS
@@ -118,6 +125,18 @@ void init_counts() {
 
   err = cudaMemcpyToSymbol(count_or_src_compat, &value, sizeof(atomic64_t));
   assert_cuda_success(err, "init count");
+
+  err = cudaMemcpyToSymbol(count_or_xor_chunks, &value,
+      sizeof(atomic64_t));
+  assert_cuda_success(err, "init count");
+
+  err = cudaMemcpyToSymbol(count_or_incompat_xor_chunks, &value,
+      sizeof(atomic64_t));
+  assert_cuda_success(err, "init count");
+
+  err = cudaMemcpyToSymbol(count_or_incompat_xor_chunk_sources, &value,
+      sizeof(atomic64_t));
+  assert_cuda_success(err, "init count");
 #endif
 }
 
@@ -134,6 +153,7 @@ void display_counts() {
   atomic64_t l_or_are_variations_compat_clocks;
   atomic64_t l_or_check_src_compat_clocks;
   atomic64_t l_or_is_src_compat_clocks;
+  atomic64_t l_or_incompat_xor_clocks;
 
   err = cudaMemcpyFromSymbol(&l_get_next_xor_compat_clocks,
       get_next_xor_compat_clocks, sizeof(atomic64_t));
@@ -167,8 +187,12 @@ void display_counts() {
       or_check_src_compat_clocks, sizeof(atomic64_t));
   assert_cuda_success(err, "display count");
 
-  err = cudaMemcpyFromSymbol(
-      &l_or_is_src_compat_clocks, or_is_src_compat_clocks, sizeof(atomic64_t));
+  err = cudaMemcpyFromSymbol(&l_or_is_src_compat_clocks,
+      or_is_src_compat_clocks, sizeof(atomic64_t));
+  assert_cuda_success(err, "display count");
+
+  err = cudaMemcpyFromSymbol(&l_or_incompat_xor_clocks, or_incompat_xor_clocks,
+      sizeof(atomic64_t));
   assert_cuda_success(err, "display count");
 #endif
   
@@ -178,20 +202,20 @@ void display_counts() {
   atomic64_t compat_xor_check_src_count;
   atomic64_t compat_xor_count;
 
-  err = cudaMemcpyFromSymbol(
-      &considered_xor_count, count_xor_src_considered, sizeof(atomic64_t));
+  err = cudaMemcpyFromSymbol(&considered_xor_count, count_xor_src_considered,
+      sizeof(atomic64_t));
   assert_cuda_success(err, "display count");
 
-  err = cudaMemcpyFromSymbol(
-      &compat_xor_src_variation_count, count_xor_src_variation_compat, sizeof(atomic64_t));
+  err = cudaMemcpyFromSymbol(&compat_xor_src_variation_count,
+      count_xor_src_variation_compat, sizeof(atomic64_t));
   assert_cuda_success(err, "display count");
 
-  err = cudaMemcpyFromSymbol(
-      &compat_xor_check_src_count, count_xor_check_src_compat, sizeof(atomic64_t));
+  err = cudaMemcpyFromSymbol(&compat_xor_check_src_count,
+      count_xor_check_src_compat, sizeof(atomic64_t));
   assert_cuda_success(err, "display count");
 
-  err = cudaMemcpyFromSymbol(
-      &compat_xor_count, count_xor_src_compat, sizeof(atomic64_t));
+  err = cudaMemcpyFromSymbol(&compat_xor_count, count_xor_src_compat,
+      sizeof(atomic64_t));
   assert_cuda_success(err, "display count");
 #endif
 
@@ -201,25 +225,40 @@ void display_counts() {
   atomic64_t compat_or_src_variation_count;
   atomic64_t compat_or_check_src_count;
   atomic64_t compat_or_count;
+  atomic64_t num_or_xor_chunks;
+  atomic64_t incompat_xor_chunks;
+  atomic64_t incompat_xor_chunk_sources;
 
-  err = cudaMemcpyFromSymbol(
-      &get_or_compat_idx_count, count_or_get_compat_idx, sizeof(atomic64_t));
+  err = cudaMemcpyFromSymbol(&get_or_compat_idx_count, count_or_get_compat_idx,
+      sizeof(atomic64_t));
   assert_cuda_success(err, "display count");
 
-  err = cudaMemcpyFromSymbol(
-      &considered_or_count, count_or_src_considered, sizeof(atomic64_t));
+  err = cudaMemcpyFromSymbol(&considered_or_count, count_or_src_considered,
+      sizeof(atomic64_t));
   assert_cuda_success(err, "display count");
 
-  err = cudaMemcpyFromSymbol(
-      &compat_or_src_variation_count, count_or_src_variation_compat, sizeof(atomic64_t));
+  err = cudaMemcpyFromSymbol(&compat_or_src_variation_count,
+      count_or_src_variation_compat, sizeof(atomic64_t));
   assert_cuda_success(err, "display count");
 
-  err = cudaMemcpyFromSymbol(
-      &compat_or_check_src_count, count_or_check_src_compat, sizeof(atomic64_t));
+  err = cudaMemcpyFromSymbol(&compat_or_check_src_count,
+      count_or_check_src_compat, sizeof(atomic64_t));
   assert_cuda_success(err, "display count");
 
-  err = cudaMemcpyFromSymbol(
-      &compat_or_count, count_or_src_compat, sizeof(atomic64_t));
+  err = cudaMemcpyFromSymbol(&compat_or_count, count_or_src_compat,
+      sizeof(atomic64_t));
+  assert_cuda_success(err, "display count");
+
+  err = cudaMemcpyFromSymbol(&num_or_xor_chunks, count_or_xor_chunks,
+      sizeof(atomic64_t));
+  assert_cuda_success(err, "display count");
+
+  err = cudaMemcpyFromSymbol(&incompat_xor_chunks, count_or_incompat_xor_chunks,
+      sizeof(atomic64_t));
+  assert_cuda_success(err, "display count");
+
+  err = cudaMemcpyFromSymbol(&incompat_xor_chunk_sources, count_or_incompat_xor_chunk_sources,
+      sizeof(atomic64_t));
   assert_cuda_success(err, "display count");
 #endif
 
@@ -290,8 +329,13 @@ void display_counts() {
       << " count: " << compat_or_count
 #endif
 #ifdef CLOCKS
-      << " clocks: " << l_or_is_src_compat_clocks
+      << " clocks: " << l_or_is_src_compat_clocks << std::endl
 #endif
+#endif
+#if defined(DEBUG_OR_COUNTS)
+      << " incompat xor chunks " << incompat_xor_chunks << " of "
+      << num_or_xor_chunks << ", sources: " << incompat_xor_chunk_sources
+      << " clocks: " << l_or_incompat_xor_clocks
 #endif
       << std::endl;
 }
