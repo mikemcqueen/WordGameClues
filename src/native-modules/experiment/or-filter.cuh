@@ -1,5 +1,6 @@
 #pragma once
 #include <cassert>
+#include <cub/block/block_scan.cuh>
 #include <thrust/execution_policy.h>
 #include <thrust/device_vector.h>
 #include <thrust/scan.h>
@@ -56,20 +57,6 @@ struct OR {};
 
 extern __constant__ FilterData::DeviceXor xor_data;
 extern __constant__ FilterData::DeviceOr or_data;
-
-__device__ __forceinline__ auto get_xor_combo_index(
-    index_t flat_idx, const IndexSpanPair& idx_spans) {
-  index_t compat_idx{};
-  if (flat_idx < idx_spans.first.size()) {
-    compat_idx = idx_spans.first[flat_idx];
-  } else {
-    flat_idx -= idx_spans.first.size();
-    // TODO #ifdef ASSERTS
-    assert(flat_idx < idx_spans.second.size());
-    compat_idx = idx_spans.second[flat_idx];
-  }
-  return xor_data.compat_indices[compat_idx];
-}
 
 __device__ __forceinline__ index_t get_flat_idx(
     index_t block_idx, index_t thread_idx = threadIdx.x) {
@@ -215,17 +202,26 @@ __device__ inline auto compute_variations_compat_results(
   __shared__ bool any_compat;
   if (!threadIdx.x) any_compat = false;
   __syncthreads();
-  for (auto idx{threadIdx.x}; idx < tgt_uv_data.num_unique_variations;
-      idx += blockDim.x) {
-    const auto& tgt_variations = tgt_uv_data.unique_variations[idx].variations;
-    const auto compat = UsedSources::are_variations_compatible(src_variations,
-        tgt_variations);
-    xor_data.variations_compat_results[results_offset + idx] = compat ? 1 : 0;
-    if (compat) any_compat = true;
+  // round up to nearest block size
+  const auto max_uv_idx = blockDim.x
+      * ((tgt_uv_data.num_unique_variations + blockDim.x - 1) / blockDim.x);
+  for (auto idx{threadIdx.x}; idx < max_uv_idx; idx += blockDim.x) {
+    if (idx < tgt_uv_data.num_unique_variations) {
+      const auto& tgt_variations =
+          tgt_uv_data.unique_variations[idx].variations;
+      const auto compat = UsedSources::are_variations_compatible(src_variations,
+          tgt_variations);
+      xor_data.variations_compat_results[results_offset + idx] = compat ? 1 : 0;
+      if (compat) any_compat = true;
+    } else {
+      xor_data.variations_compat_results[results_offset + idx] = 0;
+    }
   }
   __syncthreads();
   return any_compat;
 }
+
+inline __device__ bool shown = false;
 
 __device__ inline auto compute_compat_uv_indices(
     const index_t num_unique_variations, index_t* dst_uv_indices,
@@ -233,32 +229,64 @@ __device__ inline auto compute_compat_uv_indices(
   // convert flag array (variations_compat_results) to prefix sums
   // (variations_scan_results)
   const auto results_offset = blockIdx.x * num_results_per_block;
-  const auto d_flags = &xor_data.variations_compat_results[results_offset];
-  auto d_scan_output = &xor_data.variations_scan_results[results_offset];
-  thrust::device_ptr<const result_t> d_flags_ptr(d_flags);
-  thrust::device_ptr<result_t> d_scan_output_ptr(d_scan_output);
-  thrust::exclusive_scan(thrust::device, d_flags_ptr,
-      d_flags_ptr + num_unique_variations, d_scan_output_ptr);
+  const auto compat_results =
+      &xor_data.variations_compat_results[results_offset];
+  const auto scan_results = &xor_data.variations_scan_results[results_offset];
+  const auto last_result_idx = num_unique_variations - 1;
+#if 1
+  if (!blockIdx.x && !threadIdx.x && !shown)
+    printf("last_result_idx: %u\n", last_result_idx);
+#endif
+
+  constexpr auto kBlockSize = 64;
+  using BlockScan = cub::BlockScan<index_t, kBlockSize>;
+  __shared__ typename BlockScan::TempStorage temp_storage;
+
+  const auto max_idx = blockDim.x
+      * ((num_unique_variations + blockDim.x - 1) / blockDim.x);
+  __shared__ index_t prefix_sum;
+  if (!threadIdx.x) prefix_sum = 0;
+  for (index_t idx{threadIdx.x}; idx < max_idx; idx += blockDim.x) {
+    __syncthreads();
+    index_t val = compat_results[idx];
+    index_t total;
+    BlockScan(temp_storage).ExclusiveSum(val, scan_results[idx], total);
+    if (idx < num_unique_variations) {
+      scan_results[idx] += prefix_sum;
+      if (idx == last_result_idx) scan_results[idx] += val;
+    }
+#if 1
+    if (!blockIdx.x && !shown) {
+      printf("idx: %u, compat: %u, prefix: %u, total: %u, sum: %u\n", idx,
+          compat_results[idx], prefix_sum, total, scan_results[idx]);
+    }
+#endif
+    if (!threadIdx.x) prefix_sum += total;
+  }
 
   // generate indices from flag array + prefix sums
   const auto uv_indices_offset = blockIdx.x * num_unique_variations;
-  auto d_indices = &dst_uv_indices[uv_indices_offset];
-  thrust::device_ptr<index_t> d_indices_ptr(d_indices);
-  thrust::counting_iterator<int> count_begin(0);
-  thrust::for_each(thrust::device, count_begin,
-      count_begin + num_unique_variations,
-      [d_flags, d_scan_output, d_indices] __device__(const index_t idx) {
-        if (!threadIdx.x && d_flags[idx]) {
-          d_indices[d_scan_output[idx]] = idx;
-        }
-      });
+  for (index_t idx{threadIdx.x}; idx < num_unique_variations; idx += blockDim.x) {
+    //    if ((!idx && results[idx]) || (idx && (results[idx] > results[idx - 1]))) {
+    if (compat_results[idx]) {
+      dst_uv_indices[uv_indices_offset + scan_results[idx]] = idx;
+    }
+  }
+
+#if 1
+  if (!blockIdx.x && !threadIdx.x && !shown)
+    printf("last_scan_result: %u\n", scan_results[last_result_idx]);
+
+  if (!blockIdx.x) shown = true;
+#endif
+
   // compute total number of set flags (which is total num indices)
-  const auto last_idx = num_unique_variations - 1;
-  return d_scan_output[last_idx] + d_flags[last_idx];
+  //  return results[num_unique_variations - 1] + last_flag_value;
+  return scan_results[last_result_idx];
 }
 
+
 __device__ bool is_any_OR_source_compatible(
-    const SourceCompatibilityData& source, const index_t xor_chunk_idx,
-    const IndexSpanPair& xor_idx_spans);
+    const SourceCompatibilityData& source, const index_t xor_chunk_idx);
 
 }  // namespace cm

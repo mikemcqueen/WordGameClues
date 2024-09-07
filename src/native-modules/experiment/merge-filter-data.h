@@ -148,9 +148,10 @@ struct FilterData {
     device::VariationIndices* variation_indices;
     // flag array (0/1) of compatible entries with source variations and
     // or_data.unique_variations (dual use, allocated for greater of two)
-    result_t* variations_compat_results;
+    // TODO: update comment
+    index_t* variations_compat_results;
     // exclusive_scan results, also dual use
-    result_t* variations_scan_results;
+    index_t* variations_scan_results;
     // list of xor.unique_variations indices compatible with current source
     index_t* src_compat_uv_indices;
     // list of or.unique_variations indices compatible with current xor source
