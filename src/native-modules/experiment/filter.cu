@@ -553,12 +553,12 @@ __device__ auto compute_compat_XOR_uv_indices(const Variations& src_variations) 
   const auto begin = clock64();
   index_t num_uv_indices{};
   if (compute_variations_compat_results(src_variations, xor_data,
-          xor_data.variations_results_per_block)) {
+          xor_data.src_compat_uv_indices)) {
     num_uv_indices = compute_compat_uv_indices(xor_data.num_unique_variations,
-        xor_data.src_compat_uv_indices, xor_data.variations_results_per_block);
+        xor_data.src_compat_uv_indices);
   }
 
-#ifdef CLOCKS
+  #ifdef CLOCKS
   atomicAdd(&xor_compute_compat_uv_indices_clocks, clock64() - begin);
   #endif
 
@@ -807,7 +807,6 @@ __global__ void filter_kernel(const SourceCompatibilityData* RESTRICT src_list,
     const result_t* RESTRICT compat_src_results,
     const UniqueVariations* src_unique_variations,
     int num_src_unique_variations, result_t* RESTRICT results, int stream_idx) {
-  const auto block_size = blockDim.x;
   __shared__ bool is_compat;
   if (!threadIdx.x) is_compat = false;
 
@@ -825,13 +824,11 @@ __global__ void filter_kernel(const SourceCompatibilityData* RESTRICT src_list,
     __syncthreads();
     const auto src_idx = src_indices[idx];
     const auto flat_idx = src_idx.index;
-    if (compat_src_results && !compat_src_results[flat_idx]) continue;
-
-    dynamic_shared[kSrcFlatIdx] = src_idx.listIndex;
-
-    const auto& source = src_list[flat_idx];
-    if (is_compat_loop(source)) {  //
-      is_compat = true;
+    if (!compat_src_results || compat_src_results[flat_idx]) {
+      dynamic_shared[kSrcFlatIdx] = src_idx.listIndex;
+      if (is_compat_loop(src_list[flat_idx])) {  
+        is_compat = true;
+      }
     }
     __syncthreads();
     if (is_compat && !threadIdx.x) {
@@ -902,14 +899,12 @@ void run_filter_kernel(int threads_per_block, StreamData& stream,
     mfd.device_xor.variations_results_per_block = max_uv;
 
     // NB: these have the potential to grow large as num_variations grow
-    const auto or_indices_bytes =
-        ((mfd.device_or.num_unique_variations + block_size - 1) / block_size)
-        * block_size * grid_size * sizeof(index_t);
+    const auto or_indices_bytes = mfd.device_or.num_unique_variations
+        * grid_size * sizeof(index_t);
     cuda_malloc_async((void**)&mfd.device_xor.or_compat_uv_indices,
         or_indices_bytes, cuda_stream, "xor.or_compat_uv_indices");
-    const auto src_indices_bytes =
-        ((mfd.device_xor.num_unique_variations + block_size - 1) / block_size)
-        * block_size * grid_size * sizeof(index_t);
+    const auto src_indices_bytes = mfd.device_xor.num_unique_variations
+        * grid_size * sizeof(index_t);
     cuda_malloc_async((void**)&mfd.device_xor.src_compat_uv_indices,
         src_indices_bytes, cuda_stream, "xor.src_compat_uv_indices");
   }

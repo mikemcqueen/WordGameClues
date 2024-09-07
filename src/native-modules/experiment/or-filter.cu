@@ -56,10 +56,10 @@ __device__ variation_index_t get_one_variation(
 __device__ auto compute_compat_OR_uv_indices(const Variations& xor_variations) {
   const auto begin = clock64();
   index_t num_uv_indices{};
-  if (compute_variations_compat_results(
-          xor_variations, or_data, xor_data.variations_results_per_block)) {
+  if (compute_variations_compat_results(xor_variations, or_data,
+          xor_data.or_compat_uv_indices)) {
     num_uv_indices = compute_compat_uv_indices(or_data.num_unique_variations,
-        xor_data.or_compat_uv_indices, xor_data.variations_results_per_block);
+        xor_data.or_compat_uv_indices);
   }
 
   #ifdef CLOCKS

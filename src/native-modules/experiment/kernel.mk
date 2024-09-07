@@ -18,7 +18,7 @@ NVCC_COMPILE_FLAGS := -Xcompiler -fPIC \
 	-Xptxas=-v \
 	-lineinfo \
 	-std=c++20 \
-	-O3 \
+	-O2 \
 	-dopt=on \
 	-maxrregcount=40
 

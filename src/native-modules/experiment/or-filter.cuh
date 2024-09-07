@@ -1,20 +1,15 @@
 #pragma once
 #include <cassert>
 #include <cub/block/block_scan.cuh>
-#include <thrust/execution_policy.h>
-#include <thrust/device_vector.h>
-#include <thrust/scan.h>
-#include <thrust/iterator/counting_iterator.h>
-#include <thrust/copy.h>
+#include <cooperative_groups.h>
 #include "cuda-types.h"
 #include "merge-filter-data.h"
 
 namespace cm {
 
-#if 1
-//#define LOGGY
-//#define XOR_SPANS
+namespace cg = cooperative_groups;
 
+#if 1
 #define CLOCKS
 #define DEBUG_OR_COUNTS
 #define DEBUG_XOR_COUNTS
@@ -193,28 +188,21 @@ __device__ auto build_variations(fat_index_t combo_idx, const T& data) {
   return v;
 }
 
-// TODO: dst_compat_results param maybe
 __device__ inline auto compute_variations_compat_results(
     const Variations& src_variations,
     const FilterData::DeviceCommon& tgt_uv_data,
-    const index_t num_results_per_block) {
+    index_t* out_compat_results) {
   __shared__ bool any_compat;
   if (!threadIdx.x) any_compat = false;
   __syncthreads();
-  const auto results_offset = blockIdx.x * num_results_per_block;
-  auto results = &xor_data.variations_compat_results[results_offset];
-  // round up to nearest block size
-  const auto max_uv_idx = blockDim.x
-      * ((tgt_uv_data.num_unique_variations + blockDim.x - 1) / blockDim.x);
-  for (auto idx{threadIdx.x}; idx < max_uv_idx; idx += blockDim.x) {
-    if (idx < tgt_uv_data.num_unique_variations) {
-      const auto compat = UsedSources::are_variations_compatible(src_variations,
-          tgt_uv_data.unique_variations[idx].variations);
-      results[idx] = compat ? 1 : 0;
-      if (compat) any_compat = true;
-    } else {
-      results[idx] = 0;
-    }
+  const auto results_offset = blockIdx.x * tgt_uv_data.num_unique_variations;
+  const auto results = &out_compat_results[results_offset];
+  for (auto idx{threadIdx.x}; idx < tgt_uv_data.num_unique_variations;
+      idx += blockDim.x) {
+    const auto compat = UsedSources::are_variations_compatible(src_variations,
+        tgt_uv_data.unique_variations[idx].variations);
+    results[idx] = compat ? 1 : 0;
+    if (compat) any_compat = true;
   }
   __syncthreads();
   return any_compat;
@@ -235,8 +223,9 @@ __device__ inline void compute_prefix_sums_in_place(index_t* results,
   __shared__ index_t prefix_sum;
   if (!threadIdx.x) prefix_sum = 0;
   for (index_t idx{threadIdx.x}; idx < max_idx; idx += blockDim.x) {
-    index_t total;
-    BlockScan(temp_storage).ExclusiveSum(results[idx], results[idx], total);
+    const auto compat_result = idx < num_unique_variations ? results[idx] : 0;
+    index_t total{};
+    BlockScan(temp_storage).ExclusiveSum(compat_result, results[idx], total);
     __syncthreads();
     if (idx < num_results) {
       results[idx] += prefix_sum;
@@ -256,7 +245,6 @@ __device__ inline auto compact_indices(const index_t* scan_results,
       indices[scan_results[idx]] = idx;
     }
   }
-  // sync for access to last *scan* result on all threads
   __syncthreads();
   const auto last_scan_result = scan_results[last_result_idx];
   if (!threadIdx.x && last_compat_result) {
