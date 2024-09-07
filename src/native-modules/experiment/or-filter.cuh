@@ -225,18 +225,16 @@ inline __device__ bool shown = false;
 __device__ inline auto compute_compat_uv_indices(
     const index_t num_unique_variations, index_t* dst_uv_indices,
     const index_t num_results_per_block) {
-  // convert flag array (variations_compat_results) to prefix sums
-  // (variations_scan_results)
   const auto results_offset = blockIdx.x * num_results_per_block;
-  const auto compat_results =
-      &xor_data.variations_compat_results[results_offset];
-  const auto scan_results = &xor_data.variations_scan_results[results_offset];
+  const auto results = &xor_data.variations_compat_results[results_offset];
   const auto last_result_idx = num_unique_variations - 1;
+  const auto last_compat_result = results[last_result_idx];
 
   constexpr auto kBlockSize = 64;
   using BlockScan = cub::BlockScan<index_t, kBlockSize>;
   __shared__ typename BlockScan::TempStorage temp_storage;
 
+  // convert flag array (variations_compat_results) to prefix sums
   const auto max_idx = blockDim.x
       * ((num_unique_variations + blockDim.x - 1) / blockDim.x);
   __shared__ index_t prefix_sum;
@@ -248,22 +246,26 @@ __device__ inline auto compute_compat_uv_indices(
     __syncthreads();
     if (idx < num_unique_variations) {
       scan_results[idx] += prefix_sum;
-      if (idx == last_result_idx) scan_results[idx] += compat_results[idx];
+      if (idx == last_result_idx) scan_results[idx] += last_compat_result;
     }
     if (!threadIdx.x) prefix_sum += total;
   }
-  // generate indices from flag array + prefix sums
+
+  // generate indices from prefix sums
   const auto uv_indices_offset = blockIdx.x * num_unique_variations;
-  for (index_t idx{threadIdx.x}; idx < num_unique_variations; idx += blockDim.x) {
-    if (compat_results[idx]) {
-      dst_uv_indices[uv_indices_offset + scan_results[idx]] = idx;
+  const auto indices = &dst_uv_indices[uv_indices_offset];
+  for (index_t idx{threadIdx.x}; idx < last_result_idx; idx += blockDim.x) {
+    if (results[idx] < results[idx + 1]) {  //
+      indices[results[idx]] = idx;
     }
   }
-  // sync all threads correct value of scan_results[last_result_idx]
-  // there may be other ways to achieve this, e.g. atomic store/load
   __syncthreads();
+  const auto last_scan_result = results[last_result_idx];
+  if (!threadIdx.x && last_compat_result) {
+    indices[last_scan_result] = last_result_idx;
+  }
   // compute total number of set flags (which is total num indices)
-  return scan_results[last_result_idx];
+  return last_scan_result;
 }
 
 __device__ bool is_any_OR_source_compatible(
