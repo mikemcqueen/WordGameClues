@@ -227,8 +227,6 @@ __device__ inline auto compute_compat_uv_indices(
     const index_t num_results_per_block) {
   const auto results_offset = blockIdx.x * num_results_per_block;
   const auto results = &xor_data.variations_compat_results[results_offset];
-  const auto last_result_idx = num_unique_variations - 1;
-  const auto last_compat_result = results[last_result_idx];
 
   constexpr auto kBlockSize = 64;
   using BlockScan = cub::BlockScan<index_t, kBlockSize>;
@@ -264,7 +262,7 @@ __device__ inline auto compute_compat_uv_indices(
   if (!threadIdx.x && last_compat_result) {
     indices[last_scan_result] = last_result_idx;
   }
-  // compute total number of set flags (which is total num indices)
+  // return last computed sum = total number of set flags = total num indices
   return last_scan_result;
 }
 
