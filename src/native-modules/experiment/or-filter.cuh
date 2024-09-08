@@ -241,12 +241,11 @@ __device__ inline auto compute_compat_uv_indices(
   if (!threadIdx.x) prefix_sum = 0;
   for (index_t idx{threadIdx.x}; idx < max_idx; idx += blockDim.x) {
     index_t total;
-    BlockScan(temp_storage)
-        .ExclusiveSum(compat_results[idx], scan_results[idx], total);
+    BlockScan(temp_storage).ExclusiveSum(results[idx], results[idx], total);
     __syncthreads();
     if (idx < num_unique_variations) {
-      scan_results[idx] += prefix_sum;
-      if (idx == last_result_idx) scan_results[idx] += last_compat_result;
+      results[idx] += prefix_sum;
+      if (idx == last_result_idx) results[idx] += last_compat_result;
     }
     if (!threadIdx.x) prefix_sum += total;
   }
@@ -259,6 +258,7 @@ __device__ inline auto compute_compat_uv_indices(
       indices[results[idx]] = idx;
     }
   }
+  // sync for access to last *scan* result on all threads
   __syncthreads();
   const auto last_scan_result = results[last_result_idx];
   if (!threadIdx.x && last_compat_result) {
