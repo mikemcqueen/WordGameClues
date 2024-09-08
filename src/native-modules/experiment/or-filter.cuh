@@ -195,8 +195,8 @@ __device__ inline auto compute_variations_compat_results(
   if (!threadIdx.x) any_compat = false;
   __syncthreads();
 #ifdef ONE_ARRAY
-  const auto results_offset = blockIdx.x * num_results_per_block;
-  const auto results = &compat_results[results_offset];
+  const auto results_offset = blockIdx.x * tgt_uv_data.num_unique_variations;
+  const auto results = &out_compat_results[results_offset];
 #else
   const auto results_offset = blockIdx.x * xor_data.variations_results_per_block;
   const auto results = &xor_data.variations_compat_results[results_offset];
@@ -250,6 +250,7 @@ __device__ inline auto compact_indices(const index_t* scan_results,
       indices[scan_results[idx]] = idx;
     }
   }
+  // sync for access to last *scan* result on all threads
   __syncthreads();
   const auto last_scan_result = scan_results[last_result_idx];
   if (!threadIdx.x && last_compat_result) {
@@ -259,38 +260,65 @@ __device__ inline auto compact_indices(const index_t* scan_results,
   return last_scan_result;
 }
 
-// compact prefix sums in place
-__device__ inline auto compact_indices_in_place(index_t* results,
-    const index_t num_results) {
+inline __device__ bool shown = false;
+
+// compact indices from prefix sums in same array
+__device__ inline auto compact_indices(index_t* results,
+    const index_t num_results, const index_t last_compat_result) {
   __shared__ index_t indices[kBlockSize];
   __shared__ index_t total_indices;
   __shared__ index_t num_indices_this_block;
   if (!threadIdx.x) total_indices = 0;
   const auto last_result_idx = num_results - 1;
+  const auto last_scan_result = results[last_result_idx];
   // NOTE: this is almost certainly broken if blockDim.x != kBlockSize
   const auto max_idx = blockDim.x
       * ((num_results + blockDim.x - 1) / blockDim.x);
   for (index_t idx{threadIdx.x}; idx < max_idx; idx += blockDim.x) {
     if (!threadIdx.x) num_indices_this_block = 0;
-    __syncthreads();  // total_indices, num_indices_this_block
+    __syncthreads();  // sync total_indices, num_indices_this_block
     if (idx < last_result_idx) {
       if (results[idx] < results[idx + 1]) {  //
-        indices[results[idx] - total_indices] = idx;
+        if (results[idx] - total_indices >= kBlockSize) {
+          printf("block %u results[%u]: %u, total: %u, diff: %u\n", blockIdx.x,
+              idx, results[idx], total_indices, results[idx] - total_indices);
+        } else
+          indices[results[idx] - total_indices] = idx;
       }
-      if (idx == blockDim.x - 1 || idx == last_result_idx - 1) {
-        num_indices_this_block = results[idx] - total_indices;
+      if (threadIdx.x == blockDim.x - 1) {
+        num_indices_this_block = results[idx + 1] - total_indices;
       }
+    } else if (idx == last_result_idx) {
+      num_indices_this_block = results[idx] + last_compat_result
+          - total_indices;
     }
     __syncthreads();
     if (threadIdx.x < num_indices_this_block) {
       results[total_indices + threadIdx.x] = indices[threadIdx.x];
+      if (!blockIdx.x && !shown) {
+        printf("block %u, idx %u, tid %u, total %u, num_this_block %u"
+               ", results[%u] = %u\n",
+            blockIdx.x, idx, threadIdx.x, total_indices, num_indices_this_block,
+            total_indices + threadIdx.x, indices[threadIdx.x]);
+      }
     }
     if (!threadIdx.x) total_indices += num_indices_this_block;
   }
-  return results[last_result_idx];
+#if 1
+  __syncthreads();
+  if (!blockIdx.x && !threadIdx.x) shown = true;
+#endif
+
+#if 0
+  if (last_compat_result) {
+    ++num_indices;
+    if (!threadIdx.x) results[last_scan_result] = last_result_idx;
+  }
+#endif
+  return last_scan_result + last_compat_result;
 }
 
-// convert flag array -> prefix sums -> indices
+// convert compat results flag array -> prefix sums -> indices
 __device__ inline auto compute_compat_uv_indices(
     const index_t num_unique_variations, index_t* in_results_out_indices) {
 #ifdef ONE_ARRAY
