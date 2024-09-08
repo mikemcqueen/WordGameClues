@@ -190,13 +190,17 @@ __device__ auto build_variations(fat_index_t combo_idx, const T& data) {
 
 __device__ inline auto compute_variations_compat_results(
     const Variations& src_variations,
-    const FilterData::DeviceCommon& tgt_uv_data,
-    index_t* out_compat_results) {
+    const FilterData::DeviceCommon& tgt_uv_data, index_t* compat_results) {
   __shared__ bool any_compat;
   if (!threadIdx.x) any_compat = false;
   __syncthreads();
-  const auto results_offset = blockIdx.x * tgt_uv_data.num_unique_variations;
-  const auto results = &out_compat_results[results_offset];
+#ifdef ONE_ARRAY
+  const auto results_offset = blockIdx.x * num_results_per_block;
+  const auto results = &compat_results[results_offset];
+#else
+  const auto results_offset = blockIdx.x * xor_data.variations_results_per_block;
+  const auto results = &xor_data.variations_compat_results[results_offset];
+#endif
   for (auto idx{threadIdx.x}; idx < tgt_uv_data.num_unique_variations;
       idx += blockDim.x) {
     const auto compat = UsedSources::are_variations_compatible(src_variations,
@@ -208,13 +212,14 @@ __device__ inline auto compute_variations_compat_results(
   return any_compat;
 }
 
+constexpr auto kBlockSize = 64;
+
 // compute prefix sums from compat results flag array
 __device__ inline void compute_prefix_sums_in_place(index_t* results,
     const index_t num_results) {
   const auto last_result_idx = num_results - 1;
   const auto last_compat_result = results[last_result_idx];
 
-  constexpr auto kBlockSize = 64;
   using BlockScan = cub::BlockScan<index_t, kBlockSize>;
   __shared__ typename BlockScan::TempStorage temp_storage;
 
@@ -223,7 +228,7 @@ __device__ inline void compute_prefix_sums_in_place(index_t* results,
   __shared__ index_t prefix_sum;
   if (!threadIdx.x) prefix_sum = 0;
   for (index_t idx{threadIdx.x}; idx < max_idx; idx += blockDim.x) {
-    const auto compat_result = idx < num_unique_variations ? results[idx] : 0;
+    const auto compat_result = idx < num_results ? results[idx] : 0;
     index_t total{};
     BlockScan(temp_storage).ExclusiveSum(compat_result, results[idx], total);
     __syncthreads();
@@ -254,6 +259,67 @@ __device__ inline auto compact_indices(const index_t* scan_results,
   return last_scan_result;
 }
 
+// compact prefix sums in place
+__device__ inline auto compact_indices_in_place(index_t* results,
+    const index_t num_results) {
+  __shared__ index_t indices[kBlockSize];
+  __shared__ index_t total_indices;
+  __shared__ index_t num_indices_this_block;
+  if (!threadIdx.x) total_indices = 0;
+  const auto last_result_idx = num_results - 1;
+  // NOTE: this is almost certainly broken if blockDim.x != kBlockSize
+  const auto max_idx = blockDim.x
+      * ((num_results + blockDim.x - 1) / blockDim.x);
+  for (index_t idx{threadIdx.x}; idx < max_idx; idx += blockDim.x) {
+    if (!threadIdx.x) num_indices_this_block = 0;
+    __syncthreads();  // total_indices, num_indices_this_block
+    if (idx < last_result_idx) {
+      if (results[idx] < results[idx + 1]) {  //
+        indices[results[idx] - total_indices] = idx;
+      }
+      if (idx == blockDim.x - 1 || idx == last_result_idx - 1) {
+        num_indices_this_block = results[idx] - total_indices;
+      }
+    }
+    __syncthreads();
+    if (threadIdx.x < num_indices_this_block) {
+      results[total_indices + threadIdx.x] = indices[threadIdx.x];
+    }
+    if (!threadIdx.x) total_indices += num_indices_this_block;
+  }
+  return results[last_result_idx];
+}
+
+// convert flag array -> prefix sums -> indices
+__device__ inline auto compute_compat_uv_indices(
+    const index_t num_unique_variations, index_t* in_results_out_indices) {
+#ifdef ONE_ARRAY
+  const auto results_offset = blockIdx.x * num_unique_variations;
+  const auto results = &in_results_out_indices[results_offset];
+#else
+  const auto results_offset = blockIdx.x * xor_data.variations_results_per_block;
+  const auto results = &xor_data.variations_compat_results[results_offset];
+#endif
+  const auto last_result_idx = num_unique_variations - 1;
+  const auto last_compat_result = results[last_result_idx];
+
+  compute_prefix_sums_in_place(results, num_unique_variations);
+#ifdef ONE_ARRAY
+  auto num_indices = compact_indices_in_place(results, num_unique_variations);
+  if (last_compat_result) {
+    ++num_indices;
+    if (!threadIdx.x) results[num_indices] = last_result_idx;
+  }
+#else
+  const auto indices_offset = blockIdx.x * num_unique_variations;
+  const auto indices = &in_results_out_indices[indices_offset];
+  const auto num_indices = compact_indices(results, num_unique_variations,
+      indices, last_compat_result);
+#endif
+  return num_indices;
+}
+
+  /*
 __device__ inline auto compute_compat_uv_indices(
     const index_t num_unique_variations, index_t* dst_uv_indices,
     const index_t num_results_per_block) {
@@ -270,7 +336,8 @@ __device__ inline auto compute_compat_uv_indices(
 
   return num_indices;
 }
-
+  */
+  
 __device__ bool is_any_OR_source_compatible(
     const SourceCompatibilityData& source, const index_t xor_chunk_idx);
 
