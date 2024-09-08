@@ -198,23 +198,22 @@ __device__ inline auto compute_variations_compat_results(
     const Variations& src_variations,
     const FilterData::DeviceCommon& tgt_uv_data,
     const index_t num_results_per_block) {
-  const auto results_offset = blockIdx.x * num_results_per_block;
   __shared__ bool any_compat;
   if (!threadIdx.x) any_compat = false;
   __syncthreads();
+  const auto results_offset = blockIdx.x * num_results_per_block;
+  auto results = &xor_data.variations_compat_results[results_offset];
   // round up to nearest block size
   const auto max_uv_idx = blockDim.x
       * ((tgt_uv_data.num_unique_variations + blockDim.x - 1) / blockDim.x);
   for (auto idx{threadIdx.x}; idx < max_uv_idx; idx += blockDim.x) {
     if (idx < tgt_uv_data.num_unique_variations) {
-      const auto& tgt_variations =
-          tgt_uv_data.unique_variations[idx].variations;
       const auto compat = UsedSources::are_variations_compatible(src_variations,
-          tgt_variations);
-      xor_data.variations_compat_results[results_offset + idx] = compat ? 1 : 0;
+          tgt_uv_data.unique_variations[idx].variations);
+      results[idx] = compat ? 1 : 0;
       if (compat) any_compat = true;
     } else {
-      xor_data.variations_compat_results[results_offset + idx] = 0;
+      results[idx] = 0;
     }
   }
   __syncthreads();
@@ -233,10 +232,6 @@ __device__ inline auto compute_compat_uv_indices(
       &xor_data.variations_compat_results[results_offset];
   const auto scan_results = &xor_data.variations_scan_results[results_offset];
   const auto last_result_idx = num_unique_variations - 1;
-#if 1
-  if (!blockIdx.x && !threadIdx.x && !shown)
-    printf("last_result_idx: %u\n", last_result_idx);
-#endif
 
   constexpr auto kBlockSize = 64;
   using BlockScan = cub::BlockScan<index_t, kBlockSize>;
@@ -247,44 +242,29 @@ __device__ inline auto compute_compat_uv_indices(
   __shared__ index_t prefix_sum;
   if (!threadIdx.x) prefix_sum = 0;
   for (index_t idx{threadIdx.x}; idx < max_idx; idx += blockDim.x) {
-    __syncthreads();
-    index_t val = compat_results[idx];
     index_t total;
-    BlockScan(temp_storage).ExclusiveSum(val, scan_results[idx], total);
+    BlockScan(temp_storage)
+        .ExclusiveSum(compat_results[idx], scan_results[idx], total);
+    __syncthreads();
     if (idx < num_unique_variations) {
       scan_results[idx] += prefix_sum;
-      if (idx == last_result_idx) scan_results[idx] += val;
+      if (idx == last_result_idx) scan_results[idx] += compat_results[idx];
     }
-#if 1
-    if (!blockIdx.x && !shown) {
-      printf("idx: %u, compat: %u, prefix: %u, total: %u, sum: %u\n", idx,
-          compat_results[idx], prefix_sum, total, scan_results[idx]);
-    }
-#endif
     if (!threadIdx.x) prefix_sum += total;
   }
-
   // generate indices from flag array + prefix sums
   const auto uv_indices_offset = blockIdx.x * num_unique_variations;
   for (index_t idx{threadIdx.x}; idx < num_unique_variations; idx += blockDim.x) {
-    //    if ((!idx && results[idx]) || (idx && (results[idx] > results[idx - 1]))) {
     if (compat_results[idx]) {
       dst_uv_indices[uv_indices_offset + scan_results[idx]] = idx;
     }
   }
-
-#if 1
-  if (!blockIdx.x && !threadIdx.x && !shown)
-    printf("last_scan_result: %u\n", scan_results[last_result_idx]);
-
-  if (!blockIdx.x) shown = true;
-#endif
-
+  // sync all threads correct value of scan_results[last_result_idx]
+  // there may be other ways to achieve this, e.g. atomic store/load
+  __syncthreads();
   // compute total number of set flags (which is total num indices)
-  //  return results[num_unique_variations - 1] + last_flag_value;
   return scan_results[last_result_idx];
 }
-
 
 __device__ bool is_any_OR_source_compatible(
     const SourceCompatibilityData& source, const index_t xor_chunk_idx);

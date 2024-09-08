@@ -226,26 +226,25 @@ __device__ auto is_any_OR_source_compatible(
     }
     xor_variations[threadIdx.x] = get_one_variation(threadIdx.x, xor_combo_idx);
   }
-  __syncthreads();
+  // compute_compat will call __sync
   const auto num_uv_indices = compute_compat_OR_uv_indices(xor_variations);
   if (!num_uv_indices) return false;
   for (index_t or_chunk_idx{};
       or_chunk_idx * block_size < or_data.num_compat_indices; ++or_chunk_idx) {
+    __syncthreads();
     if (get_OR_sources_chunk(source, or_chunk_idx, xor_variations,
             num_uv_indices)) {
       any_or_compat = true;
     }
     __syncthreads();
-
-    // Or compatibility here is "success" for the supplied source and will
-    // result in an exit out of is_compat_loop.
-    if (any_or_compat) return true;
+    if (any_or_compat) break;
     if (dynamic_shared[kOrStartUvIdx] == num_uv_indices) break;
   }
-  // No OR sources were compatible with both the supplied xor_combo_idx and
-  // the supplied source. The next call to this function will be with a new
-  // xor_combo_idx.
-  return false;
+  // Or compatibility here is "success" for the supplied source and will
+  // result in an exit out of is_compat_loop.
+  // If no OR sources were compatible, the next call to this function will
+  // be with a new xor_combo_idx.
+  return any_or_compat;
 }
 
 // not the fastest function in the world. but keeps GPU busy at least.
