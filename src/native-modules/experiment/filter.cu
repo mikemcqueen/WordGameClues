@@ -549,6 +549,11 @@ __device__ auto init_source(const SourceCompatibilityData& source) {
   return compute_src_compat_results<tag::OR>(source, or_data);
 }
 
+  //
+  // so i'm thinking maybe a cudaMemcpyAysnc hasn't completed yet at this point
+  // for src_compat_uv_indices? find out where that is initialized host-side.
+  // 
+
 __device__ auto compute_compat_XOR_uv_indices(const Variations& src_variations) {
   const auto begin = clock64();
   index_t num_uv_indices{};
@@ -825,7 +830,8 @@ __global__ void filter_kernel(const SourceCompatibilityData* RESTRICT src_list,
     const auto src_idx = src_indices[idx];
     const auto flat_idx = src_idx.index;
     if (!compat_src_results || compat_src_results[flat_idx]) {
-      dynamic_shared[kSrcFlatIdx] = src_idx.listIndex;
+      dynamic_shared[kSrcListIdx] = src_idx.listIndex;
+      dynamic_shared[kSrcIdx] = src_idx.index;
       if (is_compat_loop(src_list[flat_idx])) {  
         is_compat = true;
       }
@@ -961,8 +967,8 @@ void run_get_compatible_sources_kernel(
   int num_sm;
   cudaDeviceGetAttribute(&num_sm, cudaDevAttrMultiProcessorCount, 0);
   int threads_per_sm;
-  cudaDeviceGetAttribute(
-      &threads_per_sm, cudaDevAttrMaxThreadsPerMultiProcessor, 0);
+  cudaDeviceGetAttribute(&threads_per_sm,
+      cudaDevAttrMaxThreadsPerMultiProcessor, 0);
   auto block_size = 768;  // aka threads per block
   auto blocks_per_sm = threads_per_sm / block_size;
   assert(blocks_per_sm * block_size == threads_per_sm);
