@@ -125,9 +125,6 @@ struct FilterData {
     void reset_pointers() {
       Base::reset_pointers();
       incompat_src_desc_pairs = nullptr;
-      variation_indices = nullptr;
-      variations_compat_results = nullptr;
-      variations_scan_results = nullptr;
       src_compat_uv_indices = nullptr;
       or_compat_uv_indices = nullptr;
     }
@@ -136,27 +133,16 @@ struct FilterData {
     void cuda_free() {
       Base::cuda_free();
       cm::cuda_free(incompat_src_desc_pairs);
-      cm::cuda_free(variation_indices);
-      cm::cuda_free(variations_compat_results);
-      cm::cuda_free(variations_scan_results);
       cm::cuda_free(src_compat_uv_indices);
       cm::cuda_free(or_compat_uv_indices);
       reset_pointers();
     }
 
     UsedSources::SourceDescriptorPair* incompat_src_desc_pairs;
-    device::VariationIndices* variation_indices;
-    // flag array (0/1) of compatible entries with source variations and
-    // or_data.unique_variations (dual use, allocated for greater of two)
-    // TODO: update comment
-    index_t* variations_compat_results;
-    // exclusive_scan results, also dual use
-    index_t* variations_scan_results;
     // list of xor.unique_variations indices compatible with current source
     index_t* src_compat_uv_indices;
     // list of or.unique_variations indices compatible with current xor source
     index_t* or_compat_uv_indices;
-    index_t variations_results_per_block;
   } device_xor;
 
   //

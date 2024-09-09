@@ -259,8 +259,7 @@ auto run_concurrent_filter_kernels(int sum, StreamSwarm& streams,
     int threads_per_block, IndexStates& idx_states, FilterData& mfd,
     const SourceCompatibilityData* device_src_list,
     const result_t* device_compat_src_results,
-    const UniqueVariations* device_unique_variations, int num_unique_variations,
-    result_t* device_results, const index_t* device_start_indices,
+    result_t* device_results,  // const index_t* device_start_indices,
     std::vector<result_t>& results) {
   int total_processed{};
   int total_compat{};
@@ -275,8 +274,9 @@ auto run_concurrent_filter_kernels(int sum, StreamSwarm& streams,
         log_fill_indices(sum, stream, idx_states, t.microseconds());
         stream.alloc_copy_source_indices(idx_states);
         run_filter_kernel(threads_per_block, stream, mfd, device_src_list,
-            device_compat_src_results, device_unique_variations,
-            num_unique_variations, device_results, device_start_indices);
+            device_compat_src_results,
+            device_results  //, device_start_indices
+        );
       }
     } else {
       // kernel on stream has finished
@@ -356,7 +356,6 @@ void log_filter_sources(int sum, int num_processed, int num_compat,
 filter_task_result_t filter_sources(FilterData& mfd,
     const SourceCompatibilityData* device_sources,
     const result_t* device_compat_src_results,
-    const UniqueVariations* device_unique_variations, int num_unique_variations,
     std::vector<IndexList>& idx_lists, const FilterParams& params,
     cudaStream_t stream) {
   using namespace std::experimental::fundamentals_v3;
@@ -367,10 +366,11 @@ filter_task_result_t filter_sources(FilterData& mfd,
   const auto num_src_lists = idx_lists.size();
   const auto num_results = num_src_lists;
   IndexStates idx_states{std::move(idx_lists)};
+  /*
   auto device_start_indices = idx_states.alloc_copy_start_indices(stream);
   scope_exit free_indices{
       [device_start_indices]() { cuda_free(device_start_indices); }};
-
+  */
   auto device_results = cuda_alloc_results(num_results, stream, "filter results");
   scope_exit free_results{[device_results]() { cuda_free(device_results); }};
   cuda_zero_results(device_results, num_results, stream);
@@ -384,8 +384,8 @@ filter_task_result_t filter_sources(FilterData& mfd,
   auto t = util::Timer::start_timer();
   auto [num_processed, num_compat] = run_concurrent_filter_kernels(params.sum,
       streams, params.threads_per_block, idx_states, mfd, device_sources,
-      device_compat_src_results, device_unique_variations,
-      num_unique_variations, device_results, device_start_indices, results);
+      device_compat_src_results, device_results,  // device_start_indices,
+      results);
   t.stop();
   SourceCompatibilitySet incompat_sources;
   int num_incompat_sources{};
@@ -452,20 +452,18 @@ auto filter_task(FilterData& mfd, FilterParams params) {
   const auto& candidates = get_candidates(params.sum);
   CudaEvent copy_start(stream);
   auto idx_lists = make_variations_sorted_idx_lists(candidates);
-  UniqueVariations* device_uv{};
-  scope_exit free_uv{[device_uv]() { cuda_free(device_uv); }};
-  int num_uv{};
   SourceCompatibilityData* device_sources{};
   scope_exit free_sources{[device_sources]() { cuda_free(device_sources); }};
   const auto num_sources = util::sum_sizes(idx_lists);
   {
+    // TODO: there is a lot of effort here to sort sources, originally for the
+    // purpose of enabling unique_variations, which is no longer necessary.
+    // this sorting can be very time consuming I think (host-side), but one
+    // benefit is we no longer need src_list_start_indices. Maybe there's a
+    // middle ground here.
     const auto src_compat_list = make_src_compat_list(candidates, idx_lists);
     std::cerr << "src_compat_list: " << src_compat_list.size() << std::endl;
     device_sources = cuda_alloc_copy_sources(src_compat_list, stream);
-    const auto unique_variations = make_unique_variations(src_compat_list);
-    device_uv = alloc_copy_unique_variations(unique_variations, stream,  //
-        "sources unique_variations");
-    num_uv = int(unique_variations.size());
   }
   log_copy_sources(num_sources, params, copy_start);
   result_t* device_compat_src_results{};
@@ -477,7 +475,7 @@ auto filter_task(FilterData& mfd, FilterParams params) {
         int(mfd.host_xor.incompat_src_desc_pairs.size()));
   }
   auto filter_result = filter_sources(mfd, device_sources,
-      device_compat_src_results, device_uv, num_uv, idx_lists, params, stream);
+      device_compat_src_results, idx_lists, params, stream);
   // free host memory associated with candidates
   clear_candidates(params.sum);
   return filter_result;
@@ -505,72 +503,6 @@ auto make_source_descriptor_pairs(
     src_desc_pairs.push_back(src.usedSources.get_source_descriptor_pair());
   }
   return src_desc_pairs;
-}
-
-[[nodiscard]] auto cuda_allocCopySentenceVariationIndices(
-    const SentenceVariationIndices& svi,
-    cudaStream_t stream) -> device::VariationIndices* {
-  using DeviceVariationIndicesArray =
-      std::array<device::VariationIndices, kNumSentences>;
-  DeviceVariationIndicesArray device_indices_array;
-  cudaError_t err{};
-  for (int s{}; s < kNumSentences; ++s) {
-    const auto& variation_idx_lists = svi.at(s);
-    const auto num_variations{variation_idx_lists.size()};
-    const auto num_indices{util::sum_sizes(variation_idx_lists)};
-    const auto device_data_bytes =
-        ((num_variations * 2) + num_indices) * sizeof(index_t);
-    auto& device_indices = device_indices_array.at(s);
-    cuda_malloc_async((void**)&device_indices.device_data, device_data_bytes,
-        stream, "variation_indices device_data");
-    device_indices.num_indices = num_indices; // probably unused
-    device_indices.num_variations = index_t(num_variations);
-    // copy combo indices first, populating offsets and num_indices
-    device_indices.indices = &device_indices.device_data[num_variations * 2];
-    IndexList offsets_list;
-    IndexList num_indices_list;
-    for (size_t offset{}; const auto& idx_list : variation_idx_lists) {
-      offsets_list.push_back(index_t(offset));
-      num_indices_list.push_back(index_t(idx_list.size()));
-      const auto indices_bytes = idx_list.size() * sizeof(index_t);
-      err = cudaMemcpyAsync(&device_indices.indices[offset],
-          idx_list.data(), indices_bytes, cudaMemcpyHostToDevice, stream);
-      assert_cuda_success(err, "copy variation indices");
-      assert(offset + idx_list.size() < std::numeric_limits<index_t>::max());
-      offset += idx_list.size();
-    }
-    assert(num_indices_list.size() == offsets_list.size());
-    // copy variation offsets
-    device_indices.variation_offsets = device_indices.device_data;
-    const auto offsets_bytes = offsets_list.size() * sizeof(index_t);
-    err = cudaMemcpyAsync(device_indices.variation_offsets,
-        offsets_list.data(), offsets_bytes, cudaMemcpyHostToDevice,
-        stream);
-    assert_cuda_success(err, "copy variation_offsets");
-    // copy num combo indices
-    device_indices.num_indices_per_variation =
-        &device_indices.device_data[num_variations];
-    const auto num_indices_bytes = num_indices_list.size() * sizeof(index_t);
-    err = cudaMemcpyAsync(device_indices.num_indices_per_variation,
-        num_indices_list.data(), num_indices_bytes, cudaMemcpyHostToDevice,
-        stream);
-    assert_cuda_success(err, "copy num_indices_per_variation");
-  }
-  const auto variation_indices_bytes =
-      kNumSentences * sizeof(device::VariationIndices);
-  device::VariationIndices* device_variation_indices;
-  cuda_malloc_async((void**)&device_variation_indices, variation_indices_bytes,
-      stream, "variation_indices");
-  err = cudaMemcpyAsync(device_variation_indices, device_indices_array.data(),
-      variation_indices_bytes, cudaMemcpyHostToDevice, stream);
-  assert_cuda_success(err, "copy variation_indices");
-
-  // TODO: be nice to get rid of this
-  // just to be sure, due to lifetime problems of local host-side memory
-  // solution: cram stuff into MFD
-  CudaEvent temp(stream);
-  temp.synchronize();
-  return device_variation_indices;
 }
 
 void alloc_copy_start_indices(MergeData::Host& host,
@@ -665,12 +597,6 @@ void alloc_copy_filter_indices(FilterData& mfd, cudaStream_t stream) {
   alloc_copy_compat_indices(mfd.host_xor, mfd.device_xor, stream);
   alloc_copy_unique_variations(mfd.host_xor, mfd.device_xor, stream,  //
       "xor unique_variations");
-  // NOTE i'm not sure variation indices are required anymore if
-  // unique_variations works for XOR. something to look into.
-  auto xor_vi = buildSentenceVariationIndices(mfd.host_xor.src_lists,
-      mfd.host_xor.compat_idx_lists, mfd.host_xor.compat_indices);
-  mfd.device_xor.variation_indices =
-    cuda_allocCopySentenceVariationIndices(xor_vi, stream);
 
   if (!mfd.host_or.compat_indices.empty()) {
     alloc_copy_start_indices(mfd.host_or, mfd.device_or, stream);
@@ -684,8 +610,6 @@ void alloc_copy_filter_indices(FilterData& mfd, cudaStream_t stream) {
 
   // these all get allocated within the run_kernel function because they
   // are dependent on grid_size.
-  mfd.device_xor.variations_compat_results = nullptr;
-  mfd.device_xor.variations_scan_results = nullptr;
   mfd.device_xor.src_compat_uv_indices = nullptr;
   mfd.device_xor.or_compat_uv_indices = nullptr;
   mfd.device_or.src_compat_results = nullptr;

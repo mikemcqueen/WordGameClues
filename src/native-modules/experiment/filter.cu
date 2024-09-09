@@ -444,7 +444,7 @@ __device__ auto source_bits_are_XOR_compatible(
   return true;
 }
 
-// #define USE_LOCAL_XOR_COMPAT
+//#define USE_LOCAL_XOR_COMPAT
 
 __device__ bool is_source_XOR_compatible(const SourceCompatibilityData& source,
     fat_index_t combo_idx) {
@@ -492,22 +492,7 @@ __device__ auto compute_src_compat_results(
     const auto idx_list_idx = data.idx_list_start_indices[src_idx.listIndex];
     const auto idx_list = &data.idx_lists[idx_list_idx];
     const auto& src = src_list[idx_list[src_idx.index]];
-#if 0
-    // TODO: overloads. Variations as struct/class. SourceBits also.
-    auto compat = UsedSources::are_variations_compatible(
-        src.usedSources.variations, source.usedSources.variations);
-    if (compat) {
-      if constexpr (std::is_same_v<TagT, tag::OR>) {
-        compat = source_bits_are_OR_compatible(
-            src.usedSources.getBits(), source.usedSources.getBits());
-      } else if constexpr (std::is_same_v<TagT, tag::XOR>) {
-        compat = source_bits_are_XOR_compatible(
-            src.usedSources.getBits(), source.usedSources.getBits());
-      }
-    }
-#else
     const auto compat = is_source_compatible_with<TagT>(source, src);
-#endif
     const auto result_idx = blockIdx.x * data.sum_idx_list_sizes + idx;
     if (compat) {
       any_compat[src_idx.listIndex] = 1;
@@ -548,11 +533,6 @@ __device__ auto init_source(const SourceCompatibilityData& source) {
   }
   return compute_src_compat_results<tag::OR>(source, or_data);
 }
-
-  //
-  // so i'm thinking maybe a cudaMemcpyAysnc hasn't completed yet at this point
-  // for src_compat_uv_indices? find out where that is initialized host-side.
-  // 
 
 __device__ auto compute_compat_XOR_uv_indices(const Variations& src_variations) {
   const auto begin = clock64();
@@ -754,51 +734,6 @@ __device__ bool is_compat_loop(const SourceCompatibilityData& source) {
   return false;
 }
 
-__device__ void dump(const device::VariationIndices* dvi_array) {
-  char buf[128];
-  char smolbuf[16];
-  uint64_t total_indices{};
-  for (int s{}; s < kNumSentences; ++s) {
-    const auto& dvi = dvi_array[s];
-    cuda_strcpy(buf, "S");
-    cuda_itoa(s + 1, smolbuf);
-    cuda_strcat(buf, smolbuf);
-    cuda_strcat(buf, ": variations(");
-    cuda_itoa(dvi.num_variations, smolbuf);
-    cuda_strcat(buf, smolbuf);
-    cuda_strcat(buf, "), indices(");
-    cuda_itoa(dvi.num_indices, smolbuf);
-    cuda_strcat(buf, smolbuf);
-    cuda_strcat(buf, ")\n");
-    printf(buf);
-    total_indices += dvi.num_indices;
-    size_t sum{};
-    for (size_t i{0}; i < dvi.num_variations; ++i) {
-      cuda_strcpy(buf, "  v");
-      cuda_itoa(int(i) - 1, smolbuf);
-      cuda_strcat(buf, smolbuf);
-      cuda_strcat(buf, ": indices(");
-      cuda_itoa(dvi.num_indices_per_variation[i], smolbuf);
-      cuda_strcat(buf, smolbuf);
-      cuda_strcat(buf, "), offset: ");
-      cuda_itoa(dvi.variation_offsets[i], smolbuf);
-      cuda_strcat(buf, smolbuf);
-      cuda_strcat(buf, "\n");
-      printf(buf);
-      sum += dvi.num_indices_per_variation[i];
-    }
-    cuda_strcpy(buf, "  sum(");
-    cuda_itoa(sum, smolbuf);
-    cuda_strcat(buf, smolbuf);
-    cuda_strcat(buf, ")\n");
-    printf(buf);
-  }
-}
-
-__device__ void dump(const FilterData::DeviceXor& data) {
-  dump(data.variation_indices);
-}
-
 // explain better:
 // Find sources that are:
 // * XOR compatible with any of the supplied XOR sources, and
@@ -808,10 +743,9 @@ __device__ void dump(const FilterData::DeviceXor& data) {
 // Find compatible XOR source -> compare with variation-compatible OR sources.
 __global__ void filter_kernel(const SourceCompatibilityData* RESTRICT src_list,
     int num_sources, const SourceIndex* RESTRICT src_indices,
-    const index_t* RESTRICT src_list_start_indices,
-    const result_t* RESTRICT compat_src_results,
-    const UniqueVariations* src_unique_variations,
-    int num_src_unique_variations, result_t* RESTRICT results, int stream_idx) {
+    // const index_t* RESTRICT src_list_start_indices,
+    const result_t* RESTRICT compat_src_results, result_t* RESTRICT results,
+    int stream_idx) {
   __shared__ bool is_compat;
   if (!threadIdx.x) is_compat = false;
 
@@ -865,8 +799,7 @@ void copy_filter_data(const FilterData& mfd) {
 void run_filter_kernel(int threads_per_block, StreamData& stream,
     FilterData& mfd, const SourceCompatibilityData* device_src_list,
     const result_t* device_compat_src_results,
-    const UniqueVariations* device_unique_variations, int num_unique_variations,
-    result_t* device_results, const index_t* device_list_start_indices) {
+    result_t* device_results /*, const index_t* device_list_start_indices*/) {
   // TODO: move to device_attr class
   int num_sm;
   cudaDeviceGetAttribute(&num_sm, cudaDevAttrMultiProcessorCount, 0);
@@ -877,7 +810,7 @@ void run_filter_kernel(int threads_per_block, StreamData& stream,
   stream.is_running = true;
   stream.sequence_num = StreamData::next_sequence_num();
 
-  const auto block_size = threads_per_block ? threads_per_block : 128;
+  const auto block_size = threads_per_block ? threads_per_block : 64;
   const auto blocks_per_sm = threads_per_sm / block_size;
   assert(blocks_per_sm * block_size == threads_per_sm);
   const auto grid_size = num_sm * blocks_per_sm;  // aka blocks per grid
@@ -889,21 +822,7 @@ void run_filter_kernel(int threads_per_block, StreamData& stream,
   const auto cuda_stream = cudaStreamPerThread;
   // TODO: move to helper function
   // v- Populate any remaining mfd.device_xx values BEFORE copy_filter_data() -v
-  if (!mfd.device_xor.variations_compat_results) {
-    auto max_uv = std::max(mfd.device_or.num_unique_variations,
-        mfd.device_xor.num_unique_variations);
-    // round up to nearest block_size
-    max_uv = ((max_uv + block_size - 1) / block_size) * block_size;
-    const auto xor_compat_results_bytes = grid_size * max_uv * sizeof(index_t);
-    cuda_malloc_async((void**)&mfd.device_xor.variations_compat_results,
-        xor_compat_results_bytes, cuda_stream, "xor.variations_compat_results");
-#if 1
-    const auto xor_scan_results_bytes = grid_size * max_uv * sizeof(index_t);
-    cuda_malloc_async((void**)&mfd.device_xor.variations_scan_results,
-        xor_scan_results_bytes, cuda_stream, "xor.variations_scan_results");
-#endif
-    mfd.device_xor.variations_results_per_block = max_uv;
-
+  if (!mfd.device_xor.or_compat_uv_indices) {
     // NB: these have the potential to grow large as num_variations grow
     const auto or_indices_bytes = mfd.device_or.num_unique_variations
         * grid_size * sizeof(index_t);
@@ -942,9 +861,8 @@ void run_filter_kernel(int threads_per_block, StreamData& stream,
   stream.xor_kernel_start.record();
   filter_kernel<<<grid_dim, block_dim, shared_bytes, stream.cuda_stream>>>(
       device_src_list, int(stream.src_indices.size()),
-      stream.device_src_indices, device_list_start_indices,
-      device_compat_src_results, device_unique_variations,
-      num_unique_variations, device_results, stream.stream_idx);
+      stream.device_src_indices,  // device_list_start_indices,
+      device_compat_src_results, device_results, stream.stream_idx);
   assert_cuda_success(cudaPeekAtLastError(), "filter kernel launch failed");
   stream.xor_kernel_stop.record();
 

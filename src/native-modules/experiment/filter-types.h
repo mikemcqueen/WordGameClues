@@ -1,8 +1,5 @@
 // filter-types.h
 
-#ifndef INCLUDE_FILTER_TYPES_H
-#define INCLUDE_FILTER_TYPES_H
-
 #pragma once
 #include <algorithm>
 #include <array>
@@ -28,9 +25,6 @@ namespace cm {
 // aliases
 
 using filter_result_t = std::unordered_set<std::string>;
-
-using SentenceVariationIndices =
-    std::array<std::vector<IndexList>, kNumSentences>;
 
 // types
 
@@ -66,30 +60,13 @@ public:
 
   IndexStates() = delete;
 
-  /*
-  IndexStates(const CandidateList& candidates) {
-    list_.resize(candidates.size());
-    for (index_t idx{}; auto& data : list_) {
-      data.sourceIndex.listIndex = idx++;
-    }
-    for (index_t list_start_index{}; const auto& candidate : candidates) {
-      auto num_sources{(index_t)candidate.src_list_cref.get().size()};
-      list_sizes_.push_back(num_sources);
-      list_start_indices_.push_back(list_start_index);
-      list_start_index += num_sources;
-    }
-    fill_indices_.resize(candidates.size());
-    std::iota(fill_indices_.begin(), fill_indices_.end(), 0);
-    fill_iter_ = fill_indices_.before_begin();
-  }
-  */
-
   IndexStates(std::vector<IndexList>&& idx_lists)
       : idx_lists_(std::move(idx_lists)) {
     list_.resize(idx_lists_.size());
     for (index_t idx{}; auto& data : list_) {
       data.sourceIndex.listIndex = idx++;
     }
+    /*
     // this can all go i think
     for (index_t list_start_idx{}; const auto& idx_list : idx_lists_) {
       auto list_size = (index_t)idx_list.size();
@@ -97,16 +74,19 @@ public:
       list_start_indices_.push_back(list_start_idx);
       list_start_idx += list_size;
     }
-
+    */
     fill_indices_.resize(idx_lists_.size());
     std::ranges::iota(fill_indices_, 0);
     fill_iter_ = fill_indices_.before_begin();
   }
 
+  /*
   auto list_size(index_t list_index) const {
     return list_sizes_.at(list_index);
   }
+  */
 
+  // Slow. For logging/debugging.
   auto num_in_state(int first, int count, Status status) const {
     // hack
     auto max = std::min(first + count, int(num_lists()));
@@ -146,7 +126,7 @@ public:
       if (results.at(src_idx.listIndex)) {
         idx_state.status = Status::compatible;
         ++num_compat;
-      } else if (src_idx.index == idx_lists_.at(src_idx.listIndex).back()) { // list_sizes_.at(src_idx.listIndex) - 1) {
+      } else if (src_idx.index == idx_lists_.at(src_idx.listIndex).back()) {
         // if this is the result for the last source in a sourcelist,
         // mark the list (indexState) as done.
         idx_state.status = Status::done;
@@ -175,6 +155,7 @@ public:
     return !fill_indices_.empty();
   }
 
+  /*
   const auto& list_start_indices() const {
     return list_start_indices_;
   }
@@ -183,6 +164,7 @@ public:
     return cuda_alloc_copy_start_indices(
         list_start_indices_, stream, "idx_states.list_start_indices");
   }
+  */
 
   std::optional<SourceIndex> get_next_fill_idx() {
     while (has_fill_indices()) {
@@ -247,31 +229,24 @@ private:
       -> std::optional<SourceIndex> {
     auto& data = list_.at(list_idx);
     auto& idx_list = idx_lists_.at(list_idx);
-    if (data.is_ready() && (data.sourceIndex.index < idx_list.size())) {      // list_sizes_.at(list_index))) {
+    if (data.is_ready() && (data.sourceIndex.index < idx_list.size())) {
       // capture value before increment
       auto capture = std::make_optional(SourceIndex{
           data.sourceIndex.listIndex, idx_list.at(data.sourceIndex.index)});
       ++data.sourceIndex.index;
       return capture;
     }
-#if 0
-    else {
-      std::cerr << "skipping " << data.sourceIndex.listIndex << "";
-      if (!data.is_ready()) std::cerr << "- not ready";
-      if (data.sourceIndex.index >= idx_list.size()) std::cerr << " - out of bounds";
-      std::cerr << std::endl;
-    }
-#endif
     return std::nullopt;
   }
 
   std::vector<Data> list_;
   std::vector<IndexList> idx_lists_;
 
-  // can go
+  /*  // can go
   IndexList list_start_indices_;
   IndexList list_sizes_;
-
+  */
+  
   std::forward_list<index_t> fill_indices_;
   std::forward_list<index_t>::iterator fill_iter_;
 };  // class IndexStates
@@ -402,5 +377,3 @@ private:
 }; // class StreamSwarm
 
 }  // namespace cm
-
-#endif // INCLUDE_FILTER_TYPES_H

@@ -1,11 +1,11 @@
+* Investigate whether I can use USE_LOCAL_XOR_COMPAT in filter.cu. When I turn it
+  on I get slightly different results. why?
+
 * I should add new host/device structs to FilterData for Source.
   * and the Device version of it can be allocated in constant memory similar to OR/XOR.
 
 * get_src_compat_results: custom version of src_bits_are_OR_compatible that takes
   full sources and only bit-compares if both variation !=  -1
-
-* consider whether the OR-src_list preprocessing is a superior alternative to the
-  unbounded variationIndices madness i have going on for XOR sources.
 
 * Variations as struct.
 
@@ -69,8 +69,6 @@
     is more than an implementation detail either.
   * need to VERIFY counts are accurate and actually display them somewhere.
 
-* std::move into promise in filter-support
-
 * my understanding of std::move might have regressed for non-initializing 
   assignment of a variable to a function that returns by value. i think i
   need move in those cases, and I think I removed some recently.
@@ -80,7 +78,7 @@
 
 * cuda_device_ptr_t
 
-* set --max-sources to N(-1) (if not otherwise specified) when -cM,N ?
+* set --max-sources to (N-1) (if not otherwise specified) when -cM,N ?
 
 * make -t x,y,z show VALID entries even if they exceed max_sources (maybe
   separated by a -- line)

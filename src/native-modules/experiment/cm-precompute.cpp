@@ -1,11 +1,6 @@
-#include <algorithm>
-#include <array>
 #include <cassert>
-#include <chrono>
 #include <functional>
 #include <iostream>
-#include <iterator>
-#include <memory>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -15,7 +10,6 @@
 #include "log.h"
 #include "util.h"
 #include "cm-hash.h"
-#include "filter-types.h"
 
 namespace cm {
 
@@ -77,37 +71,6 @@ auto mergeAllCompatibleSources(const NameCountList& ncList) -> SourceList {
     if (src_list.empty()) break;
   }
   return src_list;
-}
-
-void dumpSentenceVariationIndices(const SentenceVariationIndices& svi) {
-  uint64_t total_indices{};
-  for (int s{}; s < kNumSentences; ++s) {
-    const auto& variation_idx_lists = svi.at(s);
-    if (!variation_idx_lists.empty()) {
-      const auto num_indices = util::sum_sizes(variation_idx_lists);
-      if (log_level(ExtraVerbose)) {
-        std::cerr << "S" << s + 1 << ": variations("
-                  << variation_idx_lists.size() << "), indices(" << num_indices
-                  << ")" << std::endl;
-      }
-      total_indices += num_indices;
-      if (log_level(Ludicrous)) {
-        size_t sum{};
-        for (size_t i{}; i < variation_idx_lists.size(); ++i) {
-          const auto& idx_list = variation_idx_lists.at(i);
-          std::cerr << "  v" << int(i) - 1 << ": indices(" << idx_list.size() << ")"
-                    << std::endl;
-          sum += idx_list.size();
-        }
-        std::cerr << "  sum(" << sum << ")" << std::endl;
-      }
-    }
-  }
-  const auto MB = (total_indices * 8) / 1'000'000;
-  std::cerr << "XOR variation indices: " << total_indices << " (" << MB << "MB)\n";
-  if (MB > 2000) {
-    std::cerr << "**** WARNING: variationIndices is getting big! ****\n";
-  }
 }
 
 }  // namespace
@@ -193,48 +156,6 @@ auto build_src_lists(const std::vector<NCDataList>& nc_data_lists)
               << ", sources: " << util::sum_sizes(sourceLists) << std::endl;
   }
   return sourceLists;
-}
-
-auto buildSentenceVariationIndices(const std::vector<SourceList>& xor_src_lists,
-    const std::vector<IndexList>& compat_idx_lists,
-    const FatIndexList& compat_indices)
-    -> SentenceVariationIndices {
-  SentenceVariationIndices svi;
-  for (index_t idx{}; idx < compat_indices.size(); ++idx) {
-    // = make_array<variation_index_t, kNumSentences>(-1);
-    Variations variations = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
-    util::for_each_source_index(compat_indices.at(idx), compat_idx_lists,
-        [&xor_src_lists, &variations](index_t list_idx, index_t src_idx) {
-          const auto& src = xor_src_lists.at(list_idx).at(src_idx);
-          for (const auto& nc : src.primaryNameSrcList) {
-            assert(Source::isCandidate(nc.count));
-            auto b = UsedSources::merge_one_variation(variations, nc.count);
-            assert(b);
-          }
-        });
-    for (int s{}; s < kNumSentences; ++s) {
-      auto& variation_idx_lists = svi.at(s);
-      const auto variation_idx = variations.at(s) + 1u;
-      if (variation_idx >= variation_idx_lists.size()) {
-        variation_idx_lists.resize(variation_idx + 1u);
-      }
-      variation_idx_lists.at(variation_idx).push_back(idx);
-    }
-  }
-  // When the list of xor_sources is very small, there may be no xor_source
-  // that contain a primary source from one or more sentences. Destroy the
-  // variation_idx_listss for those sentences with no variations, since they
-  // only contain a single element (index 0) representing the "-1" or "no"
-  // variation, that contains all indices. It's redundant and unnecessary data.
-  // TODO: for (auto& variation_idx_lists : svi) {
-  std::for_each(svi.begin(),
-    svi.end(), [](auto& variation_idx_lists) {
-      if (variation_idx_lists.size() == 1) {
-        variation_idx_lists.clear();
-      }
-    });
-  dumpSentenceVariationIndices(svi);
-  return svi;
 }
 
 }  // namespace cm
