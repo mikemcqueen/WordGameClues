@@ -120,7 +120,7 @@ export const getCandidatesContainer = (sentence: number):
     return State.allCandidates[sentence];
 };
 
-export const getUniqueClueNameCount = (clueCount: number) => {
+export const getUniqueClueNameCount = (clueCount: number): number => {
     if (clueCount === 1) {
         return State.uniquePrimaryClueNames.length;
     }

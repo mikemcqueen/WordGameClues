@@ -87,6 +87,19 @@ const listIsEmpty = (list: any[]): boolean => {
     return list.length === 0;
 };
 
+const showUniqueClueNameCounts = (last: number): void => {
+    for (let i = 1; i < last; ++i) {
+        console.error(`uniqueCluesJS(${i}): ${ClueManager.getUniqueClueNameCount(i)}`);
+    }
+}
+
+const showUniqueClueNames = (count: number): void => {
+    const n = ClueManager.getUniqueClueNameCount(count);
+    for (let i = 0; i < n; ++i) {
+        console.log(ClueManager.getUniqueClueName(count, i));
+    }
+}
+
 const nextIndex = (countList: number[], clueIndices: number[]): boolean => {
     // increment last index
     let index = clueIndices.length - 1;
@@ -208,11 +221,9 @@ const getCombosForUseNcLists = (sum: number, max: number, args: any): void => {
 
     // enhancing visibility of JS duration coz it's starting to matter
     if (1 || args.verbose) {
-        console.error(`sum(${sum}) consider(JS) - combos(${comboCount})` +
-            ` variations(${totalVariations}) - ${duration}ms `);
+        console.error(`sum(${sum}) consider(JS) - count_lists(${comboCount})` +
+            ` candidates(${totalVariations}) - ${duration}ms `);
     }
-    Native.filterCandidatesForSum(sum, args.tpb, args.streams, args.stride,
-        args.iters, args.synchronous);
 };
 
 export const makeCombosForSum = (sum: number, args: any,
@@ -228,12 +239,15 @@ export const makeCombosForSum = (sum: number, args: any,
     args.sum = sum;
     let max = args.max;
     args.max = Math.min(args.max, args.sum);
+    // 3 = c++, 4 = dump/exit
     if (_.includes(args.flags, '3')) {
-        Native.computeCombosForSum(sum, max);
+        Native.computeCombosForSum(sum, max, _.includes(args.flags, '4'));
     } else {
         getCombosForUseNcLists(sum, max, args);
     }
     args.max = max;
+    Native.filterCandidatesForSum(sum, args.tpb, args.streams, args.stride,
+        args.iters, args.synchronous);
 };
 
 const parallel_makeCombosForRange = (first: number, last: number, args: any): any => {
@@ -319,6 +333,13 @@ export const makeCombos = (args: any): any => {
         let totals = ClueManager.emptyFilterResult();
         const pc_result = PreCompute.preCompute(first, last, args);
         if (pc_result) {
+            showUniqueClueNameCounts(last);
+            // 3 = c++, 4 = dump/exit
+            if (_.includes(args.flags, '4') && !_.includes(args.flags, '3')) {
+                showUniqueClueNames(1);
+                process.exit(0);
+            }
+
             // run 2-clue sources synchronously to seed "incompatible sources"
             // which makes subsequent sums faster.
             makeCombosForSum(2, args, true);

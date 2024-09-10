@@ -452,7 +452,7 @@ Value filterPreparation(const CallbackInfo& info) {
 // computeCombosForSum
 Value computeCombosForSum(const CallbackInfo& info) {
   Env env = info.Env();
-  if (!info[0].IsNumber() && !info[1].IsNumber()) {
+  if (!info[0].IsNumber() && !info[1].IsNumber() && !info[2].IsBoolean()) {
     TypeError::New(env, "computeCombosForSum: invalid parameter type")
       .ThrowAsJavaScriptException();
     return env.Null();
@@ -461,7 +461,25 @@ Value computeCombosForSum(const CallbackInfo& info) {
   auto sum = info[0].As<Number>().Int32Value();
   // arg1
   auto max = info[1].As<Number>().Int32Value();
+  // arg1
+  auto dump = info[2].As<Boolean>();
   // --
+  static bool unique_names_shown = false;
+  if (!unique_names_shown) {
+    for (int i{1}; i < 15; ++i) {
+      std::cerr << "uniqueClues(" << i
+                << "): " << clue_manager::get_num_unique_clue_names(i)
+                << std::endl;
+    }
+    if (dump) {
+      for (int i{}; i < clue_manager::get_num_unique_clue_names(1); ++i) {
+        std::cout << clue_manager::get_unique_clue_name(1, i) << std::endl;
+      }
+      std::terminate();
+    }
+    unique_names_shown = true;
+  }
+
   compute_combos_for_sum(sum, max);
   return env.Null();
 }
