@@ -448,23 +448,32 @@ auto alloc_copy_unique_variations(
 //
 auto filter_task(FilterData& mfd, FilterParams params) {
   using namespace std::experimental::fundamentals_v3;  // scope_exit
-  const auto stream = cudaStreamPerThread;
-  const auto& candidates = get_candidates(params.sum);
-  CudaEvent copy_start(stream);
-  auto idx_lists = make_variations_sorted_idx_lists(candidates);
   SourceCompatibilityData* device_sources{};
   scope_exit free_sources{[device_sources]() { cuda_free(device_sources); }};
-  const auto num_sources = util::sum_sizes(idx_lists);
+  const auto stream = cudaStreamPerThread;
+  const auto& candidates = get_candidates(params.sum);
+  auto t_make = util::Timer::start_timer();
+  auto idx_lists = make_variations_sorted_idx_lists(candidates);
+  t_make.stop();
+  std::cerr << " " << params.sum << ": make_variations_sorted_idx_lists  - "
+            << t_make.count() << "ms\n";
+  CudaEvent copy_start(stream, false);
   {
     // TODO: there is a lot of effort here to sort sources, originally for the
     // purpose of enabling unique_variations, which is no longer necessary.
     // this sorting can be very time consuming I think (host-side), but one
     // benefit is we no longer need src_list_start_indices. Maybe there's a
     // middle ground here.
+    auto t = util::Timer::start_timer();
     const auto src_compat_list = make_src_compat_list(candidates, idx_lists);
-    std::cerr << "src_compat_list: " << src_compat_list.size() << std::endl;
+    t.stop();
+    std::cerr << " " << params.sum
+              << ": make_src_compat_list: " << src_compat_list.size() << " - "
+              << t.count() << "ms\n";
+    copy_start.record();
     device_sources = cuda_alloc_copy_sources(src_compat_list, stream);
   }
+  const auto num_sources = util::sum_sizes(idx_lists);
   log_copy_sources(num_sources, params, copy_start);
   result_t* device_compat_src_results{};
   scope_exit free_results{
