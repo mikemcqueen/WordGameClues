@@ -56,7 +56,6 @@ const CmdLineOptions = Opt.create(_.concat(Clues.Options, [
     ['',  'remove=NAME',                       '  remove compound clue NAME=SOURCE; use with --test' ],
     ['',  'property=PROP',                     '    add PROP:true, or remove PROP from existing compound clues' +
                                                   ' matching NAME=SOURCE; use with --test --add/--remove' ],
-    ['',  'reject',                            '  add combination to reject list; use with --test' ],
     ['',  'fast',                              '  use fast method' ],
     ['',  'validate',                          '  treat SOURCE as filename, validate all source lists in file'],
     ['',  'combos',                            '    validate all combos of sources/source lists in file'],
@@ -71,7 +70,7 @@ const CmdLineOptions = Opt.create(_.concat(Clues.Options, [
     ['',  'ccc',                               'clue (source) consistency check (--save to save results)'],
     ['',  'show-pairs',                        'show unique known source pairs'],
     ['',  'flip',                              '  include flipped (reversed) pairs in results'],
-    ['z', 'flags=OPTION+',                     'flags: 2=ignoreErrors,3=cccV2' ],
+    ['z', 'flags=OPTION+',                     'flags: 2=ignoreErrors,3=NativeComboMaker' ],
     ['v', 'verbose',                           'more output' ],
     ['',  'vv',                                'More' ],
     ['',  'vvv',                               'MOAR' ],
@@ -219,7 +218,8 @@ function copyClues (fromType, options = {}) {
                     continue;
                 }
                 //{ valid, known, rejects, invalid, clues, addRemoveSet };
-                console.log(` valid(${_.size(result.valid)}) known(${_.size(result.known)}) invalid(${_.size(result.invalid)}) clues(${_.size(result.clues)})`);
+                console.log(` valid(${_.size(result.valid)}) known(${_.size(result.known)})`
+                            ` invalid(${_.size(result.invalid)}) clues(${_.size(result.clues)})`);
                 if (_.isEmpty(result.known) && _.isEmpty(result.valid)) continue;
                 countSet = new Set();
                 countSet = result.valid.reduce((countSet, countList) => {
@@ -331,7 +331,6 @@ async function main () {
     options.allow_used = options['allow-used'] ? true : false;
     options.merge_style = Boolean(options['merge-style']);
     options.removeAllInvalid = Boolean(options['remove-all-invalid']);
-//    let showKnownArg = options['show-known'];
     options.copy_from = options['copy-from'];
     options.max_sources = _.toNumber(options['max-sources'] || 19);
     console.error(`max_sources(${options.max_sources})`);
@@ -340,7 +339,6 @@ async function main () {
     if (!options.count) {
         needCount = true;
         if (showSourcesClueName ||
-//            showKnownArg ||
             useClueList ||
             options.test ||
             options.copy_from ||
@@ -376,7 +374,7 @@ async function main () {
         process.exit(0);
     }
 
-    if (options.count && /*!showKnownArg && */ !options['ccc']) {
+    if (options.count && !options['ccc']) {
         let countRange = options.count.split(',').map(_.toNumber);
         options.count_lo = countRange[0];
         options.count_hi = countRange.length > 1 ? countRange[1] : countRange[0];
@@ -394,25 +392,6 @@ async function main () {
 
     options.notebook = options.notebook || Note.getWorksheetName(clueSource);
 
-    // TODO: add "show.js" with these exports
-/*
-    if (showKnownArg) {
-        if (!useClueList) {
-            // TODO: require max if !metaFlag
-            console.log('one or more -u NAME:COUNT required with that option');
-            return 1;
-        }
-        Show.compatibleKnownClues({
-            nameList: useClueList,
-            max: options.count ? Number(options.count) : ClueManager.getMaxClues(),
-            root: '../data/results/',
-            format: {
-                csv: options.csv,
-                files: options.files
-            }
-        });
-    } else
-*/
     if (options.test) {
         let start = new Date();
         if (options.validate) {
@@ -427,10 +406,7 @@ async function main () {
     } else if (showSourcesClueName) {
         showSources(showSourcesClueName);
     } else if (options['ccc']) {
-        //if (_.includes(options.flags, '3')) {
-        //} else {
         Components.consistency_check(options);
-        //}
     } else if (options.copy_from) {
         const from = Clues.getByVariety(options.copy_from);
         Debug(`from: ${from.baseDir}`);
@@ -455,6 +431,7 @@ async function main () {
             or_variations: options['or-variations'],
             ignoreErrors: options.ignoreErrors,
             max_sources: options.max_sources,
+            flags: options.flags,
             tpb: options.tpb ? Number(options.tpb) : 0,
             streams: options.streams ? Number(options.streams) : 0,
             stride: options.stride ? Number(options.stride) : 0,

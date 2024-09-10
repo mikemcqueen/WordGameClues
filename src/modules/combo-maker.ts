@@ -210,20 +210,13 @@ const getCombosForUseNcLists = (sum: number, max: number, args: any): void => {
     if (1 || args.verbose) {
         console.error(`sum(${sum}) consider(JS) - combos(${comboCount})` +
             ` variations(${totalVariations}) - ${duration}ms `);
-        /*
-        const cs = Native.getCandidateStatsForSum(sum);
-        console.error(`  sourceLists(${cs.sourceLists})` +
-            `, totalSources(${cs.totalSources})` +
-            `, comboMapIndices(${cs.comboMapIndices})` +
-            `, totalCombos(${cs.totalCombos})`);
-        */
     }
     Native.filterCandidatesForSum(sum, args.tpb, args.streams, args.stride,
         args.iters, args.synchronous);
 };
 
 export const makeCombosForSum = (sum: number, args: any,
-  synchronous: boolean = false): void =>
+    synchronous: boolean = false): void =>
 {
     if (_.isUndefined(args.maxResults)) {
         args.maxResults = 50000;
@@ -235,7 +228,11 @@ export const makeCombosForSum = (sum: number, args: any,
     args.sum = sum;
     let max = args.max;
     args.max = Math.min(args.max, args.sum);
-    getCombosForUseNcLists(sum, max, args);
+    if (_.includes(args.flags, '3')) {
+        Native.computeCombosForSum(sum, max);
+    } else {
+        getCombosForUseNcLists(sum, max, args);
+    }
     args.max = max;
 };
 

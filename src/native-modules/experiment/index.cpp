@@ -26,6 +26,10 @@
 #include "wrap.h"
 #include "log.h"
 
+namespace cm {
+void compute_combos_for_sum(int sum, int max);
+}
+
 namespace {
 
 // using
@@ -445,6 +449,24 @@ Value filterPreparation(const CallbackInfo& info) {
   return Boolean::New(env, !or_merge_fail);
 }
 
+// computeCombosForSum
+Value computeCombosForSum(const CallbackInfo& info) {
+  Env env = info.Env();
+  if (!info[0].IsNumber() && !info[1].IsNumber()) {
+    TypeError::New(env, "computeCombosForSum: invalid parameter type")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+  // arg0
+  auto sum = info[0].As<Number>().Int32Value();
+  // arg1
+  auto max = info[1].As<Number>().Int32Value();
+  // --
+  compute_combos_for_sum(sum, max);
+  return env.Null();
+}
+  
+
 // considerCandidate
 Value considerCandidate(const CallbackInfo& info) {
   Env env = info.Env();
@@ -649,10 +671,10 @@ Value dumpMemory(const CallbackInfo& info) {
 Object Init(Env env, Object exports) {
   // clue-manager
   //
-  exports["setPrimaryNameSrcIndicesMap"] =
-      Function::New(env, setPrimaryNameSrcIndicesMap);
-  exports["setCompoundClueNameSourcesMap"] =
-      Function::New(env, setCompoundClueNameSourcesMap);
+  exports["setPrimaryNameSrcIndicesMap"] = Function::New(env,
+      setPrimaryNameSrcIndicesMap);
+  exports["setCompoundClueNameSourcesMap"] = Function::New(env,
+      setCompoundClueNameSourcesMap);
   exports["isKnownSourceMapEntry"] = Function::New(env, isKnownSourceMapEntry);
   exports["addCompoundClue"] = Function::New(env, addCompoundClue);
 
@@ -665,17 +687,18 @@ Object Init(Env env, Object exports) {
   exports["mergeCompatibleXorSourceCombinations"] =
       Function::New(env, mergeCompatibleXorSourceCombinations);
   exports["filterPreparation"] = Function::New(env, filterPreparation);
+  exports["computeCombosForSum"] = Function::New(env, computeCombosForSum);
   exports["considerCandidate"] = Function::New(env, considerCandidate);
-  exports["filterCandidatesForSum"] =
-      Function::New(env, filterCandidatesForSum);
+  exports["filterCandidatesForSum"] = Function::New(env,
+      filterCandidatesForSum);
   exports["getResult"] = Function::New(env, getResult);
 
   // components
   //
   exports["showComponents"] = Function::New(env, showComponents);
   exports["checkClueConsistency"] = Function::New(env, checkClueConsistency);
-  exports["getConsistencyCheckResults"] =
-      Function::New(env, getConsistencyCheckResults);
+  exports["getConsistencyCheckResults"] = Function::New(env,
+      getConsistencyCheckResults);
 
   // misc
   //

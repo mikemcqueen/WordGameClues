@@ -37,6 +37,7 @@
       'candidates.cpp',
       'clue-manager.cpp',
       'cm-precompute.cpp',
+      'combo-maker.cpp',
       'components.cpp',
       'cuda-common.cpp',
       'filter-support.cpp',

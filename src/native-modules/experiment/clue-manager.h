@@ -2,11 +2,11 @@
 #define INCLUDE_CLUE_MANAGER_H
 
 #include <functional>
-#include <set>
 #include <string>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
+#include <set>
 #include <vector>
 #include "cuda-types.h"
 // not thrilled about this. it's really a header organization issue though
@@ -101,8 +101,8 @@ inline void for_each_nc_source(const NameCount& nc, const auto& fn) {
   for_each_nc_source(nc.name, nc.count, fn);
 }
 
-void init_primary_clues(
-    std::vector<std::string>&& names, std::vector<IndexList>&& idx_lists);
+void init_primary_clues(std::vector<std::string>&& names,
+    std::vector<IndexList>&& idx_lists);
 
 void dump_memory(std::string_view header = "clue-manager memory:");
 

@@ -464,6 +464,11 @@ struct NameCount {
     return names;
   }
 
+  static void listSort(NameCountList& list) {
+    std::ranges::sort(list,
+        [](const NameCount& a, const NameCount& b) { return a.name < b.name; });
+  }
+
   static std::string listToString(const std::vector<std::string>& list) {
     char buf[1280] = { 0 };
     for (auto it = list.cbegin(); it != list.cend(); ++it) {
