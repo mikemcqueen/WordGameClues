@@ -2,7 +2,6 @@
 #include <charconv>
 #include <chrono>
 #include <cmath>
-//#include <format>
 #include <string>
 #include <unordered_set>
 #include <vector>
@@ -32,11 +31,11 @@ PrimaryNameSrcIndicesMap primaryNameSrcIndicesMap_;
 // map clue_name -> source_csv_list for each count (including primary)
 std::vector<NameSourcesMap> nameSourcesMaps;
 
-// map source_csv -> { src_list, clue_names set } for each count
+// map source_csv -> { src_list, clue_names_set } for each count
 std::vector<KnownSourceMap> knownSourceMaps;
 
 // populated on demand from primaryNameSrcIndicesMap/nameSrcMaps
-std::vector<StringCRefList> uniqueClueNames;
+std::vector<NameCountList> uniqueClueNames;
 
 // nameSourcesMap
 
@@ -106,21 +105,21 @@ void init_primary_known_source_map(
 
 // uniqueClueNames
 
-void populate_unique_clue_names(StringCRefList& name_cref_list, int count) {
+void populate_unique_clue_nc_list(NameCountList& nc_list, int count) {
   for (const auto& [name, _] : get_name_sources_map(count)) {
-    name_cref_list.push_back(std::cref(name));
+    nc_list.emplace_back(name, count);
   }
 }
 
-const auto& get_unique_clue_names(int count) {
+const auto& get_unique_clue_nc_list(int count) {
   const auto idx{count - 1};
   if ((int)uniqueClueNames.size() <= idx) { uniqueClueNames.resize(idx + 1); }
-  auto& names = uniqueClueNames.at(idx);
-  if (names.empty()) {
-    populate_unique_clue_names(names, count);
-    assert(!names.empty());
+  auto& nc_list = uniqueClueNames.at(idx);
+  if (nc_list.empty()) {
+    populate_unique_clue_nc_list(nc_list, count);
+    assert(!nc_list.empty());
   }
-  return names;
+  return nc_list;
 }
 
 // misc
@@ -271,11 +270,15 @@ bool add_compound_clue(
 //
 
 int get_num_unique_clue_names(int count) {
-  return int(get_unique_clue_names(count).size());
+  return int(get_unique_clue_nc_list(count).size());
+}
+
+const NameCount& get_unique_clue_nc(int count, int idx) {
+  return get_unique_clue_nc_list(count).at(idx);
 }
 
 const std::string& get_unique_clue_name(int count, int idx) {
-  return get_unique_clue_names(count).at(idx).get();
+  return get_unique_clue_nc(count, idx).name;
 }
 
 //

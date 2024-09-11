@@ -6,6 +6,7 @@
 #include <ranges>
 #include <set>
 #include <string>
+#include <stacktrace>
 #include <unordered_map>
 #include <vector>
 #include "candidates.h"
@@ -481,6 +482,7 @@ Value computeCombosForSum(const CallbackInfo& info) {
   }
 
   compute_combos_for_sum(sum, max);
+
   return env.Null();
 }
   

@@ -164,13 +164,14 @@ public:
     start_ = std::chrono::high_resolution_clock::now();
   }
 
-  void stop() {
-    stop_ = std::chrono::high_resolution_clock::now();
-  }
-
   template <typename TimeUnit = std::chrono::milliseconds>
   auto count() {
     return std::chrono::duration_cast<TimeUnit>(stop_ - start_).count();
+  }
+
+  auto stop() {
+    stop_ = std::chrono::high_resolution_clock::now();
+    return count();
   }
 
   template <typename TimeUnit = std::chrono::milliseconds>

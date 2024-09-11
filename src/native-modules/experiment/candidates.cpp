@@ -25,6 +25,11 @@ struct MergeData {
   SourceCompatibilityCRefList src_cref_list;
 };
 
+struct MergeData2 {
+  SourceCompatibilityDataCRef src_cref;
+  SourceCompatibilityCRefList src_cref_list;
+};
+
 struct CandidateRepoValue {
   SourceCompatibilityList merged_src_list;
   std::optional<int> opt_idx;
@@ -60,6 +65,7 @@ std::binary_semaphore candidate_counts_semaphore_{1};
 // functions
 
 auto& get_candidate_repo(int sum) {
+  assert(sum >=2 && "sum < 2");
   Lock lk(candidate_repos_semaphore_);
   return candidate_repos_.at(sum - 2);
 }
@@ -73,7 +79,7 @@ auto get_src_compat_list(const NameCount& nc) {
   return src_list;
 }
 
-auto get_src_compat_cref_list(const NameCount& nc) {
+auto make_source_cref_list(const NameCount& nc) {
   SourceCompatibilityCRefList src_cref_list;
   clue_manager::for_each_nc_source(
       nc, [&src_cref_list](const SourceCompatibilityData& src) {
@@ -99,12 +105,39 @@ auto make_merge_list(const SourceCompatibilityList& merged_src_list,
   return merge_list;
 }
 
+auto make_merge_list(const SourceCompatibilityCRefList& src_cref_list1,
+    const SourceCompatibilityCRefList& src_cref_list2) {
+  std::vector<MergeData2> merge_list;
+  for (const auto src_cref1 : src_cref_list1) {
+    SourceCompatibilityCRefList compat_src_cref_list;
+    for (const auto src_cref2 : src_cref_list2) {
+      if (src_cref1.get().isXorCompatibleWith(src_cref2.get())) {
+        compat_src_cref_list.push_back(src_cref2);
+      }
+    }
+    if (!compat_src_cref_list.empty()) {
+      merge_list.emplace_back(src_cref1, std::move(compat_src_cref_list));
+    }
+  }
+  return merge_list;
+}
+
 auto make_merged_src_list(const std::vector<MergeData>& merge_list) {
   SourceCompatibilityList merged_src_list;
   for (const auto& merge_data : merge_list) {
     for (const auto src_cref : merge_data.src_cref_list) {
+      merged_src_list.push_back(merge_data.merged_src.copyMerge(src_cref.get()));
+    }
+  }
+  return merged_src_list;
+}
+
+auto make_merged_src_list(const std::vector<MergeData2>& merge_list) {
+  SourceCompatibilityList merged_src_list;
+  for (const auto& merge_data : merge_list) {
+    for (const auto src_cref : merge_data.src_cref_list) {
       merged_src_list.push_back(
-          std::move(merge_data.merged_src.copyMerge(src_cref.get())));
+          merge_data.src_cref.get().copyMerge(src_cref.get()));
     }
   }
   return merged_src_list;
@@ -121,7 +154,7 @@ SourceCompatibilityList merge_all_compatible_sources(
     }
     // TODO: optimization opportunity. Walk through loop building merge_lists
     // first. If any are empty, bail. After all succeed, do actual merges.
-    const auto& src_cref_list = get_src_compat_cref_list(nc);
+    const auto& src_cref_list = make_source_cref_list(nc);
     const auto merge_list = make_merge_list(merged_src_list, src_cref_list);
     if (merge_list.empty()) {
       return {};
@@ -131,9 +164,21 @@ SourceCompatibilityList merge_all_compatible_sources(
   return merged_src_list;
 }
 
+// optimized for 2 sources, using more crefs
+// ultimately making this a kernel is the path forward due to isXorCompat calls
+SourceCompatibilityList merge_all_compatible_sources(
+    const NameCountCRefList& nc_cref_list) {
+  assert(nc_cref_list.size() == 2 && "nc_cref_list.size() != 2");
+  const auto src_cref_list1 = make_source_cref_list(nc_cref_list.at(0).get());
+  const auto src_cref_list2 = make_source_cref_list(nc_cref_list.at(1).get());
+  const auto merge_list = make_merge_list(src_cref_list1, src_cref_list2);
+  if (merge_list.empty()) return {};
+  return make_merged_src_list(merge_list);
+}
+
 auto add_candidate(int sum, std::string&& combo, int index) {
   // need to lock/find only because get_candidates() returns const reference.
-  // if this were in a class this could be satisified with a private non-const
+  // if this were in a class this could be satisfied with a private non-const
   // get_candidates() accessor.
   Lock lk(candidate_map_semaphore_);
   auto& candidates = candidate_map_.find(sum)->second;
@@ -142,19 +187,18 @@ auto add_candidate(int sum, std::string&& combo, int index) {
 }
 
 auto add_candidate(int sum, std::string&& combo,
-    std::reference_wrapper<const SourceCompatibilityList> src_list_cref) {
+    SourceCompatibilityListCRef src_list_cref) {
+  std::unordered_set<std::string> combos{};
+  combos.insert(std::move(combo));
   Lock lk(candidate_map_semaphore_);
   if (!candidate_map_.contains(sum)) {
     auto [_, success] = candidate_map_.emplace(sum, CandidateList{});
     assert(success);
   }
-  std::set<std::string> combos{};
-  combos.insert(std::move(combo));
-  // can't use get_candidates() here due to owning lock already, and because
-  // it returns a const reference.
+  // can't use get_candidates() here because it returns a const reference.
   auto& candidates = candidate_map_.find(sum)->second;
   candidates.emplace_back(std::move(src_list_cref), std::move(combos));
-  return (int)candidates.size() - 1;
+  return int(candidates.size()) - 1;
 }
 
 auto get_candidate_counts_ref(int sum) -> CandidateCounts& {
@@ -178,7 +222,7 @@ void consider_candidate(const NameCountList& nc_list) {
   if (!candidate_repo.contains(key)) {
     CandidateRepoValue repo_value;
     repo_value.merged_src_list =
-      std::move(merge_all_compatible_sources(nc_list));
+        std::move(merge_all_compatible_sources(nc_list));
     candidate_repo.emplace(key, std::move(repo_value));
   }
   auto& cc = get_candidate_counts_ref(sum);
@@ -189,6 +233,38 @@ void consider_candidate(const NameCountList& nc_list) {
     return;
   }
   auto combo = NameCount::listToString(NameCount::listToNameList(nc_list));
+  if (repo_value.opt_idx.has_value()) {
+    add_candidate(sum, std::move(combo), repo_value.opt_idx.value());
+  } else {
+    repo_value.opt_idx = add_candidate(
+      sum, std::move(combo), std::cref(repo_value.merged_src_list));
+  }
+}
+
+void consider_candidate(const NameCountCRefList& nc_cref_list) {
+  auto sum = std::accumulate(nc_cref_list.begin(), nc_cref_list.end(), 0,
+      [](int total, const NameCountCRef& nc_cref) {
+        return total + nc_cref.get().count;
+      });
+  auto& candidate_repo = get_candidate_repo(sum);
+  // no lock necessary to modify repo map for a particular sum
+  // TODO: auto& repo_value = repo_get_or_add(nc_list)
+  // that way we can std::move(key), and only one lookup
+  auto key = NameCount::listToString(nc_cref_list);
+  if (!candidate_repo.contains(key)) {
+    CandidateRepoValue repo_value;
+    repo_value.merged_src_list =
+      std::move(merge_all_compatible_sources(nc_cref_list));
+    candidate_repo.emplace(key, std::move(repo_value));
+  }
+  auto& cc = get_candidate_counts_ref(sum);
+  cc.num_considers++;
+  auto& repo_value = candidate_repo.find(key)->second;
+  if (repo_value.merged_src_list.empty()) {
+    cc.num_incompat++;
+    return;
+  }
+  auto combo = NameCount::listToNameCsv(nc_cref_list);
   if (repo_value.opt_idx.has_value()) {
     add_candidate(sum, std::move(combo), repo_value.opt_idx.value());
   } else {

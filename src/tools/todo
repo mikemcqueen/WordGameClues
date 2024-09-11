@@ -1,3 +1,6 @@
+* Look into why some uniqueNames are different lengths in JS vs. C++. in particular
+  why would JS have *more* names for some counts?
+
 * Investigate whether I can use USE_LOCAL_XOR_COMPAT in filter.cu. When I turn it
   on I get slightly different results. why?
 

@@ -93,7 +93,7 @@ auto make_unique_variations(const std::vector<VariationsIndex>& sorted_vi_list) 
 // for generated sources
 
 struct SourceCompatCRefSrcIndex {
-  std::reference_wrapper<const SourceCompatibilityData> src_compat_cref;
+  SourceCompatibilityDataCRef src_compat_cref;
   SourceIndex src_idx{};
 };
 
@@ -104,6 +104,17 @@ auto make_src_compat_cref_src_idx_list(const CandidateList& candidates) {
     for (size_t src_idx{}; src_idx < src_compat_list.size(); ++src_idx) {
       result.emplace_back(std::cref(src_compat_list.at(src_idx)),
           SourceIndex{index_t(list_idx), index_t(src_idx)});
+    }
+  }
+  return result;
+}
+
+auto make_source_index_list(const CandidateList& candidates) {
+  std::vector<SourceIndex> result;
+  for (size_t list_idx{}; list_idx < candidates.size(); ++list_idx) {
+    const auto& src_compat_list = candidates.at(list_idx).src_list_cref.get();
+    for (size_t src_idx{}; src_idx < src_compat_list.size(); ++src_idx) {
+      result.emplace_back(SourceIndex{index_t(list_idx), index_t(src_idx)});
     }
   }
   return result;
@@ -145,12 +156,18 @@ void build_unique_variations(
 
 auto make_variations_sorted_idx_lists(
     const CandidateList& candidates) -> std::vector<IndexList> {
+  // I don't completely understand what's happening here. I wrote this code for
+  // generated source unique variations, which are no longer used. It required
+  // sources be sorted by variations, which is no longer necessary. I'm not sure
+  // if any of this SourceIndex stuff is required if the sort isn't.
   auto src_compat_cref_src_idx_list = make_src_compat_cref_src_idx_list(candidates);
+  /*
   std::ranges::sort(src_compat_cref_src_idx_list,
       [](const SourceCompatCRefSrcIndex& a, const SourceCompatCRefSrcIndex& b) {
         return std::less{}(a.src_compat_cref.get().usedSources.variations,
             b.src_compat_cref.get().usedSources.variations);
       });
+  */
   return make_idx_lists(candidates, src_compat_cref_src_idx_list);
 }
 
@@ -167,6 +184,7 @@ auto make_src_compat_list(const CandidateList& candidates,
   return src_compat_list;
 }
 
+// was used for "generated source" unique variations. which is currently not used.
 // NB: src_compat_list must be sorted by variations
 auto make_unique_variations(const SourceCompatibilityList& sorted_src_compat_list)
     -> std::vector<UniqueVariations> {

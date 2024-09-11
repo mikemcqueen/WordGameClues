@@ -47,19 +47,19 @@ bool has_known_source_map(int count);
 bool is_known_source_map_entry(int count, const std::string& sources_csv);
 
 // TODO: const ref version of this as an overload
-auto get_known_source_map_entry(int count, const std::string& sources_csv)
-  -> KnownSourceMapValue&;
+auto get_known_source_map_entry(int count,
+    const std::string& sources_csv) -> KnownSourceMapValue&;
 
-void init_known_source_map_entry(
-    int count, const std::string source_csv, SourceList&& src_list);
+void init_known_source_map_entry(int count, const std::string source_csv,
+    SourceList&& src_list);
 
 const IndexList& getPrimaryClueSrcIndices(const std::string& name);
 
-auto get_known_source_map_entries(const std::string& name, int count)  //
-    -> std::vector<KnownSourceMapValueCRef>;
+auto get_known_source_map_entries(const std::string& name,
+    int count) -> std::vector<KnownSourceMapValueCRef>;
 
-auto get_known_source_map_entries(const NameCount& nc)  //
-    -> std::vector<KnownSourceMapValueCRef>;
+auto get_known_source_map_entries(
+    const NameCount& nc) -> std::vector<KnownSourceMapValueCRef>;
 
 bool add_compound_clue(const NameCount& nc, const std::string& sources_csv);
 
@@ -76,8 +76,9 @@ inline auto make_src_cref_list(const NameCount& nc) {
 // uniqueClueNames
 
 int get_num_unique_clue_names(int count);
-
+const NameCount& get_unique_clue_nc(int count, int idx);
 const std::string& get_unique_clue_name(int count, int idx);
+
 
 // misc
 

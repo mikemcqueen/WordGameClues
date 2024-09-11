@@ -8,6 +8,7 @@
 #include <cstring>
 #include <iostream>
 #include <set>
+#include <charconv>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -430,11 +431,13 @@ struct SourceCompatibilityData {
 using SourceCompatibilityList = std::vector<SourceCompatibilityData>;
 using SourceCompatibilitySet = std::unordered_set<SourceCompatibilityData>;
 using SourceCompatibilityDataCRef =
-  std::reference_wrapper<const SourceCompatibilityData>;
+    std::reference_wrapper<const SourceCompatibilityData>;
 using SourceCompatibilityCRefList = std::vector<SourceCompatibilityDataCRef>;
 
 struct NameCount;
 using NameCountList = std::vector<NameCount>;
+using NameCountCRef = std::reference_wrapper<const NameCount>;
+using NameCountCRefList = std::vector<NameCountCRef>;
 
 struct NameCount {
   NameCount(const std::string& name, int count) : name(name), count(count) {}
@@ -447,8 +450,17 @@ struct NameCount {
   */
 
   std::string toString() const {
-    char buf[128] = { 0 };
+    char buf[128];
+#if 0
+    std::strcpy(buf, name.c_str());
+    std::strcat(buf, ":");
+    auto end = buf + strlen(buf);
+    auto r = std::to_chars(end, end + 4, count);
+    assert(r.ec == std::errc{});
+    *r.ptr = 0;
+#else
     snprintf(buf, sizeof(buf), "%s:%d", name.c_str(), count);
+#endif
     return buf;
   }
 
@@ -469,8 +481,40 @@ struct NameCount {
         [](const NameCount& a, const NameCount& b) { return a.name < b.name; });
   }
 
+  static void listSort(NameCountCRefList& cref_list) {
+    std::ranges::sort(cref_list,
+        [](const NameCountCRef& a, const NameCountCRef& b) {
+          return a.get().name < b.get().name;
+        });
+  }
+
+  static std::string listToNameCsv(const NameCountCRefList& cref_list) {
+    char buf[1280];
+    buf[0] = 0;
+    for (auto it = cref_list.cbegin(); it != cref_list.cend(); ++it) {
+      std::strcat(buf, it->get().name.c_str());
+      if ((it + 1) != cref_list.cend()) {  // TODO std::next() ?
+        std::strcat(buf, ",");
+      }
+    }
+    return buf;
+  }
+
+  static std::string listToString(const NameCountCRefList& cref_list) {
+    char buf[1280];
+    buf[0] = 0;
+    for (auto it = cref_list.cbegin(); it != cref_list.cend(); ++it) {
+      std::strcat(buf, it->get().toString().c_str());
+      if ((it + 1) != cref_list.cend()) { // TODO std::next() ?
+        std::strcat(buf, ",");
+      }
+    }
+    return buf;
+  }
+
   static std::string listToString(const std::vector<std::string>& list) {
-    char buf[1280] = { 0 };
+    char buf[1280];
+    buf[0] = 0;
     for (auto it = list.cbegin(); it != list.cend(); ++it) {
       std::strcat(buf, it->c_str());
       if ((it + 1) != list.cend()) { // TODO std::next() ?
@@ -481,7 +525,8 @@ struct NameCount {
   }
 
   static std::string listToString(const NameCountList& list) {
-    char buf[1280] = { 0 };
+    char buf[1280];
+    buf[0] = 0;
     for (auto it = list.cbegin(); it != list.cend(); ++it) {
       std::strcat(buf, it->toString().c_str());
       if ((it + 1) != list.cend()) { // TODO std::next() ?

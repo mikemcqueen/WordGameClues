@@ -3,6 +3,7 @@
 
 #include <functional>
 #include <unordered_map>
+#include <unordered_set>
 #include <set>
 #include <string>
 #include <utility>
@@ -13,7 +14,9 @@ namespace cm {
 
 // aliases/types
 
-using SourceCompatibilityLists = std::vector<SourceCompatibilityList>;
+//using SourceCompatibilityLists = std::vector<SourceCompatibilityList>;
+using SourceCompatibilityListCRef =
+    std::reference_wrapper<const SourceCompatibilityList>;
 
 struct CandidateCounts {
   size_t num_considers;
@@ -23,14 +26,15 @@ struct CandidateCounts {
 };
 
 struct CandidateData {
-  std::reference_wrapper<const SourceCompatibilityList> src_list_cref;
-  std::set<std::string> combos;  // TODO: why is this a set vs. unordered_set?
+  SourceCompatibilityListCRef src_list_cref;
+  std::unordered_set<std::string> combos;
 };
 using CandidateList = std::vector<CandidateData>;
 
 // functions
 
 void consider_candidate(const NameCountList& ncList);
+void consider_candidate(const NameCountCRefList& nc_cref_list);
 
 void clear_candidates(int sum);
 
