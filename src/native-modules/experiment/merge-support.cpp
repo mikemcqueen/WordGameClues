@@ -572,8 +572,8 @@ auto cuda_get_compatible_indices(const std::vector<SourceList>& src_lists,
         &device_compat_matrices[compat_matrix_start_indices.at(n)], merge_type,
         stream, flag);
   });
-  // debugging
   /*
+  // debugging
   if constexpr (0) {
     CudaEvent lp_stop;
     auto lp_dur = lp_stop.synchronize(lp_start);
@@ -621,8 +621,8 @@ XorSource merge_sources(const std::vector<index_t>& src_indices,
     const auto& src = src_lists.at(i).at(src_indices.at(i));
     // TODO: std::ranges::copy
     const auto& pnsl = src.primaryNameSrcList;
-    primaryNameSrcList.insert(
-        primaryNameSrcList.end(), pnsl.begin(), pnsl.end());  // copy
+    primaryNameSrcList.insert(primaryNameSrcList.end(), pnsl.begin(),
+        pnsl.end());  // copy
     const auto& ncl = src.ncList;
     ncList.insert(ncList.end(), ncl.begin(), ncl.end());  // copy
     usedSources.mergeInPlace(src.usedSources);
@@ -670,13 +670,13 @@ void log_compat_indices(const std::vector<IndexList>& idx_lists,
     std::cerr << (merge_type == MergeType::XOR ? "XOR" : "OR")
               << " compat_idx_lists(" << idx_lists.size() << ")" << std::endl;
   }
-#if 1
-  for (size_t i{}; i < idx_lists.size(); ++i) {
-    const auto& list = idx_lists.at(i);
-    std::cerr << "list[" << i << "][0] = "<<  list.at(0) << " ";
+  if (log_level(ExtraVerbose)) {
+    for (size_t i{}; i < idx_lists.size(); ++i) {
+      const auto& list = idx_lists.at(i);
+      std::cerr << "list[" << i << "][0] = " << list.at(0) << " ";
+    }
+    std::cerr << std::endl;
   }
-  std::cerr << std::endl;
-#endif
 }
 
 }  // anonymous namespace

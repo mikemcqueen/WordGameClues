@@ -14,7 +14,8 @@ namespace cm {
 
 __constant__ FilterData::DeviceXor xor_data;
 __constant__ FilterData::DeviceOr or_data;
-__constant__ FilterData::DeviceSources sources_data;
+__constant__ SourceCompatibilityData* sources_data[32];
+//__constant__ FilterData::DeviceSources sources_data;
 
 #if defined(DEBUG_XOR_COUNTS) || defined(DEBUG_OR_COUNTS)
 __device__ atomic64_t count_xor_src_considered = 0;
@@ -374,23 +375,27 @@ __device__ void dump_all_sources(fat_index_t flat_idx,
 }
 */
 
-// Test if the supplied source contains both of the primary sources described
+// Test if the supplied sources match both of the primary sources described
 // by any of the supplied source descriptor pairs.
-__device__ bool source_contains_any_descriptor_pair(
-    const SourceCompatibilityData& source,
+__device__ bool sources_match_any_descriptor_pair(
+    const SourceCompatibilityData& source1,
+    const SourceCompatibilityData& source2,
     const UsedSources::SourceDescriptorPair* RESTRICT src_desc_pairs,
     const unsigned num_src_desc_pairs) {
 
-  __shared__ bool contains_both;
-  if (!threadIdx.x) contains_both = false;
+  __shared__ bool matches_both;
+  if (!threadIdx.x) matches_both = false;
   // one thread per src_desc_pair
   for (unsigned idx{}; idx * blockDim.x < num_src_desc_pairs; ++idx) {
     __syncthreads();
-    if (contains_both) return true;
+    if (matches_both) return true;
     const auto pair_idx = idx * blockDim.x + threadIdx.x;
     if (pair_idx < num_src_desc_pairs) {
-      if (source.usedSources.has(src_desc_pairs[pair_idx])) {
-        contains_both = true;
+      if ((source1.usedSources.has(src_desc_pairs[pair_idx].first)
+              && source2.usedSources.has(src_desc_pairs[pair_idx].second))
+          || ((source1.usedSources.has(src_desc_pairs[pair_idx].second)
+              && source2.usedSources.has(src_desc_pairs[pair_idx].first)))) {
+        matches_both = true;
       }
     }
   }
@@ -398,20 +403,20 @@ __device__ bool source_contains_any_descriptor_pair(
 }
 
 __global__ void get_compatible_sources_kernel(
-    const SourceCompatibilityData* RESTRICT sources,
-    const unsigned num_sources,
-    const UsedSources::
-        SourceDescriptorPair* RESTRICT incompat_src_desc_pairs,
+    const CompatSourceIndices* RESTRICT src_indices,
+    const unsigned num_src_indices,
+    const UsedSources::SourceDescriptorPair* RESTRICT incompat_src_desc_pairs,
     const unsigned num_src_desc_pairs, result_t* RESTRICT results) {
-  // one block per source
-  for (unsigned idx{blockIdx.x}; idx < num_sources; idx += gridDim.x) {
-    const auto& source = sources[idx];
+  // one block per source-(index)-pair
+  for (unsigned idx{blockIdx.x}; idx < num_src_indices; idx += gridDim.x) {
+    // NOTE: hard-coded to index 1, doesn't need to be
+    const auto& source1 = sources_data[1][src_indices[idx].first().index()];
+    const auto& source2 = sources_data[1][src_indices[idx].second().index()];
     // I don't understand why this is required, but fails synccheck and
     // produces wobbly results without.
     __syncthreads();
-    if (!source_contains_any_descriptor_pair(
-          source, incompat_src_desc_pairs, num_src_desc_pairs)) {
-      /// TODO: this looks wrong. why thread 0 only? can i cg::block::any this?
+    if (!sources_match_any_descriptor_pair(source1, source2,
+            incompat_src_desc_pairs, num_src_desc_pairs)) {
       if (!threadIdx.x) {
         results[idx] = 1;
       }
@@ -444,7 +449,7 @@ __device__ auto source_bits_are_XOR_compatible(
   return true;
 }
 
-//#define USE_LOCAL_XOR_COMPAT
+#define USE_LOCAL_XOR_COMPAT
 
 __device__ bool is_source_XOR_compatible(const SourceCompatibilityData& source,
     fat_index_t combo_idx) {
@@ -641,7 +646,6 @@ __device__ bool get_next_compatible_XOR_sources_chunk(
   if (!threadIdx.x) any_xor_compat = false;
   __syncthreads();
   for (; xor_chunk_idx * block_size < num_xor_indices; ++xor_chunk_idx) {
-    assert(xor_chunk_idx * block_size < num_xor_indices);
     if (get_next_XOR_sources_chunk(source, xor_chunk_idx, num_uv_indices)) {
       any_xor_compat = true;
     }
@@ -678,11 +682,12 @@ __device__ bool is_compat_loop(const SourceCompatibilityData& source) {
     dynamic_shared[kXorStartUvIdx] = 0;
     dynamic_shared[kXorStartSrcIdx] = 0;
   }
+  __syncthreads();
   auto num_uv_indices =
       compute_compat_XOR_uv_indices(source.usedSources.variations);
   if (!num_uv_indices) return false;
   for (;;) {
-    __syncthreads();
+    //    __syncthreads();
     if (*xor_chunk_idx_ptr * block_size >= num_xor_indices) return false;
 
     auto begin = clock64();
@@ -730,45 +735,77 @@ __device__ bool is_compat_loop(const SourceCompatibilityData& source) {
       any_xor_compat = false;
       (*xor_chunk_idx_ptr)++;
     }
+    __syncthreads();
   }
   return false;
 }
+
+__device__ SourceCompatibilityData merge_sources(
+    const CompatSourceIndices compat_src_indices) {
+  // NOTE: this could be faster with 9 threads for example
+  // and, shared memory
+  const auto csi1 = compat_src_indices.first();
+  const auto csi2 = compat_src_indices.second();
+  SourceCompatibilityData source{sources_data[csi1.count()][csi1.index()]};
+  source.mergeInPlace(sources_data[csi2.count()][csi2.index()]);
+  return source;
+}
+
+__device__ int dumped = 0;
 
 // explain better:
 // Find sources that are:
 // * XOR compatible with any of the supplied XOR sources, and
 // * OR compatible with any of the supplied OR sources, which must in turn be
-// * variation-compatible with the XOR source.
+// * variation-compatible with the corresponding/aforementioned XOR source.
 //
 // Find compatible XOR source -> compare with variation-compatible OR sources.
-__global__ void filter_kernel(const SourceCompatibilityData* RESTRICT src_list,
-    int num_sources, const SourceIndex* RESTRICT src_indices,
-    // const index_t* RESTRICT src_list_start_indices,
+__global__ void filter_kernel(
+    const CompatSourceIndices* RESTRICT compat_src_indices,
+    int num_compat_src_indices, const SourceIndex* RESTRICT src_indices,
     const result_t* RESTRICT compat_src_results, result_t* RESTRICT results,
     int stream_idx) {
+  __shared__ SourceCompatibilityData source;
   __shared__ bool is_compat;
   if (!threadIdx.x) is_compat = false;
 
-  #if 1 || defined(PRINTF)
-  if (!blockIdx.x && !threadIdx.x) {
-    printf("+++kernel+++ blocks: %u\n", gridDim.x);
-  }
-  #endif
+#if defined(PRINTF)
+    if (!blockIdx.x && !threadIdx.x) {
+      printf("+++kernel+++ blocks: %u\n", gridDim.x);
+    }
+#endif
 
-  // for each source (one block per source)
-  #if MAX_SOURCES
+#if 1
+  if (!blockIdx.x && !threadIdx.x && !dumped) {
+    dump_compat_src_indices(compat_src_indices, 10, "device");
+    dumped = 1;
+  }
+#endif
+  
+#if MAX_SOURCES
   num_sources = num_sources < MAX_SOURCES ? num_sources : MAX_SOURCES;
-  #endif
-  for (index_t idx{blockIdx.x}; idx < num_sources; idx += gridDim.x) {
+#endif
+  // for each source (one block per source)
+  for (index_t idx{blockIdx.x}; idx < num_compat_src_indices;
+      idx += gridDim.x) {
     __syncthreads();
     const auto src_idx = src_indices[idx];
-    const auto flat_idx = src_idx.index;
-    if (!compat_src_results || compat_src_results[flat_idx]) {
+    if (!compat_src_results || compat_src_results[src_idx.index]) {
       dynamic_shared[kSrcListIdx] = src_idx.listIndex;
       dynamic_shared[kSrcIdx] = src_idx.index;
-      if (is_compat_loop(src_list[flat_idx])) {  
-        is_compat = true;
+      if (!threadIdx.x) {
+        const auto csi1 = compat_src_indices[idx].first();
+        const auto csi2 = compat_src_indices[idx].second();
+#if 0
+        if (!blockIdx.x) {
+          printf("first (%u, %u) second (%u, %u)\n", csi1.count(), csi1.index(),
+              csi2.count(), csi2.index());
+        }
+#endif
+        source = sources_data[csi1.count()][csi1.index()];
+        source.mergeInPlace(sources_data[csi2.count()][csi2.index()]);
       }
+      if (is_compat_loop(source)) { is_compat = true; }
     }
     __syncthreads();
     if (is_compat && !threadIdx.x) {
@@ -789,15 +826,17 @@ void copy_filter_data(const FilterData& mfd) {
   err = cudaMemcpyToSymbol(or_data, &mfd.device_or, or_bytes);
   assert_cuda_success(err, "copy or filter data");
 
+  /*
   const auto sources_bytes = sizeof(FilterData::DeviceSources);
   err = cudaMemcpyToSymbol(sources_data, &mfd.device_sources, sources_bytes);
   assert_cuda_success(err, "copy sources filter data");
+  */
 }
 
 }  // anonymous namespace
 
 void run_filter_kernel(int threads_per_block, StreamData& stream,
-    FilterData& mfd, const SourceCompatibilityData* device_src_list,
+    FilterData& mfd, const CompatSourceIndices* device_src_indices,
     const result_t* device_compat_src_results,
     result_t* device_results /*, const index_t* device_list_start_indices*/) {
   // TODO: move to device_attr class
@@ -860,10 +899,10 @@ void run_filter_kernel(int threads_per_block, StreamData& stream,
 
   stream.xor_kernel_start.record();
   filter_kernel<<<grid_dim, block_dim, shared_bytes, stream.cuda_stream>>>(
-      device_src_list, int(stream.src_indices.size()),
-      stream.device_src_indices,  // device_list_start_indices,
-      device_compat_src_results, device_results, stream.stream_idx);
-  assert_cuda_success(cudaPeekAtLastError(), "filter kernel launch failed");
+      device_src_indices, int(stream.src_indices.size()),
+      stream.device_src_indices, device_compat_src_results, device_results,
+      stream.stream_idx);
+  assert_cuda_success(cudaPeekAtLastError(), "filter_kernel");
   stream.xor_kernel_stop.record();
 
   #if defined(DEBUG_XOR_COUNTS) || defined(DEBUG_OR_COUNTS)
@@ -879,7 +918,7 @@ void run_filter_kernel(int threads_per_block, StreamData& stream,
 }
 
 void run_get_compatible_sources_kernel(
-    const SourceCompatibilityData* device_src_list, unsigned num_sources,
+    const CompatSourceIndices* device_src_indices, unsigned num_src_indices,
     const UsedSources::SourceDescriptorPair* device_src_desc_pairs,
     unsigned num_src_desc_pairs, result_t* device_results) {
   int num_sm;
@@ -898,8 +937,9 @@ void run_get_compatible_sources_kernel(
   // async copies are on thread stream therefore auto synchronized
   cudaStream_t stream = cudaStreamPerThread;
   get_compatible_sources_kernel<<<grid_dim, block_dim, shared_bytes, stream>>>(
-      device_src_list, num_sources, device_src_desc_pairs, num_src_desc_pairs,
-      device_results);
+      device_src_indices, num_src_indices, device_src_desc_pairs,
+      num_src_desc_pairs, device_results);
+  assert_cuda_success(cudaPeekAtLastError(), "get_compat_sources_kernel");
 }
 
 }  // namespace cm

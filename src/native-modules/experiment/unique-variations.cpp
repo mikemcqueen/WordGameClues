@@ -1,8 +1,9 @@
 #include <iostream>
 #include <vector>
-#include "unique-variations.h"
 #include "cuda-types.h"
 #include "log.h"
+#include "source-index.h"
+#include "unique-variations.h"
 #include "util.h"
 
 namespace cm {
@@ -44,8 +45,8 @@ auto get_variations_index_list(const MergeData::Host& host) {
   for (index_t idx{}; auto combo_idx : host.compat_indices) {
     VariationsIndex vi;
     util::for_each_source_index(combo_idx, host.compat_idx_lists,
-        [&host, &v = vi.variations, combo_idx](
-            index_t list_idx, index_t src_idx) {
+        [&host, &v = vi.variations, combo_idx](index_t list_idx,
+            index_t src_idx) {
           const auto& src = host.src_lists.at(list_idx).at(src_idx);
           if (UsedSources::merge_variations(v, src.usedSources.variations)) {
             return true;
@@ -92,43 +93,45 @@ auto make_unique_variations(const std::vector<VariationsIndex>& sorted_vi_list) 
 
 // for generated sources
 
+/*
 struct SourceCompatCRefSrcIndex {
-  SourceCompatibilityDataCRef src_compat_cref;
+  //  SourceCompatibilityDataCRef src_compat_cref;
   SourceIndex src_idx{};
 };
 
-auto make_src_compat_cref_src_idx_list(const CandidateList& candidates) {
+auto make_src_idx_list(const CandidateList& candidates) {
   std::vector<SourceCompatCRefSrcIndex> result;
   for (size_t list_idx{}; list_idx < candidates.size(); ++list_idx) {
     const auto& src_compat_list = candidates.at(list_idx).src_list_cref.get();
     for (size_t src_idx{}; src_idx < src_compat_list.size(); ++src_idx) {
-      result.emplace_back(std::cref(src_compat_list.at(src_idx)),
-          SourceIndex{index_t(list_idx), index_t(src_idx)});
+      result.push_back(SourceIndex{index_t(list_idx), index_t(src_idx)});
     }
   }
   return result;
 }
+*/
 
 auto make_source_index_list(const CandidateList& candidates) {
-  std::vector<SourceIndex> result;
+  std::vector<SourceIndex> src_idx_list;
   for (size_t list_idx{}; list_idx < candidates.size(); ++list_idx) {
-    const auto& src_compat_list = candidates.at(list_idx).src_list_cref.get();
-    for (size_t src_idx{}; src_idx < src_compat_list.size(); ++src_idx) {
-      result.emplace_back(SourceIndex{index_t(list_idx), index_t(src_idx)});
+    const auto& src_indices =
+        candidates.at(list_idx).compat_src_indices_cref.get();
+    for (size_t idx{}; idx < src_indices.size(); ++idx) {
+      src_idx_list.emplace_back(index_t(list_idx), index_t(idx));
     }
   }
-  return result;
+  return src_idx_list;
 }
 
 auto make_idx_lists(const CandidateList& candidates,
-    const std::vector<SourceCompatCRefSrcIndex>& src_compat_cref_src_idx_list) {
+    const std::vector<SourceIndex>& src_idx_list) {
   std::vector<IndexList> idx_lists(candidates.size());
-  for (size_t list_idx{} ; list_idx < idx_lists.size(); ++list_idx) {
+  for (size_t list_idx{}; list_idx < idx_lists.size(); ++list_idx) {
     idx_lists.at(list_idx).resize(
-        candidates.at(list_idx).src_list_cref.get().size());
+        candidates.at(list_idx).compat_src_indices_cref.get().size());
   }
-  for (index_t idx{}; idx < src_compat_cref_src_idx_list.size(); ++idx) {
-    const auto src_idx = src_compat_cref_src_idx_list.at(idx).src_idx;
+  for (index_t idx{}; idx < src_idx_list.size(); ++idx) {
+    const auto src_idx = src_idx_list.at(idx);
     idx_lists.at(src_idx.listIndex).at(src_idx.index) = idx;
   }
   return idx_lists;
@@ -137,6 +140,7 @@ auto make_idx_lists(const CandidateList& candidates,
 }  // namespace
 
 // For XOR and OR compat_indices lists
+// TODO: better comment
 void build_unique_variations(
     FilterData::HostCommon& host, std::string_view name) {
   auto variations_idx_list = get_variations_index_list(host);
@@ -158,19 +162,25 @@ auto make_variations_sorted_idx_lists(
     const CandidateList& candidates) -> std::vector<IndexList> {
   // I don't completely understand what's happening here. I wrote this code for
   // generated source unique variations, which are no longer used. It required
-  // sources be sorted by variations, which is no longer necessary. I'm not sure
-  // if any of this SourceIndex stuff is required if the sort isn't.
-  auto src_compat_cref_src_idx_list = make_src_compat_cref_src_idx_list(candidates);
-  /*
-  std::ranges::sort(src_compat_cref_src_idx_list,
-      [](const SourceCompatCRefSrcIndex& a, const SourceCompatCRefSrcIndex& b) {
-        return std::less{}(a.src_compat_cref.get().usedSources.variations,
-            b.src_compat_cref.get().usedSources.variations);
-      });
-  */
-  return make_idx_lists(candidates, src_compat_cref_src_idx_list);
+  // sources be sorted by variations, which is no longer necessary. 
+  auto src_idx_list = make_source_index_list(candidates);
+  return make_idx_lists(candidates, src_idx_list);
 }
 
+auto make_compat_src_indices(const CandidateList& candidates,
+    const std::vector<IndexList>& idx_lists) -> CompatSourceIndicesList {
+  CompatSourceIndicesList compat_src_indices(util::sum_sizes(idx_lists));
+  for (size_t list_idx{}; list_idx < idx_lists.size(); ++list_idx) {
+    const auto& idx_list = idx_lists.at(list_idx);
+    for (size_t idx{}; idx < idx_list.size(); ++idx) {
+      compat_src_indices.at(idx_list.at(idx)) =
+          candidates.at(list_idx).compat_src_indices_cref.get().at(idx);
+    }
+  }
+  return compat_src_indices;
+}
+
+/*
 auto make_src_compat_list(const CandidateList& candidates,
     const std::vector<IndexList>& idx_lists) -> SourceCompatibilityList {
   SourceCompatibilityList src_compat_list(util::sum_sizes(idx_lists));
@@ -205,5 +215,6 @@ auto make_unique_variations(const SourceCompatibilityList& sorted_src_compat_lis
   }
   return unique_variations;
 }
+*/
 
 }  // namespace cm

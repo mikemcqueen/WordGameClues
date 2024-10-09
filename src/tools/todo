@@ -1,5 +1,27 @@
-* Look into why some uniqueNames are different lengths in JS vs. C++. in particular
-  why would JS have *more* names for some counts?
+
+* I should implement some kind of "freeze" mechanism on some of the data structures in
+  clue-manager, such that I can assert(!frozen) when adding new elements, and freeze
+  when on-demand constructing "secondary" representations of the data. (uniqueClueNames
+  is one example, but I think there is also opportunity for get_known_source_map_entries
+  as indicated below.
+
+* appears to be some massive inefficiences in clue-manager, in a couple places.
+  1) get_known_source_map_entries(), which is called by for_each_nc_source(), constructs
+     a new list every time it's called. this function is also apparently called directly
+     by index.cpp and combo-maker.cpp.
+
+* I think there's something weird going on in Candidates.cpp. I *should* be generating
+  word-pairs that have the *same* sources, because of synonyms, for example. And I had
+  code in there with the opt_idx.value() that was presumably written to enable multiple
+  combos with the same underlying sources to "share" those sources; effectively to be
+  the same candidate data (src_list), but with multiple combos. That's what CandidateData
+  *is*, ostensibly. But it doesn't appear to be working that way; seems I lost the plot
+  at some point. Or my assumptions about what the "key" of the candidate_repo map should
+  be is wrong. I mean, it's potentially synonyms all the way down right?
+
+* move all the clock/count stuff to a separate file
+
+* refactor xor/or get_idx_incremental_uv into a single function
 
 * Investigate whether I can use USE_LOCAL_XOR_COMPAT in filter.cu. When I turn it
   on I get slightly different results. why?
@@ -30,6 +52,7 @@
 * get_compatible_sources sync-check errors with -c2,N N>2, log.get_compat_sync_errors
 
 * move considerCandidate loop to C++.
+  * partially done. not much perf benefit here, just "cleaner code".
 
 * Pack all the idx_list stuff into a single device-allocated structure. will certainly
   make the code a lot easier to read (and also will facilitate allocating it in constant
@@ -221,7 +244,7 @@
   would consume less memory. could potentially integrate that into ncList/
   primaryNameSrcList as well.
 
-* as the dataset grows and things slow down, doing either a) more synchrous
+* as the dataset grows and things slow down, doing either a) more synchronous
   filters (e.g. for count=3) and including those incompatible results into
   the icompat_sources, or figuring out how to merge asynchronously completed
   results into the incompatible sources will probably speed things up.

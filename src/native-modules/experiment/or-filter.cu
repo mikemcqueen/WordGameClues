@@ -12,12 +12,7 @@
 
 namespace cm {
 
-namespace cg = cooperative_groups;
-
-/*
-extern __constant__ FilterData::DeviceXor xor_data;
-extern __constant__ FilterData::DeviceOr or_data;
-*/  
+// namespace cg = cooperative_groups;
 
 #ifdef DEBUG_OR_COUNTS
 extern __device__ atomic64_t or_compute_compat_uv_indices_clocks;

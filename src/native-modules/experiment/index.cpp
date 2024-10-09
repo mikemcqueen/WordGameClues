@@ -28,6 +28,7 @@
 #include "log.h"
 
 namespace cm {
+// combo-maker.cpp
 void compute_combos_for_sum(int sum, int max);
 }
 
@@ -313,7 +314,7 @@ auto combo_to_str(fat_index_t combo_idx, const IndexList& list_sizes) {
   return s;
 }
   */
-  
+
 void dump_combos(const MergeData::Host& host, const MergeData::Device& device) {
   std::vector<Variations> variations;
   const auto list_sizes = util::make_list_sizes(host.compat_idx_lists);
@@ -450,7 +451,21 @@ Value filterPreparation(const CallbackInfo& info) {
   return Boolean::New(env, !or_merge_fail);
 }
 
+//
 // computeCombosForSum
+//
+
+/*
+auto append_sources(const NameCount& nc, SourceCompatibilityList& src_list) {
+  auto start_size = src_list.size();
+  clue_manager::for_each_nc_source(nc,
+      [&src_list](const SourceCompatibilityData& src, int) {
+        src_list.push_back(src);
+      });
+  return src_list.size() - start_size;
+}
+*/
+
 Value computeCombosForSum(const CallbackInfo& info) {
   Env env = info.Env();
   if (!info[0].IsNumber() && !info[1].IsNumber() && !info[2].IsBoolean()) {
@@ -465,28 +480,40 @@ Value computeCombosForSum(const CallbackInfo& info) {
   // arg1
   auto dump = info[2].As<Boolean>();
   // --
+#if 0
   static bool unique_names_shown = false;
   if (!unique_names_shown) {
-    for (int i{1}; i < 15; ++i) {
+    for (int i{1}; i <= 15; ++i) {
       std::cerr << "uniqueClues(" << i
                 << "): " << clue_manager::get_num_unique_clue_names(i)
                 << std::endl;
     }
-    if (dump) {
-      for (int i{}; i < clue_manager::get_num_unique_clue_names(1); ++i) {
-        std::cout << clue_manager::get_unique_clue_name(1, i) << std::endl;
-      }
-      std::terminate();
-    }
     unique_names_shown = true;
   }
-
+#endif
+  if (dump) {
+    static size_t total_sources{};
+    size_t num_sources{};
+    for (int i{}; i < clue_manager::get_num_unique_clue_names(sum); ++i) {
+      const auto& name = clue_manager::get_unique_clue_name(sum, i);
+      for (const auto entry_cref : get_known_source_map_entries(name, sum)) {
+        num_sources += entry_cref.get().src_list.size();
+      }
+    }
+    total_sources += num_sources;
+    std::cerr << " sum " << sum << " num_sources: " << num_sources
+              << ", total: " << total_sources;
+    if (sum == 2)
+      std::cerr << ", sizeof SCD: " << sizeof(SourceCompatibilityData);
+    std::cerr << std::endl;
+  }
   compute_combos_for_sum(sum, max);
-
+  // TODO: move save_current_candidate_counts() here?
   return env.Null();
 }
   
 
+/*
 // considerCandidate
 Value considerCandidate(const CallbackInfo& info) {
   Env env = info.Env();
@@ -501,6 +528,7 @@ Value considerCandidate(const CallbackInfo& info) {
   consider_candidate(ncList);
   return env.Null();
 }
+*/
   
 //
 // filterCandidatesForSum
@@ -514,9 +542,9 @@ Value filterCandidatesForSum(const CallbackInfo& info) {
       .ThrowAsJavaScriptException();
     return env.Null();
   }
-  auto sum = info[0].As<Number>().Int32Value();
+  const auto sum = info[0].As<Number>().Int32Value();
   assert(sum >= 2);
-  FilterParams filter_params{sum,         //
+  FilterParams filter_params{sum,
       info[1].As<Number>().Int32Value(),  // threads_per_block
       info[2].As<Number>().Int32Value(),  // num_streams
       info[3].As<Number>().Int32Value(),  // stride
@@ -529,10 +557,10 @@ Value filterCandidatesForSum(const CallbackInfo& info) {
   // sum so we can access it later.
   save_current_candidate_counts(sum);
 
-  auto opt_incompat_sources = filter_candidates_cuda(MFD, filter_params);
+  const auto opt_incompat_sources = filter_candidates_cuda(MFD, filter_params);
   assert(filter_params.synchronous == opt_incompat_sources.has_value());
   if (opt_incompat_sources.has_value()) {
-    auto stream = cudaStreamPerThread;
+    const auto stream = cudaStreamPerThread;
     set_incompatible_sources(MFD, opt_incompat_sources.value(), stream);
   }
   // NOTE: can only free device data here after synchronous call. 
@@ -572,7 +600,8 @@ Value showComponents(const CallbackInfo& info) {
 
 Value checkClueConsistency(const CallbackInfo& info) {
   Env env = info.Env();
-  if (!info[0].IsArray() && !info[1].IsNumber() && !info[2].IsNumber() && !info[3].IsBoolean()) {
+  if (!info[0].IsArray() && !info[1].IsNumber() && !info[2].IsNumber()
+      && !info[3].IsBoolean()) {
     TypeError::New(env, "checkClueConsistency: invalid parameter type")
       .ThrowAsJavaScriptException();
     return env.Null();
@@ -708,7 +737,7 @@ Object Init(Env env, Object exports) {
       Function::New(env, mergeCompatibleXorSourceCombinations);
   exports["filterPreparation"] = Function::New(env, filterPreparation);
   exports["computeCombosForSum"] = Function::New(env, computeCombosForSum);
-  exports["considerCandidate"] = Function::New(env, considerCandidate);
+  //exports["considerCandidate"] = Function::New(env, considerCandidate);
   exports["filterCandidatesForSum"] = Function::New(env,
       filterCandidatesForSum);
   exports["getResult"] = Function::New(env, getResult);

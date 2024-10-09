@@ -227,7 +227,7 @@ const getCombosForUseNcLists = (sum: number, max: number, args: any): void => {
 };
 
 export const makeCombosForSum = (sum: number, args: any,
-    synchronous: boolean = false): void =>
+    synchronous: boolean = false, is_last: boolean = false): void =>
 {
     if (_.isUndefined(args.maxResults)) {
         args.maxResults = 50000;
@@ -241,7 +241,7 @@ export const makeCombosForSum = (sum: number, args: any,
     args.max = Math.min(args.max, args.sum);
     // 3 = c++, 4 = dump/exit
     if (_.includes(args.flags, '3')) {
-        Native.computeCombosForSum(sum, max, _.includes(args.flags, '4'));
+        Native.computeCombosForSum(sum, max, /*is_last &&*/ _.includes(args.flags, '4'));
     } else {
         getCombosForUseNcLists(sum, max, args);
     }
@@ -333,20 +333,20 @@ export const makeCombos = (args: any): any => {
         let totals = ClueManager.emptyFilterResult();
         const pc_result = PreCompute.preCompute(first, last, args);
         if (pc_result) {
-            showUniqueClueNameCounts(last);
+            //showUniqueClueNameCounts(last);
             // 3 = c++, 4 = dump/exit
             if (_.includes(args.flags, '4') && !_.includes(args.flags, '3')) {
-                showUniqueClueNames(1);
+                showUniqueClueNames(last);
                 process.exit(0);
             }
 
             // run 2-clue sources synchronously to seed "incompatible sources"
             // which makes subsequent sums faster.
-            makeCombosForSum(2, args, true);
+            makeCombosForSum(2, args, true, last == 2);
             if (first === 2) ++first;
             for (let sum = first; sum <= last; ++sum) {
                 // TODO: return # of combos filtered due to note name match
-                makeCombosForSum(sum, args);
+                makeCombosForSum(sum, args, false, last === sum);
             }
             const comboList = Native.getResult();
             total += comboList.length;

@@ -104,12 +104,12 @@ struct UsedSources {
     return variations.at(sentence - 1);
   }
 
-  void setVariation(int sentence, variation_index_t value) {
+  constexpr void setVariation(int sentence, variation_index_t value) {
     variations.at(sentence - 1) = value;
   }
 
   constexpr bool hasVariation(int sentence) const {
-    return getVariation(sentence) > -1;
+    return getVariation(sentence) > static_cast<variation_index_t>(-1);
   }
 
   /*
@@ -127,11 +127,15 @@ struct UsedSources {
   */
 
 private:
-  void addVariations(const UsedSources& other) {
+  constexpr void addVariations(const UsedSources& other) {
     for (int sentence{1}; sentence <= kNumSentences; ++sentence) {
       if (!other.hasVariation(sentence)) continue;
       // ensure variations for this sentence are compatible
       if (hasVariation(sentence)) {
+        if (getVariation(sentence) != other.getVariation(sentence)) {
+          printf("Variation Mismatch sentence %d, this %hd, other %hd\n",
+              sentence, getVariation(sentence), other.getVariation(sentence));
+        }          
         assert(getVariation(sentence) == other.getVariation(sentence));
       } else {
         setVariation(sentence, other.getVariation(sentence));
@@ -157,7 +161,7 @@ public:
         to, Source::getSentence(src), Source::getVariation(src));
   }
 
-  // TODO: maybe should have a fast version fo this for CUDA
+  // TODO: maybe should have a fast version of this for CUDA
   static constexpr auto merge_variations(Variations& to, const Variations& from) {
     for (int sentence{1}; sentence <= kNumSentences; ++sentence) {
       const auto from_value = from[sentence - 1];
@@ -248,7 +252,7 @@ public:
     return true;
   }
 
-  auto mergeInPlace(const UsedSources& other) {
+  constexpr auto mergeInPlace(const UsedSources& other) {
     // merge bits
     getBits() |= other.getBits();
     // merge variations.
@@ -303,6 +307,25 @@ public:
     }
   }
 
+  // This works because it is only used (currently) for incompatible
+  // sources resulting from the synchronous `Sum == 2` filter kernel
+  // execution. That implies always exactly one primary source.
+  SourceDescriptor get_source_descriptor() const {
+    for (int i{}; i < bits.wc(); ++i) {
+      auto word = bits.word(i);
+      if (word) {
+        auto bit_pos = int(lrint(log2(word)));
+        return {i + 1, bit_pos, getVariation(i + 1)};
+      }
+    }
+    assert(0 && "source not found");
+    return {};
+  }
+
+  // TODO: remove, probably.
+  // This works because it is only used (currently) for incompatible
+  // sources resulting from the synchronous `Sum == 2` filter kernel
+  // execution. That implies always exactly two primary sources.
   SourceDescriptorPair get_source_descriptor_pair() const {
     SourceDescriptor first;
     for (int i{}; i < bits.wc(); ++i) {
@@ -329,13 +352,15 @@ public:
            && getBits().test(sd.sentence - 1, sd.bit_pos);
   }
 
+  // TODO: remove
   constexpr auto has(SourceDescriptorPair sd_pair) const {
     return has(sd_pair.first) && has(sd_pair.second);
   }
 
   void reset() {
     bits.reset();
-    std::memset(&variations, -1, sizeof(variations));
+    std::fill(variations.begin(), variations.end(),
+        static_cast<variation_index_t>(-1));
   }
 
   SourceBits bits{};
@@ -407,7 +432,7 @@ struct SourceCompatibilityData {
     return usedSources.addSource(src, nothrow);
   }
 
-  void mergeInPlace(const SourceCompatibilityData& other) {
+  constexpr void mergeInPlace(const SourceCompatibilityData& other) {
     usedSources.mergeInPlace(other.usedSources);
   }
 

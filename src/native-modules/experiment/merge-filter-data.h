@@ -168,6 +168,7 @@ struct FilterData {
     result_t* src_compat_results;
   } device_or;
 
+  /*
   struct DeviceSources { // : DeviceUniqueVariations {
   protected:
     void reset_pointers() {
@@ -180,10 +181,11 @@ struct FilterData {
       reset_pointers();
     }
   } device_sources;
+  */
 
   DeviceXor* device_xor_data{};
   DeviceOr* device_or_data{};
-  DeviceSources* device_sources_data{};
+  //DeviceSources* device_sources_data{};
 };  // struct FilterData
 
 }  // namespace cm

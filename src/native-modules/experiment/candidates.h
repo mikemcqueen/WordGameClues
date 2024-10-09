@@ -9,14 +9,15 @@
 #include <utility>
 #include <vector>
 #include "combo-maker.h"
+#include "cuda-types.h"
 
 namespace cm {
 
 // aliases/types
 
 //using SourceCompatibilityLists = std::vector<SourceCompatibilityList>;
-using SourceCompatibilityListCRef =
-    std::reference_wrapper<const SourceCompatibilityList>;
+//using SourceCompatibilityListCRef = std::reference_wrapper<const SourceCompatibilityList>;
+using FatIndexListCRef = std::reference_wrapper<const FatIndexList>;
 
 struct CandidateCounts {
   size_t num_considers;
@@ -26,15 +27,21 @@ struct CandidateCounts {
 };
 
 struct CandidateData {
-  SourceCompatibilityListCRef src_list_cref;
+  CompatSourceIndicesListCRef compat_src_indices_cref;
   std::unordered_set<std::string> combos;
 };
 using CandidateList = std::vector<CandidateData>;
 
 // functions
 
+// I'll get it right eventually.
+/*
 void consider_candidate(const NameCountList& ncList);
 void consider_candidate(const NameCountCRefList& nc_cref_list);
+void consider_candidate(int sum, const NameCountCRefList& nc_cref_list);
+*/
+void consider_candidate(int sum, const NameCountCRefList& nc_cref_list,
+    const IndexList& unique_name_indices);
 
 void clear_candidates(int sum);
 

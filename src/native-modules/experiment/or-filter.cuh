@@ -1,14 +1,11 @@
 #pragma once
 #include <cassert>
-//#include <cooperative_groups.h>
 #include <cub/block/block_scan.cuh>
 #include <cuda/atomic>
 #include "cuda-types.h"
 #include "merge-filter-data.h"
 
 namespace cm {
-
-//namespace cg = cooperative_groups;
 
 #define ONE_ARRAY
 
@@ -56,6 +53,9 @@ struct OR {};
 
 extern __constant__ FilterData::DeviceXor xor_data;
 extern __constant__ FilterData::DeviceOr or_data;
+
+// also declared extern in filter.cuh, required in filter-support.cpp
+// extern __constant__ SourceCompatibilityData* sources_data[32];
 
 __device__ __forceinline__ index_t get_flat_idx(
     index_t block_idx, index_t thread_idx = threadIdx.x) {
@@ -262,6 +262,7 @@ __device__ inline auto compact_indices_in_place(index_t* results,
   const auto last_result_idx = num_results - 1;
   const auto last_scan_result = results[last_result_idx];
   // NOTE: this is almost certainly broken if blockDim.x != kBlockSize
+  assert(blockDim.x == kBlockSize);  // TODO: move this to run_kernel()
   const auto max_idx = blockDim.x
       * ((num_results + blockDim.x - 1) / blockDim.x);
   for (index_t idx{threadIdx.x}; idx < max_idx; idx += blockDim.x) {

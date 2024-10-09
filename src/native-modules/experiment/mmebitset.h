@@ -81,7 +81,7 @@ public:
     return n;
   }
 
-  bitset<size>& operator|=(const bitset<size>& other) {
+  constexpr bitset<size>& operator|=(const bitset<size>& other) {
     for (int i{}; i < wc(); ++i)
       bits[i] |= other.bits[i];
     return *this;

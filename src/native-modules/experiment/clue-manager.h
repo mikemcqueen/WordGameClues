@@ -22,8 +22,6 @@ struct KnownSourceMapValue {
 };
 using KnownSourceMapValueCRef = std::reference_wrapper<const KnownSourceMapValue>;
 
-// primary name -> IndexList??
-using PrimaryNameSrcIndicesMap = std::unordered_map<std::string, IndexList>;
 // name -> source_csv list 
 using NameSourcesMap = std::unordered_map<std::string, std::vector<std::string>>;
 
@@ -76,9 +74,26 @@ inline auto make_src_cref_list(const NameCount& nc) {
 // uniqueClueNames
 
 int get_num_unique_clue_names(int count);
+
 const NameCount& get_unique_clue_nc(int count, int idx);
+
 const std::string& get_unique_clue_name(int count, int idx);
 
+const SourceCompatibilityData& get_unique_clue_source(int count, int idx);
+
+SourceCompatibilityList make_unique_clue_source_list(int count);
+
+const SourceCompatibilityList& get_primary_unique_clue_source_list();
+
+// TODO: needs rewrite
+int get_unique_clue_starting_source_index(int count, int unique_name_idx);
+
+// debugging
+int get_num_unique_clue_sources(int count, const std::string& name);
+inline int get_num_unique_clue_sources(int count, int unique_name_idx) {
+  return get_num_unique_clue_sources(count,
+      get_unique_clue_name(count, unique_name_idx));
+}
 
 // misc
 
@@ -91,10 +106,13 @@ inline void for_each_source_map_entry(
 }
 */
 
-void for_each_nc_source(const std::string& name, int count, const auto& fn) {
-  for (const auto& entry_cref : get_known_source_map_entries(name, count)) {
-    const auto& src_list = entry_cref.get().src_list;
-    std::ranges::for_each(src_list, fn);
+inline void for_each_nc_source(const std::string& name, int count,
+    const auto& fn) {
+  for (index_t idx{};
+      const auto entry_cref : get_known_source_map_entries(name, count)) {
+    for (const auto& src : entry_cref.get().src_list) {
+      fn(src, idx++);
+    }
   }
 }
 

@@ -1,5 +1,7 @@
 #pragma once
+#include <functional>
 #include "combo-maker.h"
+#include "cuda-types.h"
 
 namespace cm {
 
@@ -11,9 +13,9 @@ inline void hash_combine(SizeT& seed, SizeT value) {
 inline auto hash_called = 0;
 inline auto equal_to_called = 0;
 
-}
+}  // namespace cm
 
-template struct std::hash<cm::UsedSources::SourceBits>;
+//template struct std::hash<cm::UsedSources::SourceBits>;
 
 namespace std {
 
@@ -95,6 +97,19 @@ template <> struct hash<cm::SourceCompatibilityData> {
     size_t seed = 0;
     cm::hash_combine(seed, hash<cm::UsedSources>()(data.usedSources));
     return seed;
+  }
+};
+
+template <> struct equal_to<cm::CompatSourceIndices> {
+  bool operator()(const cm::CompatSourceIndices lhs,
+      const cm::CompatSourceIndices rhs) const noexcept {
+    return lhs.data() == rhs.data();
+  }
+};
+
+template <> struct hash<cm::CompatSourceIndices> {
+  size_t operator()(const cm::CompatSourceIndices csi) const noexcept {
+    return hash<uint64_t>()(csi.data());
   }
 };
 

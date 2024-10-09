@@ -15,10 +15,10 @@ constexpr auto kMaxMatrices = 10u;
 // Given two arrays of sources, test xor compatibility of all combinations
 // of source pairs consisting of one source from each list.
 //
-// Indices are used because only a subset (as specified by indicee arrays)
+// Indices are used because only a subset (as specified by indices arrays)
 // of each source array is actually considered.
 //
-// compat_results can be thought of as a matrix, with withh num_src1_indices
+// compat_results can be thought of as a matrix, with with num_src1_indices
 // rows and num_src2_indices columns.
 //
 __global__ void list_pair_compat_kernel(const SourceCompatibilityData* sources1,
@@ -47,18 +47,18 @@ __global__ void list_pair_compat_kernel(const SourceCompatibilityData* sources1,
     }
   }
 }
-
+  ;
 // Given N compatibility matrices, representing the results of comparing every
 // pair of sources arrays (via list_pair_compat_kernel), find all N-tuples of
 // of compatible results, representing combinations of compatible sources to
 // be merged.
 //
 // The logic in this function is dependent on the order that pairs are fed to
-// list_pair_compat_kernel via for_each_list_pair(), and the order of,,,
-// both of  which are intentional and
-// important, and ensure that the mapping of a "flat" (linear) index to a
-// particular combination of index lists is in a specific order. There is logic
-// outside of this function depends on this order.
+// list_pair_compat_kernel via for_each_list_pair(), and the order of,,, ??
+// both of which are intentional and important, and ensure that the mapping of
+// a "flat" (linear) index to a particular combination of index lists is in a
+// specific order. There is logic outside of this function that depends on this
+// order.
 //
 // Ex: for the 2 index lists: [[0, 1], [0, 1, 2]], the flat-index order
 // of their combinations is:
@@ -101,13 +101,13 @@ __global__ void get_compat_combos_kernel(uint64_t first_idx,
   }
 }
 
+/*
 struct ComboIndex {
   index_t row_idx;    // row index
   index_t elem1_idx;  // first element of the combination
   index_t elem2_idx;  // second element of the combination
 };
 
-  /*
 __device__ void get_combo_index(unsigned idx, unsigned row_size,
   unsigned combos_per_row, ComboIndex& result) {
   // Calculate sublist idx
@@ -122,7 +122,7 @@ __device__ void get_combo_index(unsigned idx, unsigned row_size,
   }
   result.elem2_idx = result.elem1_idx + r + 1;
 }
-  */
+*/
 
 }  // anonymous namespace
 

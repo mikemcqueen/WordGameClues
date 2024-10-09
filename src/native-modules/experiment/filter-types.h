@@ -189,20 +189,20 @@ public:
 
   auto get_incompatible_sources(const CandidateList& candidates,
       int* num_incompat_sources = nullptr) {
-    SourceCompatibilitySet src_set;
+    std::unordered_set<CompatSourceIndices> src_indices_set;
     int num_incompat{};
     for (const auto& data : list_) {
       if (!data.is_compatible()) {
-        const auto& src_list =
-            candidates.at(data.sourceIndex.listIndex).src_list_cref.get();
-        src_set.insert(src_list.begin(), src_list.end());
-        num_incompat += int(src_list.size());
+        const auto& indices_list = candidates.at(data.sourceIndex.listIndex)
+                                       .compat_src_indices_cref.get();
+        src_indices_set.insert(indices_list.begin(), indices_list.end());
+        num_incompat += int(indices_list.size());
       }
     }
     if (num_incompat_sources) {
       *num_incompat_sources = num_incompat;
     }
-    return src_set;
+    return src_indices_set;
   }
 
   void mark_compatible(const IndexList& list_indices) {

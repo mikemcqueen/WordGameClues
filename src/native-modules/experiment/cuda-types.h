@@ -1,13 +1,16 @@
 #ifndef INCLUDE_CUDA_TYPES_H // TODO: CUDA_COMMON
 #define INCLUDE_CUDA_TYPES_H
 
+#pragma once
 #include <cassert>
 #include <cmath>
 #include <cstdint>
+#include <functional>
 #include <iostream>
 #include <span>
 #include <string_view>
 #include <type_traits>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 #include <cuda_runtime.h>
@@ -30,11 +33,57 @@ using FatIndexList = IndexListBase<fat_index_t>;
 using IndexSpan = std::span<const index_t>;
 using IndexSpanPair = std::pair<IndexSpan, IndexSpan>;
 
-struct VariationIndexOffset {
-  variation_index_t variation_index;
-  variation_index_t padding_;
-  index_t offset;
+// types
+
+struct CompatSourceIndex {
+  constexpr CompatSourceIndex(index_t data) : data_(data) {}
+  CompatSourceIndex(int count, index_t idx) : data_(make_data(count, idx)) {}
+
+  static index_t make_data(int count, index_t idx) {
+    return index_t(count) << 27 | (idx & 0x07ffffff);
+  }
+
+  constexpr auto count() const { return data_ >> 27; }
+  constexpr auto index() const { return data_ & 0x07ffffff; }
+
+  auto data() const { return data_; }
+
+private:
+  index_t data_;
 };
+
+struct CompatSourceIndices {
+  constexpr CompatSourceIndices() = default; 
+  CompatSourceIndices(CompatSourceIndex first, CompatSourceIndex second)
+      : data_(make_data(first, second)) {}
+
+  static fat_index_t make_data(CompatSourceIndex first,
+      CompatSourceIndex second) {
+    auto first_data = first.count() < second.count()
+        ? first.data()
+        : (first.index() < second.index() ? first.data() : second.data());
+    auto second_data = first_data == first.data() ? second.data() : first.data();
+    return fat_index_t(first_data) << 32 | second_data;
+  }
+
+  constexpr CompatSourceIndex first() const {  //
+    return index_t(data_ >> 32);
+  }
+
+  constexpr CompatSourceIndex second() const {
+    return index_t(data_ & 0xffffffff);
+  }
+
+  auto data() const { return data_; }
+
+private:
+  fat_index_t data_{};
+};
+
+using CompatSourceIndicesList = std::vector<CompatSourceIndices>;
+using CompatSourceIndicesListCRef =
+    std::reference_wrapper<const CompatSourceIndicesList>;
+using CompatSourceIndicesSet = std::unordered_set<CompatSourceIndices>;
 
 struct UniqueVariations {
   Variations variations{};
@@ -64,31 +113,6 @@ struct VariationIndices {
   index_t num_variations;      // size of num_indices & variation_offsets arrays
 };
 
-// this was all some attempt at supporting OrVariationIndices, an idea which
-// has died on the vine and which I should have left relegated to an orphan
-// branch. Lots of unnecessary template noise leftover here.
-/*
-template <typename T> struct VariationIndices;
-template <> struct VariationIndices<index_t> : VariationIndicesBase<index_t> {
-constexpr IndexSpan<index_t> get_index_span(int variation) const {
-  assert(0);
-  return {&indices[variation_index_offsets[variation].offset],
-      num_indices_per_variation[variation]};
-}
-
-VariationIndexOffset* variation_index_offsets;
-};
-
-struct VariationIndices : VariationIndicesBase<index_t> {
-  constexpr IndexSpan get_index_span(int variation) const {
-    return {&indices[variation_offsets[variation]],
-      num_indices_per_variation[variation]};
-  }
-
-};
-using OrVariationIndices = VariationIndices<index_t>;
-*/
-
 using XorVariationIndices = VariationIndices;
 
 struct SourceCompatibilityData;
@@ -117,8 +141,6 @@ template <typename T = result_t>
   // alloc results
   auto results_bytes = num_results * sizeof(T);
   T* device_results;
-  // cudaError_t err = cudaMallocAsync((void**)&device_results, results_bytes, stream);
-  // assert_cuda_success(err, "alloc results");
   cuda_malloc_async((void**)&device_results, results_bytes, stream, tag);
   return device_results;
 }
