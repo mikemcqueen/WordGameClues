@@ -111,6 +111,7 @@ auto make_src_idx_list(const CandidateList& candidates) {
 }
 */
 
+// this is actually "SourceIndex", i.e., SourceIndex::make_from_candidates()
 auto make_source_index_list(const CandidateList& candidates) {
   std::vector<SourceIndex> src_idx_list;
   for (size_t list_idx{}; list_idx < candidates.size(); ++list_idx) {

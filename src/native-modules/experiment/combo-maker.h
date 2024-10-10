@@ -475,22 +475,20 @@ struct NameCount {
   */
 
   std::string toString() const {
-    char buf[128];
-#if 0
-    std::strcpy(buf, name.c_str());
-    std::strcat(buf, ":");
-    auto end = buf + strlen(buf);
-    auto r = std::to_chars(end, end + 4, count);
-    assert(r.ec == std::errc{});
-    *r.ptr = 0;
-#else
-    snprintf(buf, sizeof(buf), "%s:%d", name.c_str(), count);
-#endif
-    return buf;
+    return makeString(name, count);
   }
 
   static std::string makeString(const std::string& name, int count) {
-    return name + ":" + std::to_string(count);
+    char buf[32];
+    snprintf(buf, sizeof(buf), "%s:%d", name.c_str(), count);
+    return buf;
+  }
+
+  static std::string makeString(const NameCount& nc1, const NameCount& nc2) {
+    char buf[64];
+    snprintf(buf, sizeof(buf), "%s:%d,%s:%d", nc1.name.c_str(), nc1.count,
+        nc2.name.c_str(), nc2.count);
+    return buf;
   }
 
   static std::vector<std::string> listToNameList(const NameCountList& list) {

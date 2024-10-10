@@ -209,20 +209,14 @@ auto make_merge_list(const SourceCompatibilityCRefList& src_cref_list1,
 // ultimately making this a kernel is the path forward due to isXorCompat calls
 // ^- Still true? -^
 auto make_compat_source_indices(const NameCountCRefList& nc_cref_list,
-    const IndexList& unique_name_indices) {
+    const IndexList& unique_name_indices, const std::pair<int, int> idx_pair) {
   assert(nc_cref_list.size() == 2 && "nc_cref_list.size() != 2");
-  const auto& first_nc = nc_cref_list.at(0).get();
-  const auto& second_nc = nc_cref_list.at(1).get();
-  // effectively "sort" NCs (and unique_name_indices).
-  const auto nc1_idx = first_nc.name < second_nc.name ? 0 : 1;
-  const auto nc2_idx = 1 - nc1_idx;
-  const auto& nc1 = nc_cref_list.at(nc1_idx).get();
-  const auto& nc2 = nc_cref_list.at(nc2_idx).get();
-
+  const auto& nc1 = nc_cref_list.at(idx_pair.first).get();
+  const auto& nc2 = nc_cref_list.at(idx_pair.second).get();
   const auto start_idx1 = clue_manager::get_unique_clue_starting_source_index(
-      nc1.count, unique_name_indices.at(nc1_idx));
+      nc1.count, unique_name_indices.at(idx_pair.first));
   const auto start_idx2 = clue_manager::get_unique_clue_starting_source_index(
-      nc2.count, unique_name_indices.at(nc2_idx));
+      nc2.count, unique_name_indices.at(idx_pair.second));
   CompatSourceIndicesList compat_src_indices;
 
   // TODO: this is ridiculously inefficient because we repeatedly call
@@ -237,10 +231,10 @@ auto make_compat_source_indices(const NameCountCRefList& nc_cref_list,
 #if 0
         if (n < 10) {
           std::cerr << "count1: " << csi1.count()
-                    << ", name_idx: " << unique_name_indices.at(0)
+                    << ", name_idx: " << unique_name_indices.at(idx_pair.first)
                     << ", num_sources: "
                     << clue_manager::get_num_unique_clue_sources(nc1.count,
-                           unique_name_indices.at(nc1_idx))
+                           unique_name_indices.at(idx_pair.first))
                     << ", src_index: " << csi1.index()
                     << ", start_idx: " << start_idx1
                     << ", idx: " << idx1
@@ -257,10 +251,10 @@ auto make_compat_source_indices(const NameCountCRefList& nc_cref_list,
                 if (n < 10) {
                   std::cerr
                       << "count2: " << csi2.count()
-                      << ", name_idx: " << unique_name_indices.at(1)
+                      << ", name_idx: " << unique_name_indices.at(idx_pair.second)
                       << ", num_sources: "
                       << clue_manager::get_num_unique_clue_sources(nc2.count,
-                             unique_name_indices.at(nc2_idx))
+                             unique_name_indices.at(idx_pair.first))
                       << ", src_index: " << csi2.index()
                       << ", start_idx: " << start_idx2 << ", idx: " << idx2
                       << std::endl;
@@ -409,38 +403,27 @@ void consider_candidate(const NameCountCRefList& nc_cref_list) {
 }
 */
 
+std::pair<int, int> get_sorted_index_pair(
+    const NameCountCRefList& nc_cref_list) {
+  const auto& first_nc = nc_cref_list.at(0).get();
+  const auto& second_nc = nc_cref_list.at(1).get();
+  // effectively "sort" NCs
+  const auto first_idx = first_nc.name < second_nc.name ? 0 : 1;
+  const auto second_idx = 1 - first_idx;
+  return std::make_pair(first_idx, second_idx);
+}
+
 void consider_candidate(int sum, const NameCountCRefList& nc_cref_list,
     const IndexList& unique_name_indices) {
+  auto idx_pair = get_sorted_index_pair(nc_cref_list);
   // no lock necessary to modify repo map for a particular sum
   auto& candidate_repo = get_candidate_repo(sum);
-  auto key = NameCount::listToString(nc_cref_list);
+  auto key = NameCount::makeString(nc_cref_list.at(idx_pair.first).get(),
+      nc_cref_list.at(idx_pair.second).get());
   if (candidate_repo.contains(key)) return;
   CandidateRepoValue repo_value;
-  repo_value.compat_src_indices =
-      std::move(make_compat_source_indices(nc_cref_list, unique_name_indices));
-
-#if 0
-  // debugging for duplicate sources-index-list count with different 
-    const auto it = candidate_map_.find(sum);
-    if (!repo_value.compat_src_indices.empty()) {
-      assert(it != candidate_map_.end());
-      const auto& candidates = it->second;
-      const auto combo = NameCount::listToNameCsv(nc_cref_list);
-      bool has{false};
-      for (const auto& candidate : candidates) {
-        if (candidate.combos.empty()) {
-          std::cerr << "empty combos\n";
-        } else if (candidate.combos.contains(combo)) {
-          std::cerr << "already has combo " << combo << std::endl;
-          has = true;
-          break;
-        }
-      }
-      if (!has) { std::cerr << "no has combo!!" << std::endl; }
-      // std::terminate();
-    }
-#endif
-
+  repo_value.compat_src_indices = std::move(
+      make_compat_source_indices(nc_cref_list, unique_name_indices, idx_pair));
   candidate_repo.emplace(key, std::move(repo_value));
   auto& cc = get_candidate_counts_ref(sum);
   cc.num_considers++;
@@ -448,6 +431,7 @@ void consider_candidate(int sum, const NameCountCRefList& nc_cref_list,
   if (rv.compat_src_indices.empty()) {
     cc.num_incompat++;
   } else {
+    // i guess we don't care about order of names in nameCsv here
     add_candidate(sum, NameCount::listToNameCsv(nc_cref_list),
         std::cref(rv.compat_src_indices));
   }
