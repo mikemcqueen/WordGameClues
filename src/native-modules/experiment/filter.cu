@@ -775,7 +775,7 @@ __global__ void filter_kernel(
     }
 #endif
 
-#if 1
+#if 0
   if (!blockIdx.x && !threadIdx.x && !dumped) {
     dump_compat_src_indices(compat_src_indices, 10, "device");
     dumped = 1;
@@ -794,8 +794,8 @@ __global__ void filter_kernel(
       dynamic_shared[kSrcListIdx] = src_idx.listIndex;
       dynamic_shared[kSrcIdx] = src_idx.index;
       if (!threadIdx.x) {
-        const auto csi1 = compat_src_indices[idx].first();
-        const auto csi2 = compat_src_indices[idx].second();
+        const auto csi1 = compat_src_indices[src_idx.index].first();
+        const auto csi2 = compat_src_indices[src_idx.index].second();
 #if 0
         if (!blockIdx.x) {
           printf("first (%u, %u) second (%u, %u)\n", csi1.count(), csi1.index(),
@@ -808,6 +808,17 @@ __global__ void filter_kernel(
       if (is_compat_loop(source)) { is_compat = true; }
     }
     __syncthreads();
+
+
+    if (!is_compat && !threadIdx.x && blockIdx.x < 1) {
+      const auto csi1 = compat_src_indices[src_idx.index].first();
+      const auto csi2 = compat_src_indices[src_idx.index].second();
+      printf("idx %u first count %u, index %u,  second count %u, index %u\n",
+          idx, csi1.count(), csi1.index(), csi2.count(), csi2.index());
+      source.dump("source");
+    }
+
+
     if (is_compat && !threadIdx.x) {
       results[src_idx.listIndex] = 1;
       is_compat = false;
