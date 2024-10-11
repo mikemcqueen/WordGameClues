@@ -204,6 +204,12 @@ auto make_merge_list(const SourceCompatibilityCRefList& src_cref_list1,
 }
 */
 
+int get_num_candidate_sources(int sum) {
+  Lock lk(candidate_map_semaphore_);
+  const auto it = candidate_map_.find(sum);
+  return (it == candidate_map_.end()) ? 0 : int(get_num_candidate_sources(it->second));
+}
+
 // optimized for 2 sources, using more crefs
 //
 // ultimately making this a kernel is the path forward due to isXorCompat calls
@@ -224,6 +230,9 @@ auto make_compat_source_indices(const NameCountCRefList& nc_cref_list,
   // debugging
   //  static int n{};
 
+  const auto sum = nc1.count + nc2.count;
+  const auto num_indices = get_num_candidate_sources(sum);
+  int idx{num_indices};
   clue_manager::for_each_nc_source(nc1,
       [&](const SourceCompatibilityData& src1, index_t idx1) {
         CompatSourceIndex csi1{nc1.count, start_idx1 + idx1};
@@ -272,6 +281,11 @@ auto make_compat_source_indices(const NameCountCRefList& nc_cref_list,
                 }
                 compat_src_indices.push_back(indices);
 #else
+                if ((sum == 3) && (idx < 25056)) {
+                  printf("%d: %u:%u, %u,%u\n", idx, csi1.count(), csi1.index(),
+                      csi2.count(), csi2.index());
+                }
+                idx++;
                 compat_src_indices.emplace_back(csi1, csi2);
 #endif
               }
