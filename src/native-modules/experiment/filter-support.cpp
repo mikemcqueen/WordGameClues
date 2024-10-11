@@ -491,6 +491,12 @@ filter_task_result_t filter_task(FilterData& mfd, FilterParams params) {
             << ": make_compat_src_indices: " << src_indices.size()
             << " - " << t.count() << "ms\n";
   copy_start.record();
+  if (params.copy_all_prior_sources) {
+    // copy sources for all prior sum
+    for (int sum{3}; sum < params.sum; ++sum) {
+      cuda_alloc_copy_sources(sum, stream);
+    }
+  }
   // copy sources for prior sum
   cuda_alloc_copy_sources(params.sum, stream);
   // copy source indices (indices into prior-sum source arrays)
@@ -533,20 +539,6 @@ auto get_unique_clue_source_descriptor(index_t src_idx) {
       .usedSources.get_source_descriptor();
 }
 
-UsedSources::SourceDescriptorPair sort_desc_pair(
-    const UsedSources::SourceDescriptorPair pair) {
-  UsedSources::SourceDescriptor sd1 = pair.first;
-  UsedSources::SourceDescriptor sd2 = pair.second;
-
-  if (sd1.sentence < sd2.sentence) return {sd1, sd2};
-  else if (sd2.sentence < sd1.sentence) return {sd2, sd1};
-  if (sd1.variation < sd2.variation) return {sd1, sd2};
-  else if (sd2.variation < sd1.variation) return {sd2, sd1};
-  if (sd1.bit_pos < sd2.bit_pos) return {sd1, sd2};
-  assert(sd1.bit_pos != sd2.bit_pos);
-  return {sd2, sd1};
-}
-
 auto make_source_descriptor_pairs(
     const CompatSourceIndicesSet& src_indices_set) {
   std::vector<UsedSources::SourceDescriptorPair> src_desc_pairs;
@@ -556,10 +548,6 @@ auto make_source_descriptor_pairs(
     src_desc_pairs.emplace_back(
         get_unique_clue_source_descriptor(src_indices.first().index()),
         get_unique_clue_source_descriptor(src_indices.second().index()));
-
-    auto pair = sort_desc_pair(src_desc_pairs.back());
-    std::cout << pair.first.toString() << ", "
-              << pair.second.toString() << std::endl;
   }
   return src_desc_pairs;
 }

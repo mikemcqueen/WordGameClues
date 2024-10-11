@@ -35,6 +35,7 @@ struct FilterParams {
   int stride;
   int num_iters;
   bool synchronous;
+  bool copy_all_prior_sources;
 };
 
 class IndexStates {

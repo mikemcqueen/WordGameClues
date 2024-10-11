@@ -813,29 +813,13 @@ __global__ void filter_kernel(
       if (!threadIdx.x) {
         const auto csi1 = compat_src_indices[src_idx.index].first();
         const auto csi2 = compat_src_indices[src_idx.index].second();
-#if 0
-        if (!blockIdx.x) {
-          printf("first (%u, %u) second (%u, %u)\n", csi1.count(), csi1.index(),
-              csi2.count(), csi2.index());
-        }
-#endif
+        // TODO: compare to source.reset() followed by 2x mergeInPlace
         source = sources_data[csi1.count()][csi1.index()];
         source.mergeInPlace(sources_data[csi2.count()][csi2.index()]);
       }
       if (is_compat_loop(source)) { is_compat = true; }
     }
     __syncthreads();
-
-
-    if (!is_compat && !threadIdx.x && blockIdx.x < 1) {
-      const auto csi1 = compat_src_indices[src_idx.index].first();
-      const auto csi2 = compat_src_indices[src_idx.index].second();
-      printf("idx %u first count %u, index %u,  second count %u, index %u\n",
-          idx, csi1.count(), csi1.index(), csi2.count(), csi2.index());
-      source.dump("source");
-    }
-
-
     if (is_compat && !threadIdx.x) {
       results[src_idx.listIndex] = 1;
       is_compat = false;

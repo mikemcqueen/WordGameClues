@@ -227,27 +227,27 @@ const getCombosForUseNcLists = (sum: number, max: number, args: any): void => {
 };
 
 export const makeCombosForSum = (sum: number, args: any,
-    synchronous: boolean = false, is_last: boolean = false): void =>
+    synchronous: boolean = false, load_all_prior_sources: boolean = false): void =>
 {
     if (_.isUndefined(args.maxResults)) {
         args.maxResults = 50000;
-        // TODO: whereever this is actually enforced:
+        // TODO: wherever this is actually enforced:
         // console.error(`Enforcing max results: ${args.maxResults}`);
     }
-    args.synchronous = synchronous;
-    // TODO: Fix this abomination
-    args.sum = sum;
-    let max = args.max;
-    args.max = Math.min(args.max, args.sum);
     // 3 = c++, 4 = dump/exit
     if (_.includes(args.flags, '3')) {
-        Native.computeCombosForSum(sum, max, /*is_last &&*/ _.includes(args.flags, '4'));
+        Native.computeCombosForSum(sum, args.max);
     } else {
+        args.synchronous = synchronous;
+        // TODO: Fix this abomination
+        args.sum = sum;
+        let max = args.max;
+        args.max = Math.min(args.max, args.sum);
         getCombosForUseNcLists(sum, max, args);
+        args.max = max;
     }
-    args.max = max;
     Native.filterCandidatesForSum(sum, args.tpb, args.streams, args.stride,
-        args.iters, args.synchronous);
+        args.iters, synchronous, load_all_prior_sources);
 };
 
 const parallel_makeCombosForRange = (first: number, last: number, args: any): any => {
@@ -346,7 +346,7 @@ export const makeCombos = (args: any): any => {
             if (first === 2) ++first;
             for (let sum = first; sum <= last; ++sum) {
                 // TODO: return # of combos filtered due to note name match
-                makeCombosForSum(sum, args, false, last === sum);
+                makeCombosForSum(sum, args, false, first === last);
             }
             const comboList = Native.getResult();
             total += comboList.length;

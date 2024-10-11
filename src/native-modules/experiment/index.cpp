@@ -477,36 +477,9 @@ Value computeCombosForSum(const CallbackInfo& info) {
   auto sum = info[0].As<Number>().Int32Value();
   // arg1
   auto max = info[1].As<Number>().Int32Value();
-  // arg1
-  auto dump = info[2].As<Boolean>();
+  // arg2
+  //auto dump = info[2].As<Boolean>();
   // --
-#if 0
-  static bool unique_names_shown = false;
-  if (!unique_names_shown) {
-    for (int i{1}; i <= 15; ++i) {
-      std::cerr << "uniqueClues(" << i
-                << "): " << clue_manager::get_num_unique_clue_names(i)
-                << std::endl;
-    }
-    unique_names_shown = true;
-  }
-#endif
-  if (dump) {
-    static size_t total_sources{};
-    size_t num_sources{};
-    for (int i{}; i < clue_manager::get_num_unique_clue_names(sum); ++i) {
-      const auto& name = clue_manager::get_unique_clue_name(sum, i);
-      for (const auto entry_cref : get_known_source_map_entries(name, sum)) {
-        num_sources += entry_cref.get().src_list.size();
-      }
-    }
-    total_sources += num_sources;
-    std::cerr << " sum " << sum << " num_sources: " << num_sources
-              << ", total: " << total_sources;
-    if (sum == 2)
-      std::cerr << ", sizeof SCD: " << sizeof(SourceCompatibilityData);
-    std::cerr << std::endl;
-  }
   compute_combos_for_sum(sum, max);
   // TODO: move save_current_candidate_counts() here?
   return env.Null();
@@ -537,7 +510,8 @@ Value considerCandidate(const CallbackInfo& info) {
 Value filterCandidatesForSum(const CallbackInfo& info) {
   Env env = info.Env();
   if (!info[0].IsNumber() || !info[1].IsNumber() || !info[2].IsNumber()
-      || !info[3].IsNumber() || !info[4].IsNumber() || !info[5].IsBoolean()) {
+      || !info[3].IsNumber() || !info[4].IsNumber() || !info[5].IsBoolean()
+      || !info[6].IsBoolean()) {
     TypeError::New(env, "fitlerCandidatesForSum: invalid parameter type")
       .ThrowAsJavaScriptException();
     return env.Null();
@@ -549,7 +523,8 @@ Value filterCandidatesForSum(const CallbackInfo& info) {
       info[2].As<Number>().Int32Value(),  // num_streams
       info[3].As<Number>().Int32Value(),  // stride
       info[4].As<Number>().Int32Value(),  // num_iters
-      info[5].As<Boolean>().Value()};     // synchronous
+      info[5].As<Boolean>().Value(),      // synchronous
+      info[6].As<Boolean>().Value()};     // load_all_prior_sources
   // --
   // this function signifies the end of calls to consider_candidate() for a
   // particular sum. filter_candidates_cuda() will clear candidate data to

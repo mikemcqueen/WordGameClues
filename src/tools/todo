@@ -1,4 +1,3 @@
-
 * I should implement some kind of "freeze" mechanism on some of the data structures in
   clue-manager, such that I can assert(!frozen) when adding new elements, and freeze
   when on-demand constructing "secondary" representations of the data. (uniqueClueNames
