@@ -383,35 +383,52 @@ __device__ bool sources_match_any_descriptor_pair(
     const UsedSources::SourceDescriptorPair* RESTRICT src_desc_pairs,
     const unsigned num_src_desc_pairs) {
 
-  __shared__ bool matches_both;
-  if (!threadIdx.x) matches_both = false;
+  //  __shared__ SourceCompatibilityData source;
+  __shared__ bool match;
+  if (!threadIdx.x) {
+    //    source = source1;
+    //    source.mergeInPlace(source2);
+    match = false;
+  }
+    __syncthreads();
   // one thread per src_desc_pair
   for (unsigned idx{}; idx * blockDim.x < num_src_desc_pairs; ++idx) {
-    __syncthreads();
-    if (matches_both) return true;
     const auto pair_idx = idx * blockDim.x + threadIdx.x;
     if (pair_idx < num_src_desc_pairs) {
-      if ((source1.usedSources.has(src_desc_pairs[pair_idx].first)
-              && source2.usedSources.has(src_desc_pairs[pair_idx].second))
-          || ((source1.usedSources.has(src_desc_pairs[pair_idx].second)
-              && source2.usedSources.has(src_desc_pairs[pair_idx].first)))) {
-        matches_both = true;
+#if 0
+      if (source.usedSources.has(src_desc_pairs[pair_idx].first)
+          && source.usedSources.has(src_desc_pairs[pair_idx].second)) {
+        match = true;
       }
+#else
+      const auto first = source1.usedSources.has(src_desc_pairs[pair_idx].first)
+          || source2.usedSources.has(src_desc_pairs[pair_idx].first);
+      const auto second =
+          source1.usedSources.has(src_desc_pairs[pair_idx].second)
+          || source2.usedSources.has(src_desc_pairs[pair_idx].second);
+      if (first && second) { match = true; }
+#endif
     }
+    __syncthreads();
+    if (match) return true;
   }
   return false;
 }
 
+// "filter compatible sources"
 __global__ void get_compatible_sources_kernel(
-    const CompatSourceIndices* RESTRICT src_indices,
-    const unsigned num_src_indices,
+    const CompatSourceIndices* RESTRICT compat_src_indices,
+    const unsigned num_compat_src_indices,
     const UsedSources::SourceDescriptorPair* RESTRICT incompat_src_desc_pairs,
     const unsigned num_src_desc_pairs, result_t* RESTRICT results) {
   // one block per source-(index)-pair
-  for (unsigned idx{blockIdx.x}; idx < num_src_indices; idx += gridDim.x) {
-    // NOTE: hard-coded to index 1, doesn't need to be
-    const auto& source1 = sources_data[1][src_indices[idx].first().index()];
-    const auto& source2 = sources_data[1][src_indices[idx].second().index()];
+  for (unsigned idx{blockIdx.x}; idx < num_compat_src_indices;
+      idx += gridDim.x) {
+    const auto csi = compat_src_indices[idx];
+    const auto& source1 =
+        sources_data[csi.first().count()][csi.first().index()];
+    const auto& source2 =
+        sources_data[csi.second().count()][csi.second().index()];
     // I don't understand why this is required, but fails synccheck and
     // produces wobbly results without.
     __syncthreads();

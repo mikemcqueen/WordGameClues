@@ -533,6 +533,20 @@ auto get_unique_clue_source_descriptor(index_t src_idx) {
       .usedSources.get_source_descriptor();
 }
 
+UsedSources::SourceDescriptorPair sort_desc_pair(
+    const UsedSources::SourceDescriptorPair pair) {
+  UsedSources::SourceDescriptor sd1 = pair.first;
+  UsedSources::SourceDescriptor sd2 = pair.second;
+
+  if (sd1.sentence < sd2.sentence) return {sd1, sd2};
+  else if (sd2.sentence < sd1.sentence) return {sd2, sd1};
+  if (sd1.variation < sd2.variation) return {sd1, sd2};
+  else if (sd2.variation < sd1.variation) return {sd2, sd1};
+  if (sd1.bit_pos < sd2.bit_pos) return {sd1, sd2};
+  assert(sd1.bit_pos != sd2.bit_pos);
+  return {sd2, sd1};
+}
+
 auto make_source_descriptor_pairs(
     const CompatSourceIndicesSet& src_indices_set) {
   std::vector<UsedSources::SourceDescriptorPair> src_desc_pairs;
@@ -543,8 +557,9 @@ auto make_source_descriptor_pairs(
         get_unique_clue_source_descriptor(src_indices.first().index()),
         get_unique_clue_source_descriptor(src_indices.second().index()));
 
-    std::cout << src_desc_pairs.back().first.toString() << ", "
-              << src_desc_pairs.back().second.toString() << std::endl;
+    auto pair = sort_desc_pair(src_desc_pairs.back());
+    std::cout << pair.first.toString() << ", "
+              << pair.second.toString() << std::endl;
   }
   return src_desc_pairs;
 }
