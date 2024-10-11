@@ -521,7 +521,7 @@ filter_task_result_t filter_task(FilterData& mfd, FilterParams params) {
       src_desc_pairs.size() * sizeof(UsedSources::SourceDescriptorPair);
   UsedSources::SourceDescriptorPair* device_src_desc_pairs{};
   cuda_malloc_async((void**)&device_src_desc_pairs, pairs_bytes, stream,
-      "src_desc_pairs");  // cl-format
+      "src_desc_pairs");
   auto err = cudaMemcpyAsync(device_src_desc_pairs, src_desc_pairs.data(),
       pairs_bytes, cudaMemcpyHostToDevice, stream);
   assert_cuda_success(err, "copy src_desc_pairs");
@@ -534,14 +534,17 @@ auto get_unique_clue_source_descriptor(index_t src_idx) {
 }
 
 auto make_source_descriptor_pairs(
-    const CompatSourceIndicesSet& incompat_src_indices) {
+    const CompatSourceIndicesSet& src_indices_set) {
   std::vector<UsedSources::SourceDescriptorPair> src_desc_pairs;
-  src_desc_pairs.reserve(incompat_src_indices.size());
-  for (const auto& compat_src_idx: incompat_src_indices) {
-    // NOTE: passing idx() as get_unique() only works for primary indices.
+  src_desc_pairs.reserve(src_indices_set.size());
+  for (const auto src_indices : src_indices_set) {
+    // passing index() only as get_unique() only works for primary indices.
     src_desc_pairs.emplace_back(
-        get_unique_clue_source_descriptor(compat_src_idx.first().index()),
-        get_unique_clue_source_descriptor(compat_src_idx.second().index()));
+        get_unique_clue_source_descriptor(src_indices.first().index()),
+        get_unique_clue_source_descriptor(src_indices.second().index()));
+
+    std::cout << src_desc_pairs.back().first.toString() << ", "
+              << src_desc_pairs.back().second.toString() << std::endl;
   }
   return src_desc_pairs;
 }

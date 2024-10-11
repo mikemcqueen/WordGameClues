@@ -230,9 +230,9 @@ auto make_compat_source_indices(const NameCountCRefList& nc_cref_list,
   // debugging
   //  static int n{};
 
-  const auto sum = nc1.count + nc2.count;
-  const auto num_indices = get_num_candidate_sources(sum);
-  int idx{num_indices};
+  //const auto sum = nc1.count + nc2.count;
+  //const auto num_indices = get_num_candidate_sources(sum);
+  //int idx{num_indices};
   clue_manager::for_each_nc_source(nc1,
       [&](const SourceCompatibilityData& src1, index_t idx1) {
         CompatSourceIndex csi1{nc1.count, start_idx1 + idx1};
@@ -281,11 +281,13 @@ auto make_compat_source_indices(const NameCountCRefList& nc_cref_list,
                 }
                 compat_src_indices.push_back(indices);
 #else
+#if 0
                 if ((sum == 3) && (idx < 25056)) {
                   printf("%d: %u:%u, %u,%u\n", idx, csi1.count(), csi1.index(),
                       csi2.count(), csi2.index());
                 }
                 idx++;
+#endif
                 compat_src_indices.emplace_back(csi1, csi2);
 #endif
               }

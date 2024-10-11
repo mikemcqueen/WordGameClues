@@ -59,6 +59,13 @@ struct UsedSources {
       printf("sentence %d, variation %d, bit_pos %d\n", (int)sentence, (int)variation, (int)bit_pos);
     }
 
+    std::string toString() const {
+      char buf[32];
+      snprintf(buf, sizeof(buf), "s%d v%d b%d", (int)sentence, (int)variation,
+          (int)bit_pos);
+      return buf;
+    }
+
     constexpr void validate() const {
       bool valid = true;
       if ((sentence < 0) || (sentence > kNumSentences)) {
