@@ -383,31 +383,19 @@ __device__ bool sources_match_any_descriptor_pair(
     const UsedSources::SourceDescriptorPair* RESTRICT src_desc_pairs,
     const unsigned num_src_desc_pairs) {
 
-  //  __shared__ SourceCompatibilityData source;
   __shared__ bool match;
-  if (!threadIdx.x) {
-    //    source = source1;
-    //    source.mergeInPlace(source2);
-    match = false;
-  }
-    __syncthreads();
+  if (!threadIdx.x) match = false;
+  __syncthreads();
   // one thread per src_desc_pair
   for (unsigned idx{}; idx * blockDim.x < num_src_desc_pairs; ++idx) {
     const auto pair_idx = idx * blockDim.x + threadIdx.x;
     if (pair_idx < num_src_desc_pairs) {
-#if 0
-      if (source.usedSources.has(src_desc_pairs[pair_idx].first)
-          && source.usedSources.has(src_desc_pairs[pair_idx].second)) {
-        match = true;
-      }
-#else
-      const auto first = source1.usedSources.has(src_desc_pairs[pair_idx].first)
-          || source2.usedSources.has(src_desc_pairs[pair_idx].first);
-      const auto second =
-          source1.usedSources.has(src_desc_pairs[pair_idx].second)
-          || source2.usedSources.has(src_desc_pairs[pair_idx].second);
+      const auto pair = src_desc_pairs[pair_idx];
+      const auto first = source1.usedSources.has(pair.first)
+          || source2.usedSources.has(pair.first);
+      const auto second = source1.usedSources.has(pair.second)
+          || source2.usedSources.has(pair.second);
       if (first && second) { match = true; }
-#endif
     }
     __syncthreads();
     if (match) return true;
@@ -792,13 +780,6 @@ __global__ void filter_kernel(
     }
 #endif
 
-#if 0
-  if (!blockIdx.x && !threadIdx.x && !dumped) {
-    dump_compat_src_indices(compat_src_indices, 10, "device");
-    dumped = 1;
-  }
-#endif
-  
 #if MAX_SOURCES
   num_sources = num_sources < MAX_SOURCES ? num_sources : MAX_SOURCES;
 #endif

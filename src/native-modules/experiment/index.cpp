@@ -328,36 +328,6 @@ void dump_combos(const MergeData::Host& host, const MergeData::Device& device) {
   }
   */
 }
-  /*
-auto get_combo_indices(const UsedSources::VariationsSet& variations) {
-  const auto kMaxVariationIdx = 138u;  // 138^9 fits in fat_index_t
-  ComboIndexList combo_indices;
-  for (const auto& v : variations) {
-    combo_index_t combo_idx{};
-    for (auto idx_int : v | std::views::reverse) {
-      auto idx = static_cast<index_t>(idx_int + 1);  // because -1 is valid
-      if (idx >= kMaxVariationIdx) {                 // 137 is largest allowed
-        std::cerr << "variation index " << idx << " exceeds maximum of "
-                  << kMaxVariationIdx << ", terminating\n";
-        std::terminate();
-      }
-      if (combo_idx) combo_idx *= kMaxVariationIdx;
-      combo_idx += idx;
-    }
-    combo_indices.push_back(combo_idx);
-  }
-  return combo_indices;
-}
-  */
-
-  /*
-const auto& get_source(
-    const MergeData::Host& host, fat_index_t combo_idx, size_t list_idx) {
-  auto& idx_list = host.compat_idx_lists.at(list_idx);
-  auto src_idx = idx_list.at(combo_idx % idx_list.size());
-  return host.src_lists.at(list_idx).at(src_idx);
-}
-  */
 
 void show_unique_XOR_variations(const MergeData::Host& host) {  // host_xor
   VariationsSet variations;
@@ -375,47 +345,6 @@ void show_unique_XOR_variations(const MergeData::Host& host) {  // host_xor
   }
   std::cerr << "XOR unique variations: " << variations.size() << std::endl;
 }
-
-/*
- * NOTE: maybe keep around some of this for a while.
- *
-auto get_unique_OR_variations(
-    const UsedSources::VariationsList& variations_list) {
-  UsedSources::VariationsSet variations;
-  for (auto& v : variations_list) {
-    variations.insert(v);
-  }
-  std::cerr << "OR variations: " << variations_list.size()
-            << ", unique: " << variations.size() << std::endl;
-  return variations;
-}
-
-auto check_XOR_compatibility(const FilterData& mfd,
-    const UsedSources::VariationsSet& or_variations) {
-  //dump_combos(mfd.host_or, mfd.device_or);
-  auto xor_variations = get_variations_list(mfd.host_xor);
-  std::cerr << "XOR variations: " << xor_variations.size() << std::endl;
-  int num_incompat{};
-  for (auto& xor_v : xor_variations) {
-    auto compat = or_variations.contains(xor_v);
-    if (compat) continue;
-    for (auto& or_v : or_variations) {
-      if (UsedSources::are_variations_compatible(xor_v, or_v)) {
-        compat = true;
-        break;
-      }
-    }
-    if (!compat) ++num_incompat;
-  }
-  if (num_incompat) {
-    std::cerr << num_incompat
-              << " XOR variations are not compatible with any OR variation\n";
-  } else {
-    std::cerr << "All XOR variations are compatible with an OR variation\n";
-  }
-  return true;
-}
-*/
 
 //
 // filterPreparation
@@ -455,17 +384,6 @@ Value filterPreparation(const CallbackInfo& info) {
 // computeCombosForSum
 //
 
-/*
-auto append_sources(const NameCount& nc, SourceCompatibilityList& src_list) {
-  auto start_size = src_list.size();
-  clue_manager::for_each_nc_source(nc,
-      [&src_list](const SourceCompatibilityData& src, int) {
-        src_list.push_back(src);
-      });
-  return src_list.size() - start_size;
-}
-*/
-
 Value computeCombosForSum(const CallbackInfo& info) {
   Env env = info.Env();
   if (!info[0].IsNumber() && !info[1].IsNumber() && !info[2].IsBoolean()) {
@@ -484,24 +402,6 @@ Value computeCombosForSum(const CallbackInfo& info) {
   // TODO: move save_current_candidate_counts() here?
   return env.Null();
 }
-  
-
-/*
-// considerCandidate
-Value considerCandidate(const CallbackInfo& info) {
-  Env env = info.Env();
-  if (!info[0].IsArray()) {
-    TypeError::New(env, "considerCandidates: invalid parameter type")
-      .ThrowAsJavaScriptException();
-    return env.Null();
-  }
-  // arg0
-  auto ncList = makeNameCountList(env, info[0].As<Array>());
-  // --
-  consider_candidate(ncList);
-  return env.Null();
-}
-*/
   
 //
 // filterCandidatesForSum
@@ -712,7 +612,6 @@ Object Init(Env env, Object exports) {
       Function::New(env, mergeCompatibleXorSourceCombinations);
   exports["filterPreparation"] = Function::New(env, filterPreparation);
   exports["computeCombosForSum"] = Function::New(env, computeCombosForSum);
-  //exports["considerCandidate"] = Function::New(env, considerCandidate);
   exports["filterCandidatesForSum"] = Function::New(env,
       filterCandidatesForSum);
   exports["getResult"] = Function::New(env, getResult);
