@@ -404,9 +404,10 @@ filter_task_result_t filter_sources(FilterData& mfd,
   StreamSwarm streams(num_streams, stride);
   std::vector<result_t> results(num_results);
   auto t = util::Timer::start_timer();
-  auto [num_processed, num_compat] = run_concurrent_filter_kernels(params.sum,
-      streams, params.threads_per_block, idx_states, mfd, device_src_indices,
-      device_compat_src_results, device_results, results);
+  const auto [num_processed, num_compat] =  //
+      run_concurrent_filter_kernels(params.sum, streams,
+          params.threads_per_block, idx_states, mfd, device_src_indices,
+          device_compat_src_results, device_results, results);
   t.stop();
   CompatSourceIndicesSet incompat_src_indices;
   int num_incompat_sources{};
@@ -604,23 +605,22 @@ auto filter_candidates_cuda(FilterData& mfd, const FilterParams& params)
 
 filter_result_t get_filter_result() {
   filter_result_t unique_combos;
-  std::string results{"results: "};
+  std::string result_str{"results: "};
   int total{-1};
   for (auto& fut : filter_futures_) {
     assert(fut.valid());
     const auto result = fut.get();
-    //std::cerr << " GOT RESULT!\n";
     const auto& combos = result.first;
     if (total > -1) {
-      results.append(", ");
+      result_str.append(", ");
     } else {
       total = 0;
     }
-    results.append(std::to_string(combos.size()));
+    result_str.append(std::to_string(combos.size()));
     total += int(combos.size());
     unique_combos.insert(combos.begin(), combos.end());
   }
-  std::cerr << results << ", total: " << total
+  std::cerr << result_str << ", total: " << total
             << ", unique: " << unique_combos.size() << std::endl;
   return unique_combos;
 }

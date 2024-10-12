@@ -259,13 +259,10 @@ const parallel_makeCombosForRange = (first: number, last: number, args: any): an
             sum,
             max: (args.max > sum) ? sum : args.max,
             xor: args.xor,
-            //xormm: args.xormm,
             or: args.or,
             fast: args.fast,
             load_max: ClueManager.getMaxClues(),
             parallel: true
-            //,puse_syns: args.use_syns
-            //,synonymMinMax: args.synonymMinMax
         }));
 
     let cpus = OS.cpus().length;
@@ -299,6 +296,7 @@ const displayCombos = (combos: any, variations: Sentence.Variations): void => {
         Peco.makeNew({
             listArray: makeNameVariationLists(nameCsv.split(','), variations)
         }).getCombinations().forEach(nameList => {
+            if (nameList[0] === nameList[1]) return;
             const nameCsv = nameList.sort().toString();
             if (!hash.has(nameCsv)) {
                 hash.add(nameCsv);

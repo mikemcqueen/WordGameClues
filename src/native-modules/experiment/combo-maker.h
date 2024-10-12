@@ -498,6 +498,13 @@ struct NameCount {
     return buf;
   }
 
+  // yeah not pretty, i was in a hurry
+  static std::string makeString(const std::string& name1, const std::string& name2) {
+    char buf[32];
+    snprintf(buf, sizeof(buf), "%s,%s", name1.c_str(), name2.c_str());
+    return buf;
+  }
+
   static std::vector<std::string> listToNameList(const NameCountList& list) {
     std::vector<std::string> names;
     for (auto it = list.cbegin(); it != list.cend(); ++it) {

@@ -43,7 +43,7 @@ std::optional<NameCountCRefList> next(const std::vector<int>& count_list,
         nc_cref_list.push_back(std::cref(nc));
       } else {
         // no duplicate names allowed
-        if (nc_cref_list.at(0).get().name != nc.name) {
+        if (nc_cref_list.front().get().name != nc.name) {
           nc_cref_list.push_back(std::cref(nc));
           return std::make_optional(std::move(nc_cref_list));
         }
