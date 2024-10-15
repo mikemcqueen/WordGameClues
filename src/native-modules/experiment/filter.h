@@ -20,6 +20,8 @@ void set_incompatible_sources(FilterData& mfd,
 
 void alloc_copy_filter_indices(FilterData& mfd, cudaStream_t stream);
 
+void free_swarm_pool();
+
 }  // namespace cm
 
 #endif  // INCLUDE_FILTER_H

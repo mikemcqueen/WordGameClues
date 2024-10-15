@@ -913,7 +913,9 @@ void run_filter_kernel(int threads_per_block, StreamData& stream,
 void run_get_compatible_sources_kernel(
     const CompatSourceIndices* device_src_indices, unsigned num_src_indices,
     const UsedSources::SourceDescriptorPair* device_src_desc_pairs,
-    unsigned num_src_desc_pairs, result_t* device_results) {
+    unsigned num_src_desc_pairs, result_t* device_results,
+    cudaStream_t stream) {
+
   int num_sm;
   cudaDeviceGetAttribute(&num_sm, cudaDevAttrMultiProcessorCount, 0);
   int threads_per_sm;
@@ -927,8 +929,10 @@ void run_get_compatible_sources_kernel(
 
   dim3 grid_dim(grid_size);
   dim3 block_dim(block_size);
-  // async copies are on thread stream therefore auto synchronized
-  cudaStream_t stream = cudaStreamPerThread;
+  // ensure any async alloc/copies aee complete on main thread stream
+  // TODO: don't know if it's practical to ensure all prior malloc/copies
+  // are done on the passed in stream.
+  cudaError_t err = cudaStreamSynchronize(cudaStreamPerThread);
   get_compatible_sources_kernel<<<grid_dim, block_dim, shared_bytes, stream>>>(
       device_src_indices, num_src_indices, device_src_desc_pairs,
       num_src_desc_pairs, device_results);

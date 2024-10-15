@@ -10,8 +10,8 @@ class IndexStates;
 struct StreamBase {
   StreamBase() = delete;
 
-  StreamBase(index_t idx, index_t stride, cudaStream_t stream)
-      : stream_idx(idx), stride(stride), cuda_stream(stream),
+  StreamBase(index_t stream_idx, index_t stride, cudaStream_t stream)
+      : stream_idx(stream_idx), stride(stride), cuda_stream(stream),
         xor_kernel_start(stream, false), xor_kernel_stop(stream, false) {}
 
   index_t stream_idx;
@@ -25,6 +25,9 @@ struct StreamBase {
   bool has_run{false};     // has run at least once
   SourceIndex* device_src_indices{};  // allocated in device memory
   std::vector<SourceIndex> src_indices;
+
+private:
+  int swarm_idx;
 };
 
 struct StreamData : public StreamBase {

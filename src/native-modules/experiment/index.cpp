@@ -451,6 +451,7 @@ Value getResult(const CallbackInfo& info) {
   // free all device data
   MFD.device_xor.cuda_free();
   MFD.device_or.cuda_free();
+  free_swarm_pool();
   cuda_memory_dump("filter complete");
   return wrap(env, result);
 }
