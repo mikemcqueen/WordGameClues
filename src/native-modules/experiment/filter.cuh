@@ -7,22 +7,24 @@
 namespace cm {
 
 constexpr unsigned kMaxOrArgs = 20;
+constexpr unsigned kMaxSums = 32;
 
 struct FilterData;
 struct StreamData;
 
-extern __constant__ SourceCompatibilityData* sources_data[32];
+extern __constant__ SourceCompatibilityData* sources_data[kMaxSums];
 
 void run_get_compatible_sources_kernel(
     const CompatSourceIndices* device_src_indices, unsigned num_src_indices,
     const UsedSources::SourceDescriptorPair* device_incompat_src_desc_pairs,
     unsigned num_src_desc_pairs, result_t* device_resultsy,
-    cudaStream_t stream);
+    cudaStream_t sync_stream, cudaStream_t stream);
 
 void run_filter_kernel(int threads_per_block, StreamData& stream,
     FilterData& mfd, const CompatSourceIndices* device_src_indices,
     const result_t* device_compat_src_results, result_t* device_results);
 
+#if 0
 __device__ __host__ inline void dump_compat_src_indices(
     const CompatSourceIndices* compat_src_indices, int num_csi,
     const char* header) {
@@ -34,6 +36,7 @@ __device__ __host__ inline void dump_compat_src_indices(
         csi2.count(), csi2.index());
   }
 }
+#endif
 
 }  // namespace cm
 

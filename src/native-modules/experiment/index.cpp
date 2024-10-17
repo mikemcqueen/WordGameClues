@@ -431,6 +431,9 @@ Value filterCandidatesForSum(const CallbackInfo& info) {
   // free memory. now is a good opportunity to save candidate counts for this
   // sum so we can access it later.
   save_current_candidate_counts(sum);
+  // do any filter initialization required for filters of any sum. a lil hacky
+  // to depend on sum==2 for that condition.
+  if (sum == 2) filter_init();
 
   const auto opt_incompat_sources = filter_candidates_cuda(MFD, filter_params);
   assert(filter_params.synchronous == opt_incompat_sources.has_value());
@@ -451,7 +454,8 @@ Value getResult(const CallbackInfo& info) {
   // free all device data
   MFD.device_xor.cuda_free();
   MFD.device_or.cuda_free();
-  free_swarm_pool();
+  // mirrors filter_init() in filterCandidatesForSum()
+  filter_cleanup();
   cuda_memory_dump("filter complete");
   return wrap(env, result);
 }

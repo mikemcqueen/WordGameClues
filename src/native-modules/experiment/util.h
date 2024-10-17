@@ -165,7 +165,7 @@ public:
   }
 
   template <typename TimeUnit = std::chrono::milliseconds>
-  auto count() {
+  auto count() const {
     return std::chrono::duration_cast<TimeUnit>(stop_ - start_).count();
   }
 
@@ -182,11 +182,11 @@ public:
     return result;
   }
 
-  auto microseconds() {
+  auto microseconds() const {
     return count<std::chrono::microseconds>();
   }
 
-  auto nanoseconds() {
+  auto nanoseconds() const {
     return count<std::chrono::nanoseconds>();
   }
 

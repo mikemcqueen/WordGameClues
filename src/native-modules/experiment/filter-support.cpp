@@ -6,7 +6,7 @@
 #include <limits>
 #include <numeric>
 #include <optional>
-#include <semaphore>
+//#include <semaphore>
 #include <string>
 #include <unordered_set>
 #include <utility>
@@ -25,6 +25,10 @@
 #include "log.h"
 #include "util.h"
 
+#include <condition_variable>
+#include <mutex>
+#include <bitset>
+
 namespace cm {
 
 namespace {
@@ -38,7 +42,40 @@ using filter_task_result_t = std::pair<std::unordered_set<std::string>,
 
 std::vector<std::future<filter_task_result_t>> filter_futures_;
 
-StreamSwarmPool stream_swarm_pool(2);
+StreamSwarmPool swarm_pool_(2);
+
+cudaStream_t sources_stream_{};
+
+struct CompletionTracker {
+  void complete(int sum) {
+    assert(sum >= 2);
+    auto pos = sum - 2;
+    assert(!bits_.test(pos));
+    std::lock_guard lock(mutex_);
+    bits_.set(pos);
+    cv_.notify_all();
+  }
+
+  void wait_for_all_prior(int sum) {
+    assert(sum >= 2);
+    auto pos = sum - 2;
+    if (!pos) return;
+    unsigned long mask = (1ul << pos) - 1;
+    std::unique_lock<std::mutex> lock(mutex_);
+    cv_.wait(lock, [this, mask]() { return this->test_mask(mask); });
+  }
+
+private:
+  bool test_mask(unsigned long mask) {
+    return (bits_.to_ulong() & mask) == mask;
+  }
+
+  std::mutex mutex_;
+  std::condition_variable cv_;
+  std::bitset<kMaxSums> bits_;
+};
+
+CompletionTracker source_copy_tracker_;
 
 // functions
 
@@ -82,7 +119,7 @@ void cuda_alloc_copy_sources(int sum, const cudaStream_t stream) {
 
 /* unused. nothing wrong with it though.
 [[nodiscard]] auto cuda_alloc_copy_sources(const CandidateList& candidates,
-  const cudaStream_t stream = cudaStreamPerThread) {
+  const cudaStream_t stream) {
 return cuda_alloc_copy_sources(
     candidates, get_num_candidate_sources(candidates), stream);
 }
@@ -115,7 +152,7 @@ auto cuda_copy_results(
 auto get_compatible_sources_results(int sum,
     const CompatSourceIndices* device_src_indices, unsigned num_src_indices,
     const UsedSources::SourceDescriptorPair* device_incompat_src_desc_pairs,
-    int num_src_desc_pairs, cudaStream_t stream) {
+    int num_src_desc_pairs, cudaStream_t sync_stream, cudaStream_t stream) {
   CudaEvent alloc_event(stream);
   auto device_results = cuda_alloc_results(num_src_indices, stream,
       "get_compat_sources results");
@@ -123,7 +160,7 @@ auto get_compatible_sources_results(int sum,
   CudaEvent start_event(stream);
   run_get_compatible_sources_kernel(device_src_indices, num_src_indices,
       device_incompat_src_desc_pairs, num_src_desc_pairs, device_results,
-      stream);
+      sync_stream, stream);
   // probably sync always is correct/easiest thing to do here. sync'ing only
   // when logging is wrong, esp. if semaphore is introduced at calling site.
   CudaEvent stop_event(stream);
@@ -286,6 +323,11 @@ auto run_concurrent_filter_kernels(int sum, StreamSwarm& swarm,
     const CompatSourceIndices* device_src_indices,
     const result_t* device_compat_src_results, result_t* device_results,
     std::vector<result_t>& results) {
+  // would like to get rid of this for sure. only the first stream in the
+  // swarm will auto-sync with any prior alloc/zero/copies on that stream.
+  if (swarm.num_streams() > 1) {
+    cudaStreamSynchronize(swarm.at(0).cuda_stream);
+  }
   int total_processed{};
   int total_compat{};
   int stream_idx{-1};
@@ -354,12 +396,13 @@ void log_filter_sources(int sum, int num_processed, int num_compat,
   }
 }
 
-//
 // This is the intermediate filter "task" function, which takes a device
 // array of compat_src_indices to filter.
 //
 // Additional preparation and post-processing surrounding the call to
 // run_xor_filter_task.
+//
+// TODO: THIS HAS CHANGED A BIT, UPDATE COMMENTS
 //
 // Preparation:
 //
@@ -383,13 +426,12 @@ filter_task_result_t filter_sources(FilterData& mfd,
     std::vector<IndexList>& idx_lists, const FilterParams& params,
     StreamSwarm& swarm) {
   using namespace std::experimental::fundamentals_v3;
-  // TODO: FIXMENOW: streams = 3
-  const auto stream = cudaStreamPerThread; // alloc/copy/zero on thread stream
+  const auto stream = swarm.at(0).cuda_stream;
   const auto num_streams = params.num_streams ? params.num_streams : 1;
   const auto num_src_lists = idx_lists.size();
   const auto num_results = num_src_lists;
   const auto stride = params.stride ? params.stride : int(num_src_lists);
-  // get num_src_lists before moving idx_lists
+  // NB: get num_src_lists, above, before moving idx_lists
   IndexStates idx_states{std::move(idx_lists)};
   auto device_results = cuda_alloc_results(num_results, stream,
       "filter results");
@@ -427,14 +469,24 @@ filter_task_result_t filter_sources(FilterData& mfd,
       std::move(incompat_src_indices));
 }
 
-void log_copy_sources(size_t num_sources, const FilterParams& params,
-    const CudaEvent& copy_start) {  //
+void log_filter_task(const FilterParams& params,
+    const std::vector<IndexList>& idx_lists,
+    const CompatSourceIndicesList& src_indices, const util::Timer& make_timer,
+    const CudaEvent& copy_start, const CudaEvent& copy_stop) {
+  const auto num_src_indices = util::sum_sizes(idx_lists);
+  if (log_level(Verbose)) {
+    std::cerr << " " << params.sum
+              << ": make_variations_sorted_idx_lists: " << idx_lists.size()
+              << " : " << num_src_indices << std::endl;
+    std::cerr << " " << params.sum
+              << ": make_compat_src_indices: " << src_indices.size() << " - "
+              << make_timer.count() << "ms\n";
+  }
   if ((params.synchronous && log_level(Normal))
       || (!params.synchronous && log_level(Verbose))) {
-    CudaEvent copy_stop(copy_start.stream());
     auto copy_duration = copy_stop.synchronize(copy_start);
     auto free_mem = cuda_get_free_mem() / 1'000'000;
-    std::cerr << " " << params.sum << ": alloc_copy_sources(" << num_sources
+    std::cerr << " " << params.sum << ": alloc_copy_sources(" << num_src_indices
               << ")" << ", free: " << free_mem << "MB"
               << " - " << copy_duration << "ms" << std::endl;
   }
@@ -454,12 +506,11 @@ auto alloc_copy_unique_variations(
   return device_uv;
 }
 
-//
 // This is the outermost filter "task" function.
 //
 // Preparation prior to calling xor_filter_task:
 //
-// NOTE: changes have been made to this, related to unique_variations
+// TOOD: changes have been made to this, related to unique_variations
 //       and candidates containing compat_src_indices vs. sources.
 //
 // * Determine the candidate sources for the supplied sum.
@@ -476,58 +527,73 @@ auto alloc_copy_unique_variations(
 //
 filter_task_result_t filter_task(FilterData& mfd, FilterParams params) {
   using namespace std::experimental::fundamentals_v3;  // scope_exit
-  SourceCompatibilityData* device_sources{};
-  scope_exit free_sources{[&params, device_sources]() {
-    cuda_free(device_sources);
-  }};
-  const auto stream = cudaStreamPerThread;
-  const auto& candidates = get_candidates(params.sum);
-  auto t_make = util::Timer::start_timer();
-  auto idx_lists = make_variations_sorted_idx_lists(candidates);
-  t_make.stop();
-  const auto num_src_indices = util::sum_sizes(idx_lists);
-  std::cerr << " " << params.sum
-            << ": make_variations_sorted_idx_lists: " << idx_lists.size()
-            << " : " << num_src_indices << " - " << t_make.count() << "ms\n";
-  CudaEvent copy_start(stream, false);
-  auto t = util::Timer::start_timer();
-  const auto src_indices = make_compat_src_indices(candidates, idx_lists);
-  t.stop();
-  std::cerr << " " << params.sum
-            << ": make_compat_src_indices: " << src_indices.size()
-            << " - " << t.count() << "ms\n";
-  copy_start.record();
+  const auto stream = sources_stream_;
+  // The logic in this function isn't segregated very well. we enter here on a
+  // separate thread-per-sum. the goal of each thread is to perform the
+  // following in order:
+  //
+  // 1. Initiate fulfillment of the device-data dependency (sources for prior
+  //    sum) for subsequent-sum threads as quickly as possible, because they
+  //    are all blocked until this data is available. All of these alloc/copies
+  //    use the same stream shared across all threads, so that there is only
+  //    one "dependent" stream to sync with before launching a kernel.
+  CudaEvent copy_start(stream);
   if (params.copy_all_prior_sources) {
     // copy sources for all prior sums except immediately prior
     for (int sum{3}; sum < params.sum; ++sum) {
       cuda_alloc_copy_sources(sum, stream);
+      source_copy_tracker_.complete(sum);
     }
   }
-  // copy sources for prior sum
+  // copy sources for immediately prior sum
   cuda_alloc_copy_sources(params.sum, stream);
-  // copy source indices (indices into prior-sum source arrays)
+  CudaEvent copy_finish(stream);
+  // indicate that our immediately prior sum source copy is initiated
+  source_copy_tracker_.complete(params.sum);
+
+  // 2. Perform as much CPU work as possible for data that is only used by this
+  //    sum's kernel, before blocking for one of the  available stream swarms
+  //    from the swarm pool. Generate compat source indices, basically. 
+  const auto& candidates = get_candidates(params.sum);
+  auto t_make = util::Timer::start_timer();
+  auto idx_lists = make_variations_sorted_idx_lists(candidates);
+  const auto src_indices = make_compat_src_indices(candidates, idx_lists);
+  t_make.stop();
+  log_filter_task(params, idx_lists, src_indices, t_make, copy_start,
+      copy_finish);
+
+  // 3. Wait for all prior sum source copies to be initiated
+  source_copy_tracker_.wait_for_all_prior(params.sum);
+
+  // acquire swarm here even though we don't really use the "swarm" feature
+  // until filter kernel, because I want to limit the amount of concurrent
+  // kernels (including get_compatible_results) to the # of swarms.
+  auto& swarm = swarm_pool_.acquire();
+  swarm.ensure_streams(1);
+
+  // copy source indices (indices into prior-sum source arrays) for this sum.
+  // kind of arbitrary where this occurs, but it is not *necessary* that it
+  // occurs prior to all prior sum sources being copied, so i'm doing it after.
   const auto device_src_indices = cuda_alloc_copy_source_indices(src_indices,
-      stream);
-  log_copy_sources(num_src_indices, params, copy_start);
+      swarm.at(0).cuda_stream);
 
   result_t* device_compat_src_results{};
   scope_exit free_results{
       [device_compat_src_results]() { cuda_free(device_compat_src_results); }};
-  // acquire swarm here even though we don't really use the "swarm" feature
-  // until filter kernel, because I want to limit the amount of concurrent
-  // kernels (including get_compatible_results) to the # of swarms.
-  auto& swarm = stream_swarm_pool.acquire();
-  swarm.ensure_streams(1);
   if (!params.synchronous) {
+    const auto num_src_indices = util::sum_sizes(idx_lists);
     device_compat_src_results = get_compatible_sources_results(params.sum,
         device_src_indices, num_src_indices,
         mfd.device_xor.incompat_src_desc_pairs,
-        int(mfd.host_xor.incompat_src_desc_pairs.size()),
-        swarm.at(0).cuda_stream);  // lil hacky
+        int(mfd.host_xor.incompat_src_desc_pairs.size()), sources_stream_,
+        swarm.at(0).cuda_stream);
+  } else {
+    // TOOD: hate this. the stream story is a mess here. fix.
+    cudaStreamSynchronize(sources_stream_);
   }
   auto filter_result = filter_sources(mfd, device_src_indices,
       device_compat_src_results, idx_lists, params, swarm);
-  stream_swarm_pool.release(swarm);
+  swarm_pool_.release(swarm);
   // free host memory associated with candidates
   clear_candidates(params.sum);
   return filter_result;
@@ -677,6 +743,15 @@ void alloc_copy_filter_indices(FilterData& mfd, cudaStream_t stream) {
   mfd.device_or.src_compat_results = nullptr;
 }
 
-void free_swarm_pool() { stream_swarm_pool.destroy_all_streams(); }
+void filter_init() {
+  auto err = cudaStreamCreate(&sources_stream_);
+  assert_cuda_success(err, "create sources_stream");
+}
+
+void filter_cleanup() {
+  auto err = cudaStreamDestroy(sources_stream_);
+  assert_cuda_success(err, "destroy sources_stream");
+  swarm_pool_.destroy_all_streams();
+}
 
 }  // namespace cm

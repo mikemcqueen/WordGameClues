@@ -851,7 +851,7 @@ void run_filter_kernel(int threads_per_block, StreamData& stream,
           * sizeof(shared_index_t)               // indices
       + kNumSentenceDataBytes * sizeof(uint8_t)  // src_sentence data
       + block_size * sizeof(result_t);           // xor_results
-  const auto cuda_stream = cudaStreamPerThread;
+
   // TODO: move to helper function
   // v- Populate any remaining mfd.device_xx values BEFORE copy_filter_data() -v
   if (!mfd.device_xor.or_compat_uv_indices) {
@@ -859,19 +859,20 @@ void run_filter_kernel(int threads_per_block, StreamData& stream,
     const auto or_indices_bytes = mfd.device_or.num_unique_variations
         * grid_size * sizeof(index_t);
     cuda_malloc_async((void**)&mfd.device_xor.or_compat_uv_indices,
-        or_indices_bytes, cuda_stream, "xor.or_compat_uv_indices");
+        or_indices_bytes, stream.cuda_stream, "xor.or_compat_uv_indices");
     const auto src_indices_bytes = mfd.device_xor.num_unique_variations
         * grid_size * sizeof(index_t);
     cuda_malloc_async((void**)&mfd.device_xor.src_compat_uv_indices,
-        src_indices_bytes, cuda_stream, "xor.src_compat_uv_indices");
+        src_indices_bytes, stream.cuda_stream, "xor.src_compat_uv_indices");
   }
   if (!mfd.device_or.src_compat_results) {
     const auto or_results_bytes = mfd.device_or.sum_idx_list_sizes * grid_size
         * sizeof(result_t);
     cuda_malloc_async((void**)&mfd.device_or.src_compat_results,
-        or_results_bytes, cuda_stream, "or.src_compat_results");
+        or_results_bytes, stream.cuda_stream, "or.src_compat_results");
   }
   // ^- Populate any reamining mfd.device_xx values BEFORE copy_filter_data() -^
+
   copy_filter_data(mfd);
 
   static bool log_once{true};
@@ -885,11 +886,10 @@ void run_filter_kernel(int threads_per_block, StreamData& stream,
   #endif 
 
   // ensure any async alloc/copies are complete on main thread stream
-  cudaError_t err = cudaStreamSynchronize(cuda_stream);
-  assert_cuda_success(err, "run_filter_kernel sync");
+  // cudaError_t err = cudaStreamSynchronize(cuda_stream);
+  // assert_cuda_success(err, "run_filter_kernel sync");
   const dim3 grid_dim(grid_size);
   const dim3 block_dim(block_size);
-
   stream.xor_kernel_start.record();
   filter_kernel<<<grid_dim, block_dim, shared_bytes, stream.cuda_stream>>>(
       device_src_indices, int(stream.src_indices.size()),
@@ -914,8 +914,7 @@ void run_get_compatible_sources_kernel(
     const CompatSourceIndices* device_src_indices, unsigned num_src_indices,
     const UsedSources::SourceDescriptorPair* device_src_desc_pairs,
     unsigned num_src_desc_pairs, result_t* device_results,
-    cudaStream_t stream) {
-
+    cudaStream_t sync_stream, cudaStream_t stream) {
   int num_sm;
   cudaDeviceGetAttribute(&num_sm, cudaDevAttrMultiProcessorCount, 0);
   int threads_per_sm;
@@ -929,10 +928,9 @@ void run_get_compatible_sources_kernel(
 
   dim3 grid_dim(grid_size);
   dim3 block_dim(block_size);
-  // ensure any async alloc/copies aee complete on main thread stream
-  // TODO: don't know if it's practical to ensure all prior malloc/copies
-  // are done on the passed in stream.
-  cudaError_t err = cudaStreamSynchronize(cudaStreamPerThread);
+  // ensure any async alloc/copies aee complete on sync stream
+  cudaError_t err = cudaStreamSynchronize(sync_stream);
+  assert_cuda_success(err, "get_compat_sources_kernel sync");
   get_compatible_sources_kernel<<<grid_dim, block_dim, shared_bytes, stream>>>(
       device_src_indices, num_src_indices, device_src_desc_pairs,
       num_src_desc_pairs, device_results);

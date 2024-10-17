@@ -302,11 +302,11 @@ SourceCompatibilityList make_unique_clue_source_list(int count) {
       unique_src_list.insert(unique_src_list.end(), src_list.begin(), src_list.end());
     }
   }
-#if 1
-  std::cerr << " " << count << ": make_unique_clue_sources("
-            << unique_src_list.size() << "), names("
-            << get_num_unique_clue_names(count) << ")\n";
-#endif
+  if (log_level(ExtraVerbose)) {
+    std::cerr << " " << count << ": make_unique_clue_sources("
+              << unique_src_list.size() << "), names("
+              << get_num_unique_clue_names(count) << ")\n";
+  }
   return unique_src_list;
 }
 
