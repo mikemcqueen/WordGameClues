@@ -1,6 +1,30 @@
+* ok something weird with --max-sources. it actually changes the number of valid results,
+  for a -c2 for example. it also seems to, naturally(?), increase the number of XOR sources.
+  so really, i need to:
+  * figure out *why* this is affecting valid result count.
+  * set --max-sources to (M-1) for -cM, and (N-1) for -cM,N, if not otherwise specified,
+    because there is no reason to generate a large number of XOR sources that shouldn't
+    be used and shouldn't impact results (afaik).
+    * actually there is a reason to do this. because I need to generate the actual
+      --xor sources themselves, like, "21", which requires --max-sources 13. but maybe
+      there is some way to shortcut this, such that rather than searching *all* sources
+      up to some --max, i just search for all instances of "21".
+  * maybe think about how i might support -cLARGE with --max-sources *smaller* than
+    LARGE-1. not a priority though, i should't really be playing with those sizes.
+
+* -c2,15 is oom with low --xor count and no --or.
+
 * still some cudaStreamPerThread usage in index.cpp. which means if things currently
   work, they are working somewhat "accidentally" unless I put in a synchronize call
   on that stream: cudaStreamSynchronize(cudaStreamPerThread) somewhere.
+
+* There is a larger issue with streams as well. And possible CompletionRecorder thingy
+  isn't working as I expected, spurious memory access failures.
+
+* cudaMemcpyToSymbol -> cudaMemcpyToSymbolAsync
+
+* there are duplicate sources in the per-sum sourcelists. up to 50% duplicate. perhaps
+  even more across sum boundaries. easyish optimization when the time comes.
 
 * I should implement some kind of "freeze" mechanism on some of the data structures in
   clue-manager, such that I can assert(!frozen) when adding new elements, and freeze
@@ -106,8 +130,6 @@
   * test case for emplace_back(copy, move)
 
 * cuda_device_ptr_t
-
-* set --max-sources to (N-1) (if not otherwise specified) when -cM,N ?
 
 * make -t x,y,z show VALID entries even if they exceed max_sources (maybe
   separated by a -- line)

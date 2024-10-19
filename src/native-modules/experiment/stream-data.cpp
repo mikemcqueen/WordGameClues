@@ -38,22 +38,24 @@ bool StreamData::fill_source_indices(IndexStates& idx_states, index_t max_indice
   return !src_indices.empty();
 }
 
-void StreamData::alloc_copy_source_indices(
-    [[maybe_unused]] const IndexStates& idx_states) {
-  cudaError_t err = cudaSuccess;
+void StreamData::alloc_copy_source_indices() {
   // alloc source indices
-  if (!device_src_indices) {
-    auto num_alloc_bytes = stride * sizeof(SourceIndex);
-    //std::cerr << " stream_idx: " << stream_idx
-    //              << ", alloc_bytes: " << num_alloc_bytes << std::endl;
-    cuda_malloc_async((void**)&device_src_indices, num_alloc_bytes, cuda_stream,
+  auto num_bytes = src_indices.size() * sizeof(SourceIndex);
+  if (num_device_src_indices_bytes < num_bytes) {
+    if (device_src_indices) {
+      cuda_free_async(device_src_indices, cuda_stream);
+      device_src_indices = nullptr;
+    }
+    // std::cerr << " stream_idx: " << stream_idx
+    //    << ", alloc_bytes: " << num_bytes << std::endl;
+    cuda_malloc_async((void**)&device_src_indices, num_bytes, cuda_stream,
         "src_indices");
+    num_device_src_indices_bytes = num_bytes;
   }
+  // std::cerr << " stream_idx: " << stream_idx << ", copy_bytes: " <<
+  //     num_bytes << std::endl;
   // copy source indices
-  auto num_copy_bytes = src_indices.size() * sizeof(SourceIndex);
-  //  std::cerr << " stream_idx: " << stream_idx
-  //            << ", copy_bytes: " << num_copy_bytes << std::endl;
-  err = cudaMemcpyAsync(device_src_indices, src_indices.data(), num_copy_bytes,
+  auto err = cudaMemcpyAsync(device_src_indices, src_indices.data(), num_bytes,
       cudaMemcpyHostToDevice, cuda_stream);
   assert_cuda_success(err, "copy src_indices");
 }

@@ -123,6 +123,14 @@ void cuda_free(void* ptr) {
   remove_ptr(ptr);
 }
 
+void cuda_free_async(void* ptr, cudaStream_t stream) {
+  if (!ptr)
+    return;
+  auto err = cudaFreeAsync(ptr, stream);
+  assert_cuda_success(err, "cuda_free_async");
+  remove_ptr(ptr);
+}
+
 void cuda_memory_dump(std::string_view header /* = "cuda_memory_dump" */) {
   if (!log_level(MemoryDumps)) return;
   TagMap tag_map_copy;

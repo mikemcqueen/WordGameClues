@@ -261,10 +261,10 @@ void host_show_num_compat_combos(const int first_combo,
             << "]: " << num_compat << " - " << t.count() << "ms" << std::endl;
 }
 
-auto log_compat_combos_kernel(int idx, CudaEvent& start, LogLevel level = Verbose) {
+auto log_compat_combos_kernel(int idx, const CudaEvent& start,
+    const CudaEvent& stop, LogLevel level = Verbose) {
   long elapsed{};
   if (log_level(level)) {
-    CudaEvent stop(start.stream());
     elapsed = stop.synchronize(start);
     if (log_level(ExtraVerbose)) {
       std::cerr << "  completed get_compat_combos_kernel " << idx << " - "
@@ -296,7 +296,7 @@ auto sync_copy_compat_results(std::vector<result_t>& results,
   auto err = cudaMemcpyAsync(results.data(), device_results, num_bytes,
       cudaMemcpyDeviceToHost, stream);
   assert_cuda_success(err, "merge copy results");
-  CudaEvent stop(start.stream());
+  CudaEvent stop(stream);
   return stop.synchronize(start);
 }
 
@@ -335,7 +335,8 @@ auto run_get_compat_combos_task(const result_t* device_compat_matrices,
 
   std::vector<result_t> host_results(num_indices);
   std::vector<fat_index_t> result_indices;
-  CudaEvent gcc_start(stream);
+  CudaEvent gcc_start;
+  CudaEvent gcc_stop;
   long gcc_elapsed{};
   long copy_elapsed{};
   long proc_elapsed{};
@@ -349,11 +350,12 @@ auto run_get_compat_combos_task(const result_t* device_compat_matrices,
                 << " for [" << first_idx << ", " << first_idx + num_indices
                 << "]" << std::endl;
     }
-    if (log_level(Verbose)) gcc_start.record();
+    gcc_start.record(stream);
     run_get_compat_combos_kernel(first_idx, num_indices, device_compat_matrices,
         device_compat_matrix_start_indices, device_idx_list_sizes,
         num_idx_lists, device_results, stream, merge_type == MergeType::OR);
-    gcc_elapsed += log_compat_combos_kernel(kernel_idx, gcc_start);
+    gcc_stop.record(stream);
+    gcc_elapsed += log_compat_combos_kernel(kernel_idx, gcc_start, gcc_stop);
 
     // TODO: sync_copy_results returns event.elapsed but precision is low
     // does it matter? could return a timer instead

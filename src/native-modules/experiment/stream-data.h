@@ -11,19 +11,19 @@ struct StreamBase {
   StreamBase() = delete;
 
   StreamBase(index_t stream_idx, index_t stride, cudaStream_t stream)
-      : stream_idx(stream_idx), stride(stride), cuda_stream(stream),
-        xor_kernel_start(stream, false), xor_kernel_stop(stream, false) {}
+      : stream_idx(stream_idx), stride(stride), cuda_stream(stream) {}
 
   index_t stream_idx;
   index_t stride;
   cudaStream_t cuda_stream;
 
-  CudaEvent xor_kernel_start;
-  CudaEvent xor_kernel_stop;
+  CudaEvent xor_kernel_start{};
+  CudaEvent xor_kernel_stop{};
   int sequence_num{};
   bool is_running{false};  // true until results retrieved
   bool has_run{false};     // has run at least once
-  SourceIndex* device_src_indices{};  // allocated in device memory
+  SourceIndex* device_src_indices{};     // allocated in device memory
+  size_t num_device_src_indices_bytes{}; // size of above buffer
   std::vector<SourceIndex> src_indices;
 
 private:
@@ -51,8 +51,7 @@ struct StreamData : public StreamBase {
     return fill_source_indices(idx_states, stride);
   }
 
-  void alloc_copy_source_indices(
-      [[maybe_unused]] const IndexStates& idx_states);
+  void alloc_copy_source_indices();
 
   auto hasWorkRemaining() const { return !src_indices.empty(); }
 

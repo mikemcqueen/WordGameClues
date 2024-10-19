@@ -15,9 +15,9 @@ struct StreamData;
 extern __constant__ SourceCompatibilityData* sources_data[kMaxSums];
 
 void run_get_compatible_sources_kernel(
-    const CompatSourceIndices* device_src_indices, unsigned num_src_indices,
+    const CompatSourceIndices* device_src_indices, size_t num_src_indices,
     const UsedSources::SourceDescriptorPair* device_incompat_src_desc_pairs,
-    unsigned num_src_desc_pairs, result_t* device_resultsy,
+    size_t num_src_desc_pairs, result_t* device_resultsy,
     cudaStream_t sync_stream, cudaStream_t stream);
 
 void run_filter_kernel(int threads_per_block, StreamData& stream,

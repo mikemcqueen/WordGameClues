@@ -124,6 +124,7 @@ struct SourceCompatibilityData;
 void cuda_malloc_async(
     void** ptr, size_t bytes, cudaStream_t stream, std::string_view tag);
 void cuda_free(void* ptr);
+void cuda_free_async(void* ptr, cudaStream_t stream);
 void cuda_memory_dump(std::string_view header = "cuda_memory_dump");
 size_t cuda_get_free_mem();
 
@@ -156,13 +157,13 @@ inline void cuda_zero_results(
 
 class CudaEvent {
 public:
-  CudaEvent(cudaStream_t stream, bool record_now = true)
-      : stream_(stream) {
+  CudaEvent() {
     auto err = cudaEventCreate(&event_);
     assert_cuda_success(err, "cudaEventCreate");
-    if (record_now) {
-      record();
-    }
+  }
+
+  CudaEvent(cudaStream_t stream_to_record) : CudaEvent() {
+    record(stream_to_record);
   }
 
   ~CudaEvent() {
@@ -174,12 +175,8 @@ public:
     return event_;
   }
 
-  auto stream() const {
-    return stream_;
-  }
-
-  void record() const {
-    auto err = cudaEventRecord(event_, stream_);
+  void record(cudaStream_t stream) const {
+    auto err = cudaEventRecord(event_, stream);
     assert_cuda_success(err, "cudaEventRecord");
   }
 
@@ -202,7 +199,6 @@ public:
 
 private:
   cudaEvent_t event_;
-  cudaStream_t stream_;
 };
 
 }  // namespace cm

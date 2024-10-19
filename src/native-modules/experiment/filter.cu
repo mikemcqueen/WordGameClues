@@ -890,13 +890,13 @@ void run_filter_kernel(int threads_per_block, StreamData& stream,
   // assert_cuda_success(err, "run_filter_kernel sync");
   const dim3 grid_dim(grid_size);
   const dim3 block_dim(block_size);
-  stream.xor_kernel_start.record();
+  stream.xor_kernel_start.record(stream.cuda_stream);
   filter_kernel<<<grid_dim, block_dim, shared_bytes, stream.cuda_stream>>>(
       device_src_indices, int(stream.src_indices.size()),
       stream.device_src_indices, device_compat_src_results, device_results,
       stream.stream_idx);
   assert_cuda_success(cudaPeekAtLastError(), "filter_kernel");
-  stream.xor_kernel_stop.record();
+  stream.xor_kernel_stop.record(stream.cuda_stream);
 
   #if defined(DEBUG_XOR_COUNTS) || defined(DEBUG_OR_COUNTS)
   if (log_level(ExtraVerbose)) {
@@ -911,9 +911,9 @@ void run_filter_kernel(int threads_per_block, StreamData& stream,
 }
 
 void run_get_compatible_sources_kernel(
-    const CompatSourceIndices* device_src_indices, unsigned num_src_indices,
+    const CompatSourceIndices* device_src_indices, size_t num_src_indices,
     const UsedSources::SourceDescriptorPair* device_src_desc_pairs,
-    unsigned num_src_desc_pairs, result_t* device_results,
+    size_t num_src_desc_pairs, result_t* device_results,
     cudaStream_t sync_stream, cudaStream_t stream) {
   int num_sm;
   cudaDeviceGetAttribute(&num_sm, cudaDevAttrMultiProcessorCount, 0);
@@ -932,8 +932,8 @@ void run_get_compatible_sources_kernel(
   cudaError_t err = cudaStreamSynchronize(sync_stream);
   assert_cuda_success(err, "get_compat_sources_kernel sync");
   get_compatible_sources_kernel<<<grid_dim, block_dim, shared_bytes, stream>>>(
-      device_src_indices, num_src_indices, device_src_desc_pairs,
-      num_src_desc_pairs, device_results);
+      device_src_indices, unsigned(num_src_indices), device_src_desc_pairs,
+      unsigned(num_src_desc_pairs), device_results);
   assert_cuda_success(cudaPeekAtLastError(), "get_compat_sources_kernel");
 }
 
