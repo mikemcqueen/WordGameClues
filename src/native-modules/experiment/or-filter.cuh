@@ -7,7 +7,7 @@
 
 namespace cm {
 
-#define ONE_ARRAY
+  //#define ONE_ARRAY
 
 #if 1
 #define CLOCKS
@@ -136,7 +136,7 @@ __device__ auto check_src_compat_results(fat_index_t combo_idx, const T& data) {
   }
   return true;
 }
-
+  
 // faster than UsedSources version
 __device__ __forceinline__ void merge_variations(
     Variations& to, const Variations& from, bool force = false) {
@@ -191,7 +191,7 @@ __device__ inline auto compute_variations_compat_results(
   return any_compat;
 }
 
-constexpr auto kBlockSize = 64;
+constexpr unsigned kBlockSize = 64u;
 
 // compute prefix sums from compat results flag array
 __device__ inline void compute_prefix_sums_in_place(index_t* results,
@@ -209,6 +209,7 @@ __device__ inline void compute_prefix_sums_in_place(index_t* results,
   __shared__ index_t prefix_sum;
   __shared__ index_t last_total;
   if (!threadIdx.x) prefix_sum = 0;
+  __syncthreads();
   for (index_t idx{threadIdx.x}; idx < max_idx; idx += blockDim.x) {
     const auto compat_result = idx < num_results ? results[idx] : 0;
     index_t scan_result;
@@ -270,6 +271,15 @@ __device__ inline auto compact_indices_in_place(index_t* results,
     // copy up to one block of indices to shared memory for this iteration
     if (idx < last_result_idx) {
       if (results[idx] < results[idx + 1]) {
+#if 1
+        if ((results[idx] < first_idx)
+            || (results[idx] - first_idx >= blockDim.x)) {
+          printf("idx %u, blockDim.x %u, num_results %u, max %u, results[idx] "
+                 "%u, first_idx %u, diff %u\n",
+              idx, blockDim.x, num_results, max_idx, results[idx], first_idx,
+              results[idx] - first_idx);
+        }
+#endif
         indices[results[idx] - first_idx] = idx;
       }
       if (threadIdx.x == blockDim.x - 1) { //

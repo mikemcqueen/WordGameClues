@@ -24,9 +24,13 @@
 #include "log.h"
 #include "util.h"
 
+// CompletionTracker
+#include <bitset>
 #include <condition_variable>
 #include <mutex>
-#include <bitset>
+
+// TEST
+#include "cm-hash.h"
 
 namespace cm {
 
@@ -83,8 +87,8 @@ void add_filter_future(std::future<filter_task_result_t>&& filter_future) {
 }
 
 auto get_prior_sum_source_list(int sum) {
-  // NOTE: unncessary copy of primary source list.
-  // introduced when splitting this function out of cuday_alloc_copy_sources
+  // NOTE: unncessary copy of primary source list introduced when splitting
+  // this function out of cuda_alloc_copy_sources.
   auto src_list = (sum == 2)
       ? clue_manager::get_primary_unique_clue_source_list()
       : clue_manager::make_unique_clue_source_list(sum - 1);
@@ -117,11 +121,6 @@ void copy_prior_sum_sources_pointer(int sum,
 
 auto cuda_alloc_copy_prior_sum_sources(int sum, cudaStream_t stream) {
   const auto& src_list = get_prior_sum_source_list(sum);
-
-  SourceCompatibilitySet src_set(src_list.begin(), src_list.end());
-  std::cerr << "***  " << sum - 1 << " ***, sources: " << src_list.size()
-            << ", unique: " << src_set.size() << std::endl;
-
   const auto device_sources = cuda_alloc_copy_sources(src_list, stream);
   copy_prior_sum_sources_pointer(sum, device_sources, stream);
   return src_list.size();
@@ -591,8 +590,17 @@ filter_task_result_t filter_task(FilterData& mfd, FilterParams params) {
   const auto& candidates = get_candidates(params.sum);
   auto t_make = util::Timer::start_timer();
   auto idx_lists = make_variations_sorted_idx_lists(candidates);
-  const auto src_indices = make_compat_src_indices(candidates, idx_lists);
+  auto src_indices = make_compat_src_indices(candidates, idx_lists);
   t_make.stop();
+
+#if 0
+  std::unordered_set<CompatSourceIndices> src_indices_set(src_indices.begin(),
+      src_indices.end());
+  std::cerr << "TEST  " << params.sum
+            << " ***, sources_indices: " << src_indices.size()
+            << ", unique: " << src_indices_set.size() << std::endl;
+#endif
+
   log_make_indices_copy_sources(params, idx_lists, src_indices, t_make,
       num_sources, copy_start, copy_stop);
 
@@ -610,7 +618,7 @@ filter_task_result_t filter_task(FilterData& mfd, FilterParams params) {
   // occurs prior to all prior sum sources being copied, so i'm doing it after.
 
   //
-  // NOTE: we switch streams here! because reasons!
+  // NOTE: we switch streams here! weee! because reasons!
   //
   stream = swarm.at(0).cuda_stream;
   copy_start.record(stream);
@@ -626,6 +634,10 @@ filter_task_result_t filter_task(FilterData& mfd, FilterParams params) {
         device_src_indices, src_indices.size(),
         mfd.device_xor.incompat_src_desc_pairs,
         mfd.host_xor.incompat_src_desc_pairs.size(), sources_stream_, stream);
+#if 1
+    src_indices.clear();
+    src_indices.shrink_to_fit();
+#endif
   } else {
     // TOOD: hate this. the stream story is a mess here. fix.
     cudaStreamSynchronize(sources_stream_);
@@ -777,6 +789,10 @@ void alloc_copy_filter_indices(FilterData& mfd, cudaStream_t stream) {
 
   // these all get allocated within the run_kernel function because they
   // are dependent on grid_size.
+  // TODO: add helper functdion for grid_size and compute these here.
+#if 1
+  mfd.device_xor.variations_compat_results = nullptr;
+#endif
   mfd.device_xor.src_compat_uv_indices = nullptr;
   mfd.device_xor.or_compat_uv_indices = nullptr;
   mfd.device_or.src_compat_results = nullptr;
