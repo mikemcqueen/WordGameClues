@@ -1,8 +1,6 @@
 * i think all of the allocations delayed until run_filter_kernel should be moved to
   filter-support, and there should be a shared function to determine grid_size.
 
-* While i'm at it, a "DeviceAttributes" singleton would be a good idea.
-
 * see if I can manually free the device_src_indices instead of relying on the
   scope_exit which doesn't *appear* to be executing in a timely manner.
   * maybe cuda_free_async as well.
@@ -17,6 +15,11 @@
   even hijack an event out of the StreamData (or add a new sync_event to it).
 
 * cudaMemcpyToSymbol -> cudaMemcpyToSymbolAsync
+
+* consider_candidate slowness.
+  * get_known_source_map_entries(), which is called by for_each_nc_source(), constructs
+    a new list every time it's called. this function is also apparently called directly
+    by index.cpp and combo-maker.cpp.
 
 * compact_uv_indices_in_place is broken!
 
@@ -47,11 +50,6 @@
   when on-demand constructing "secondary" representations of the data. (uniqueClueNames
   is one example, but I think there is also opportunity for get_known_source_map_entries
   as indicated below.
-
-* appears to be some massive inefficiences in clue-manager, in a couple places.
-  1) get_known_source_map_entries(), which is called by for_each_nc_source(), constructs
-     a new list every time it's called. this function is also apparently called directly
-     by index.cpp and combo-maker.cpp.
 
 * I think there's something weird going on in Candidates.cpp. I *should* be generating
   word-pairs that have the *same* sources, because of synonyms, for example. And I had
@@ -200,16 +198,6 @@
 
 // -- Tricky Bidness
 
-* Precompute is taking longer now with -c2,2 and multiple --xors, did I introduce
-  some copying?
-  - nope, problem is combo indices. 11 million of them. multiply x 9 x 8 (72) and
-    that's how many variation indices we allocate (850MB).
-  - we could cut that about in half by only copying the 64-bit combo indices once -
-    that's 11M * 8 bytes = 88MB. then 11M * 9 sentences = ~100M x 4-byte indices.
-    total: 488MB.
-  - at some point, i'll probably see 100M combo indices (800MB) + 900M x 4-byte (3.6B)
-    = ~4.5GB just for variation indices!
-
 * index.cpp:  merge-only=true is used for showComponents() and consistencyCheck V1,
   both of which can be eliminated.
 
@@ -252,7 +240,9 @@
 
 // NEW PERF:
 
-* Experiment with different block sizes for filter-kernel?
+* Experiment with different block sizes for filter-kernel? This would be dependent
+  on an implmentation that uses different templated versions of cub::BlockScan
+  based on block size.
 
 * Move filter_kernel results arrays to global mem? is something else better off
   in shared? figure out exactly how much shared mem i get per SM or per device.
@@ -268,7 +258,7 @@
 
 * had an idea about doubling the stride in streamswarm/indexstates if the
   moving average was 0. i could store 3x 10 bit (1024) kernel-time ms values
-  in a 32-bit word and <<10 out the oldest and add on the (newest&1023)>>20.
+  in a 32-bit word and <<10 out the oldest and add on the (newest&1023).
   so after 3 streams if that value (or the moving average of them) is zero,
   double the stride. actually make sure i have accurate timings on all of
   (fill + copy + copy + update). kernel runtime should be greater than sum

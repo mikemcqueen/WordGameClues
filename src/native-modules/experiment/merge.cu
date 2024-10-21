@@ -3,6 +3,7 @@
 #include <iostream>
 #include <cuda_runtime.h>
 #include "combo-maker.h"
+#include "cuda-device.h"
 #include "merge.cuh"
 #include "peco.h"
 
@@ -132,18 +133,15 @@ int run_list_pair_compat_kernel(const SourceCompatibilityData* device_sources1,
     const index_t* device_indices2, unsigned num_device_indices2,
     result_t* device_compat_results, MergeType merge_type, cudaStream_t stream,
     bool flag) {
-  int num_sm;
-  cudaDeviceGetAttribute(&num_sm, cudaDevAttrMultiProcessorCount, 0);
-  int threads_per_sm;
-  cudaDeviceGetAttribute(&threads_per_sm, cudaDevAttrMaxThreadsPerMultiProcessor, 0);
-  auto block_size = 256; // should be variable probably
-  auto blocks_per_sm = threads_per_sm / block_size;
-  assert(blocks_per_sm * block_size == threads_per_sm);
-  auto grid_size = num_sm * blocks_per_sm;  // aka blocks per grid
-  auto shared_bytes = 0;
+  const auto block_size = 256; // should be variable probably
+  const auto max_threads_per_sm = CudaDevice::get().max_threads_per_sm();
+  const auto blocks_per_sm = max_threads_per_sm / block_size;
+  assert(blocks_per_sm * block_size == max_threads_per_sm);
+  const auto grid_size = CudaDevice::get().num_sm() * blocks_per_sm;
+  const auto shared_bytes = 0;
 
-  dim3 grid_dim(grid_size);
-  dim3 block_dim(block_size);
+  const dim3 grid_dim(grid_size);
+  const dim3 block_dim(block_size);
   list_pair_compat_kernel<<<grid_dim, block_dim, shared_bytes, stream>>>(
       device_sources1, device_sources2, device_indices1, num_device_indices1,
       device_indices2, num_device_indices2, device_compat_results, merge_type,
@@ -158,18 +156,15 @@ int run_get_compat_combos_kernel(uint64_t first_idx, uint64_t num_indices,
     result_t* device_results, cudaStream_t stream, bool flag) {
   assert((num_idx_lists <= kMaxMatrices)
          && "max compat matrix count exceeded (easy fix)");
-  int num_sm;
-  cudaDeviceGetAttribute(&num_sm, cudaDevAttrMultiProcessorCount, 0);
-  int threads_per_sm;
-  cudaDeviceGetAttribute(&threads_per_sm, cudaDevAttrMaxThreadsPerMultiProcessor, 0);
-  auto block_size = 256;
-  auto blocks_per_sm = threads_per_sm / block_size;
-  assert(blocks_per_sm * block_size == threads_per_sm);
-  auto grid_size = num_sm * blocks_per_sm;  // aka blocks per grid
-  auto shared_bytes = 0;
+  const auto block_size = 256;
+  const auto max_threads_per_sm = CudaDevice::get().max_threads_per_sm();
+  const auto blocks_per_sm = max_threads_per_sm / block_size;
+  assert(blocks_per_sm * block_size == max_threads_per_sm);
+  const auto grid_size = CudaDevice::get().num_sm() * blocks_per_sm;
+  const auto shared_bytes = 0;
 
-  dim3 grid_dim(grid_size);
-  dim3 block_dim(block_size);
+  const dim3 grid_dim(grid_size);
+  const dim3 block_dim(block_size);
   get_compat_combos_kernel<<<grid_dim, block_dim, shared_bytes, stream>>>(
       first_idx, num_indices, device_compat_matrices,
       device_compat_matrix_start_indices, device_idx_list_sizes, num_idx_lists,

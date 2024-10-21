@@ -4,10 +4,11 @@
 #include <iostream>
 #include <limits>
 #include <cuda_runtime.h>
+#include "cuda-device.h"
 #include "filter.cuh"
+#include "merge-filter-data.h"
 #include "or-filter.cuh"
 #include "stream-data.h"
-#include "merge-filter-data.h"
 #include "util.h"
 
 namespace cm {
@@ -831,21 +832,16 @@ void copy_filter_data(const FilterData& mfd) {
 void run_filter_kernel(int threads_per_block, StreamData& stream,
     FilterData& mfd, const CompatSourceIndices* device_src_indices,
     const result_t* device_compat_src_results, result_t* device_results) {
-  // TODO: move to device_attr class
-  int num_sm;
-  cudaDeviceGetAttribute(&num_sm, cudaDevAttrMultiProcessorCount, 0);
-  int threads_per_sm;
-  cudaDeviceGetAttribute(&threads_per_sm,
-      cudaDevAttrMaxThreadsPerMultiProcessor, 0);
-
   stream.is_running = true;
   stream.sequence_num = StreamData::next_sequence_num();
 
-  const auto block_size = threads_per_block ? threads_per_block : 64;
-  const auto blocks_per_sm = threads_per_sm / block_size;
-  assert(blocks_per_sm * block_size == threads_per_sm);
-  const auto grid_size = num_sm * blocks_per_sm;  // aka blocks per grid
-  // results could probably be moved to global
+  // hard-code 64 due to cub::BlockScan
+  const auto block_size = 64;  // threads_per_block ? threads_per_block : 64;
+  const auto max_threads_per_sm = CudaDevice::get().max_threads_per_sm();
+  const auto blocks_per_sm = max_threads_per_sm / block_size;
+  assert(blocks_per_sm * block_size == max_threads_per_sm);
+  const auto grid_size = CudaDevice::get().num_sm() * blocks_per_sm;
+  // xor_results could probably be moved to global
   const auto shared_bytes = kSharedIndexCount
           * sizeof(shared_index_t)               // indices
       + kNumSentenceDataBytes * sizeof(uint8_t)  // src_sentence data
@@ -934,19 +930,15 @@ void run_get_compatible_sources_kernel(
     const UsedSources::SourceDescriptorPair* device_src_desc_pairs,
     size_t num_src_desc_pairs, result_t* device_results,
     cudaStream_t sync_stream, cudaStream_t stream) {
-  int num_sm;
-  cudaDeviceGetAttribute(&num_sm, cudaDevAttrMultiProcessorCount, 0);
-  int threads_per_sm;
-  cudaDeviceGetAttribute(&threads_per_sm,
-      cudaDevAttrMaxThreadsPerMultiProcessor, 0);
-  auto block_size = 768;  // aka threads per block
-  auto blocks_per_sm = threads_per_sm / block_size;
-  assert(blocks_per_sm * block_size == threads_per_sm);
-  auto grid_size = num_sm * blocks_per_sm;  // aka blocks per grid
-  auto shared_bytes = 0;
+  const auto block_size = 768;  // aka threads per block
+  const auto max_threads_per_sm = CudaDevice::get().max_threads_per_sm();
+  const auto blocks_per_sm = max_threads_per_sm / block_size;
+  assert(blocks_per_sm * block_size == max_threads_per_sm);
+  const auto grid_size = CudaDevice::get().num_sm() * blocks_per_sm;
+  const auto shared_bytes = 0;
 
-  dim3 grid_dim(grid_size);
-  dim3 block_dim(block_size);
+  const dim3 grid_dim(grid_size);
+  const dim3 block_dim(block_size);
   // ensure any async alloc/copies aee complete on sync stream
   // TODO: change to a event.synchronize. maybe pass in a new 
   // CudaEventStream class?
