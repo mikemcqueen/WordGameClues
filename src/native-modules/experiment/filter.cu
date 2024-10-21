@@ -15,7 +15,7 @@ namespace cm {
 
 __constant__ FilterData::DeviceXor xor_data;
 __constant__ FilterData::DeviceOr or_data;
-__constant__ SourceCompatibilityData* sources_data[32];
+__constant__ SourceCompatibilityData* sources_data[kMaxSums];
 //__constant__ FilterData::DeviceSources sources_data;
 
 #if defined(DEBUG_XOR_COUNTS) || defined(DEBUG_OR_COUNTS)
@@ -809,15 +809,28 @@ __global__ void filter_kernel(
   }
 }
 
-void copy_filter_data(const FilterData& mfd) {
-  cudaError_t err{};
+}  // anonymous namespace
 
+std::pair<int, int> get_filter_kernel_grid_block_sizes() {
+  // hard-code 64 due to cub::BlockScan
+  const auto block_size = 64;  // threads_per_block ? threads_per_block : 64;
+  const auto max_threads_per_sm = CudaDevice::get().max_threads_per_sm();
+  const auto blocks_per_sm = max_threads_per_sm / block_size;
+  assert(blocks_per_sm * block_size == max_threads_per_sm);
+  const auto grid_size = CudaDevice::get().num_sm() * blocks_per_sm;
+  return std::make_pair(grid_size, block_size);
+}
+
+void copy_filter_data_to_symbols(const FilterData& mfd, cudaStream_t stream) {
+  cudaError_t err{};
   const auto xor_bytes = sizeof(FilterData::DeviceXor);
-  err = cudaMemcpyToSymbol(xor_data, &mfd.device_xor, xor_bytes);
+  err = cudaMemcpyToSymbolAsync(xor_data, &mfd.device_xor, xor_bytes, 0,
+      cudaMemcpyHostToDevice, stream);
   assert_cuda_success(err, "copy xor filter data");
 
   const auto or_bytes = sizeof(FilterData::DeviceOr);
-  err = cudaMemcpyToSymbol(or_data, &mfd.device_or, or_bytes);
+  err = cudaMemcpyToSymbolAsync(or_data, &mfd.device_or, or_bytes, 0,
+      cudaMemcpyHostToDevice, stream);
   assert_cuda_success(err, "copy or filter data");
 
   /*
@@ -827,68 +840,18 @@ void copy_filter_data(const FilterData& mfd) {
   */
 }
 
-}  // anonymous namespace
-
-void run_filter_kernel(int threads_per_block, StreamData& stream,
-    FilterData& mfd, const CompatSourceIndices* device_src_indices,
+void run_filter_kernel(int /*threads_per_block*/, StreamData& stream,
+    const CompatSourceIndices* device_src_indices,
     const result_t* device_compat_src_results, result_t* device_results) {
   stream.is_running = true;
   stream.sequence_num = StreamData::next_sequence_num();
 
-  // hard-code 64 due to cub::BlockScan
-  const auto block_size = 64;  // threads_per_block ? threads_per_block : 64;
-  const auto max_threads_per_sm = CudaDevice::get().max_threads_per_sm();
-  const auto blocks_per_sm = max_threads_per_sm / block_size;
-  assert(blocks_per_sm * block_size == max_threads_per_sm);
-  const auto grid_size = CudaDevice::get().num_sm() * blocks_per_sm;
+  const auto [grid_size, block_size] = get_filter_kernel_grid_block_sizes();
   // xor_results could probably be moved to global
   const auto shared_bytes = kSharedIndexCount
           * sizeof(shared_index_t)               // indices
       + kNumSentenceDataBytes * sizeof(uint8_t)  // src_sentence data
       + block_size * sizeof(result_t);           // xor_results
-
-  // TODO: move to helper function
-  // v- Populate any remaining mfd.device_xx values BEFORE copy_filter_data() -v
-  if (!mfd.device_xor.or_compat_uv_indices
-      && mfd.device_or.num_unique_variations) {
-    // NB: these have the potential to grow large as num_variations grow
-    const auto or_indices_bytes = mfd.device_or.num_unique_variations
-        * grid_size * sizeof(index_t);
-    cuda_malloc_async((void**)&mfd.device_xor.or_compat_uv_indices,
-        or_indices_bytes, stream.cuda_stream, "xor.or_compat_uv_indices");
-  }
-  if (!mfd.device_xor.src_compat_uv_indices
-      && mfd.device_xor.num_unique_variations) {
-    const auto src_indices_bytes = mfd.device_xor.num_unique_variations
-        * grid_size * sizeof(index_t);
-    cuda_malloc_async((void**)&mfd.device_xor.src_compat_uv_indices,
-        src_indices_bytes, stream.cuda_stream, "xor.src_compat_uv_indices");
-  }
-#if 1 // !ONE_ARRAY
-  if (!mfd.device_xor.variations_compat_results) {
-    const auto max_uv = std::max(mfd.device_or.num_unique_variations,
-        mfd.device_xor.num_unique_variations);
-    if (max_uv) {
-      const auto results_bytes = max_uv * grid_size * sizeof(index_t);
-      cuda_malloc_async((void**)&mfd.device_xor.variations_compat_results,
-          results_bytes, stream.cuda_stream, "xor.variations_compat_results");
-    }
-    mfd.device_xor.variations_results_per_block = max_uv;
-  }
-#endif
-  if (!mfd.device_or.src_compat_results && mfd.device_or.sum_idx_list_sizes) {
-    const auto or_results_bytes = mfd.device_or.sum_idx_list_sizes * grid_size
-        * sizeof(result_t);
-    cuda_malloc_async((void**)&mfd.device_or.src_compat_results,
-        or_results_bytes, stream.cuda_stream, "or.src_compat_results");
-  }
-  // ^- Populate any reamining mfd.device_xx values BEFORE copy_filter_data() -^
-
-  // TODO: i think this only needs to be done once? like, all of this mfd
-  //       stuff should be done in filter-support, and we should have a
-  //       shared helper function to determine grid_size so that we don't
-  //       have to wait until here to do the allocations.
-  copy_filter_data(mfd);
 
   static bool log_once{true};
   if (log_once) {

@@ -1,6 +1,3 @@
-* i think all of the allocations delayed until run_filter_kernel should be moved to
-  filter-support, and there should be a shared function to determine grid_size.
-
 * see if I can manually free the device_src_indices instead of relying on the
   scope_exit which doesn't *appear* to be executing in a timely manner.
   * maybe cuda_free_async as well.

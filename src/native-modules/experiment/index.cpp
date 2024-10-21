@@ -360,24 +360,23 @@ Value filterPreparation(const CallbackInfo& info) {
   // arg0
   auto nc_data_lists = makeNcDataLists(env, info[0].As<Array>());
   // --
-  auto stream = cudaStreamPerThread;
-  auto or_merge_fail{false};
+  auto success{true};
   MFD.host_or.src_lists = std::move(build_src_lists(nc_data_lists));
   if (MFD.host_or.src_lists.size()) {
     if (!get_merge_data(MFD.host_or.src_lists, MFD.host_or, MFD.device_or,
-            MergeType::OR, stream)) {
+            MergeType::OR, cudaStreamPerThread)) {
       std::cerr << "failed to merge OR args" << std::endl;
-      or_merge_fail = true;
+      success = false;
     } else {
       build_unique_variations(MFD.host_or, "OR");
     }
   }
-  if (!or_merge_fail) {
+  if (success) {
     build_unique_variations(MFD.host_xor, "XOR");
-    alloc_copy_filter_indices(MFD, stream);
+    filter_init(MFD);
     cuda_memory_dump("filter preparation");
   }
-  return Boolean::New(env, !or_merge_fail);
+  return Boolean::New(env, success);
 }
 
 //
@@ -431,9 +430,6 @@ Value filterCandidatesForSum(const CallbackInfo& info) {
   // free memory. now is a good opportunity to save candidate counts for this
   // sum so we can access it later.
   save_current_candidate_counts(sum);
-  // do any filter initialization required for filters of any sum. a lil hacky
-  // to depend on sum==2 for that condition.
-  if (sum == 2) filter_init();
 
   const auto opt_incompat_sources = filter_candidates_cuda(MFD, filter_params);
   assert(filter_params.synchronous == opt_incompat_sources.has_value());
@@ -454,7 +450,7 @@ Value getResult(const CallbackInfo& info) {
   // free all device data
   MFD.device_xor.cuda_free();
   MFD.device_or.cuda_free();
-  // mirrors filter_init() in filterCandidatesForSum()
+  // mirrors filter_init() in filterPreparation()
   filter_cleanup();
   cuda_memory_dump("filter complete");
   return wrap(env, result);

@@ -100,8 +100,8 @@ void copy_prior_sum_sources_pointer(int sum,
   // copy pointer to constant memory
   //stream;
   const auto ptr_size = sizeof(SourceCompatibilityData*);
-  const auto err = cudaMemcpyToSymbol(sources_data, &device_sources, ptr_size,
-      (sum - 1) * ptr_size);
+  const auto err = cudaMemcpyToSymbolAsync(sources_data, &device_sources,
+      ptr_size, (sum - 1) * ptr_size, cudaMemcpyHostToDevice, stream);
   assert_cuda_success(err, "copy prior sum sources pointer");
 }
 
@@ -342,7 +342,7 @@ void log_filter_kernel(int sum, const StreamData& stream,
 // and the number of xor-compatible sources. (TODO: compatible with what)
 //
 auto run_concurrent_filter_kernels(int sum, StreamSwarm& swarm,
-    int threads_per_block, IndexStates& idx_states, FilterData& mfd,
+    int threads_per_block, IndexStates& idx_states,
     const CompatSourceIndices* device_src_indices,
     const result_t* device_compat_src_results, result_t* device_results,
     std::vector<result_t>& results) {
@@ -363,7 +363,7 @@ auto run_concurrent_filter_kernels(int sum, StreamSwarm& swarm,
         t.stop();
         log_fill_indices(sum, stream, idx_states, t.microseconds());
         stream.alloc_copy_source_indices();
-        run_filter_kernel(threads_per_block, stream, mfd, device_src_indices,
+        run_filter_kernel(threads_per_block, stream, device_src_indices,
             device_compat_src_results, device_results);
       }
     } else {
@@ -443,7 +443,7 @@ void log_filter_sources(int sum, int num_processed, int num_compat,
 //
 // Returns a pair<compat_combo_string_set, incompat_sources_set>
 //
-filter_task_result_t filter_sources(FilterData& mfd,
+filter_task_result_t filter_sources(
     const CompatSourceIndices* device_src_indices,
     const result_t* device_compat_src_results,
     std::vector<IndexList>& idx_lists, const FilterParams& params,
@@ -476,7 +476,7 @@ filter_task_result_t filter_sources(FilterData& mfd,
   auto t = util::Timer::start_timer();
   const auto [num_processed, num_compat] =  //
       run_concurrent_filter_kernels(params.sum, swarm, params.threads_per_block,
-          idx_states, mfd, device_src_indices, device_compat_src_results,
+          idx_states, device_src_indices, device_compat_src_results,
           device_results, results);
   t.stop();
   CompatSourceIndicesSet incompat_src_indices;
@@ -642,7 +642,7 @@ filter_task_result_t filter_task(FilterData& mfd, FilterParams params) {
     // TOOD: hate this. the stream story is a mess here. fix.
     cudaStreamSynchronize(sources_stream_);
   }
-  auto filter_result = filter_sources(mfd, device_src_indices,
+  auto filter_result = filter_sources(device_src_indices,
       device_compat_src_results, idx_lists, params, swarm);
   swarm_pool_.release(swarm);
   // free host memory associated with candidates
@@ -712,6 +712,63 @@ void alloc_copy_unique_variations(FilterData::HostCommon& host,
   device.num_unique_variations = int(host.unique_variations.size());
 }
 
+void alloc_copy_common_filter_data(FilterData::HostCommon& host,
+    FilterData::DeviceCommon& device, cudaStream_t stream,
+    std::string_view tag) {
+  alloc_copy_start_indices(host, device, stream);
+  alloc_copy_compat_indices(host, device, stream);
+  std::string uv_tag = std::string(tag) + ".unique_variations";
+  alloc_copy_unique_variations(host, device, stream, uv_tag);
+}
+
+void alloc_filter_buffers(FilterData& mfd, cudaStream_t stream) {
+  const auto [grid_size, _] = get_filter_kernel_grid_block_sizes();
+  if (mfd.device_or.num_unique_variations) {
+    // NB: these have the potential to grow large as num_variations grow
+    const auto or_indices_bytes = mfd.device_or.num_unique_variations
+        * grid_size * sizeof(index_t);
+    cuda_malloc_async((void**)&mfd.device_xor.or_compat_uv_indices,
+        or_indices_bytes, stream, "xor.or_compat_uv_indices");
+  }
+  if (mfd.device_xor.num_unique_variations) {
+    const auto src_indices_bytes = mfd.device_xor.num_unique_variations
+        * grid_size * sizeof(index_t);
+    cuda_malloc_async((void**)&mfd.device_xor.src_compat_uv_indices,
+        src_indices_bytes, stream, "xor.src_compat_uv_indices");
+  }
+#if 1 // !ONE_ARRAY
+  const auto max_uv = std::max(mfd.device_or.num_unique_variations,
+      mfd.device_xor.num_unique_variations);
+  if (max_uv) {
+    const auto results_bytes = max_uv * grid_size * sizeof(index_t);
+    cuda_malloc_async((void**)&mfd.device_xor.variations_compat_results,
+        results_bytes, stream, "xor.variations_compat_results");
+  }
+  mfd.device_xor.variations_results_per_block = max_uv;
+#endif
+  if (mfd.device_or.sum_idx_list_sizes) {
+    const auto or_results_bytes = mfd.device_or.sum_idx_list_sizes * grid_size
+        * sizeof(result_t);
+    cuda_malloc_async((void**)&mfd.device_or.src_compat_results,
+        or_results_bytes, stream, "or.src_compat_results");
+  }
+}
+
+void alloc_copy_filter_data(FilterData& mfd, cudaStream_t stream) {
+  assert(!mfd.host_xor.compat_indices.empty()); // arbitrary
+  util::LogDuration ld("alloc_copy_filter_data", Verbose);
+  alloc_copy_common_filter_data(mfd.host_xor, mfd.device_xor, stream, "xor");
+  if (!mfd.host_or.compat_indices.empty()) {
+    alloc_copy_common_filter_data(mfd.host_or, mfd.device_or, stream, "or");
+  } else {
+    // TODO: cuda_free(), assuming we reset_pointers somewhere earlier.
+    mfd.device_or.reset_pointers();
+  }
+  // call alloc_filter_buffers *AFTER* alloc_copy_common_filter_data, because
+  // some necessary values get initialized in mfd.
+  alloc_filter_buffers(mfd, sources_stream_);
+}
+
 }  // anonymous namespace
 
 auto filter_candidates_cuda(FilterData& mfd, const FilterParams& params)
@@ -769,38 +826,12 @@ void set_incompatible_sources(FilterData& mfd,
           mfd.host_xor.incompat_src_desc_pairs, stream);
 }
 
-void alloc_copy_filter_indices(FilterData& mfd, cudaStream_t stream) {
-  assert(!mfd.host_xor.compat_indices.empty()); // arbitrary
-  util::LogDuration ld("alloc_copy_filter_indices", Verbose);
-  alloc_copy_start_indices(mfd.host_xor, mfd.device_xor, stream);
-  alloc_copy_compat_indices(mfd.host_xor, mfd.device_xor, stream);
-  alloc_copy_unique_variations(mfd.host_xor, mfd.device_xor, stream,
-      "xor unique_variations");
-
-  if (!mfd.host_or.compat_indices.empty()) {
-    alloc_copy_start_indices(mfd.host_or, mfd.device_or, stream);
-    alloc_copy_compat_indices(mfd.host_or, mfd.device_or, stream);
-    alloc_copy_unique_variations(mfd.host_or, mfd.device_or, stream,
-        "or unique_variations");
-  } else {
-    // TODO: cuda_free(), assuming we reset_pointers somewhere earlier.
-    mfd.device_or.reset_pointers();
-  }
-
-  // these all get allocated within the run_kernel function because they
-  // are dependent on grid_size.
-  // TODO: add helper functdion for grid_size and compute these here.
-#if 1
-  mfd.device_xor.variations_compat_results = nullptr;
-#endif
-  mfd.device_xor.src_compat_uv_indices = nullptr;
-  mfd.device_xor.or_compat_uv_indices = nullptr;
-  mfd.device_or.src_compat_results = nullptr;
-}
-
-void filter_init() {
+void filter_init(FilterData& mfd) {
+  assert(!sources_stream_);
   auto err = cudaStreamCreate(&sources_stream_);
   assert_cuda_success(err, "create sources_stream");
+  alloc_copy_filter_data(mfd, sources_stream_);
+  copy_filter_data_to_symbols(mfd, sources_stream_);
 }
 
 void filter_cleanup() {
