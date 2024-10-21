@@ -909,10 +909,6 @@ void run_filter_kernel(int threads_per_block, StreamData& stream,
   // assert_cuda_success(err, "run_filter_kernel sync");
   const dim3 grid_dim(grid_size);
   const dim3 block_dim(block_size);
-#if 1
-  auto err = cudaDeviceSynchronize();
-  assert_cuda_success(err, "filter_kernel sync");
-#endif
   stream.xor_kernel_start.record(stream.cuda_stream);
   filter_kernel<<<grid_dim, block_dim, shared_bytes, stream.cuda_stream>>>(
       device_src_indices, int(stream.src_indices.size()),
@@ -952,11 +948,9 @@ void run_get_compatible_sources_kernel(
   dim3 grid_dim(grid_size);
   dim3 block_dim(block_size);
   // ensure any async alloc/copies aee complete on sync stream
-#if 1
-  auto err = cudaDeviceSynchronize();
-#else
+  // TODO: change to a event.synchronize. maybe pass in a new 
+  // CudaEventStream class?
   auto err = cudaStreamSynchronize(sync_stream);
-#endif
   assert_cuda_success(err, "get_compat_sources_kernel sync");
   get_compatible_sources_kernel<<<grid_dim, block_dim, shared_bytes, stream>>>(
       device_src_indices, unsigned(num_src_indices), device_src_desc_pairs,

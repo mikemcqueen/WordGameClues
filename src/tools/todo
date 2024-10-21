@@ -1,16 +1,24 @@
-* -c2,15 is still oom with low --xor count and no --or.
-
 * i think all of the allocations delayed until run_filter_kernel should be moved to
   filter-support, and there should be a shared function to determine grid_size.
 
-* unique_sources implementation issues:
-  * validation failures. possibly because hash/equal_to of SourceData is wrong (doesn't
-    take into account ncList, maybe).
-  * Increased xor.src_compat_uv_indices count (grep src_compat_uv log.memory.old vs.
-    log.memory.unique_sources).
-  * I want to *decrease* xor.src_compat_uv_indices, not increase it. Why is it increasing,
-    and how do I decrease it?
-  * so i did the comparison of 
+* While i'm at it, a "DeviceAttributes" singleton would be a good idea.
+
+* see if I can manually free the device_src_indices instead of relying on the
+  scope_exit which doesn't *appear* to be executing in a timely manner.
+  * maybe cuda_free_async as well.
+
+* re-structure filter-task so it calls 2 or 3 separate functions, to logically divide
+  the work being done there better. it's a bit of a mess of shifting state throughout
+  the function atm.
+  
+* there's an idea for using a CudaStreamEvent to pair a CudaEvent (or cudaEvent_t)
+  with a cudaStream_t such that I can record the event after the last copy, and synchronize
+  it wherever, later (like in run_get_compatible_results_kernel). I could potentially
+  even hijack an event out of the StreamData (or add a new sync_event to it).
+
+* cudaMemcpyToSymbol -> cudaMemcpyToSymbolAsync
+
+* compact_uv_indices_in_place is broken!
 
 * ok something weird with --max-sources. it actually changes the number of valid results,
   for a -c2 for example. it also seems to, naturally(?), increase the number of XOR sources.
@@ -26,14 +34,13 @@
   * maybe think about how i might support -cLARGE with --max-sources *smaller* than
     LARGE-1. not a priority though, i should't really be playing with those sizes.
 
+* unique_sources implementation issues:
+  * validation failures. possibly because hash/equal_to of SourceData is wrong (doesn't
+    take into account ncList, maybe).
+
 * still some cudaStreamPerThread usage in index.cpp. which means if things currently
   work, they are working somewhat "accidentally" unless I put in a synchronize call
   on that stream: cudaStreamSynchronize(cudaStreamPerThread) somewhere.
-
-* There is a larger issue with streams as well. And possible CompletionRecorder thingy
-  isn't working as I expected, spurious memory access failures.
-
-* cudaMemcpyToSymbol -> cudaMemcpyToSymbolAsync
 
 * I should implement some kind of "freeze" mechanism on some of the data structures in
   clue-manager, such that I can assert(!frozen) when adding new elements, and freeze
