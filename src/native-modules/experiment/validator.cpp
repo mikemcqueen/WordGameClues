@@ -4,6 +4,7 @@
 #include <iostream>
 #include "clue-manager.h"
 #include "combo-maker.h"
+#include "known-sources.h"
 #include "peco.h"
 #include "util.h"
 #include "validator.h"
@@ -16,9 +17,9 @@ auto validateSourceNamesAtCounts(const std::string& clue_name,
     const std::vector<std::string>& src_names, std::vector<int> count_list,
     NameCountList& nc_list) -> SourceList {
   auto src_cref_list0 =
-      clue_manager::make_src_cref_list(src_names.at(0), count_list.at(0));
+      KnownSources::make_src_cref_list(src_names.at(0), count_list.at(0));
   auto src_cref_list1 =
-      clue_manager::make_src_cref_list(src_names.at(1), count_list.at(1));
+      KnownSources::make_src_cref_list(src_names.at(1), count_list.at(1));
   // NOTE: in order to support more than 2 sources here, we'd probably have
   // to bite the bullet and merge sources in lists 0,1 then then merge the
   // resulting list with sources from list 2, and so on.

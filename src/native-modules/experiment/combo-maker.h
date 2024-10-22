@@ -19,9 +19,6 @@
 
 namespace cm {
 
-  //constexpr auto kMaxSourcesPerSentence = 32;
-  //constexpr auto kNumSentences = 9;
-
 template<typename T, size_t N>
 constexpr auto make_array(T value) -> std::array<T, N> {
   std::array<T, N> a{};
@@ -37,7 +34,7 @@ namespace Source {
 constexpr inline auto isCandidate(int src) noexcept  { return src >= 1'000'000; }
 constexpr inline auto getSentence(int src) noexcept  { return src / 1'000'000; }
 constexpr inline auto getSource(int src) noexcept    { return src % 1'000'000; }
-constexpr inline auto getVariation(int src) noexcept { return variation_index_t(getSource(src) / 100); }
+constexpr inline auto getVariation(int src) noexcept { return static_cast<variation_index_t>(getSource(src) / 100); }
 constexpr inline auto getIndex(int src) noexcept     { return getSource(src) % 100; }
 // clang-format on
 
@@ -56,7 +53,8 @@ struct UsedSources {
     }
 
     constexpr void dump() const {
-      printf("sentence %d, variation %d, bit_pos %d\n", (int)sentence, (int)variation, (int)bit_pos);
+      printf("sentence %d, variation %d, bit_pos %d\n", (int)sentence,
+          (int)variation, (int)bit_pos);
     }
 
     std::string toString() const {
@@ -134,7 +132,7 @@ struct UsedSources {
   */
 
 private:
-  constexpr void addVariations(const UsedSources& other) {
+  constexpr auto addVariations(const UsedSources& other) {
     for (int sentence{1}; sentence <= kNumSentences; ++sentence) {
       if (!other.hasVariation(sentence)) continue;
       // ensure variations for this sentence are compatible
@@ -142,12 +140,14 @@ private:
         if (getVariation(sentence) != other.getVariation(sentence)) {
           printf("Variation Mismatch sentence %d, this %hd, other %hd\n",
               sentence, getVariation(sentence), other.getVariation(sentence));
+          return false;
         }          
-        assert(getVariation(sentence) == other.getVariation(sentence));
+        //assert(getVariation(sentence) == other.getVariation(sentence));
       } else {
         setVariation(sentence, other.getVariation(sentence));
       }
     }
+    return true;
   }
 
 public:
@@ -263,7 +263,7 @@ public:
     // merge bits
     getBits() |= other.getBits();
     // merge variations.
-    addVariations(other);
+    return addVariations(other);
   }
 
   auto copyMerge(const UsedSources& other) const {
@@ -499,7 +499,8 @@ struct NameCount {
   }
 
   // yeah not pretty, i was in a hurry
-  static std::string makeString(const std::string& name1, const std::string& name2) {
+  static std::string makeString(const std::string& name1,
+      const std::string& name2) {
     char buf[32];
     snprintf(buf, sizeof(buf), "%s,%s", name1.c_str(), name2.c_str());
     return buf;

@@ -221,7 +221,7 @@ __device__ auto is_any_OR_source_compatible(
     }
     xor_variations[threadIdx.x] = get_one_variation(threadIdx.x, xor_combo_idx);
   }
-  // compute_compat will call __sync
+  // compute_compat will call __syncthreads
   const auto num_uv_indices = compute_compat_OR_uv_indices(xor_variations);
   if (!num_uv_indices) return false;
   for (index_t or_chunk_idx{};

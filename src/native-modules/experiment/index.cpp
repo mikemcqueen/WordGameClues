@@ -16,6 +16,7 @@
 #include "dump.h"
 #include "filter.cuh"
 #include "filter.h"
+#include "known-sources.h"
 #include "merge.h"
 #include "merge-filter-common.h"
 #include "merge-filter-data.h"
@@ -30,6 +31,7 @@
 namespace cm {
 // combo-maker.cpp
 void compute_combos_for_sum(int sum, int max);
+long get_consider_duration();
 }
 
 namespace {
@@ -107,8 +109,7 @@ Value isKnownSourceMapEntry(const CallbackInfo& info) {
   // arg1
   auto src_csv = info[1].As<String>().Utf8Value();
   // --
-  return Boolean::New(
-    env, clue_manager::is_known_source_map_entry(count, src_csv));
+  return Boolean::New(env, KnownSources::get().has_entries_for(count, src_csv));
 }
 
 void show_device_state() {
@@ -142,7 +143,7 @@ Value addCompoundClue(const CallbackInfo& info) {
   // arg1
   auto src_csv = info[1].As<String>().Utf8Value();
   // --
-  clue_manager::add_compound_clue(nc, src_csv);
+  KnownSources::add_compound_clue(nc, src_csv);
 
   // arbitrary to put it here; just somewhere early
   //show_device_state();
@@ -176,8 +177,8 @@ Value validateSources(const CallbackInfo& info) {
   validate_ns += t.nanoseconds();
   const auto is_valid_src_list = !src_list.empty();
   if (validate_all && is_valid_src_list) {
-    clue_manager::init_known_source_map_entry(
-        sum, util::join(src_names, ","), std::move(src_list));
+    KnownSources::get().init_entry(sum, util::join(src_names, ","),
+        std::move(src_list));
   }
   return Boolean::New(env, is_valid_src_list);
 }
@@ -453,6 +454,8 @@ Value getResult(const CallbackInfo& info) {
   // mirrors filter_init() in filterPreparation()
   filter_cleanup();
   cuda_memory_dump("filter complete");
+  std::cerr << "total consider(C++) duration - " << get_consider_duration()
+            << "ms\n";
   return wrap(env, result);
 }
 

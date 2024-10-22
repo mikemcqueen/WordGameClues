@@ -1,5 +1,6 @@
 // combo-maker.cpp
 
+#include <atomic>
 #include <cassert>
 #include <optional>
 #include "candidates.h"
@@ -113,6 +114,8 @@ void test_unique_clue_sources(int sum) {
 
 }  // anonymous namespace
 
+std::atomic<long> consider_duration_ = 0;
+
 // Given a sum, such as 4, and a max # of numbers to combine, such as 4,
 // generate an array of addend arrays ("count lists"), for each 2 <= N <= max,
 // that add up to that sum, such as [ [1, 3], [2, 2], [1, 1, 2], [1, 1, 1, 1] ]
@@ -143,9 +146,12 @@ void compute_combos_for_sum(int sum, int max) {
               << " candidates(" << num_candidates << ") - " << t.count()
               << "ms\n";
   }
+  consider_duration_.fetch_add(t.count());
   //  Native.filterCandidatesForSum(sum, args.tpb, args.streams, args.stride,
   //      args.iters, args.synchronous);
 }
+
+long get_consider_duration() { return consider_duration_; }
 
 /*
 export const makeCombosForSum = (sum: number, args: any,

@@ -46,8 +46,7 @@ Array wrap(Env& env, const XorSourceList& xorSourceList) {
   return jsList;
 }
 
-Array wrap(Env& env,
-  std::vector<clue_manager::KnownSourceMapValueCRef> cref_entries) {
+Array wrap(Env& env, const std::vector<KnownSources::EntryCRef>& cref_entries) {
   //
   Array jsList = Array::New(env, cref_entries.size());
   for (uint32_t i{}; i < cref_entries.size(); ++i) {

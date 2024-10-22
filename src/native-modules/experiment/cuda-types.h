@@ -140,7 +140,7 @@ template <typename T = result_t>
     cudaStream_t stream = cudaStreamPerThread,
     std::string_view tag = "results") {
   // alloc results
-  auto results_bytes = num_results * sizeof(T);
+  const auto results_bytes = num_results * sizeof(T);
   T* device_results;
   cuda_malloc_async((void**)&device_results, results_bytes, stream, tag);
   return device_results;
@@ -150,7 +150,7 @@ template <typename T = result_t>
 inline void cuda_zero_results(
   T* results, size_t num_results, cudaStream_t stream) {
   // memset results to zero
-  auto num_bytes = num_results * sizeof(T);
+  const auto num_bytes = num_results * sizeof(T);
   cudaError_t err = cudaMemsetAsync(results, 0, num_bytes, stream);
   assert_cuda_success(err, "zero results");
 }

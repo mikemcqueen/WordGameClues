@@ -11,7 +11,8 @@
 #include <napi.h>
 #include "combo-maker.h"
 #include "candidates.h"
-#include "clue-manager.h"
+#include "known-sources.h"
+//#include "clue-manager.h"
 
 namespace cm {
 
@@ -23,7 +24,7 @@ Napi::Object wrap(
 Napi::Object wrap(Napi::Env& env, const XorSource& xorSource);
 Napi::Array wrap(Napi::Env& env, const XorSourceList& xorSourceList);
 Napi::Array wrap(Napi::Env& env,
-    std::vector<clue_manager::KnownSourceMapValueCRef> cref_entries);
+    const std::vector<KnownSources::EntryCRef>& cref_entries);
 
 // combine two or three of these with templated forward delcarations?
 // TODO: combine int one as well

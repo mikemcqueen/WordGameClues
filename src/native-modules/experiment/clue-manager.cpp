@@ -6,6 +6,7 @@
 #include <unordered_set>
 #include <vector>
 #include "clue-manager.h"
+#include "known-sources.h"
 #include "util.h"
 #include "log.h"
 
@@ -19,7 +20,7 @@ namespace {
 
 using PrimaryNameSrcIndicesMap = std::unordered_map<std::string, IndexList>;
 // TODO: CompoundSrcSourceListMap
-using KnownSourceMap = std::unordered_map<std::string, KnownSourceMapValue>;
+//using KnownSourceMap = std::unordered_map<std::string, KnownSourceMapValue>;
 // using StringCRefList = std::vector<std::reference_wrapper<const std::string>>;
 
 //
@@ -33,7 +34,7 @@ PrimaryNameSrcIndicesMap primaryNameSrcIndicesMap_;
 std::vector<NameSourcesMap> nameSourcesMaps;
 
 // map source_csv -> { src_list, clue_names_set } for each count
-std::vector<KnownSourceMap> knownSourceMaps;
+//std::vector<KnownSourceMap> knownSourceMaps;
 
 // populated on demand from primaryNameSrcIndicesMap/nameSrcMaps
 std::vector<NameCountList> uniqueClueNames_;
@@ -41,10 +42,6 @@ std::vector<NameCountList> uniqueClueNames_;
 SourceCompatibilityList uniquePrimaryClueSrcList_;
 
 // nameSourcesMap
-
-const auto& get_name_sources_map(int count) {
-  return nameSourcesMaps.at(count - 1);
-}
 
 auto build_primary_name_sources_map(
     const PrimaryNameSrcIndicesMap& name_src_indices_map) {
@@ -62,7 +59,7 @@ auto build_primary_name_sources_map(
 
 // knownSourceMap
 
-
+/*
 auto& get_known_source_map(int count, bool force_create = false) {
   // allow force-creates exactly in-sequence only, or throw an exception
   const auto idx = count - 1;
@@ -71,6 +68,7 @@ auto& get_known_source_map(int count, bool force_create = false) {
   }
   return knownSourceMaps.at(idx);
 }
+*/
 
 // Initialize entries of knownSourceMaps_[0] and populate the src_list fields.
 void init_primary_known_source_map(
@@ -83,7 +81,7 @@ void init_primary_known_source_map(
       const auto name_src = name + ":" + sources.at(idx);
       // TODO: questionable behavior. I think we need to add all varitions now,
       // at leat if the names are different.
-      if (is_known_source_map_entry(1, name_src)) {
+      if (KnownSources::get().has_entries_for(1, name_src)) {
         // or abort?
         std::cerr << "skip adding '" << name << "' as known primary source " << name_src
                   << std::endl;
@@ -102,7 +100,7 @@ void init_primary_known_source_map(
       src_list.emplace_back(used_sources, std::move(primary_name_src_list),
           std::move(nc_list), std::move(nc_names));
       // TODO: std::move(name_src), param as r-value reference
-      init_known_source_map_entry(1, name_src, std::move(src_list));
+      KnownSources::get().init_entry(1, name_src, std::move(src_list));
     }
   }
 }
@@ -176,6 +174,11 @@ const IndexList& getPrimaryClueSrcIndices(const std::string& name) {
 // nameSourcesMaps
 //
 
+auto get_name_sources_map(int count) -> const NameSourcesMap& {
+  return nameSourcesMaps.at(count - 1);
+}
+
+/*
 void init_known_source_map_entry(
     int count, const std::string source, SourceList&& src_list) {
   // True is arbitrary here. I *could* support replacing an existing src_list,
@@ -189,6 +192,7 @@ void init_known_source_map_entry(
   }
   assert(success);
 }
+*/
 
 void set_name_sources_map(int count, NameSourcesMap&& name_sources_map) {
   auto idx = count - 1;
@@ -222,6 +226,7 @@ const std::vector<std::string>& get_nc_sources(const NameCount& nc) {
 }
   */
 
+/*
 //
 // knownSourceMaps
 //
@@ -247,17 +252,12 @@ auto get_known_source_map_entry(int count, const std::string& source)
   return it->second;
 }
 
-auto append(
-    const std::string& s1, const std::string& s2, const std::string& s3) {
-  return s1 + s2 + s3;
-}
-
 auto get_known_source_map_entries(const std::string& name,
     int count) -> std::vector<KnownSourceMapValueCRef> {
   std::vector<KnownSourceMapValueCRef> cref_entries;
   const auto& name_sources_map = get_name_sources_map(count);
   for (const auto& source : name_sources_map.at(name)) {
-    const auto& key = count > 1 ? source : append(name, ":", source);
+    const auto& key = count > 1 ? source : util::append(name, ":", source);
     cref_entries.push_back(
         std::cref(get_known_source_map_entry(count, key)));
   }
@@ -274,6 +274,7 @@ bool add_compound_clue(
   get_known_source_map_entry(nc.count, sources_csv).clue_names.emplace(nc.name);
   return true;
 }
+*/
 
 //
 // uniqueClueNames
@@ -297,8 +298,8 @@ SourceCompatibilityList make_unique_clue_source_list(int count) {
   for (int idx{}; idx < get_num_unique_clue_names(count); ++idx) {
     const auto& name = get_unique_clue_name(count, idx);
     for (const auto& source : name_sources_map.at(name)) {
-      const auto& key = count > 1 ? source : append(name, ":", source);
-      const auto& src_list = get_known_source_map_entry(count, key).src_list;
+      const auto& key = count > 1 ? source : util::append(name, ":", source);
+      const auto& src_list = KnownSources::get().get_entry(count, key).src_list;
       unique_src_list.insert(unique_src_list.end(), src_list.begin(), src_list.end());
     }
   }
@@ -325,8 +326,8 @@ int get_num_unique_clue_sources(int count, const std::string& name) {
   int num_sources{};
   const auto& name_sources_map = get_name_sources_map(count);
   for (const auto& source : name_sources_map.at(name)) {
-    const auto& key = count > 1 ? source : append(name, ":", source);
-    const auto& src_list = get_known_source_map_entry(count, key).src_list;
+    const auto& key = count > 1 ? source : util::append(name, ":", source);
+    const auto& src_list = KnownSources::get().get_entry(count, key).src_list;
     num_sources += int(src_list.size());
   }
   return num_sources;
@@ -357,16 +358,15 @@ inline void for_each_source_map_entry(
 
 auto make_src_list(const NameCount& nc) -> cm::SourceList {
   SourceList src_list;
-  for_each_nc_source(nc, [&src_list](const SourceData& src, index_t) {  //
-    src_list.push_back(src);
-  });
+  KnownSources::for_each_nc_source(nc,
+      [&src_list](const SourceData& src, index_t) { src_list.push_back(src); });
   return src_list;
 }
 
 auto make_src_cref_list(const std::string& name,
     int count) -> cm::SourceCRefList {
   SourceCRefList src_cref_list;
-  for_each_nc_source(name, count,
+  KnownSources::for_each_nc_source(name, count,
       [&src_cref_list](const SourceData& src, index_t) {
         src_cref_list.push_back(std::cref(src));
       });
@@ -433,6 +433,7 @@ void dump_memory(std::string_view header /* = "clue_manager memory:" */) {
   // KnownSourceMapValue>; std::vector<KnownSourceMap> knownSourceMaps;
   size_t known_source_maps_size{};
   size_t num_known_source_maps_sources{};
+  /* TODO
   for (const auto& m : knownSourceMaps) {
     for (const auto& p : m) {
       size_t s{p.first.size()};
@@ -444,6 +445,7 @@ void dump_memory(std::string_view header /* = "clue_manager memory:" */) {
       known_source_maps_size += s;
     }
   }
+  */
 
   // not counted yet
   // std::vector<StringCRefList> uniqueClueNames;

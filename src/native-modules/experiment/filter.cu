@@ -383,7 +383,6 @@ __device__ bool sources_match_any_descriptor_pair(
     const SourceCompatibilityData& source2,
     const UsedSources::SourceDescriptorPair* RESTRICT src_desc_pairs,
     const unsigned num_src_desc_pairs) {
-
   __shared__ bool match;
   if (!threadIdx.x) match = false;
   __syncthreads();
@@ -403,6 +402,30 @@ __device__ bool sources_match_any_descriptor_pair(
   }
   return false;
 }
+
+#if 1
+__global__ void get_compatible_sources_kernel(
+    const CompatSourceIndices* RESTRICT compat_src_indices,
+    const unsigned num_compat_src_indices,
+    const UsedSources::SourceDescriptorPair* RESTRICT incompat_src_desc_pairs,
+    const unsigned num_src_desc_pairs, result_t* RESTRICT results) {
+  // one block per source-(index)-pair
+  for (unsigned idx{blockIdx.x}; idx < num_compat_src_indices;
+      idx += gridDim.x) {
+    const auto csi = compat_src_indices[idx];
+    const auto& source1 =
+        sources_data[csi.first().count()][csi.first().index()];
+    const auto& source2 =
+        sources_data[csi.second().count()][csi.second().index()];
+    __syncthreads();
+    if (!sources_match_any_descriptor_pair(source1, source2,
+            incompat_src_desc_pairs, num_src_desc_pairs)) {
+      if (!threadIdx.x) { results[idx] = 1; }
+    }
+  }
+}
+
+#else
 
 // "filter compatible sources"
 __global__ void get_compatible_sources_kernel(
@@ -429,6 +452,7 @@ __global__ void get_compatible_sources_kernel(
     }
   }
 }
+#endif
 
 __device__ SourceIndex get_source_index(index_t idx,
     const MergeData::Device& data) {
@@ -782,7 +806,9 @@ __global__ void filter_kernel(
 #endif
 
 #if MAX_SOURCES
-  num_sources = num_sources < MAX_SOURCES ? num_sources : MAX_SOURCES;
+    if (num_compat_src_indices >= MAX_SOURCES) {
+      num_compat_src_indices = MAX_SOURCES;
+    }
 #endif
   // for each source (one block per source)
   for (index_t idx{blockIdx.x}; idx < num_compat_src_indices;
@@ -790,14 +816,21 @@ __global__ void filter_kernel(
     __syncthreads();
     const auto src_idx = src_indices[idx];
     if (!compat_src_results || compat_src_results[src_idx.index]) {
-      dynamic_shared[kSrcListIdx] = src_idx.listIndex;
-      dynamic_shared[kSrcIdx] = src_idx.index;
       if (!threadIdx.x) {
+        dynamic_shared[kSrcListIdx] = src_idx.listIndex;
+        dynamic_shared[kSrcIdx] = src_idx.index;
         const auto csi1 = compat_src_indices[src_idx.index].first();
         const auto csi2 = compat_src_indices[src_idx.index].second();
         // TODO: compare to source.reset() followed by 2x mergeInPlace
         source = sources_data[csi1.count()][csi1.index()];
-        source.mergeInPlace(sources_data[csi2.count()][csi2.index()]);
+        if (!source.usedSources.mergeInPlace(
+                sources_data[csi2.count()][csi2.index()].usedSources)) {
+          printf("idx %u, num_indices %u, src_idx.listIndex %u, src_idx.index "
+                 "%u, csi1 count %u index %u, csi2 count %u index %u\n",
+              idx, num_compat_src_indices, src_idx.listIndex, src_idx.index,
+              csi1.count(), csi1.index(), csi2.count(), csi2.index());
+        }
+        // sync happens inside is_compat_loop
       }
       if (is_compat_loop(source)) { is_compat = true; }
     }

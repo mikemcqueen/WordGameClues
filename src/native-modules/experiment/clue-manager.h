@@ -16,18 +16,28 @@ namespace cm::clue_manager {
 
 // types
 
-struct KnownSourceMapValue {
+/*
+  struct KnownSourceMapValue {
   SourceList src_list;
   std::set<std::string> clue_names;
 };
-using KnownSourceMapValueCRef = std::reference_wrapper<const KnownSourceMapValue>;
 
-// name -> source_csv list 
-using NameSourcesMap = std::unordered_map<std::string, std::vector<std::string>>;
+using KnownSourceMapValueCRef =
+    std::reference_wrapper<const KnownSourceMapValue>;
+*/
+
+// name -> list of "sources"
+// for primary clues, a "source" is a name:primary_source_packed_integer, for
+//   which I really need a better, more distinct and descriptive name.
+// for compound clues, a source is a comma-separated-value: "name,name"
+using NameSourcesMap =
+    std::unordered_map<std::string, std::vector<std::string>>;
 
 // functions
 
 // nameSourcesMaps
+
+auto get_name_sources_map(int count) -> const NameSourcesMap&;
 
 void set_name_sources_map(int count, NameSourcesMap&& name_sources_map);
 
@@ -38,6 +48,7 @@ bool are_known_name_counts(const std::vector<std::string>& name_list,
 
 const std::vector<std::string>& get_nc_sources(const NameCount& nc);
 
+/*
 // knownSourceMaps
 
 bool has_known_source_map(int count);
@@ -70,6 +81,7 @@ auto make_src_cref_list(const std::string& name, int count) -> SourceCRefList;
 inline auto make_src_cref_list(const NameCount& nc) {
   return make_src_cref_list(nc.name, nc.count);
 }
+*/
 
 // uniqueClueNames
 
@@ -106,6 +118,7 @@ inline void for_each_source_map_entry(
 }
 */
 
+/*
 inline void for_each_nc_source(const std::string& name, int count,
     const auto& fn) {
   for (index_t idx{};
@@ -119,7 +132,8 @@ inline void for_each_nc_source(const std::string& name, int count,
 inline void for_each_nc_source(const NameCount& nc, const auto& fn) {
   for_each_nc_source(nc.name, nc.count, fn);
 }
-
+*/
+  
 void init_primary_clues(std::vector<std::string>&& names,
     std::vector<IndexList>&& idx_lists);
 

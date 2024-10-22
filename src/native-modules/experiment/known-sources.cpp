@@ -12,11 +12,37 @@ namespace cm {
 
 namespace {
 
-KnownSources known_sources_;
+  //KnownSources known_sources_;
 
 }
 
-/* static */ KnownSources& KnownSources::get() { return known_sources_; }
+///* static */ KnownSources& KnownSources::get() { return known_sources_; }
+
+/*static*/ auto KnownSources::make_src_list(const NameCount& nc) -> SourceList {
+  SourceList src_list;
+  for_each_nc_source(nc, [&src_list](const SourceData& src, index_t) { //
+    src_list.push_back(src);
+  });
+  return src_list;
+}
+
+/*static*/ auto KnownSources::make_src_cref_list(const std::string& name,
+    int count) -> SourceCRefList {
+  SourceCRefList src_cref_list;
+  for_each_nc_source(name, count,
+      [&src_cref_list](const SourceData& src, index_t) {
+        src_cref_list.push_back(std::cref(src));
+      });
+  return src_cref_list;
+}
+
+// NB: NOT threadsafe (but shouldn't matter)
+// TODO: i think this can be eliminated; check src/tools/todo
+/*static*/ bool KnownSources::add_compound_clue(const NameCount& nc,
+    const std::string& sources_csv) {
+  get().get_entry(nc.count, sources_csv).clue_names.insert(nc.name);
+  return true;
+}
 
 auto& KnownSources::get_map(int count, bool force_create /* = false */) {
   // allow force-creates exactly in-sequence only, or throw an exception
@@ -84,31 +110,6 @@ auto KnownSources::get_entries(const std::string& name, int count) const
     cref_entries.push_back(std::cref(get_entry(count, key)));
   }
   return cref_entries;
-}
-
-// TODO: i think this can be eliminated; check src/tools/todo
-bool KnownSources::add_compound_clue(const NameCount& nc,
-    const std::string& sources_csv) {
-  get_entry(nc.count, sources_csv).clue_names.insert(nc.name);
-  return true;
-}
-
-auto KnownSources::make_src_list(const NameCount& nc) -> SourceList {
-  SourceList src_list;
-  for_each_nc_source(nc, [&src_list](const SourceData& src, index_t) { //
-    src_list.push_back(src);
-  });
-  return src_list;
-}
-
-auto KnownSources::make_src_cref_list(const std::string& name, int count)
-    -> SourceCRefList {
-  SourceCRefList src_cref_list;
-  for_each_nc_source(name, count,
-      [&src_cref_list](const SourceData& src, index_t) {
-        src_cref_list.push_back(std::cref(src));
-      });
-  return src_cref_list;
 }
 
 }  // namespace cm

@@ -9,7 +9,7 @@ namespace cm {
 
   //#define ONE_ARRAY
 
-#if 1
+#if 0
 #define CLOCKS
 #define DEBUG_OR_COUNTS
 #define DEBUG_XOR_COUNTS

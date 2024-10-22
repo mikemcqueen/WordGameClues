@@ -45,7 +45,7 @@ using filter_task_result_t = std::pair<std::unordered_set<std::string>,
 
 std::vector<std::future<filter_task_result_t>> filter_futures_;
 
-StreamSwarmPool swarm_pool_(2);
+StreamSwarmPool swarm_pool_(1);
 
 cudaStream_t sources_stream_{};
 
@@ -458,7 +458,9 @@ filter_task_result_t filter_sources(
   IndexStates idx_states{std::move(idx_lists)};
   auto device_results = cuda_alloc_results(num_results, stream,
       "filter results");
-  scope_exit free_results{[device_results]() { cuda_free(device_results); }};
+  scope_exit free_results{[device_results, stream]() {  //
+    cuda_free_async(device_results, stream);
+  }};
   // TODO: I'm not sure this is necessary
   cuda_zero_results(device_results, num_results, stream);
   if (params.synchronous || log_level(Verbose)) {
@@ -592,15 +594,6 @@ filter_task_result_t filter_task(FilterData& mfd, FilterParams params) {
   auto idx_lists = make_variations_sorted_idx_lists(candidates);
   auto src_indices = make_compat_src_indices(candidates, idx_lists);
   t_make.stop();
-
-#if 0
-  std::unordered_set<CompatSourceIndices> src_indices_set(src_indices.begin(),
-      src_indices.end());
-  std::cerr << "TEST  " << params.sum
-            << " ***, sources_indices: " << src_indices.size()
-            << ", unique: " << src_indices_set.size() << std::endl;
-#endif
-
   log_make_indices_copy_sources(params, idx_lists, src_indices, t_make,
       num_sources, copy_start, copy_stop);
 
@@ -625,10 +618,14 @@ filter_task_result_t filter_task(FilterData& mfd, FilterParams params) {
   const auto device_src_indices = cuda_alloc_copy_source_indices(src_indices,
       stream);
   copy_stop.record(stream);
+  scope_exit free_results{[device_src_indices, stream]() {
+    cuda_free_async(device_src_indices, stream);
+  }};
   log_copy_indices(params, src_indices.size(), copy_start, copy_stop);
   result_t* device_compat_src_results{};
-  scope_exit free_results{
-      [device_compat_src_results]() { cuda_free(device_compat_src_results); }};
+  scope_exit free_indices{[device_compat_src_results, stream]() {
+    cuda_free_async(device_compat_src_results, stream);
+  }};
   if (!params.synchronous) {
     device_compat_src_results = get_compatible_sources_results(params.sum,
         device_src_indices, src_indices.size(),

@@ -158,6 +158,11 @@ inline std::string join(
     });
 }
 
+inline std::string append(const std::string& s1, const std::string& s2,
+    const std::string& s3) {
+  return s1 + s2 + s3;
+}
+
 class Timer {
 public:
   void start() {

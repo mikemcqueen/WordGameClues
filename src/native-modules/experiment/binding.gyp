@@ -42,6 +42,7 @@
       'cuda-common.cpp',
       'filter-support.cpp',
       'index.cpp',
+      'known-sources.cpp',
       'merge-support.cpp',
       'stream-data.cpp',
       'unique-variations.cpp',

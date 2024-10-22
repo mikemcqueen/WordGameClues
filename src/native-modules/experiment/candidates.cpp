@@ -10,6 +10,7 @@
 #include "candidates.h"
 #include "clue-manager.h"
 #include "combo-maker.h"
+#include "known-sources.h"
 #include "merge-filter-data.h"
 
 // debugging
@@ -84,10 +85,10 @@ auto make_compat_source_indices(const NameCountCRefList& nc_cref_list,
 
   // TODO: this is ridiculously inefficient because we repeatedly call
   //       get_known_sources_map_entries() within for_each_nc_source().
-  clue_manager::for_each_nc_source(nc1,
+  KnownSources::for_each_nc_source(nc1,
       [&](const SourceCompatibilityData& src1, index_t idx1) {
         CompatSourceIndex csi1{nc1.count, start_idx1 + idx1};
-        clue_manager::for_each_nc_source(nc2,
+        KnownSources::for_each_nc_source(nc2,
             [&](const SourceCompatibilityData& src2, index_t idx2) {
               if (src1.isXorCompatibleWith(src2)) {
                 CompatSourceIndex csi2{nc2.count, start_idx2 + idx2};

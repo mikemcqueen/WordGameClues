@@ -13,6 +13,7 @@
 #include "cm-precompute.h"
 #include "combo-maker.h"
 #include "components.h"
+#include "known-sources.h"
 #include "merge.h"
 #include "log.h"
 #include "util.h"
@@ -56,23 +57,21 @@ void add_show_result_for_nc(const NameCount& nc, ShowResults& results) {
 // -t word1,word2
 auto add_show_result_for_sources(const std::string& sources_csv,
     const std::vector<int>& counts, int sum, ShowResults& results) {
-  using namespace clue_manager;
-  if (has_known_source_map(sum)) {
-    if (is_known_source_map_entry(sum, sources_csv)) {
+  if (KnownSources::get().has_entries_for(sum)) {
+    if (KnownSources::get().has_entries_for(sum, sources_csv)) {
       const auto& names =
-        get_known_source_map_entry(sum, sources_csv).clue_names;
+          KnownSources::get().get_entry(sum, sources_csv).clue_names;
       results.known.emplace_back(names, counts);
     } else {
       results.valid.emplace_back(counts);
     }
     return true;
-  } else {
-    if (log_level(Verbose)) {
-      std::cerr << "!knownSourceMap(" << sum << "), sources: " << sources_csv
-                << std::endl;
-    }
-    return false;
   }
+  if (log_level(Verbose)) {
+    std::cerr << "!knownSourceMap(" << sum << "), sources: " << sources_csv
+              << std::endl;
+  }
+  return false;
 }
 
 auto get_show_results(
@@ -101,8 +100,7 @@ auto get_show_results(
 auto get_source_clues(const std::vector<std::string>& source_list,
     const NamesAndCounts& names_counts) {
   const auto sum = util::sum(names_counts.counts);
-  if (!clue_manager::is_known_source_map_entry(
-        sum, util::join(source_list, ","))) {
+  if (!KnownSources::get().has_entries_for(sum, util::join(source_list, ","))) {
     std::string sources{};
     // honestly i don't understand this at all
     for (const auto& source : source_list) {
@@ -110,6 +108,7 @@ auto get_source_clues(const std::vector<std::string>& source_list,
       // sources.
       sources += source;  //  ??
     }
+    assert(0 && "determine what is happening here");
     return sources;
   }
   return util::join(names_counts.names, ",");
@@ -157,9 +156,10 @@ using opt_str_set_cref_t =
 opt_str_set_cref_t get_clue_names_for_source(int sum, const std::string& source_csv) {
   static const std::set<std::string> empty;
   using namespace clue_manager;
-  if (has_known_source_map(sum)) {
-    if (is_known_source_map_entry(sum, source_csv)) {
-      auto& clue_names = get_known_source_map_entry(sum, source_csv).clue_names;
+  if (KnownSources::get().has_entries_for(sum)) {
+    if (KnownSources::get().has_entries_for(sum, source_csv)) {
+      auto& clue_names =
+          KnownSources::get().get_entry(sum, source_csv).clue_names;
       return std::make_optional(std::cref(clue_names));
     } else {
       return std::make_optional(std::cref(empty));

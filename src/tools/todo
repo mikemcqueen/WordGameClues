@@ -1,24 +1,30 @@
-* see if I can manually free the device_src_indices instead of relying on the
-  scope_exit which doesn't *appear* to be executing in a timely manner.
-  * maybe cuda_free_async as well.
-
 * re-structure filter-task so it calls 2 or 3 separate functions, to logically divide
   the work being done there better. it's a bit of a mess of shifting state throughout
   the function atm.
-  
-* there's an idea for using a CudaStreamEvent to pair a CudaEvent (or cudaEvent_t)
-  with a cudaStream_t such that I can record the event after the last copy, and synchronize
-  it wherever, later (like in run_get_compatible_results_kernel). I could potentially
-  even hijack an event out of the StreamData (or add a new sync_event to it).
-
-* cudaMemcpyToSymbol -> cudaMemcpyToSymbolAsync
 
 * consider_candidate slowness.
   * get_known_source_map_entries(), which is called by for_each_nc_source(), constructs
     a new list every time it's called. this function is also apparently called directly
     by index.cpp and combo-maker.cpp.
 
-* compact_uv_indices_in_place is broken!
+* determine whether CompletionTracker has it's dependency bits right, or if it's waiting
+  1 bit too long. (i.e, 3 should only wait for 2,1 - not 3,2,1)
+
+* remove -z3
+* remove --or-variations
+
+* there's an idea for using a CudaStreamEvent to pair a CudaEvent (or cudaEvent_t)
+  with a cudaStream_t such that I can record the event after the last copy, and synchronize
+  it wherever, later (like in run_get_compatible_results_kernel). I could potentially
+  even hijack an event out of the StreamData (or add a new sync_event to it).
+
+* per-swarm compat_results/compat_indices buffers. maybe this swarm is not so much a
+  swarm, but a kernel context?  maybe it's two things? (1:swarm 2:context)?
+
+* compact_uv_indices_in_place is broken! maybe! maybe not!
+
+* zero results:
+  node clues --or-variations -pf.72 -c2 --xor tree --max-sources 1  -z3 --stride 100000 -v > out
 
 * ok something weird with --max-sources. it actually changes the number of valid results,
   for a -c2 for example. it also seems to, naturally(?), increase the number of XOR sources.

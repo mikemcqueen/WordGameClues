@@ -5,8 +5,9 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-#include "clue-manager.h"
+//#include "clue-manager.h"
 #include "cm-precompute.h"
+#include "known-sources.h"
 #include "log.h"
 #include "util.h"
 #include "cm-hash.h"
@@ -51,7 +52,7 @@ auto mergeAllCompatibleSources(const NameCountList& ncList) -> SourceList {
   // that the src_list was generated from. We can't fully determine
   // compatibility without all of the names.
 
-  SourceList src_list = clue_manager::make_src_list(ncList[0]);
+  SourceList src_list = KnownSources::make_src_list(ncList[0]);
   if (logging) {
     std::cerr << "nc[0]: " << ncList[0].toString() << " (" << src_list.size()
               << ")" << std::endl;
@@ -59,7 +60,7 @@ auto mergeAllCompatibleSources(const NameCountList& ncList) -> SourceList {
   }
   // TODO: std::next() or something.
   for (auto i = 1u; i < ncList.size(); ++i) {
-    const auto src_cref_list = clue_manager::make_src_cref_list(ncList[i]);
+    const auto src_cref_list = KnownSources::make_src_cref_list(ncList[i]);
     if (logging) {
       std::cerr << " nc[" << i << "]: " << ncList[i].toString() << " ("
                 << src_cref_list.size() << ")" << std::endl;
