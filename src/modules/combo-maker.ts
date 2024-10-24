@@ -173,6 +173,7 @@ export const first = (countList: number[], clueIndices: number[]): FirstNextResu
     return next(countList, clueIndices);
 };
 
+/*
 //
 // args:
 //   synonymMinMax
@@ -225,6 +226,7 @@ const getCombosForUseNcLists = (sum: number, max: number, args: any): void => {
             ` candidates(${totalVariations}) - ${duration}ms `);
     }
 };
+*/
 
 export const makeCombosForSum = (sum: number, args: any,
     synchronous: boolean = false, load_all_prior_sources: boolean = false): void =>
@@ -234,9 +236,8 @@ export const makeCombosForSum = (sum: number, args: any,
         // TODO: wherever this is actually enforced:
         // console.error(`Enforcing max results: ${args.maxResults}`);
     }
-    // 3 = c++, 4 = dump/exit
-    if (_.includes(args.flags, '3')) {
-        Native.computeCombosForSum(sum, args.max);
+    Native.computeCombosForSum(sum, args.max);
+    /*
     } else {
         args.synchronous = synchronous;
         // TODO: Fix this abomination
@@ -246,6 +247,7 @@ export const makeCombosForSum = (sum: number, args: any,
         getCombosForUseNcLists(sum, max, args);
         args.max = max;
     }
+    */
     Native.filterCandidatesForSum(sum, args.tpb, args.streams, args.stride,
         args.iters, synchronous, load_all_prior_sources);
 };
@@ -331,16 +333,9 @@ export const makeCombos = (args: any): any => {
         let totals = ClueManager.emptyFilterResult();
         const pc_result = PreCompute.preCompute(first, last, args);
         if (pc_result) {
-            //showUniqueClueNameCounts(last);
-            // 3 = c++, 4 = dump/exit
-            if (_.includes(args.flags, '4') && !_.includes(args.flags, '3')) {
-                showUniqueClueNames(last);
-                process.exit(0);
-            }
-
             // run 2-clue sources synchronously to seed "incompatible sources"
             // which makes subsequent sums faster.
-            makeCombosForSum(2, args, true, last == 2);
+            makeCombosForSum(2, args, true, last === 2);
             if (first === 2) ++first;
             for (let sum = first; sum <= last; ++sum) {
                 // TODO: return # of combos filtered due to note name match

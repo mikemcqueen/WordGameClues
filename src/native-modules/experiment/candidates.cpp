@@ -204,7 +204,6 @@ auto make_compat_source_indices(const NameCountCRefList& nc_cref_list,
 #endif
   t.stop();
   auto ns = t.nanoseconds();
-  assert(ns > 0);
   make_indices_duration_ns_.fetch_add(ns);
   return src_indices;
 }
@@ -258,7 +257,7 @@ void finish_considering() {
     compat_src_indices.emplace_back(csi1, csi2);
   }
   */
-  std::cerr << " max: " << max_ << std::endl;
+  //std::cerr << " max: " << max_ << std::endl;
 }
 
 int consider_candidate(int sum, const NameCountCRefList& nc_cref_list,

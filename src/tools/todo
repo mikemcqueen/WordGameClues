@@ -1,4 +1,3 @@
-
 * consider_candidate slowness.
   * get_known_source_map_entries(), which is called by for_each_nc_source(), constructs
     a new list every time it's called. this function is also apparently called directly
@@ -8,16 +7,21 @@
     known source map, or if I can just use "source" here. like, iterate over the keys,
     split by ":", and add sources to a set, to see if there are any duplicates. I
     don't think there will be. and I could enforce that with an assert when i emplace().
+    * I'm doing this now but it's not clear there is really any perf benefit, at the
+      cost of some small amount of additional memory.
+*** so i'm wondering, can i just start the consider_candidate loop(s) earlier? is there
+    any data-dependency reason why I wait to run 3 after the filter kernel for 2 is done?
+    Or could I just spawn a bunch of threads right off the bat to do the considers?
+
+* remove -z3
+* remove --or-variations
 
 * re-structure filter-task so it calls 2 or 3 separate functions, to logically divide
   the work being done there better. it's a bit of a mess of shifting state throughout
   the function atm.
 
 * determine whether CompletionTracker has it's dependency bits right, or if it's waiting
-  1 bit too long. (i.e, 3 should only wait for 2,1 - not 3,2,1)
-
-* remove -z3
-* remove --or-variations
+  1 bit too long. (i.e, 3 should only wait for 2,1 - not 3,2,1). (I think it's right).
 
 * init_primary_name_source_map in clue_manager is doing a lot of shit that can probably
   be moved to KnownSources::init_primary_entry
@@ -30,7 +34,8 @@
 * per-swarm compat_results/compat_indices buffers. maybe this swarm is not so much a
   swarm, but a kernel context?  maybe it's two things? (1:swarm 2:context)?
 
-* compact_uv_indices_in_place is broken! maybe! maybe not!
+* compact_uv_indices_in_place is broken! maybe! maybe not! maybe I can remove that first
+  __syncthreads() call.
 
 * zero results:
   node clues --or-variations -pf.72 -c2 --xor tree --max-sources 1  -z3 --stride 100000 -v > out
@@ -49,7 +54,7 @@
   * maybe think about how i might support -cLARGE with --max-sources *smaller* than
     LARGE-1. not a priority though, i should't really be playing with those sizes.
 
-* unique_sources implementation issues:
+* unique_sources branch implementation issues:
   * validation failures. possibly because hash/equal_to of SourceData is wrong (doesn't
     take into account ncList, maybe).
 

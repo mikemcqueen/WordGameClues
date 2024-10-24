@@ -70,13 +70,12 @@ const CmdLineOptions = Opt.create(_.concat(Clues.Options, [
     ['',  'ccc',                               'clue (source) consistency check (--save to save results)'],
     ['',  'show-pairs',                        'show unique known source pairs'],
     ['',  'flip',                              '  include flipped (reversed) pairs in results'],
-    ['z', 'flags=OPTION+',                     'flags: 2=ignoreErrors,3=NativeComboMaker' ],
+    ['z', 'flags=OPTION+',                     'flags: 2=ignoreErrors' ],
     ['v', 'verbose',                           'more output' ],
     ['',  'vv',                                'More' ],
     ['',  'vvv',                               'MOAR' ],
     ['',  'memory',                            'output memory dumps' ],
     ['',  'allocations',                       'output memory allocations' ],
-    ['',  'or-variations',                     'generate unique OR arg variations' ],
     ['q', 'quiet',                             'less output'],
     ['h', 'help',                              'this screen']
 ])).bindHelp();
@@ -428,7 +427,6 @@ async function main () {
             quiet:    options.quiet,
             memory:   options.memory,
             allocations: options.allocations,
-            or_variations: options['or-variations'],
             ignoreErrors: options.ignoreErrors,
             max_sources: options.max_sources,
             flags: options.flags,

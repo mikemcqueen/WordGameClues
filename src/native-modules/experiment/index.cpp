@@ -554,15 +554,6 @@ LogOptions makeLogOptions(Env& env, const Object& jsObject) {
     }
     log_args.mem_allocs = jsAllocs.As<Boolean>();
   }
-  auto jsOrVariations = jsObject.Get("or-variations");
-  if (!jsOrVariations.IsUndefined()) {
-    if (!jsOrVariations.IsBoolean()) {
-      TypeError::New(env, "makeLogOptions: invalid or_variations arg")
-        .ThrowAsJavaScriptException();
-      return {};
-    }
-    log_args.or_variations = jsOrVariations.As<Boolean>();
-  }
   auto jsVerbose = jsObject.Get("verbose");
   if (!jsVerbose.IsUndefined()) {
     if (!jsVerbose.IsNumber()) {
