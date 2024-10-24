@@ -114,7 +114,12 @@ void test_unique_clue_sources(int sum) {
 
 }  // anonymous namespace
 
-std::atomic<long> consider_duration_ = 0;
+#if 1
+extern void start_considering();
+extern void finish_considering();
+#endif
+
+std::atomic<long> compute_duration_ = 0;
 
 // Given a sum, such as 4, and a max # of numbers to combine, such as 4,
 // generate an array of addend arrays ("count lists"), for each 2 <= N <= max,
@@ -126,8 +131,10 @@ void compute_combos_for_sum(int sum, int max) {
   //  auto prefix_sums = make_unique_name_prefix_sums(sum);
   auto addends = Peco::make_addends(sum, max);
   int num_candidates{};
+  int num_sources{};
   IndexList unique_name_indices;
   auto t = util::Timer::start_timer();
+  start_considering();
   for (const auto& count_list: addends) {
     for (auto result = first(count_list, unique_name_indices);
         result.has_value(); result = next(count_list, unique_name_indices)) {
@@ -135,23 +142,26 @@ void compute_combos_for_sum(int sum, int max) {
       // this call is a bit weird, a legacy of migrating from list of sources to
       // list of source-indices. "result.value()" (nc_cref_list) arguably isn't
       // the right data type anymore. indices all the way down.
-      consider_candidate(sum, result.value(), unique_name_indices);
+      num_sources += consider_candidate(sum, result.value(),
+          unique_name_indices);
       // old: consider_candidate(result.value());
     }
   }
   t.stop();
+  finish_considering();
   if (log_level(Normal)) {
     std::cerr << "sum(" << sum << ") consider(C++) - count_lists("
-              << addends.size() << ")"
-              << " candidates(" << num_candidates << ") - " << t.count()
-              << "ms\n";
+              << addends.size() << ")" << " candidates(" << num_candidates
+              << ") sources(" << num_sources << ") - " << t.count() << "ms\n";
   }
-  consider_duration_.fetch_add(t.count());
+  compute_duration_.fetch_add(t.count());
   //  Native.filterCandidatesForSum(sum, args.tpb, args.streams, args.stride,
   //      args.iters, args.synchronous);
 }
 
-long get_consider_duration() { return consider_duration_; }
+long get_compute_duration() {
+  return compute_duration_;
+}
 
 /*
 export const makeCombosForSum = (sum: number, args: any,

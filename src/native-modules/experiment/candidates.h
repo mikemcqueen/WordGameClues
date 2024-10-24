@@ -40,7 +40,7 @@ void consider_candidate(const NameCountList& ncList);
 void consider_candidate(const NameCountCRefList& nc_cref_list);
 void consider_candidate(int sum, const NameCountCRefList& nc_cref_list);
 */
-void consider_candidate(int sum, const NameCountCRefList& nc_cref_list,
+int consider_candidate(int sum, const NameCountCRefList& nc_cref_list,
     const IndexList& unique_name_indices);
 
 void clear_candidates(int sum);

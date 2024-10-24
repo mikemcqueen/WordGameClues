@@ -44,7 +44,7 @@ namespace {
   return true;
 }
 
-auto& KnownSources::get_map(int count, bool force_create /* = false */) {
+auto KnownSources::get_map(int count, bool force_create /* = false */) -> Map& {
   // allow force-creates exactly in-sequence only, or throw an exception
   const auto idx = count - 1;
   if (force_create && (int(maps_.size()) == idx)) {
@@ -69,16 +69,23 @@ bool KnownSources::has_entries_for(int count, const std::string& source) const {
 
 void KnownSources::init_entry(int count, const std::string source,
     SourceList&& src_list) {
-  // True is arbitrary here. I *could* support replacing an existing src_list,
-  // but i'm unaware of any situation that requires it, and as a result I want
-  // things to blow up when it is attempted, currently.
-  auto& map = get_map(count, true);
+  auto& map = get_map(count, true);  // true = create map if it doesn't exist
   auto [_, success] = map.emplace(std::move(source), std::move(src_list));
   if (!success) {
     std::cerr << "failed adding " << source << ":" << count
               << " to known_source_map" << std::endl;
   }
   assert(success);
+}
+
+void KnownSources::init_primary_entry(const std::string& name,
+    const std::string& source, SourceList&& src_list) {
+  assert(src_list.size() == 1);
+  // copy before move in init_entry call
+  SourceCompatibilityData src_compat{src_list.at(0).usedSources};
+  init_entry(1, util::append(name, ":", source), std::move(src_list));
+  // this is expected to fail a lot due to duplicates
+  primary_map_.emplace(source, std::move(src_compat));
 }
 
 // one entry per source_csv

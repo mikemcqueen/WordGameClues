@@ -5,18 +5,37 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include "clue-manager.h"
 #include "combo-maker.h"
 #include "cuda-types.h"
+#include "util.h"
+
+#if 1
+#include <iostream>
+#include <unordered_set>
+#endif
 
 namespace cm {
+
+inline std::vector<std::string_view> split(std::string_view str, char delim = ':') {
+    std::vector<std::string_view> tokens;
+    size_t start = 0;
+    size_t end = str.find(delim);
+    
+    while (end != std::string_view::npos) {
+        tokens.push_back(str.substr(start, end - start));
+        start = end + 1;
+        end = str.find(delim, start);
+    }
+    
+    tokens.push_back(str.substr(start));
+    return tokens;
+}
 
 //
 // KnownSources
 //
 class KnownSources {
-  //TODO: try: 
-  // static KnownSources known_sources_;
-
 public:
   struct Entry {
     SourceList src_list; // TODO: remove
@@ -31,27 +50,53 @@ public:
     return known_sources;
   }
 
-  /*
-  auto KnownSources::get_entries(const std::string& name, int count) const
-      -> std::vector<EntryCRef> {
-    std::vector<EntryCRef> cref_entries;
-    const auto& name_sources_map = clue_manager::get_name_sources_map(count);
-    for (const auto& source : name_sources_map.at(name)) {
-      const auto& key = count > 1 ? source : util::append(name, ":", source);
-      cref_entries.push_back(std::cref(get_entry(count, key)));
+#if 0
+  static void test_keys() {
+    std::unordered_set<std::string_view> sources;
+    const auto& map = get().get_map(1);
+    for (const auto& [key, entry] : map) {
+      assert(entry.src_list.size() == 1);
+      const auto tokens = split(key);
+      std::cerr
+          << tokens.at(0) << ":" << tokens.at(1) << " - "
+          << entry.src_list.at(0).usedSources.get_source_descriptor().toString()
+          << std::endl;
+      sources.insert(tokens.at(0));
     }
-    return cref_entries;
+    std::cerr << "primary KnownSources keys: " << map.size()
+              << ", unique: " << sources.size() << std::endl;
   }
-  */
+#endif
+
+#if 1
+  static void for_each_nc_source_compat_data(const NameCount& nc,
+      const auto& fn) {
+    index_t idx{};
+    const auto& name_sources_map = clue_manager::get_name_sources_map(nc.count);
+    for (const auto& source : name_sources_map.at(nc.name)) {
+      // const auto& key = count > 1 ? source : util::append(name, ":", source);
+      if (nc.count > 1) {
+        const auto& src_list = get().get_entry(nc.count, source).src_list;
+        for (const auto& src : src_list) {
+          fn(static_cast<const SourceCompatibilityData&>(src), idx++);
+        }
+      } else {
+        const auto it = get().get_primary_map().find(source);
+        assert(it != get().get_primary_map().end());
+        fn(it->second, idx++);
+      }
+    }
+  }
+#endif
 
   static void for_each_nc_source(const std::string& name, int count,
       const auto& fn) {
-    for (index_t idx{};
-        const auto entry_cref : get().get_entries(name, count)) {
-      for (const auto& src : entry_cref.get().src_list) {
+    index_t idx{};
+    for_each_entry(name, count, [&fn, &idx](const SourceList& src_list) {
+      for (const auto& src : src_list) {
         fn(src, idx++);
       }
-    }
+    });
   }
 
   static void for_each_nc_source(const NameCount& nc, const auto& fn) {
@@ -76,6 +121,8 @@ public:
   bool has_entries_for(int count, const std::string& source) const;
 
   void init_entry(int count, const std::string source, SourceList&& src_list);
+  void init_primary_entry(const std::string& name, const std::string& source,
+      SourceList&& src_list);
 
   // one entry per source_csv
   auto get_entry(int count, const std::string& source_csv) -> Entry&;
@@ -92,13 +139,27 @@ public:
 
 private:
   using Map = std::unordered_map<std::string, Entry>;
+  using PrimaryMap = std::unordered_map<std::string, SourceCompatibilityData>;
 
-  auto& get_map(int count, bool force_create = false);
+  auto get_map(int count, bool force_create = false) -> Map&;
 
-  const auto& get_map(int count) const { return maps_.at(count - 1); }
+  auto get_map(int count) const -> const Map& { return maps_.at(count - 1); }
+
+  auto get_primary_map() const -> const PrimaryMap& { return primary_map_; }
+
+  static void for_each_entry(const std::string& name, int count,
+      const auto& fn) {
+    const auto& name_sources_map = clue_manager::get_name_sources_map(count);
+    for (const auto& source : name_sources_map.at(name)) {
+      const auto& key = count > 1 ? source : util::append(name, ":", source);
+      fn(get().get_entry(count, key).src_list);
+    }
+  }
 
   // map source_csv -> { src_cref_list, clue_names_set } for each count
   std::vector<Map> maps_;
+  // map primary source (packed-index as string) -> SourceCompatibilityData
+  PrimaryMap primary_map_;
   // ordered set of unique sources
   std::set<SourceData> src_set_;
 };

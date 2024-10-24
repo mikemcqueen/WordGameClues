@@ -31,7 +31,10 @@
 namespace cm {
 // combo-maker.cpp
 void compute_combos_for_sum(int sum, int max);
-long get_consider_duration();
+#if 1
+long get_compute_duration();
+long get_make_indices_duration();
+#endif
 }
 
 namespace {
@@ -76,6 +79,11 @@ Value setPrimaryNameSrcIndicesMap(const CallbackInfo& info) {
   }
   // --
   clue_manager::init_primary_clues(std::move(name_list), std::move(idx_lists));
+
+#if 0
+  KnownSources::test_keys();
+#endif
+
   return env.Null();
 }
 
@@ -418,7 +426,7 @@ Value filterCandidatesForSum(const CallbackInfo& info) {
   }
   const auto sum = info[0].As<Number>().Int32Value();
   assert(sum >= 2);
-  FilterParams filter_params{sum,
+  [[maybe_unused]] FilterParams filter_params{sum,
       info[1].As<Number>().Int32Value(),  // threads_per_block
       info[2].As<Number>().Int32Value(),  // num_streams
       info[3].As<Number>().Int32Value(),  // stride
@@ -430,6 +438,7 @@ Value filterCandidatesForSum(const CallbackInfo& info) {
   // particular sum. filter_candidates_cuda() will clear candidate data to
   // free memory. now is a good opportunity to save candidate counts for this
   // sum so we can access it later.
+#if 1
   save_current_candidate_counts(sum);
 
   const auto opt_incompat_sources = filter_candidates_cuda(MFD, filter_params);
@@ -438,6 +447,7 @@ Value filterCandidatesForSum(const CallbackInfo& info) {
     const auto stream = cudaStreamPerThread;
     set_incompatible_sources(MFD, opt_incompat_sources.value(), stream);
   }
+#endif
   // NOTE: can only free device data here after synchronous call. 
   return env.Null();
 }
@@ -454,8 +464,11 @@ Value getResult(const CallbackInfo& info) {
   // mirrors filter_init() in filterPreparation()
   filter_cleanup();
   cuda_memory_dump("filter complete");
-  std::cerr << "total consider(C++) duration - " << get_consider_duration()
-            << "ms\n";
+#if 1
+  std::cerr
+      << "total consider(C++) durations - compute: " << get_compute_duration()
+      << "ms, make_indices: " << get_make_indices_duration() << "ms\n";
+#endif
   return wrap(env, result);
 }
 

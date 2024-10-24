@@ -19,9 +19,6 @@ namespace {
 //
 
 using PrimaryNameSrcIndicesMap = std::unordered_map<std::string, IndexList>;
-// TODO: CompoundSrcSourceListMap
-//using KnownSourceMap = std::unordered_map<std::string, KnownSourceMapValue>;
-// using StringCRefList = std::vector<std::reference_wrapper<const std::string>>;
 
 //
 // globals
@@ -32,9 +29,6 @@ PrimaryNameSrcIndicesMap primaryNameSrcIndicesMap_;
 
 // map clue_name -> source_csv_list for each count (including primary)
 std::vector<NameSourcesMap> nameSourcesMaps;
-
-// map source_csv -> { src_list, clue_names_set } for each count
-//std::vector<KnownSourceMap> knownSourceMaps;
 
 // populated on demand from primaryNameSrcIndicesMap/nameSrcMaps
 std::vector<NameCountList> uniqueClueNames_;
@@ -59,17 +53,6 @@ auto build_primary_name_sources_map(
 
 // knownSourceMap
 
-/*
-auto& get_known_source_map(int count, bool force_create = false) {
-  // allow force-creates exactly in-sequence only, or throw an exception
-  const auto idx = count - 1;
-  if (force_create && ((int)knownSourceMaps.size() == idx)) {
-    knownSourceMaps.push_back(KnownSourceMap{});
-  }
-  return knownSourceMaps.at(idx);
-}
-*/
-
 // Initialize entries of knownSourceMaps_[0] and populate the src_list fields.
 void init_primary_known_source_map(
     const PrimaryNameSrcIndicesMap& name_src_indices_map,
@@ -80,11 +63,15 @@ void init_primary_known_source_map(
     for (size_t idx{}; idx < sources.size(); ++idx) {
       const auto name_src = name + ":" + sources.at(idx);
       // TODO: questionable behavior. I think we need to add all varitions now,
-      // at leat if the names are different.
+      // at least if the names are different.
+      // Do I really need to do this check here? can't i delay until
+      // init_primary_entry? in fact, all of this junk, building the source,
+      // can't it be done by KnownSources?
       if (KnownSources::get().has_entries_for(1, name_src)) {
         // or abort?
         std::cerr << "skip adding '" << name << "' as known primary source " << name_src
                   << std::endl;
+        assert(false); // bcoz i forgot if this happens and want to know
         continue;
       }
       int int_src = name_src_indices_map.find(name)->second.at(idx);
@@ -99,8 +86,7 @@ void init_primary_known_source_map(
       SourceList src_list;
       src_list.emplace_back(used_sources, std::move(primary_name_src_list),
           std::move(nc_list), std::move(nc_names));
-      // TODO: std::move(name_src), param as r-value reference
-      KnownSources::get().init_entry(1, name_src, std::move(src_list));
+      KnownSources::get().init_primary_entry(name, sources.at(idx), std::move(src_list));
     }
   }
 }
@@ -178,22 +164,6 @@ auto get_name_sources_map(int count) -> const NameSourcesMap& {
   return nameSourcesMaps.at(count - 1);
 }
 
-/*
-void init_known_source_map_entry(
-    int count, const std::string source, SourceList&& src_list) {
-  // True is arbitrary here. I *could* support replacing an existing src_list,
-  // but i'm unaware of any situation that requires it, and as a result I want
-  // things to blow up when it is attempted, currently.
-  auto& map = get_known_source_map(count, true);
-  auto [_, success] = map.emplace(std::move(source), std::move(src_list));
-  if (!success) {
-    std::cerr << "failed adding " << source << ":" << count
-              << " to known_source_map" << std::endl;
-  }
-  assert(success);
-}
-*/
-
 void set_name_sources_map(int count, NameSourcesMap&& name_sources_map) {
   auto idx = count - 1;
   // allow sets exactly in-sequence only, or throw an exception
@@ -219,62 +189,6 @@ bool are_known_name_counts(const std::vector<std::string>& name_list,
 const std::vector<std::string>& get_nc_sources(const NameCount& nc) {
   return get_name_sources_map(nc.count).at(nc.name);
 }
-
-  /*
-const std::vector<std::string>& get_nc_sources(const NameCount& nc) {
-  return get_name_sources_map(nc.count).at(nc.name);
-}
-  */
-
-/*
-//
-// knownSourceMaps
-//
-
-bool has_known_source_map(int count) {
-  assert(count > 0);
-  return (int)knownSourceMaps.size() >= count;
-}
-
-bool is_known_source_map_entry(int count, const std::string& source) {
-  const auto idx = count - 1;
-  if ((int)knownSourceMaps.size() > idx) {
-    return get_known_source_map(count).contains(source);
-  }
-  return false;
-}
-
-auto get_known_source_map_entry(int count, const std::string& source)
-    -> KnownSourceMapValue& {
-  auto& map = get_known_source_map(count);
-  auto it = map.find(source);
-  assert(it != map.end());
-  return it->second;
-}
-
-auto get_known_source_map_entries(const std::string& name,
-    int count) -> std::vector<KnownSourceMapValueCRef> {
-  std::vector<KnownSourceMapValueCRef> cref_entries;
-  const auto& name_sources_map = get_name_sources_map(count);
-  for (const auto& source : name_sources_map.at(name)) {
-    const auto& key = count > 1 ? source : util::append(name, ":", source);
-    cref_entries.push_back(
-        std::cref(get_known_source_map_entry(count, key)));
-  }
-  return cref_entries;
-}
-
-auto get_known_source_map_entries(const NameCount& nc)
-    -> std::vector<KnownSourceMapValueCRef> {
-  return get_known_source_map_entries(nc.name, nc.count);
-}
-
-bool add_compound_clue(
-    const cm::NameCount& nc, const std::string& sources_csv) {
-  get_known_source_map_entry(nc.count, sources_csv).clue_names.emplace(nc.name);
-  return true;
-}
-*/
 
 //
 // uniqueClueNames
@@ -348,14 +262,6 @@ int get_unique_clue_starting_source_index(int count, int unique_name_idx) {
 //
 
 /*
-inline void for_each_source_map_entry(
-    const std::string& name, int count, const auto& fn) {
-  for (const auto& entry_cref : get_known_source_map_entries(nc)) {
-    fn(entry_cref.get());
-  }
-}
-*/
-
 auto make_src_list(const NameCount& nc) -> cm::SourceList {
   SourceList src_list;
   KnownSources::for_each_nc_source(nc,
@@ -372,6 +278,7 @@ auto make_src_cref_list(const std::string& name,
       });
   return src_cref_list;
 }
+*/
 
 // JavaScript's primary name-sources map is Sentence.NameSourcesMap, which is
 // a map of [string: Set<number]. On the C++ side that is unwrapped as a list

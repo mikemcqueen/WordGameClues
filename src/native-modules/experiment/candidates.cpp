@@ -12,9 +12,12 @@
 #include "combo-maker.h"
 #include "known-sources.h"
 #include "merge-filter-data.h"
+#include "cm-hash.h"
 
 // debugging
 #include "filter.cuh"
+#include <atomic>
+#include <array>
 
 namespace cm {
 
@@ -68,41 +71,149 @@ int get_num_candidate_sources(int sum) {
   return (it == candidate_map_.end()) ? 0 : int(get_num_candidate_sources(it->second));
 }
 
+std::atomic<long> make_indices_duration_ns_(0);
+
 // optimized for 2 sources, using more crefs
 //
 // ultimately making this a kernel is the path forward due to isXorCompat calls
-// ^- Still true? -^
+// Still true? Probably, eventually, when it becomes too slow.
+//
+// So. One problem here is duplicate sources. There are a lot of them.
+// Eliminating those would probably cut the number of sources in half, which
+// would cut the time by 3/4ths. Because would go from ~ 20K^2 tests to
+// 10K^2 tests - 400K to 100K.
+//
+// maybe instead of calling make_compat_src_indices for each nc_cref_list,
+// which is really an nc_cref_pair, we could just build 2 nc_cref_lists
+// from .at(0) and .at(1).
+//
+// consider_candidate would just dump an empty compat_src_indices list into
+// the repo map. after we're done with all consider_candidate calls, we
+// execute a "bulk" make_compat_src_indices.
+//
+// what would this look like? Well the main goal is to eliminate duplicates
+// at least at first. so we walk both nc_lists and add all ...
+//
+// ok there are a couple options here that I need to think through.
+//
+// 1) maps from SourceCompatibilityDataCRef -> IndexList of unique indices.
+//    in fact, i think i could build these incrementally during each call to
+//    consider_candidate. then the "compute_all_indices()" function just
+//    walks they keys in each map testing isXorCompat, and if true, adds
+//    every index combination.
+//    - Too slow. doing dynamic allocation, specifically creating the
+//      std::vector<int> for each source is too much. there's 100M sources
+//      combined. I got it down to ~900ms total by emplacing a std::array<int,
+//      10> but unfortunately some sources are shared ~2000 times so that's not
+//      enough space to hold all the indices. and 100M * 2000*4 is too much
+//      host memory.
+//
+// 2) my original idea, was a map of SourceCompatibilityDataCRef -> bool,
+//    initialized to false. in the outer loop, once a source is used, set
+//    it to true. any future same sources in outer-loop will skip.
+//    inner loop is a problem though. need to reset every entry to false at
+//    the end of each inner loop. So #1 looks better.
+//
+// maybe there's another idea here.
+//
+// 3) is there some way I can leverage unique variations? like, i get it,
+//    there are 35M sources across all sources for all nc_pairs in c15,
+//    but what if there were only 60K unique variations, and somehow each
+//    UV pointed to a list/set of sources for that variation?
+//
+
+struct Indices {
+  //  std::array<index_t, 10> array;
+  IndexList indices;
+  index_t max{};
+};
+
+// using Indices = std::array<index_t, 10>;
+
+std::unordered_map<index_t, Indices> source_indices_map_;
+//std::unordered_map<SourceCompatibilityDataCRef, Indices> source_indices_map_;
+
+void add_map_entry(const SourceCompatibilityData& src) {
+  Indices idx_list;
+  static index_t index = 0;
+  source_indices_map_.emplace(index++, std::move(idx_list));
+  //source_indices_map_.emplace(std::cref(src), std::move(idx_list));
+}
+
+index_t max_ = 0;
+
+void add_compat_source_index(const SourceCompatibilityData& src, index_t idx) {
+  static index_t index = 0;
+  auto it = source_indices_map_.find(index++);
+  //auto it = source_indices_map_.find(std::cref(src));
+  assert(it != source_indices_map_.end());
+  //  it->second.array.at(0) = idx;
+  if (++it->second.max > max_) {
+    max_ = it->second.max;
+  }
+}
+
 auto make_compat_source_indices(const NameCountCRefList& nc_cref_list,
     const IndexList& unique_name_indices, const std::pair<int, int> idx_pair) {
   assert(nc_cref_list.size() == 2 && "nc_cref_list.size() != 2");
   const auto& nc1 = nc_cref_list.at(idx_pair.first).get();
-  const auto& nc2 = nc_cref_list.at(idx_pair.second).get();
   const auto start_idx1 = clue_manager::get_unique_clue_starting_source_index(
       nc1.count, unique_name_indices.at(idx_pair.first));
+  const auto& nc2 = nc_cref_list.at(idx_pair.second).get();
   const auto start_idx2 = clue_manager::get_unique_clue_starting_source_index(
       nc2.count, unique_name_indices.at(idx_pair.second));
-  CompatSourceIndicesList compat_src_indices;
 
-  // TODO: this is ridiculously inefficient because we repeatedly call
-  //       get_known_sources_map_entries() within for_each_nc_source().
-  KnownSources::for_each_nc_source(nc1,
-      [&](const SourceCompatibilityData& src1, index_t idx1) {
-        CompatSourceIndex csi1{nc1.count, start_idx1 + idx1};
-        KnownSources::for_each_nc_source(nc2,
-            [&](const SourceCompatibilityData& src2, index_t idx2) {
+  CompatSourceIndicesList src_indices;
+#if 0
+  KnownSources::for_each_nc_source_compat_data(nc1,
+      [](const SourceCompatibilityData& src1, index_t idx1) {
+        add_map_entry(src1);
+      });
+  KnownSources::for_each_nc_source_compat_data(nc2,
+      [](const SourceCompatibilityData& src2, index_t idx2) {
+        add_map_entry(src2);
+      });
+
+  int n{};
+  auto t = util::Timer::start_timer();
+  KnownSources::for_each_nc_source_compat_data(nc1,
+      [&n, start_idx1](const SourceCompatibilityData& src1, index_t idx1) {
+        add_compat_source_index(src1, start_idx1 + idx1);
+        n++;
+      });
+  KnownSources::for_each_nc_source_compat_data(nc2,
+      [&n, start_idx2](const SourceCompatibilityData& src2, index_t idx2) {
+        add_compat_source_index(src2, start_idx2 + idx2);
+        n++;
+      });
+#else
+  auto t = util::Timer::start_timer();
+  KnownSources::for_each_nc_source_compat_data(nc1,
+      [count = nc1.count, start_idx1, &nc2, start_idx2, &src_indices]  //
+      (const SourceCompatibilityData& src1, index_t idx1) {
+        CompatSourceIndex csi1{count, start_idx1 + idx1};
+        KnownSources::for_each_nc_source_compat_data(nc2,
+            [count = nc2.count, start_idx2, csi1, &src1, &src_indices]  //
+            (const SourceCompatibilityData& src2, index_t idx2) {
               if (src1.isXorCompatibleWith(src2)) {
-                CompatSourceIndex csi2{nc2.count, start_idx2 + idx2};
-                compat_src_indices.emplace_back(csi1, csi2);
+                CompatSourceIndex csi2{count, start_idx2 + idx2};
+                src_indices.emplace_back(csi1, csi2);
               }
             });
       });
-  return compat_src_indices;
+#endif
+  t.stop();
+  auto ns = t.nanoseconds();
+  assert(ns > 0);
+  make_indices_duration_ns_.fetch_add(ns);
+  return src_indices;
 }
 
 auto add_candidate(int sum, std::string&& combo,
     CompatSourceIndicesListCRef compat_src_indices_cref) {
   std::unordered_set<std::string> combos{};
   combos.insert(std::move(combo));
+
   Lock lk(candidate_map_semaphore_);
   if (!candidate_map_.contains(sum)) {
     auto [_, success] = candidate_map_.emplace(sum, CandidateList{});
@@ -134,7 +245,23 @@ std::pair<int, int> get_sorted_index_pair(
   return std::make_pair(first_idx, second_idx);
 }
 
-void consider_candidate(int sum, const NameCountCRefList& nc_cref_list,
+void start_considering() {
+  source_indices_map_.clear();
+  max_ = 0;
+}
+
+void finish_considering() {
+  // CompatSourceIndex csi1{nc1.count, start_idx1 + idx1};
+  /*
+  if (src1.isXorCompatibleWith(src2)) {
+    CompatSourceIndex csi2{nc2.count, start_idx2 + idx2};
+    compat_src_indices.emplace_back(csi1, csi2);
+  }
+  */
+  std::cerr << " max: " << max_ << std::endl;
+}
+
+int consider_candidate(int sum, const NameCountCRefList& nc_cref_list,
     const IndexList& unique_name_indices) {
   auto idx_pair = get_sorted_index_pair(nc_cref_list);
   const auto& nc1 = nc_cref_list.at(idx_pair.first).get();
@@ -142,7 +269,7 @@ void consider_candidate(int sum, const NameCountCRefList& nc_cref_list,
   // no lock necessary to modify repo map for a particular sum
   auto& candidate_repo = get_candidate_repo(sum);
   auto key = NameCount::makeString(nc1, nc2);
-  if (candidate_repo.contains(key)) return;
+  if (candidate_repo.contains(key)) return 0;
   CandidateRepoValue repo_value;
   repo_value.compat_src_indices = std::move(
       make_compat_source_indices(nc_cref_list, unique_name_indices, idx_pair));
@@ -153,9 +280,15 @@ void consider_candidate(int sum, const NameCountCRefList& nc_cref_list,
   if (rv.compat_src_indices.empty()) {
     cc.num_incompat++;
   } else {
+    // TODO: util::append
     add_candidate(sum, NameCount::makeString(nc1.name, nc2.name),
         std::cref(rv.compat_src_indices));
   }
+  return 0;
+}
+
+long get_make_indices_duration() {
+  return long((double)make_indices_duration_ns_.load() / 1e6);
 }
 
 void clear_candidates(int sum) {

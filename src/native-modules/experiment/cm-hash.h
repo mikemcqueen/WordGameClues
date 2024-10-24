@@ -52,14 +52,8 @@ template <> struct hash<cm::Variations> {
 
 template <> struct equal_to<cm::UsedSources> {
   bool operator()(const cm::UsedSources& lhs,
-    const cm::UsedSources& rhs) const noexcept
-  {
+      const cm::UsedSources& rhs) const noexcept {
     if (lhs.getBits() != rhs.getBits()) return false;
-    /*
-    for (size_t i{}; i < lhs.variations.size(); ++i) {
-      if (lhs.variations[i] != rhs.variations[i]) return false;
-    }
-    */
     if (lhs.variations != rhs.variations) return false;
     return true;
   }
@@ -69,15 +63,9 @@ template <> struct hash<cm::UsedSources> {
   size_t operator()(const cm::UsedSources& us) const noexcept {
     size_t bits_seed = 0;
     cm::hash_combine(bits_seed, us.getBits().hash());
-    /*
-    size_t variation_seed = 0;
-    for (const auto variation: us.variations) {
-      cm::hash_combine(variation_seed, hash<int>()(variation));
-    }
-    */
     size_t seed = 0;
     cm::hash_combine(seed, bits_seed);
-    cm::hash_combine(seed, hash<cm::Variations>()(us.variations)); // variation_seed);
+    cm::hash_combine(seed, hash<cm::Variations>()(us.variations));
     return seed;
   }
 };
@@ -86,17 +74,39 @@ template <> struct equal_to<cm::SourceCompatibilityData> {
   bool operator()(const cm::SourceCompatibilityData& lhs,
     const cm::SourceCompatibilityData& rhs) const noexcept
   {
-    ++cm::equal_to_called;
     return equal_to<cm::UsedSources>{}(lhs.usedSources, rhs.usedSources);
   }
 };
 
 template <> struct hash<cm::SourceCompatibilityData> {
-  size_t operator()(const cm::SourceCompatibilityData& data) const noexcept {
-    ++cm::hash_called;
+  size_t operator()(const cm::SourceCompatibilityData& src) const noexcept {
+#if 0
     size_t seed = 0;
-    cm::hash_combine(seed, hash<cm::UsedSources>()(data.usedSources));
+    cm::hash_combine(seed, hash<cm::UsedSources>()(src.usedSources));
     return seed;
+#else
+    return hash<cm::UsedSources>{}(src.usedSources);
+#endif
+  }
+};
+
+template <> struct equal_to<cm::SourceCompatibilityDataCRef> {
+  bool operator()(const cm::SourceCompatibilityDataCRef lhs_cref,
+    const cm::SourceCompatibilityDataCRef rhs_cref) const noexcept
+  {
+    return equal_to<cm::SourceCompatibilityData>{}(lhs_cref, rhs_cref);
+  }
+};
+
+template <> struct hash<cm::SourceCompatibilityDataCRef> {
+  size_t operator()(const cm::SourceCompatibilityDataCRef src_cref) const noexcept {
+#if 0
+    size_t seed = 0;
+    cm::hash_combine(seed, hash<cm::SourceCompatibilityData>()(src_cref);
+    return seed;
+#else
+    return hash<cm::SourceCompatibilityData>{}(src_cref);
+#endif
   }
 };
 

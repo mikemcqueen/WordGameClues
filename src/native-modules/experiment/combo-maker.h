@@ -378,19 +378,17 @@ struct SourceCompatibilityData {
   SourceCompatibilityData() = default;
   // copy consruct/assign allowed for now, precompute.mergeAllCompatibleXorSources
   SourceCompatibilityData(const SourceCompatibilityData&) = default;
+
   SourceCompatibilityData& operator=(const SourceCompatibilityData&) = default;
   SourceCompatibilityData(SourceCompatibilityData&&) = default;
   SourceCompatibilityData& operator=(SourceCompatibilityData&&) = default;
 
-  // copy components
+  // conversion from usedSources
   SourceCompatibilityData(const UsedSources& usedSources)
-      : usedSources(usedSources) {
-  }
+      : usedSources(usedSources) {}
 
-  // move components
   SourceCompatibilityData(UsedSources&& usedSources)
-      : usedSources(std::move(usedSources)) {
-  }
+      : usedSources(std::move(usedSources)) {}
 
   constexpr auto isXorCompatibleWith(const SourceCompatibilityData& other,
       bool check_variations = true) const {

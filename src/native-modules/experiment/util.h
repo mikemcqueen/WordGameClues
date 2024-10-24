@@ -165,8 +165,14 @@ inline std::string append(const std::string& s1, const std::string& s2,
 
 class Timer {
 public:
+  static Timer start_timer() {
+    Timer t;
+    t.start();
+    return t;
+  }
+
   void start() {
-    start_ = std::chrono::high_resolution_clock::now();
+    start_ = std::chrono::steady_clock::now();
   }
 
   template <typename TimeUnit = std::chrono::milliseconds>
@@ -175,7 +181,7 @@ public:
   }
 
   auto stop() {
-    stop_ = std::chrono::high_resolution_clock::now();
+    stop_ = std::chrono::steady_clock::now();
     return count();
   }
 
@@ -195,14 +201,8 @@ public:
     return count<std::chrono::nanoseconds>();
   }
 
-  static Timer start_timer() {
-    Timer t;
-    t.start();
-    return t;
-  }
-
 private:
-  using time_point_t = decltype(std::chrono::high_resolution_clock::now());
+  using time_point_t = decltype(std::chrono::steady_clock::now());
 
   time_point_t start_{};
   time_point_t stop_{};

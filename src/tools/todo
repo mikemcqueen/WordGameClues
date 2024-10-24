@@ -1,17 +1,26 @@
-* re-structure filter-task so it calls 2 or 3 separate functions, to logically divide
-  the work being done there better. it's a bit of a mess of shifting state throughout
-  the function atm.
 
 * consider_candidate slowness.
   * get_known_source_map_entries(), which is called by for_each_nc_source(), constructs
     a new list every time it's called. this function is also apparently called directly
     by index.cpp and combo-maker.cpp.
+    * so I fixed this to no longer create a vector and it's not faster at all.
+  * I want to figure out if i really need to append(name, ":", source) for primary
+    known source map, or if I can just use "source" here. like, iterate over the keys,
+    split by ":", and add sources to a set, to see if there are any duplicates. I
+    don't think there will be. and I could enforce that with an assert when i emplace().
+
+* re-structure filter-task so it calls 2 or 3 separate functions, to logically divide
+  the work being done there better. it's a bit of a mess of shifting state throughout
+  the function atm.
 
 * determine whether CompletionTracker has it's dependency bits right, or if it's waiting
   1 bit too long. (i.e, 3 should only wait for 2,1 - not 3,2,1)
 
 * remove -z3
 * remove --or-variations
+
+* init_primary_name_source_map in clue_manager is doing a lot of shit that can probably
+  be moved to KnownSources::init_primary_entry
 
 * there's an idea for using a CudaStreamEvent to pair a CudaEvent (or cudaEvent_t)
   with a cudaStream_t such that I can record the event after the last copy, and synchronize
