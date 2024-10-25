@@ -125,38 +125,32 @@ struct FilterData {
     void reset_pointers() {
       Base::reset_pointers();
       incompat_src_desc_pairs = nullptr;
-      src_compat_uv_indices = nullptr;
-      or_compat_uv_indices = nullptr;
-#if 1
-      variations_compat_results = nullptr;
-#endif
+      //src_compat_uv_indices = nullptr;
+      //or_compat_uv_indices = nullptr;
+      //variations_compat_results = nullptr;
     }
 
   public:
     void cuda_free() {
       Base::cuda_free();
       cm::cuda_free(incompat_src_desc_pairs);
-      cm::cuda_free(src_compat_uv_indices);
-      cm::cuda_free(or_compat_uv_indices);
-#if 1
-      cm::cuda_free(variations_compat_results);
-#endif
+      //cm::cuda_free(src_compat_uv_indices);
+      //cm::cuda_free(or_compat_uv_indices);
+      //cm::cuda_free(variations_compat_results);
       reset_pointers();
     }
 
     SourceDescriptorPair* incompat_src_desc_pairs;
-#if 1
     // serves as both flag-array results of variation compatibility check, and
     // result of in-place exclusive scan.
     // necessary  because compact_indices_in_place is probably broken so I
     // ompact them into this.
     index_t* variations_compat_results;
-#endif
     index_t variations_results_per_block;
     // list of xor.unique_variations indices compatible with current source
-    index_t* src_compat_uv_indices;
+    //index_t* src_compat_uv_indices;
     // list of or.unique_variations indices compatible with current xor source
-    index_t* or_compat_uv_indices;
+    //index_t* or_compat_uv_indices;
   } device_xor;
 
   //
@@ -170,16 +164,16 @@ struct FilterData {
   public:
     void reset_pointers() {
       Base::reset_pointers();
-      src_compat_results = nullptr;
+      //src_compat_results = nullptr;
     }
 
     void cuda_free() {
       Base::cuda_free();
-      cm::cuda_free(src_compat_results);
+      //cm::cuda_free(src_compat_results);
       reset_pointers();
     }
 
-    result_t* src_compat_results;
+    //result_t* src_compat_results;
   } device_or;
 
   /*

@@ -441,12 +441,15 @@ Value filterCandidatesForSum(const CallbackInfo& info) {
 #if 1
   save_current_candidate_counts(sum);
 
-  const auto opt_incompat_sources = filter_candidates_cuda(MFD, filter_params);
+  // const auto opt_incompat_sources =
+  filter_candidates_cuda(MFD, filter_params);
+#if 0
   assert(filter_params.synchronous == opt_incompat_sources.has_value());
   if (opt_incompat_sources.has_value()) {
     const auto stream = cudaStreamPerThread;
     set_incompatible_sources(MFD, opt_incompat_sources.value(), stream);
   }
+#endif
 #endif
   // NOTE: can only free device data here after synchronous call. 
   return env.Null();

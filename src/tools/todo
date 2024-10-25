@@ -3,6 +3,8 @@
 
 * call set_compat_src_indices in filter_candidates_cuda() rather than in index.cpp
 
+* filter_task return value.
+
 * consider_candidate slowness.
   * get_known_source_map_entries(), which is called by for_each_nc_source(), constructs
     a new list every time it's called. this function is also apparently called directly

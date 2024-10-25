@@ -52,12 +52,12 @@ __device__ auto compute_compat_OR_uv_indices(const Variations& xor_variations) {
   const auto begin = clock64();
   index_t num_uv_indices{};
   if (compute_variations_compat_results(xor_variations, or_data,
-          xor_data.or_compat_uv_indices)) {
+          stream_data().or_xor_compat_uv_indices)) {
     num_uv_indices = compute_compat_uv_indices(or_data.num_unique_variations,
-        xor_data.or_compat_uv_indices);
+        stream_data().or_xor_compat_uv_indices);
   }
 
-  #ifdef CLOCKS
+#ifdef CLOCKS
   atomicAdd(&or_compute_compat_uv_indices_clocks, clock64() - begin);
   #endif
 
@@ -86,7 +86,8 @@ __device__ fat_index_t get_OR_compat_idx_incremental_uv(
   auto uvi_idx = dynamic_shared[kOrStartUvIdx];
   auto start_idx = dynamic_shared[kOrStartSrcIdx];
   for (; uvi_idx < num_uv_indices; ++uvi_idx) {
-    const auto or_uv_idx = xor_data.or_compat_uv_indices[first_uvi_idx + uvi_idx];
+    const auto or_uv_idx =
+        stream_data().or_xor_compat_uv_indices[first_uvi_idx + uvi_idx];
     uv = &or_data.unique_variations[or_uv_idx];
     if (desired_idx < (uv->num_indices - start_idx)) {
       break;
@@ -255,7 +256,8 @@ __device__ auto get_xor_combo_index(index_t xor_flat_idx) {
   // TODO: really should use num_uv_indices here
   const auto uvi_offset = blockIdx.x * xor_data.num_unique_variations;
   for (index_t uvi_idx{}; uvi_idx < xor_data.num_unique_variations; ++uvi_idx) {
-    const auto uv_idx = xor_data.src_compat_uv_indices[uvi_offset + uvi_idx];
+    const auto uv_idx =
+        stream_data().xor_src_compat_uv_indices[uvi_offset + uvi_idx];
     const auto& uv = xor_data.unique_variations[uv_idx];
     if (xor_flat_idx < uv.num_indices) {
       return xor_data.compat_indices[uv.first_compat_idx + xor_flat_idx];

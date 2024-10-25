@@ -2,17 +2,28 @@
 
 #include <cassert>
 #include <mutex>
+#include <optional>
 #include <semaphore>
 #include <vector>
 #include <cuda_runtime.h>
 #include "cuda-types.h"
-#include "filter-stream.h"
+#include "stream-data.h"
 
 namespace cm {
 
+template <typename Swarm> class StreamSwarmPool;
+
+template <typename Stream, typename HostData, typename DeviceData>
 class StreamSwarm {
+  struct ValueIndex {
+    int value{};
+    int index{-1};
+  };
+
 public:
-  StreamSwarm(int pool_idx = 0) : pool_idx(pool_idx), in_use(false) {}
+  StreamSwarm(int pool_idx = 0) : pool_idx(pool_idx), in_use(false) {
+    device.init();
+  }
 
   void ensure_streams(index_t num_streams) {
     for (auto idx = index_t(streams_.size()); idx < num_streams; ++idx) {
@@ -20,7 +31,6 @@ public:
       auto err = cudaStreamCreate(&cuda_stream);
       assert_cuda_success(err, "cudaStreamCreate");
       streams_.emplace_back(idx, 0u, cuda_stream);
-      //streams_.back().init();
     }
   }
 
@@ -74,11 +84,6 @@ public:
     }
     return false;
   }
-
-  struct ValueIndex {
-    int value{};
-    int index{-1};
-  };
 
   // TODO: std::optional, and above here
   bool anyRunningComplete(int& index) {
@@ -144,16 +149,19 @@ public:
     return streams_.at(idx);
   }
 
+  HostData host;
+  DeviceData device;
+
 private:
-  std::vector<FilterStream> streams_;
+  std::vector<Stream> streams_;
 
   // hacky
-  friend class StreamSwarmPool;
+  friend class StreamSwarmPool<StreamSwarm<Stream, HostData, DeviceData>>;
   int pool_idx;
   bool in_use;
-}; // class StreamSwarm
+};  // class StreamSwarm
 
-class StreamSwarmPool {
+template <typename Swarm> class StreamSwarmPool {
 public:
   StreamSwarmPool(int initial_count) : semaphore_(initial_count) {
     for (int i{}; i < initial_count; ++i) {
@@ -166,7 +174,7 @@ public:
     return get_available();
   }
 
-  void release(StreamSwarm& swarm) {
+  void release(Swarm& swarm) {
     make_available(swarm.pool_idx);
     semaphore_.release();
   }
@@ -178,8 +186,17 @@ public:
     }
   }
 
+  // lil hacky
+  void for_each(auto& fn) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    for (auto& swarm : swarms_) {
+      assert(!swarm.in_use);
+      fn(swarm);
+    }
+  }
+
 private:
-  StreamSwarm& get_available() {
+  Swarm& get_available() {
     std::lock_guard<std::mutex> lock(mutex_);
     for (auto& swarm : swarms_) {
       if (!swarm.in_use) {
@@ -199,7 +216,7 @@ private:
 
   std::counting_semaphore<> semaphore_;
   std::mutex mutex_;
-  std::vector<StreamSwarm> swarms_;
+  std::vector<Swarm> swarms_;
 };
 
 }  // namespace cm

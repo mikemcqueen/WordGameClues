@@ -5,7 +5,8 @@
 
 namespace cm {
 
-class StreamSwarm;
+// template <typename Stream, typename HostData, typename DeviceData>
+// class StreamSwarm;
 
 struct KernelContext {
   void record(const CudaEvent& event) { event.record(cuda_stream); }
@@ -17,18 +18,32 @@ struct KernelContext {
   CudaEvent kernel_stop{};
 };  // struct KernelContext
 
-struct HasGlobalDeviceData {
-  explicit HasGlobalDeviceData() : global_idx_{increment_global_idx()} {}
+struct HasStreamDeviceData {
+  explicit HasStreamDeviceData() : stream_idx_{increment_stream_idx()} {}
 
-  auto global_idx() const { return global_idx_; }
+  auto stream_idx() const { return stream_idx_; }
 
 private:
-  static index_t increment_global_idx() {
-    static std::atomic<index_t> global_idx = 0;
-    return global_idx++;
+  static index_t increment_stream_idx() {
+    static std::atomic<index_t> stream_idx = 0;
+    return stream_idx++;
   }
 
-  index_t global_idx_;
+  index_t stream_idx_;
+};
+
+struct HasSwarmDeviceData {
+  explicit HasSwarmDeviceData() : swarm_idx_{increment_swarm_idx()} {}
+
+  auto swarm_idx() const { return swarm_idx_; }
+
+private:
+  static index_t increment_swarm_idx() {
+    static std::atomic<index_t> swarm_idx = 0;
+    return swarm_idx++;
+  }
+
+  index_t swarm_idx_;
 };
 
 template <typename HostData, typename DeviceData>
@@ -43,7 +58,9 @@ public:
   StreamData() = delete;
 
   StreamData(index_t stream_idx, index_t stride, cudaStream_t stream)
-      : KernelContext{stream}, stream_idx(stream_idx), stride(stride) {}
+      : KernelContext{stream}, stream_idx(stream_idx), stride(stride) {
+    device.init();
+  }
 
   auto increment_sequence_num() {
     sequence_num = next_sequence_num();

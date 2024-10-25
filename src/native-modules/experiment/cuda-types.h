@@ -21,7 +21,8 @@ namespace cm {
 
 constexpr unsigned kMaxOrArgs = 20;
 constexpr auto kMaxSums = 32;
-constexpr auto kMaxStreams = 4;  // 2 swarms x 2 streams each
+constexpr auto kMaxSwarms = 2;                // 2 swarms
+constexpr auto kMaxStreams = kMaxSwarms * 2;  // 2 streams per swarm
 
 // aliases
 

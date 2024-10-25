@@ -21,8 +21,8 @@ std::pair<int, int> get_filter_kernel_grid_block_sizes();
 
 void copy_filter_data_to_symbols(const FilterData& mfd, cudaStream_t stream);
 
-void run_filter_kernel(int threads_per_block, FilterStream& stream,
-    const CompatSourceIndices* device_src_indices,
+void run_filter_kernel(int threads_per_block, index_t swarm_idx,
+    FilterStream& stream, const CompatSourceIndices* device_src_indices,
     const result_t* device_compat_src_results, result_t* device_results);
 
 #if 0

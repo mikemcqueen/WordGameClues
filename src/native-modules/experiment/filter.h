@@ -10,8 +10,7 @@
 
 namespace cm {
 
-auto filter_candidates_cuda(FilterData& mfd, const FilterParams& params)  //
-    -> std::optional<CompatSourceIndicesSet>;
+void filter_candidates_cuda(FilterData& mfd, const FilterParams& params);
 
 filter_result_t get_filter_result();
 

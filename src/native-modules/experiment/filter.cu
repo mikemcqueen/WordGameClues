@@ -15,9 +15,9 @@ namespace cm {
 
 __constant__ FilterData::DeviceXor xor_data;
 __constant__ FilterData::DeviceOr or_data;
-__constant__ FilterStreamData::Device stream_data[kMaxStreams];
+__constant__ FilterStreamData::Device swarm_data_[kMaxSwarms];
+__constant__ FilterStreamData::Device stream_data_[kMaxStreams];
 __constant__ SourceCompatibilityData* sources_data[kMaxSums];
-//__constant__ FilterData::DeviceSources sources_data;
 
 #if defined(DEBUG_XOR_COUNTS) || defined(DEBUG_OR_COUNTS)
 __device__ atomic64_t count_xor_src_considered = 0;
@@ -532,9 +532,9 @@ __device__ auto compute_src_compat_results(
     const auto result_idx = blockIdx.x * data.sum_idx_list_sizes + idx;
     if (compat) {
       any_compat[src_idx.listIndex] = 1;
-      data.src_compat_results[result_idx] = 1;
+      stream_data().or_src_bits_compat_results[result_idx] = 1;
     } else {
-      data.src_compat_results[result_idx] = 0;
+      stream_data().or_src_bits_compat_results[result_idx] = 0;
     }
   }
   __syncthreads();
@@ -574,9 +574,9 @@ __device__ auto compute_compat_XOR_uv_indices(const Variations& src_variations) 
   const auto begin = clock64();
   index_t num_uv_indices{};
   if (compute_variations_compat_results(src_variations, xor_data,
-          xor_data.src_compat_uv_indices)) {
+          stream_data().xor_src_compat_uv_indices)) {
     num_uv_indices = compute_compat_uv_indices(xor_data.num_unique_variations,
-        xor_data.src_compat_uv_indices);
+        stream_data().xor_src_compat_uv_indices);
   }
 
   #ifdef CLOCKS
@@ -596,7 +596,8 @@ __device__ fat_index_t get_XOR_compat_idx_incremental_uv(
   auto uvi_idx = dynamic_shared[kXorStartUvIdx];
   auto start_idx = dynamic_shared[kXorStartSrcIdx];
   for (; uvi_idx < num_uv_indices; ++uvi_idx) {
-    const auto xor_uv_idx = xor_data.src_compat_uv_indices[uvi_offset + uvi_idx];
+    const auto xor_uv_idx =
+        stream_data().xor_src_compat_uv_indices[uvi_offset + uvi_idx];
     uv = &xor_data.unique_variations[xor_uv_idx];
     if (desired_idx < (uv->num_indices - start_idx)) break;
     desired_idx -= (uv->num_indices - start_idx);
@@ -794,10 +795,11 @@ __global__ void filter_kernel(
     const CompatSourceIndices* RESTRICT compat_src_indices,
     int num_compat_src_indices, const SourceIndex* RESTRICT src_indices,
     const result_t* RESTRICT compat_src_results, result_t* RESTRICT results,
-    index_t stream_idx) {
+    index_t swarm_idx, index_t stream_idx) {
   __shared__ SourceCompatibilityData source;
   __shared__ bool is_compat;
   if (!threadIdx.x) {
+    dynamic_shared[kSwarmIdx] = swarm_idx;
     dynamic_shared[kStreamIdx] = stream_idx;
     is_compat = false;
   }
@@ -878,8 +880,8 @@ void copy_filter_data_to_symbols(const FilterData& mfd, cudaStream_t stream) {
   */
 }
 
-void run_filter_kernel(int /*threads_per_block*/, FilterStream& stream,
-    const CompatSourceIndices* device_src_indices,
+void run_filter_kernel(int /*threads_per_block*/, index_t swarm_idx,
+    FilterStream& stream, const CompatSourceIndices* device_src_indices,
     const result_t* device_compat_src_results, result_t* device_results) {
   stream.is_running = true;
   stream.increment_sequence_num();
@@ -909,7 +911,7 @@ void run_filter_kernel(int /*threads_per_block*/, FilterStream& stream,
   filter_kernel<<<grid_dim, block_dim, shared_bytes, stream.cuda_stream>>>(
       device_src_indices, int(stream.host.src_idx_list.size()),
       stream.device.src_idx_list, device_compat_src_results, device_results,
-      stream.host.global_idx());
+      swarm_idx, stream.host.stream_idx());
   assert_cuda_success(cudaPeekAtLastError(), "filter_kernel");
   stream.record(stream.kernel_stop);
 

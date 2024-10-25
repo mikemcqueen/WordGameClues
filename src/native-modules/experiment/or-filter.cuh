@@ -31,9 +31,10 @@ inline constexpr auto kOrStartUvIdx = 3;
 inline constexpr auto kOrStartSrcIdx = 4;
 inline constexpr auto kSrcListIdx = 5;
 inline constexpr auto kSrcIdx = 6;
-inline constexpr auto kStreamIdx = 7;
-inline constexpr auto kDebugIdx = 8;
-inline constexpr auto kSharedIndexCount = 9;
+inline constexpr auto kSwarmIdx = 7;
+inline constexpr auto kStreamIdx = 8;
+inline constexpr auto kDebugIdx = 9;
+inline constexpr auto kSharedIndexCount = 10;
 
 // num source sentences (uint8_t) starts at end of indices
 inline constexpr auto kNumSrcSentences = kSharedIndexCount;
@@ -55,7 +56,16 @@ struct OR {};
 
 extern __constant__ FilterData::DeviceXor xor_data;
 extern __constant__ FilterData::DeviceOr or_data;
-extern __constant__ FilterStreamData::Device stream_data[kMaxStreams];
+extern __constant__ FilterStreamData::Device swarm_data_[kMaxSwarms];
+extern __constant__ FilterStreamData::Device stream_data_[kMaxStreams];
+
+__device__ __forceinline__ auto& swarm_data() {
+  return swarm_data_[dynamic_shared[kSwarmIdx]];
+}
+
+__device__ __forceinline__ auto& stream_data() {
+  return stream_data_[dynamic_shared[kStreamIdx]];
+}
 
 // also declared extern in filter.cuh, required in filter-support.cpp
 // extern __constant__ SourceCompatibilityData* sources_data[32];
@@ -135,7 +145,8 @@ __device__ auto check_src_compat_results(fat_index_t combo_idx, const T& data) {
     const auto src_idx = combo_idx % list_size;
     assert(list_start_idx >= list_size);
     list_start_idx -= list_size;
-    if (!data.src_compat_results[block_start_idx + list_start_idx + src_idx])
+    if (!stream_data().or_src_bits_compat_results[block_start_idx
+            + list_start_idx + src_idx])
       return false;
     combo_idx /= list_size;
   }
@@ -185,6 +196,7 @@ __device__ inline auto compute_variations_compat_results(
 #else
   const auto results_offset = blockIdx.x * xor_data.variations_results_per_block;
   const auto results = &xor_data.variations_compat_results[results_offset];
+  //const auto results = &stream_data().variations_compat_results[results_offset];
 #endif
   for (auto idx{threadIdx.x}; idx < num_results; idx += blockDim.x) {
     const auto compat = UsedSources::are_variations_compatible(src_variations,
@@ -323,6 +335,7 @@ __device__ inline auto compute_compat_uv_indices(
 #else
   const auto results_offset = blockIdx.x * xor_data.variations_results_per_block;
   const auto results = &xor_data.variations_compat_results[results_offset];
+  //const auto results = &stream_data().variations_compat_results[results_offset];
 #endif
   const auto last_result_idx = num_unique_variations - 1;
   const auto last_compat_result = results[last_result_idx];

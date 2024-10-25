@@ -5,16 +5,18 @@
 #include "merge-filter-data.h"
 #include "source-desc.h"
 #include "source-index.h"
-#include "stream-data.h"
+#include "stream-swarm.h"
 
 namespace cm {
+
+// #define VARIATIONS_RESULTS
 
 struct FilterStream;
 
 struct FilterStreamData {
   struct Device;
 
-  struct Host : HasGlobalDeviceData {
+  struct Host : HasStreamDeviceData {
     std::vector<SourceIndex> src_idx_list{};
 
   private:
@@ -23,12 +25,15 @@ struct FilterStreamData {
   };
 
   struct Device {
+    void init() {
+      src_idx_list = nullptr;
+      num_src_idx = 0;
+    }
     void init(FilterStream& stream, FilterData& mfd);
+    void alloc_copy_source_index_list(const Host& host, cudaStream_t stream);
 
     // list of ...TODO...
     SourceIndex* src_idx_list;
-
-    // Buffers
 
     // xor_data.unique_variations indices compatible with current source
     index_t* xor_src_compat_uv_indices;
@@ -36,12 +41,13 @@ struct FilterStreamData {
     // or_data.unique_variations indices compatible with current xor source
     index_t* or_xor_compat_uv_indices;
 
-#if 1
+#ifdef VARIATIONS_RESULTS
     // serves as both flag-array of variation compatibility test, and result
     // in-place exclusive scan.
     // necessary because i thought compact_indices_in_place was broken so I
     // temporarily reverted to compact them into this.
     index_t* variations_compat_results;
+    index_t variations_results_per_block;
 #endif
 
     // flag-array of SourceBits-compatibility tests between current source and
@@ -56,21 +62,45 @@ struct FilterStreamData {
 
   private:
     void alloc_buffers(FilterData& fd, cudaStream_t stream);
-    void cuda_copy_to_symbol(index_t idx, cudaStream_t stream);
-  };
+    void copy_to_symbol(index_t idx, cudaStream_t stream);
+    };
 };  // struct FilterStreamData
 
 using FilterStreamBase =
     StreamData<FilterStreamData::Host, FilterStreamData::Device>;
 
 struct FilterSwarmData {
-  struct Host : HasGlobalDeviceData {
-    std::vector<SourceDescriptorPair> incompat_src_desc_pairs;
+  struct Host : HasSwarmDeviceData {
   };
 
   struct Device {
-    // list of incompatible primary source descriptor pairs from sum==2
-    SourceDescriptorPair* incompat_src_desc_pairs;
+    void init() { reset(); }
+
+    void reset() {
+      compat_src_indices = nullptr;
+      compat_src_results = nullptr;
+    }
+
+    void cuda_free(cudaStream_t stream) {
+      if (compat_src_indices) cuda_free_async(compat_src_indices, stream);
+      if (compat_src_results) cuda_free_async(compat_src_results, stream);
+      reset();
+    }
+
+    void update(index_t swarm_idx,
+        CompatSourceIndices* device_compat_src_indices,
+        result_t* device_compat_src_results, cudaStream_t stream) {
+      cuda_free(stream);
+      compat_src_indices = device_compat_src_indices;
+      compat_src_results = device_compat_src_results;
+      copy_to_symbol(swarm_idx, stream);
+    }
+
+    CompatSourceIndices* compat_src_indices;
+    result_t* compat_src_results;
+
+    private:
+      void copy_to_symbol(index_t idx, cudaStream_t stream);
   };
 };  // struct FilterSwarmData
 
@@ -87,17 +117,20 @@ struct FilterStream : public FilterStreamBase {
 
   int num_compatible(const IndexStates& indexStates) const;
 
-  bool fill_source_indices(IndexStates& idx_states, index_t max_indices);
+  bool fill_source_index_list(IndexStates& idx_states, index_t max_indices);
 
-  bool fill_source_indices(IndexStates& idx_states) {
-    return fill_source_indices(idx_states, stride);
+  bool fill_source_index_list(IndexStates& idx_states) {
+    return fill_source_index_list(idx_states, stride);
   }
 
-  void alloc_copy_source_indices();
+  void alloc_copy_source_index_list();
 
   auto hasWorkRemaining() const { return !host.src_idx_list.empty(); }
 
   void dump() const;
 };  // struct FilterStream
+
+using FilterSwarm =
+    StreamSwarm<FilterStream, FilterSwarmData::Host, FilterSwarmData::Device>;
 
 }  // namespace cm
