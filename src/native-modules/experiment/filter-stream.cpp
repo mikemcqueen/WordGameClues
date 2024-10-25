@@ -62,13 +62,11 @@ void FilterStreamData::Device::alloc_buffers(FilterData& mfd,
       mfd.device_xor.num_unique_variations);
   if (max_uv) {
     const auto num_bytes = max_uv * grid_size * sizeof(index_t);
-    std::cerr << "stream_data max_uv: " << max_uv
-              << ", variations results bytes: " << num_bytes << std::endl;
 #ifdef VARIATIONS_RESULTS
     cuda_malloc_async((void**)&variations_compat_results, num_bytes, stream,
         "variations_compat_results");
   }
-  variations_results_per_block = max_uv;
+  num_variations_results_per_block = max_uv;
 #else
   }
 #endif

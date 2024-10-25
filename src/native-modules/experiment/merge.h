@@ -5,6 +5,7 @@
 #include <vector>
 #include "combo-maker.h"
 #include "merge-filter-data.h"
+#include "merge-type.h"
 
 namespace cm {
 

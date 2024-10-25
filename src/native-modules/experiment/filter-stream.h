@@ -9,7 +9,7 @@
 
 namespace cm {
 
-// #define VARIATIONS_RESULTS
+#define VARIATIONS_RESULTS
 
 struct FilterStream;
 
@@ -42,12 +42,12 @@ struct FilterStreamData {
     index_t* or_xor_compat_uv_indices;
 
 #ifdef VARIATIONS_RESULTS
-    // serves as both flag-array of variation compatibility test, and result
-    // in-place exclusive scan.
+    // serves as both flag-array of variation compatibility test, and results
+    // of in-place exclusive scan.
     // necessary because i thought compact_indices_in_place was broken so I
-    // temporarily reverted to compact them into this.
+    // temporarily reverted to compact them from this.
     index_t* variations_compat_results;
-    index_t variations_results_per_block;
+    index_t num_variations_results_per_block;
 #endif
 
     // flag-array of SourceBits-compatibility tests between current source and

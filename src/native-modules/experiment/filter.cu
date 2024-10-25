@@ -757,8 +757,8 @@ __device__ bool is_compat_loop(const SourceCompatibilityData& source) {
       atomicAdd(&is_any_or_compat_clocks, clock64() - begin);
       #endif
     }
-
     __syncthreads();
+
     if (any_or_compat) return true;
     if (dynamic_shared[kXorStartUvIdx] == num_uv_indices) break;
 

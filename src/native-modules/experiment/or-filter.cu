@@ -57,7 +57,7 @@ __device__ auto compute_compat_OR_uv_indices(const Variations& xor_variations) {
         stream_data().or_xor_compat_uv_indices);
   }
 
-#ifdef CLOCKS
+  #ifdef CLOCKS
   atomicAdd(&or_compute_compat_uv_indices_clocks, clock64() - begin);
   #endif
 

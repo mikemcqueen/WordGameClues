@@ -58,6 +58,8 @@ extern __constant__ FilterData::DeviceXor xor_data;
 extern __constant__ FilterData::DeviceOr or_data;
 extern __constant__ FilterSwarmData::Device swarm_data_[kMaxSwarms];
 extern __constant__ FilterStreamData::Device stream_data_[kMaxStreams];
+// also declared extern in filter.cuh, required in filter-support.cpp
+// extern __constant__ SourceCompatibilityData* sources_data[32];
 
 __device__ __forceinline__ auto& swarm_data() {
   return swarm_data_[dynamic_shared[kSwarmIdx]];
@@ -66,9 +68,6 @@ __device__ __forceinline__ auto& swarm_data() {
 __device__ __forceinline__ auto& stream_data() {
   return stream_data_[dynamic_shared[kStreamIdx]];
 }
-
-// also declared extern in filter.cuh, required in filter-support.cpp
-// extern __constant__ SourceCompatibilityData* sources_data[32];
 
 __device__ __forceinline__ index_t get_flat_idx(index_t block_idx,
     index_t thread_idx = threadIdx.x) {
@@ -194,9 +193,9 @@ __device__ inline auto compute_variations_compat_results(
   const auto results_offset = blockIdx.x * num_results;
   const auto results = &compat_results[results_offset];
 #else
-  const auto results_offset = blockIdx.x * xor_data.variations_results_per_block;
-  const auto results = &xor_data.variations_compat_results[results_offset];
-  //const auto results = &stream_data().variations_compat_results[results_offset];
+  const auto results_offset = blockIdx.x
+      * stream_data().num_variations_results_per_block;
+  const auto results = &stream_data().variations_compat_results[results_offset];
 #endif
   for (auto idx{threadIdx.x}; idx < num_results; idx += blockDim.x) {
     const auto compat = UsedSources::are_variations_compatible(src_variations,
@@ -333,9 +332,9 @@ __device__ inline auto compute_compat_uv_indices(
   const auto results_offset = blockIdx.x * num_unique_variations;
   const auto results = &in_results_out_indices[results_offset];
 #else
-  const auto results_offset = blockIdx.x * xor_data.variations_results_per_block;
-  const auto results = &xor_data.variations_compat_results[results_offset];
-  //const auto results = &stream_data().variations_compat_results[results_offset];
+  const auto results_offset = blockIdx.x
+      * stream_data().num_variations_results_per_block;
+  const auto results = &stream_data().variations_compat_results[results_offset];
 #endif
   const auto last_result_idx = num_unique_variations - 1;
   const auto last_compat_result = results[last_result_idx];
