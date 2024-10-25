@@ -15,7 +15,7 @@ namespace cm {
 
 __constant__ FilterData::DeviceXor xor_data;
 __constant__ FilterData::DeviceOr or_data;
-__constant__ FilterStreamData::Device swarm_data_[kMaxSwarms];
+__constant__ FilterSwarmData::Device swarm_data_[kMaxSwarms];
 __constant__ FilterStreamData::Device stream_data_[kMaxStreams];
 __constant__ SourceCompatibilityData* sources_data[kMaxSums];
 
@@ -792,10 +792,11 @@ __device__ int dumped = 0;
 //
 // Find compatible XOR source -> compare with variation-compatible OR sources.
 __global__ void filter_kernel(
-    const CompatSourceIndices* RESTRICT compat_src_indices,
-    int num_compat_src_indices, const SourceIndex* RESTRICT src_indices,
-    const result_t* RESTRICT compat_src_results, result_t* RESTRICT results,
-    index_t swarm_idx, index_t stream_idx) {
+    /*    const CompatSourceIndices* RESTRICT compat_src_indices,
+        int num_compat_src_indices, const SourceIndex* RESTRICT src_indices,
+        const result_t* RESTRICT compat_src_results,
+    */
+    result_t* RESTRICT results, index_t swarm_idx, index_t stream_idx) {
   __shared__ SourceCompatibilityData source;
   __shared__ bool is_compat;
   if (!threadIdx.x) {
@@ -803,29 +804,32 @@ __global__ void filter_kernel(
     dynamic_shared[kStreamIdx] = stream_idx;
     is_compat = false;
   }
+  __syncthreads();
 
 #if defined(PRINTF)
-    if (!blockIdx.x && !threadIdx.x) {
-      printf("+++kernel+++ blocks: %u\n", gridDim.x);
-    }
+  if (!blockIdx.x && !threadIdx.x) {
+    printf("+++kernel+++ blocks: %u\n", gridDim.x);
+  }
 #endif
 
 #if MAX_SOURCES
-    if (num_compat_src_indices >= MAX_SOURCES) {
-      num_compat_src_indices = MAX_SOURCES;
-    }
+  if (num_compat_src_indices >= MAX_SOURCES) {
+    num_compat_src_indices = MAX_SOURCES;
+  }
 #endif
+
   // for each source (one block per source)
-  for (index_t idx{blockIdx.x}; idx < num_compat_src_indices;
+  for (index_t idx{blockIdx.x}; idx < stream_data().num_src_idx;
       idx += gridDim.x) {
-    __syncthreads();
-    const auto src_idx = src_indices[idx];
-    if (!compat_src_results || compat_src_results[src_idx.index]) {
+    const auto src_idx = stream_data().src_idx_list[idx];
+    if (!swarm_data().compat_src_results
+        || swarm_data().compat_src_results[src_idx.index]) {
       if (!threadIdx.x) {
         dynamic_shared[kSrcListIdx] = src_idx.listIndex;
         dynamic_shared[kSrcIdx] = src_idx.index;
-        const auto csi1 = compat_src_indices[src_idx.index].first();
-        const auto csi2 = compat_src_indices[src_idx.index].second();
+        const auto csi = swarm_data().compat_src_indices[src_idx.index];
+        const auto csi1 = csi.first();
+        const auto csi2 = csi.second();
         // TODO: compare to source.reset() followed by 2x mergeInPlace
         source = sources_data[csi1.count()][csi1.index()];
 #if 1
@@ -833,12 +837,12 @@ __global__ void filter_kernel(
                 sources_data[csi2.count()][csi2.index()].usedSources)) {
           printf("idx %u, num_indices %u, src_idx.listIndex %u, src_idx.index "
                  "%u, csi1 count %u index %u, csi2 count %u index %u\n",
-              idx, num_compat_src_indices, src_idx.listIndex, src_idx.index,
+              idx, stream_data().num_src_idx, src_idx.listIndex, src_idx.index,
               csi1.count(), csi1.index(), csi2.count(), csi2.index());
         }
 #endif
-        // sync happens inside is_compat_loop
       }
+      // __syncthreads() happens inside is_compat_loop
       if (is_compat_loop(source)) { is_compat = true; }
     }
     __syncthreads();
@@ -846,6 +850,7 @@ __global__ void filter_kernel(
       results[src_idx.listIndex] = 1;
       is_compat = false;
     }
+    __syncthreads();
   }
 }
 
@@ -881,8 +886,7 @@ void copy_filter_data_to_symbols(const FilterData& mfd, cudaStream_t stream) {
 }
 
 void run_filter_kernel(int /*threads_per_block*/, index_t swarm_idx,
-    FilterStream& stream, const CompatSourceIndices* device_src_indices,
-    const result_t* device_compat_src_results, result_t* device_results) {
+    FilterStream& stream, result_t* device_results) {
   stream.is_running = true;
   stream.increment_sequence_num();
   const auto [grid_size, block_size] = get_filter_kernel_grid_block_sizes();
@@ -909,9 +913,13 @@ void run_filter_kernel(int /*threads_per_block*/, index_t swarm_idx,
   const dim3 block_dim(block_size);
   stream.record(stream.kernel_start);
   filter_kernel<<<grid_dim, block_dim, shared_bytes, stream.cuda_stream>>>(
+#if 0
       device_src_indices, int(stream.host.src_idx_list.size()),
       stream.device.src_idx_list, device_compat_src_results, device_results,
       swarm_idx, stream.host.stream_idx());
+#else
+      device_results, swarm_idx, stream.host.stream_idx());
+#endif
   assert_cuda_success(cudaPeekAtLastError(), "filter_kernel");
   stream.record(stream.kernel_stop);
 

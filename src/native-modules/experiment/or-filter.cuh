@@ -8,7 +8,7 @@
 
 namespace cm {
 
-// #define ONE_ARRAY
+//#define ONE_ARRAY
 
 #if 0
 #define CLOCKS
@@ -56,7 +56,7 @@ struct OR {};
 
 extern __constant__ FilterData::DeviceXor xor_data;
 extern __constant__ FilterData::DeviceOr or_data;
-extern __constant__ FilterStreamData::Device swarm_data_[kMaxSwarms];
+extern __constant__ FilterSwarmData::Device swarm_data_[kMaxSwarms];
 extern __constant__ FilterStreamData::Device stream_data_[kMaxStreams];
 
 __device__ __forceinline__ auto& swarm_data() {

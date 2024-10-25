@@ -378,9 +378,7 @@ void log_filter_kernel(int sum, const FilterStream& stream,
 // and the number of compatible sources.
 //
 auto run_concurrent_filter_kernels(int sum, FilterSwarm& swarm,
-    int threads_per_block, IndexStates& idx_states,
-    const CompatSourceIndices* device_src_indices,
-    const result_t* device_compat_src_results, result_t* device_results,
+    int threads_per_block, IndexStates& idx_states, result_t* device_results,
     std::vector<result_t>& results) {
   // would like to get rid of this for sure. only the first stream in the
   // swarm will auto-sync with any prior alloc/zero/copies on that stream.
@@ -400,7 +398,7 @@ auto run_concurrent_filter_kernels(int sum, FilterSwarm& swarm,
         log_fill_indices(sum, stream, idx_states, t.microseconds());
         stream.alloc_copy_source_index_list();
         run_filter_kernel(threads_per_block, swarm.host.swarm_idx(), stream,
-            device_src_indices, device_compat_src_results, device_results);
+            device_results);
       }
     } else {
       // kernel on stream has finished
@@ -479,11 +477,8 @@ void log_filter_sources(int sum, int num_processed, int num_compat,
 //
 // Returns a pair<compat_combo_string_set, incompat_sources_set>
 //
-filter_task_result_t filter_sources(
-    const CompatSourceIndices* device_src_indices,
-    const result_t* device_compat_src_results,
-    std::vector<IndexList>& idx_lists, const FilterParams& params,
-    FilterSwarm& swarm) {
+filter_task_result_t filter_sources(FilterSwarm& swarm,
+    const FilterParams& params, std::vector<IndexList>& idx_lists) {
   using namespace std::experimental::fundamentals_v3;
   const auto stream = swarm.at(0).cuda_stream;
   const auto num_streams = params.num_streams ? params.num_streams : 1;
@@ -517,8 +512,7 @@ filter_task_result_t filter_sources(
   auto t = util::Timer::start_timer();
   const auto [num_processed, num_compat] =  //
       run_concurrent_filter_kernels(params.sum, swarm, params.threads_per_block,
-          idx_states, device_src_indices, device_compat_src_results,
-          device_results, results);
+          idx_states, device_results, results);
   t.stop();
   CompatSourceIndicesSet incompat_src_indices;
   int num_incompat_sources{};
@@ -635,6 +629,7 @@ filter_task_result_t filter_task(FilterData& mfd, FilterParams params) {
   CudaEvent copy_start(stream);
   auto num_sources = copy_prior_sum_sources(params, stream);
   CudaEvent copy_stop(stream);
+  // TODO: log_copy_sources()
 
   // 2. Perform as much CPU work as possible for data that is only used by this
   //    sum's kernel, before blocking for one of the available stream swarms
@@ -702,8 +697,7 @@ filter_task_result_t filter_task(FilterData& mfd, FilterParams params) {
       device_compat_src_results, stream);
   swarm.at(0).init(mfd);
 
-  auto filter_result = filter_sources(device_src_indices,
-      device_compat_src_results, idx_lists, params, swarm);
+  auto filter_result = filter_sources(swarm, params, idx_lists);
 
   if (params.synchronous) {
     assert(filter_result.second.has_value());

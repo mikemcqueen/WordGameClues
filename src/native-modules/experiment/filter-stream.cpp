@@ -8,7 +8,7 @@
 
 namespace cm {
 
-extern __constant__ FilterStreamData::Device swarm_data_[kMaxSwarms];
+extern __constant__ FilterSwarmData::Device swarm_data_[kMaxSwarms];
 extern __constant__ FilterStreamData::Device stream_data_[kMaxStreams];
 
 void FilterStreamData::Device::init(FilterStream& stream, FilterData& mfd) {
