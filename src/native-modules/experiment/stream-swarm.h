@@ -1,26 +1,12 @@
-// filter-types.h
-
 #pragma once
-//#include <algorithm>
-//#include <array>
-//#include <chrono>
-//#include <forward_list>
-//#include <iostream>
-//#include <numeric>
-//#include <optional>
-//#include <thread>
-//#include <unordered_set>
-//#include <utility>
+
+#include <cassert>
 #include <mutex>
 #include <semaphore>
 #include <vector>
 #include <cuda_runtime.h>
-//#include "cm-hash.h"
 #include "cuda-types.h"
-//#include "candidates.h"
-//#include "merge-filter-common.h"
-#include "stream-data.h"
-//#include "log.h"
+#include "filter-stream.h"
 
 namespace cm {
 
@@ -28,15 +14,17 @@ class StreamSwarm {
 public:
   StreamSwarm(int pool_idx = 0) : pool_idx(pool_idx), in_use(false) {}
 
-  void ensure_streams(int num_streams) {
-    for (auto idx = int(streams_.size()); idx < num_streams; ++idx) {
+  void ensure_streams(index_t num_streams) {
+    for (auto idx = index_t(streams_.size()); idx < num_streams; ++idx) {
       cudaStream_t cuda_stream;
       auto err = cudaStreamCreate(&cuda_stream);
       assert_cuda_success(err, "cudaStreamCreate");
-      streams_.emplace_back(idx, 0, cuda_stream);
+      streams_.emplace_back(idx, 0u, cuda_stream);
+      //streams_.back().init();
     }
   }
 
+  // bad name.  call it "set_stride"
   void init(int num_streams, int stride) {
     ensure_streams(num_streams);
     // not a strict requirement but matches existing use and simplifies logic.
@@ -49,7 +37,8 @@ public:
 
   void reset() {
     for (auto& stream : streams_) {
-      stream.src_indices.resize(stream.stride);
+      // TODO move this
+      stream.host.src_idx_list.resize(stream.stride);
       stream.is_running = false;
       stream.has_run = false;
     }
@@ -156,7 +145,7 @@ public:
   }
 
 private:
-  std::vector<StreamData> streams_;
+  std::vector<FilterStream> streams_;
 
   // hacky
   friend class StreamSwarmPool;

@@ -6,17 +6,14 @@
 
 namespace cm {
 
-constexpr unsigned kMaxOrArgs = 20;
-constexpr unsigned kMaxSums = 32;
-
 struct FilterData;
-struct StreamData;
+struct FilterStream;
 
 extern __constant__ SourceCompatibilityData* sources_data[kMaxSums];
 
 void run_get_compatible_sources_kernel(
     const CompatSourceIndices* device_src_indices, size_t num_src_indices,
-    const UsedSources::SourceDescriptorPair* device_incompat_src_desc_pairs,
+    const SourceDescriptorPair* device_incompat_src_desc_pairs,
     size_t num_src_desc_pairs, result_t* device_resultsy,
     cudaStream_t sync_stream, cudaStream_t stream);
 
@@ -24,7 +21,7 @@ std::pair<int, int> get_filter_kernel_grid_block_sizes();
 
 void copy_filter_data_to_symbols(const FilterData& mfd, cudaStream_t stream);
 
-void run_filter_kernel(int threads_per_block, StreamData& stream,
+void run_filter_kernel(int threads_per_block, FilterStream& stream,
     const CompatSourceIndices* device_src_indices,
     const result_t* device_compat_src_results, result_t* device_results);
 

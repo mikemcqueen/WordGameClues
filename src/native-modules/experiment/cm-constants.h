@@ -2,7 +2,7 @@
 
 namespace cm {
 
-constexpr auto kMaxSourcesPerSentence = 32;
-constexpr auto kNumSentences = 9;
+inline constexpr auto kMaxSourcesPerSentence = 32;
+inline constexpr auto kNumSentences = 9;
 
-}
+}  // namespace cm

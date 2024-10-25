@@ -1,16 +1,85 @@
 #pragma once
 
 #include <vector>
+#include <cuda_runtime.h> // cudaStream_t
+#include "merge-filter-data.h"
+#include "source-desc.h"
 #include "source-index.h"
 #include "stream-data.h"
 
 namespace cm {
-  
+
+struct FilterStream;
+
+struct FilterStreamData {
+  struct Device;
+
+  struct Host : HasGlobalDeviceData {
+    std::vector<SourceIndex> src_idx_list{};
+
+  private:
+    friend struct Device;
+    bool device_initialized{false};
+  };
+
+  struct Device {
+    void init(FilterStream& stream, FilterData& mfd);
+
+    // list of ...TODO...
+    SourceIndex* src_idx_list;
+
+    // Buffers
+
+    // xor_data.unique_variations indices compatible with current source
+    index_t* xor_src_compat_uv_indices;
+
+    // or_data.unique_variations indices compatible with current xor source
+    index_t* or_xor_compat_uv_indices;
+
+#if 1
+    // serves as both flag-array of variation compatibility test, and result
+    // in-place exclusive scan.
+    // necessary because i thought compact_indices_in_place was broken so I
+    // temporarily reverted to compact them into this.
+    index_t* variations_compat_results;
+#endif
+
+    // flag-array of SourceBits-compatibility tests between current source and
+    // all or-sources
+    result_t* or_src_bits_compat_results;
+
+    // TODO:
+    // result_t* results;
+
+    // length of src_idx_list
+    index_t num_src_idx;
+
+  private:
+    void alloc_buffers(FilterData& fd, cudaStream_t stream);
+    void cuda_copy_to_symbol(index_t idx, cudaStream_t stream);
+  };
+};  // struct FilterStreamData
+
+using FilterStreamBase =
+    StreamData<FilterStreamData::Host, FilterStreamData::Device>;
+
+struct FilterSwarmData {
+  struct Host : HasGlobalDeviceData {
+    std::vector<SourceDescriptorPair> incompat_src_desc_pairs;
+  };
+
+  struct Device {
+    // list of incompatible primary source descriptor pairs from sum==2
+    SourceDescriptorPair* incompat_src_desc_pairs;
+  };
+};  // struct FilterSwarmData
+
 class IndexStates;
 
-struct FilterStream : public StreamData {
-  FilterStream(index_t idx, index_t stride, cudaStream_t stream)
-      : StreamData{idx, stride, stream} {}
+struct FilterStream : public FilterStreamBase {
+  using FilterStreamBase::FilterStreamBase;
+
+  void init(FilterData& mfd) { device.init(*this, mfd); }
 
   int num_ready(const IndexStates& indexStates) const;
 
@@ -26,13 +95,9 @@ struct FilterStream : public StreamData {
 
   void alloc_copy_source_indices();
 
-  auto hasWorkRemaining() const { return !src_indices.empty(); }
+  auto hasWorkRemaining() const { return !host.src_idx_list.empty(); }
 
   void dump() const;
-
-  SourceIndex* device_src_indices{};     // allocated in device memory
-  size_t num_device_src_indices_bytes{}; // size of above buffer
-  std::vector<SourceIndex> src_indices;
 };  // struct FilterStream
 
 }  // namespace cm

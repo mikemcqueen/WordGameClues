@@ -1,13 +1,14 @@
 #pragma once
 #include <cassert>
 #include <cub/block/block_scan.cuh>
-#include <cuda/atomic>
+//#include <cuda/atomic>
 #include "cuda-types.h"
+#include "filter-stream.h"
 #include "merge-filter-data.h"
 
 namespace cm {
 
-  //#define ONE_ARRAY
+// #define ONE_ARRAY
 
 #if 0
 #define CLOCKS
@@ -30,15 +31,16 @@ inline constexpr auto kOrStartUvIdx = 3;
 inline constexpr auto kOrStartSrcIdx = 4;
 inline constexpr auto kSrcListIdx = 5;
 inline constexpr auto kSrcIdx = 6;
-inline constexpr auto kDebugIdx = 7;
-inline constexpr auto kSharedIndexCount = 8;
+inline constexpr auto kStreamIdx = 7;
+inline constexpr auto kDebugIdx = 8;
+inline constexpr auto kSharedIndexCount = 9;
 
 // num source sentences (uint8_t) starts at end of indices
 inline constexpr auto kNumSrcSentences = kSharedIndexCount;
 inline constexpr auto kNumSentenceDataBytes = 12;
 // source sentence data (unit8_t) follows for 9 more bytes, round to 12 total
 
-// xor_results (result_t) starts after of sentence data
+// xor_results (result_t) starts after sentence data
 inline constexpr auto kXorResults =
     kNumSrcSentences + (kNumSentenceDataBytes / kSharedIndexSize);
 
@@ -53,12 +55,13 @@ struct OR {};
 
 extern __constant__ FilterData::DeviceXor xor_data;
 extern __constant__ FilterData::DeviceOr or_data;
+extern __constant__ FilterStreamData::Device stream_data[kMaxStreams];
 
 // also declared extern in filter.cuh, required in filter-support.cpp
 // extern __constant__ SourceCompatibilityData* sources_data[32];
 
-__device__ __forceinline__ index_t get_flat_idx(
-    index_t block_idx, index_t thread_idx = threadIdx.x) {
+__device__ __forceinline__ index_t get_flat_idx(index_t block_idx,
+    index_t thread_idx = threadIdx.x) {
   return block_idx * blockDim.x + thread_idx;
 }
 
@@ -76,16 +79,18 @@ __device__ __forceinline__ auto are_source_bits_XOR_compatible(
   return (a.word(word_idx) & b.word(word_idx)) == 0u;
 }
 
+// each thread calls this with a different "other" source
 template <typename TagT>
-requires std::is_same_v<TagT, tag::XOR> || std::is_same_v<TagT, tag::OR>
-__device__ inline auto is_source_compatible_with(
+requires /*std::is_same_v<TagT, tag::XOR> ||*/ std::is_same_v<TagT, tag::OR>
+__device__ inline auto are_sources_compatible(
     const SourceCompatibilityData& source,
     const SourceCompatibilityData& other) {
-  uint8_t* num_src_sentences = (uint8_t*)&dynamic_shared[kNumSrcSentences];
-  uint8_t* src_sentences = &num_src_sentences[1];
+  const uint8_t* num_sentences = (uint8_t*)&dynamic_shared[kNumSrcSentences];
+  const uint8_t* sentences = &num_sentences[1];
 
-  for (uint8_t idx{}; idx < *num_src_sentences; ++idx) {
-    auto sentence = src_sentences[idx];
+  // TODO: i could just increment 'sentences++' here instead of indexing
+  for (uint8_t idx{}; idx < *num_sentences; ++idx) {
+    const auto sentence = sentences[idx];
     // we know all source.variations[s] are > -1. no need to compare bits if
     // other.variations[s] == -1.
     if (other.usedSources.variations[sentence] > -1) {
@@ -108,14 +113,14 @@ __device__ inline auto is_source_compatible_with(
 
 // With all sources identified by combo_idx
 template <typename TagT, typename T>
-requires std::is_same_v<TagT, tag::XOR> || std::is_same_v<TagT, tag::OR>
+requires /*std::is_same_v<TagT, tag::XOR> ||*/ std::is_same_v<TagT, tag::OR>
 __device__ auto is_source_compatible_with_all(
     const SourceCompatibilityData& source, fat_index_t combo_idx,
     const T& data) {
   for (int list_idx{int(data.num_idx_lists) - 1}; list_idx >= 0;
       --list_idx) {
-    const auto& src = data.get_source(combo_idx, list_idx);
-    if (!is_source_compatible_with<TagT>(source, src)) return false;
+    const auto& other = data.get_source(combo_idx, list_idx);
+    if (!are_sources_compatible<TagT>(source, other)) return false;
     combo_idx /= data.idx_list_sizes[list_idx];
   }
   return true;
@@ -138,7 +143,7 @@ __device__ auto check_src_compat_results(fat_index_t combo_idx, const T& data) {
 }
   
 // faster than UsedSources version
-__device__ __forceinline__ void merge_variations(
+__device__ __forceinline__ void merge_variations_unchecked(
     Variations& to, const Variations& from, bool force = false) {
   for (int s{}; s < kNumSentences; ++s) {
     if (force || (to[s] == -1)) to[s] = from[s];
@@ -153,7 +158,7 @@ __device__ auto build_variations(fat_index_t combo_idx, const T& data) {
     const auto& src = data.get_source(combo_idx, list_idx);
     combo_idx /= data.idx_list_sizes[list_idx];
     // TODO: put UsedSources version of this in an #ifdef ASSERTS block
-    merge_variations(v, src.usedSources.variations, force);
+    merge_variations_unchecked(v, src.usedSources.variations, force);
     force = false;
   }
   return v;

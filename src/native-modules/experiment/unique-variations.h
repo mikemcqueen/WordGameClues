@@ -14,7 +14,7 @@ void build_unique_variations(
 auto make_variations_sorted_idx_lists(
     const CandidateList& candidates) -> std::vector<IndexList>;
 
-auto make_compat_src_indices(const CandidateList& candidates,
+auto make_compat_source_indices(const CandidateList& candidates,
     const std::vector<IndexList>& idx_lists) -> CompatSourceIndicesList;
 
 /*

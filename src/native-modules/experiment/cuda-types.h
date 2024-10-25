@@ -2,6 +2,7 @@
 #define INCLUDE_CUDA_TYPES_H
 
 #pragma once
+
 #include <cassert>
 #include <cmath>
 #include <cstdint>
@@ -17,6 +18,10 @@
 #include "variations.h"
 
 namespace cm {
+
+constexpr unsigned kMaxOrArgs = 20;
+constexpr auto kMaxSums = 32;
+constexpr auto kMaxStreams = 4;  // 2 swarms x 2 streams each
 
 // aliases
 
@@ -165,6 +170,12 @@ public:
   CudaEvent(cudaStream_t stream_to_record) : CudaEvent() {
     record(stream_to_record);
   }
+
+  // disable copy/assign
+  CudaEvent(const CudaEvent&) = delete;
+  CudaEvent& operator=(const CudaEvent&) = delete;
+  // enable move
+  CudaEvent(CudaEvent&&) = default;
 
   ~CudaEvent() {
     auto err = cudaEventDestroy(event_);

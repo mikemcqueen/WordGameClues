@@ -1,3 +1,8 @@
+* per-swarm compat_results/compat_indices buffers. maybe this swarm is not so much a
+  swarm, but a kernel context?  maybe it's two things? (1:swarm 2:context)?
+
+* call set_compat_src_indices in filter_candidates_cuda() rather than in index.cpp
+
 * consider_candidate slowness.
   * get_known_source_map_entries(), which is called by for_each_nc_source(), constructs
     a new list every time it's called. this function is also apparently called directly
@@ -12,9 +17,8 @@
 *** so i'm wondering, can i just start the consider_candidate loop(s) earlier? is there
     any data-dependency reason why I wait to run 3 after the filter kernel for 2 is done?
     Or could I just spawn a bunch of threads right off the bat to do the considers?
-
-* remove -z3
-* remove --or-variations
+    * Maybe. Does it really matter? Not with lots of --or args. Probably improves the
+      --xor flag only case a little bit.
 
 * re-structure filter-task so it calls 2 or 3 separate functions, to logically divide
   the work being done there better. it's a bit of a mess of shifting state throughout
@@ -30,9 +34,6 @@
   with a cudaStream_t such that I can record the event after the last copy, and synchronize
   it wherever, later (like in run_get_compatible_results_kernel). I could potentially
   even hijack an event out of the StreamData (or add a new sync_event to it).
-
-* per-swarm compat_results/compat_indices buffers. maybe this swarm is not so much a
-  swarm, but a kernel context?  maybe it's two things? (1:swarm 2:context)?
 
 * compact_uv_indices_in_place is broken! maybe! maybe not! maybe I can remove that first
   __syncthreads() call.

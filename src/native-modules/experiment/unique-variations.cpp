@@ -46,8 +46,8 @@ auto get_variations_index_list(const MergeData::Host& host) {
     VariationsIndex vi;
     util::for_each_source_index(combo_idx, host.compat_idx_lists,
         [&host, &v = vi.variations, combo_idx](index_t list_idx,
-            index_t src_idx) {
-          const auto& src = host.src_lists.at(list_idx).at(src_idx);
+            index_t elem_idx) {
+          const auto& src = host.src_lists.at(list_idx).at(elem_idx);
           if (UsedSources::merge_variations(v, src.usedSources.variations)) {
             return true;
           }
@@ -76,7 +76,7 @@ auto make_sorted_compat_indices(const FatIndexList& compat_indices,
 
 auto make_unique_variations(const std::vector<VariationsIndex>& sorted_vi_list) {
   std::vector<UniqueVariations> unique_variations;
-  size_t sum_of_indices{};
+  size_t sum_of_indices{}; // prefix sum
   for (auto it = sorted_vi_list.cbegin(); it != sorted_vi_list.cend();) {
     auto range_end = std::find_if_not(it, sorted_vi_list.end(),  //
         [&first_vi = *it](const VariationsIndex& vi) {
@@ -143,7 +143,7 @@ auto make_idx_lists(const CandidateList& candidates,
 // For XOR and OR compat_indices lists
 // TODO: better comment
 void build_unique_variations(
-    FilterData::HostCommon& host, std::string_view name) {
+    FilterData::HostCommon& host, std::string_view tag) {
   auto variations_idx_list = get_variations_index_list(host);
   std::ranges::sort(variations_idx_list,
       [](const VariationsIndex& a, const VariationsIndex& b) {
@@ -153,8 +153,8 @@ void build_unique_variations(
       make_sorted_compat_indices(host.compat_indices, variations_idx_list));
   host.unique_variations =
       std::move(make_unique_variations(variations_idx_list));
-  if (log_level(Verbose)) {
-    std::cerr << name << " unique variations: " << host.unique_variations.size()
+  if (log_level(Normal)) {
+    std::cerr << tag << " unique variations: " << host.unique_variations.size()
               << std::endl;
   }
 }
@@ -168,7 +168,7 @@ auto make_variations_sorted_idx_lists(
   return make_idx_lists(candidates, src_idx_list);
 }
 
-auto make_compat_src_indices(const CandidateList& candidates,
+auto make_compat_source_indices(const CandidateList& candidates,
     const std::vector<IndexList>& idx_lists) -> CompatSourceIndicesList {
   CompatSourceIndicesList compat_src_indices(util::sum_sizes(idx_lists));
   for (size_t list_idx{}; list_idx < idx_lists.size(); ++list_idx) {

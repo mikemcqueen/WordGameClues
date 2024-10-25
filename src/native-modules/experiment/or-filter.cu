@@ -186,8 +186,8 @@ __device__ auto get_OR_sources_chunk(const SourceCompatibilityData& source,
   #endif
 
   begin = clock64();
-  auto isc =
-      is_source_compatible_with_all<tag::OR>(source, or_combo_idx, or_data);
+  auto isc = is_source_compatible_with_all<tag::OR>(source, or_combo_idx,
+      or_data);
 
   #ifdef CLOCKS
   atomicAdd(&or_is_src_compat_clocks, clock64() - begin);

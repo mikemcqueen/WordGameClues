@@ -1,11 +1,10 @@
 #pragma once
+
 #include <vector>
 #include "cuda-types.h"
 
 namespace cm {
 
-// should be called ResultSourceIndices
-// or ResultFlatIdx or ListFlatIdx or something....
 struct SourceIndex {
   constexpr bool operator<(const SourceIndex& rhs) const {
     return (listIndex < rhs.listIndex)
@@ -17,8 +16,8 @@ struct SourceIndex {
     return buf;
   }
 
-  index_t listIndex{};  // result_idx
-  index_t index{};      // src_idx
+  index_t listIndex{};
+  index_t index{};
 };
 
 using SourceIndexList = std::vector<SourceIndex>;

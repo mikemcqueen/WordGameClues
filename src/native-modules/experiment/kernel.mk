@@ -17,10 +17,11 @@ NVCC_COMPILE_FLAGS := -Xcompiler -fPIC \
 	--extended-lambda \
 	-Xptxas=-v \
 	-lineinfo \
-	-std=c++20 \
 	-O2 \
+	-std=c++20 \
 	-dopt=on \
 	-maxrregcount=40
+
 
 NVCC_LINK_FLAGS := -Xcompiler -fPIC
 

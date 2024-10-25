@@ -6,15 +6,16 @@
 #include <cuda_runtime.h>
 #include "cuda-device.h"
 #include "filter.cuh"
+#include "filter-stream.h"
 #include "merge-filter-data.h"
 #include "or-filter.cuh"
-#include "stream-data.h"
 #include "util.h"
 
 namespace cm {
 
 __constant__ FilterData::DeviceXor xor_data;
 __constant__ FilterData::DeviceOr or_data;
+__constant__ FilterStreamData::Device stream_data[kMaxStreams];
 __constant__ SourceCompatibilityData* sources_data[kMaxSums];
 //__constant__ FilterData::DeviceSources sources_data;
 
@@ -381,7 +382,7 @@ __device__ void dump_all_sources(fat_index_t flat_idx,
 __device__ bool sources_match_any_descriptor_pair(
     const SourceCompatibilityData& source1,
     const SourceCompatibilityData& source2,
-    const UsedSources::SourceDescriptorPair* RESTRICT src_desc_pairs,
+    const SourceDescriptorPair* RESTRICT src_desc_pairs,
     const unsigned num_src_desc_pairs) {
   __shared__ bool match;
   if (!threadIdx.x) match = false;
@@ -407,7 +408,7 @@ __device__ bool sources_match_any_descriptor_pair(
 __global__ void get_compatible_sources_kernel(
     const CompatSourceIndices* RESTRICT compat_src_indices,
     const unsigned num_compat_src_indices,
-    const UsedSources::SourceDescriptorPair* RESTRICT incompat_src_desc_pairs,
+    const SourceDescriptorPair* RESTRICT incompat_src_desc_pairs,
     const unsigned num_src_desc_pairs, result_t* RESTRICT results) {
   // one block per source-(index)-pair
   for (unsigned idx{blockIdx.x}; idx < num_compat_src_indices;
@@ -506,11 +507,11 @@ __device__ bool is_source_XOR_compatible(const SourceCompatibilityData& source,
 // Return true if the source is Bits-compatible with at least one OR-source
 // from each OR-arg source list.
 //
-// If so, that flag array is used by check_src_compat_results() to reject
+// If true, the flag array is used by check_src_compat_results() to reject
 // incompatible OR-source combo-indices when generating OR-source chunks.
 //
 // It's currently not used for testing compatibility with XOR sources, and
-// the XOR code in is_source_compatible_with() should be reviewed when it is.
+// the XOR code in are_sources_compatible() should be reviewed when it is.
 //
 template <typename TagT, typename T>
 requires /*std::is_same_v<TagT, tag::XOR> ||*/ std::is_same_v<TagT, tag::OR>
@@ -526,8 +527,8 @@ __device__ auto compute_src_compat_results(
     const auto src_list = &data.src_lists[src_list_idx];
     const auto idx_list_idx = data.idx_list_start_indices[src_idx.listIndex];
     const auto idx_list = &data.idx_lists[idx_list_idx];
-    const auto& src = src_list[idx_list[src_idx.index]];
-    const auto compat = is_source_compatible_with<TagT>(source, src);
+    const auto& other = src_list[idx_list[src_idx.index]];
+    const auto compat = are_sources_compatible<TagT>(source, other);
     const auto result_idx = blockIdx.x * data.sum_idx_list_sizes + idx;
     if (compat) {
       any_compat[src_idx.listIndex] = 1;
@@ -562,7 +563,7 @@ __device__ auto init_source(const SourceCompatibilityData& source) {
     *num_src_sentences = 0;
     for (int s{}; s < kNumSentences; ++s) {
       if (source.usedSources.variations[s] > -1) {
-        src_sentences[(*num_src_sentences)++] = (uint8_t)s;
+        src_sentences[(*num_src_sentences)++] = static_cast<uint8_t>(s);
       }
     }
   }
@@ -615,10 +616,8 @@ __device__ fat_index_t get_XOR_compat_idx_incremental_uv(
         start_idx = 0;
       }
     }
-    // might be technically unnecessary, but it keeps the data clean &
-    // consistent for purposes of debugging a new/complex implementation
     if (uvi_idx == num_uv_indices) {
-      start_idx = or_data.num_compat_indices;
+      start_idx = xor_data.num_compat_indices;
     }
     dynamic_shared[kXorStartUvIdx] = uvi_idx;
     dynamic_shared[kXorStartSrcIdx] = start_idx;
@@ -664,8 +663,8 @@ __device__ bool get_next_XOR_sources_chunk(const SourceCompatibilityData& source
 
 // Loop through block-sized chunks of XOR sources until we find one that
 // contains at least one XOR source that is XOR-compatibile with the supplied
-// source, or until all XOR sources are exhausted.
-// Return true if at least one XOR source is compatible.
+// source, or until all XOR sources are exhausted. Return true if at least one
+// XOR source is compatible.
 __device__ bool get_next_compatible_XOR_sources_chunk(
     const SourceCompatibilityData& source, index_t xor_chunk_idx,
     const index_t num_uv_indices) {
@@ -687,7 +686,7 @@ __device__ bool get_next_compatible_XOR_sources_chunk(
   return any_xor_compat;
 }
 
-// Test if the supplied source is:
+// Test if the supplied source both is:
 // * XOR-compatible with any of the supplied XOR sources
 // * OR-compatible with any of the supplied OR sources, which are in turn
 //   variation-compatible with the compatible XOR source.
@@ -713,7 +712,7 @@ __device__ bool is_compat_loop(const SourceCompatibilityData& source) {
     dynamic_shared[kXorStartSrcIdx] = 0;
   }
   __syncthreads();
-  auto num_uv_indices =
+  const auto num_uv_indices =
       compute_compat_XOR_uv_indices(source.usedSources.variations);
   if (!num_uv_indices) return false;
   for (;;) {
@@ -748,6 +747,7 @@ __device__ bool is_compat_loop(const SourceCompatibilityData& source) {
 
     if (any_xor_compat && src_init_done) {
       begin = clock64();
+      // TODO: passing shared variable not necessary
       if (is_any_OR_source_compatible(source, *xor_chunk_idx_ptr)) {
         any_or_compat = true;
       }
@@ -794,10 +794,13 @@ __global__ void filter_kernel(
     const CompatSourceIndices* RESTRICT compat_src_indices,
     int num_compat_src_indices, const SourceIndex* RESTRICT src_indices,
     const result_t* RESTRICT compat_src_results, result_t* RESTRICT results,
-    int stream_idx) {
+    index_t stream_idx) {
   __shared__ SourceCompatibilityData source;
   __shared__ bool is_compat;
-  if (!threadIdx.x) is_compat = false;
+  if (!threadIdx.x) {
+    dynamic_shared[kStreamIdx] = stream_idx;
+    is_compat = false;
+  }
 
 #if defined(PRINTF)
     if (!blockIdx.x && !threadIdx.x) {
@@ -823,6 +826,7 @@ __global__ void filter_kernel(
         const auto csi2 = compat_src_indices[src_idx.index].second();
         // TODO: compare to source.reset() followed by 2x mergeInPlace
         source = sources_data[csi1.count()][csi1.index()];
+#if 1
         if (!source.usedSources.mergeInPlace(
                 sources_data[csi2.count()][csi2.index()].usedSources)) {
           printf("idx %u, num_indices %u, src_idx.listIndex %u, src_idx.index "
@@ -830,12 +834,13 @@ __global__ void filter_kernel(
               idx, num_compat_src_indices, src_idx.listIndex, src_idx.index,
               csi1.count(), csi1.index(), csi2.count(), csi2.index());
         }
+#endif
         // sync happens inside is_compat_loop
       }
       if (is_compat_loop(source)) { is_compat = true; }
     }
     __syncthreads();
-    if (is_compat && !threadIdx.x) {
+    if (!threadIdx.x && is_compat) {
       results[src_idx.listIndex] = 1;
       is_compat = false;
     }
@@ -873,12 +878,11 @@ void copy_filter_data_to_symbols(const FilterData& mfd, cudaStream_t stream) {
   */
 }
 
-void run_filter_kernel(int /*threads_per_block*/, StreamData& stream,
+void run_filter_kernel(int /*threads_per_block*/, FilterStream& stream,
     const CompatSourceIndices* device_src_indices,
     const result_t* device_compat_src_results, result_t* device_results) {
   stream.is_running = true;
-  stream.sequence_num = StreamData::next_sequence_num();
-
+  stream.increment_sequence_num();
   const auto [grid_size, block_size] = get_filter_kernel_grid_block_sizes();
   // xor_results could probably be moved to global
   const auto shared_bytes = kSharedIndexCount
@@ -901,13 +905,13 @@ void run_filter_kernel(int /*threads_per_block*/, StreamData& stream,
   // assert_cuda_success(err, "run_filter_kernel sync");
   const dim3 grid_dim(grid_size);
   const dim3 block_dim(block_size);
-  stream.xor_kernel_start.record(stream.cuda_stream);
+  stream.record(stream.kernel_start);
   filter_kernel<<<grid_dim, block_dim, shared_bytes, stream.cuda_stream>>>(
-      device_src_indices, int(stream.src_indices.size()),
-      stream.device_src_indices, device_compat_src_results, device_results,
-      stream.stream_idx);
+      device_src_indices, int(stream.host.src_idx_list.size()),
+      stream.device.src_idx_list, device_compat_src_results, device_results,
+      stream.host.global_idx());
   assert_cuda_success(cudaPeekAtLastError(), "filter_kernel");
-  stream.xor_kernel_stop.record(stream.cuda_stream);
+  stream.record(stream.kernel_stop);
 
   #if defined(DEBUG_XOR_COUNTS) || defined(DEBUG_OR_COUNTS)
   if (log_level(ExtraVerbose)) {
@@ -923,7 +927,7 @@ void run_filter_kernel(int /*threads_per_block*/, StreamData& stream,
 
 void run_get_compatible_sources_kernel(
     const CompatSourceIndices* device_src_indices, size_t num_src_indices,
-    const UsedSources::SourceDescriptorPair* device_src_desc_pairs,
+    const SourceDescriptorPair* device_src_desc_pairs,
     size_t num_src_desc_pairs, result_t* device_results,
     cudaStream_t sync_stream, cudaStream_t stream) {
   const auto block_size = 768;  // aka threads per block

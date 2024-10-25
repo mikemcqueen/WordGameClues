@@ -13,12 +13,14 @@
 #include <utility>
 #include <vector>
 #include <cuda_runtime.h>
+#include "candidates.h"
 #include "cm-hash.h"
 #include "cuda-types.h"
-#include "candidates.h"
-#include "merge-filter-common.h"
-#include "stream-data.h"
+#include "filter-stream.h"
 #include "log.h"
+#include "merge-filter-common.h"
+#include "source-index.h"
+//#include "stream-data.h"
 
 namespace cm {
 
@@ -144,8 +146,8 @@ public:
     return num_compat;
   }
 
-  auto update(StreamBase& stream, const std::vector<result_t>& results) {
-    return update(stream.src_indices, results, stream.stream_idx);
+  auto update(FilterStream& stream, const std::vector<result_t>& results) {
+    return update(stream.host.src_idx_list, results, stream.stream_idx);
   }
 
   auto get(index_t list_index) const {

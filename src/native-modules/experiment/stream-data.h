@@ -1,61 +1,62 @@
 #pragma once
 
-#include "source-index.h"
+#include <atomic>
 #include "cuda-types.h"
 
 namespace cm {
-  
-class IndexStates;
 
-struct StreamBase {
-  StreamBase() = delete;
+class StreamSwarm;
 
-  StreamBase(index_t stream_idx, index_t stride, cudaStream_t stream)
-      : stream_idx(stream_idx), stride(stride), cuda_stream(stream) {}
+struct KernelContext {
+  void record(const CudaEvent& event) { event.record(cuda_stream); }
 
-  index_t stream_idx;
-  index_t stride;
   cudaStream_t cuda_stream;
+  CudaEvent copy_start{};
+  CudaEvent copy_stop{};
+  CudaEvent kernel_start{};
+  CudaEvent kernel_stop{};
+};  // struct KernelContext
 
-  CudaEvent xor_kernel_start{};
-  CudaEvent xor_kernel_stop{};
-  int sequence_num{};
-  bool is_running{false};  // true until results retrieved
-  bool has_run{false};     // has run at least once
-  SourceIndex* device_src_indices{};     // allocated in device memory
-  size_t num_device_src_indices_bytes{}; // size of above buffer
-  std::vector<SourceIndex> src_indices;
+struct HasGlobalDeviceData {
+  explicit HasGlobalDeviceData() : global_idx_{increment_global_idx()} {}
+
+  auto global_idx() const { return global_idx_; }
 
 private:
-  int swarm_idx;
+  static index_t increment_global_idx() {
+    static std::atomic<index_t> global_idx = 0;
+    return global_idx++;
+  }
+
+  index_t global_idx_;
 };
 
-struct StreamData : public StreamBase {
+template <typename HostData, typename DeviceData>
+struct StreamData : KernelContext {
+private:
   static int next_sequence_num() {
-    static int sequence_num{};
+    static std::atomic<int> sequence_num{};
     return sequence_num++;
   }
 
-  StreamData(index_t idx, index_t stride, cudaStream_t stream)
-      : StreamBase{idx, stride, stream} {}
+public:
+  StreamData() = delete;
 
-  int num_ready(const IndexStates& indexStates) const;
+  StreamData(index_t stream_idx, index_t stride, cudaStream_t stream)
+      : KernelContext{stream}, stream_idx(stream_idx), stride(stride) {}
 
-  int num_done(const IndexStates& indexStates) const;
-
-  int num_compatible(const IndexStates& indexStates) const;
-
-  bool fill_source_indices(IndexStates& idx_states, index_t max_indices);
-
-  bool fill_source_indices(IndexStates& idx_states) {
-    return fill_source_indices(idx_states, stride);
+  auto increment_sequence_num() {
+    sequence_num = next_sequence_num();
+    return sequence_num;
   }
 
-  void alloc_copy_source_indices();
-
-  auto hasWorkRemaining() const { return !src_indices.empty(); }
-
-  void dump() const;
+  index_t stream_idx;
+  index_t stride;
+  int sequence_num{};
+  bool is_running{false};  // true until results retrieved
+  bool has_run{false};     // has run at least once
+  HostData host;
+  DeviceData device;
 };  // struct StreamData
 
 }  // namespace cm

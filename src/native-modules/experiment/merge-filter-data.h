@@ -116,7 +116,7 @@ struct FilterData {
     // consistency check v1 can be removed, and showComponents can be
     // updated to do everything on c++ side, obviating the need for this.
     SourceList merged_xor_src_list;
-    std::vector<UsedSources::SourceDescriptorPair> incompat_src_desc_pairs;
+    std::vector<SourceDescriptorPair> incompat_src_desc_pairs;
   } host_xor;
 
   struct DeviceXor : DeviceCommon {
@@ -144,15 +144,15 @@ struct FilterData {
       reset_pointers();
     }
 
-    UsedSources::SourceDescriptorPair* incompat_src_desc_pairs;
+    SourceDescriptorPair* incompat_src_desc_pairs;
 #if 1
     // serves as both flag-array results of variation compatibility check, and
     // result of in-place exclusive scan.
     // necessary  because compact_indices_in_place is probably broken so I
     // ompact them into this.
     index_t* variations_compat_results;
-    index_t variations_results_per_block;
 #endif
+    index_t variations_results_per_block;
     // list of xor.unique_variations indices compatible with current source
     index_t* src_compat_uv_indices;
     // list of or.unique_variations indices compatible with current xor source
