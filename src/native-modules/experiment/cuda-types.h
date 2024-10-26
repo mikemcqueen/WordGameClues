@@ -176,11 +176,16 @@ public:
   CudaEvent(const CudaEvent&) = delete;
   CudaEvent& operator=(const CudaEvent&) = delete;
   // enable move
-  CudaEvent(CudaEvent&&) = default;
+  CudaEvent(CudaEvent&& from) {
+    this->event_ = from.event_;
+    from.event_ = nullptr;
+  }
 
   ~CudaEvent() {
-    auto err = cudaEventDestroy(event_);
-    assert_cuda_success(err, "cudaEventDestroy");
+    if (event_) {
+      auto err = cudaEventDestroy(event_);
+      assert_cuda_success(err, "cudaEventDestroy");
+    }
   }
 
   auto event() const {
