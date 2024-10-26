@@ -25,6 +25,8 @@
 * "Source" is overloaded. like the "Source" (namespace?) in combo-maker.h. what's
    a better name for it?
 
+* 9-thread source reset/copy/merge in filter_kernel
+
 * consider_candidate slowness.
   * get_known_source_map_entries(), which is called by for_each_nc_source(), constructs
     a new list every time it's called. this function is also apparently called directly

@@ -5,6 +5,7 @@
 
 #include "combo-maker.h"
 #include "cuda-types.h"
+#include "source-index.h"
 
 namespace cm {
 
@@ -35,11 +36,21 @@ struct MergeData {
       reset_pointers();
     }
 
+    constexpr SourceIndex get_source_index(index_t flat_idx) {
+      for (index_t list_idx{}; list_idx < num_idx_lists; ++list_idx) {
+        const auto list_size = idx_list_sizes[list_idx];
+        if (flat_idx < list_size) return {list_idx, flat_idx};
+        flat_idx -= list_size;
+      }
+      assert(0);
+      return {};
+    }
+
     SourceCompatibilityData* src_lists;
     index_t* idx_lists;
     index_t* idx_list_sizes;
-    int num_idx_lists;
-    int sum_idx_list_sizes;
+    index_t num_idx_lists;
+    index_t num_src_compat_results; // sum of all idx_list_sizes
   } device;
 };
 
@@ -71,13 +82,21 @@ struct FilterData {
       reset_pointers();
     }
 
-    constexpr const auto& get_source(
-        fat_index_t combo_idx, index_t list_idx) const {
+    constexpr const auto& get_source(const fat_index_t combo_idx,
+        const index_t list_idx) const {
       const auto src_list = &src_lists[src_list_start_indices[list_idx]];
       const auto idx_list = &idx_lists[idx_list_start_indices[list_idx]];
       const auto idx_list_size = idx_list_sizes[list_idx];
       const auto src_idx = idx_list[combo_idx % idx_list_size];
       return src_list[src_idx];
+    }
+
+    constexpr const auto& get_source(const SourceIndex src_idx) {
+      const auto src_list_idx = src_list_start_indices[src_idx.listIndex];
+      const auto src_list = &src_lists[src_list_idx];
+      const auto idx_list_idx = idx_list_start_indices[src_idx.listIndex];
+      const auto idx_list = &idx_lists[idx_list_idx];
+      return src_list[idx_list[src_idx.index]];
     }
 
     index_t* src_list_start_indices;

@@ -34,11 +34,8 @@ public:
     }
   }
 
-  // bad name.  call it "set_stride"
-  void init(int num_streams, int stride) {
-    ensure_streams(num_streams);
-    // not a strict requirement but matches existing use and simplifies logic.
-    assert(num_streams == int(streams_.size()));
+  // bad name. call it "set_stride"?
+  void init(int stride) {
     for (auto& stream : streams_) {
       stream.stride = stride;
     }

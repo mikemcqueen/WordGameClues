@@ -371,11 +371,13 @@ void log_filter_kernel(int sum, const FilterStream& stream,
 auto run_concurrent_filter_kernels(int sum, FilterSwarm& swarm,
     int threads_per_block, IndexStates& idx_states, result_t* device_results,
     std::vector<result_t>& results) {
+  /*
   // would like to get rid of this for sure. only the first stream in the
   // swarm will auto-sync with any prior alloc/zero/copies on that stream.
   if (swarm.num_streams() > 1) {
     cudaStreamSynchronize(swarm.at(0).cuda_stream);
   }
+  */
   int total_processed{};
   int total_compat{};
   int stream_idx{-1};
@@ -473,7 +475,6 @@ filter_sources(FilterSwarm& swarm, const FilterParams& params,
     std::vector<IndexList>& idx_lists) {
   using namespace std::experimental::fundamentals_v3;
   const auto stream = swarm.at(0).cuda_stream;
-  const auto num_streams = params.num_streams ? params.num_streams : 1;
   const auto num_src_lists = idx_lists.size();
   const auto num_results = num_src_lists;
   const auto stride = params.stride ? params.stride : int(num_src_lists);
@@ -500,7 +501,7 @@ filter_sources(FilterSwarm& swarm, const FilterParams& params,
   // TODO: FilterStreamData::Host, resize_results()
   std::vector<result_t> results(num_results);
   // TODO: this is dumb
-  swarm.init(num_streams, stride);
+  swarm.init(stride);
   auto t = util::Timer::start_timer();
   const auto [num_processed, num_compat] =  //
       run_concurrent_filter_kernels(params.sum, swarm, params.threads_per_block,
@@ -652,7 +653,8 @@ filter_task_result_t filter_task(FilterData& mfd, FilterParams params) {
   // acquire here in order to limit the number of concurrent kernels
   // (including get_compatible_results) to the # of swarms.
   auto& swarm = swarm_pool_.acquire();
-  swarm.ensure_streams(1);
+  const auto num_streams = params.num_streams ? params.num_streams : 1;
+  swarm.ensure_streams(num_streams);
 
   //
   // NOTE: we switch streams here! weee! because reasons!
@@ -684,7 +686,9 @@ filter_task_result_t filter_task(FilterData& mfd, FilterParams params) {
   // stream here is questionable
   swarm.device.update(swarm.host.swarm_idx(), device_src_indices,
       device_compat_src_results, stream);
-  swarm.at(0).init(mfd);
+  for (int i{}; i < num_streams; ++i) {
+    swarm.at(i).init(mfd);
+  }
 
   auto filter_result = filter_sources(swarm, params, idx_lists);
 

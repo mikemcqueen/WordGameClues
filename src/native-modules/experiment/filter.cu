@@ -455,9 +455,10 @@ __global__ void get_compatible_sources_kernel(
 }
 #endif
 
+/*
 __device__ SourceIndex get_source_index(index_t idx,
     const MergeData::Device& data) {
-  for (unsigned list_idx{}; list_idx < data.num_idx_lists; ++list_idx) {
+  for (index_t list_idx{}; list_idx < data.num_idx_lists; ++list_idx) {
     auto list_size = data.idx_list_sizes[list_idx];
     if (idx < list_size) return {list_idx, idx};
     idx -= list_size;
@@ -465,17 +466,20 @@ __device__ SourceIndex get_source_index(index_t idx,
   assert(0);
   return {};
 }
-
+*/
 __device__ auto source_bits_are_XOR_compatible(
     const UsedSources::SourceBits& a, const UsedSources::SourceBits& b) {
   using SourceBits = UsedSources::SourceBits;
-  for (int i{}; i < SourceBits::wc() / 2; ++i) {
-    const auto w = a.long_word(i) & b.long_word(i);
-    if (w) return false;
+#if 0 // requires 16-byte alignment, not yugely faster
+  for (int i{}; i < SourceBits::wc() >> 2; ++i) {
+    if (a.quad_word(i) & b.quad_word(i)) return false;
   }
-  for (int i{}; i < SourceBits::wc() - (SourceBits::wc() / 2) * 2; ++i) {
-    const auto w = a.word(i) & b.word(i);
-    if (w) return false;
+#endif
+  for (int i{}; i < SourceBits::wc() >> 1; ++i) {
+    if (a.double_word(i) & b.double_word(i)) return false;
+  }
+  for (int i{SourceBits::wc() ^ 1}; i < SourceBits::wc(); ++i) {
+    if (a.word(i) & b.word(i)) return false;
   }
   return true;
 }
@@ -522,16 +526,19 @@ __device__ auto compute_src_compat_results(
   __shared__ result_t any_compat[kMaxOrArgs];
   if (threadIdx.x < kMaxOrArgs) any_compat[threadIdx.x] = false;
   __syncthreads();
-  for (auto idx{threadIdx.x}; idx < data.sum_idx_list_sizes;
+  for (auto idx{threadIdx.x}; idx < data.num_src_compat_results;
       idx += blockDim.x) {
-    const auto src_idx = get_source_index(idx, data);
+    const auto src_idx = data.get_source_index(idx);
+    /*
     const auto src_list_idx = data.src_list_start_indices[src_idx.listIndex];
     const auto src_list = &data.src_lists[src_list_idx];
     const auto idx_list_idx = data.idx_list_start_indices[src_idx.listIndex];
     const auto idx_list = &data.idx_lists[idx_list_idx];
     const auto& other = src_list[idx_list[src_idx.index]];
-    const auto compat = are_sources_compatible<TagT>(/*source,*/ other);
-    const auto result_idx = blockIdx.x * data.sum_idx_list_sizes + idx;
+    */
+    const auto& other = data.get_source(src_idx);
+    const auto compat = are_source_bits_compatible<TagT>(other);
+    const auto result_idx = blockIdx.x * data.num_src_compat_results + idx;
     if (compat) {
       any_compat[src_idx.listIndex] = 1;
       stream_data().or_src_bits_compat_results[result_idx] = 1;
@@ -564,7 +571,7 @@ __device__ auto init_source(/*const SourceCompatibilityData& source*/) {
     // initialize num_src_sentences and src_sentences for this source
     *num_sentences = 0;
     for (int s{}; s < kNumSentences; ++s) {
-      if (source().usedSources.variations[s] > -1) {
+      if (source().usedSources.variations[s] != NoVariation) {
         src_sentences[(*num_sentences)++] = static_cast<uint8_t>(s);
       }
     }
@@ -749,7 +756,6 @@ __device__ bool is_compat_loop() {  // const SourceCompatibilityData& source) {
 
     if (any_xor_compat && src_init_done) {
       begin = clock64();
-      // TODO: passing shared variable not necessary
       if (is_any_OR_source_compatible(/*source, *xor_chunk_idx_ptr*/)) {
         any_or_compat = true;
       }
@@ -827,7 +833,6 @@ __global__ void filter_kernel(result_t* RESTRICT results, index_t swarm_idx,
         const auto csi = swarm_data().compat_src_indices[src_idx.index];
         const auto csi1 = csi.first();
         const auto csi2 = csi.second();
-        // TODO: compare to source.reset() followed by 2x mergeInPlace
         source() = sources_data[csi1.count()][csi1.index()];
         [[maybe_unused]] const auto b =
             source().mergeInPlace(sources_data[csi2.count()][csi2.index()]);

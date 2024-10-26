@@ -1,4 +1,5 @@
 #pragma once
+
 #include <array>
 #include <unordered_set>
 #include <vector>
@@ -12,4 +13,6 @@ using Variations = std::array<variation_index_t, kNumSentences>;
 using VariationsList = std::vector<Variations>;
 using VariationsSet = std::unordered_set<Variations>;
 
-}
+constexpr auto NoVariation = static_cast<variation_index_t>(-1);
+
+}  // namespace cm

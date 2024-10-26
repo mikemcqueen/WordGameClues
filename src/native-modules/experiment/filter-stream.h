@@ -22,7 +22,7 @@ struct FilterStreamData {
   private:
     friend struct Device;
     bool device_initialized{false};
-  };
+  };  // struct Host
 
   struct Device {
     void init() {
@@ -63,15 +63,14 @@ struct FilterStreamData {
   private:
     void alloc_buffers(FilterData& fd, cudaStream_t stream);
     void copy_to_symbol(index_t idx, cudaStream_t stream);
-    };
+  };  // struct Device
 };  // struct FilterStreamData
 
 using FilterStreamBase =
     StreamData<FilterStreamData::Host, FilterStreamData::Device>;
 
 struct FilterSwarmData {
-  struct Host : HasSwarmDeviceData {
-  };
+  struct Host : HasSwarmDeviceData {};  // struct Host
 
   struct Device {
     void init() { reset(); }
@@ -101,7 +100,7 @@ struct FilterSwarmData {
 
     private:
       void copy_to_symbol(index_t idx, cudaStream_t stream);
-  };
+  };  // struct Device
 };  // struct FilterSwarmData
 
 class IndexStates;

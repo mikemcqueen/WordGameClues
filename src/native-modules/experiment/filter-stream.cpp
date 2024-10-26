@@ -70,9 +70,8 @@ void FilterStreamData::Device::alloc_buffers(FilterData& mfd,
 #else
   }
 #endif
-  // TODO: retarded name. num_src_compat_results or, is idx_list in host struct?
-  if (mfd.device_or.sum_idx_list_sizes) {
-    const auto num_bytes = mfd.device_or.sum_idx_list_sizes * grid_size
+  if (mfd.device_or.num_src_compat_results) {
+    const auto num_bytes = mfd.device_or.num_src_compat_results * grid_size
         * sizeof(result_t);
     cuda_malloc_async((void**)&or_src_bits_compat_results, num_bytes, stream,
         "or_src_bits_compat_results");

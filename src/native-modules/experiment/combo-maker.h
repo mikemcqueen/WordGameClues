@@ -316,15 +316,14 @@ public:
 
   void reset() {
     bits.reset();
-    std::fill(variations.begin(), variations.end(),
-        static_cast<variation_index_t>(-1));
+    std::fill(variations.begin(), variations.end(), NoVariation);
   }
 
   SourceBits bits{};
   Variations variations = make_array<variation_index_t, kNumSentences>(-1);
 };  // UsedSources
 
-struct alignas(4) SourceCompatibilityData {
+struct alignas(8) SourceCompatibilityData {
   SourceCompatibilityData() = default;
   // copy consruct/assign allowed for now, precompute.mergeAllCompatibleXorSources
   SourceCompatibilityData(const SourceCompatibilityData&) = default;

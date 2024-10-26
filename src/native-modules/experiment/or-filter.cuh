@@ -100,7 +100,7 @@ __device__ __forceinline__ auto are_source_bits_XOR_compatible(
 // each thread calls this with a different "other" source
 template <typename TagT>
 requires /*std::is_same_v<TagT, tag::XOR> ||*/ std::is_same_v<TagT, tag::OR>
-__device__ inline auto are_sources_compatible(
+__device__ inline auto are_source_bits_compatible(
     /*    const SourceCompatibilityData& source,*/
     const SourceCompatibilityData& other) {
   const uint8_t* num_sentences = (uint8_t*)&dynamic_shared[kNumSentencesIdx];
@@ -132,13 +132,13 @@ __device__ inline auto are_sources_compatible(
 // With all sources identified by combo_idx
 template <typename TagT, typename T>
 requires /*std::is_same_v<TagT, tag::XOR> ||*/ std::is_same_v<TagT, tag::OR>
-__device__ auto is_source_compatible_with_all(
+__device__ auto is_source_bits_compatible_with_all(
     /*   const SourceCompatibilityData& source, */ fat_index_t combo_idx,
     const T& data) {
   for (int list_idx{int(data.num_idx_lists) - 1}; list_idx >= 0;
       --list_idx) {
     const auto& other = data.get_source(combo_idx, list_idx);
-    if (!are_sources_compatible<TagT>(/*source, */other)) return false;
+    if (!are_source_bits_compatible<TagT>(/*source, */other)) return false;
     combo_idx /= data.idx_list_sizes[list_idx];
   }
   return true;
@@ -146,8 +146,8 @@ __device__ auto is_source_compatible_with_all(
 
 template <typename T>
 __device__ auto check_src_compat_results(fat_index_t combo_idx, const T& data) {
-  const auto block_start_idx = blockIdx.x * data.sum_idx_list_sizes;
-  auto list_start_idx = index_t(data.sum_idx_list_sizes);
+  const auto block_start_idx = blockIdx.x * data.num_src_compat_results;
+  auto list_start_idx = data.num_src_compat_results;
   for (int list_idx{int(data.num_idx_lists) - 1}; list_idx >= 0; --list_idx) {
     const auto list_size = data.idx_list_sizes[list_idx];
     const auto src_idx = combo_idx % list_size;

@@ -187,7 +187,7 @@ __device__ fat_index_t get_OR_compat_idx_incremental_uv(
   #endif
 
   begin = clock64();
-  auto isc = is_source_compatible_with_all<tag::OR>(/*source,*/ or_combo_idx,
+  auto isc = is_source_bits_compatible_with_all<tag::OR>(/*source,*/ or_combo_idx,
       or_data);
 
   #ifdef CLOCKS
@@ -228,8 +228,7 @@ __device__ auto is_any_OR_source_compatible(
   for (index_t or_chunk_idx{};
       or_chunk_idx * block_size < or_data.num_compat_indices; ++or_chunk_idx) {
     __syncthreads();
-    if (get_OR_sources_chunk(/*source, */or_chunk_idx, xor_variations,
-            num_uv_indices)) {
+    if (get_OR_sources_chunk(or_chunk_idx, xor_variations, num_uv_indices)) {
       any_or_compat = true;
     }
     __syncthreads();

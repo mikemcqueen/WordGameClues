@@ -48,7 +48,7 @@ __global__ void list_pair_compat_kernel(const SourceCompatibilityData* sources1,
     }
   }
 }
-  ;
+
 // Given N compatibility matrices, representing the results of comparing every
 // pair of sources arrays (via list_pair_compat_kernel), find all N-tuples of
 // of compatible results, representing combinations of compatible sources to

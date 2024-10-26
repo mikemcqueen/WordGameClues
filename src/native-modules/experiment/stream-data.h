@@ -20,6 +20,8 @@ struct KernelContext {
 
 struct HasStreamDeviceData {
   explicit HasStreamDeviceData() : stream_idx_{increment_stream_idx()} {}
+  HasStreamDeviceData(const HasStreamDeviceData&) = delete;
+  HasStreamDeviceData(HasStreamDeviceData&&) = default;
 
   auto stream_idx() const { return stream_idx_; }
 
@@ -34,6 +36,8 @@ private:
 
 struct HasSwarmDeviceData {
   explicit HasSwarmDeviceData() : swarm_idx_{increment_swarm_idx()} {}
+  HasSwarmDeviceData(const HasSwarmDeviceData&) = delete;
+  HasSwarmDeviceData(HasSwarmDeviceData&&) = default;
 
   auto swarm_idx() const { return swarm_idx_; }
 

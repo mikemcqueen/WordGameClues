@@ -130,8 +130,12 @@ public:
     return bits[i];
   }
 
-  constexpr auto long_word(int i) const {
-    return reinterpret_cast<const unsigned long long int*>(bits)[i];
+  constexpr auto quad_word(int i) const {
+    return reinterpret_cast<const __uint128_t*>(bits)[i];
+  }
+
+  constexpr auto double_word(int i) const {
+    return reinterpret_cast<const uint64_t*>(bits)[i];
   }
 
   void reset() {
