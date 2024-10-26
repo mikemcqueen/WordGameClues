@@ -30,7 +30,7 @@
 #include <mutex>
 
 // TEST
-#include "cm-hash.h"
+//#include "cm-hash.h"
 
 namespace cm {
 
@@ -44,7 +44,7 @@ using filter_task_result_t = std::unordered_set<std::string>;
 
 std::vector<std::future<filter_task_result_t>> filter_futures_;
 
-StreamSwarmPool<FilterSwarm> swarm_pool_(1);
+StreamSwarmPool<FilterSwarm> swarm_pool_(2);
 
 cudaStream_t sources_stream_{};
 

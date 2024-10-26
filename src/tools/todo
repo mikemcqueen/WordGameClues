@@ -1,9 +1,29 @@
-* per-swarm compat_results/compat_indices buffers. maybe this swarm is not so much a
-  swarm, but a kernel context?  maybe it's two things? (1:swarm 2:context)?
+* passing shared variables as params: Source, xor_chunk_idx
 
-* call set_compat_src_indices in filter_candidates_cuda() rather than in index.cpp
+* results -> FilterStreamData
 
-* filter_task return value.
+* re-structure filter-task so it calls 2 or 3 separate functions, to logically divide
+  the work being done there better. it's a bit of a mess of shifting state throughout
+  the function atm.
+
+* ok something weird with --max-sources. it actually changes the number of valid results,
+  for a -c2 for example. it also seems to, naturally(?), increase the number of XOR sources.
+  so really, i need to:
+  * figure out *why* this is affecting valid result count.
+  * set --max-sources to (M-1) for -cM, and (N-1) for -cM,N, if not otherwise specified,
+    because there is no reason to generate a large number of XOR sources that shouldn't
+    be used and shouldn't impact results (afaik).
+    * actually there is a reason to do this. because I need to generate the actual
+      --xor sources themselves, like, "21", which requires --max-sources 13. but maybe
+      there is some way to shortcut this, such that rather than searching *all* sources
+      up to some --max, i just search for all instances of "21" (specified sources).
+  * maybe think about how i might support -cLARGE with --max-sources *smaller* than
+    LARGE-1. not a priority though, i should't really be playing with those sizes.
+
+* filter_kernel 48 bytes stack frame
+
+* "Source" is overloaded. like the "Source" (namespace?) in combo-maker.h. what's
+   a better name for it?
 
 * consider_candidate slowness.
   * get_known_source_map_entries(), which is called by for_each_nc_source(), constructs
@@ -22,10 +42,6 @@
     * Maybe. Does it really matter? Not with lots of --or args. Probably improves the
       --xor flag only case a little bit.
 
-* re-structure filter-task so it calls 2 or 3 separate functions, to logically divide
-  the work being done there better. it's a bit of a mess of shifting state throughout
-  the function atm.
-
 * determine whether CompletionTracker has it's dependency bits right, or if it's waiting
   1 bit too long. (i.e, 3 should only wait for 2,1 - not 3,2,1). (I think it's right).
 
@@ -36,26 +52,17 @@
   with a cudaStream_t such that I can record the event after the last copy, and synchronize
   it wherever, later (like in run_get_compatible_results_kernel). I could potentially
   even hijack an event out of the StreamData (or add a new sync_event to it).
+  * sort of doing this now.  can i use it with run_gcr?
 
 * compact_uv_indices_in_place is broken! maybe! maybe not! maybe I can remove that first
   __syncthreads() call.
+  * try putting that block of debug printf code in compact_in_place, into an old working 
+    commit right after I thought it was fixed.
+  * alternatively, I could put the scratch_buffer (variations_compat_results) into the
+    swarm, or back into MFD, and have access guarded by (an array of) binary_sempahore.
 
 * zero results:
   node clues --or-variations -pf.72 -c2 --xor tree --max-sources 1  -z3 --stride 100000 -v > out
-
-* ok something weird with --max-sources. it actually changes the number of valid results,
-  for a -c2 for example. it also seems to, naturally(?), increase the number of XOR sources.
-  so really, i need to:
-  * figure out *why* this is affecting valid result count.
-  * set --max-sources to (M-1) for -cM, and (N-1) for -cM,N, if not otherwise specified,
-    because there is no reason to generate a large number of XOR sources that shouldn't
-    be used and shouldn't impact results (afaik).
-    * actually there is a reason to do this. because I need to generate the actual
-      --xor sources themselves, like, "21", which requires --max-sources 13. but maybe
-      there is some way to shortcut this, such that rather than searching *all* sources
-      up to some --max, i just search for all instances of "21" (specified sources).
-  * maybe think about how i might support -cLARGE with --max-sources *smaller* than
-    LARGE-1. not a priority though, i should't really be playing with those sizes.
 
 * unique_sources branch implementation issues:
   * validation failures. possibly because hash/equal_to of SourceData is wrong (doesn't
@@ -221,22 +228,6 @@
 * index.cpp:  merge-only=true is used for showComponents() and consistencyCheck V1,
   both of which can be eliminated.
 
-* on the subject of MFD device memory, we can't free it until a kernel is complete.
-  and we can't *reallocate* it (technically) until the kernel has been launched,
-  for async kernels, at least (like xor_filter). binary semaphore might work for
-  that case: call std::async with a semaphore, release it after kernel launch.
-
-* for MFD-host memory, we can't really reallocate that until after the kernel
-  is launched as well (or after a cudaStreamSynchronize prior to kernel launch)
-  because we need to make sure it sticks around for any pending async copies.
-
-* while i don't love the idea, it seems like it'd be a lot cleaner to have the
-  kernel-launch wrapper code responsible for free'ing device memory. like, we
-  typically have to sync to copy results, why not just free stuff then?
-  ** OR, instead of calling launch wrapper function directly, call from within
-     a lambda that does the freeing afterwards, to keep the alloc/frees a bit
-      more local to each other.
-  
 * Timer.pretty() - get nanoseconds() and auto determine best unit and suffix
 
 * LogDuration: merge_support.cpp, may also want version that uses a CudaEvent/thread
@@ -314,12 +305,8 @@
 
 // OLD PERF
 
-* elimination of event sync'ing by storing of host-side data in MFD during copies.
-  * deletion of appropriate host data after launch of associated kernel.
-  * maybe a "host.merge" and "host.filter" section of MFD, though that may not
-    be granular enough. may need a section for every kernel?
-
 * move remaining combo-maker TS code to C++.
+  * only a tiny sliver left
 
 * spawn a thread to do "synchronous" sum=2, but acquire a binary semaphore to
   prevent the next sum from executing until all the data from 2 is packed into MFD.
@@ -473,31 +460,12 @@
   (but probably shouldn't even be called)
   what about --or with no --xor? bet that's fun. probably should fail (or fix).
 
-* can i sort sources within each device_sources list, in order of the smallest
-  xor_sources IndexSpanPair they will test against? like, could I store
-  candidates in an ordered set, with a test for the smallest IndexSpanPair
-  combined size in the comparator function? or, is a candidate a sourcelist
-  already? or just a single source?
-
 * have a stream keep track of how many times it's been run, and/or a total
   count of the number of indices it's processed, then total all of them at
   the end, so i show: num streams executed (M), num indices processed (N)
 
-**************************************************************************
-* how about I actually compare new code results with old code results?
-  like, cuda-xor. but I need to remove the xorSourceList wrapping from that.
-  once that's done, I can remove a big paragraph below about wrapping.
-**************************************************************************
-
 * consider stripping some types out of combo_maker.h into separate files.
 
-**************************************************************************
-* i have count(), countIndices(), and sum_sizes() and I think they all do 
-  the same thing or close to it.  maybe a util.h?
-  sum_vector_sizes()/sum_container_sizes()?
-  add vec_product, vec_to_string, etc.
-**************************************************************************
-  
 * get rid of std::async? have 1 thread waiting on queue, executing filters,
   and main thread just adds execute requests to queue?
   * async, while a sloppy approach, does appear to be reasonably performant.

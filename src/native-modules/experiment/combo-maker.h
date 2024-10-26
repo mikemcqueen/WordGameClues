@@ -387,8 +387,8 @@ struct SourceCompatibilityData {
     return usedSources.addSource(src, nothrow);
   }
 
-  constexpr void mergeInPlace(const SourceCompatibilityData& other) {
-    usedSources.mergeInPlace(other.usedSources);
+  constexpr auto mergeInPlace(const SourceCompatibilityData& other) {
+    return usedSources.mergeInPlace(other.usedSources);
   }
 
   auto copyMerge(const SourceCompatibilityData& other) const {

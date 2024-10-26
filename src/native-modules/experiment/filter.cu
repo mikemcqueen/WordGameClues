@@ -791,12 +791,8 @@ __device__ int dumped = 0;
 // * variation-compatible with the corresponding/aforementioned XOR source.
 //
 // Find compatible XOR source -> compare with variation-compatible OR sources.
-__global__ void filter_kernel(
-    /*    const CompatSourceIndices* RESTRICT compat_src_indices,
-        int num_compat_src_indices, const SourceIndex* RESTRICT src_indices,
-        const result_t* RESTRICT compat_src_results,
-    */
-    result_t* RESTRICT results, index_t swarm_idx, index_t stream_idx) {
+__global__ void filter_kernel(result_t* RESTRICT results, index_t swarm_idx,
+    index_t stream_idx) {
   __shared__ SourceCompatibilityData source;
   __shared__ bool is_compat;
   if (!threadIdx.x) {
@@ -832,9 +828,10 @@ __global__ void filter_kernel(
         const auto csi2 = csi.second();
         // TODO: compare to source.reset() followed by 2x mergeInPlace
         source = sources_data[csi1.count()][csi1.index()];
+        [[maybe_unused]] const auto b =
+            source.mergeInPlace(sources_data[csi2.count()][csi2.index()]);
 #if 1
-        if (!source.usedSources.mergeInPlace(
-                sources_data[csi2.count()][csi2.index()].usedSources)) {
+        if (!b) {
           printf("idx %u, num_indices %u, src_idx.listIndex %u, src_idx.index "
                  "%u, csi1 count %u index %u, csi2 count %u index %u\n",
               idx, stream_data().num_src_idx, src_idx.listIndex, src_idx.index,
@@ -877,12 +874,6 @@ void copy_filter_data_to_symbols(const FilterData& mfd, cudaStream_t stream) {
   err = cudaMemcpyToSymbolAsync(or_data, &mfd.device_or, or_bytes, 0,
       cudaMemcpyHostToDevice, stream);
   assert_cuda_success(err, "copy or filter data");
-
-  /*
-  const auto sources_bytes = sizeof(FilterData::DeviceSources);
-  err = cudaMemcpyToSymbol(sources_data, &mfd.device_sources, sources_bytes);
-  assert_cuda_success(err, "copy sources filter data");
-  */
 }
 
 void run_filter_kernel(int /*threads_per_block*/, index_t swarm_idx,
@@ -913,13 +904,7 @@ void run_filter_kernel(int /*threads_per_block*/, index_t swarm_idx,
   const dim3 block_dim(block_size);
   stream.record(stream.kernel_start);
   filter_kernel<<<grid_dim, block_dim, shared_bytes, stream.cuda_stream>>>(
-#if 0
-      device_src_indices, int(stream.host.src_idx_list.size()),
-      stream.device.src_idx_list, device_compat_src_results, device_results,
-      swarm_idx, stream.host.stream_idx());
-#else
       device_results, swarm_idx, stream.host.stream_idx());
-#endif
   assert_cuda_success(cudaPeekAtLastError(), "filter_kernel");
   stream.record(stream.kernel_stop);
 
@@ -928,6 +913,7 @@ void run_filter_kernel(int /*threads_per_block*/, index_t swarm_idx,
     display_counts();
   }
   #endif 
+
   if constexpr (0) {
     std::cerr << "stream " << stream.stream_idx << " XOR kernel started with "
               << grid_size << " blocks of " << block_size << " threads"

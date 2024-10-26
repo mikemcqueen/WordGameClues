@@ -1,13 +1,16 @@
 // filter.cuh
 
 #pragma once
-#include "combo-maker.h"
+
+#include <utility>
 #include "cuda-types.h"
 
 namespace cm {
 
 struct FilterData;
 struct FilterStream;
+class SourceCompatibilityData;
+struct SourceDescriptorPair;
 
 extern __constant__ SourceCompatibilityData* sources_data[kMaxSums];
 
@@ -25,7 +28,7 @@ void run_filter_kernel(int threads_per_block, index_t swarm_idx,
     FilterStream& stream, result_t* device_results);
 
 #if 0
-__device__ __host__ inline void dump_compat_src_indices(
+inline constexpr void dump_compat_src_indices(
     const CompatSourceIndices* compat_src_indices, int num_csi,
     const char* header) {
   printf("%s:\n", header);
