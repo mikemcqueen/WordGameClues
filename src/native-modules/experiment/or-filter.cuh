@@ -1,7 +1,7 @@
 #pragma once
 #include <cassert>
 #include <cub/block/block_scan.cuh>
-//#include <cuda/atomic>
+#include "combo-maker.h"
 #include "cuda-types.h"
 #include "filter-stream.h"
 #include "merge-filter-data.h"
@@ -29,23 +29,25 @@ inline constexpr auto kXorStartUvIdx = 1;
 inline constexpr auto kXorStartSrcIdx = 2;
 inline constexpr auto kOrStartUvIdx = 3;
 inline constexpr auto kOrStartSrcIdx = 4;
-inline constexpr auto kSrcListIdx = 5;
-inline constexpr auto kSrcIdx = 6;
+inline constexpr auto kSrcListIdx = 5;  // src_idx.listIndex
+inline constexpr auto kSrcIdx = 6;      // src_idx.index
 inline constexpr auto kSwarmIdx = 7;
 inline constexpr auto kStreamIdx = 8;
 inline constexpr auto kDebugIdx = 9;
 inline constexpr auto kSharedIndexCount = 10;
 
 // num source sentences (uint8_t) starts at end of indices
-inline constexpr auto kNumSrcSentences = kSharedIndexCount;
+inline constexpr auto kNumSentencesIdx = kSharedIndexCount;
 inline constexpr auto kNumSentenceDataBytes = 12;
 // source sentence data (unit8_t) follows for 9 more bytes, round to 12 total
 
-// xor_results (result_t) starts after sentence data
-inline constexpr auto kXorResults =
-    kNumSrcSentences + (kNumSentenceDataBytes / kSharedIndexSize);
+// "The Source" that is being tested by current block in filter_kernel
+inline constexpr auto kTheSourceIdx = kNumSentences
+    + (kNumSentenceDataBytes / kSharedIndexSize);
 
-extern __shared__ index_t dynamic_shared[];
+// xor_results (result_t) starts after source
+inline constexpr auto kXorResultsIdx = kTheSourceIdx
+    + (sizeof(SourceCompatibilityData) / kSharedIndexSize);
 
 namespace tag {
 
@@ -54,12 +56,19 @@ struct OR {};
 
 }  // namespace tag
 
+extern __shared__ index_t dynamic_shared[];
+
 extern __constant__ FilterData::DeviceXor xor_data;
 extern __constant__ FilterData::DeviceOr or_data;
 extern __constant__ FilterSwarmData::Device swarm_data_[kMaxSwarms];
 extern __constant__ FilterStreamData::Device stream_data_[kMaxStreams];
 // also declared extern in filter.cuh, required in filter-support.cpp
 // extern __constant__ SourceCompatibilityData* sources_data[32];
+
+__device__ __forceinline__ auto& source() {
+  return reinterpret_cast<SourceCompatibilityData&>(
+      dynamic_shared[kTheSourceIdx]);
+}
 
 __device__ __forceinline__ auto& swarm_data() {
   return swarm_data_[dynamic_shared[kSwarmIdx]];
@@ -92,9 +101,9 @@ __device__ __forceinline__ auto are_source_bits_XOR_compatible(
 template <typename TagT>
 requires /*std::is_same_v<TagT, tag::XOR> ||*/ std::is_same_v<TagT, tag::OR>
 __device__ inline auto are_sources_compatible(
-    const SourceCompatibilityData& source,
+    /*    const SourceCompatibilityData& source,*/
     const SourceCompatibilityData& other) {
-  const uint8_t* num_sentences = (uint8_t*)&dynamic_shared[kNumSrcSentences];
+  const uint8_t* num_sentences = (uint8_t*)&dynamic_shared[kNumSentencesIdx];
   const uint8_t* sentences = &num_sentences[1];
 
   // TODO: i could just increment 'sentences++' here instead of indexing
@@ -106,12 +115,12 @@ __device__ inline auto are_sources_compatible(
       if constexpr (std::is_same_v<TagT, tag::OR>) {
         // NB: order of params matters here (or_src first)
         if (!are_source_bits_OR_compatible(other.usedSources.getBits(),
-                source.usedSources.getBits(), sentence)) {
+                source().usedSources.getBits(), sentence)) {
           return false;
         }
       } else if constexpr (std::is_same_v<TagT, tag::XOR>) {
         if (!are_source_bits_XOR_compatible(other.usedSources.getBits(),
-                source.usedSources.getBits(), sentence)) {
+                source().usedSources.getBits(), sentence)) {
           return false;
         }
       }
@@ -124,12 +133,12 @@ __device__ inline auto are_sources_compatible(
 template <typename TagT, typename T>
 requires /*std::is_same_v<TagT, tag::XOR> ||*/ std::is_same_v<TagT, tag::OR>
 __device__ auto is_source_compatible_with_all(
-    const SourceCompatibilityData& source, fat_index_t combo_idx,
+    /*   const SourceCompatibilityData& source, */ fat_index_t combo_idx,
     const T& data) {
   for (int list_idx{int(data.num_idx_lists) - 1}; list_idx >= 0;
       --list_idx) {
     const auto& other = data.get_source(combo_idx, list_idx);
-    if (!are_sources_compatible<TagT>(source, other)) return false;
+    if (!are_sources_compatible<TagT>(/*source, */other)) return false;
     combo_idx /= data.idx_list_sizes[list_idx];
   }
   return true;
@@ -353,7 +362,8 @@ __device__ inline auto compute_compat_uv_indices(
   return num_indices;
 }
 
-__device__ bool is_any_OR_source_compatible(
-    const SourceCompatibilityData& source, const index_t xor_chunk_idx);
+__device__ bool is_any_OR_source_compatible();
+  /*    const SourceCompatibilityData& source,
+    const index_t xor_chunk_idx */
 
 }  // namespace cm

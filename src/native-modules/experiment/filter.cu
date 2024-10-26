@@ -482,25 +482,26 @@ __device__ auto source_bits_are_XOR_compatible(
 
 #define USE_LOCAL_XOR_COMPAT
 
-__device__ bool is_source_XOR_compatible(const SourceCompatibilityData& source,
+__device__ bool is_source_XOR_compatible(
+    /*const SourceCompatibilityData& source,*/
     fat_index_t combo_idx) {
   for (int list_idx{int(xor_data.num_idx_lists) - 1}; list_idx >= 0;
       --list_idx) {
     const auto& src = xor_data.get_source(combo_idx, list_idx);
 #ifdef USE_LOCAL_XOR_COMPAT
-    if (!source_bits_are_XOR_compatible(source.usedSources.bits,
+    if (!source_bits_are_XOR_compatible(source().usedSources.bits,
             src.usedSources.bits)) {
       return false;
     }
 #else
-    if (!src.isXorCompatibleWith(source)) return false;
+    if (!src.isXorCompatibleWith(source())) return false;
 #endif
     combo_idx /= xor_data.idx_list_sizes[list_idx];
   }
   return true;
 }
 
-// This tests SourceBits-compatibility with the supplied source and each
+// This tests SourceBits-compatibility with the TheSource and each
 // OR-source in each OR-arg source list, and stores the results in the
 // or_data.compat_src_results flag array.
 //
@@ -516,7 +517,8 @@ __device__ bool is_source_XOR_compatible(const SourceCompatibilityData& source,
 template <typename TagT, typename T>
 requires /*std::is_same_v<TagT, tag::XOR> ||*/ std::is_same_v<TagT, tag::OR>
 __device__ auto compute_src_compat_results(
-    const SourceCompatibilityData& source, T& data) {
+    /*const SourceCompatibilityData& source, */
+    T& data) {
   __shared__ result_t any_compat[kMaxOrArgs];
   if (threadIdx.x < kMaxOrArgs) any_compat[threadIdx.x] = false;
   __syncthreads();
@@ -528,7 +530,7 @@ __device__ auto compute_src_compat_results(
     const auto idx_list_idx = data.idx_list_start_indices[src_idx.listIndex];
     const auto idx_list = &data.idx_lists[idx_list_idx];
     const auto& other = src_list[idx_list[src_idx.index]];
-    const auto compat = are_sources_compatible<TagT>(source, other);
+    const auto compat = are_sources_compatible<TagT>(/*source,*/ other);
     const auto result_idx = blockIdx.x * data.sum_idx_list_sizes + idx;
     if (compat) {
       any_compat[src_idx.listIndex] = 1;
@@ -555,19 +557,19 @@ __device__ auto compute_src_compat_results(
   return false;
 }
 
-__device__ auto init_source(const SourceCompatibilityData& source) {
-  uint8_t* num_src_sentences = (uint8_t*)&dynamic_shared[kNumSrcSentences];
-  uint8_t* src_sentences = &num_src_sentences[1];
+__device__ auto init_source(/*const SourceCompatibilityData& source*/) {
+  uint8_t* num_sentences = (uint8_t*)&dynamic_shared[kNumSentencesIdx];
+  uint8_t* src_sentences = &num_sentences[1];
   if (!threadIdx.x) {
     // initialize num_src_sentences and src_sentences for this source
-    *num_src_sentences = 0;
+    *num_sentences = 0;
     for (int s{}; s < kNumSentences; ++s) {
-      if (source.usedSources.variations[s] > -1) {
-        src_sentences[(*num_src_sentences)++] = static_cast<uint8_t>(s);
+      if (source().usedSources.variations[s] > -1) {
+        src_sentences[(*num_sentences)++] = static_cast<uint8_t>(s);
       }
     }
   }
-  return compute_src_compat_results<tag::OR>(source, or_data);
+  return compute_src_compat_results<tag::OR>(/*source,*/ or_data);
 }
 
 __device__ auto compute_compat_XOR_uv_indices(const Variations& src_variations) {
@@ -629,9 +631,10 @@ __device__ fat_index_t get_XOR_compat_idx_incremental_uv(
 // Get the next block-sized chunk of XOR sources and test them for 
 // compatibility with the supplied source.
 // Return true if at least one XOR source is compatible.
-__device__ bool get_next_XOR_sources_chunk(const SourceCompatibilityData& source,
+__device__ bool get_next_XOR_sources_chunk(
+    /*const SourceCompatibilityData& source,*/
     const index_t xor_chunk_idx, const index_t num_uv_indices) {
-  result_t* xor_results = (result_t*)&dynamic_shared[kXorResults];
+  result_t* xor_results = (result_t*)&dynamic_shared[kXorResultsIdx];
   // a __sync will happen in calling function
   xor_results[threadIdx.x] = 0;
   // one thread per compat_idx
@@ -650,7 +653,7 @@ __device__ bool get_next_XOR_sources_chunk(const SourceCompatibilityData& source
   if (!are_source_bits_XOR_compatible(source, xor_combo_idx, xor_data))
     return false;
 #else
-  if (!is_source_XOR_compatible(source, xor_combo_idx))
+  if (!is_source_XOR_compatible(/*source, */xor_combo_idx))
     return false;
 #endif
 
@@ -667,16 +670,15 @@ __device__ bool get_next_XOR_sources_chunk(const SourceCompatibilityData& source
 // source, or until all XOR sources are exhausted. Return true if at least one
 // XOR source is compatible.
 __device__ bool get_next_compatible_XOR_sources_chunk(
-    const SourceCompatibilityData& source, index_t xor_chunk_idx,
-    const index_t num_uv_indices) {
-  result_t* xor_results = (result_t*)&dynamic_shared[kXorResults];
+    /*    const SourceCompatibilityData& source, */
+    index_t xor_chunk_idx, const index_t num_uv_indices) {
   const auto block_size = blockDim.x;
   const auto num_xor_indices = xor_data.num_compat_indices;
   __shared__ bool any_xor_compat;
   if (!threadIdx.x) any_xor_compat = false;
   __syncthreads();
   for (; xor_chunk_idx * block_size < num_xor_indices; ++xor_chunk_idx) {
-    if (get_next_XOR_sources_chunk(source, xor_chunk_idx, num_uv_indices)) {
+    if (get_next_XOR_sources_chunk(/*source,*/ xor_chunk_idx, num_uv_indices)) {
       any_xor_compat = true;
     }
     __syncthreads();
@@ -697,7 +699,7 @@ __device__ bool get_next_compatible_XOR_sources_chunk(
 //   For each OR source that is variation-compatible with XOR source
 //     If OR source is OR-compatible with Source
 //       is_compat = true
-__device__ bool is_compat_loop(const SourceCompatibilityData& source) {
+__device__ bool is_compat_loop() {  // const SourceCompatibilityData& source) {
   const auto block_size = blockDim.x;
   index_t* xor_chunk_idx_ptr = &dynamic_shared[kXorChunkIdx];
   __shared__ bool any_xor_compat;
@@ -714,15 +716,14 @@ __device__ bool is_compat_loop(const SourceCompatibilityData& source) {
   }
   __syncthreads();
   const auto num_uv_indices =
-      compute_compat_XOR_uv_indices(source.usedSources.variations);
+      compute_compat_XOR_uv_indices(source().usedSources.variations);
   if (!num_uv_indices) return false;
   for (;;) {
-    //    __syncthreads();
     if (*xor_chunk_idx_ptr * block_size >= num_xor_indices) return false;
 
     auto begin = clock64();
     // TODO: passing shared variable not necessary
-    if (get_next_compatible_XOR_sources_chunk(source, *xor_chunk_idx_ptr,
+    if (get_next_compatible_XOR_sources_chunk(/*source, */*xor_chunk_idx_ptr,
             num_uv_indices)) {
       any_xor_compat = true;
     }
@@ -735,7 +736,7 @@ __device__ bool is_compat_loop(const SourceCompatibilityData& source) {
     if (any_xor_compat) {
       if (!or_data.num_compat_indices) return true;
       begin = clock64();
-      if (!src_init_done && init_source(source)) {
+      if (!src_init_done && init_source(/*source*/)) {
         src_init_done = true;
       }
 
@@ -749,7 +750,7 @@ __device__ bool is_compat_loop(const SourceCompatibilityData& source) {
     if (any_xor_compat && src_init_done) {
       begin = clock64();
       // TODO: passing shared variable not necessary
-      if (is_any_OR_source_compatible(source, *xor_chunk_idx_ptr)) {
+      if (is_any_OR_source_compatible(/*source, *xor_chunk_idx_ptr*/)) {
         any_or_compat = true;
       }
 
@@ -793,7 +794,7 @@ __device__ int dumped = 0;
 // Find compatible XOR source -> compare with variation-compatible OR sources.
 __global__ void filter_kernel(result_t* RESTRICT results, index_t swarm_idx,
     index_t stream_idx) {
-  __shared__ SourceCompatibilityData source;
+  //  __shared__ SourceCompatibilityData source;
   __shared__ bool is_compat;
   if (!threadIdx.x) {
     dynamic_shared[kSwarmIdx] = swarm_idx;
@@ -827,9 +828,9 @@ __global__ void filter_kernel(result_t* RESTRICT results, index_t swarm_idx,
         const auto csi1 = csi.first();
         const auto csi2 = csi.second();
         // TODO: compare to source.reset() followed by 2x mergeInPlace
-        source = sources_data[csi1.count()][csi1.index()];
+        source() = sources_data[csi1.count()][csi1.index()];
         [[maybe_unused]] const auto b =
-            source.mergeInPlace(sources_data[csi2.count()][csi2.index()]);
+            source().mergeInPlace(sources_data[csi2.count()][csi2.index()]);
 #if 1
         if (!b) {
           printf("idx %u, num_indices %u, src_idx.listIndex %u, src_idx.index "
@@ -840,7 +841,7 @@ __global__ void filter_kernel(result_t* RESTRICT results, index_t swarm_idx,
 #endif
       }
       // __syncthreads() happens inside is_compat_loop
-      if (is_compat_loop(source)) { is_compat = true; }
+      if (is_compat_loop()) { is_compat = true; }
     }
     __syncthreads();
     if (!threadIdx.x && is_compat) {
@@ -885,6 +886,7 @@ void run_filter_kernel(int /*threads_per_block*/, index_t swarm_idx,
   const auto shared_bytes = kSharedIndexCount
           * sizeof(shared_index_t)               // indices
       + kNumSentenceDataBytes * sizeof(uint8_t)  // src_sentence data
+      + sizeof(SourceCompatibilityData)          // TheSource data
       + block_size * sizeof(result_t);           // xor_results
 
   static bool log_once{true};

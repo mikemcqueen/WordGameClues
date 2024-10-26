@@ -121,7 +121,7 @@ __device__ fat_index_t get_OR_compat_idx_incremental_uv(
 // compatibililty with all of the XOR sources identified by the supplied
 // xor_combo_index, and for OR-compatibility with the supplied source.
 // Return true if at least one OR source is compatible.
-__device__ auto get_OR_sources_chunk(const SourceCompatibilityData& source,
+  __device__ auto get_OR_sources_chunk(/*const SourceCompatibilityData& source,*/
     const index_t or_chunk_idx, const Variations& xor_variations,
     const index_t num_uv_indices) {
 
@@ -161,9 +161,9 @@ __device__ auto get_OR_sources_chunk(const SourceCompatibilityData& source,
 
   begin = clock64();
   auto or_avc = UsedSources::are_variations_compatible(
-      source.usedSources.variations, or_variations);
+      source().usedSources.variations, or_variations);
 
-  #ifdef CLOCKS
+#ifdef CLOCKS
   atomicAdd(&or_are_variations_compat_clocks, clock64() - begin);
   #endif
 
@@ -187,7 +187,7 @@ __device__ auto get_OR_sources_chunk(const SourceCompatibilityData& source,
   #endif
 
   begin = clock64();
-  auto isc = is_source_compatible_with_all<tag::OR>(source, or_combo_idx,
+  auto isc = is_source_compatible_with_all<tag::OR>(/*source,*/ or_combo_idx,
       or_data);
 
   #ifdef CLOCKS
@@ -210,7 +210,7 @@ __device__ auto get_OR_sources_chunk(const SourceCompatibilityData& source,
 // with all of the XOR sources identified by the supplied xor_combo_idx, and
 // OR-compatible with the supplied source.
 __device__ auto is_any_OR_source_compatible(
-    const SourceCompatibilityData& source, const fat_index_t xor_combo_idx) {
+    /*const SourceCompatibilityData& source,*/ const fat_index_t xor_combo_idx) {
   const auto block_size = blockDim.x;
   __shared__ bool any_or_compat;
   __shared__ Variations xor_variations;
@@ -228,7 +228,7 @@ __device__ auto is_any_OR_source_compatible(
   for (index_t or_chunk_idx{};
       or_chunk_idx * block_size < or_data.num_compat_indices; ++or_chunk_idx) {
     __syncthreads();
-    if (get_OR_sources_chunk(source, or_chunk_idx, xor_variations,
+    if (get_OR_sources_chunk(/*source, */or_chunk_idx, xor_variations,
             num_uv_indices)) {
       any_or_compat = true;
     }
@@ -245,7 +245,7 @@ __device__ auto is_any_OR_source_compatible(
 
 // not the fastest function in the world. but keeps GPU busy at least.
 __device__ __forceinline__ auto next_xor_result_idx(index_t result_idx) {
-  result_t* xor_results = (result_t*)&dynamic_shared[kXorResults];
+  result_t* xor_results = (result_t*)&dynamic_shared[kXorResultsIdx];
   const auto block_size = blockDim.x;
   while ((result_idx < block_size) && !xor_results[result_idx])
     result_idx++;
@@ -272,8 +272,9 @@ __device__ auto get_xor_combo_index(index_t xor_flat_idx) {
 
 // With any XOR results in the specified chunk
 __device__ bool is_any_OR_source_compatible(
-    const SourceCompatibilityData& source, const index_t xor_chunk_idx) {
-  result_t* xor_results = (result_t*)&dynamic_shared[kXorResults];
+    /*    const SourceCompatibilityData& source,
+ const index_t xor_chunk_idx*/) {
+  //  index_t xor_chunk_idx = dynamic_shared[kXorChunkIdx];
   __shared__ bool any_or_compat;
   if (!threadIdx.x) any_or_compat = false;
   __syncthreads();
@@ -290,9 +291,10 @@ __device__ bool is_any_OR_source_compatible(
   for (auto xor_results_idx{next_xor_result_idx(0)};
       xor_results_idx < block_size; ++num_sources) {
 
-    const auto xor_flat_idx = get_flat_idx(xor_chunk_idx, xor_results_idx);
+    const auto xor_flat_idx = get_flat_idx(dynamic_shared[kXorChunkIdx],
+        xor_results_idx);
     const auto xor_combo_idx = get_xor_combo_index(xor_flat_idx);
-    if (is_any_OR_source_compatible(source, xor_combo_idx)) {
+    if (is_any_OR_source_compatible(/*source,*/ xor_combo_idx)) {
       any_or_compat = true;
     }
     __syncthreads();
