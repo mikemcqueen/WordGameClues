@@ -34,20 +34,24 @@ inline constexpr auto kSrcIdx = 6;      // src_idx.index
 inline constexpr auto kSwarmIdx = 7;
 inline constexpr auto kStreamIdx = 8;
 inline constexpr auto kDebugIdx = 9;
-inline constexpr auto kSharedIndexCount = 10;
-
-// num source sentences (uint8_t) starts at end of indices
-inline constexpr auto kNumSentencesIdx = kSharedIndexCount;
-inline constexpr auto kNumSentenceDataBytes = 12;
-// source sentence data (unit8_t) follows for 9 more bytes, round to 12 total
+inline constexpr auto kSharedIndexCount = 16;  // for SourceCompatData alignment
 
 // "The Source" that is being tested by current block in filter_kernel
-inline constexpr auto kTheSourceIdx = kNumSentences
-    + (kNumSentenceDataBytes / kSharedIndexSize);
+inline constexpr auto kTheSourceIdx = kSharedIndexCount;
 
+#if 0
+// num source sentences (uint8_t) follows after TheSource
+inline constexpr auto kNumSentencesIdx = kTheSourceIdx
+    + (sizeof(SourceCompatibilityData) / kSharedIndexSize);
+// sentence data (unit8_t) follows for 9 more bytes, 10 total; round to 12
+inline constexpr auto kNumSentencesBytes = 12;
+
+#else
 // xor_results (result_t) starts after source
 inline constexpr auto kXorResultsIdx = kTheSourceIdx
     + (sizeof(SourceCompatibilityData) / kSharedIndexSize);
+#endif
+
 
 namespace tag {
 
@@ -83,11 +87,13 @@ __device__ __forceinline__ index_t get_flat_idx(index_t block_idx,
   return block_idx * blockDim.x + thread_idx;
 }
 
+#if 0
 __device__ __forceinline__ auto are_source_bits_OR_compatible(
-    const UsedSources::SourceBits& a, const UsedSources::SourceBits& b,
-    int word_idx) {
-  const auto w = a.word(word_idx) & b.word(word_idx);
-  if (w && (w != a.word(word_idx))) return false;
+    const UsedSources::SourceBits& other_bits, int word_idx) {
+  const auto& src_bits = source().usedSources.getBits();
+  const auto other_word = other_bits.word(word_idx);
+  const auto w = src_bits.word(word_idx) & other_word;
+  if (w && (w != other_word)) return false;
   return true;
 }
 
@@ -100,8 +106,7 @@ __device__ __forceinline__ auto are_source_bits_XOR_compatible(
 // each thread calls this with a different "other" source
 template <typename TagT>
 requires /*std::is_same_v<TagT, tag::XOR> ||*/ std::is_same_v<TagT, tag::OR>
-__device__ inline auto are_source_bits_compatible(
-    /*    const SourceCompatibilityData& source,*/
+__device__ inline auto are_source_bits_compatible_with(
     const SourceCompatibilityData& other) {
   const uint8_t* num_sentences = (uint8_t*)&dynamic_shared[kNumSentencesIdx];
   const uint8_t* sentences = &num_sentences[1];
@@ -109,13 +114,13 @@ __device__ inline auto are_source_bits_compatible(
   // TODO: i could just increment 'sentences++' here instead of indexing
   for (uint8_t idx{}; idx < *num_sentences; ++idx) {
     const auto sentence = sentences[idx];
-    // we know all source.variations[s] are > -1. no need to compare bits if
-    // other.variations[s] == -1.
-    if (other.usedSources.variations[sentence] > -1) {
+    // we know all source.variations[s] == NoVariation. no need to compare bits
+    // if other.variations[s] == NoVariation.
+    if (other.usedSources.variations[sentence] != NoVariation) {
       if constexpr (std::is_same_v<TagT, tag::OR>) {
         // NB: order of params matters here (or_src first)
         if (!are_source_bits_OR_compatible(other.usedSources.getBits(),
-                source().usedSources.getBits(), sentence)) {
+                sentence)) {
           return false;
         }
       } else if constexpr (std::is_same_v<TagT, tag::XOR>) {
@@ -128,20 +133,58 @@ __device__ inline auto are_source_bits_compatible(
   }
   return true;
 }
+#else
 
+template <typename T>
+__device__ __forceinline__ auto are_words_OR_compatible(const T a, const T b) {
+  const auto w = a & b;
+  if (w && (w != a)) return false;
+  return true;
+}
+
+inline __device__ auto are_source_bits_OR_compatible_with(
+    const UsedSources::SourceBits& other_bits) {
+  const auto& bits = source().usedSources.getBits();
+  if (!are_words_OR_compatible(other_bits.quad_word(0), bits.quad_word(0)))
+    return false;
+  if (!are_words_OR_compatible(other_bits.quad_word(1), bits.quad_word(1)))
+    return false;
+  if (!are_words_OR_compatible(other_bits.word(8), bits.word(8))) return false;
+  return true;
+}
+
+// each thread calls this with a different "other" source
+template <typename TagT>
+requires /*std::is_same_v<TagT, tag::XOR> ||*/ std::is_same_v<TagT, tag::OR>
+__device__ __forceinline__ auto are_source_bits_compatible_with(
+    const SourceCompatibilityData& other) {
+  if constexpr (std::is_same_v<TagT, tag::OR>) {
+    if (!are_source_bits_OR_compatible_with(other.usedSources.getBits()))
+      return false;
+  } else if constexpr (std::is_same_v<TagT, tag::XOR>) {
+    return false;
+  }
+  return true;
+}
+#endif
+  
 // With all sources identified by combo_idx
 template <typename TagT, typename T>
 requires /*std::is_same_v<TagT, tag::XOR> ||*/ std::is_same_v<TagT, tag::OR>
-__device__ auto is_source_bits_compatible_with_all(
-    /*   const SourceCompatibilityData& source, */ fat_index_t combo_idx,
+__device__ auto are_source_bits_compatible_with_all(fat_index_t combo_idx,
     const T& data) {
   for (int list_idx{int(data.num_idx_lists) - 1}; list_idx >= 0;
       --list_idx) {
     const auto& other = data.get_source(combo_idx, list_idx);
-    if (!are_source_bits_compatible<TagT>(/*source, */other)) return false;
+    if (!are_source_bits_compatible_with<TagT>(other)) return false;
     combo_idx /= data.idx_list_sizes[list_idx];
   }
   return true;
+}
+
+__device__ __forceinline__ auto are_source_bits_OR_compatible_with_all(
+    fat_index_t combo_idx) {
+  return are_source_bits_compatible_with_all<tag::OR>(combo_idx, or_data);
 }
 
 template <typename T>
@@ -165,7 +208,7 @@ __device__ auto check_src_compat_results(fat_index_t combo_idx, const T& data) {
 __device__ __forceinline__ void merge_variations_unchecked(
     Variations& to, const Variations& from, bool force = false) {
   for (int s{}; s < kNumSentences; ++s) {
-    if (force || (to[s] == -1)) to[s] = from[s];
+    if (force || (to[s] == NoVariation)) to[s] = from[s];
   }
 }
 

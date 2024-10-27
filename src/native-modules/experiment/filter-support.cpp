@@ -522,8 +522,10 @@ filter_sources(FilterSwarm& swarm, const FilterParams& params,
 
 //
 
-auto copy_prior_sum_sources(const FilterParams& params, cudaStream_t stream) {
+auto alloc_copy_prior_sum_sources(const FilterParams& params,
+    cudaStream_t stream) {
   size_t num_sources{};
+  CudaEvent copy_start(stream);
   if (params.copy_all_prior_sources) {
     // copy sources for all prior sums except immediately prior
     for (int sum{3}; sum < params.sum; ++sum) {
@@ -535,6 +537,13 @@ auto copy_prior_sum_sources(const FilterParams& params, cudaStream_t stream) {
   num_sources += cuda_alloc_copy_prior_sum_sources(params.sum, stream);
   // indicate that our immediately prior sum source copy is initiated
   source_copy_tracker_.complete(params.sum);
+  CudaEvent copy_stop(stream);
+  if (log_level(Verbose)) {
+    auto copy_duration = copy_stop.synchronize(copy_start);
+    std::cerr << " " << params.sum
+              << ": copy_prior_sum_sources: " << num_sources << " - "
+              << copy_duration << "ms\n";
+  }
   return num_sources;
 }
 
@@ -552,15 +561,6 @@ void set_incompat_sources(FilterData& mfd,
   mfd.device_xor.incompat_src_desc_pairs =
       cuda_alloc_copy_source_descriptor_pairs(
           mfd.host_xor.incompat_src_desc_pairs, stream);
-}
-
-void log_copy_sources(const FilterParams& params, size_t num_sources,
-    const CudaEvent& copy_start, const CudaEvent& copy_stop) {
-  if (log_level(Verbose)) {
-    auto copy_duration = copy_stop.synchronize(copy_start);
-    std::cerr << " " << params.sum << ": alloc_copy_sources: " << num_sources
-              << " - " << copy_duration << "ms\n";
-  }
 }
 
 void log_make_indices(const FilterParams& params,
@@ -612,25 +612,19 @@ void log_copy_indices(const FilterParams& params, size_t num_src_indices,
 //
 filter_task_result_t filter_task(FilterData& mfd, FilterParams params) {
   using namespace std::experimental::fundamentals_v3;  // scope_exit
-  // The logic in this function isn't segregated very well. we enter here on a
-  // separate thread-per-sum. the goal of each thread is to perform the
-  // following in order:
+  // We enter here on a separate thread-per-sum. the goal of each thread is to
+  // perform the following in order:
   //
-  // 1. Initiate fulfillment of the device-data dependency (sources for prior
-  //    sum) for subsequent-sum threads as quickly as possible, because they
-  //    are all blocked until this data is available. All of these
-  //    alloc/copies use the same stream shared across all threads, so that
-  //    there is only one "dependent" stream to sync with before launching a
-  //    kernel.
+  // 1. Initiate (async) fulfillment of the device-data dependency (sources for
+  //    prior sum) for subsequent-sum threads as quickly as possible, because
+  //    they will all be blocked until this data is available. This done using
+  //    the same stream shared across all threads, so that there is only one
+  //    "dependent" stream to sync with before launching a kernel.
 
-  auto stream = sources_stream_;
-  CudaEvent copy_start(stream);
-  auto num_sources = copy_prior_sum_sources(params, stream);
-  CudaEvent copy_stop(stream);
-  log_copy_sources(params, num_sources, copy_start, copy_stop);
+  // NB: sources_stream_
+  alloc_copy_prior_sum_sources(params, sources_stream_);
 
-  // 2. Perform as much CPU work as possible for data that is only used by
-  // this
+  // 2. Perform as much CPU work as possible for data that is only used by this
   //    sum's kernel, before blocking for one of the available stream swarms
   //    from the swarm pool. Once we take ownership of a swarm, we should be
   //    in GPU mode.
@@ -643,8 +637,9 @@ filter_task_result_t filter_task(FilterData& mfd, FilterParams params) {
   t_make.stop();
   log_make_indices(params, idx_lists, src_indices, t_make);
 
-  // 3. Wait for all prior sum source copies to be initiated
+  // TODO: can i initialize IndexStates here?
 
+  // 3. Wait for all prior sum source copies to be initiated
   source_copy_tracker_.wait_for_all_prior(params.sum);
 
   // 4. Acquire swarm
@@ -654,38 +649,34 @@ filter_task_result_t filter_task(FilterData& mfd, FilterParams params) {
   // (including get_compatible_results) to the # of swarms.
   auto& swarm = swarm_pool_.acquire();
   const auto num_streams = params.num_streams ? params.num_streams : 1;
-  swarm.ensure_streams(num_streams);
+  swarm.ensure_streams(num_streams); // set_num_streams might be better
 
-  //
-  // NOTE: we switch streams here! weee! because reasons!
-  //
-  stream = swarm.at(0).cuda_stream;
-  copy_start.record(stream);
+  const auto& stream = swarm.at(0);
+  stream.copy_start.record(stream.cuda_stream);
   const auto device_src_indices = cuda_alloc_copy_source_indices(src_indices,
-      stream);
-  copy_stop.record(stream);
-  log_copy_indices(params, src_indices.size(), copy_start, copy_stop);
+      stream.cuda_stream);
+  stream.copy_stop.record(stream.cuda_stream);
+  log_copy_indices(params, src_indices.size(), stream.copy_start, stream.copy_stop);
 
   result_t* device_compat_src_results{};
   if (!params.synchronous) {
     device_compat_src_results = get_compatible_sources_results(params.sum,
         device_src_indices, src_indices.size(),
         mfd.device_xor.incompat_src_desc_pairs,
-        mfd.host_xor.incompat_src_desc_pairs.size(), sources_stream_, stream);
+        mfd.host_xor.incompat_src_desc_pairs.size(), sources_stream_,
+        stream.cuda_stream);
     // proactively relieve some memory pressure 
     src_indices.clear();
     src_indices.shrink_to_fit();
   } else {
-    // TOOD: hate this. the stream story is a mess here. fix.
+    // TODO: not in love with this.
     cudaStreamSynchronize(sources_stream_);
   }
 
-  // TODO: magic, but also wrong-headed. we need to init every stream in the 
-  // swarm. I would like swarm to call stream.init() when it constructs the
+  // TODO: I would like swarm to call stream.init() when it constructs the
   // object, but unfortunately I need access to MFD.
-  // stream here is questionable
   swarm.device.update(swarm.host.swarm_idx(), device_src_indices,
-      device_compat_src_results, stream);
+      device_compat_src_results, stream.cuda_stream);
   for (int i{}; i < num_streams; ++i) {
     swarm.at(i).init(mfd);
   }

@@ -163,7 +163,7 @@ __device__ fat_index_t get_OR_compat_idx_incremental_uv(
   auto or_avc = UsedSources::are_variations_compatible(
       source().usedSources.variations, or_variations);
 
-#ifdef CLOCKS
+  #ifdef CLOCKS
   atomicAdd(&or_are_variations_compat_clocks, clock64() - begin);
   #endif
 
@@ -187,8 +187,7 @@ __device__ fat_index_t get_OR_compat_idx_incremental_uv(
   #endif
 
   begin = clock64();
-  auto isc = is_source_bits_compatible_with_all<tag::OR>(/*source,*/ or_combo_idx,
-      or_data);
+  auto isc = are_source_bits_OR_compatible_with_all(or_combo_idx);
 
   #ifdef CLOCKS
   atomicAdd(&or_is_src_compat_clocks, clock64() - begin);
@@ -209,8 +208,7 @@ __device__ fat_index_t get_OR_compat_idx_incremental_uv(
 // a chunk that contains at least one OR source that is variation-compatible
 // with all of the XOR sources identified by the supplied xor_combo_idx, and
 // OR-compatible with the supplied source.
-__device__ auto is_any_OR_source_compatible(
-    /*const SourceCompatibilityData& source,*/ const fat_index_t xor_combo_idx) {
+__device__ auto is_any_OR_source_compatible(const fat_index_t xor_combo_idx) {
   const auto block_size = blockDim.x;
   __shared__ bool any_or_compat;
   __shared__ Variations xor_variations;
@@ -293,7 +291,7 @@ __device__ bool is_any_OR_source_compatible(
     const auto xor_flat_idx = get_flat_idx(dynamic_shared[kXorChunkIdx],
         xor_results_idx);
     const auto xor_combo_idx = get_xor_combo_index(xor_flat_idx);
-    if (is_any_OR_source_compatible(/*source,*/ xor_combo_idx)) {
+    if (is_any_OR_source_compatible(xor_combo_idx)) {
       any_or_compat = true;
     }
     __syncthreads();

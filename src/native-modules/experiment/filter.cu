@@ -470,15 +470,18 @@ __device__ SourceIndex get_source_index(index_t idx,
 __device__ auto source_bits_are_XOR_compatible(
     const UsedSources::SourceBits& a, const UsedSources::SourceBits& b) {
   using SourceBits = UsedSources::SourceBits;
-#if 0 // requires 16-byte alignment, not yugely faster
+#if 1 // requires 16-byte alignment, not yugely faster
   for (int i{}; i < SourceBits::wc() >> 2; ++i) {
     if (a.quad_word(i) & b.quad_word(i)) return false;
   }
-#endif
+  constexpr auto mask_bits = 3;
+#else
   for (int i{}; i < SourceBits::wc() >> 1; ++i) {
     if (a.double_word(i) & b.double_word(i)) return false;
   }
-  for (int i{SourceBits::wc() ^ 1}; i < SourceBits::wc(); ++i) {
+  constexpr auto mask_bits = 1;
+#endif
+  for (int i{SourceBits::wc() ^ mask_bits}; i < SourceBits::wc(); ++i) {
     if (a.word(i) & b.word(i)) return false;
   }
   return true;
@@ -520,24 +523,15 @@ __device__ bool is_source_XOR_compatible(
 //
 template <typename TagT, typename T>
 requires /*std::is_same_v<TagT, tag::XOR> ||*/ std::is_same_v<TagT, tag::OR>
-__device__ auto compute_src_compat_results(
-    /*const SourceCompatibilityData& source, */
-    T& data) {
+__device__ auto compute_src_compat_results(T& data) {
   __shared__ result_t any_compat[kMaxOrArgs];
   if (threadIdx.x < kMaxOrArgs) any_compat[threadIdx.x] = false;
   __syncthreads();
   for (auto idx{threadIdx.x}; idx < data.num_src_compat_results;
       idx += blockDim.x) {
     const auto src_idx = data.get_source_index(idx);
-    /*
-    const auto src_list_idx = data.src_list_start_indices[src_idx.listIndex];
-    const auto src_list = &data.src_lists[src_list_idx];
-    const auto idx_list_idx = data.idx_list_start_indices[src_idx.listIndex];
-    const auto idx_list = &data.idx_lists[idx_list_idx];
-    const auto& other = src_list[idx_list[src_idx.index]];
-    */
     const auto& other = data.get_source(src_idx);
-    const auto compat = are_source_bits_compatible<TagT>(other);
+    const auto compat = are_source_bits_compatible_with<TagT>(other);
     const auto result_idx = blockIdx.x * data.num_src_compat_results + idx;
     if (compat) {
       any_compat[src_idx.listIndex] = 1;
@@ -564,7 +558,8 @@ __device__ auto compute_src_compat_results(
   return false;
 }
 
-__device__ auto init_source(/*const SourceCompatibilityData& source*/) {
+__device__ auto init_source() {
+#if 0
   uint8_t* num_sentences = (uint8_t*)&dynamic_shared[kNumSentencesIdx];
   uint8_t* src_sentences = &num_sentences[1];
   if (!threadIdx.x) {
@@ -576,7 +571,8 @@ __device__ auto init_source(/*const SourceCompatibilityData& source*/) {
       }
     }
   }
-  return compute_src_compat_results<tag::OR>(/*source,*/ or_data);
+#endif
+  return compute_src_compat_results<tag::OR>(or_data);
 }
 
 __device__ auto compute_compat_XOR_uv_indices(const Variations& src_variations) {
@@ -889,10 +885,10 @@ void run_filter_kernel(int /*threads_per_block*/, index_t swarm_idx,
   const auto [grid_size, block_size] = get_filter_kernel_grid_block_sizes();
   // xor_results could probably be moved to global
   const auto shared_bytes = kSharedIndexCount
-          * sizeof(shared_index_t)               // indices
-      + kNumSentenceDataBytes * sizeof(uint8_t)  // src_sentence data
-      + sizeof(SourceCompatibilityData)          // TheSource data
-      + block_size * sizeof(result_t);           // xor_results
+          * sizeof(shared_index_t)            // indices
+      + sizeof(SourceCompatibilityData)       // TheSource data
+    //      + kNumSentencesBytes * sizeof(uint8_t)  // src_sentence data
+      + block_size * sizeof(result_t);        // xor_results
 
   static bool log_once{true};
   if (log_once) {

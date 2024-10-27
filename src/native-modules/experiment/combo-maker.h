@@ -323,7 +323,7 @@ public:
   Variations variations = make_array<variation_index_t, kNumSentences>(-1);
 };  // UsedSources
 
-struct alignas(8) SourceCompatibilityData {
+struct alignas(16) SourceCompatibilityData {
   SourceCompatibilityData() = default;
   // copy consruct/assign allowed for now, precompute.mergeAllCompatibleXorSources
   SourceCompatibilityData(const SourceCompatibilityData&) = default;
