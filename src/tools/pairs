@@ -13,15 +13,23 @@ fi
 _bigram_file=~/uniq.10
 _unsorted_file=intermediate.pairs.unsorted
 _sorted_file=intermediate.pairs
+_steps=5
 
+echo "(1 of $_steps) Generating word pairs..." >&2
 cm pairs -w > "$_unsorted_file"      # pairs of words
+echo "(2 of $_steps) Generating word/solution pairs..." >&2
 cm pairs -w -s >> "$_unsorted_file"  # pairs of words and single-word solution words
+echo "(3 of $_steps) Sorting results..." >&2
 sort "$_unsorted_file" > "$_sorted_file"
 
 # valid bigrams back to (soon to be) unsorted file
+echo "(4 of $_steps) Finding valid bigrams..." >&2
 comm -12 "$_bigram_file" "$_sorted_file" > "$_unsorted_file"
+echo "(5 of $_steps) Generating word/solutions pairs..." >&2
 cm pairs -w -m >> "$_unsorted_file"  # pairs of words and multiple-word solution words
+echo "(6 of $_steps) Generating solutions pairs..." >&2
 cm pairs -s -m >> "$_unsorted_file"  # pairs of 1-word and multipe-word solution words
+echo "(7 of $_steps) Generating solutions pairs..." >&2
 cm pairs -m >> "$_unsorted_file"     # mutliple-word solution words
 cat "$_unsorted_file" | sort | uniq
 

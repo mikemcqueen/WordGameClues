@@ -331,7 +331,7 @@ async function main () {
     options.merge_style = Boolean(options['merge-style']);
     options.removeAllInvalid = Boolean(options['remove-all-invalid']);
     options.copy_from = options['copy-from'];
-    options.max_sources = _.toNumber(options['max-sources'] || 19);
+    options.max_sources = _.toNumber(options['max-sources'] || 15);
     console.error(`max_sources(${options.max_sources})`);
     options.maxArg = _.toNumber(options.max || 0);  // TODO: make this not used
     let maxArg = _.toNumber(options.max || 2);

@@ -1,3 +1,11 @@
+* replace src_list in KnownSources.Entry with SourceCompatIndices (index pair)
+  * and the std::set is just a single string. or is it? does addCompoundClue()
+    add to it for duplicate source names?
+  * why 150k+ sources for blue,bird:19? north,atlantic:19? i'm not sure i ever
+    got to the bottom of exactly why this count, but clearly primary clue variations
+    cause source count to expand exponentially. adding more variations is going
+    to hit that level at c15 eventually.
+
 * passing shared variables as params: Source, xor_chunk_idx
 
 * results -> FilterStreamData
@@ -42,7 +50,8 @@
     commit right after I thought it was fixed.
   * alternatively, I could put the scratch_buffer (variations_compat_results) into the
     swarm, or back into MFD, and have access guarded by (an array of) binary_sempahore.
-
+    * i think it's in the stream now. in_place still broke I think.
+    
 * zero results:
   node clues --or-variations -pf.72 -c2 --xor tree --max-sources 1  -z3 --stride 100000 -v > out
 
