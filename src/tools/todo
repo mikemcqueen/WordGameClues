@@ -1,12 +1,4 @@
-* replace src_list in KnownSources.Entry with SourceCompatIndices (index pair)
-  * and the std::set is just a single string. or is it? does addCompoundClue()
-    add to it for duplicate source names?
-  * why 150k+ sources for blue,bird:19? north,atlantic:19? i'm not sure i ever
-    got to the bottom of exactly why this count, but clearly primary clue variations
-    cause source count to expand exponentially. adding more variations is going
-    to hit that level at c15 eventually.
-
-* passing shared variables as params: Source, xor_chunk_idx
+* passing shared variable as param: xor_chunk_idx
 
 * results -> FilterStreamData
 
@@ -27,7 +19,6 @@
       up to some --max, i just search for all instances of "21" (specified sources).
   * maybe think about how i might support -cLARGE with --max-sources *smaller* than
     LARGE-1. not a priority though, i should't really be playing with those sizes.
-
 
 * "Source" is overloaded. like the "Source" (namespace?) in combo-maker.h. what's
    a better name for it?
@@ -51,10 +42,9 @@
   * alternatively, I could put the scratch_buffer (variations_compat_results) into the
     swarm, or back into MFD, and have access guarded by (an array of) binary_sempahore.
     * i think it's in the stream now. in_place still broke I think.
+  * fixed a bug in compact_sums_to_indices wrt last_scan_result that needs to be fixed
+    here as well. left a comment in code.
     
-* zero results:
-  node clues --or-variations -pf.72 -c2 --xor tree --max-sources 1  -z3 --stride 100000 -v > out
-
 * unique_sources branch implementation issues:
   * validation failures. possibly because hash/equal_to of SourceData is wrong (doesn't
     take into account ncList, maybe).
@@ -82,10 +72,6 @@
 
 * refactor xor/or get_idx_incremental_uv into a single function
 
-* Investigate whether I can use USE_LOCAL_XOR_COMPAT in filter.cu. When I turn it
-  on I get slightly different results. why?
-  * coz of bug. fixed it. now validate.
-
 * I should add new host/device structs to FilterData for Source.
   * and the Device version of it can be allocated in constant memory similar to OR/XOR.
 
@@ -99,6 +85,9 @@
     of the StreamData struct?
   * Note this might be trickier than it looks. 8/28 note in notebook about it.
   * also sum_idx_list_sizes probably needs to change to num_results
+  * tried this. more memory, not faster (at least at 64-thread blocks.) maybe
+    re-assess if/when I ever get to point of implementing block-size agnostic
+    ExclusiveSum.
 
 * should look into using libcu++ for standard library such as std::array, std::copy in
   kernels. coz.. i might just be gettting lucky. and i'm not sure how to control which
@@ -184,8 +173,6 @@
 * clue-manager::add_compound_clue could maybe be integrated into validateSources
   workflow (in index.cpp) depending on conditionals used in TS.
 
-* removed edward,tattoo,wallet =throat and =bomb. (??)
-
 * one of the reasons why the Peco approach is slower, for compatibility
   checking, especially with length > 2, is that once we determine that the
   sources at the current indices of 0 and 1 are incompatible, there is no
@@ -238,8 +225,6 @@
   rid of the return true inside the loop, and return is_or_compat; at the end of the
   function?
   This approach (if it works) might apply to other is_xxx_compat functions as well.
-
-* fix variable names in filter-support::cuda_allocCopySentenceVariationIndices()
 
 // NEW PERF:
 
@@ -323,6 +308,18 @@
 * spawn a thread to do "synchronous" sum=2, but acquire a binary semaphore to
   prevent the next sum from executing until all the data from 2 is packed into MFD.
 
+* This is the solution to device-side memory (at the expense of additional computation):
+  * replace src_list in KnownSources.Entry with SourceCompatIndices (index pair)
+  * and the std::set is just a single string. or is it? does addCompoundClue()
+    add to it for duplicate source names?
+  * why 150k+ sources for blue,bird:19? north,atlantic:19? i'm not sure i ever
+    got to the bottom of exactly why this count, but clearly primary clue variations
+    cause source count to expand exponentially. adding more variations is going
+    to hit that level at c15 eventually.
+    * I think this is just combinatorial explosion. mostly due to clue1 variations.
+    * This should be moved to "perf" section and dealt with when it becomes a problem.
+
+* Old solutions to device-side memory that are worse than above:
 * potentially hairy: see if it's possible to process sources in chunks, such that
   device-data requirements are restricted to some threshold such as 1GB, for sums
   that have lots of sources (such as 19, 20 currently, but this may become a much
@@ -371,9 +368,6 @@
   specifically for sentence 7, if i could just ignore [s] or make (s) optional or
   something.
 
-* fix lifetime issue requiring sync in cuda_allocCopySentenceVariationIndices()
-  * store in MFD.
-
 * thoughts from last night: i really want to focus on new sentence combinations, and
   corresponding compound clues in the sub-10 (typically 6-8) region. then combine
   those to build larger combinations. so, performance (and memory use) of large
@@ -388,7 +382,6 @@
     * syntactically, some way to mark it in the sentence.json. like a "skip" flag
       or maybe a priority value, and default priority could be 1, but a command
       line flag could increase it.
-
     * some way to mark the variations created from that combination with the 
       corresponding priority.
     * combo-maker awareness of current priority, and exclusion of combinations
@@ -410,9 +403,6 @@
 * old-working compatible sources and working compatible sources are different.
   why? is it related to above?
 
-* I may need to re-think OR compatibility. Since it's using IsCompatibleSubsetOf
-  now. Is that really appropriate for the OR = (XOR || AND) case?
-
 * -t braves,ace ?
   
 * add syn/hom of anagrams at .. post-process?
@@ -424,17 +414,12 @@
     for matches, and when a pass through all of them yield no new results, we're done.
     that map can be used for lookup by both combo-maker and show-components.
 
-* shouldn't I be using a uint64_t for combo_idx in filter kernel? maybe not? look at
-  what these things are host-side and how/where I am copying them to device_side.
-  * the problem is that i am using "combo_idx" to mean different things depending on
-    the context. in at least one function, i use both "compat_idx" and "combo_idx"
-    to refer to the same thing.
-
-* i should probably document and/or name and/or encapsulate some of the clue-manager
-  global data into classes to help me remember what is what and what goes where. its
-  a bit of a mess of rather poorly named global data and functions at the moment,
-  and i don't have a lot of intuition about it all, so could use the help of some
-  additional structure.
+* i should probably document and/or name and/or encapsulate some (more) of the
+  clue-manager global data into classes to help me remember what is what and what
+  goes where. its a bit of a mess of rather poorly named global data and functions at
+  the moment, and i don't have a lot of intuition about it all, so could use the help
+  of some additional structure.
+  * NOTE: already did KnownSources
 
 * getUniqueClueNameCount -> Native.get_num_unique_clue_names
 
@@ -512,10 +497,6 @@
   (it's a tiny fraction of combos so probably not a big deal)
   Haha. This may be what's breaking things right now.
 
-* additional thoughts on optimizaiton:
- - only call addCandidate every 1000+ candidates. maintain a list and
-   bulk push them.
-
 * candidates.comboListMap should be a vector. It's not even strictly
   necessary anymore.
 
@@ -528,7 +509,6 @@
   have each "rule" encapsulated as a separate variation entry type.
 
 * NameCount.listHasCompatibleSources looks unnecessary, or weird, or both
-
 
 * OPTIMIZITIONS:
 

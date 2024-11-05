@@ -404,7 +404,6 @@ __device__ bool sources_match_any_descriptor_pair(
   return false;
 }
 
-#if 1
 __global__ void get_compatible_sources_kernel(
     const CompatSourceIndices* RESTRICT compat_src_indices,
     const unsigned num_compat_src_indices,
@@ -426,47 +425,6 @@ __global__ void get_compatible_sources_kernel(
   }
 }
 
-#else
-
-// "filter compatible sources"
-__global__ void get_compatible_sources_kernel(
-    const CompatSourceIndices* RESTRICT compat_src_indices,
-    const unsigned num_compat_src_indices,
-    const UsedSources::SourceDescriptorPair* RESTRICT incompat_src_desc_pairs,
-    const unsigned num_src_desc_pairs, result_t* RESTRICT results) {
-  // one block per source-(index)-pair
-  for (unsigned idx{blockIdx.x}; idx < num_compat_src_indices;
-      idx += gridDim.x) {
-    const auto csi = compat_src_indices[idx];
-    const auto& source1 =
-        sources_data[csi.first().count()][csi.first().index()];
-    const auto& source2 =
-        sources_data[csi.second().count()][csi.second().index()];
-    // I don't understand why this is required, but fails synccheck and
-    // produces wobbly results without.
-    __syncthreads();
-    if (!sources_match_any_descriptor_pair(source1, source2,
-            incompat_src_desc_pairs, num_src_desc_pairs)) {
-      if (!threadIdx.x) {
-        results[idx] = 1;
-      }
-    }
-  }
-}
-#endif
-
-/*
-__device__ SourceIndex get_source_index(index_t idx,
-    const MergeData::Device& data) {
-  for (index_t list_idx{}; list_idx < data.num_idx_lists; ++list_idx) {
-    auto list_size = data.idx_list_sizes[list_idx];
-    if (idx < list_size) return {list_idx, idx};
-    idx -= list_size;
-  }
-  assert(0);
-  return {};
-}
-*/
 __device__ auto source_bits_are_XOR_compatible(
     const UsedSources::SourceBits& a, const UsedSources::SourceBits& b) {
   using SourceBits = UsedSources::SourceBits;
@@ -487,22 +445,14 @@ __device__ auto source_bits_are_XOR_compatible(
   return true;
 }
 
-#define USE_LOCAL_XOR_COMPAT
-
-__device__ bool is_source_XOR_compatible(
-    /*const SourceCompatibilityData& source,*/
-    fat_index_t combo_idx) {
+__device__ bool is_source_XOR_compatible(fat_index_t combo_idx) {
   for (int list_idx{int(xor_data.num_idx_lists) - 1}; list_idx >= 0;
       --list_idx) {
     const auto& src = xor_data.get_source(combo_idx, list_idx);
-#ifdef USE_LOCAL_XOR_COMPAT
     if (!source_bits_are_XOR_compatible(source().usedSources.bits,
             src.usedSources.bits)) {
       return false;
     }
-#else
-    if (!src.isXorCompatibleWith(source())) return false;
-#endif
     combo_idx /= xor_data.idx_list_sizes[list_idx];
   }
   return true;
@@ -559,19 +509,6 @@ __device__ auto compute_src_compat_results(T& data) {
 }
 
 __device__ auto init_source() {
-#if 0
-  uint8_t* num_sentences = (uint8_t*)&dynamic_shared[kNumSentencesIdx];
-  uint8_t* src_sentences = &num_sentences[1];
-  if (!threadIdx.x) {
-    // initialize num_src_sentences and src_sentences for this source
-    *num_sentences = 0;
-    for (int s{}; s < kNumSentences; ++s) {
-      if (source().usedSources.variations[s] != NoVariation) {
-        src_sentences[(*num_sentences)++] = static_cast<uint8_t>(s);
-      }
-    }
-  }
-#endif
   return compute_src_compat_results<tag::OR>(or_data);
 }
 
@@ -634,9 +571,8 @@ __device__ fat_index_t get_XOR_compat_idx_incremental_uv(
 // Get the next block-sized chunk of XOR sources and test them for 
 // compatibility with the supplied source.
 // Return true if at least one XOR source is compatible.
-__device__ bool get_next_XOR_sources_chunk(
-    /*const SourceCompatibilityData& source,*/
-    const index_t xor_chunk_idx, const index_t num_uv_indices) {
+__device__ bool get_next_XOR_sources_chunk(const index_t xor_chunk_idx,
+    const index_t num_uv_indices) {
   result_t* xor_results = (result_t*)&dynamic_shared[kXorResultsIdx];
   // a __sync will happen in calling function
   xor_results[threadIdx.x] = 0;
@@ -650,15 +586,8 @@ __device__ bool get_next_XOR_sources_chunk(
   #endif
 
   const auto xor_combo_idx = xor_data.compat_indices[xor_compat_idx];
-
-#if 0
-  // When/if I get kNumSentences initialized early for source
-  if (!are_source_bits_XOR_compatible(source, xor_combo_idx, xor_data))
+  if (!is_source_XOR_compatible(xor_combo_idx))
     return false;
-#else
-  if (!is_source_XOR_compatible(/*source, */xor_combo_idx))
-    return false;
-#endif
 
   #if defined(DEBUG_XOR_COUNTS)
   atomicAdd(&count_xor_src_compat, 1);
@@ -672,16 +601,15 @@ __device__ bool get_next_XOR_sources_chunk(
 // contains at least one XOR source that is XOR-compatibile with the supplied
 // source, or until all XOR sources are exhausted. Return true if at least one
 // XOR source is compatible.
-__device__ bool get_next_compatible_XOR_sources_chunk(
-    /*    const SourceCompatibilityData& source, */
-    index_t xor_chunk_idx, const index_t num_uv_indices) {
+__device__ bool get_next_compatible_XOR_sources_chunk(index_t xor_chunk_idx,
+    const index_t num_uv_indices) {
   const auto block_size = blockDim.x;
   const auto num_xor_indices = xor_data.num_compat_indices;
   __shared__ bool any_xor_compat;
   if (!threadIdx.x) any_xor_compat = false;
   __syncthreads();
   for (; xor_chunk_idx * block_size < num_xor_indices; ++xor_chunk_idx) {
-    if (get_next_XOR_sources_chunk(/*source,*/ xor_chunk_idx, num_uv_indices)) {
+    if (get_next_XOR_sources_chunk(xor_chunk_idx, num_uv_indices)) {
       any_xor_compat = true;
     }
     __syncthreads();
@@ -702,7 +630,7 @@ __device__ bool get_next_compatible_XOR_sources_chunk(
 //   For each OR source that is variation-compatible with XOR source
 //     If OR source is OR-compatible with Source
 //       is_compat = true
-__device__ bool is_compat_loop() {  // const SourceCompatibilityData& source) {
+__device__ bool is_compat_loop() {
   const auto block_size = blockDim.x;
   index_t* xor_chunk_idx_ptr = &dynamic_shared[kXorChunkIdx];
   __shared__ bool any_xor_compat;
@@ -726,7 +654,7 @@ __device__ bool is_compat_loop() {  // const SourceCompatibilityData& source) {
 
     auto begin = clock64();
     // TODO: passing shared variable not necessary
-    if (get_next_compatible_XOR_sources_chunk(/*source, */*xor_chunk_idx_ptr,
+    if (get_next_compatible_XOR_sources_chunk(*xor_chunk_idx_ptr,
             num_uv_indices)) {
       any_xor_compat = true;
     }
@@ -739,7 +667,7 @@ __device__ bool is_compat_loop() {  // const SourceCompatibilityData& source) {
     if (any_xor_compat) {
       if (!or_data.num_compat_indices) return true;
       begin = clock64();
-      if (!src_init_done && init_source(/*source*/)) {
+      if (!src_init_done && init_source()) {
         src_init_done = true;
       }
 
@@ -752,9 +680,7 @@ __device__ bool is_compat_loop() {  // const SourceCompatibilityData& source) {
 
     if (any_xor_compat && src_init_done) {
       begin = clock64();
-      if (is_any_OR_source_compatible(/*source, *xor_chunk_idx_ptr*/)) {
-        any_or_compat = true;
-      }
+      if (is_any_OR_source_compatible()) { any_or_compat = true; }
 
       #ifdef CLOCKS
       atomicAdd(&is_any_or_compat_clocks, clock64() - begin);
@@ -785,8 +711,6 @@ __device__ SourceCompatibilityData merge_sources(
   return source;
 }
 
-__device__ int dumped = 0;
-
 // explain better:
 // Find sources that are:
 // * XOR compatible with any of the supplied XOR sources, and
@@ -796,7 +720,6 @@ __device__ int dumped = 0;
 // Find compatible XOR source -> compare with variation-compatible OR sources.
 __global__ void filter_kernel(result_t* RESTRICT results, index_t swarm_idx,
     index_t stream_idx) {
-  //  __shared__ SourceCompatibilityData source;
   __shared__ bool is_compat;
   if (!threadIdx.x) {
     dynamic_shared[kSwarmIdx] = swarm_idx;
@@ -887,7 +810,6 @@ void run_filter_kernel(int /*threads_per_block*/, index_t swarm_idx,
   const auto shared_bytes = kSharedIndexCount
           * sizeof(shared_index_t)            // indices
       + sizeof(SourceCompatibilityData)       // TheSource data
-    //      + kNumSentencesBytes * sizeof(uint8_t)  // src_sentence data
       + block_size * sizeof(result_t);        // xor_results
 
   static bool log_once{true};

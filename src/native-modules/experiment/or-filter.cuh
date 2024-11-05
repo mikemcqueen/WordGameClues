@@ -39,19 +39,9 @@ inline constexpr auto kSharedIndexCount = 16;  // for SourceCompatData alignment
 // "The Source" that is being tested by current block in filter_kernel
 inline constexpr auto kTheSourceIdx = kSharedIndexCount;
 
-#if 0
-// num source sentences (uint8_t) follows after TheSource
-inline constexpr auto kNumSentencesIdx = kTheSourceIdx
-    + (sizeof(SourceCompatibilityData) / kSharedIndexSize);
-// sentence data (unit8_t) follows for 9 more bytes, 10 total; round to 12
-inline constexpr auto kNumSentencesBytes = 12;
-
-#else
 // xor_results (result_t) starts after source
 inline constexpr auto kXorResultsIdx = kTheSourceIdx
     + (sizeof(SourceCompatibilityData) / kSharedIndexSize);
-#endif
-
 
 namespace tag {
 
@@ -262,7 +252,7 @@ __device__ inline auto compute_variations_compat_results(
 constexpr unsigned kBlockSize = 64u;
 
 // compute prefix sums from compat results flag array
-__device__ inline void compute_prefix_sums_in_place(index_t* results,
+__device__ inline auto compute_prefix_sums_in_place(index_t* results,
     const index_t num_results) {
   const auto last_result_idx = num_results - 1;
   const auto last_compat_result = results[last_result_idx];
@@ -274,49 +264,54 @@ __device__ inline void compute_prefix_sums_in_place(index_t* results,
   // or: copy block_size_bits to constant memory and use shift left/right
   const auto max_idx = blockDim.x
       * ((num_results + blockDim.x - 1) / blockDim.x);
-  __shared__ index_t prefix_sum;
+  __shared__ index_t cumulative_total;
   __shared__ index_t last_total;
-  if (!threadIdx.x) prefix_sum = 0;
+  if (!threadIdx.x) cumulative_total = 0;
   __syncthreads();
   for (index_t idx{threadIdx.x}; idx < max_idx; idx += blockDim.x) {
-    const auto compat_result = idx < num_results ? results[idx] : 0;
+    const auto compat_result = idx < num_results ? results[idx] : 0u;
     index_t scan_result;
     index_t total;
     BlockScan(temp_storage).ExclusiveSum(compat_result, scan_result, total);
     if (!threadIdx.x) {
-      if (idx > 0) prefix_sum += last_total;
+      if (idx > 0) cumulative_total += last_total;
       last_total = total;
     }
     __syncthreads();
     if (idx < num_results) {
-      results[idx] = prefix_sum + scan_result;
+      results[idx] = cumulative_total + scan_result;
     }
   }
-  // confirmed necessary but never examined why.
+  // ensure global results array updates are visible to all threads
+  // volatile reads would also achieve this, presumably.
   __syncthreads();
+  return cumulative_total + last_total;
 }
 
 // compact prefix sums into separate indices array
-__device__ inline auto compact_indices(const index_t* scan_results,
-    const index_t num_results, index_t* indices,
-    const index_t last_compat_result) {
-  const auto last_result_idx = num_results - 1;
-  for (index_t idx{threadIdx.x}; idx < last_result_idx; idx += blockDim.x) {
-    if (scan_results[idx] < scan_results[idx + 1]) {
-      indices[scan_results[idx]] = idx;
+__device__ inline void compact_sums_to_indices(const index_t* prefix_sums,
+    const index_t num_prefix_sums, index_t aggregate_sum, index_t* indices) {
+  // determine whether a prefix sum value represents what was originally a "1"
+  // compat result by comparing it to the next prefix sum value.
+  const auto last_idx = num_prefix_sums - 1;
+  for (index_t idx{threadIdx.x}; idx < last_idx; idx += blockDim.x) {
+    if (prefix_sums[idx] < prefix_sums[idx + 1]) {
+      indices[prefix_sums[idx]] = idx;
     }
   }
-  // sync for access to last *scan* result on all threads
-  __syncthreads();
-  const auto last_scan_result = scan_results[last_result_idx];
-  if (!threadIdx.x && last_compat_result) {
-    indices[last_scan_result] = last_result_idx;
+  // we can't compare the last prefix sum value to the next... because it's the
+  // last! but, if it's (exactly 1) less than the aggregate total sum, we know
+  // it too was originally a "1" compat result.
+  if (!threadIdx.x) {
+    const auto last_prefix_sum = prefix_sums[last_idx];
+    if (last_prefix_sum < aggregate_sum) {
+      assert(last_prefix_sum + 1 == aggregate_sum);
+      indices[last_prefix_sum] = last_idx;
+    }
   }
-  // return last computed sum = total number of set flags = total num indices
-  return last_scan_result;
 }
 
-// compact indices from prefix sums in-place
+// compact indices from prefix sums in-place (broken probably, not in use)
 __device__ inline auto compact_indices_in_place(index_t* results,
     const index_t num_results, const index_t last_compat_result) {
   __shared__ index_t indices[kBlockSize];
@@ -388,25 +383,31 @@ __device__ inline auto compute_compat_uv_indices(
       * stream_data().num_variations_results_per_block;
   const auto results = &stream_data().variations_compat_results[results_offset];
 #endif
-  const auto last_result_idx = num_unique_variations - 1;
-  const auto last_compat_result = results[last_result_idx];
 
-  compute_prefix_sums_in_place(results, num_unique_variations);
+  // should get a "unused local" with ONE_ARRAY defined. good. fix it.
+  const auto aggregate_sum = compute_prefix_sums_in_place(results,
+      num_unique_variations);
 
 #ifdef ONE_ARRAY
+  // TODO: don't need to pass in as parameter; can be computed in function
+  // also TODO: i think using last_compat_result is wrong. the element at
+  // that index is actually a sum, not a "flag" (0 or 1). we're treating
+  // it as a flag in compute_indices_in_place(). need to do some kind of
+  // computation using the total sum (return value of compute_prefix_sums
+  // _in_place) similar to how compat_indices() is doing it.
+  const auto last_compat_result = results[num_unique_variations - 1];
+  // unused variable
   auto num_indices = compact_indices_in_place(results, num_unique_variations,
       last_compat_result);
 #else
   const auto indices_offset = blockIdx.x * num_unique_variations;
   const auto indices = &in_results_out_indices[indices_offset];
-  const auto num_indices = compact_indices(results, num_unique_variations,
-      indices, last_compat_result);
+  compact_sums_to_indices(results, num_unique_variations, aggregate_sum,
+      indices);
 #endif
-  return num_indices;
+  return aggregate_sum;
 }
 
 __device__ bool is_any_OR_source_compatible();
-  /*    const SourceCompatibilityData& source,
-    const index_t xor_chunk_idx */
 
 }  // namespace cm
