@@ -57,13 +57,22 @@
     'library_dirs': [
       '/usr/local/cuda/lib64'
     ],
-    'libraries': [ '-lcudart', '-lcudadevrt' ],
-    'dependencies': [ 'kernels_lib', 'kernels_dlink' ],
+    'libraries': [
+      '-Wl,--whole-archive',
+      '<(PRODUCT_DIR)/kernels_lib.a',
+      '-Wl,--no-whole-archive',
+      '<(PRODUCT_DIR)/kernels_dlink.a',
+      '-lcudart',
+      '-lcudadevrt'
+    ],
+    'dependencies': [
+      'dlink_kernels'
+    ],
     'defines': [ 'NAPI_CPP_EXCEPTIONS' ]
   },
   {
-    'target_name': 'kernels_dlink',
-    'type': 'static_library',
+    'target_name': 'dlink_kernels',
+    'type': 'none',
     'sources': [
       '<(PRODUCT_DIR)/kernels_lib.a',
     ],
@@ -79,8 +88,9 @@
         ]
       },
       'inputs': [ '<(RULE_INPUT_PATH)' ],
-      'outputs': [ '<(SHARED_INTERMEDIATE_DIR)/kernels_dlink.a' ],
-#      'process_outputs_as_sources': 1,
+      'outputs': [
+        '<(SHARED_INTERMEDIATE_DIR)/kernels_dlink.a'
+      ],
       'action': [
         'env', 'OBJ_DIR=<(SHARED_INTERMEDIATE_DIR)', 'LIB_DIR=<(PRODUCT_DIR)',
         'make', '-sf', 'kernel.mk', '<(SHARED_INTERMEDIATE_DIR)/kernels_dlink.a'
@@ -90,16 +100,31 @@
   },
   {
     'target_name': 'kernels_lib',
+    'type': 'none',
+    'actions': [{
+      'action_name': 'create_kernels_lib',
+      'inputs': [
+        '<(SHARED_INTERMEDIATE_DIR)/merge.o',
+        '<(SHARED_INTERMEDIATE_DIR)/or-filter.o',
+        '<(SHARED_INTERMEDIATE_DIR)/filter.o',
+      ],
+      'outputs': [ '<(PRODUCT_DIR)/kernels_lib.a' ],
+      'action': [
+        'ar', 'rcs', '<@(_outputs)', '<@(_inputs)'
+      ]
+    }],
+  },
+  {
+    'target_name': 'old_kernels_lib',
     'type': 'static_library',
     'sources': [
       '<(SHARED_INTERMEDIATE_DIR)/merge.o',
       '<(SHARED_INTERMEDIATE_DIR)/or-filter.o',
       '<(SHARED_INTERMEDIATE_DIR)/filter.o',
     ],
-#    'dependencies': [ 'compile_kernels' ],
   },
   {
-    'target_name': 'compile_kernels',
+    'target_name': 'unused_compile_kernels',
     'type': 'none',
     'sources': [
       'merge.cu',
