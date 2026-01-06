@@ -10,16 +10,20 @@ if [ ! -e "$_input_file" ]; then
     exit 1
 fi
 
-# TODO remove
-#_cm=~/code/clues/src/dist/tools/cm
+exit_on_error() {
+    if [ $# -ne 2 ]; then
+        echo "exit_on_error() called with incorrect number of arguments"
+        exit 1
+    fi
+    if [ $1 -ne 0 ]; then
+        echo "$2" >&2
+        exit 1
+    fi
+}
 
 _latest_pairs_file=$(cm retire --latest)
 #echo "latest: $_latest_pairs_file"
-_exitcode=$?
-if [ $_exitcode -ne 0 ]; then
-    echo "cm retire --latest failed."
-    exit 1
-fi
+exit_on_error $? "cm retire --latest failed."
 _num_latest=0
 if [ ! -z "$_latest_pairs_file" ]; then 
     _num_latest=$(wc -l "$_latest_pairs_file" | cut -d' ' -f1)
@@ -28,11 +32,8 @@ echo "existing pairs:  $_num_latest"
 
 _next_pairs_file=$(cm retire --next)
 #echo "next: $_next_pairs_file"
-_exitcode=$?
-if [ $_exitcode -ne 0 ]; then
-    echo "cm retire --next failed."
-    exit 1
-fi
+exit_on_error $? "cm retire --next failed."
+
 _next_folder=$(dirname "$_next_pairs_file")
 _next_filename=$(basename "$_next_pairs_file")
 _file_to_retire="$_next_folder/files/$_next_filename"
@@ -52,10 +53,7 @@ if [ "$_num_latest" -eq "$_num_next" ]; then
     rm "$_file_to_retire"
     rm "$_next_pairs_file"
     cm retire --revert "$_next_pairs_file"
-    _exitcode=$?
-    if [ $_exitcode -ne 0 ]; then
-        echo "cm --revert failed."
-    fi
+    exit_on_error $? "cm retire --revert failed."
     exit 1;
 fi
 

@@ -1,4 +1,5 @@
 #pragma once
+
 #include <cassert>
 #include <cub/block/block_scan.cuh>
 #include "combo-maker.h"
@@ -17,8 +18,6 @@ namespace cm {
 #endif
 //#define MAX_SOURCES 1
 //#define PRINTF
-
-class SourceCompatibilityData;
 
 using shared_index_t = index_t;
 
@@ -389,12 +388,16 @@ __device__ inline auto compute_compat_uv_indices(
       num_unique_variations);
 
 #ifdef ONE_ARRAY
-  // TODO: don't need to pass in as parameter; can be computed in function
+  // TODO: don't need to pass in as parameter; can be computed in-function
   // also TODO: i think using last_compat_result is wrong. the element at
   // that index is actually a sum, not a "flag" (0 or 1). we're treating
-  // it as a flag in compute_indices_in_place(). need to do some kind of
+  // it as a flag in compact_indices_in_place(). need to do some kind of
   // computation using the total sum (return value of compute_prefix_sums
   // _in_place) similar to how compat_indices() is doing it.
+  // NOTE: that last_compat_result is an OK approach as long as I capture
+  //       it *before* i call compute_prefix_sums_in_place. (and in which
+  //       case, it *cannot* be computed in-function. but then is there
+  //       potential instrution re-ordering I have to be concerned with?
   const auto last_compat_result = results[num_unique_variations - 1];
   // unused variable
   auto num_indices = compact_indices_in_place(results, num_unique_variations,

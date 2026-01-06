@@ -64,10 +64,11 @@ const CmdLineOptions = Opt.create(_.concat(Clues.Options, [
     ['',  'any',                               '  any match (uh, probably should not use this)'],
     ['',  'production',                        'use production note store'],
     ['',  'sort-all-clues',                    'sort all clue data files by src'],
-    ['m', 'max-sources=COUNT',                 'enforce COUNT max primary sources for a single clue; default 19\n' +
+    ['m', 'max-sources=COUNT',                 'enforce COUNT max primary sources for a single clue; default 15\n' +
         '                                            impacts clue loading, combo generation, consistency checking, etc.'],
     ['R', 'remove-all-invalid',                'remove all invalid (validation error) clues'],
     ['',  'ccc',                               'clue (source) consistency check (--save to save results)'],
+    ['',  'show-clues',                        'show unique known clue names'],
     ['',  'show-pairs',                        'show unique known source pairs'],
     ['',  'flip',                              '  include flipped (reversed) pairs in results'],
     ['z', 'flags=OPTION+',                     'flags: 2=ignoreErrors' ],
@@ -308,6 +309,20 @@ const show_pairs = (clueSource, max, options) => {
     }
 };
 
+const show_clue_names = (options) => {
+    let clues = new Set();
+    // using options.max_sources is kinda hacky.
+    for (let count = 1; count < options.max_sources; ++count) {
+        const obj = ClueManager.getKnownClueMap(count);
+        Object.keys(obj).forEach(name => {
+            clues.add(name);
+        });
+    }
+    const sorted_clues = [...clues].sort();
+    for (let clue of sorted_clues) {
+        console.log(clue);
+    }
+};
 
 async function main () {
     let needCount;
@@ -342,6 +357,7 @@ async function main () {
             options.test ||
             options.copy_from ||
             options['sort-all-clues'] ||
+            options['show-clues'] ||
             options['show-pairs'] ||
             options['ccc'])
         {
@@ -388,6 +404,11 @@ async function main () {
     let loadMillis = new Duration(loadBegin, new Date()).milliseconds;
     console.error(`loadClues(${PrettyMs(loadMillis)})`);
     setLogging(false); //options.verbose);
+
+    if (options['show-clues']) {
+        show_clue_names(options);
+        process.exit(0);
+    }
 
     options.notebook = options.notebook || Note.getWorksheetName(clueSource);
 

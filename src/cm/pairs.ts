@@ -12,12 +12,12 @@ const StringifyObj = require("stringify-object");
 
 export const Options = [
     [ 'w', 'words',              'use words from words.json' ],
-    [ 'l', 'with-letter=LETTER', 'use words from words.json containing LETTER' ],
+    [ 'l', 'with-letter=LETTER', '  containing LETTER' ],
+    [ 'c', 'letter-counts',      '  calculate pair-counts for words containing each remaining letter' ],
     [ 's', 'single-solutions',   'use single-word solution words' ],
     [ 'm', 'multi-solutions',    'use multi-word solution words' ],
     [ 'a', 'all-solutions',      'use all solutions words' ],
     [ 'f', 'file=JSON+',         'use words from JSON file' ],
-    [ 'c', 'letter-counts',      'calculate pair-counts for words containing each remaining letter (using words.json)' ],
     [ 'o', 'old',                'use old method (build set of all pairs)' ],
     [ 'p', 'flip',               'flip order of the two word lists' ],
     [ '',  'analyze=FILE',       'analyze pairs in text FILE. current only and default option is 2nd word frequency' ]
@@ -140,6 +140,10 @@ const get_solution_words = (word_count: WordCountType): WordType[] => {
     return result;
 };
 
+const get_solution_words_for_source_id = (src_id: number): WordType[] => {
+    return get_solution_words(get_word_count_from_source_id(src_id));
+};
+
 const is_solution_source_id = (src_id: number): boolean => {
     return (src_id & SolutionFlag) !== 0;
 };
@@ -167,13 +171,9 @@ const get_word_list = (src_id: number, filename?: string): WordList => {
             words = list_from_strings(Json.load(filename!));
             break;
         case WordSourceId.SingleSolutions:
-            words = get_solution_words({ single: true });
-            break;
         case WordSourceId.MultiSolutions:
-            words = get_solution_words({ multi: true });
-            break;
         case WordSourceId.AllSolutions:
-            words = get_solution_words({ single: true, multi: true });
+            words = get_solution_words_for_source_id(src_id);
             break;
         default:
             throw new Error(`Invalid word source id: ${src_id}`);
@@ -490,9 +490,9 @@ export const run = (args: string[], options: any): Promise<number> => {
     if (options['analyze']) {
         return show_2nd_word_frequency(options.analyze);
     }
-    if (!validate_options(options)) return Promise.resolve(-1); //return -1;
+    if (!validate_options(options)) return Promise.resolve(-1);
     const src_ids = get_word_source_ids(options);
-    if (!validate_source_ids(src_ids, options)) return Promise.resolve(-1); // return -1;
+    if (!validate_source_ids(src_ids, options)) return Promise.resolve(-1);
     if (options.verbose) {
         console.error(`src_ids: ${Stringify(src_ids)} (${src_ids.length})`);
     }
@@ -502,11 +502,12 @@ export const run = (args: string[], options: any): Promise<number> => {
             `, list2(${words2.words.length})`);
     }
     // When to use show_pairs_old:
-    // * when option --old is specified
-    // * or when two word source options are specified, and the 2nd one is not --words
-    // when to use new:
-    // * when only one word source option is specified
-    // * or when two word source options are specified, and the 2nd one is --words
+    //  * when option --old is specified
+    //  * or when two word source options are specified, and the 2nd one is not --words
+    //
+    // When to use show_pairs (new):
+    //  * when only one word source option is specified
+    //  * or when two word source options are specified, and the 2nd one is --words
     //
     // Note that by default the --words list is always put in 2nd slot. Option --flip
     // can override that and cause the version of show_pairs to change.
