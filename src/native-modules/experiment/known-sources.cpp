@@ -119,4 +119,72 @@ auto KnownSources::get_entries(const std::string& name, int count) const
   return cref_entries;
 }
 
+void KnownSources::dump_memory() const {
+  size_t total_entries{};
+  size_t total_sources{};
+  size_t maps_size{};
+
+  std::cerr << "KnownSources memory:" << std::endl;
+
+  for (size_t count{1}; count <= maps_.size(); ++count) {
+    const auto& map = maps_.at(count - 1);
+    size_t map_size{};
+    size_t map_sources{};
+
+    for (const auto& [key, entry] : map) {
+      // key string
+      map_size += key.capacity();
+      // Entry: src_list
+      map_size += entry.src_list.capacity() * sizeof(SourceData);
+      for (const auto& src : entry.src_list) {
+        // SourceData internal allocations
+        map_size += src.primaryNameSrcList.capacity() * sizeof(NameCount);
+        for (const auto& nc : src.primaryNameSrcList) {
+          map_size += nc.name.capacity();
+        }
+        map_size += src.ncList.capacity() * sizeof(NameCount);
+        for (const auto& nc : src.ncList) {
+          map_size += nc.name.capacity();
+        }
+        // nc_names set - approximate: node overhead + string capacity
+        map_size += src.nc_names.size() * (sizeof(void*) * 3 + 32);
+        for (const auto& name : src.nc_names) {
+          map_size += name.capacity();
+        }
+      }
+      map_sources += entry.src_list.size();
+      // Entry: src_cref_list
+      map_size += entry.src_cref_list.capacity() * sizeof(SourceCRef);
+      // Entry: clue_names set
+      map_size += entry.clue_names.size() * (sizeof(void*) * 3 + 32);
+      for (const auto& name : entry.clue_names) {
+        map_size += name.capacity();
+      }
+    }
+    total_entries += map.size();
+    total_sources += map_sources;
+    maps_size += map_size;
+
+    if (map.size() > 0) {
+      std::cerr << "  count " << count << ": " << map.size() << " entries, "
+                << map_sources << " sources, "
+                << util::pretty_bytes(map_size) << std::endl;
+    }
+  }
+
+  // primary_map_
+  size_t primary_map_size{};
+  for (const auto& [key, src_compat] : primary_map_) {
+    primary_map_size += key.capacity();
+    primary_map_size += sizeof(SourceCompatibilityData);
+  }
+
+  std::cerr << "  primary_map: " << primary_map_.size() << " entries, "
+            << util::pretty_bytes(primary_map_size) << std::endl;
+
+  std::cerr << "  total: " << total_entries << " entries, "
+            << total_sources << " sources, "
+            << util::pretty_bytes(maps_size + primary_map_size) << std::endl;
+}
+
 }  // namespace cm

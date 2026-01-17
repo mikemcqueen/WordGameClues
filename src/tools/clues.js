@@ -57,7 +57,7 @@ const CmdLineOptions = Opt.create(_.concat(Clues.Options, [
     ['',  'property=PROP',                     '    add PROP:true, or remove PROP from existing compound clues' +
                                                   ' matching NAME=SOURCE; use with --test --add/--remove' ],
     ['',  'fast',                              '  use fast method' ],
-    ['',  'validate',                          '  treat SOURCE as filename, validate all source lists in file'],
+    ['f', 'filter',                            '  treat SOURCE as filename, filter all invalid source lists in file'],
     ['',  'combos',                            '    validate all combos of sources/source lists in file'],
     ['u', 'use=NAME[:COUNT]+',                 'use the specified NAME[:COUNT](s)' ],
     ['',  'allow-used',                        '  allow used clues in clue combo generation' ],
@@ -414,9 +414,8 @@ async function main () {
 
     if (options.test) {
         let start = new Date();
-        if (options.validate) {
-            Assert(false);
-            //Components.validate(options.test, options);
+        if (options.filter) {
+            Components.filter(options.test, options);
         } else {
             Components.show(options);
         }

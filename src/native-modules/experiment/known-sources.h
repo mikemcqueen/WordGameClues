@@ -137,6 +137,8 @@ public:
     return get_entries(nc.name, nc.count);
   }
 
+  void dump_memory() const;
+
 private:
   using Map = std::unordered_map<std::string, Entry>;
   using PrimaryMap = std::unordered_map<std::string, SourceCompatibilityData>;

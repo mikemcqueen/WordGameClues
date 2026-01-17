@@ -368,6 +368,8 @@ void dump_memory(std::string_view header /* = "clue_manager memory:" */) {
             << util::pretty_bytes(src_indices_map_size + name_sources_maps_size
                    + known_source_maps_size)
             << std::endl;
+
+  KnownSources::get().dump_memory();
 }
 
 }  // namespace cm::clue_manager

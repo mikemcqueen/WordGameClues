@@ -15,6 +15,8 @@ const Assert      = require('assert');
 const Debug       = require('debug')('components');
 const Expect      = require('should/as-function');
 const JStringify  = require('javascript-stringify').stringify;
+const Path        = require('path');
+const Readlines    = require('n-readlines');
 
 import * as ClueList from '../types/clue-list';
 import * as ClueManager from './clue-manager';
@@ -55,30 +57,36 @@ const addClues = (names: string[], nc_list: NameCount.List, options: any): void 
     }
 };
 
+// PreCompute.preCompute wrapper
+const pre_compute = (name_list: string, quiet: boolean, options: any): boolean => {
+    const min_sources = 2;
+    const pc_args = {
+        xor: name_list,
+        merge_only: true,
+        min_sources,
+        max_sources: options.max_sources,
+        quiet,
+        verbose: options.verbose,
+        ignoreErrors: options.ignoreErrors
+    };
+    return PreCompute.preCompute(min_sources, options.max_sources, pc_args);
+}
+
 export const show = (options: any): any => {
     Expect(options).is.an.Object();
     Expect(options.test).is.a.String();
     if (options.reject) {
         Expect(options.add).is.undefined();
     }
-    options.fast = true; // force fast
+    options.fast = true; // force fast // TODO: probably unnecessary
     console.log(`test: ${options.test}, fast=${options.fast}`);
 
-    const nameList = options.test.split(',').sort();
-    const pc_args = {
-        xor: nameList,
-        merge_only: true,
-        max: 2,
-        max_sources: options.max_sources,
-        quiet: options.quiet,
-        verbose: options.verbose,
-        ignoreErrors: options.ignoreErrors
-    };
-    const pc_result = PreCompute.preCompute(2, options.max_sources, pc_args);
-    if (pc_result) {
-        const counts = Native.showComponents(nameList);
+    const name_list = options.test.split(',').sort();
+    const result = pre_compute(name_list, options.quiet, options);
+    if (result) {
+        const counts = Native.showComponents(name_list);
         options.save = true; // hacky
-        addRemove(nameList, counts, options);
+        addRemove(name_list, counts, options);
     } else {
         console.error(`Precompute failed.`);
     }
@@ -246,6 +254,7 @@ function showNcLists (ncLists) {
         console.log(`${ncList}`);
     }
 }
+*/
 
 ////////
 
@@ -260,6 +269,27 @@ function readlines(filename): string[] {
     return lines;
 }
 
+function filter_sources(csv_names_list, options) {
+    for (const csv_names of csv_names_list) {
+        const name_list = csv_names.split(',').sort();
+        const result = pre_compute(name_list, options.quiet, options);
+        if (result) {
+            console.log(`${csv_names}`);
+        }
+    }
+}
+
+export const filter  = (filename: string, options: any = {}): void => {
+    const lines = readlines(filename);
+    /*
+    if (options.combos) {
+        validate_combos(lines, options);
+    } else {
+    */
+    filter_sources(lines, options);
+}
+
+/*
 function valid_combos(combo_list: string[], options: any = {}): string[] {
     const combos: string[] = [];
     options.any = true;
@@ -301,16 +331,8 @@ function all_combos(input_list: string[], word_list: string[]): string[] {
     }
     return _.uniq(combos);
 }
-
-function validate_sources(lines, options) {
-    for (const line of lines) {
-        const result: any = {}; // REPLACE: ClueManager.getCountListArrays(line, options);
-        if (!result || !result.valid) {
-            console.log(`${line} ${!result ? 'doesnt exist??' : result.invalid ? 'invalid' : 'rejected'}`);
-        }
-    }
-}
-
+*/
+/*
 function validate_combos(lines, options): void {
     const combos: string[] = [];
     let input = lines;
@@ -329,15 +351,5 @@ function validate_combos(lines, options): void {
     combos.forEach(combo => {
         console.log(`${combo}`);
     });
-}
-
-export function validate (filename, options: any = {}) {
-    Assert(0 && "validate broken, don't use ClueManager.getCountListArrays");
-    const lines = readlines(filename);
-    if (options.combos) {
-        validate_combos(lines, options);
-    } else {
-        validate_sources(lines, options);
-    }
 }
 */
