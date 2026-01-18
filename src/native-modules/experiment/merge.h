@@ -16,6 +16,9 @@ auto get_merge_data(const std::vector<SourceComboList>& combo_lists,
 auto merge_xor_compatible_src_lists(
     const std::vector<SourceComboList>& combo_lists) -> SourceList;
 
+auto merge_xor_compatible_src_lists_minimal(
+    const std::vector<SourceComboList>& combo_lists) -> SourceList;
+
 }  // namespace cm
 
 #endif  // INCLUDE_MERGE_H

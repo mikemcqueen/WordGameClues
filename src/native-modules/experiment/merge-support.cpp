@@ -621,6 +621,22 @@ XorSource merge_sources(const std::vector<index_t>& combo_indices,
       std::move(primaryNameSrcList), std::move(ncList), std::move(usedSources)};
 }
 
+// Minimal merge: only populates ncList directly from combo.nc
+// Skips all recursive parent tree traversal
+XorSource merge_sources_minimal(const std::vector<index_t>& combo_indices,
+    const std::vector<SourceComboList>& combo_lists) {
+  NameCountList ncList{};
+  UsedSources usedSources{};
+  for (size_t i{}; i < combo_indices.size(); ++i) {
+    const auto& combo = combo_lists.at(i).at(combo_indices.at(i));
+    // Direct access to nc - no reconstruction needed
+    ncList.emplace_back(combo.nc.name, combo.nc.count);
+    usedSources.mergeInPlace(combo.usedSources);
+  }
+  assert(!ncList.empty() && "empty ncList");
+  return {NameCountList{}, std::move(ncList), std::move(usedSources)};
+}
+
 auto xor_merge_sources(const std::vector<SourceComboList>& combo_lists,
     const std::vector<IndexList>& idx_lists,
     const std::vector<fat_index_t>& compat_flat_indices) -> XorSourceList {
@@ -636,6 +652,26 @@ auto xor_merge_sources(const std::vector<SourceComboList>& combo_lists,
   if (log_level(Verbose)) {
     t.stop();
     std::cerr << "  xor_merge_sources complete (" << xorSourceList.size()
+              << ") - " << t.count() << "ms" << std::endl;
+  }
+  return xorSourceList;
+}
+
+auto xor_merge_sources_minimal(const std::vector<SourceComboList>& combo_lists,
+    const std::vector<IndexList>& idx_lists,
+    const std::vector<fat_index_t>& compat_flat_indices) -> XorSourceList {
+  XorSourceList xorSourceList;
+  if (log_level(Verbose)) {
+    std::cerr << "  starting xor_merge_sources_minimal..." << std::endl;
+  }
+  auto t = util::Timer::start_timer();
+  for (auto flat_idx : compat_flat_indices) {
+    auto combo_indices = get_src_indices(flat_idx, idx_lists);
+    xorSourceList.emplace_back(merge_sources_minimal(combo_indices, combo_lists));
+  }
+  if (log_level(Verbose)) {
+    t.stop();
+    std::cerr << "  xor_merge_sources_minimal complete (" << xorSourceList.size()
               << ") - " << t.count() << "ms" << std::endl;
   }
   return xorSourceList;
@@ -701,6 +737,18 @@ auto merge_xor_compatible_src_lists(
     return {};
   }
   return xor_merge_sources(
+      combo_lists, md.host.compat_idx_lists, md.host.compat_indices);
+}
+
+auto merge_xor_compatible_src_lists_minimal(
+    const std::vector<SourceComboList>& combo_lists) -> SourceList {
+  assert(combo_lists.size() > 1);
+  MergeData md;
+  if (!get_merge_data(combo_lists, md.host, md.device, MergeType::XOR,
+          cudaStreamPerThread, true)) {
+    return {};
+  }
+  return xor_merge_sources_minimal(
       combo_lists, md.host.compat_idx_lists, md.host.compat_indices);
 }
 

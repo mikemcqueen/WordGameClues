@@ -147,6 +147,17 @@ void collect_nc_names(const SourceCombo& combo, std::set<std::string>& result) {
       std::move(ncList), std::move(nc_names));
 }
 
+// Minimal reconstruction: only populates ncList from combo.nc
+// Skips all recursive parent tree traversal
+/*static*/ SourceData KnownSources::reconstruct_nclist(const SourceCombo& combo) {
+  NameCountList ncList;
+  ncList.emplace_back(combo.nc.name, combo.nc.count);
+  return SourceData(combo.usedSources,
+      NameCountList{},  // empty primaryNameSrcList
+      std::move(ncList),
+      std::set<std::string>{});  // empty nc_names
+}
+
 // NB: NOT threadsafe (but shouldn't matter)
 // TODO: i think this can be eliminated; check src/tools/todo
 /*static*/ bool KnownSources::add_compound_clue(const NameCount& nc,
@@ -260,6 +271,22 @@ auto KnownSources::get_entry(int count, const std::string& source_csv) const
     -> const Entry& {
   assert(count == 1 && "get_entry: only count == 1 supported, use get_combo_entry for count > 1");
   return get_primary_entry(source_csv);
+}
+
+const std::set<std::string>& KnownSources::get_entry_clue_names(int count,
+    const std::string& source_csv) const {
+  if (count == 1) {
+    return get_primary_entry(source_csv).clue_names;
+  }
+  return get_combo_entry(count, source_csv).clue_names;
+}
+
+size_t KnownSources::get_num_clue_sources(int count,
+    const std::string& key) const {
+  if (count == 1) {
+    return get_primary_entry(key).src_list.size();
+  }
+  return get_combo_entry(count, key).src_combo_list.size();
 }
 
 void KnownSources::dump_memory() const {

@@ -273,6 +273,7 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   }
 #endif
 
+  auto t_total = util::Timer::start_timer();
   auto xor_src_lists = build_src_lists(nc_data_lists);
   if (log_level(Normal)) {
     //std::cerr << "build xor_src_lists(" << xor_src_lists.size() << ")\n";
@@ -290,13 +291,16 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
     // merge-only=true is used for showComponents() and consistencyCheck V1,
     // both of which can be eliminated.
     if (xor_src_lists.size() > 1) {
+      auto t_merge = util::Timer::start_timer();
       MFD.host_xor.merged_xor_src_list =
-          merge_xor_compatible_src_lists(xor_src_lists);
+          merge_xor_compatible_src_lists_minimal(xor_src_lists);
+      t_merge.stop();
+      std::cerr << " xor_merge - " << t_merge.count() << "ms\n";
     } else {
-      // Single list: reconstruct each SourceCombo to SourceData
+      // Single list: minimal reconstruct - only ncList needed
       SourceList result;
       for (const auto& combo : xor_src_lists.back()) {
-        result.push_back(KnownSources::reconstruct(combo));
+        result.push_back(KnownSources::reconstruct_nclist(combo));
       }
       MFD.host_xor.merged_xor_src_list = std::move(result);
     }
@@ -312,6 +316,8 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
       MFD.host_xor.src_lists = std::move(xor_src_lists);
     }
   }
+  t_total.stop();
+  std::cerr << " xor_total - " << t_total.count() << "ms\n";
   return Number::New(env, uint32_t(num_compat));
 }
 

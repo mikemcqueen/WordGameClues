@@ -159,6 +159,10 @@ public:
   // THE RECONSTRUCTION POINT: Convert compact SourceCombo to full SourceData
   static SourceData reconstruct(const SourceCombo& combo);
 
+  // Minimal reconstruction: only populates ncList from combo.nc
+  // Use when only ncList is needed (e.g., merge_only path)
+  static SourceData reconstruct_nclist(const SourceCombo& combo);
+
   // TODO: i think this can be eliminated; check src/tools/todo
   static bool add_compound_clue(const NameCount& nc,
       const std::string& sources_csv);
@@ -183,6 +187,11 @@ public:
   auto get_entry(int count, const std::string& source_csv) -> Entry&;
   auto get_entry(int count, const std::string& source_csv) const
       -> const Entry&;
+
+  // Helpers that work with both Entry (count==1) and ComboEntry (count>1)
+  const std::set<std::string>& get_entry_clue_names(int count,
+      const std::string& source_csv) const;
+  size_t get_num_clue_sources(int count, const std::string& key) const;
 
   void dump_memory() const;
 

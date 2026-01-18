@@ -212,14 +212,12 @@ const std::string& get_unique_clue_name(int count, int idx) {
 
 SourceCompatibilityList make_unique_clue_source_list(int count) {
   SourceCompatibilityList unique_src_list;
-  const auto& name_sources_map = get_name_sources_map(count);
   for (int idx{}; idx < get_num_unique_clue_names(count); ++idx) {
     const auto& name = get_unique_clue_name(count, idx);
-    for (const auto& source : name_sources_map.at(name)) {
-      const auto& key = count > 1 ? source : util::append(name, ":", source);
-      const auto& src_list = KnownSources::get().get_entry(count, key).src_list;
-      unique_src_list.insert(unique_src_list.end(), src_list.begin(), src_list.end());
-    }
+    KnownSources::for_each_nc_source_compat(name, count,
+        [&unique_src_list](const SourceCompatibilityData& src, index_t) {
+          unique_src_list.push_back(src);
+        });
   }
   if (log_level(ExtraVerbose)) {
     std::cerr << " " << count << ": make_unique_clue_sources("
@@ -245,8 +243,7 @@ int get_num_unique_clue_sources(int count, const std::string& name) {
   const auto& name_sources_map = get_name_sources_map(count);
   for (const auto& source : name_sources_map.at(name)) {
     const auto& key = count > 1 ? source : util::append(name, ":", source);
-    const auto& src_list = KnownSources::get().get_entry(count, key).src_list;
-    num_sources += int(src_list.size());
+    num_sources += int(KnownSources::get().get_num_clue_sources(count, key));
   }
   return num_sources;
 }

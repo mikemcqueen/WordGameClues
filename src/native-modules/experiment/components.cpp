@@ -60,7 +60,7 @@ auto add_show_result_for_sources(const std::string& sources_csv,
   if (KnownSources::get().has_entries_for(sum)) {
     if (KnownSources::get().has_entries_for(sum, sources_csv)) {
       const auto& names =
-          KnownSources::get().get_entry(sum, sources_csv).clue_names;
+          KnownSources::get().get_entry_clue_names(sum, sources_csv);
       results.known.emplace_back(names, counts);
     } else {
       results.valid.emplace_back(counts);
@@ -160,7 +160,7 @@ opt_str_set_cref_t get_clue_names_for_source(int sum, const std::string& source_
   if (KnownSources::get().has_entries_for(sum)) {
     if (KnownSources::get().has_entries_for(sum, source_csv)) {
       auto& clue_names =
-          KnownSources::get().get_entry(sum, source_csv).clue_names;
+          KnownSources::get().get_entry_clue_names(sum, source_csv);
       return std::make_optional(std::cref(clue_names));
     } else {
       return std::make_optional(std::cref(empty));
