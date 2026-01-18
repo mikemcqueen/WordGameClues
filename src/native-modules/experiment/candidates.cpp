@@ -165,18 +165,18 @@ auto make_compat_source_indices(const NameCountCRefList& nc_cref_list,
 
   CompatSourceIndicesList src_indices;
 #if 0
-  KnownSources::for_each_nc_source_compat_data(nc1,
+  KnownSources::for_each_nc_source_compat(nc1,
       [](const SourceCompatibilityData& src1, index_t idx1) {
         add_map_entry(src1);
       });
-  KnownSources::for_each_nc_source_compat_data(nc2,
+  KnownSources::for_each_nc_source_compat(nc2,
       [](const SourceCompatibilityData& src2, index_t idx2) {
         add_map_entry(src2);
       });
 
   int n{};
   auto t = util::Timer::start_timer();
-  KnownSources::for_each_nc_source_compat_data(nc1,
+  KnownSources::for_each_nc_source_compat(nc1,
       [&n, start_idx1](const SourceCompatibilityData& src1, index_t idx1) {
         add_compat_source_index(src1, start_idx1 + idx1);
         n++;
@@ -188,11 +188,11 @@ auto make_compat_source_indices(const NameCountCRefList& nc_cref_list,
       });
 #else
   auto t = util::Timer::start_timer();
-  KnownSources::for_each_nc_source_compat_data(nc1,
+  KnownSources::for_each_nc_source_compat(nc1,
       [count = nc1.count, start_idx1, &nc2, start_idx2, &src_indices]  //
       (const SourceCompatibilityData& src1, index_t idx1) {
         CompatSourceIndex csi1{count, start_idx1 + idx1};
-        KnownSources::for_each_nc_source_compat_data(nc2,
+        KnownSources::for_each_nc_source_compat(nc2,
             [count = nc2.count, start_idx2, csi1, &src1, &src_indices]  //
             (const SourceCompatibilityData& src2, index_t idx2) {
               if (src1.isXorCompatibleWith(src2)) {

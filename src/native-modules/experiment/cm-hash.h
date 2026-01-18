@@ -90,16 +90,16 @@ template <> struct hash<cm::SourceCompatibilityData> {
   }
 };
 
-template <> struct equal_to<cm::SourceCompatibilityDataCRef> {
-  bool operator()(const cm::SourceCompatibilityDataCRef lhs_cref,
-    const cm::SourceCompatibilityDataCRef rhs_cref) const noexcept
+template <> struct equal_to<cm::SourceCompatCRef> {
+  bool operator()(const cm::SourceCompatCRef lhs_cref,
+    const cm::SourceCompatCRef rhs_cref) const noexcept
   {
     return equal_to<cm::SourceCompatibilityData>{}(lhs_cref, rhs_cref);
   }
 };
 
-template <> struct hash<cm::SourceCompatibilityDataCRef> {
-  size_t operator()(const cm::SourceCompatibilityDataCRef src_cref) const noexcept {
+template <> struct hash<cm::SourceCompatCRef> {
+  size_t operator()(const cm::SourceCompatCRef src_cref) const noexcept {
 #if 0
     size_t seed = 0;
     cm::hash_combine(seed, hash<cm::SourceCompatibilityData>()(src_cref);

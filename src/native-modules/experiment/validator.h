@@ -11,9 +11,9 @@
 
 namespace cm::validator {
 
-auto validateSources(const std::string& clue_name,
+auto validate_sources(const std::string& clue_name,
     const std::vector<std::string>& src_names, int sum,
-    bool validate_all) -> SourceList;
+    bool validate_all) -> SourceComboList;
 
 void show_validator_durations();
 

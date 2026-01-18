@@ -7,6 +7,6 @@ namespace cm {
 // functions
 
 auto build_src_lists(
-    const std::vector<NCDataList>& nc_data_lists) -> std::vector<SourceList>;
+    const std::vector<NCDataList>& nc_data_lists) -> std::vector<SourceComboList>;
 
 }  // namespace cm

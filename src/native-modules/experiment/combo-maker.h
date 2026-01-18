@@ -7,6 +7,7 @@
 #include <cmath>
 #include <cstring>
 #include <iostream>
+#include <optional>
 #include <set>
 #include <charconv>
 #include <string>
@@ -409,9 +410,9 @@ struct alignas(16) SourceCompatibilityData {
 
 using SourceCompatibilityList = std::vector<SourceCompatibilityData>;
 using SourceCompatibilitySet = std::unordered_set<SourceCompatibilityData>;
-using SourceCompatibilityDataCRef =
+using SourceCompatCRef =
     std::reference_wrapper<const SourceCompatibilityData>;
-using SourceCompatibilityCRefList = std::vector<SourceCompatibilityDataCRef>;
+using SourceCompatCRefList = std::vector<SourceCompatCRef>;
 
 struct NameCount;
 using NameCountList = std::vector<NameCount>;
@@ -593,6 +594,36 @@ using SourceList = std::vector<SourceData>;
 using SourceCRef = std::reference_wrapper<const SourceData>;
 using SourceCRefList = std::vector<SourceCRef>;
 
+// Identifies a parent source for reconstruction of merged sources
+struct SourceParent {
+  std::string name;
+  int count;
+  uint32_t idx;  // index within the source list for (name, count)
+};
+
+using SourceParentList = std::vector<SourceParent>;
+
+// Compact form - used during precomputation and compatibility checking
+// Stores only compatibility data + parent references for later reconstruction
+struct SourceCombo : SourceCompatibilityData {
+  SourceCombo() = default;
+  SourceCombo(SourceCompatibilityData&& compat, SourceParentList&& parent_list,
+      std::string&& clue_name, int clue_count)
+      : SourceCompatibilityData(std::move(compat)),
+        parents(std::move(parent_list)),
+        nc(std::move(clue_name), clue_count) {}
+
+  SourceCombo(const SourceCombo&) = default;
+  SourceCombo& operator=(const SourceCombo&) = default;
+  SourceCombo(SourceCombo&&) = default;
+  SourceCombo& operator=(SourceCombo&&) = default;
+
+  SourceParentList parents;  // lineage for reconstruction
+  NameCount nc{"", 0};       // the clue name:count for this combo
+};
+using SourceComboList = std::vector<SourceCombo>;
+
+// Full form - ALWAYS has populated lists, used for final output
 struct SourceData : SourceCompatibilityData {
   SourceData() = default;
   SourceData(NameCountList&& primaryNameSrcList, NameCountList&& ncList,
@@ -652,22 +683,6 @@ struct SourceData : SourceCompatibilityData {
     return true;
   }
 
-  auto merge_nc_name(const std::string& name) {
-    return nc_names.insert(name).second;
-  }
-
-  auto merge_nc_names(
-      const std::set<std::string>& from_names, bool allow_duplicates = false) {
-    bool duplicate{};
-    for (const auto& name : from_names) {
-      if (!merge_nc_name(name)) {
-        if (!allow_duplicates) return false;
-        duplicate = true;
-      }
-    }
-    return !duplicate;
-  }
-
   static void dumpList(const SourceList& src_list) {
     for (const auto& src : src_list) {
       std::cerr << " " << NameCount::listToString(src.ncList) << " - "
@@ -688,6 +703,7 @@ struct SourceData : SourceCompatibilityData {
   NameCountList primaryNameSrcList;
   NameCountList ncList;
   std::set<std::string> nc_names;
+  // NOTE: SourceData is ALWAYS fully populated. Use SourceCombo for compact storage.
 };
 
 using SourceListCRef = std::reference_wrapper<const SourceList>;

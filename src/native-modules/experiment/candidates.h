@@ -15,8 +15,6 @@ namespace cm {
 
 // aliases/types
 
-//using SourceCompatibilityLists = std::vector<SourceCompatibilityList>;
-//using SourceCompatibilityListCRef = std::reference_wrapper<const SourceCompatibilityList>;
 using FatIndexListCRef = std::reference_wrapper<const FatIndexList>;
 
 struct CandidateCounts {

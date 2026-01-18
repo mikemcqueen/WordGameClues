@@ -9,12 +9,12 @@
 
 namespace cm {
 
-auto get_merge_data(const std::vector<SourceList>& src_lists,
+auto get_merge_data(const std::vector<SourceComboList>& combo_lists,
     MergeData::Host& host, MergeData::Device& device, MergeType merge_type,
     cudaStream_t stream, bool merge_only = false) -> bool;
 
 auto merge_xor_compatible_src_lists(
-    const std::vector<SourceList>& src_lists) -> SourceList;
+    const std::vector<SourceComboList>& combo_lists) -> SourceList;
 
 }  // namespace cm
 

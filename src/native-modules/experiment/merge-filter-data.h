@@ -15,7 +15,7 @@ struct MergeData {
     Host(const Host&) = delete; // disable copy
     Host(Host&&) = delete; // disable move
 
-    std::vector<SourceList> src_lists;
+    std::vector<SourceComboList> src_lists;  // compact storage with parent refs
     std::vector<IndexList> compat_idx_lists;
     FatIndexList compat_indices;
   } host;

@@ -79,6 +79,7 @@ auto get_show_results(
   ShowResults results;
   std::unordered_set<std::string> hash;
   for (const auto& src: xor_src_list) {
+    // SourceData is always fully populated (no more compact storage)
     const auto count_list = NameCount::listToCountList(src.ncList);
     // TODO: hash sum?
     const auto key = util::join(count_list, ",");
@@ -205,6 +206,7 @@ bool are_sources_consistent(
   //int names_sum{};
   bool first = true;
   for (const auto& src: xor_src_list) {
+    // SourceData is always fully populated
     const auto count_list = NameCount::listToCountList(src.ncList);
     const auto sum = util::sum(count_list);
     const auto key = util::join(count_list, ","); // TODO: we could just use sum as key?
@@ -263,6 +265,7 @@ void display(const std::vector<NCDataList>& nc_data_lists) {
 void display(const SourceList& src_list) {
   std::cerr << " src_list(" << src_list.size() << "):\n";
   for (const auto& src : src_list) {
+    // SourceData is always fully populated
     std::cerr << "  ncl: ";
     for (const auto& nc : src.ncList) {
       std::cerr << nc.toString() << ", ";
@@ -332,6 +335,7 @@ auto get_all_clue_names(
     const std::string& source_csv, const SourceList& src_list) {
   std::set<std::string> result;
   for (const auto& src: src_list) {
+    // SourceData is always fully populated
     const auto sum = util::sum(NameCount::listToCountList(src.ncList));
     /*
     const auto key = util::join(count_list, ",");
@@ -356,6 +360,7 @@ auto get_missing_nc_list(
   auto all_clue_names = get_all_clue_names(source_csv, src_list);
   std::unordered_set<int> hash;
   for (const auto& src : src_list) {
+    // SourceData is always fully populated
     const auto sum = util::sum(NameCount::listToCountList(src.ncList));
     if (hash.contains(sum)) continue;
     hash.insert(sum);

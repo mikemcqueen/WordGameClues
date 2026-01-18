@@ -179,23 +179,23 @@ Value validateSources(const CallbackInfo& info) {
   auto validate_all = info[3].As<Boolean>();
   // --
   auto t = util::Timer::start_timer();
-  auto src_list =
-      validator::validateSources(clue_name, src_names, sum, validate_all);
+  auto combo_list =
+      validator::validate_sources(clue_name, src_names, sum, validate_all);
   t.stop();
   validate_ns += t.nanoseconds();
-  const auto is_valid_src_list = !src_list.empty();
-  if (validate_all && is_valid_src_list) {
-    KnownSources::get().init_entry(sum, util::join(src_names, ","),
-        std::move(src_list));
+  const auto is_valid = !combo_list.empty();
+  if (validate_all && is_valid) {
+    KnownSources::get().init_combo_entry(sum, util::join(src_names, ","),
+        std::move(combo_list));
   }
-  return Boolean::New(env, is_valid_src_list);
+  return Boolean::New(env, is_valid);
 }
 
 void show_clue_manager_durations(){
   static bool shown = false;
   if (!shown) {
     std::cerr << "(delayed clue_manager durations)\n"
-              << " validateSources - " << int((double)validate_ns / 1e6) << "ms\n";
+              << " validate_sources - " << int((double)validate_ns / 1e6) << "ms\n";
     show_validator_durations();
     shown = true;
   }
@@ -293,7 +293,12 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
       MFD.host_xor.merged_xor_src_list =
           merge_xor_compatible_src_lists(xor_src_lists);
     } else {
-      MFD.host_xor.merged_xor_src_list = std::move(xor_src_lists.back());
+      // Single list: reconstruct each SourceCombo to SourceData
+      SourceList result;
+      for (const auto& combo : xor_src_lists.back()) {
+        result.push_back(KnownSources::reconstruct(combo));
+      }
+      MFD.host_xor.merged_xor_src_list = std::move(result);
     }
     num_compat = MFD.host_xor.merged_xor_src_list.size();
     host_memory_dump(MFD.host_xor);
@@ -489,8 +494,13 @@ Value showComponents(const CallbackInfo& info) {
   // arg0:
   auto name_list = makeStringList(env, info[0].As<Array>());
   // --
-  auto sums = components::show(name_list, MFD.host_xor.merged_xor_src_list);
-  return wrap(env, sums);
+  try {
+    auto sums = components::show(name_list, MFD.host_xor.merged_xor_src_list);
+    return wrap(env, sums);
+  } catch (std::exception& e) {
+    std::cerr << "exception: " << e.what() << "\n";
+    std::terminate();
+  }
 }
 
 Value checkClueConsistency(const CallbackInfo& info) {

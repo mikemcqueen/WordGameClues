@@ -24,10 +24,10 @@ void show_all_sources(const MergeData::Host& host, fat_index_t flat_idx) {
         */
         fprintf(stderr, "list_idx: %u, src_idx: %u:\n", list_idx, src_idx);
 
-        const auto& src = host.src_lists.at(list_idx).at(src_idx);
+        const auto& combo = host.src_lists.at(list_idx).at(src_idx);
         auto success =
-            UsedSources::merge_variations(v, src.usedSources.variations);
-        std::cerr << NameCount::listToString(src.primaryNameSrcList)
+            UsedSources::merge_variations(v, combo.usedSources.variations);
+        std::cerr << combo.nc.toString()
                   << std::endl
                   << "  merged as: " << util::join(v, ","s)
                   << " - success: " << std::boolalpha << success << std::endl;
@@ -47,13 +47,13 @@ auto get_variations_index_list(const MergeData::Host& host) {
     util::for_each_source_index(combo_idx, host.compat_idx_lists,
         [&host, &v = vi.variations, combo_idx](index_t list_idx,
             index_t elem_idx) {
-          const auto& src = host.src_lists.at(list_idx).at(elem_idx);
-          if (UsedSources::merge_variations(v, src.usedSources.variations)) {
+          const auto& combo = host.src_lists.at(list_idx).at(elem_idx);
+          if (UsedSources::merge_variations(v, combo.usedSources.variations)) {
             return true;
           }
           std::cerr << "failed merging variations of " << combo_idx << std::endl
-                    << util::join(src.usedSources.variations, ","s) << " of "
-                    << NameCount::listToString(src.primaryNameSrcList)
+                    << util::join(combo.usedSources.variations, ","s) << " of "
+                    << combo.nc.toString()
                     << " to:\n"
                     << util::join(v, ","s) << std::endl;
           //show_all_sources(host, combo_idx);
