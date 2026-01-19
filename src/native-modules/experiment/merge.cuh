@@ -19,4 +19,17 @@ int run_get_compat_combos_kernel(uint64_t first_idx, uint64_t num_indices,
     const index_t* device_idx_list_sizes, unsigned num_idx_lists,
     result_t* device_results, cudaStream_t stream, bool flag = false);
 
+// CUB wrapper functions for stream compaction
+size_t get_cub_reduce_temp_bytes(fat_index_t num_indices, cudaStream_t stream);
+size_t get_cub_select_temp_bytes(fat_index_t num_indices, cudaStream_t stream);
+
+void run_cub_reduce_sum(void* d_temp, size_t temp_bytes,
+    const result_t* d_flags, fat_index_t* d_count,
+    fat_index_t num_indices, cudaStream_t stream);
+
+void run_cub_select_flagged(void* d_temp, size_t temp_bytes,
+    fat_index_t first_idx, const result_t* d_flags,
+    fat_index_t* d_output, fat_index_t* d_num_selected,
+    fat_index_t num_indices, cudaStream_t stream);
+
 }  // namespace cm

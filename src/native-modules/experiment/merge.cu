@@ -2,6 +2,9 @@
 #include <chrono>
 #include <iostream>
 #include <cuda_runtime.h>
+#include <cub/device/device_reduce.cuh>
+#include <cub/device/device_select.cuh>
+#include <thrust/iterator/counting_iterator.h>
 #include "combo-maker.h"
 #include "cuda-device.h"
 #include "merge.cuh"
@@ -170,6 +173,42 @@ int run_get_compat_combos_kernel(uint64_t first_idx, uint64_t num_indices,
       device_compat_matrix_start_indices, device_idx_list_sizes, num_idx_lists,
       device_results, flag);
   return 0;
+}
+
+size_t get_cub_reduce_temp_bytes(fat_index_t num_indices, cudaStream_t stream) {
+  size_t temp_bytes = 0;
+  result_t* dummy_in = nullptr;
+  fat_index_t* dummy_out = nullptr;
+  cub::DeviceReduce::Sum(nullptr, temp_bytes, dummy_in, dummy_out,
+      num_indices, stream);
+  return temp_bytes;
+}
+
+size_t get_cub_select_temp_bytes(fat_index_t num_indices, cudaStream_t stream) {
+  size_t temp_bytes = 0;
+  result_t* dummy_flags = nullptr;
+  fat_index_t* dummy_out = nullptr;
+  fat_index_t* dummy_count = nullptr;
+  cub::DeviceSelect::Flagged(nullptr, temp_bytes,
+      thrust::counting_iterator<fat_index_t>(0),
+      dummy_flags, dummy_out, dummy_count, num_indices, stream);
+  return temp_bytes;
+}
+
+void run_cub_reduce_sum(void* d_temp, size_t temp_bytes,
+    const result_t* d_flags, fat_index_t* d_count,
+    fat_index_t num_indices, cudaStream_t stream) {
+  cub::DeviceReduce::Sum(d_temp, temp_bytes, d_flags, d_count,
+      num_indices, stream);
+}
+
+void run_cub_select_flagged(void* d_temp, size_t temp_bytes,
+    fat_index_t first_idx, const result_t* d_flags,
+    fat_index_t* d_output, fat_index_t* d_num_selected,
+    fat_index_t num_indices, cudaStream_t stream) {
+  cub::DeviceSelect::Flagged(d_temp, temp_bytes,
+      thrust::counting_iterator<fat_index_t>(first_idx),
+      d_flags, d_output, d_num_selected, num_indices, stream);
 }
 
 }  // namespace cm

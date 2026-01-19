@@ -327,31 +327,44 @@ auto run_get_compat_combos_task(const result_t* device_compat_matrices,
     fat_index_t max_indices, MergeType merge_type, cudaStream_t stream) {
   using namespace std::chrono;
   using namespace std::experimental::fundamentals_v3;
-  constexpr auto logging = false;
 
   const fat_index_t chunk_size = 600'000'000;
   fat_index_t num_indices{chunk_size};
+
+  // Allocate flag buffer (same as before)
   auto device_results =
       cuda_alloc_results(num_indices, stream, "get_compat_combos results");
   scope_exit free_results{[device_results]() { cuda_free(device_results); }};
 
-  std::vector<result_t> host_results(num_indices);
+  // Allocate device counter (reused for count and num_selected)
+  fat_index_t* d_count;
+  cuda_malloc_async((void**)&d_count, sizeof(fat_index_t), stream, "hit count");
+  scope_exit free_count{[d_count]() { cuda_free(d_count); }};
+
+  // Determine CUB temp storage requirements (use larger of the two)
+  size_t reduce_temp_bytes = get_cub_reduce_temp_bytes(num_indices, stream);
+  size_t select_temp_bytes = get_cub_select_temp_bytes(num_indices, stream);
+
+  size_t temp_bytes = std::max(reduce_temp_bytes, select_temp_bytes);
+  void* d_temp;
+  cuda_malloc_async(&d_temp, temp_bytes, stream, "CUB temp storage");
+  scope_exit free_temp{[d_temp]() { cuda_free(d_temp); }};
+
   std::vector<fat_index_t> result_indices;
   CudaEvent gcc_start;
   CudaEvent gcc_stop;
   long gcc_elapsed{};
+  long reduce_elapsed{};
+  long select_elapsed{};
   long copy_elapsed{};
-  long proc_elapsed{};
   fat_index_t total_hits{};
   int kernel_idx{};
-  for (fat_index_t first_idx{};; ++kernel_idx, first_idx += num_indices) {
+
+  for (fat_index_t first_idx{}; ; ++kernel_idx, first_idx += num_indices) {
     num_indices = std::min(num_indices, max_indices - first_idx);
     if (!num_indices) break;
-    if constexpr (logging) {
-      std::cerr << "  launching get_compat_combos_kernel " << kernel_idx
-                << " for [" << first_idx << ", " << first_idx + num_indices
-                << "]" << std::endl;
-    }
+
+    // 1. Run existing kernel (produces flags in device_results)
     gcc_start.record(stream);
     run_get_compat_combos_kernel(first_idx, num_indices, device_compat_matrices,
         device_compat_matrix_start_indices, device_idx_list_sizes,
@@ -359,26 +372,62 @@ auto run_get_compat_combos_task(const result_t* device_compat_matrices,
     gcc_stop.record(stream);
     gcc_elapsed += log_compat_combos_kernel(kernel_idx, gcc_start, gcc_stop);
 
-    // TODO: sync_copy_results returns event.elapsed but precision is low
-    // does it matter? could return a timer instead
+    // 2. Count hits
+    auto t_reduce = util::Timer::start_timer();
+    run_cub_reduce_sum(d_temp, temp_bytes, device_results, d_count,
+        num_indices, stream);
+
+    fat_index_t num_hits;
+    cudaMemcpyAsync(&num_hits, d_count, sizeof(fat_index_t),
+        cudaMemcpyDeviceToHost, stream);
+    cudaStreamSynchronize(stream);
+    t_reduce.stop();
+    reduce_elapsed += t_reduce.count();
+
+    if (!num_hits) continue;
+
+    // 3. Allocate EXACT output size
+    fat_index_t* d_output;
+    cuda_malloc_async((void**)&d_output, num_hits * sizeof(fat_index_t),
+        stream, "hit indices");
+
+    // 4. Compact (reuse d_count as d_num_selected)
+    auto t_select = util::Timer::start_timer();
+    run_cub_select_flagged(d_temp, temp_bytes, first_idx, device_results,
+        d_output, d_count, num_indices, stream);
+    cudaStreamSynchronize(stream);
+    t_select.stop();
+    select_elapsed += t_select.count();
+
+    // 5. Copy only the hits
     auto t_copy = util::Timer::start_timer();
-    sync_copy_compat_results(host_results, num_indices, device_results, stream);
+    size_t old_size = result_indices.size();
+    result_indices.resize(old_size + num_hits);
+    cudaMemcpyAsync(&result_indices[old_size], d_output,
+        num_hits * sizeof(fat_index_t), cudaMemcpyDeviceToHost, stream);
+    cudaStreamSynchronize(stream);
     t_copy.stop();
     copy_elapsed += t_copy.count();
 
-    auto t_proc = util::Timer::start_timer();
-    auto num_hits =
-        process_results(host_results, first_idx, num_indices, result_indices);
-    proc_elapsed += log_compat_copy_process(t_copy, t_proc, num_hits);
+    cuda_free(d_output);
+
     total_hits += num_hits;
+    if (result_indices.size() > 500'000'000) {
+      std::cerr << "too many combo_indices: " << result_indices.size()
+                << ", refine your parameters, terminating\n";
+      std::terminate();
+    }
   }
+
   if (log_level(Verbose)) {
     std::cerr << " get_compat_combos_kernel total " << kernel_idx << " runs of "
               << chunk_size / 1'000'000 << "M - " << gcc_elapsed << "ms\n";
-    std::cerr << " copy/process results total hits: " << total_hits
-              << ", copy: " << copy_elapsed << "ms"
-              << ", process: " << proc_elapsed << "ms" << std::endl;
+    std::cerr << " stream compaction total hits: " << total_hits
+              << ", reduce: " << reduce_elapsed << "ms"
+              << ", select: " << select_elapsed << "ms"
+              << ", copy: " << copy_elapsed << "ms" << std::endl;
   }
+
   return result_indices;
 }
 
