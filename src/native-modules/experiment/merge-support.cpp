@@ -308,15 +308,15 @@ auto process_results(const std::vector<result_t>& results, fat_index_t start_idx
   for (fat_index_t i{}; i < num_results; ++i) {
     if (results[i]) {
       result_indices.push_back(start_idx + i);
+      if (result_indices.size() > 500'000'000) {
+        // 500M * 8-byte combo_index_t = 4GB. that's an acceptable limit for
+        // choking at this time.
+        std::cerr << "too many combo_indices: " << result_indices.size()
+                  << ", refine your parameters, terminating\n";
+        std::terminate();
+      }
       ++hits;
     }
-  }
-  if (result_indices.size() > 500'000'000) {
-    // 500M * 8-byte combo_index_t = 4GB. that's an acceptable limit for
-    // choking at this time.
-    std::cerr << "too many combo_indices: " << result_indices.size()
-              << ", refine your parameters, terminating\n";
-    std::terminate();
   }
   return hits;
 }
@@ -605,16 +605,16 @@ XorSource merge_sources(const std::vector<index_t>& combo_indices,
   NameCountList ncList{};
   UsedSources usedSources{};
   for (size_t i{}; i < combo_indices.size(); ++i) {
-    const auto& combo = combo_lists.at(i).at(combo_indices.at(i));
+    const auto& combo_src = combo_lists.at(i).at(combo_indices.at(i));
     // Reconstruct SourceCombo to get full SourceData
-    const auto reconstructed = KnownSources::reconstruct(combo);
-    // Copy data from reconstructed source
-    const auto& pnsl = reconstructed.primaryNameSrcList;
+    const auto src = KnownSources::reconstruct(combo_src);
+    // Append/merge data from reconsructed source
+    const auto& pnsl = src.primaryNameSrcList;
     primaryNameSrcList.insert(primaryNameSrcList.end(), pnsl.begin(),
         pnsl.end());
-    const auto& ncl = reconstructed.ncList;
+    const auto& ncl = src.ncList;
     ncList.insert(ncList.end(), ncl.begin(), ncl.end());
-    usedSources.mergeInPlace(combo.usedSources);
+    usedSources.mergeInPlace(combo_src.usedSources);
   }
   assert(!primaryNameSrcList.empty() && !ncList.empty() && "empty ncList");
   return {
@@ -728,7 +728,7 @@ auto get_merge_data(const std::vector<SourceComboList>& combo_lists,
   return true;
 }
 
-auto merge_xor_compatible_src_lists(
+auto merge_xor_compatible_src_list(
     const std::vector<SourceComboList>& combo_lists) -> SourceList {
   assert(combo_lists.size() > 1);
   MergeData md;

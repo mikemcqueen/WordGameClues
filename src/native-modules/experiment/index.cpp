@@ -258,7 +258,7 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
   auto nc_data_lists = makeNcDataLists(env, info[0].As<Array>());
   // arg1
   auto merge_only = info[1].As<Boolean>();
-  if (merge_only) the_log_args_.quiet = true;
+  //  if (merge_only) the_log_args_.quiet = true;
   // --
 
   // arbitrary, want to do it somewhere

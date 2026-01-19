@@ -54,8 +54,30 @@ CLI (clues.js/cm.ts) → TypeScript modules → Native C++ → CUDA kernels
 ```
 
 ### Key Types
-- **NameCount** - `{ name: string, count: number }` - clue with letter count
+- **NameCount** - `{ name: string, count: number }` - a name and count
 - **Clue** - `{ name, src, note?, ignore?, synonym?, homonym? }` - full clue record
+- **NcList** - a lit of NameCounts
+
+The "count" member of NameCount is used differently when representing primary and compound clues.
+
+For primary clues such as those in represented in a NcList variable typically named 'primaryNameSrcList',
+count is a unique identifier that includes sentence #, sentence variation, and a unique index within that
+variation.
+
+For example:
+
+primary clue bird:1002003 may represent the 3rd index of the 2nd sentence variation of the 1st sentence.
+
+For compound clues, and some representations of primary clues, typically using the variable name 'ncList',
+count is the number of primary sources combined to form that clue.
+
+For Example:
+
+compound clue hole:2 indicates that there is a clue named 'hole' that has two primary sources. Those primary
+sources can also be represented in an ncList as hobbit:1 and home:1.
+
+In summary, while primary clues all have a unique identifier as their count, it is also possible to represent
+any primary clues as "name:1" in an ncList.
 
 ### Data Files
 Clue data lives in `data/` as JSON files, organized by clue type and word count.
@@ -66,6 +88,5 @@ Clue data lives in `data/` as JSON files, organized by clue type and word count.
 cd src/tools
 
 # show components of a clue
-# also used for testing memory-usage refactoring currently in progress
-node clues -pf.72 -t constitution -m 18 --memory
+node clues -pf.72 -t constitution 
 ```

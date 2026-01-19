@@ -84,6 +84,7 @@ auto get_show_results(
     // TODO: hash sum?
     const auto key = util::join(count_list, ",");
     if (hash.contains(key)) {
+      // std::cerr << "hashed: " << key << "\n";
       continue;
     }
     hash.insert(key);
