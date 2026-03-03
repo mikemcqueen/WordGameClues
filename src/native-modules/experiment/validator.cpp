@@ -98,6 +98,22 @@ auto validate_sources(const std::string& clue_name,
   return result;
 }
 
+auto is_xor_compatible(const std::vector<std::string>& src_names,
+    const std::vector<int>& count_list) -> bool {
+  if (src_names.size() != 2) return false;
+  if (!clue_manager::are_known_name_counts(src_names, count_list)) return false;
+  auto src_crefs0 = KnownSources::make_src_compat_cref_list(
+      src_names.at(0), count_list.at(0));
+  auto src_crefs1 = KnownSources::make_src_compat_cref_list(
+      src_names.at(1), count_list.at(1));
+  for (const auto src_cref0 : src_crefs0) {
+    for (const auto src_cref1 : src_crefs1) {
+      if (src_cref0.get().isXorCompatibleWith(src_cref1.get())) return true;
+    }
+  }
+  return false;
+}
+
 void show_validator_durations() {}
 
 }  // namespace cm::validator

@@ -191,6 +191,19 @@ Value validateSources(const CallbackInfo& info) {
   return Boolean::New(env, is_valid);
 }
 
+// isXorCompatible(src_names: string[], count_list: number[]) -> boolean
+Value isXorCompatible(const CallbackInfo& info) {
+  Env env = info.Env();
+  if (!info[0].IsArray() || !info[1].IsArray()) {
+    TypeError::New(env, "isXorCompatible: invalid parameter type")
+        .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+  auto src_names = makeStringList(env, info[0].As<Array>());
+  auto count_list = makeIntList(env, info[1].As<Array>());
+  return Boolean::New(env, validator::is_xor_compatible(src_names, count_list));
+}
+
 void show_clue_manager_durations(){
   static bool shown = false;
   if (!shown) {
@@ -632,6 +645,7 @@ Object Init(Env env, Object exports) {
   // validator
   //
   exports["validateSources"] = Function::New(env, validateSources);
+  exports["isXorCompatible"] = Function::New(env, isXorCompatible);
 
   // combo-maker
   //

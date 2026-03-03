@@ -58,7 +58,7 @@ const addClues = (names: string[], nc_list: NameCount.List, options: any): void 
 };
 
 // PreCompute.preCompute wrapper
-const pre_compute = (name_list: string, quiet: boolean, options: any): boolean => {
+const pre_compute = (name_list: string[], quiet: boolean, options: any): boolean => {
     const min_sources = 2;
     const pc_args = {
         xor: name_list,

@@ -70,6 +70,7 @@ const CmdLineOptions = Opt.create(_.concat(Clues.Options, [
     ['',  'ccc',                               'clue (source) consistency check (--save to save results)'],
     ['',  'show-clues',                        'show unique known clue names'],
     ['',  'show-pairs',                        'show unique known source pairs'],
+    ['',  'unknown-pairs',                     'show unknown compatible source pairs'],
     ['',  'flip',                              '  include flipped (reversed) pairs in results'],
     ['z', 'flags=OPTION+',                     'flags: 2=ignoreErrors' ],
     ['v', 'verbose',                           'more output' ],
@@ -277,7 +278,7 @@ function sortAllClues (clueSource, max) {
     }
 }
 
-const show_pairs = (clueSource, max, options) => {
+const get_known_pairs = (clueSource, max, options) => {
     let pairs = new Set();
     const dir = clueSource.baseDir;
     for (let count = 2; count < max; ++count) {
@@ -303,13 +304,18 @@ const show_pairs = (clueSource, max, options) => {
             }
         }
     }
+    return pairs;
+};
+
+const show_pairs = (clueSource, max, options) => {
+    const pairs = get_known_pairs(clueSource, max, options);
     const sorted_pairs = [...pairs].sort();
     for (let pair of sorted_pairs) {
         console.log(pair);
     }
 };
 
-const show_clue_names = (options) => {
+const get_clue_names = (options) => {
     let clues = new Set();
     // using options.max_sources is kinda hacky.
     for (let count = 1; count < options.max_sources; ++count) {
@@ -318,10 +324,69 @@ const show_clue_names = (options) => {
             clues.add(name);
         });
     }
-    const sorted_clues = [...clues].sort();
+    return [...clues].sort();
+};
+
+const show_clue_names = (options) => {
+    const sorted_clues = get_clue_names(options);
     for (let clue of sorted_clues) {
         console.log(clue);
     }
+};
+
+const show_unknown_compatible_pairs = (clueSource, load_max, options) => {
+    // Step 1: Build name -> Set<count> map
+    const nameCountsMap = new Map();
+    for (let count = 1; count < options.max_sources; ++count) {
+        const obj = ClueManager.getKnownClueMap(count);
+        for (const name of Object.keys(obj)) {
+            if (!nameCountsMap.has(name)) nameCountsMap.set(name, new Set());
+            nameCountsMap.get(name).add(count);
+        }
+    }
+    const names = [...nameCountsMap.keys()].sort();
+
+    // Step 2: Get known pairs
+    const knownPairs = get_known_pairs(clueSource, load_max, options);
+
+    // Step 3: Build unknown pair -> addends map
+    const unknownPairAddends = new Map();
+    for (let i = 0; i < names.length; i++) {
+        for (let j = i + 1; j < names.length; j++) {
+            const pair = `${names[i]},${names[j]}`;
+            if (knownPairs.has(pair)) continue;
+            const countsI = nameCountsMap.get(names[i]);
+            const countsJ = nameCountsMap.get(names[j]);
+            const addends = [];
+            for (const ci of countsI) {
+                for (const cj of countsJ) {
+                    addends.push([ci, cj]);
+                }
+            }
+            if (addends.length) unknownPairAddends.set(pair, addends);
+        }
+    }
+
+    // Step 4: Validate, short-circuiting across addends
+    let tested = 0;
+    let compatible = 0;
+    console.error(`${unknownPairAddends.size} unknown pairs to test`);
+
+    for (const [pair, addends] of unknownPairAddends) {
+        const nameList = pair.split(',');
+        tested++;
+        if (tested % 500 === 0) {
+            process.stderr.write(`\rtested ${tested}, compatible ${compatible}`);
+        }
+        for (const [ca, cb] of addends) {
+            if (Native.isXorCompatible(nameList, [ca, cb])) {
+                compatible++;
+                console.log(pair);
+                break;
+            }
+        }
+    }
+    console.error(`\rtested ${tested}, compatible ${compatible}`);
 };
 
 async function main () {
@@ -359,6 +424,7 @@ async function main () {
             options['sort-all-clues'] ||
             options['show-clues'] ||
             options['show-pairs'] ||
+            options['unknown-pairs'] ||
             options['ccc'])
         {
             needCount = false;
@@ -407,6 +473,10 @@ async function main () {
 
     if (options['show-clues']) {
         show_clue_names(options);
+        process.exit(0);
+    }
+    if (options['unknown-pairs']) {
+        show_unknown_compatible_pairs(clueSource, load_max, options);
         process.exit(0);
     }
 
