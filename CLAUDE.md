@@ -12,11 +12,11 @@ Word-game clue manager for nested word puzzles. Given word pairs (e.g., "blue", 
 # Install dependencies
 npm install
 
-# Build native module (requires CUDA toolkit)
-node-gyp build
+# Build native module
+cd /home/mike/code/clues && node-gyp build
 
 # Compile TypeScript (output to src/dist/)
-cd src && tsc
+cd /home/mike/code/clues/src && tsc
 ```
 
 ## Architecture
