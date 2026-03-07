@@ -632,6 +632,71 @@ Value dumpMemory(const CallbackInfo& info) {
   return env.Null();
 }
 
+Value getSourceListsForNc(const CallbackInfo& info) {
+  Env env = info.Env();
+  if (!info[0].IsObject()) {
+    TypeError::New(env, "getSourceListForNc: invalid parameter type")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+  // arg0
+  auto nc = makeNameCount(env, info[0].As<Object>());
+  // --
+  // assert(nc.count == 1);  // assert only known use case.
+#if 0
+  if (!clue_manager::is_known_name_count(nc.name, nc.count)) {
+    std::cerr << "invalid nc" << std::endl;
+    return env.Null();
+  }
+  const auto& nc_sources = clue_manager::get_nc_sources(nc);
+  for (const auto& source_csv : nc_sources) {
+
+  }
+#endif
+#if 0
+  auto cref_entries = clue_manager::get_known_source_map_entries(nc);
+  return wrap(env, cref_entries);
+#endif
+
+  const auto& sources = clue_manager::get_nc_sources(nc);
+  Array jsSrcLists = Array::New(env, sources.size());
+  Array jsNcLists = Array::New(env, sources.size());
+
+  for (uint32_t i{}; i < sources.size(); ++i) {
+    if (nc.count == 1) {
+      const auto& key = util::append(nc.name, ":", sources[i]);
+      const auto& entry = KnownSources::get().get_primary_entry(key);
+      jsSrcLists.Set(i, wrap(env, entry.src_list));
+      Array ncList = Array::New(env, 1u);
+      ncList.Set(0u, wrap(env, NameCount{nc.name, 1}));
+      jsNcLists.Set(i, ncList);
+    } else {
+      const auto& combo_entry =
+          KnownSources::get().get_combo_entry(nc.count, sources[i]);
+      SourceList src_list;
+      Array ncListsForSource =
+          Array::New(env, combo_entry.src_combo_list.size());
+      for (uint32_t j{}; j < combo_entry.src_combo_list.size(); ++j) {
+        const auto& combo = combo_entry.src_combo_list[j];
+        src_list.push_back(KnownSources::reconstruct(combo));
+        Array ncList = Array::New(env, combo.parents.size());
+        for (uint32_t k{}; k < combo.parents.size(); ++k) {
+          const auto& p = combo.parents[k];
+          ncList.Set(k, wrap(env, NameCount{p.name, p.count}));
+        }
+        ncListsForSource.Set(j, ncList);
+      }
+      jsSrcLists.Set(i, wrap(env, src_list));
+      jsNcLists.Set(i, ncListsForSource);
+    }
+  }
+
+  Object result = Object::New(env);
+  result.Set("srcLists", jsSrcLists);
+  result.Set("ncLists", jsNcLists);
+  return result;
+}
+
 Object Init(Env env, Object exports) {
   // clue-manager
   //
@@ -641,6 +706,7 @@ Object Init(Env env, Object exports) {
       setCompoundClueNameSourcesMap);
   exports["isKnownSourceMapEntry"] = Function::New(env, isKnownSourceMapEntry);
   exports["addCompoundClue"] = Function::New(env, addCompoundClue);
+  exports["getSourceListsForNc"] = Function::New(env, getSourceListsForNc);
 
   // validator
   //

@@ -150,8 +150,32 @@ function combo_maker(args) {
         });
 }
 
+function pnslToSet(primaryNameSrcList) {
+    return new Set(primaryNameSrcList.map(nc => NameCount.toString(nc)));
+}
+
+function pnslIsSubset(childPnsl, parentSet) {
+    return childPnsl.every(nc => parentSet.has(NameCount.toString(nc)));
+}
+
+function showSourceTree(nc, primarySet, indent) {
+    const { srcLists, ncLists } = Native.getSourceListsForNc(nc);
+    if (!srcLists) return;
+    srcLists.forEach((src_list, i) => {
+        src_list.forEach((src, j) => {
+            if (!pnslIsSubset(src.primaryNameSrcList, primarySet)) return;
+            const components = nc.count > 1 ? ncLists[i][j] : ncLists[i];
+            console.log(`${indent}${NameCount.listToString([nc])} [${NameCount.listToStringList(components)}]`);
+            for (const component of components) {
+                if (component.count > 1) {
+                    showSourceTree(component, primarySet, indent + '  ');
+                }
+            }
+        });
+    });
+}
+
 function showSources(clueName) {
-    let result;
     let nc;
     let verbose;
     let clueSplitList = clueName.split(',');
@@ -165,17 +189,22 @@ function showSources(clueName) {
         throw new Error('Need to supply a count as name:count (for now)');
     }
 
-    const src_lists = Native.getSourceListsForNc(nc);
-    if (!src_lists) {
+    const { srcLists, ncLists } = Native.getSourceListsForNc(nc);
+    if (!srcLists) {
         usage('explosion');
     }
-    src_lists.forEach(src_list => {
-        src_list.forEach(src => {
-            //console.log(Stringify(result.resultMap.map(), { indent: '  ' }));
+    srcLists.forEach((src_list, i) => {
+        src_list.forEach((src, j) => {
             console.log(`pnsl:   ${NameCount.listToStringList(src.primaryNameSrcList)}`);
             if (verbose) {
-                console.log(`ncList: ${NameCount.listToStringList(src.ncList)}`);
-                //result.resultMap.dump();
+                const primarySet = pnslToSet(src.primaryNameSrcList);
+                const components = nc.count > 1 ? ncLists[i][j] : ncLists[i];
+                console.log(`${NameCount.listToString([nc])} [${NameCount.listToStringList(components)}]`);
+                for (const component of components) {
+                    if (component.count > 1) {
+                        showSourceTree(component, primarySet, '  ');
+                    }
+                }
             }
         });
     });
