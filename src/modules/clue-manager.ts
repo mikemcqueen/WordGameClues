@@ -462,17 +462,25 @@ const resolveToRequiredPrimaries = (clueNames: string[]): Set<string> => {
     const primaries = new Set<string>();
     const visited = new Set<string>();
     const resolve = (name: string) => {
-        if (visited.has(name)) return;
-        visited.add(name);
+        // Parse optional :COUNT suffix
+        const colonIdx = name.lastIndexOf(':');
+        const hasCount = colonIdx > 0 && !isNaN(Number(name.substring(colonIdx + 1)));
+        const baseName = hasCount ? name.substring(0, colonIdx) : name;
+        const specificCount = hasCount ? Number(name.substring(colonIdx + 1)) : undefined;
+
+        if (visited.has(baseName)) return;
+        visited.add(baseName);
         // Check if it's a primary clue
-        if (anyCandidateHasClueName(name)) {
-            primaries.add(name);
+        if (anyCandidateHasClueName(baseName)) {
+            primaries.add(baseName);
         }
         // Check compound clue maps for further resolution
-        for (let count = 2; count < State.knownClueMapArray.length; ++count) {
+        const countLo = specificCount ?? 2;
+        const countHi = specificCount ?? State.knownClueMapArray.length - 1;
+        for (let count = countLo; count <= countHi; ++count) {
             const clueMap = getKnownClueMap(count);
-            if (!clueMap || !_.has(clueMap, name)) continue;
-            const sourceCsvList: string[] = clueMap[name];
+            if (!clueMap || !_.has(clueMap, baseName)) continue;
+            const sourceCsvList: string[] = clueMap[baseName];
             for (const sourceCsv of sourceCsvList) {
                 const sourceNames = sourceCsv.split(',');
                 for (const srcName of sourceNames) {

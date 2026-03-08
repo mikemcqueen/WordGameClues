@@ -79,6 +79,7 @@ const CmdLineOptions = Opt.create(_.concat(Clues.Options, [
     ['',  'memory',                            'output memory dumps' ],
     ['',  'allocations',                       'output memory allocations' ],
     ['',  'clue-filter=NAME[,NAME,...]',        'filter sentence variations to only those relevant to specified clue names'],
+    ['',  'no-auto-filter',                      'disable auto-derivation of clue filter from --xor/--or args'],
     ['q', 'quiet',                             'less output'],
     ['h', 'help',                              'this screen']
 ])).bindHelp();
@@ -115,9 +116,18 @@ const loadClues = (clues, max, options) => {
         validateAll: true,
         verbose: options.verbose
     };
-    if (options.clueFilter) {
-        const clueNames = options.clueFilter.split(',');
-        ClueManager.loadAllCluesWithFilter(loadArgs, clueNames);
+    // Build combined clue filter from explicit --clue-filter and implicit --xor/--or args
+    const filterNames = new Set(options.clueFilter ? options.clueFilter.split(',') : []);
+    if (!options.noAutoFilter) {
+        const extractNames = (args) => {
+            if (!args) return [];
+            return [].concat(args).flatMap(arg => arg.split(','));
+        };
+        for (const name of extractNames(options.xor)) filterNames.add(name);
+        for (const name of extractNames(options.or)) filterNames.add(name);
+    }
+    if (filterNames.size > 0) {
+        ClueManager.loadAllCluesWithFilter(loadArgs, [...filterNames]);
     } else {
         ClueManager.loadAllClues(loadArgs);
     }
@@ -448,6 +458,7 @@ async function main () {
     options.removeAllInvalid = Boolean(options['remove-all-invalid']);
     options.copy_from = options['copy-from'];
     options.clueFilter = options['clue-filter'];
+    options.noAutoFilter = Boolean(options['no-auto-filter']);
     options.max_sources = _.toNumber(options['max-sources'] || 15);
     console.error(`max_sources(${options.max_sources})`);
     options.maxArg = _.toNumber(options.max || 0);  // TODO: make this not used
