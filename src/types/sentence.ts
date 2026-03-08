@@ -384,7 +384,12 @@ const buildNameIndicesMap = (candidates: Candidate[]): NameIndicesMap =>
     return map;
 };
 
-export const buildAllCandidates = (sentence: Type, variations: Variations, args: any):
+// AllowedVariationsMap: sentence number -> Set of allowed variation indices.
+// If undefined or missing entry for a sentence, all variations are allowed.
+export type AllowedVariationsMap = Map<number, Set<number>> | undefined;
+
+export const buildAllCandidates = (sentence: Type, variations: Variations,
+    args: any, allowedVariations?: AllowedVariationsMap):
     CandidatesContainer =>
 {
     let candidates: Candidate[] = [];
@@ -392,6 +397,7 @@ export const buildAllCandidates = (sentence: Type, variations: Variations, args:
     let src = 1_000_000 * sentence.num; // up to 10000 variations of up to 100 names
     // TODO: similar logic to getUniqueComponentNames() which is unfortunate
     const sortedText = stripAndSort(sentence.text);
+    const allowedSet = allowedVariations?.get(sentence.num);
     for (const combo of sentence.combinations) {
         const nameListMap = buildCandidateNameListMap(combo.split(' '), sentence.components);
         if (args.verbose > 1) {
@@ -404,6 +410,12 @@ export const buildAllCandidates = (sentence: Type, variations: Variations, args:
             // TODO: is this even possible given the validation we do on load?
             if (sortedText !== joinAndSort(nameList)) {
                 throw new Error(`sentence '${sentence.text}' != nameList '${nameList}'`);
+            }
+            // If variation filter is active for this sentence, check it
+            const variationIndex = Math.floor((src % 1_000_000) / 100);
+            if (allowedSet && !allowedSet.has(variationIndex)) {
+                src += 100;
+                continue;
             }
             const clues = buildClueList(sentence.num, nameList, src);
             candidates.push({

@@ -193,6 +193,12 @@ public:
       const std::string& source_csv) const;
   size_t get_num_clue_sources(int count, const std::string& key) const;
 
+  void reset() {
+    primary_entry_map_.clear();
+    primary_compat_map_.clear();
+    combo_entry_maps_.clear();
+  }
+
   void dump_memory() const;
 
 private:

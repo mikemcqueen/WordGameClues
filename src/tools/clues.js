@@ -78,6 +78,7 @@ const CmdLineOptions = Opt.create(_.concat(Clues.Options, [
     ['',  'vvv',                               'MOAR' ],
     ['',  'memory',                            'output memory dumps' ],
     ['',  'allocations',                       'output memory allocations' ],
+    ['',  'clue-filter=NAME[,NAME,...]',        'filter sentence variations to only those relevant to specified clue names'],
     ['q', 'quiet',                             'less output'],
     ['h', 'help',                              'this screen']
 ])).bindHelp();
@@ -100,7 +101,7 @@ function usage (msg) {
 }
 
 const loadClues = (clues, max, options) => {
-    ClueManager.loadAllClues({
+    const loadArgs = {
         addVariations: !!options.test,
         clues,
         ignoreErrors: options.ignoreErrors,
@@ -113,7 +114,13 @@ const loadClues = (clues, max, options) => {
         useSentences: true,
         validateAll: true,
         verbose: options.verbose
-    });
+    };
+    if (options.clueFilter) {
+        const clueNames = options.clueFilter.split(',');
+        ClueManager.loadAllCluesWithFilter(loadArgs, clueNames);
+    } else {
+        ClueManager.loadAllClues(loadArgs);
+    }
     if (options.memory) {
         Native.dumpMemory("after loadclues");
     }
@@ -440,6 +447,7 @@ async function main () {
     options.merge_style = Boolean(options['merge-style']);
     options.removeAllInvalid = Boolean(options['remove-all-invalid']);
     options.copy_from = options['copy-from'];
+    options.clueFilter = options['clue-filter'];
     options.max_sources = _.toNumber(options['max-sources'] || 15);
     console.error(`max_sources(${options.max_sources})`);
     options.maxArg = _.toNumber(options.max || 0);  // TODO: make this not used

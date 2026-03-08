@@ -615,6 +615,12 @@ Value setOptions(const CallbackInfo& info) {
   return env.Null();
 }
 
+Value resetAll(const CallbackInfo& info) {
+  Env env = info.Env();
+  clue_manager::reset();
+  return env.Null();
+}
+
 Value dumpMemory(const CallbackInfo& info) {
   Env env = info.Env();
   if (!(info[0].IsString() || !info[0].IsUndefined())) {
@@ -733,6 +739,7 @@ Object Init(Env env, Object exports) {
   // misc
   //
   exports["setOptions"] = Function::New(env, setOptions);
+  exports["resetAll"] = Function::New(env, resetAll);
   exports["dumpMemory"] = Function::New(env, dumpMemory);
 
   return exports;

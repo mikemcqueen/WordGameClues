@@ -19,7 +19,7 @@ namespace cm::clue_manager {
 // name -> list of "sources"
 // for primary clues, a "source" is a name:primary_source_packed_integer, for
 //   which I really need a better, more distinct and descriptive name.
-// for compound clues, a source is a comma-separated-value: "name,name"
+// for compound clues, a source is a comma-separated-value: "name1,name2"
 using NameSourcesMap =
     std::unordered_map<std::string, std::vector<std::string>>;
 
@@ -66,6 +66,8 @@ inline int get_num_unique_clue_sources(int count, int unique_name_idx) {
 
 void init_primary_clues(std::vector<std::string>&& names,
     std::vector<IndexList>&& idx_lists);
+
+void reset();
 
 void dump_memory(std::string_view header = "clue-manager memory:");
 

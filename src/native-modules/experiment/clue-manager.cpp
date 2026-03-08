@@ -291,8 +291,7 @@ auto make_src_cref_list(const std::string& name,
 //  * primaryNameSrcIndicesMap_, which is a unordered_map<string, IndexList>
 //  * nameSourcesMap_[0], which is a unordered_map<string, vector<string>>
 // The third requires we build and populate actual SourceLists:
-//  * knownSourcesMap_[0], which is a unordered_map<string,
-//  KnownSourceMapValue>
+//  * knownSourcesMap_[0], which is a unordered_map<string, KnownSourceMapValue>
 //
 void init_primary_clues(std::vector<std::string>&& names,
     std::vector<IndexList>&& idx_lists) {
@@ -309,6 +308,14 @@ void init_primary_clues(std::vector<std::string>&& names,
   // THIRD, populate knownSourcesMap_[1] from the above two maps.
   init_primary_known_source_map(primaryNameSrcIndicesMap_,
       get_name_sources_map(1));
+}
+
+void reset() {
+  primaryNameSrcIndicesMap_.clear();
+  nameSourcesMaps.clear();
+  uniqueClueNames_.clear();
+  uniquePrimaryClueSrcList_.clear();
+  KnownSources::get().reset();
 }
 
 void dump_memory(std::string_view header /* = "clue_manager memory:" */) {

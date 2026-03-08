@@ -396,7 +396,9 @@ const cacheAllPrimaryClueSources = (): void => {
     Native.setPrimaryNameSrcIndicesMap(_.keys(nameSourcesMap), values_lists(nameSourcesMap));
 };
 
-const primaryClueListPostProcessing = (args: any): void => {
+const primaryClueListPostProcessing = (args: any,
+    allowedVariations?: Sentence.AllowedVariationsMap): void =>
+{
     // TODO: got this backwards
     const sentences: Sentence.Type[] = State.sentences;
 
@@ -420,7 +422,8 @@ const primaryClueListPostProcessing = (args: any): void => {
         Assert(sentence, `sentence ${i}:`);
         const names = Sentence.getUniqueComponentNames(sentence);
         names.forEach(name => uniqueComponentNames.add(name));
-        const container = Sentence.buildAllCandidates(sentence, variations, args);
+        const container = Sentence.buildAllCandidates(sentence, variations,
+            args, allowedVariations);
         State.allCandidates[i] = container;
         if (args.verbose > 1) {
             console.error(` names: ${names.size}, variations: ${container.candidates.length}`);
@@ -441,12 +444,184 @@ const primaryClueListPostProcessing = (args: any): void => {
 let num_validates = 0;
 let validate_duration = 0;
 
+const resetState = (): void => {
+    // Reset TypeScript state
+    const dir = State.dir;
+    const sentences = State.sentences;
+    State = initialState();
+    // Preserve dir and sentences (they don't change between loads)
+    State.dir = dir;
+    State.sentences = sentences;
+    // Reset C++ state
+    Native.resetAll();
+};
+
+// Resolve a clue name to its constituent primary clue names.
+// Compound clues may reference other compound clues, requiring recursive resolution.
+const resolveToRequiredPrimaries = (clueNames: string[]): Set<string> => {
+    const primaries = new Set<string>();
+    const visited = new Set<string>();
+    const resolve = (name: string) => {
+        if (visited.has(name)) return;
+        visited.add(name);
+        // Check if it's a primary clue
+        if (anyCandidateHasClueName(name)) {
+            primaries.add(name);
+        }
+        // Check compound clue maps for further resolution
+        for (let count = 2; count < State.knownClueMapArray.length; ++count) {
+            const clueMap = getKnownClueMap(count);
+            if (!clueMap || !_.has(clueMap, name)) continue;
+            const sourceCsvList: string[] = clueMap[name];
+            for (const sourceCsv of sourceCsvList) {
+                const sourceNames = sourceCsv.split(',');
+                for (const srcName of sourceNames) {
+                    resolve(srcName);
+                }
+            }
+        }
+    };
+    for (const name of clueNames) {
+        resolve(name);
+    }
+    return primaries;
+};
+
+// Build map: primary name -> list of { sentence, variation } pairs where it appears
+const buildPrimarySentenceVariationMap = (requiredPrimaries: Set<string>):
+    Map<string, Array<{ sentence: number, variation: number }>> =>
+{
+    const map = new Map<string, Array<{ sentence: number, variation: number }>>();
+    for (const primary of requiredPrimaries) {
+        const pairs: Array<{ sentence: number, variation: number }> = [];
+        for (let i = 1; i < State.allCandidates.length; ++i) {
+            const container = State.allCandidates[i];
+            if (!container) continue;
+            const indices = container.nameIndicesMap[primary];
+            if (!indices) continue;
+            for (const idx of indices) {
+                const candidate = container.candidates[idx];
+                const sources = candidate.nameSourcesMap[primary];
+                if (!sources) continue;
+                for (const src of sources) {
+                    const variation = Math.floor((src % 1_000_000) / 100);
+                    pairs.push({ sentence: i, variation });
+                }
+            }
+        }
+        map.set(primary, pairs);
+    }
+    return map;
+};
+
+// Unit propagation: determine which sentence variations must be skipped
+const computeAllowedVariations = (clueNames: string[]): Sentence.AllowedVariationsMap => {
+    const requiredPrimaries = resolveToRequiredPrimaries(clueNames);
+    if (requiredPrimaries.size === 0) {
+        console.error(`WARNING: no required primaries found for clue names: ${clueNames}`);
+        return undefined;
+    }
+
+    const primarySVMap = buildPrimarySentenceVariationMap(requiredPrimaries);
+
+    // Track skipped variations: sentence -> Set of skipped variation indices
+    const skipped = new Map<number, Set<number>>();
+
+    // Collect all sentences and their variations
+    const sentenceVariations = new Map<number, Set<number>>();
+    for (const pairs of primarySVMap.values()) {
+        for (const { sentence, variation } of pairs) {
+            if (!sentenceVariations.has(sentence)) {
+                sentenceVariations.set(sentence, new Set<number>());
+            }
+            sentenceVariations.get(sentence)!.add(variation);
+        }
+    }
+
+    const isSkipped = (sentence: number, variation: number): boolean => {
+        return skipped.get(sentence)?.has(variation) ?? false;
+    };
+
+    const skipVariation = (sentence: number, variation: number): void => {
+        if (!skipped.has(sentence)) {
+            skipped.set(sentence, new Set<number>());
+        }
+        skipped.get(sentence)!.add(variation);
+    };
+
+    // Propagation loop
+    const eliminated = new Set<string>();
+    let changed = true;
+    while (changed) {
+        changed = false;
+        for (const [primary, pairs] of primarySVMap) {
+            if (eliminated.has(primary)) continue;
+            // Compute remaining (non-skipped) pairs for this primary
+            const remaining = pairs.filter(p => !isSkipped(p.sentence, p.variation));
+            if (remaining.length === 0) {
+                // This primary's variations were all culled by other constraints.
+                // Not fatal: other decompositions of the specified clue may still work.
+                eliminated.add(primary);
+                continue;
+            }
+            if (remaining.length === 1) {
+                // Lock: skip all other variations of this sentence
+                const locked = remaining[0];
+                const allVars = sentenceVariations.get(locked.sentence);
+                if (allVars) {
+                    for (const v of allVars) {
+                        if (v !== locked.variation && !isSkipped(locked.sentence, v)) {
+                            skipVariation(locked.sentence, v);
+                            changed = true;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if (eliminated.size > 0) {
+        console.error(`variation filter: ${eliminated.size} primary(s) eliminated: ${[...eliminated].join(', ')}`);
+    }
+
+    // Build allowed variations map from skipped
+    if (skipped.size === 0) return undefined;
+
+    const allowed = new Map<number, Set<number>>();
+    for (const [sentence, allVars] of sentenceVariations) {
+        const skippedSet = skipped.get(sentence);
+        if (!skippedSet || skippedSet.size === 0) continue;
+        const allowedSet = new Set<number>();
+        for (const v of allVars) {
+            if (!skippedSet.has(v)) {
+                allowedSet.add(v);
+            }
+        }
+        allowed.set(sentence, allowedSet);
+    }
+
+    if (allowed.size === 0) {
+        console.error(`variation filter: using all variations`);
+        return undefined;
+    }
+
+    console.error(`variation filter: ${allowed.size} sentence(s) filtered`);
+    for (const [sentence, allowedSet] of allowed) {
+        const totalVars = sentenceVariations.get(sentence)!.size;
+        const culled = totalVars - allowedSet.size;
+        console.error(`  sentence ${sentence}: culled ${culled}/${totalVars} variations`);
+    }
+
+    return allowed;
+};
+
 // args:
 //  baseDir:  base directory (meta, synth)
 //  ignoreErrors:
 //  validateAll:
 //
-export const loadAllClues = function (args: any): void {
+export const loadAllClues = function (args: any,
+    allowedVariations?: Sentence.AllowedVariationsMap): void
+{
     State.dir = Clues.getDirectory(args.clues);
     if (args.ignoreErrors) {
         State.ignoreLoadErrors = true;
@@ -459,7 +634,7 @@ export const loadAllClues = function (args: any): void {
     }
     autoSource(primaryClueList, args);
     // if using -t, add primary variations to uniqueNames
-    primaryClueListPostProcessing(args);
+    primaryClueListPostProcessing(args, allowedVariations);
     for (let count = 2; count <= args.max_sources; ++count) {
         let clueList: ClueList.Compound = loadClueList(count);
         State.clueListArray[count] = clueList;
@@ -478,6 +653,27 @@ export const loadAllClues = function (args: any): void {
         console.error(` validatesSources(${num_validates} calls) - ${PrettyMs(validate_duration)}`);
     }
     State.loaded = true;
+};
+
+// Load-Cull-Reload: load all clues, compute variation filter from specified
+// clue names, reset state, and reload with filter applied.
+export const loadAllCluesWithFilter = (args: any, clueNames: string[]): void => {
+    // Phase 1: Full load
+    loadAllClues(args);
+
+    // Phase 2: Compute allowed variations via unit propagation
+    const allowedVariations = computeAllowedVariations(clueNames);
+    if (!allowedVariations) {
+        return;
+    }
+
+    // Phase 3: Reset
+    resetState();
+    num_validates = 0;
+    validate_duration = 0;
+
+    // Phase 4: Filtered reload (skip validation; clues already validated in phase 1)
+    loadAllClues({ ...args, skipValidation: true }, allowedVariations);
 };
 
 const getRejectFilename = function (count: number): string {
@@ -518,8 +714,8 @@ let addCompoundClue = (clue: Clue.Compound, count: number, args: any): boolean =
     let nameList = clue.src.split(',').sort();
     let srcCsv = nameList.toString();
     let vs_result = true;
-    // new sources need to be validated
-    if (!Native.isKnownSourceMapEntry(count, srcCsv)) {
+    // new sources need to be validated (skip on filtered reload)
+    if (!args.skipValidation && !Native.isKnownSourceMapEntry(count, srcCsv)) {
         const t0 = new Date();
         vs_result = Native.validateSources(clue.name, nameList, count, args.validateAll);
         validate_duration += new Duration(t0, new Date()).milliseconds;
