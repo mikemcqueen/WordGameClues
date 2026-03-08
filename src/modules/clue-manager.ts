@@ -672,8 +672,8 @@ export const loadAllCluesWithFilter = (args: any, clueNames: string[]): void => 
     num_validates = 0;
     validate_duration = 0;
 
-    // Phase 4: Filtered reload (skip validation; clues already validated in phase 1)
-    loadAllClues({ ...args, skipValidation: true }, allowedVariations);
+    // Phase 4: Filtered reload
+    loadAllClues({ ...args, reload: true }, allowedVariations);
 };
 
 const getRejectFilename = function (count: number): string {
@@ -714,8 +714,7 @@ let addCompoundClue = (clue: Clue.Compound, count: number, args: any): boolean =
     let nameList = clue.src.split(',').sort();
     let srcCsv = nameList.toString();
     let vs_result = true;
-    // new sources need to be validated (skip on filtered reload)
-    if (!args.skipValidation && !Native.isKnownSourceMapEntry(count, srcCsv)) {
+    if (!Native.isKnownSourceMapEntry(count, srcCsv)) {
         const t0 = new Date();
         vs_result = Native.validateSources(clue.name, nameList, count, args.validateAll);
         validate_duration += new Duration(t0, new Date()).milliseconds;
@@ -761,7 +760,7 @@ const addKnownCompoundClues = (clueList: ClueList.Compound, clueCount: number,
                 addKnownClue(clueCount, clue.name, clue.src);
             } else if (args.removeAllInvalid) {
                 removeClue(clueCount, clue, true, false, true); // save, nothrow, force
-            } else if (!State.ignoreLoadErrors) {
+            } else if (!State.ignoreLoadErrors && !args.reload) {
                 console.error(`VALIDATE FAILED KNOWN COMPOUND CLUE:` +
                     ` '${clue.src}':${clueCount}, -t ${clue.src} --remove ${clue.name}`);
             }
