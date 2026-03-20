@@ -434,7 +434,7 @@ struct NameCount {
   }
 
   static std::string makeString(const std::string& name, int count) {
-    char buf[32];
+    char buf[128];
     snprintf(buf, sizeof(buf), "%s:%d", name.c_str(), count);
     return buf;
   }
@@ -446,12 +446,9 @@ struct NameCount {
     return buf;
   }
 
-  // yeah not pretty, i was in a hurry
   static std::string makeString(const std::string& name1,
       const std::string& name2) {
-    char buf[32];
-    snprintf(buf, sizeof(buf), "%s,%s", name1.c_str(), name2.c_str());
-    return buf;
+    return name1 + "," + name2;
   }
 
   static std::vector<std::string> listToNameList(const NameCountList& list) {
