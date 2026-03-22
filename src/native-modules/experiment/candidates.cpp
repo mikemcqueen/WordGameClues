@@ -29,7 +29,8 @@ struct CandidateRepoValue {
   CompatSourceIndicesList compat_src_indices;
   std::optional<int> opt_idx;
 };
-using CandidateRepo = std::unordered_map<std::string, CandidateRepoValue>;
+// key: packed source group ID pair (sorted: lower in high 32 bits)
+using CandidateRepo = std::unordered_map<uint64_t, CandidateRepoValue>;
 
 class Lock {
   Lock() = delete;
@@ -267,8 +268,34 @@ int consider_candidate(int sum, const NameCountCRefList& nc_cref_list,
   const auto& nc2 = nc_cref_list.at(idx_pair.second).get();
   // no lock necessary to modify repo map for a particular sum
   auto& candidate_repo = get_candidate_repo(sum);
-  auto key = NameCount::makeString(nc1, nc2);
-  if (candidate_repo.contains(key)) return 0;
+
+  // key by (count, source_group_id) pairs so names with identical sources
+  // share a candidate. pack count (16 bits) + gid (16 bits) per half.
+  auto gid1 = clue_manager::get_source_group_id(
+      nc1.count, unique_name_indices.at(idx_pair.first));
+  auto gid2 = clue_manager::get_source_group_id(
+      nc2.count, unique_name_indices.at(idx_pair.second));
+  uint32_t cg1 = (uint32_t(nc1.count) << 16) | uint32_t(gid1);
+  uint32_t cg2 = (uint32_t(nc2.count) << 16) | uint32_t(gid2);
+  // sort for consistent key regardless of pair order
+  if (cg1 > cg2) std::swap(cg1, cg2);
+  auto key = (uint64_t(cg1) << 32) | uint64_t(cg2);
+
+  auto combo = NameCount::makeString(nc1.name, nc2.name);
+
+  auto it = candidate_repo.find(key);
+  if (it != candidate_repo.end()) {
+    // source group pair already processed — add combo to existing candidate
+    auto& rv = it->second;
+    if (rv.opt_idx.has_value()) {
+      Lock lk(candidate_map_semaphore_);
+      candidate_map_.find(sum)->second.at(rv.opt_idx.value())
+          .combos.insert(std::move(combo));
+    }
+    // else: source pair was incompatible, nothing to add to
+    return 0;
+  }
+
   CandidateRepoValue repo_value;
   repo_value.compat_src_indices = std::move(
       make_compat_source_indices(nc_cref_list, unique_name_indices, idx_pair));
@@ -279,8 +306,7 @@ int consider_candidate(int sum, const NameCountCRefList& nc_cref_list,
   if (rv.compat_src_indices.empty()) {
     cc.num_incompat++;
   } else {
-    // TODO: util::append
-    add_candidate(sum, NameCount::makeString(nc1.name, nc2.name),
+    rv.opt_idx = add_candidate(sum, std::move(combo),
         std::cref(rv.compat_src_indices));
   }
   return 0;

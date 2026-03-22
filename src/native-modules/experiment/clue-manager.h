@@ -42,6 +42,9 @@ const std::vector<std::string>& get_nc_sources(const NameCount& nc);
 
 int get_num_unique_clue_names(int count);
 
+// source groups - names with identical SourceCompatibilityData sets share a group ID
+int get_source_group_id(int count, int unique_name_idx);
+
 const NameCount& get_unique_clue_nc(int count, int idx);
 
 const std::string& get_unique_clue_name(int count, int idx);

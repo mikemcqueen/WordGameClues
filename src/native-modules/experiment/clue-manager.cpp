@@ -4,9 +4,11 @@
 #include <cmath>
 #include <mutex>
 #include <string>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 #include "clue-manager.h"
+#include "cm-hash.h"
 #include "known-sources.h"
 #include "util.h"
 #include "log.h"
@@ -35,6 +37,10 @@ std::vector<NameSourcesMap> nameSourcesMaps;
 std::vector<NameCountList> uniqueClueNames_;
 
 SourceCompatibilityList uniquePrimaryClueSrcList_;
+
+// source group IDs: names with identical SourceCompatibilityData sets share a
+// group ID. indexed by [count-1][unique_name_idx]. populated lazily.
+std::vector<std::vector<int>> source_group_ids_;
 
 // nameSourcesMap
 
@@ -117,6 +123,81 @@ const auto& get_unique_clue_nc_list(int count) {
 void ensure_primary_unique_clue_source_list() {
   if (uniquePrimaryClueSrcList_.empty()) {
     uniquePrimaryClueSrcList_ = std::move(make_unique_clue_source_list(1));
+  }
+}
+
+// source groups
+
+struct NameAndSources {
+  int unique_name_idx;
+  std::unordered_set<SourceCompatCRef> sources;
+};
+
+void build_source_group_ids(int count) {
+  const auto idx = count - 1;
+  if (idx < (int)source_group_ids_.size() && !source_group_ids_.at(idx).empty()) {
+    return;  // already built
+  }
+  source_group_ids_.resize(
+      std::max(source_group_ids_.size(), (size_t)(idx + 1)));
+
+  const auto num_names = get_num_unique_clue_names(count);
+  auto& ids = source_group_ids_.at(idx);
+  ids.resize(num_names, -1);
+
+  // Phase 1: hash each name's source set into scalar buckets
+  std::unordered_map<size_t, std::vector<NameAndSources>> buckets;
+  for (int i{}; i < num_names; ++i) {
+    const auto& name = get_unique_clue_name(count, i);
+    std::unordered_set<SourceCompatCRef> src_set;
+    size_t hash = 0;
+    KnownSources::for_each_nc_source_compat(name, count,
+        [&](const SourceCompatibilityData& src, index_t) {
+          src_set.insert(std::cref(src));
+          hash += std::hash<SourceCompatibilityData>{}(src);
+        });
+    buckets[hash].push_back({i, std::move(src_set)});
+  }
+
+  // Phase 2: within each bucket, resolve hash collisions into true
+  // equivalence classes and assign group IDs
+  int next_group_id = 0;
+  int num_shared = 0;
+  for (auto& [_, bucket] : buckets) {
+    std::vector<int> sub_group_ids;
+    std::vector<std::unordered_set<SourceCompatCRef>*> sub_reps;
+    std::vector<std::vector<int>> sub_group_indices;
+
+    for (auto& entry : bucket) {
+      bool found = false;
+      for (size_t g = 0; g < sub_reps.size(); ++g) {
+        if (entry.sources == *sub_reps[g]) {
+          sub_group_indices[g].push_back(entry.unique_name_idx);
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        sub_group_ids.push_back(next_group_id++);
+        sub_reps.push_back(&entry.sources);
+        sub_group_indices.push_back({entry.unique_name_idx});
+      }
+    }
+
+    for (size_t g = 0; g < sub_group_ids.size(); ++g) {
+      if (sub_group_indices[g].size() > 1) {
+        num_shared += int(sub_group_indices[g].size());
+      }
+      for (auto name_idx : sub_group_indices[g]) {
+        ids.at(name_idx) = sub_group_ids[g];
+      }
+    }
+  }
+
+  if (num_shared && log_level(Verbose)) {
+    std::cerr << "source groups(" << count << "): " << num_names << " names -> "
+              << next_group_id << " groups, " << num_shared
+              << " names share sources\n";
   }
 }
 
@@ -267,6 +348,11 @@ int get_unique_clue_starting_source_index(int count, int unique_name_idx) {
   return start_idx;
 }
 
+int get_source_group_id(int count, int unique_name_idx) {
+  build_source_group_ids(count);
+  return source_group_ids_.at(count - 1).at(unique_name_idx);
+}
+
 //
 // misc
 //
@@ -324,6 +410,7 @@ void reset() {
   nameSourcesMaps.clear();
   uniqueClueNames_.clear();
   uniquePrimaryClueSrcList_.clear();
+  source_group_ids_.clear();
   KnownSources::get().reset();
 }
 

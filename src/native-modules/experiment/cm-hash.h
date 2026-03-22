@@ -125,3 +125,9 @@ template <> struct hash<cm::CompatSourceIndices> {
 
 } // namespace std
 
+// needed for unordered_set<SourceCompatCRef>::operator==
+namespace cm {
+inline bool operator==(SourceCompatCRef lhs, SourceCompatCRef rhs) noexcept {
+  return std::equal_to<SourceCompatibilityData>{}(lhs.get(), rhs.get());
+}
+}  // namespace cm
