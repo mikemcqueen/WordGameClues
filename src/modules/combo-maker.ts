@@ -236,7 +236,7 @@ export const makeCombosForSum = (sum: number, args: any,
         // TODO: wherever this is actually enforced:
         // console.error(`Enforcing max results: ${args.maxResults}`);
     }
-    Native.computeCombosForSum(sum, args.max);
+    Native.computeCombosForSum(sum, args.max, args.load_max);
     /*
     } else {
         args.synchronous = synchronous;

@@ -634,7 +634,7 @@ export const loadAllClues = function (args: any,
     if (args.ignoreErrors) {
         State.ignoreLoadErrors = true;
     }
-    State.maxClues = args.max;
+    State.maxClues = args.load_max;
 
     let primaryClueList: ClueList.Primary = loadClueList(1) as ClueList.Primary;
     if (primaryClueList[0].src !== 'auto') {
@@ -643,7 +643,7 @@ export const loadAllClues = function (args: any,
     autoSource(primaryClueList, args);
     // if using -t, add primary variations to uniqueNames
     primaryClueListPostProcessing(args, allowedVariations);
-    for (let count = 2; count <= args.max_sources; ++count) {
+    for (let count = 2; count <= args.load_max; ++count) {
         let clueList: ClueList.Compound = loadClueList(count);
         State.clueListArray[count] = clueList;
         addKnownCompoundClues(clueList, count, args);

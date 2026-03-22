@@ -30,7 +30,7 @@
 
 namespace cm {
 // combo-maker.cpp
-void compute_combos_for_sum(int sum, int max);
+void compute_combos_for_sum(int sum, int max, int load_max);
 #if 1
 long get_compute_duration();
 long get_make_indices_duration();
@@ -418,7 +418,7 @@ Value filterPreparation(const CallbackInfo& info) {
 
 Value computeCombosForSum(const CallbackInfo& info) {
   Env env = info.Env();
-  if (!info[0].IsNumber() && !info[1].IsNumber() && !info[2].IsBoolean()) {
+  if (!info[0].IsNumber() || !info[1].IsNumber() || !info[2].IsNumber()) {
     TypeError::New(env, "computeCombosForSum: invalid parameter type")
       .ThrowAsJavaScriptException();
     return env.Null();
@@ -428,9 +428,9 @@ Value computeCombosForSum(const CallbackInfo& info) {
   // arg1
   auto max = info[1].As<Number>().Int32Value();
   // arg2
-  //auto dump = info[2].As<Boolean>();
+  auto load_max = info[2].As<Number>().Int32Value();
   // --
-  compute_combos_for_sum(sum, max);
+  compute_combos_for_sum(sum, max, load_max);
   // TODO: move save_current_candidate_counts() here?
   return env.Null();
 }
@@ -524,8 +524,7 @@ Value showComponents(const CallbackInfo& info) {
 
 Value checkClueConsistency(const CallbackInfo& info) {
   Env env = info.Env();
-  if (!info[0].IsArray() && !info[1].IsNumber() && !info[2].IsNumber()
-      && !info[3].IsBoolean()) {
+  if (!info[0].IsArray() || !info[1].IsNumber() || !info[2].IsNumber()) {
     TypeError::New(env, "checkClueConsistency: invalid parameter type")
       .ThrowAsJavaScriptException();
     return env.Null();
@@ -533,7 +532,7 @@ Value checkClueConsistency(const CallbackInfo& info) {
   // arg0:
   auto name_list = makeStringList(env, info[0].As<Array>());
   // arg1:
-  auto max_sources = info[1].As<Number>().Int32Value();
+  auto load_max = info[1].As<Number>().Int32Value();
   // arg2:
   auto version = info[2].As<Number>().Int32Value();
   // --
@@ -544,7 +543,7 @@ Value checkClueConsistency(const CallbackInfo& info) {
         name_list, MFD.host_xor.merged_xor_src_list);
     break;
   case 2:
-    components::consistency_check(std::move(name_list), max_sources);
+    components::consistency_check(std::move(name_list), load_max);
     break;
   default:
     assert(false);

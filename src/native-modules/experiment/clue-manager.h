@@ -62,6 +62,8 @@ inline int get_num_unique_clue_sources(int count, int unique_name_idx) {
       get_unique_clue_name(count, unique_name_idx));
 }
 
+int get_max_loaded_count();
+
 // misc
 
 void init_primary_clues(std::vector<std::string>&& names,

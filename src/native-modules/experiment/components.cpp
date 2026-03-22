@@ -280,10 +280,13 @@ void display(const SourceList& src_list) {
   }
 }
 
-auto get_addends(const std::vector<std::string>& name_list, int max_sources) {
+// NOTE: uses load_max as the sum loop bound, which is correct for the
+// consistency checker. Would need a separate generate_max param if used
+// outside of that context.
+auto get_addends(const std::vector<std::string>& name_list, int load_max) {
   std::vector<std::vector<int>> result;
-  for (int sum{2}; sum <= max_sources; ++sum) {
-    auto addends = Peco::make_addends(sum, int(name_list.size()));
+  for (int sum{2}; sum <= load_max; ++sum) {
+    auto addends = Peco::make_addends(sum, int(name_list.size()), load_max);
     util::move_append(result, std::move(addends));
   }
   return result;
@@ -324,8 +327,8 @@ auto make_nc_data_lists(const std::vector<std::vector<int>>& addends,
 }
 
 auto get_all_compatible_sources(
-    const std::vector<std::string>& name_list, int max_sources) {
-  auto addends = get_addends(name_list, max_sources);
+    const std::vector<std::string>& name_list, int load_max) {
+  auto addends = get_addends(name_list, load_max);
   auto filtered_addends = filter_valid_addend_perms(addends, name_list);
   auto nc_data_lists = make_nc_data_lists(filtered_addends, name_list);
   auto src_lists = build_src_lists(nc_data_lists);
@@ -405,15 +408,15 @@ auto old_consistency_check(const std::vector<std::string>& name_list,
 }
 
 void consistency_check(
-    std::vector<std::string>&& name_list, int max_sources) {
+    std::vector<std::string>&& name_list, int load_max) {
   consistency_pool_.execute(
       [name_list = std::move(name_list),
-          max_sources]() -> std::optional<consistency_t> {
+          load_max]() -> std::optional<consistency_t> {
         // only 2-source clues supported
         if (name_list.size() != 2)
           std::cerr << "name_list: " << util::join(name_list, ",") << std::endl;
         assert(name_list.size() == 2);
-        auto src_list = get_all_compatible_sources(name_list, max_sources);
+        auto src_list = get_all_compatible_sources(name_list, load_max);
         auto source_csv = util::join(name_list, ",");
         //if (1 || !are_sources_consistent(name_list, src_list)) {
         NameCountList nc_list = get_missing_nc_list(source_csv, src_list);
@@ -431,9 +434,9 @@ auto get_consistency_check_results()
 }
 
 /*
-auto get_known_source_idx_list(const std::string& source_csv, int max_sources) {
+auto get_known_source_idx_list(const std::string& source_csv, int load_max) {
   std::vector<int> idx_list;
-  for (int i{2}; i <= max_sources; ++i) {
+  for (int i{2}; i <= load_max; ++i) {
     if (clue_manager::is_known_source_map_entry(i, source_csv)) {
       idx_list.push_back(i);
     }
@@ -532,7 +535,7 @@ return std::vector<int>(count_set.begin(), count_set.end());
 //return true;
 
 // this did.. something.. but not exactly what i wanted.
-auto potential_counts = get_addends(name_list, max_sources);
+auto potential_counts = get_addends(name_list, load_max);
 auto source_csv = util::join(name_list, ","s);
 if (!potential_counts.empty()) {
   std::cerr << "\n"
@@ -546,7 +549,7 @@ clue_names);
 
 // this only works for already-declared clue-sources, not for VALID but
 // undeclared.
-auto idx_list = get_known_source_idx_list(source_csv, max_sources);
+auto idx_list = get_known_source_idx_list(source_csv, load_max);
 auto clue_names = get_all_known_source_clue_names(source_csv, idx_list);
 return all_known_sources_have_clue_names(source_csv, idx_list, clue_names);
 */

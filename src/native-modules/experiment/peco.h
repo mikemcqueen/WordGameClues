@@ -31,6 +31,7 @@ private:
   }
 
   static void make_addends_helper(int sum, int count, int start,
+    int max_addend,
     std::vector<int>& current, std::vector<std::vector<int>>& result) {
     if (!count) {
       if (!sum) {
@@ -38,9 +39,9 @@ private:
       }
       return;
     }
-    for (auto i = start; i <= sum; ++i) {
+    for (auto i = start; i <= std::min(sum, max_addend); ++i) {
       current.push_back(i);
-      make_addends_helper(sum - i, count - 1, i, current, result);
+      make_addends_helper(sum - i, count - 1, i, max_addend, current, result);
       current.pop_back();  // backtrack
     }
   }
@@ -88,11 +89,10 @@ public:
     return idx_list;
   }
 
-  // TODO: add 'max' param, loop over it
-  static auto make_addends(int sum, int count) {
+  static auto make_addends(int sum, int count, int max_addend) {
     std::vector<std::vector<int>> result;
     std::vector<int> current;
-    make_addends_helper(sum, count, 1, current, result);
+    make_addends_helper(sum, count, 1, max_addend, current, result);
     return result;
   }
 

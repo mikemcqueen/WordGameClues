@@ -125,11 +125,9 @@ std::atomic<long> compute_duration_ = 0;
 // generate an array of addend arrays ("count lists"), for each 2 <= N <= max,
 // that add up to that sum, such as [ [1, 3], [2, 2], [1, 1, 2], [1, 1, 1, 1] ]
 // in reality though much of this code only works for max == 2.
-void compute_combos_for_sum(int sum, int max) {
+void compute_combos_for_sum(int sum, int max, int load_max) {
   assert(max == 2 && "max != 2");
-  //test_unique_clue_sources(sum);
-  //  auto prefix_sums = make_unique_name_prefix_sums(sum);
-  auto addends = Peco::make_addends(sum, max);
+  auto addends = Peco::make_addends(sum, max, load_max);
   int num_candidates{};
   int num_sources{};
   IndexList unique_name_indices;
