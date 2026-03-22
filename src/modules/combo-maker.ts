@@ -331,7 +331,7 @@ export const makeCombos = (args: any): any => {
             });
     } else {
         let totals = ClueManager.emptyFilterResult();
-        const pc_result = PreCompute.preCompute(first, last, args);
+        const pc_result = PreCompute.preCompute(args);
         if (pc_result) {
             // run 2-clue sources synchronously to seed "incompatible sources"
             // which makes subsequent sums faster.

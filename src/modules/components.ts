@@ -65,10 +65,11 @@ const pre_compute = (name_list: string[], quiet: boolean, options: any): boolean
         merge_only: true,
         min_sources,
         quiet,
+        load_max: options.load_max,
         verbose: options.verbose,
         ignoreErrors: options.ignoreErrors
     };
-    return PreCompute.preCompute(min_sources, options.load_max, pc_args);
+    return PreCompute.preCompute(pc_args);
 }
 
 export const show = (options: any): any => {
@@ -127,10 +128,11 @@ export const consistency_check = (options: any): void => {
                 merge_only: true,
                 max: 2,
                 quiet: true,
+                load_max: options.load_max,
                 verbose: options.verbose,
                 ignoreErrors: options.ignoreErrors
             };
-            valid = PreCompute.preCompute(2, options.load_max, pc_args);
+            valid = PreCompute.preCompute(pc_args);
             if (!valid) {
                 console.error(`\nConsistency::Precompute failed at ${combo}.`);
             }

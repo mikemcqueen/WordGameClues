@@ -204,13 +204,12 @@ const listCandidateCount = (ncList: NameCount.List): number => {
     return count;
 };
 
-export const preCompute = (first: number, last: number, args: any): boolean => {
-    const maxSum = last;
+export const preCompute = (args: any): boolean => {
     const merge_only = args.merge_only || false;
 
     const begin = new Date();
     // XOR first
-    const xorNcDataLists = args.xor ? buildAllUseNcDataLists("xor", maxSum, args) : [ [] ];
+    const xorNcDataLists = args.xor ? buildAllUseNcDataLists("xor", args.load_max, args) : [ [] ];
     if (listIsEmpty(xorNcDataLists)) {
        console.error(`empty xorNcDataLists`);
        return false;
@@ -226,7 +225,7 @@ export const preCompute = (first: number, last: number, args: any): boolean => {
     if (merge_only) return true;
 
     // OR next
-    const orNcDataLists = args.or ? buildAllUseNcDataLists("or", maxSum, args) : [ [] ];
+    const orNcDataLists = args.or ? buildAllUseNcDataLists("or", args.load_max, args) : [ [] ];
     if (listIsEmpty(orNcDataLists)) return false;
 
     // TODO: call mergeCompatible here for OR args same as above?

@@ -502,7 +502,9 @@ async function main () {
         options.count_lo = countRange[0];
         options.count_hi = countRange.length > 1 ? countRange[1] : countRange[0];
         let generate_max = options.count_hi;
-        options.load_max = Math.min(options.load_max, generate_max - 1);
+        if (!options.xor && !options.or) {
+            options.load_max = Math.min(options.load_max, generate_max - 1);
+        }
     }
     console.error(`load_max(${options.load_max})`);
 
