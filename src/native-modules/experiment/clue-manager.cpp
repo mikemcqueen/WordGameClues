@@ -173,7 +173,7 @@ auto get_name_sources_map(int count) -> const NameSourcesMap& {
 }
 
 void set_name_sources_map(int count, NameSourcesMap&& name_sources_map) {
-  auto idx = count - 1;
+  const auto idx = count - 1;
   // allow sets exactly in-sequence only, or throw an exception
   assert((int)nameSourcesMaps.size() == idx);
   nameSourcesMaps.push_back(std::move(name_sources_map));

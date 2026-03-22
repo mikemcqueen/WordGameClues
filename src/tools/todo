@@ -1,3 +1,5 @@
+++ older stuff below
+
 * passing shared variable as param: xor_chunk_idx
 
 * results -> FilterStreamData
@@ -9,7 +11,10 @@
 * ok something weird with --max-sources. it actually changes the number of valid results,
   for a -c2 for example. it also seems to, naturally(?), increase the number of XOR sources.
   so really, i need to:
-  * figure out *why* this is affecting valid result count.
+  * PROBABLY SOLVED - figure out *why* this is affecting valid result count.
+    - because max_sources was all fucked up and was probably overriding COUNT_LO. it was a mess.
+      but i should try it again with the new args.load_max change.
+  
   * set --max-sources to (M-1) for -cM, and (N-1) for -cM,N, if not otherwise specified,
     because there is no reason to generate a large number of XOR sources that shouldn't
     be used and shouldn't impact results (afaik).
@@ -17,8 +22,8 @@
       --xor sources themselves, like, "21", which requires --max-sources 13. but maybe
       there is some way to shortcut this, such that rather than searching *all* sources
       up to some --max, i just search for all instances of "21" (specified sources).
-  * maybe think about how i might support -cLARGE with --max-sources *smaller* than
-    LARGE-1. not a priority though, i should't really be playing with those sizes.
+  * SOLVED - maybe think about how i might support -cLARGE with --max-sources *smaller* than
+      LARGE-1. not a priority though, i should't really be playing with those sizes.
 
 * "Source" is overloaded. like the "Source" (namespace?) in combo-maker.h. what's
    a better name for it?
@@ -44,6 +49,12 @@
     * i think it's in the stream now. in_place still broke I think.
   * fixed a bug in compact_sums_to_indices wrt last_scan_result that needs to be fixed
     here as well. left a comment in code.
+  * comment from a commit:
+      Setting swarm_pool to only 1 entry fixes a lot of things related to stability
+      (particularly spurious device memory-access errors) including making me realize
+      that compact_uv_indices_in_place may actually be working just fine, but the
+      shared variations_indices and compat_indices buffer pointers (copied from MFD)
+      might be messing it (and other things) up
     
 * unique_sources branch implementation issues:
   * validation failures. possibly because hash/equal_to of SourceData is wrong (doesn't
@@ -67,6 +78,42 @@
   *is*, ostensibly. But it doesn't appear to be working that way; seems I lost the plot
   at some point. Or my assumptions about what the "key" of the candidate_repo map should
   be is wrong. I mean, it's potentially synonyms all the way down right?
+
+  Claude plan: dedupe-candidate-sources, resume session: dedupe-candidate-sources
+
+         That's a really important distinction. Let me make sure I understand the three levels:
+
+         1. Synonyms — explicit synonym relationships. Partial fix only.
+         2. Same source names — different clue names that happen to have the same source
+            CSV strings at a given count. Captures more, but still incomplete because...
+         3. Same SourceCompatibilityData — the actual resolved source data after recursively
+            expanding source names down to primary clues. Two clue names with completely
+            different source names could still produce identical SourceCompatibilityData
+            if their sources' sources are synonyms (or otherwise equivalent).
+            This is "synonyms all the way down."
+
+         And your key question: does the candidate pipeline even have access to SourceCompatibilityData
+         at the point where dedup would matter, or does it only work with packed SourceIndices?
+
+         Let me check what for_each_nc_source_compat actually iterates over and where
+         SourceCompatibilityData lives relative to the indices.
+
+         This is key. for_each_nc_source_compat iterates through SourceCompatibilityData objects — 
+         it does drill down to that level. Each callback in  make_compat_source_indices receives
+         a const SourceCompatibilityData& and an index_t idx. But then it only stores the packed
+         index (CompatSourceIndex{count, start_idx + idx}) into compat_src_indices. The actual
+         SourceCompatibilityData is used transiently for the isXorCompatibleWith test and then
+         discarded.
+
+         So to your point: candidates operates through SourceCompatibilityData (for the XOR-compat
+         check) but only stores SourceIndices. The indices are positions into a flat ordering of
+         sources for a given name+count. Two different names that happen to resolve to the same
+         SourceCompatibilityData objects would get different indices (because the index space is
+         per-name), even though the underlying data is identical.
+
+         That means dedup at level 3 can't just compare indices — the indices would differ. You'd
+         need to compare the actual SourceCompatibilityData objects.
+
 
 * move all the clock/count stuff to a separate file
 
