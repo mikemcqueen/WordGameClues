@@ -525,16 +525,21 @@ filter_sources(FilterSwarm& swarm, const FilterParams& params,
 auto alloc_copy_prior_sum_sources(const FilterParams& params,
     cudaStream_t stream) {
   size_t num_sources{};
+  const auto max_loaded_sum = clue_manager::get_max_loaded_count() + 1;
   CudaEvent copy_start(stream);
   if (params.copy_all_prior_sources) {
     // copy sources for all prior sums except immediately prior
     for (int sum{3}; sum < params.sum; ++sum) {
-      num_sources += cuda_alloc_copy_prior_sum_sources(sum, stream);
+      if (sum <= max_loaded_sum) {
+        num_sources += cuda_alloc_copy_prior_sum_sources(sum, stream);
+      }
       source_copy_tracker_.complete(sum);
     }
   }
   // copy sources for immediately prior sum
-  num_sources += cuda_alloc_copy_prior_sum_sources(params.sum, stream);
+  if (params.sum <= max_loaded_sum) {
+    num_sources += cuda_alloc_copy_prior_sum_sources(params.sum, stream);
+  }
   // indicate that our immediately prior sum source copy is initiated
   source_copy_tracker_.complete(params.sum);
   CudaEvent copy_stop(stream);

@@ -160,6 +160,10 @@ const IndexList& getPrimaryClueSrcIndices(const std::string& name) {
 // nameSourcesMaps
 //
 
+int get_max_loaded_count() {
+  return int(nameSourcesMaps.size());
+}
+
 auto get_name_sources_map(int count) -> const NameSourcesMap& {
   if (count < 1 || count > (int)nameSourcesMaps.size()) {
     std::cerr << "ERROR: get_name_sources_map called with invalid count: "

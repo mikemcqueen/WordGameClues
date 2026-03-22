@@ -50,7 +50,7 @@ const addClues = (names: string[], nc_list: NameCount.List, options: any): void 
         num_added += addRemove(names, counts, {
             add,
             save: options.save,
-            addMax: options.max_sources,
+            addMax: options.load_max,
             removeMin: 0
         });
         nc_list = nc_list.filter(nc => nc.name !== add);
@@ -64,12 +64,13 @@ const pre_compute = (name_list: string[], quiet: boolean, options: any): boolean
         xor: name_list,
         merge_only: true,
         min_sources,
-        max_sources: options.max_sources,
+        generate_max: options.load_max,
+        load_max: options.load_max,
         quiet,
         verbose: options.verbose,
         ignoreErrors: options.ignoreErrors
     };
-    return PreCompute.preCompute(min_sources, options.max_sources, pc_args);
+    return PreCompute.preCompute(min_sources, options.load_max, pc_args);
 }
 
 export const show = (options: any): any => {
@@ -116,7 +117,7 @@ type ConsistencyResultMap = {
 export const consistency_check = (options: any): void => {
     const version = _.includes(options.flags, '3') ? 2 : 1;
     console.error(`consistency check v${version}`);
-    let combos = get_unique_combos(2, options.max_sources);
+    let combos = get_unique_combos(2, options.load_max);
     let v1_results = new Set<string>();
     let v2_results: ConsistencyResultMap;
     for (let combo of combos) {
@@ -127,18 +128,19 @@ export const consistency_check = (options: any): void => {
                 xor: nameList,
                 merge_only: true,
                 max: 2,
-                max_sources: options.max_sources,
+                generate_max: options.load_max,
+                load_max: options.load_max,
                 quiet: true,
                 verbose: options.verbose,
                 ignoreErrors: options.ignoreErrors
             };
-            valid = PreCompute.preCompute(2, options.max_sources, pc_args);
+            valid = PreCompute.preCompute(2, options.load_max, pc_args);
             if (!valid) {
                 console.error(`\nConsistency::Precompute failed at ${combo}.`);
             }
         }
         if (valid) {
-            if (!Native.checkClueConsistency(nameList, options.max_sources, version)) {
+            if (!Native.checkClueConsistency(nameList, options.load_max, options.load_max, version)) {
                 if (version === 1) v1_results.add(combo);
             }
         }

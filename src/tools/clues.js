@@ -64,8 +64,7 @@ const CmdLineOptions = Opt.create(_.concat(Clues.Options, [
     ['',  'any',                               '  any match (uh, probably should not use this)'],
     ['',  'production',                        'use production note store'],
     ['',  'sort-all-clues',                    'sort all clue data files by src'],
-    ['m', 'max-sources=COUNT',                 'enforce COUNT max primary sources for a single clue; default 15\n' +
-        '                                            impacts clue loading, combo generation, consistency checking, etc.'],
+    ['m', 'load-max=COUNT',                    'max clue files to load (cluesN.json); default 15'],
     ['R', 'remove-all-invalid',                'remove all invalid (validation error) clues'],
     ['',  'ccc',                               'clue (source) consistency check (--save to save results)'],
     ['',  'show-clues',                        'show unique known clue names'],
@@ -108,7 +107,7 @@ const loadClues = (clues, max, options) => {
         ignoreErrors: options.ignoreErrors,
         fast: !options.slow,
         max,
-        max_sources: options.max_sources,
+        load_max: options.load_max,
         memory: options.memory,
         quiet: options.quiet,
         removeAllInvalid: options.removeAllInvalid,
@@ -231,7 +230,7 @@ function copyClues (fromType, options = {}) {
     const dir = fromType.baseDir;
     let total = 0;
     let copied = 0;
-    for (let count = 2; count < options.max_sources; ++count) {
+    for (let count = 2; count <= options.load_max; ++count) {
         let list;
         try {
             list = ClueManager.loadClueList(count, { dir });
@@ -363,8 +362,7 @@ const show_pairs = (clueSource, max, options) => {
 
 const get_clue_names = (options) => {
     let clues = new Set();
-    // using options.max_sources is kinda hacky.
-    for (let count = 1; count < options.max_sources; ++count) {
+    for (let count = 1; count <= options.load_max; ++count) {
         const obj = ClueManager.getKnownClueMap(count);
         Object.keys(obj).forEach(name => {
             clues.add(name);
@@ -383,7 +381,7 @@ const show_clue_names = (options) => {
 const show_unknown_compatible_pairs = (clueSource, load_max, options) => {
     // Step 1: Build name -> Set<count> map
     const nameCountsMap = new Map();
-    for (let count = 1; count < options.max_sources; ++count) {
+    for (let count = 1; count <= options.load_max; ++count) {
         const obj = ClueManager.getKnownClueMap(count);
         for (const name of Object.keys(obj)) {
             if (!nameCountsMap.has(name)) nameCountsMap.set(name, new Set());
@@ -393,7 +391,7 @@ const show_unknown_compatible_pairs = (clueSource, load_max, options) => {
     const names = [...nameCountsMap.keys()].sort();
 
     // Step 2: Get known pairs
-    const knownPairs = get_known_pairs(clueSource, load_max, options);
+    const knownPairs = get_known_pairs(clueSource, options.load_max, options);
 
     // Step 3: Build unknown pair -> addends map
     const unknownPairAddends = new Map();
@@ -459,8 +457,7 @@ async function main () {
     options.copy_from = options['copy-from'];
     options.clueFilter = options['clue-filter'];
     options.noAutoFilter = Boolean(options['no-auto-filter']);
-    options.max_sources = _.toNumber(options['max-sources'] || 15);
-    console.error(`max_sources(${options.max_sources})`);
+    options.load_max = _.toNumber(options['load-max'] || 15);
     options.maxArg = _.toNumber(options.max || 0);  // TODO: make this not used
     let maxArg = _.toNumber(options.max || 2);
     if (!options.count) {
@@ -492,14 +489,13 @@ async function main () {
     }
 
     let clueSource = Clues.getByOptions(options);
-    let load_max = options.max_sources;
 
     if (options['sort-all-clues']) {
-        sortAllClues(clueSource, load_max);
+        sortAllClues(clueSource, options.load_max);
         process.exit(0);
     }
     if (options['show-pairs']) {
-        show_pairs(clueSource, load_max, options);
+        show_pairs(clueSource, options.load_max, options);
         process.exit(0);
     }
 
@@ -507,12 +503,16 @@ async function main () {
         let countRange = options.count.split(',').map(_.toNumber);
         options.count_lo = countRange[0];
         options.count_hi = countRange.length > 1 ? countRange[1] : countRange[0];
-        load_max = options.count_hi;
+        // -c always overrides generate_max from count_hi
+        options.generate_max = options.count_hi;
+        // Cap load_max: largest individual addend needed is generate_max - 1
+        options.load_max = Math.min(options.load_max, options.generate_max - 1);
     }
+    console.error(`load_max(${options.load_max})${options.generate_max ? `, generate_max(${options.generate_max})` : ''}`);
 
     setLogging(_.includes(options.verbose, VERBOSE_FLAG_LOAD));
     let loadBegin = new Date();
-    if (!loadClues(clueSource, load_max, options)) {
+    if (!loadClues(clueSource, options.load_max, options)) {
         return 1;
     }
     let loadMillis = new Duration(loadBegin, new Date()).milliseconds;
@@ -566,7 +566,8 @@ async function main () {
             memory:   options.memory,
             allocations: options.allocations,
             ignoreErrors: options.ignoreErrors,
-            max_sources: options.max_sources,
+            load_max: options.load_max,
+            generate_max: options.generate_max,
             flags: options.flags,
             tpb: options.tpb ? Number(options.tpb) : 0,
             streams: options.streams ? Number(options.streams) : 0,
