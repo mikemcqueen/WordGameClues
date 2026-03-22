@@ -101,7 +101,7 @@ void populate_unique_clue_nc_list(NameCountList& nc_list, int count) {
 
 const auto& get_unique_clue_nc_list(int count) {
   const auto idx{count - 1};
-  if ((int)uniqueClueNames_.size() <= idx) { uniqueClueNames_.resize(idx + 1); }
+  assert(idx >= 0 && idx < (int)uniqueClueNames_.size());
   auto& nc_list = uniqueClueNames_.at(idx);
   if (nc_list.empty()) {
     populate_unique_clue_nc_list(nc_list, count);
@@ -177,6 +177,7 @@ void set_name_sources_map(int count, NameSourcesMap&& name_sources_map) {
   // allow sets exactly in-sequence only, or throw an exception
   assert((int)nameSourcesMaps.size() == idx);
   nameSourcesMaps.push_back(std::move(name_sources_map));
+  uniqueClueNames_.resize(nameSourcesMaps.size());
 }
 
 bool is_known_name_count(const std::string& name, int count) {
