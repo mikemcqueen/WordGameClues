@@ -2,6 +2,7 @@
 #include <charconv>
 #include <chrono>
 #include <cmath>
+#include <mutex>
 #include <string>
 #include <unordered_set>
 #include <vector>
@@ -99,9 +100,12 @@ void populate_unique_clue_nc_list(NameCountList& nc_list, int count) {
   }
 }
 
+std::mutex uniqueClueNamesMutex_;
+
 const auto& get_unique_clue_nc_list(int count) {
   const auto idx{count - 1};
   assert(idx >= 0 && idx < (int)uniqueClueNames_.size());
+  std::lock_guard lock(uniqueClueNamesMutex_);
   auto& nc_list = uniqueClueNames_.at(idx);
   if (nc_list.empty()) {
     populate_unique_clue_nc_list(nc_list, count);
