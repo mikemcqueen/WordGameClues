@@ -807,7 +807,6 @@ void run_filter_kernel(int /*threads_per_block*/, index_t swarm_idx,
     FilterStream& stream, result_t* device_results) {
   stream.is_running = true;
   stream.increment_sequence_num();
-  assert(!stream.host.src_idx_list.empty());
   const auto [grid_size, block_size] =
       get_filter_kernel_grid_block_sizes(stream.host.src_idx_list.size());
   // xor_results could probably be moved to global
