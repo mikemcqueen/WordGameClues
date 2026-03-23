@@ -14,7 +14,7 @@ extern __constant__ FilterStreamData::Device stream_data_[kMaxStreams];
 void FilterStreamData::Device::init(FilterStream& stream, FilterData& mfd) {
   if (!stream.host.device_initialized) {
     assert(stream.host.stream_idx() < kMaxStreams);
-    alloc_buffers(mfd, stream.cuda_stream);
+    alloc_buffers(mfd, stream.stride, stream.cuda_stream);
     copy_to_symbol(stream.host.stream_idx(), stream.cuda_stream);
     stream.host.device_initialized = true;
   }
@@ -32,10 +32,10 @@ void FilterStreamData::Device::alloc_copy_source_index_list(const Host& host,
     }
     cuda_malloc_async((void**)&src_idx_list, num_bytes, stream,
         "device.src_idx_list");
-    num_src_idx = num_host_src_idx;
-    // device members updated; need to (re)copy to symbol
-    copy_to_symbol(host.stream_idx(), stream);
   }
+  num_src_idx = num_host_src_idx;
+  // num_src_idx may shrink between sums, so always refresh constant memory.
+  copy_to_symbol(host.stream_idx(), stream);
   // copy source indices
   auto err = cudaMemcpyAsync(src_idx_list, host.src_idx_list.data(), num_bytes,
       cudaMemcpyHostToDevice, stream);
@@ -43,8 +43,9 @@ void FilterStreamData::Device::alloc_copy_source_index_list(const Host& host,
 }
 
 void FilterStreamData::Device::alloc_buffers(FilterData& mfd,
-    cudaStream_t stream) {
-  const auto [grid_size, _] = get_filter_kernel_grid_block_sizes();
+    size_t max_active_sources, cudaStream_t stream) {
+  const auto [grid_size, _] =
+      get_filter_kernel_grid_block_sizes(max_active_sources);
   if (mfd.device_xor.num_unique_variations) {
     const auto num_bytes = mfd.device_xor.num_unique_variations * grid_size
         * sizeof(index_t);

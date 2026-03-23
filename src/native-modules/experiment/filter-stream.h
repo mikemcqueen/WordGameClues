@@ -27,6 +27,13 @@ struct FilterStreamData {
   struct Device {
     void init() {
       src_idx_list = nullptr;
+      xor_src_compat_uv_indices = nullptr;
+      or_xor_compat_uv_indices = nullptr;
+#ifdef VARIATIONS_RESULTS
+      variations_compat_results = nullptr;
+      num_variations_results_per_block = 0;
+#endif
+      or_src_bits_compat_results = nullptr;
       num_src_idx = 0;
     }
     void init(FilterStream& stream, FilterData& mfd);
@@ -61,7 +68,8 @@ struct FilterStreamData {
     index_t num_src_idx;
 
   private:
-    void alloc_buffers(FilterData& fd, cudaStream_t stream);
+    void alloc_buffers(FilterData& fd, size_t max_active_sources,
+        cudaStream_t stream);
     void copy_to_symbol(index_t idx, cudaStream_t stream);
   };  // struct Device
 };  // struct FilterStreamData
