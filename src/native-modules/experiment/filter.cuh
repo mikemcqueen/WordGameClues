@@ -20,8 +20,7 @@ void run_get_compatible_sources_kernel(
     size_t num_src_desc_pairs, result_t* device_resultsy,
     cudaStream_t sync_stream, cudaStream_t stream);
 
-std::pair<int, int> get_filter_kernel_grid_block_sizes(
-    size_t active_sources = 0);
+std::pair<int, int> get_filter_kernel_grid_block_sizes(size_t num_sources);
 
 void copy_filter_data_to_symbols(const FilterData& mfd, cudaStream_t stream);
 

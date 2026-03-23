@@ -778,16 +778,15 @@ __global__ void filter_kernel(result_t* RESTRICT results, index_t swarm_idx,
 
 }  // anonymous namespace
 
-std::pair<int, int> get_filter_kernel_grid_block_sizes(size_t active_sources) {
+std::pair<int, int> get_filter_kernel_grid_block_sizes(size_t num_sources) {
   // hard-code 64 due to cub::BlockScan
   const auto block_size = 64;  // threads_per_block ? threads_per_block : 64;
   const auto max_threads_per_sm = CudaDevice::get().max_threads_per_sm();
   const auto blocks_per_sm = max_threads_per_sm / block_size;
   assert(blocks_per_sm * block_size == max_threads_per_sm);
   const auto max_grid_size = CudaDevice::get().num_sm() * blocks_per_sm;
-  const auto grid_size = active_sources
-      ? std::max(1, std::min<int>(max_grid_size, int(active_sources)))
-      : max_grid_size;
+  assert(num_sources > 0);
+  const auto grid_size = std::min<int>(max_grid_size, int(num_sources));
   return std::make_pair(grid_size, block_size);
 }
 
@@ -808,6 +807,7 @@ void run_filter_kernel(int /*threads_per_block*/, index_t swarm_idx,
     FilterStream& stream, result_t* device_results) {
   stream.is_running = true;
   stream.increment_sequence_num();
+  assert(!stream.host.src_idx_list.empty());
   const auto [grid_size, block_size] =
       get_filter_kernel_grid_block_sizes(stream.host.src_idx_list.size());
   // xor_results could probably be moved to global
