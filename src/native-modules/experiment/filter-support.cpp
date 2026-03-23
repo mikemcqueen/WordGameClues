@@ -500,8 +500,6 @@ filter_sources(FilterSwarm& swarm, const FilterParams& params,
 
   // TODO: FilterStreamData::Host, resize_results()
   std::vector<result_t> results(num_results);
-  // TODO: this is dumb
-  swarm.init(stride);
   auto t = util::Timer::start_timer();
   const auto [num_processed, num_compat] =  //
       run_concurrent_filter_kernels(params.sum, swarm, params.threads_per_block,
@@ -655,6 +653,8 @@ filter_task_result_t filter_task(FilterData& mfd, FilterParams params) {
   auto& swarm = swarm_pool_.acquire();
   const auto num_streams = params.num_streams ? params.num_streams : 1;
   swarm.ensure_streams(num_streams); // set_num_streams might be better
+  const auto stride = params.stride ? params.stride : int(idx_lists.size());
+  swarm.init(stride);
 
   const auto& stream = swarm.at(0);
   stream.copy_start.record(stream.cuda_stream);
