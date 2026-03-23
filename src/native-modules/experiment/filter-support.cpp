@@ -76,7 +76,7 @@ private:
 
   std::mutex mutex_;
   std::condition_variable cv_;
-  std::bitset<kMaxSums> bits_;
+  std::bitset<kMaxSources> bits_;
 };
 
 CompletionTracker source_copy_tracker_;

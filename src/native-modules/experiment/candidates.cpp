@@ -48,7 +48,7 @@ private:
 
 // globals
 
-constexpr const int kMaxRepos = 20;
+constexpr const int kMaxRepos = kMaxSources;
 std::vector<CandidateRepo> candidate_repos_(kMaxRepos);
 std::binary_semaphore candidate_repos_semaphore_{1};
 

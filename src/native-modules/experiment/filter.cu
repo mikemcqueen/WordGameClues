@@ -17,7 +17,7 @@ __constant__ FilterData::DeviceXor xor_data;
 __constant__ FilterData::DeviceOr or_data;
 __constant__ FilterSwarmData::Device swarm_data_[kMaxSwarms];
 __constant__ FilterStreamData::Device stream_data_[kMaxStreams];
-__constant__ SourceCompatibilityData* sources_data[kMaxSums];
+__constant__ SourceCompatibilityData* sources_data[kMaxSources];
 
 #if defined(DEBUG_XOR_COUNTS) || defined(DEBUG_OR_COUNTS)
 __device__ atomic64_t count_xor_src_considered = 0;

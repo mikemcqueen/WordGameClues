@@ -12,7 +12,7 @@ struct FilterStream;
 class SourceCompatibilityData;
 struct SourceDescriptorPair;
 
-extern __constant__ SourceCompatibilityData* sources_data[kMaxSums];
+extern __constant__ SourceCompatibilityData* sources_data[kMaxSources];
 
 void run_get_compatible_sources_kernel(
     const CompatSourceIndices* device_src_indices, size_t num_src_indices,

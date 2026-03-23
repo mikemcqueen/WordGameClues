@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <bit>
 #include <cassert>
 #include <cmath>
 #include <cstdint>
@@ -20,7 +21,6 @@
 namespace cm {
 
 constexpr unsigned kMaxOrArgs = 20;
-constexpr auto kMaxSums = 32;
 constexpr auto kMaxSwarms = 2;                // 2 swarms
 constexpr auto kMaxStreams = kMaxSwarms * 3;  // 3 streams per swarm
 
@@ -30,6 +30,9 @@ using result_t = uint8_t;
 using index_t = uint32_t;
 using fat_index_t = uint64_t;
 using atomic64_t = unsigned long long int;
+
+static_assert(std::has_single_bit(index_t{kMaxSources}),
+    "kMaxSources must be a power of two");
 
 template <typename T> using IndexListBase = std::vector<T>;
 
@@ -46,15 +49,20 @@ struct CompatSourceIndex {
   CompatSourceIndex(int count, index_t idx) : data_(make_data(count, idx)) {}
 
   static index_t make_data(int count, index_t idx) {
-    return index_t(count) << 27 | (idx & 0x07ffffff);
+    return index_t(count) << kIndexBits | (idx & kIndexMask);
   }
 
-  constexpr auto count() const { return data_ >> 27; }
-  constexpr auto index() const { return data_ & 0x07ffffff; }
+  constexpr auto count() const { return data_ >> kIndexBits; }
+  constexpr auto index() const { return data_ & kIndexMask; }
 
   auto data() const { return data_; }
 
 private:
+  static constexpr auto kIndexTypeBits = sizeof(index_t) * 8;
+  static constexpr auto kCountBits = std::countr_zero(index_t{kMaxSources});
+  static constexpr auto kIndexBits = kIndexTypeBits - kCountBits;
+  static constexpr auto kIndexMask = (index_t{1} << kIndexBits) - 1;
+
   index_t data_;
 };
 
