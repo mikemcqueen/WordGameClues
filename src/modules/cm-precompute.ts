@@ -205,7 +205,7 @@ const listCandidateCount = (ncList: NameCount.List): number => {
 };
 
 export const preCompute = (first: number, last: number, args: any): boolean => {
-    const maxSum = last;
+    const maxSum = args.load_max;
     const merge_only = args.merge_only || false;
 
     const begin = new Date();
