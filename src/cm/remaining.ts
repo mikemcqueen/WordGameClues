@@ -3,21 +3,25 @@
 import * as Folder from './folder';
 import * as Json from './json';
 import * as Solutions from './solutions';
+import Fs from 'fs-extra';
 const Assert = require('assert');
 
 export type LetterCounts = Int16Array;
+type RemoveLettersResult = {
+    counts?: LetterCounts;
+    failed_at?: string;
+};
 
 const FILE = 'remain.json';
 const LOWER_A = 'a'.charCodeAt(0);
 const LOWER_Z = 'z'.charCodeAt(0);
 
-/*
 export const Options = [
+    [ '', 'from=FILE', 'load remaining letters from FILE instead of ancestor search' ]
 ];
-*/
 
 export const show_help = (): void => {
-    console.log('Usage: node cm remain [WORDS...]');
+    console.log('Usage: node cm remain [--from FILE | from FILE] [WORDS...]');
     console.log('\nDisplay remaining letters, optionally after removing characters from WORDS.');
 };
 
@@ -34,6 +38,12 @@ export const load = (dir: string): string => {
 
 export const load_topmost = (): string => {
     return load(topmost_dir());
+};
+
+const load_file = (filename: string): string => {
+    const s = filename.endsWith('.json') ? Json.load(filename) : Fs.readFileSync(filename, 'utf8');
+    Assert(typeof s === 'string' || s instanceof String, `bad ${filename}`);
+    return s;
 };
 
 const get_ascii_code = (letter: string): number => {
@@ -64,15 +74,15 @@ export const make_letter_counts = (letters: string): LetterCounts => {
     return counts;
 };
 
-export const remove_letters = (counts: LetterCounts, letters: string): LetterCounts|undefined => {
+export const remove_letters = (counts: LetterCounts, letters: string): RemoveLettersResult => {
     let new_counts = counts.slice();
     for (const letter of letters) {
         if (!is_lower_alpha(letter)) continue;
         const idx = get_letter_index(letter);
-        if (!new_counts[idx]) return undefined;
+        if (!new_counts[idx]) return { failed_at: letter };
         new_counts[idx] -= 1;
     }
-    return new_counts;
+    return { counts: new_counts };
 };
 
 export const total_counts = (counts: LetterCounts): number => {
@@ -159,10 +169,11 @@ export const letter_counts = (dir?: string): LetterCounts => {
         const child_dirs = Folder.get_child_dirs(topmost);
         let cur_dir = topmost.slice();
         for (const child_dir of child_dirs) {
-            counts = remove_letters(counts, child_dir)!;
-            if (!counts) {
-                throw new Error(`error removing letters in '${child_dir}'`);
+            const result = remove_letters(counts, child_dir);
+            if (!result.counts) {
+                throw new Error(`error removing letters in '${child_dir}': failed_at '${result.failed_at}'`);
             }
+            counts = result.counts;
         }
     }
     return counts;
@@ -172,14 +183,28 @@ export const letters = (dir?: string, allow_duplicates = true): string => {
     return to_letters(letter_counts(dir), allow_duplicates);
 };
 
+const get_args_and_counts = (args: string[], options: any): [string[], LetterCounts] => {
+    if (options.from !== undefined) {
+        return [args, make_letter_counts(load_file(options.from))];
+    }
+    if (args[0] === 'from') {
+        Assert(args.length > 1, 'missing filename after from');
+        return [args.slice(2), make_letter_counts(load_file(args[1]))];
+    }
+    return [args, letter_counts()];
+};
+
 export const run = (args: string[], options: any): number => {
-    let counts = letter_counts();
-    for (const word of args) {
-        counts = remove_letters(counts, word)!;
-        if (!counts) {
-            console.error(`error removing letters in '${word}'`);
+    let counts: LetterCounts;
+    let words: string[];
+    [words, counts] = get_args_and_counts(args, options);
+    for (const word of words) {
+        const result = remove_letters(counts, word);
+        if (!result.counts) {
+            console.error(`error removing letters in '${word}': failed_at '${result.failed_at}'`);
             return -1;
         }
+        counts = result.counts;
     }
     console.log(to_letters(counts));
     return 0;

@@ -123,10 +123,6 @@ const execute_command = async (cmd: string, args: string[],
         show_help(args);
         return 0;
     }
-    if (opt.argv.length) {
-        console.error(`Unrecognized parameter(s): ${Stringify(opt.argv)}`)
-        return -1;
-    }
     if (options.verbose) {
         console.error(`cmd: ${cmd}, args: ${Stringify(opt.argv)}, options: ${Stringify(options)}`);
     }

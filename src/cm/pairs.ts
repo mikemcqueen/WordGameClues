@@ -329,16 +329,17 @@ const show_pairs_old = (words1: WordList, words2: WordList,
         let remaining = letter_counts;
         // remove letters from remaining for non-solution words
         if (!is_solution_source_id(words1.src_id)) {
-            remaining = Remaining.remove_letters(remaining, word1.str)!;
-            if (!remaining) {
+            const next_remaining = Remaining.remove_letters(remaining, word1.str).counts;
+            if (!next_remaining) {
                 pair_stats.first_invalid++;
                 continue;
             }
+            remaining = next_remaining;
         }
         for (const word2 of words2.words) {
             // remove_letters from remaining for non-solution words must succeed
             if (!is_solution_source_id(words2.src_id) &&
-                !Remaining.remove_letters(remaining, word2.str))
+                !Remaining.remove_letters(remaining, word2.str).counts)
             {
                 pair_stats.second_invalid++;
                 continue;
@@ -362,17 +363,18 @@ const show_pairs = (words1: WordList, words2: WordList,
         let remaining = letter_counts;
         // remove letters from remaining for non-solution words
         if (!is_solution_source_id(words1.src_id)) {
-            remaining = Remaining.remove_letters(remaining, word1.str)!;
-            if (!remaining) {
+            const next_remaining = Remaining.remove_letters(remaining, word1.str).counts;
+            if (!next_remaining) {
                 pair_stats.first_invalid++;
                 continue;
             }
+            remaining = next_remaining;
         }
         used_words.add(word1.str);
         for (const word2 of words2.words) {
             // remove_letters from remaining for non-solution words must succeed
             if (!is_solution_source_id(words2.src_id) &&
-                !Remaining.remove_letters(remaining, word2.str))
+                !Remaining.remove_letters(remaining, word2.str).counts)
             {
                 pair_stats.second_invalid++;
                 continue;

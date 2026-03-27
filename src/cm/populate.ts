@@ -12,7 +12,7 @@ const enum_directories = (primary_words: string[], secondary_words: string[],
     let any_appended = false;
     for (let i = 0; i < primary_words.length; ++i) {
         let word = primary_words[i];
-        const new_remaining = Remaining.remove_letters(remaining, word);
+        const new_remaining = Remaining.remove_letters(remaining, word).counts;
         if (!new_remaining) continue;
         any_appended = true;
         const dir = base_dir + word;
