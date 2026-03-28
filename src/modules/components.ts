@@ -72,16 +72,142 @@ const pre_compute = (name_list: string[], quiet: boolean, options: any): boolean
     return PreCompute.preCompute(pc_args);
 }
 
+const pre_compute_nc_data_lists = (name_list: string[], quiet: boolean, options: any):
+    PreCompute.NCDataList[] =>
+{
+    const min_sources = 2;
+    const pc_args = {
+        xor: name_list,
+        merge_only: true,
+        min_sources,
+        quiet,
+        load_max: options.load_max,
+        verbose: options.verbose,
+        ignoreErrors: options.ignoreErrors
+    };
+    return PreCompute.buildUseNcDataLists(name_list, options.load_max, pc_args);
+};
+
+const normalizeTestList = (test: string|string[]): string[] => {
+    return Array.isArray(test) ? test : [test];
+};
+
+const normalizeNameList = (test: string): string[] => {
+    return test.split(',').sort();
+};
+
+type TestGroup = {
+    blockLength: number;
+    ncDataLists: PreCompute.NCDataList[];
+    test: string;
+};
+
+const combineNcDataLists = (left: PreCompute.NCDataList[],
+    right: PreCompute.NCDataList[]): PreCompute.NCDataList[] =>
+{
+    const result: PreCompute.NCDataList[] = [];
+    for (const leftNcDataList of left) {
+        for (const rightNcDataList of right) {
+            result.push([...leftNcDataList, ...rightNcDataList]);
+        }
+    }
+    return result;
+};
+
+const formatGroupedNcList = (ncList: NameCount.List, blockLengths: number[]): string => {
+    let index = 0;
+    const blocks = blockLengths.map(blockLength => {
+        const block = ncList.slice(index, index + blockLength);
+        index += blockLength;
+        return `[${NameCount.listToString(block)}]`;
+    });
+    return blocks.join(' ');
+};
+
+type CompatibleResult = {
+    text: string;
+    total: number;
+};
+
+const showCombinedCompatibility = (testList: string[], options: any): number => {
+    if (options.add || options.remove) {
+        throw new Error('multiple -t values do not support --add/--remove');
+    }
+
+    const groups: TestGroup[] = testList.map(test => {
+        const name_list = normalizeNameList(test);
+        console.log(`test: ${test}, fast=${options.fast}`);
+        const ncDataLists = pre_compute_nc_data_lists(name_list, options.quiet, options);
+        if (_.isEmpty(ncDataLists)) {
+            throw new Error(`Precompute failed for ${test}`);
+        }
+        return {
+            blockLength: name_list.length,
+            ncDataLists,
+            test
+        };
+    });
+
+    let mergedNcDataLists = groups[0].ncDataLists;
+    for (let i = 1; i < groups.length; ++i) {
+        mergedNcDataLists = combineNcDataLists(mergedNcDataLists, groups[i].ncDataLists);
+    }
+
+    const compatible = Native.mergeCompatibleXorSourceCombinations(mergedNcDataLists, true);
+    if (!compatible) {
+        console.error(`compatible combinations: 0`);
+        return 0;
+    }
+
+    const mergedNcLists: NameCount.List[] = Native.getUniqueMergedXorSourceNcLists();
+    const totalNcCount = mergedNcLists.reduce((sum, ncList) => sum + ncList.length, 0);
+    console.error(`merged ncLists(${mergedNcLists.length}), total nc count(${totalNcCount})`);
+    const blockLengths = groups.map(group => group.blockLength);
+    const results: CompatibleResult[] = [];
+    for (const ncList of mergedNcLists) {
+        results.push({
+            total: NameCount.listCountSum(ncList),
+            text: formatGroupedNcList(ncList, blockLengths)
+        });
+    }
+
+    results.sort((a, b) => {
+        if (a.total !== b.total) return a.total - b.total;
+        return a.text.localeCompare(b.text);
+    });
+
+    let lastTotal: number|undefined;
+    for (const result of results) {
+        const prefix = `${result.total} VALID as `;
+        if (result.total !== lastTotal) {
+            console.log(`${prefix}${result.text}`);
+            lastTotal = result.total;
+        } else {
+            console.log(`${' '.repeat(prefix.length)}${result.text}`);
+        }
+    }
+    console.error(`compatible combinations: ${results.length}`);
+    return results.length;
+};
+
 export const show = (options: any): any => {
     Expect(options).is.an.Object();
-    Expect(options.test).is.a.String();
+    Expect(options.test).is.ok();
     if (options.reject) {
         Expect(options.add).is.undefined();
     }
     options.fast = true; // force fast // TODO: probably unnecessary
-    console.log(`test: ${options.test}, fast=${options.fast}`);
 
-    const name_list = options.test.split(',').sort();
+    const testList = normalizeTestList(options.test);
+    if (testList.length > 1) {
+        return showCombinedCompatibility(testList, options);
+    }
+
+    const test = testList[0];
+    Expect(test).is.a.String();
+    console.log(`test: ${test}, fast=${options.fast}`);
+
+    const name_list = normalizeNameList(test);
     const result = pre_compute(name_list, options.quiet, options);
     if (result) {
         const counts = Native.showComponents(name_list);

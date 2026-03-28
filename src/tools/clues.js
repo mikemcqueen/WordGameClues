@@ -51,7 +51,7 @@ const CmdLineOptions = Opt.create(_.concat(Clues.Options, [
 //  ['',  'csv',                               '  output in search-term csv format' ],
 //  ['',  'files',                             '  output in result file full-path format' ],
     ['s', 'show-sources=NAME[:COUNT][,v]',     'show primary source combos for the specified NAME[:COUNT]' ],
-    ['t', 'test=SOURCE[,SOURCE,...]',          'test the specified source list, e.g. blue,fish' ],
+    ['t', 'test=SOURCE[,SOURCE,...]+',         'test the specified source list; repeat -t for multiple groups, e.g. -t blue,fish -t red,bird' ],
     ['',  'add=NAME',                          '  add compound clue NAME=SOURCE; use with --test' ],
     ['',  'remove=NAME',                       '  remove compound clue NAME=SOURCE; use with --test' ],
     ['',  'property=PROP',                     '    add PROP:true, or remove PROP from existing compound clues' +

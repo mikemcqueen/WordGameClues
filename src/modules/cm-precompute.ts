@@ -36,11 +36,11 @@ export interface Result {
 }
 */
 
-interface NCData {
+export interface NCData {
     ncList: NameCount.List;
     name: string;
 }
-type NCDataList = NCData[];
+export type NCDataList = NCData[];
 
 //////////
 
@@ -162,11 +162,12 @@ const displayCombinationNcLists = (combinationNcLists: NameCount.List[][]): void
     console.error(' ]');
 };
 
-const buildAllUseNcDataLists = (listName: string, maxSum: number, args: any): NCDataList[] => {
-    const useArgsList: string[] = args[listName];
+export const buildUseNcDataLists = (useArgsList: string[], maxSum: number,
+    args: any): NCDataList[] =>
+{
     Assert(useArgsList);
     if (args.verbose) {
-        console.error(`buildAllUseNcDataLists(${listName}), useArgList(${useArgsList.length})` +
+        console.error(`buildUseNcDataLists(useArgList(${useArgsList.length})` +
             `, maxSum(${maxSum})`);
     }
     const combinationNcLists = getCombinationNcLists(useArgsList);
@@ -193,6 +194,10 @@ const buildAllUseNcDataLists = (listName: string, maxSum: number, args: any): NC
         console.error(` filtered ncDataLists(${result.length}) - ${PrettyMs(d)}`);
     }
     return result;
+};
+
+const buildAllUseNcDataLists = (listName: string, maxSum: number, args: any): NCDataList[] => {
+    return buildUseNcDataLists(args[listName], maxSum, args);
 };
 
 const hasCandidate = (nc: NameCount.Type): boolean => { return nc.count >= 1_000_000; }

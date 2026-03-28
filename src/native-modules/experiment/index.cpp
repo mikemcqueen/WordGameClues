@@ -8,6 +8,7 @@
 #include <string>
 #include <stacktrace>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 #include "candidates.h"
 #include "clue-manager.h"
@@ -51,6 +52,19 @@ using namespace cm::validator;
 FilterData MFD;
 
 // functions
+
+auto extract_unique_nc_lists(const SourceList& src_list) {
+  std::unordered_set<std::string> seen;
+  std::vector<NameCountList> result;
+  result.reserve(src_list.size());
+  for (const auto& src : src_list) {
+    const auto key = NameCount::listToString(src.ncList);
+    if (seen.contains(key)) continue;
+    seen.insert(key);
+    result.push_back(src.ncList);
+  }
+  return result;
+}
 
 //
 // Clue-manager
@@ -522,6 +536,25 @@ Value showComponents(const CallbackInfo& info) {
   }
 }
 
+Value getMergedXorSourceNcLists(const CallbackInfo& info) {
+  Env env = info.Env();
+  Array result = Array::New(env, MFD.host_xor.merged_xor_src_list.size());
+  for (uint32_t i{}; i < MFD.host_xor.merged_xor_src_list.size(); ++i) {
+    result.Set(i, wrap(env, MFD.host_xor.merged_xor_src_list[i].ncList));
+  }
+  return result;
+}
+
+Value getUniqueMergedXorSourceNcLists(const CallbackInfo& info) {
+  Env env = info.Env();
+  const auto unique_nc_lists = extract_unique_nc_lists(MFD.host_xor.merged_xor_src_list);
+  Array result = Array::New(env, unique_nc_lists.size());
+  for (uint32_t i{}; i < unique_nc_lists.size(); ++i) {
+    result.Set(i, wrap(env, unique_nc_lists[i]));
+  }
+  return result;
+}
+
 Value checkClueConsistency(const CallbackInfo& info) {
   Env env = info.Env();
   if (!info[0].IsArray() || !info[1].IsNumber() || !info[2].IsNumber()) {
@@ -731,6 +764,10 @@ Object Init(Env env, Object exports) {
   // components
   //
   exports["showComponents"] = Function::New(env, showComponents);
+  exports["getMergedXorSourceNcLists"] = Function::New(env,
+      getMergedXorSourceNcLists);
+  exports["getUniqueMergedXorSourceNcLists"] = Function::New(env,
+      getUniqueMergedXorSourceNcLists);
   exports["checkClueConsistency"] = Function::New(env, checkClueConsistency);
   exports["getConsistencyCheckResults"] = Function::New(env,
       getConsistencyCheckResults);
