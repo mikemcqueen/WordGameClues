@@ -66,6 +66,11 @@ auto add_show_result_for_sources(const std::string& sources_csv,
       results.valid.emplace_back(counts);
     }
     return true;
+  } else if (counts.size() > 1u) {
+    // For multi-source tests, sums beyond loaded clue data should still be shown
+    // as compatible/VALID rather than being suppressed.
+    results.valid.emplace_back(counts);
+    return true;
   }
   if (log_level(Verbose)) {
     std::cerr << "!knownSourceMap(" << sum << "), sources: " << sources_csv
@@ -146,10 +151,26 @@ void display(const std::vector<NamesAndCounts>& names_counts_list,
 
 void display_show_results(
     const std::vector<std::string>& name_list, const ShowResults& results) {
+  auto valid = results.valid;
+  const auto max_loaded_count = clue_manager::get_max_loaded_count();
+  std::ranges::sort(valid, [](const std::vector<int>& a,
+                              const std::vector<int>& b) {
+    const auto sum_a = util::sum(a);
+    const auto sum_b = util::sum(b);
+    if (sum_a != sum_b) return sum_a < sum_b;
+    return a < b;
+  });
   display(results.invalid, "INVALID");
   display(results.known, "PRESENT as", name_list);
   display(results.clues, "PRESENT as clue with source:", name_list);
-  display(results.valid, "VALID");
+  bool sep_shown = false;
+  for (const auto& count_list : valid) {
+    if (!sep_shown && util::sum(count_list) > max_loaded_count) {
+      std::cout << "---" << std::endl;
+      sep_shown = true;
+    }
+    display(count_list, "VALID");
+  }
 }
 
 using opt_str_set_cref_t =
