@@ -4,6 +4,7 @@ import * as Json from './json';
 import * as Remaining from "./remaining";
 import * as Solutions from "./solutions";
 import { stringify as Stringify } from 'javascript-stringify';
+import * as _ from 'lodash';
 const Assert = require('assert');
 const Events = require('events');
 const Fs = require('fs');
@@ -14,18 +15,19 @@ export const Options = [
     [ 'w', 'words',              'use words from words.json' ],
     [ 'l', 'with-letter=LETTER', '  containing LETTER' ],
     [ 'c', 'letter-counts',      '  calculate pair-counts for words containing each remaining letter' ],
-    [ 's', 'single-solutions',   'use single-word solution words' ],
-    [ 'm', 'multi-solutions',    'use multi-word solution words' ],
+    [ '',  'single-solutions',   'use single-word solution words' ],
+    [ '',  'multi-solutions',    'use multi-word solution words' ],
     [ 'a', 'all-solutions',      'use all solutions words' ],
     [ 'f', 'file=JSON+',         'use words from JSON file' ],
+    [ 'm', 'min=COUNT',          'minimum length for words from words.json or --file' ],
+    [ 'x', 'max=COUNT',          'maximum length for words from words.json or --file' ],
     [ 'o', 'old',                'use old method (build set of all pairs)' ],
     [ 'p', 'flip',               'flip order of the two word lists' ],
     [ '',  'analyze=FILE',       'analyze pairs in text FILE. current only and default option is 2nd word frequency' ]
 ];
 
 export const show_help = (): void => {
-    // TODO: updatee
-    console.log('Usage (outdated): node cm pairs [-w] [-s] [-m] [-a] [-f FILE]...');
+    console.log('Usage: node cm pairs [-w] [--single-solutions] [--multi-solutions] [-a] [-f FILE]... [-m COUNT] [-x COUNT]');
     console.log('\nGenerate pairs from words in words.json, solutions.json, and/or another words file.');
 };
 
@@ -160,15 +162,21 @@ const validate_word_list = (words: WordType[]): boolean => {
     return true;
 }
 
-const get_word_list = (src_id: number, filename?: string): WordList => {
+const filter_word_strings = (words: string[], options: any): string[] => {
+    return words.filter(word =>
+        (!options.min || (word.length >= options.min)) &&
+        (!options.max || (word.length <= options.max)));
+};
+
+const get_word_list = (src_id: number, options: any, filename?: string): WordList => {
     let words: WordType[] = [];
     switch (src_id) {
         case WordSourceId.Words:
-            words = list_from_strings(Json.load('words.json'));
+            words = list_from_strings(filter_word_strings(Json.load('words.json'), options));
             break;
         case WordSourceId.File:
             Assert(filename);
-            words = list_from_strings(Json.load(filename!));
+            words = list_from_strings(filter_word_strings(Json.load(filename!), options));
             break;
         case WordSourceId.SingleSolutions:
         case WordSourceId.MultiSolutions:
@@ -188,7 +196,7 @@ const get_word_lists = (src_ids: number[], options: any): WordList[] => {
     let word_lists: WordList[] = [];
     let filename_idx = 0;
     for (const src_id of src_ids) {
-        const list = get_word_list(src_id, options.file?.[filename_idx]);
+        const list = get_word_list(src_id, options, options.file?.[filename_idx]);
         word_lists.push(list);
         if (src_id === WordSourceId.File) ++filename_idx;
     }
@@ -399,7 +407,7 @@ const show_letter_counts = (letter_counts: Remaining.LetterCounts): void => {
     let map = new Map<string, LetterCountData>;
     const letters = Remaining.to_letters(letter_counts, false);
     for (const letter of letters) {
-        const words2 = get_word_list(WordSourceId.Words);
+        const words2 = get_word_list(WordSourceId.Words, {});
         const words1 = {
             src_id: words2.src_id,
             words:  words2.words.filter(word => word.str.includes(letter))
@@ -485,6 +493,17 @@ const show_2nd_word_frequency = (filename: string): Promise<number> => {
 };
 
 export const run = (args: string[], options: any): Promise<number> => {
+    options.min = options.min === undefined ? 0 : _.toNumber(options.min);
+    options.max = options.max === undefined ? 0 : _.toNumber(options.max);
+    if (Number.isNaN(options.min) || (options.min < 0)) {
+        throw new Error(`Option --min must be a non-negative number. (${options.min})`);
+    }
+    if (Number.isNaN(options.max) || (options.max < 0)) {
+        throw new Error(`Option --max must be a non-negative number. (${options.max})`);
+    }
+    if (options.min && options.max && (options.min > options.max)) {
+        throw new Error(`Option --min may not be greater than --max. (${options.min} > ${options.max})`);
+    }
     if (options['letter-counts']) {
         show_letter_counts(Remaining.letter_counts());
         return Promise.resolve(0);
