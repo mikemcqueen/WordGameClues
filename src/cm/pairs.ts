@@ -14,6 +14,7 @@ const StringifyObj = require("stringify-object");
 export const Options = [
     [ 'w', 'words',              'use words from words.json' ],
     [ 'l', 'with-letter=LETTER', '  containing LETTER' ],
+    [ '',  'with=WORD',          'generate pairs with WORD' ],
     [ 'c', 'letter-counts',      '  calculate pair-counts for words containing each remaining letter' ],
     [ '',  'single-solutions',   'use single-word solution words' ],
     [ '',  'multi-solutions',    'use multi-word solution words' ],
@@ -27,7 +28,7 @@ export const Options = [
 ];
 
 export const show_help = (): void => {
-    console.log('Usage: node cm pairs [-w] [--single-solutions] [--multi-solutions] [-a] [-f FILE]... [-m COUNT] [-x COUNT]');
+    console.log('Usage: node cm pairs [-w] [--single-solutions] [--multi-solutions] [-a] [-f FILE]... [-m COUNT] [-x COUNT] [--with WORD]');
     console.log('\nGenerate pairs from words in words.json, solutions.json, and/or another words file.');
 };
 
@@ -212,8 +213,15 @@ const get_word_lists = (src_ids: number[], options: any): WordList[] => {
         flip_order = !flip_order;
     }
     if (word_lists.length === 1) {
-        // use same list twice
-        word_lists.push(word_lists[0]);
+        if (options.with) {
+            word_lists.unshift({
+                src_id: WordSourceId.Words,
+                words: [{ str: options.with }]
+            });
+        } else {
+            // use same list twice
+            word_lists.push(word_lists[0]);
+        }
     } else if (word_lists.length === 2) {
         if ((word_lists[0].src_id === WordSourceId.Words)
             && (word_lists[1].src_id !== WordSourceId.Words)) {
@@ -446,6 +454,14 @@ const validate_source_ids = (src_ids: number[], options: any): boolean => {
         console.error(`Option --with-letter may not be combined with any other word-source option`);
         return false;
     }
+    if (options.with && options['with-letter']) {
+        console.error(`Option --with may not be combined with option --with-letter`);
+        return false;
+    }
+    if (options.with && (src_ids.length > 1)) {
+        console.error(`Option --with may only be combined with a single word source`);
+        return false;
+    }
     return true;
 };
 
@@ -510,6 +526,13 @@ export const run = (args: string[], options: any): Promise<number> => {
     }
     if (options['analyze']) {
         return show_2nd_word_frequency(options.analyze);
+    }
+    if (options.with) {
+        const result = Remaining.remove_letters(Remaining.letter_counts(), options.with);
+        if (!result.counts) {
+            console.error(`error removing letters in '${options.with}': failed_at '${result.failed_at}'`);
+            return Promise.resolve(-1);
+        }
     }
     if (!validate_options(options)) return Promise.resolve(-1);
     const src_ids = get_word_source_ids(options);
