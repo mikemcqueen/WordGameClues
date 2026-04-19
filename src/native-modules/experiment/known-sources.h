@@ -156,12 +156,9 @@ public:
   static auto make_src_compat_cref_list(const std::string& name, int count)
       -> SourceCompatCRefList;
 
-  // THE RECONSTRUCTION POINT: Convert compact DeferredSourceData to full SourceData
-  static SourceData reconstruct(const DeferredSourceData& combo);
-
-  // Minimal reconstruction: only populates ncList from combo.nc
-  // Use when only ncList is needed (e.g., merge_only path)
-  static SourceData reconstruct_nclist(const DeferredSourceData& combo);
+  static const SourceData& get_primary_source(const NameCountIndex& ref);
+  static const DeferredSourceData& get_deferred_source(
+      const NameCountIndex& ref);
 
   // TODO: i think this can be eliminated; check src/tools/todo
   static bool add_compound_clue(const NameCount& nc,

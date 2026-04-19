@@ -1,6 +1,7 @@
 #include <experimental/scope>
 #include <chrono>
 #include <iostream>
+#include "deferred-source.h"
 #include "merge.cuh"
 #include "merge.h"
 #include "merge-filter-common.h"
@@ -652,45 +653,6 @@ auto cuda_get_compatible_indices(
   return compat_indices;
 }
 
-// THE RECONSTRUCTION POINT: Convert DeferredSourceData to full SourceData
-XorSource merge_sources(const std::vector<index_t>& combo_indices,
-    const std::vector<DeferredSourceDataList>& combo_lists) {
-  NameCountList primaryNameSrcList{};
-  NameCountList ncList{};
-  UsedSources usedSources{};
-  for (size_t i{}; i < combo_indices.size(); ++i) {
-    const auto& combo_src = combo_lists.at(i).at(combo_indices.at(i));
-    // Reconstruct DeferredSourceData to get full SourceData.
-    const auto src = KnownSources::reconstruct(combo_src);
-    // Append/merge data from reconsructed source
-    const auto& pnsl = src.primaryNameSrcList;
-    primaryNameSrcList.insert(primaryNameSrcList.end(), pnsl.begin(),
-        pnsl.end());
-    const auto& ncl = src.ncList;
-    ncList.insert(ncList.end(), ncl.begin(), ncl.end());
-    usedSources.mergeInPlace(combo_src.usedSources);
-  }
-  assert(!primaryNameSrcList.empty() && !ncList.empty() && "empty ncList");
-  return {
-      std::move(primaryNameSrcList), std::move(ncList), std::move(usedSources)};
-}
-
-// Minimal merge: only populates ncList directly from combo.nc
-// Skips all recursive parent tree traversal
-XorSource merge_sources_minimal(const std::vector<index_t>& combo_indices,
-    const std::vector<DeferredSourceDataList>& combo_lists) {
-  NameCountList ncList{};
-  UsedSources usedSources{};
-  for (size_t i{}; i < combo_indices.size(); ++i) {
-    const auto& combo = combo_lists.at(i).at(combo_indices.at(i));
-    // Direct access to nc - no reconstruction needed
-    ncList.emplace_back(combo.nc.name, combo.nc.count);
-    usedSources.mergeInPlace(combo.usedSources);
-  }
-  assert(!ncList.empty() && "empty ncList");
-  return {NameCountList{}, std::move(ncList), std::move(usedSources)};
-}
-
 auto xor_merge_sources(const std::vector<DeferredSourceDataList>& combo_lists,
     const std::vector<IndexList>& idx_lists,
     const std::vector<fat_index_t>& compat_flat_indices) -> XorSourceList {
@@ -701,7 +663,8 @@ auto xor_merge_sources(const std::vector<DeferredSourceDataList>& combo_lists,
   auto t = util::Timer::start_timer();
   for (auto flat_idx : compat_flat_indices) {
     auto combo_indices = get_src_indices(flat_idx, idx_lists);
-    xorSourceList.emplace_back(merge_sources(combo_indices, combo_lists));
+    xorSourceList.emplace_back(
+        deferred_source::materialize_selected(combo_indices, combo_lists));
   }
   if (log_level(Verbose)) {
     t.stop();
@@ -722,7 +685,9 @@ auto xor_merge_sources_minimal(
   auto t = util::Timer::start_timer();
   for (auto flat_idx : compat_flat_indices) {
     auto combo_indices = get_src_indices(flat_idx, idx_lists);
-    xorSourceList.emplace_back(merge_sources_minimal(combo_indices, combo_lists));
+    xorSourceList.emplace_back(deferred_source::materialize_selected(
+        combo_indices, combo_lists,
+        deferred_source::MaterializeMode::NcListOnly));
   }
   if (log_level(Verbose)) {
     t.stop();

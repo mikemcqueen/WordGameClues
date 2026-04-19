@@ -4,6 +4,7 @@
 #include <string>
 #include <unordered_set>
 #include <vector>
+#include "base-types.h"
 #include "source-compat.h"
 
 namespace cm {
@@ -85,7 +86,7 @@ struct NameCount {
 
 struct NameCountIndex {
   NameCount nc{"", 0};
-  int index{};
+  index_t index{};
 };
 
 using NameCountIndexList = std::vector<NameCountIndex>;

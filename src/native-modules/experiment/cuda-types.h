@@ -3,7 +3,6 @@
 #include <bit>
 #include <cassert>
 #include <cmath>
-#include <cstdint>
 #include <functional>
 #include <iostream>
 #include <span>
@@ -13,6 +12,7 @@
 #include <utility>
 #include <vector>
 #include <cuda_runtime.h>
+#include "base-types.h"
 #include "variations.h"
 
 namespace cm {
@@ -24,17 +24,10 @@ constexpr auto kMaxStreams = kMaxSwarms * 3;  // 3 streams per swarm
 // aliases
 
 using result_t = uint8_t;
-using index_t = uint32_t;
-using fat_index_t = uint64_t;
 using atomic64_t = unsigned long long int;
 
-static_assert(std::has_single_bit(index_t{kMaxSources}),
+static_assert(std::has_single_bit(kMaxSources),
     "kMaxSources must be a power of two");
-
-template <typename T> using IndexListBase = std::vector<T>;
-
-using IndexList = IndexListBase<index_t>;
-using FatIndexList = IndexListBase<fat_index_t>;
 
 using IndexSpan = std::span<const index_t>;
 using IndexSpanPair = std::pair<IndexSpan, IndexSpan>;

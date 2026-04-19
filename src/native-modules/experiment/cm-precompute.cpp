@@ -6,6 +6,7 @@
 #include <unordered_set>
 #include <vector>
 #include "cm-precompute.h"
+#include "deferred-source.h"
 #include "known-sources.h"
 #include "log.h"
 #include "util.h"
@@ -14,34 +15,6 @@
 namespace cm {
 
 namespace {
-
-// Create a DeferredSourceData wrapper for a primary SourceData.
-// The deferred source has a single reconstruction reference to the primary.
-DeferredSourceData make_combo_from_primary(const SourceData& src,
-    const std::string& name,
-    int idx) {
-  DeferredSourceData deferred_source;
-  deferred_source.usedSources = src.usedSources;
-  deferred_source.known_nci_list = {{{name, 1}, idx}};
-  deferred_source.nc = src.ncList.at(0);
-  return deferred_source;
-}
-
-// Merge two DeferredSourceData values into a new DeferredSourceData.
-// Only merges compat data and combines reconstruction refs.
-DeferredSourceData mergeSourceCombos(const DeferredSourceData& combo1,
-    const DeferredSourceData& combo2) {
-  DeferredSourceData result;
-  result.usedSources = combo1.usedSources.copyMerge(combo2.usedSources);
-  result.known_nci_list = combo1.known_nci_list;
-  result.known_nci_list.insert(result.known_nci_list.end(),
-      combo2.known_nci_list.begin(), combo2.known_nci_list.end());
-  // The merged deferred source's NC combines the counts
-  // (though this isn't used for filtering, just for tracking)
-  // TODO: what
-  result.nc = NameCount("merged", combo1.nc.count + combo2.nc.count);
-  return result;
-}
 
 // Get DeferredSourceDataList for an NC.
 // For count == 1, wraps primaries in DeferredSourceData.
@@ -53,7 +26,7 @@ auto get_combo_list_for_nc(const NameCount& nc) -> DeferredSourceDataList {
     int idx{};
     KnownSources::for_each_primary_source(nc.name,
         [&result, &nc, &idx](const SourceData& src, index_t) {
-          result.push_back(make_combo_from_primary(src, nc.name, idx));
+          result.push_back(deferred_source::from_primary(src, nc.name, idx));
           ++idx;
         });
   } else {
@@ -73,7 +46,7 @@ auto mergeCompatibleComboLists(
   for (const auto& combo1 : combo_list1) {
     for (const auto& combo2 : combo_list2) {
       if (combo1.isXorCompatibleWith(combo2)) {
-        result.push_back(mergeSourceCombos(combo1, combo2));
+        result.push_back(deferred_source::combine(combo1, combo2));
       }
     }
   }

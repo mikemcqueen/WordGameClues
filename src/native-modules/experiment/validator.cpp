@@ -23,10 +23,10 @@ auto validate_source_names_at_counts(const std::string& clue_name,
   // to bite the bullet and merge sources in lists 0,1 then then merge the
   // resulting list with sources from list 2, and so on.
   DeferredSourceDataList combo_list;
-  int idx0{};
+  index_t idx0{};
   for (const auto src_cref0 : src_crefs0) {
     const auto& src0 = src_cref0.get();
-    int idx1{};
+    index_t idx1{};
     for (const auto src_cref1 : src_crefs1) {
       const auto& src1 = src_cref1.get();
       if (src0.isXorCompatibleWith(src1)) {

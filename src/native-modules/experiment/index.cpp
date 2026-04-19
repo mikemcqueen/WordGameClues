@@ -14,6 +14,7 @@
 #include "clue-manager.h"
 #include "combo-maker.h"
 #include "cm-precompute.h"
+#include "deferred-source.h"
 #include "dump.h"
 #include "filter.cuh"
 #include "filter.h"
@@ -327,7 +328,8 @@ Value mergeCompatibleXorSourceCombinations(const CallbackInfo& info) {
       // Single list: minimal reconstruct - only ncList needed
       SourceList result;
       for (const auto& combo : xor_src_lists.back()) {
-        result.push_back(KnownSources::reconstruct_nclist(combo));
+        result.push_back(deferred_source::materialize(
+            combo, deferred_source::MaterializeMode::NcListOnly));
       }
       MFD.host_xor.merged_xor_src_list = std::move(result);
     }
@@ -716,7 +718,7 @@ Value getSourceListsForNc(const CallbackInfo& info) {
           Array::New(env, combo_entry.src_combo_list.size());
       for (uint32_t j{}; j < combo_entry.src_combo_list.size(); ++j) {
         const auto& combo = combo_entry.src_combo_list[j];
-        src_list.push_back(KnownSources::reconstruct(combo));
+        src_list.push_back(deferred_source::materialize(combo));
         Array ncList = Array::New(env, combo.known_nci_list.size());
         for (uint32_t k{}; k < combo.known_nci_list.size(); ++k) {
           const auto& known_nci = combo.known_nci_list[k];

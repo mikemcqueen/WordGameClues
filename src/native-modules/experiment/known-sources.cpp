@@ -10,14 +10,12 @@
 
 namespace cm {
 
-namespace {
-
-// Helper to get a specific primary source by reconstruction reference.
-const SourceData& get_primary_source_by_ref(const NameCountIndex& ref) {
+/*static*/ const SourceData& KnownSources::get_primary_source(
+    const NameCountIndex& ref) {
   assert(ref.nc.count == 1 && "get_primary_source_by_ref: only count==1 supported");
   const SourceData* result = nullptr;
   KnownSources::for_each_primary_source(ref.nc.name,
-      [&](const SourceData& src, int idx) {
+      [&](const SourceData& src, index_t idx) {
         if (idx == ref.index) {
           result = &src;
         }
@@ -31,8 +29,8 @@ const SourceData& get_primary_source_by_ref(const NameCountIndex& ref) {
   return *result;
 }
 
-// Helper to get deferred-source data by reconstruction reference.
-const DeferredSourceData& get_combo_source_by_ref(const NameCountIndex& ref) {
+/*static*/ const DeferredSourceData& KnownSources::get_deferred_source(
+    const NameCountIndex& ref) {
   if (ref.nc.count <= 1) {
     std::cerr << "ERROR: get_combo_source_by_ref called with invalid count: "
               << ref.nc.count << ", name: " << ref.nc.name << ", idx: "
@@ -41,7 +39,7 @@ const DeferredSourceData& get_combo_source_by_ref(const NameCountIndex& ref) {
   assert(ref.nc.count > 1 && "get_combo_source_by_ref: only count>1 supported");
   const DeferredSourceData* result = nullptr;
   KnownSources::for_each_combo_source(ref.nc.name, ref.nc.count,
-      [&](const DeferredSourceData& combo, int idx) {
+      [&](const DeferredSourceData& combo, index_t idx) {
         if (idx == ref.index) {
           result = &combo;
         }
@@ -54,46 +52,6 @@ const DeferredSourceData& get_combo_source_by_ref(const NameCountIndex& ref) {
   assert(result != nullptr);
   return *result;
 }
-
-// Recursively collect primaryNameSrcList from DeferredSourceData.
-void collect_primary_name_src_list(const DeferredSourceData& combo,
-    NameCountList& result) {
-  for (const auto& known_nci : combo.known_nci_list) {
-    if (known_nci.nc.count <= 0) {
-      std::cerr << "ERROR: collect_primary_name_src_list: invalid count: "
-                << known_nci.nc.count << ", name: " << known_nci.nc.name
-                << ", idx: " << known_nci.index << std::endl;
-      assert(false && "invalid known_nci count");
-    }
-    if (known_nci.nc.count == 1) {
-      // Base case: primary source has full data
-      const auto& primary = get_primary_source_by_ref(known_nci);
-      result.insert(result.end(), primary.primaryNameSrcList.begin(),
-          primary.primaryNameSrcList.end());
-    } else {
-      const auto& parent_combo = get_combo_source_by_ref(known_nci);
-      collect_primary_name_src_list(parent_combo, result);
-    }
-  }
-}
-
-// Recursively collect nc_names from DeferredSourceData.
-void collect_nc_names(const DeferredSourceData& combo, std::set<std::string>& result) {
-  for (const auto& known_nci : combo.known_nci_list) {
-    if (known_nci.nc.count == 1) {
-      // Base case: primary source has nc_names
-      const auto& primary = get_primary_source_by_ref(known_nci);
-      result.insert(primary.nc_names.begin(), primary.nc_names.end());
-    } else {
-      const auto& parent_combo = get_combo_source_by_ref(known_nci);
-      collect_nc_names(parent_combo, result);
-    }
-  }
-  // Include this deferred source's clue name.
-  result.insert(combo.nc.name);
-}
-
-}  // anonymous namespace
 
 // Make a SourceList from primary sources (count == 1 only)
 /*static*/ auto KnownSources::make_src_list(const NameCount& nc) -> SourceList {
@@ -127,36 +85,6 @@ void collect_nc_names(const DeferredSourceData& combo, std::set<std::string>& re
         compat_crefs.push_back(std::cref(src));
       });
   return compat_crefs;
-}
-
-// THE RECONSTRUCTION POINT: Convert compact DeferredSourceData to full SourceData
-/*static*/ SourceData KnownSources::reconstruct(const DeferredSourceData& combo) {
-  // Build primaryNameSrcList by traversing the reconstruction tree.
-  NameCountList primaryNameSrcList;
-  collect_primary_name_src_list(combo, primaryNameSrcList);
-
-  // Build ncList from the combo's NC
-  NameCountList ncList;
-  ncList.emplace_back(combo.nc.name, combo.nc.count);
-
-  // Build nc_names by collecting all names from known sources + this clue name.
-  std::set<std::string> nc_names;
-  collect_nc_names(combo, nc_names);
-
-  return SourceData(combo.usedSources, std::move(primaryNameSrcList),
-      std::move(ncList), std::move(nc_names));
-}
-
-// Minimal reconstruction: only populates ncList from combo.nc.
-// Skips all recursive reconstruction tree traversal.
-/*static*/ SourceData KnownSources::reconstruct_nclist(
-    const DeferredSourceData& combo) {
-  NameCountList ncList;
-  ncList.emplace_back(combo.nc.name, combo.nc.count);
-  return SourceData(combo.usedSources,
-      NameCountList{},  // empty primaryNameSrcList
-      std::move(ncList),
-      std::set<std::string>{});  // empty nc_names
 }
 
 // NB: NOT threadsafe (but shouldn't matter)

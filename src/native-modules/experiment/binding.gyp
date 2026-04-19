@@ -39,6 +39,7 @@
       'cm-precompute.cpp',
       'combo-maker.cpp',
       'components.cpp',
+      'deferred-source.cpp',
       'cuda-common.cpp',
       'filter-stream.cpp',
       'filter-support.cpp',
