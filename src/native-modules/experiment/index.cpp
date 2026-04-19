@@ -200,7 +200,7 @@ Value validateSources(const CallbackInfo& info) {
   validate_ns += t.nanoseconds();
   const auto is_valid = !combo_list.empty();
   if (validate_all && is_valid) {
-    KnownSources::get().init_combo_entry(sum, util::join(src_names, ","),
+    KnownSources::get().init_compound_entry(sum, util::join(src_names, ","),
         std::move(combo_list));
   }
   return Boolean::New(env, is_valid);
@@ -712,12 +712,12 @@ Value getSourceListsForNc(const CallbackInfo& info) {
       jsNcLists.Set(i, ncList);
     } else {
       const auto& combo_entry =
-          KnownSources::get().get_combo_entry(nc.count, sources[i]);
+          KnownSources::get().get_compound_entry(nc.count, sources[i]);
       SourceList src_list;
       Array ncListsForSource =
-          Array::New(env, combo_entry.src_combo_list.size());
-      for (uint32_t j{}; j < combo_entry.src_combo_list.size(); ++j) {
-        const auto& combo = combo_entry.src_combo_list[j];
+          Array::New(env, combo_entry.dfer_list.size());
+      for (uint32_t j{}; j < combo_entry.dfer_list.size(); ++j) {
+        const auto& combo = combo_entry.dfer_list[j];
         src_list.push_back(deferred_source::materialize(combo));
         Array ncList = Array::New(env, combo.known_nci_list.size());
         for (uint32_t k{}; k < combo.known_nci_list.size(); ++k) {

@@ -92,19 +92,19 @@ namespace cm {
 /*static*/ bool KnownSources::add_compound_clue(const NameCount& nc,
     const std::string& sources_csv) {
   assert(nc.count > 1 && "add_compound_clue: count must be > 1");
-  get().get_combo_entry(nc.count, sources_csv).clue_names.insert(nc.name);
+  get().get_compound_entry(nc.count, sources_csv).clue_names.insert(nc.name);
   return true;
 }
 
 auto KnownSources::get_combo_map(int count, bool force_create /* = false */)
-    -> ComboEntryMap& {
+    -> CompoundEntryMap& {
   // Compound sources start at count 2, so index = count - 2
   const auto idx = count - 2;
   assert(idx >= 0 && "get_combo_map: count must be >= 2");
-  if (force_create && (int(combo_entry_maps_.size()) == idx)) {
-    combo_entry_maps_.push_back(ComboEntryMap{});
+  if (force_create && (int(compound_entry_maps_.size()) == idx)) {
+    compound_entry_maps_.push_back(CompoundEntryMap{});
   }
-  return combo_entry_maps_.at(idx);
+  return compound_entry_maps_.at(idx);
 }
 
 bool KnownSources::has_entries_for(int count) const {
@@ -113,7 +113,7 @@ bool KnownSources::has_entries_for(int count) const {
     return !primary_entry_map_.empty();
   }
   const auto idx = count - 2;
-  return int(combo_entry_maps_.size()) > idx;
+  return int(compound_entry_maps_.size()) > idx;
 }
 
 bool KnownSources::has_entries_for(int count, const std::string& source) const {
@@ -122,8 +122,8 @@ bool KnownSources::has_entries_for(int count, const std::string& source) const {
     return primary_entry_map_.contains(source);
   }
   const auto idx = count - 2;
-  if (int(combo_entry_maps_.size()) > idx) {
-    return combo_entry_maps_.at(idx).contains(source);
+  if (int(compound_entry_maps_.size()) > idx) {
+    return compound_entry_maps_.at(idx).contains(source);
   }
   return false;
 }
@@ -136,7 +136,7 @@ void KnownSources::init_primary_entry(const std::string& name,
 
   // Store full entry in primary_entry_map_
   const auto key = util::append(name, ":", source);
-  auto [_, success] = primary_entry_map_.emplace(key, Entry{std::move(src_list), {}});
+  auto [_, success] = primary_entry_map_.emplace(key, PrimaryEntry{std::move(src_list), {}});
   if (!success) {
     std::cerr << "failed adding primary entry " << key << std::endl;
   }
@@ -146,24 +146,24 @@ void KnownSources::init_primary_entry(const std::string& name,
   primary_compat_map_.emplace(source, std::move(src_compat));
 }
 
-auto KnownSources::get_primary_entry(const std::string& key) -> Entry& {
+auto KnownSources::get_primary_entry(const std::string& key) -> PrimaryEntry& {
   auto it = primary_entry_map_.find(key);
   assert(it != primary_entry_map_.end());
   return it->second;
 }
 
 auto KnownSources::get_primary_entry(const std::string& key) const
-    -> const Entry& {
+    -> const PrimaryEntry& {
   auto it = primary_entry_map_.find(key);
   assert(it != primary_entry_map_.end());
   return it->second;
 }
 
-void KnownSources::init_combo_entry(int count, const std::string& source,
+void KnownSources::init_compound_entry(int count, const std::string& source,
     DeferredSourceDataList&& src_combo_list) {
-  assert(count > 1 && "init_combo_entry: count must be > 1");
+  assert(count > 1 && "init_compound_entry: count must be > 1");
   auto& map = get_combo_map(count, true);  // true = create if doesn't exist
-  auto [_, success] = map.emplace(source, ComboEntry{std::move(src_combo_list), {}});
+  auto [_, success] = map.emplace(source, CompoundEntry{std::move(src_combo_list), {}});
   if (!success) {
     std::cerr << "failed adding combo entry " << source << ":" << count << std::endl;
   }
@@ -171,8 +171,8 @@ void KnownSources::init_combo_entry(int count, const std::string& source,
 }
 
 // TODO: move to inline in header, const_cast<>
-auto KnownSources::get_combo_entry(int count, const std::string& source_csv)
-    -> ComboEntry& {
+auto KnownSources::get_compound_entry(int count, const std::string& source_csv)
+    -> CompoundEntry& {
   assert(count > 1);
   auto& map = get_combo_map(count);
   auto it = map.find(source_csv);
@@ -180,8 +180,8 @@ auto KnownSources::get_combo_entry(int count, const std::string& source_csv)
   return it->second;
 }
 
-auto KnownSources::get_combo_entry(int count, const std::string& source_csv) const
-    -> const ComboEntry& {
+auto KnownSources::get_compound_entry(int count, const std::string& source_csv) const
+    -> const CompoundEntry& {
   assert(count > 1);
   const auto& map = get_combo_map(count);
   auto it = map.find(source_csv);
@@ -189,25 +189,27 @@ auto KnownSources::get_combo_entry(int count, const std::string& source_csv) con
   return it->second;
 }
 
+#if 0
 // Legacy compatibility: get_entry only works for count == 1 now
 auto KnownSources::get_entry(int count, const std::string& source_csv)
-    -> Entry& {
-  assert(count == 1 && "get_entry: only count == 1 supported, use get_combo_entry for count > 1");
+    -> PrimaryEntry& {
+  assert(count == 1 && "get_entry: only count == 1 supported, use get_compound_entry for count > 1");
   return get_primary_entry(source_csv);
 }
 
 auto KnownSources::get_entry(int count, const std::string& source_csv) const
-    -> const Entry& {
-  assert(count == 1 && "get_entry: only count == 1 supported, use get_combo_entry for count > 1");
+    -> const PrimaryEntry& {
+  assert(count == 1 && "get_entry: only count == 1 supported, use get_compound_entry for count > 1");
   return get_primary_entry(source_csv);
 }
+#endif
 
 const std::set<std::string>& KnownSources::get_entry_clue_names(int count,
     const std::string& source_csv) const {
   if (count == 1) {
     return get_primary_entry(source_csv).clue_names;
   }
-  return get_combo_entry(count, source_csv).clue_names;
+  return get_compound_entry(count, source_csv).clue_names;
 }
 
 size_t KnownSources::get_num_clue_sources(int count,
@@ -215,7 +217,7 @@ size_t KnownSources::get_num_clue_sources(int count,
   if (count == 1) {
     return get_primary_entry(key).src_list.size();
   }
-  return get_combo_entry(count, key).src_combo_list.size();
+  return get_compound_entry(count, key).dfer_list.size();
 }
 
 void KnownSources::dump_memory() const {
@@ -269,23 +271,23 @@ void KnownSources::dump_memory() const {
   total_size += primary_compat_size;
 
   // Combo entry maps (count > 1)
-  for (size_t count{2}; count <= combo_entry_maps_.size() + 1; ++count) {
-    const auto& map = combo_entry_maps_.at(count - 2);
+  for (size_t count{2}; count <= compound_entry_maps_.size() + 1; ++count) {
+    const auto& map = compound_entry_maps_.at(count - 2);
     if (map.empty()) continue;
 
     size_t map_size{};
     size_t map_combos{};
     for (const auto& [key, entry] : map) {
       map_size += key.capacity();
-      map_size += entry.src_combo_list.capacity() * sizeof(DeferredSourceData);
-      for (const auto& combo : entry.src_combo_list) {
+      map_size += entry.dfer_list.capacity() * sizeof(DeferredSourceData);
+      for (const auto& combo : entry.dfer_list) {
         map_size += combo.known_nci_list.capacity() * sizeof(NameCountIndex);
         for (const auto& known_nci : combo.known_nci_list) {
           map_size += known_nci.nc.name.capacity();
         }
         map_size += combo.nc.name.capacity();
       }
-      map_combos += entry.src_combo_list.size();
+      map_combos += entry.dfer_list.size();
       map_size += entry.clue_names.size() * (sizeof(void*) * 3 + 32);
       for (const auto& name : entry.clue_names) {
         map_size += name.capacity();

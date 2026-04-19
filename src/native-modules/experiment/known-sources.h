@@ -38,23 +38,23 @@ inline std::vector<std::string_view> split(std::string_view str, char delim = ':
 class KnownSources {
 public:
   // Entry for primary sources (count == 1) - always fully populated
-  struct Entry {
+  struct PrimaryEntry {
     SourceList src_list;
     std::set<std::string> clue_names;
   };
 
-  // Entry for compound sources (count > 1) - compact storage
-  struct ComboEntry {
-    DeferredSourceDataList src_combo_list;
+  // Entry for compound sources (count >= 2) 
+  struct CompoundEntry {
+    DeferredSourceDataList dfer_list;
     std::set<std::string> clue_names;
   };
 
-  using EntryCRef = std::reference_wrapper<const Entry>;
+  using EntryCRef = std::reference_wrapper<const PrimaryEntry>;
 
   // Map type aliases for clear storage boundaries
   using PrimaryCompatMap = std::unordered_map<std::string, SourceCompatibilityData>;
-  using PrimaryEntryMap = std::unordered_map<std::string, Entry>;
-  using ComboEntryMap = std::unordered_map<std::string, ComboEntry>;
+  using PrimaryEntryMap = std::unordered_map<std::string, PrimaryEntry>;
+  using CompoundEntryMap = std::unordered_map<std::string, CompoundEntry>;
 
   static KnownSources& get() {
     static KnownSources known_sources;
@@ -86,9 +86,9 @@ public:
     const auto& name_sources_map = clue_manager::get_name_sources_map(count);
     for (const auto& source : name_sources_map.at(name)) {
       if (count > 1) {
-        // Compound source: get source compat data from ComboEntryMap
-        const auto& combo_entry = get().get_combo_entry(count, source);
-        for (const auto& combo : combo_entry.src_combo_list) {
+        // Compound source: get source compat data from CompoundEntryMap
+        const auto& compound_entry = get().get_compound_entry(count, source);
+        for (const auto& combo : compound_entry.dfer_list) {
           fn(static_cast<const SourceCompatibilityData&>(combo), idx++);
         }
       } else {
@@ -126,8 +126,8 @@ public:
     index_t idx{};
     const auto& name_sources_map = clue_manager::get_name_sources_map(count);
     for (const auto& source : name_sources_map.at(name)) {
-      const auto& combo_entry = get().get_combo_entry(count, source);
-      for (const auto& combo : combo_entry.src_combo_list) {
+      const auto& compound_entry = get().get_compound_entry(count, source);
+      for (const auto& combo : compound_entry.dfer_list) {
         fn(combo, idx++);
       }
     }
@@ -170,22 +170,24 @@ public:
   // Primary entry methods (count == 1)
   void init_primary_entry(const std::string& name, const std::string& source,
       SourceList&& src_list);
-  auto get_primary_entry(const std::string& key) -> Entry&;
-  auto get_primary_entry(const std::string& key) const -> const Entry&;
+  auto get_primary_entry(const std::string& key) -> PrimaryEntry&;
+  auto get_primary_entry(const std::string& key) const -> const PrimaryEntry&;
 
   // Combo entry methods (count > 1)
-  void init_combo_entry(int count, const std::string& source,
+  void init_compound_entry(int count, const std::string& source,
       DeferredSourceDataList&& src_combo_list);
-  auto get_combo_entry(int count, const std::string& source_csv) -> ComboEntry&;
-  auto get_combo_entry(int count, const std::string& source_csv) const
-      -> const ComboEntry&;
+  auto get_compound_entry(int count, const std::string& source_csv) -> CompoundEntry&;
+  auto get_compound_entry(int count, const std::string& source_csv) const
+      -> const CompoundEntry&;
 
+#if 0
   // Legacy compatibility: get_entry delegates to appropriate type
-  auto get_entry(int count, const std::string& source_csv) -> Entry&;
+  auto get_entry(int count, const std::string& source_csv) -> PrimaryEntry&;
   auto get_entry(int count, const std::string& source_csv) const
-      -> const Entry&;
+      -> const PrimaryEntry&;
+#endif
 
-  // Helpers that work with both Entry (count==1) and ComboEntry (count>1)
+  // Helpers that work with both Entry (count==1) and CompoundEntry (count>1)
   const std::set<std::string>& get_entry_clue_names(int count,
       const std::string& source_csv) const;
   size_t get_num_clue_sources(int count, const std::string& key) const;
@@ -193,15 +195,15 @@ public:
   void reset() {
     primary_entry_map_.clear();
     primary_compat_map_.clear();
-    combo_entry_maps_.clear();
+    compound_entry_maps_.clear();
   }
 
   void dump_memory() const;
 
 private:
-  auto get_combo_map(int count, bool force_create = false) -> ComboEntryMap&;
-  auto get_combo_map(int count) const -> const ComboEntryMap& {
-    return combo_entry_maps_.at(count - 2);  // count 2 = index 0
+  auto get_combo_map(int count, bool force_create = false) -> CompoundEntryMap&;
+  auto get_combo_map(int count) const -> const CompoundEntryMap& {
+    return compound_entry_maps_.at(count - 2);  // count 2 = index 0
   }
 
   // Storage for primary sources (count == 1)
@@ -212,8 +214,8 @@ private:
 
   // Storage for compound sources (count > 1)
   // Indexed by count-2 (count 2 = index 0)
-  // source_csv -> ComboEntry with DeferredSourceDataList
-  std::vector<ComboEntryMap> combo_entry_maps_;
+  // source_csv -> CompoundEntry with DeferredSourceDataList
+  std::vector<CompoundEntryMap> compound_entry_maps_;
 };
 
 }  // namespace cm

@@ -26,9 +26,6 @@ constexpr auto kMaxStreams = kMaxSwarms * 3;  // 3 streams per swarm
 using result_t = uint8_t;
 using atomic64_t = unsigned long long int;
 
-static_assert(std::has_single_bit(kMaxSources),
-    "kMaxSources must be a power of two");
-
 using IndexSpan = std::span<const index_t>;
 using IndexSpanPair = std::pair<IndexSpan, IndexSpan>;
 
