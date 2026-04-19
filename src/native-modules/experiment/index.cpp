@@ -717,10 +717,10 @@ Value getSourceListsForNc(const CallbackInfo& info) {
       for (uint32_t j{}; j < combo_entry.src_combo_list.size(); ++j) {
         const auto& combo = combo_entry.src_combo_list[j];
         src_list.push_back(KnownSources::reconstruct(combo));
-        Array ncList = Array::New(env, combo.parents.size());
-        for (uint32_t k{}; k < combo.parents.size(); ++k) {
-          const auto& p = combo.parents[k];
-          ncList.Set(k, wrap(env, NameCount{p.name, p.count}));
+        Array ncList = Array::New(env, combo.known_nci_list.size());
+        for (uint32_t k{}; k < combo.known_nci_list.size(); ++k) {
+          const auto& known_nci = combo.known_nci_list[k];
+          ncList.Set(k, wrap(env, known_nci.nc));
         }
         ncListsForSource.Set(j, ncList);
       }

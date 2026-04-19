@@ -1,6 +1,5 @@
 #pragma once
 
-#include <cstdint>
 #include <functional>
 #include <set>
 #include <string>
@@ -16,34 +15,26 @@ using SourceList = std::vector<SourceData>;
 using SourceCRef = std::reference_wrapper<const SourceData>;
 using SourceCRefList = std::vector<SourceCRef>;
 
-// Identifies a parent source for reconstruction of merged sources
-struct SourceParent {
-  std::string name;
-  int count;
-  uint32_t idx;  // index within the source list for (name, count)
-};
-
-using SourceParentList = std::vector<SourceParent>;
-
-// Compact form - used during precomputation and compatibility checking
-// Stores only compatibility data + parent references for later reconstruction
-struct SourceCombo : SourceCompatibilityData {
-  SourceCombo() = default;
-  SourceCombo(SourceCompatibilityData&& compat, SourceParentList&& parent_list,
+// Compact form used during precomputation and compatibility checking.
+// Stores only compatibility data plus reconstruction references.
+struct DeferredSourceData : SourceCompatibilityData {
+  DeferredSourceData() = default;
+  DeferredSourceData(SourceCompatibilityData&& compat,
+      NameCountIndexList&& known_nci_list,
       std::string&& clue_name, int clue_count)
       : SourceCompatibilityData(std::move(compat)),
-        parents(std::move(parent_list)),
+        known_nci_list(std::move(known_nci_list)),
         nc(std::move(clue_name), clue_count) {}
 
-  SourceCombo(const SourceCombo&) = default;
-  SourceCombo& operator=(const SourceCombo&) = default;
-  SourceCombo(SourceCombo&&) = default;
-  SourceCombo& operator=(SourceCombo&&) = default;
+  DeferredSourceData(const DeferredSourceData&) = default;
+  DeferredSourceData& operator=(const DeferredSourceData&) = default;
+  DeferredSourceData(DeferredSourceData&&) = default;
+  DeferredSourceData& operator=(DeferredSourceData&&) = default;
 
-  SourceParentList parents;  // lineage for reconstruction
-  NameCount nc{"", 0};       // the clue name:count for this combo
+  NameCountIndexList known_nci_list;
+  NameCount nc{"", 0};
 };
-using SourceComboList = std::vector<SourceCombo>;
+using DeferredSourceDataList = std::vector<DeferredSourceData>;
 
 // Full form - ALWAYS has populated lists, used for final output
 struct SourceData : SourceCompatibilityData {
@@ -75,7 +66,7 @@ struct SourceData : SourceCompatibilityData {
   NameCountList primaryNameSrcList;
   NameCountList ncList;
   std::set<std::string> nc_names;
-  // NOTE: SourceData is ALWAYS fully populated. Use SourceCombo for compact storage.
+  // NOTE: SourceData is ALWAYS fully populated. Use DeferredSourceData for compact storage.
 };
 
 using SourceListCRef = std::reference_wrapper<const SourceList>;

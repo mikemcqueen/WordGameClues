@@ -12,7 +12,7 @@ namespace cm::validator {
 
 auto validate_sources(const std::string& clue_name,
     const std::vector<std::string>& src_names, int sum,
-    bool validate_all) -> SourceComboList;
+    bool validate_all) -> DeferredSourceDataList;
 
 auto is_xor_compatible(const std::vector<std::string>& src_names,
     const std::vector<int>& count_list) -> bool;

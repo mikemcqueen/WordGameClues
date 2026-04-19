@@ -45,7 +45,7 @@ public:
 
   // Entry for compound sources (count > 1) - compact storage
   struct ComboEntry {
-    SourceComboList src_combo_list;
+    DeferredSourceDataList src_combo_list;
     std::set<std::string> clue_names;
   };
 
@@ -119,7 +119,7 @@ public:
     }
   }
 
-  // Iterate over SourceCombo for compound sources (count > 1)
+  // Iterate over DeferredSourceData for compound sources (count > 1)
   static void for_each_combo_source(const std::string& name, int count,
       const auto& fn) {
     assert(count > 1);
@@ -156,12 +156,12 @@ public:
   static auto make_src_compat_cref_list(const std::string& name, int count)
       -> SourceCompatCRefList;
 
-  // THE RECONSTRUCTION POINT: Convert compact SourceCombo to full SourceData
-  static SourceData reconstruct(const SourceCombo& combo);
+  // THE RECONSTRUCTION POINT: Convert compact DeferredSourceData to full SourceData
+  static SourceData reconstruct(const DeferredSourceData& combo);
 
   // Minimal reconstruction: only populates ncList from combo.nc
   // Use when only ncList is needed (e.g., merge_only path)
-  static SourceData reconstruct_nclist(const SourceCombo& combo);
+  static SourceData reconstruct_nclist(const DeferredSourceData& combo);
 
   // TODO: i think this can be eliminated; check src/tools/todo
   static bool add_compound_clue(const NameCount& nc,
@@ -178,7 +178,7 @@ public:
 
   // Combo entry methods (count > 1)
   void init_combo_entry(int count, const std::string& source,
-      SourceComboList&& src_combo_list);
+      DeferredSourceDataList&& src_combo_list);
   auto get_combo_entry(int count, const std::string& source_csv) -> ComboEntry&;
   auto get_combo_entry(int count, const std::string& source_csv) const
       -> const ComboEntry&;
@@ -215,7 +215,7 @@ private:
 
   // Storage for compound sources (count > 1)
   // Indexed by count-2 (count 2 = index 0)
-  // source_csv -> ComboEntry with SourceComboList
+  // source_csv -> ComboEntry with DeferredSourceDataList
   std::vector<ComboEntryMap> combo_entry_maps_;
 };
 

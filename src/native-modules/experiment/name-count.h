@@ -83,6 +83,13 @@ struct NameCount {
   int count{};
 };
 
+struct NameCountIndex {
+  NameCount nc{"", 0};
+  int index{};
+};
+
+using NameCountIndexList = std::vector<NameCountIndex>;
+
 struct NCData {
   NameCountList ncList;
 };

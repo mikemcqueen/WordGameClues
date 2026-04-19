@@ -14,7 +14,7 @@ namespace {
 
 auto validate_source_names_at_counts(const std::string& clue_name,
     const std::vector<std::string>& src_names, std::vector<int> count_list,
-    NameCountList& nc_list) -> SourceComboList {
+    NameCountList& nc_list) -> DeferredSourceDataList {
   auto src_crefs0 = KnownSources::make_src_compat_cref_list(src_names.at(0),
       count_list.at(0));
   auto src_crefs1 = KnownSources::make_src_compat_cref_list(src_names.at(1),
@@ -22,11 +22,11 @@ auto validate_source_names_at_counts(const std::string& clue_name,
   // NOTE: in order to support more than 2 sources here, we'd probably have
   // to bite the bullet and merge sources in lists 0,1 then then merge the
   // resulting list with sources from list 2, and so on.
-  SourceComboList combo_list;
-  index_t idx0{};
+  DeferredSourceDataList combo_list;
+  int idx0{};
   for (const auto src_cref0 : src_crefs0) {
     const auto& src0 = src_cref0.get();
-    index_t idx1{};
+    int idx1{};
     for (const auto src_cref1 : src_crefs1) {
       const auto& src1 = src_cref1.get();
       if (src0.isXorCompatibleWith(src1)) {
@@ -49,16 +49,17 @@ auto validate_source_names_at_counts(const std::string& clue_name,
           continue;
         }
 #endif
-        // Create compact SourceCombo with parent references
+        // Create compact deferred-source data with reconstruction references.
         SourceCompatibilityData merged_compat{src0.usedSources};
         merged_compat.mergeInPlace(src1);
 
-        SourceParentList parents{
-            {src_names.at(0), count_list.at(0), idx0},
-            {src_names.at(1), count_list.at(1), idx1}  //
+        NameCountIndexList known_nci_list{
+            {{src_names.at(0), count_list.at(0)}, idx0},
+            {{src_names.at(1), count_list.at(1)}, idx1}  //
         };
-        combo_list.emplace_back(std::move(merged_compat), std::move(parents),
-            std::string(clue_name), util::sum(count_list));
+        combo_list.emplace_back(std::move(merged_compat),
+            std::move(known_nci_list), std::string(clue_name),
+            util::sum(count_list));
       }
       ++idx1;
     }
@@ -71,8 +72,8 @@ auto validate_source_names_at_counts(const std::string& clue_name,
 
 auto validate_sources(const std::string& clue_name,
     const std::vector<std::string>& src_names, int sum,
-    bool validate_all) -> SourceComboList {
-  SourceComboList result;
+    bool validate_all) -> DeferredSourceDataList {
+  DeferredSourceDataList result;
   if (src_names.size() != 2) return result;
   auto pred = [&clue_name](const std::string& src_name) {  
     return src_name == clue_name;

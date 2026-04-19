@@ -15,50 +15,51 @@ namespace cm {
 
 namespace {
 
-// Create a SourceCombo wrapper for a primary SourceData
-// The combo has a single parent ref pointing to the primary
-SourceCombo make_combo_from_primary(const SourceData& src, const std::string& name,
-    index_t idx) {
-  SourceCombo combo;
-  combo.usedSources = src.usedSources;
-  combo.parents = {{name, 1, idx}};  // count is always 1 for primaries
-  combo.nc = src.ncList.at(0);
-  return combo;
+// Create a DeferredSourceData wrapper for a primary SourceData.
+// The deferred source has a single reconstruction reference to the primary.
+DeferredSourceData make_combo_from_primary(const SourceData& src,
+    const std::string& name,
+    int idx) {
+  DeferredSourceData deferred_source;
+  deferred_source.usedSources = src.usedSources;
+  deferred_source.known_nci_list = {{{name, 1}, idx}};
+  deferred_source.nc = src.ncList.at(0);
+  return deferred_source;
 }
 
-// Merge two SourceCombos into a new SourceCombo
-// Only merges compat data and combines parents (no data list merging)
-SourceCombo mergeSourceCombos(const SourceCombo& combo1, const SourceCombo& combo2) {
-  SourceCombo result;
+// Merge two DeferredSourceData values into a new DeferredSourceData.
+// Only merges compat data and combines reconstruction refs.
+DeferredSourceData mergeSourceCombos(const DeferredSourceData& combo1,
+    const DeferredSourceData& combo2) {
+  DeferredSourceData result;
   result.usedSources = combo1.usedSources.copyMerge(combo2.usedSources);
-  // Combine parents from both combos
-  result.parents = combo1.parents;
-  result.parents.insert(result.parents.end(),
-      combo2.parents.begin(), combo2.parents.end());
-  // The merged combo's NC combines the counts
+  result.known_nci_list = combo1.known_nci_list;
+  result.known_nci_list.insert(result.known_nci_list.end(),
+      combo2.known_nci_list.begin(), combo2.known_nci_list.end());
+  // The merged deferred source's NC combines the counts
   // (though this isn't used for filtering, just for tracking)
   // TODO: what
   result.nc = NameCount("merged", combo1.nc.count + combo2.nc.count);
   return result;
 }
 
-// Get SourceComboList for an NC
-// For count == 1, wraps primaries in SourceCombo
-// For count > 1, returns the stored SourceComboList directly
-auto get_combo_list_for_nc(const NameCount& nc) -> SourceComboList {
-  SourceComboList result;
+// Get DeferredSourceDataList for an NC.
+// For count == 1, wraps primaries in DeferredSourceData.
+// For count > 1, returns the stored DeferredSourceDataList directly.
+auto get_combo_list_for_nc(const NameCount& nc) -> DeferredSourceDataList {
+  DeferredSourceDataList result;
   if (nc.count == 1) {
-    // Primary sources: wrap each SourceData in a SourceCombo
-    index_t idx{};
+    // Primary sources: wrap each SourceData in DeferredSourceData.
+    int idx{};
     KnownSources::for_each_primary_source(nc.name,
         [&result, &nc, &idx](const SourceData& src, index_t) {
           result.push_back(make_combo_from_primary(src, nc.name, idx));
           ++idx;
         });
   } else {
-    // Compound sources: already stored as SourceComboList
+    // Compound sources: already stored as DeferredSourceDataList.
     KnownSources::for_each_combo_source(nc.name, nc.count,
-        [&result](const SourceCombo& combo, index_t) {
+        [&result](const DeferredSourceData& combo, index_t) {
           result.push_back(combo);
         });
   }
@@ -66,8 +67,9 @@ auto get_combo_list_for_nc(const NameCount& nc) -> SourceComboList {
 }
 
 auto mergeCompatibleComboLists(
-    const SourceComboList& combo_list1, const SourceComboList& combo_list2) {
-  SourceComboList result{};
+    const DeferredSourceDataList& combo_list1,
+    const DeferredSourceDataList& combo_list2) {
+  DeferredSourceDataList result{};
   for (const auto& combo1 : combo_list1) {
     for (const auto& combo2 : combo_list2) {
       if (combo1.isXorCompatibleWith(combo2)) {
@@ -79,7 +81,8 @@ auto mergeCompatibleComboLists(
 }
 
 // NOTE: for ncList.size() <= 2
-auto mergeAllCompatibleSources(const NameCountList& ncList) -> SourceComboList {
+auto mergeAllCompatibleSources(const NameCountList& ncList)
+    -> DeferredSourceDataList {
   assert(ncList.size() <= 2 && "ncList.length > 2");
   const auto logging = false;
 
@@ -104,7 +107,7 @@ auto mergeAllCompatibleSources(const NameCountList& ncList) -> SourceComboList {
 }  // namespace
 
 auto build_src_lists(const std::vector<NCDataList>& nc_data_lists)
-    -> std::vector<SourceComboList> {
+    -> std::vector<DeferredSourceDataList> {
   using StringSet = std::unordered_set<std::string>;
   using HashMap = std::unordered_map<SourceCompatibilityData, StringSet>;
 
@@ -113,7 +116,7 @@ auto build_src_lists(const std::vector<NCDataList>& nc_data_lists)
   int hash_hits = 0;
   const auto size = nc_data_lists[0].size();
   std::vector<HashMap> hashList(size);
-  std::vector<SourceComboList> comboLists(size);
+  std::vector<DeferredSourceDataList> comboLists(size);
 
   for (const auto& nc_data_list : nc_data_lists) {
     assert(nc_data_list.size() == size);

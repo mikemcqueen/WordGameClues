@@ -12,84 +12,84 @@ namespace cm {
 
 namespace {
 
-// Helper to get a specific primary source by (name, count, idx)
-// Returns the SourceData for a parent reference
-const SourceData& get_primary_source_by_ref(const SourceParent& ref) {
-  assert(ref.count == 1 && "get_primary_source_by_ref: only count==1 supported");
+// Helper to get a specific primary source by reconstruction reference.
+const SourceData& get_primary_source_by_ref(const NameCountIndex& ref) {
+  assert(ref.nc.count == 1 && "get_primary_source_by_ref: only count==1 supported");
   const SourceData* result = nullptr;
-  KnownSources::for_each_primary_source(ref.name,
-      [&](const SourceData& src, index_t idx) {
-        if (idx == ref.idx) {
+  KnownSources::for_each_primary_source(ref.nc.name,
+      [&](const SourceData& src, int idx) {
+        if (idx == ref.index) {
           result = &src;
         }
       });
   if (!result) {
     std::cerr << "ERROR: get_primary_source_by_ref source not found: "
-              << ref.name << ":" << ref.count << " idx " << ref.idx << std::endl;
+              << ref.nc.name << ":" << ref.nc.count << " idx " << ref.index
+              << std::endl;
   }
   assert(result != nullptr);
   return *result;
 }
 
-// Helper to get a SourceCombo by reference
-const SourceCombo& get_combo_source_by_ref(const SourceParent& ref) {
-  if (ref.count <= 1) {
+// Helper to get deferred-source data by reconstruction reference.
+const DeferredSourceData& get_combo_source_by_ref(const NameCountIndex& ref) {
+  if (ref.nc.count <= 1) {
     std::cerr << "ERROR: get_combo_source_by_ref called with invalid count: "
-              << ref.count << ", name: " << ref.name << ", idx: " << ref.idx << std::endl;
+              << ref.nc.count << ", name: " << ref.nc.name << ", idx: "
+              << ref.index << std::endl;
   }
-  assert(ref.count > 1 && "get_combo_source_by_ref: only count>1 supported");
-  const SourceCombo* result = nullptr;
-  KnownSources::for_each_combo_source(ref.name, ref.count,
-      [&](const SourceCombo& combo, index_t idx) {
-        if (idx == ref.idx) {
+  assert(ref.nc.count > 1 && "get_combo_source_by_ref: only count>1 supported");
+  const DeferredSourceData* result = nullptr;
+  KnownSources::for_each_combo_source(ref.nc.name, ref.nc.count,
+      [&](const DeferredSourceData& combo, int idx) {
+        if (idx == ref.index) {
           result = &combo;
         }
       });
   if (!result) {
     std::cerr << "ERROR: get_combo_source_by_ref source not found: "
-              << ref.name << ":" << ref.count << " idx " << ref.idx << std::endl;
+              << ref.nc.name << ":" << ref.nc.count << " idx " << ref.index
+              << std::endl;
   }
   assert(result != nullptr);
   return *result;
 }
 
-// Recursively collect primaryNameSrcList from a SourceCombo
-void collect_primary_name_src_list(const SourceCombo& combo,
+// Recursively collect primaryNameSrcList from DeferredSourceData.
+void collect_primary_name_src_list(const DeferredSourceData& combo,
     NameCountList& result) {
-  for (const auto& parent_ref : combo.parents) {
-    if (parent_ref.count <= 0) {
-      std::cerr << "ERROR: collect_primary_name_src_list: invalid parent count: "
-                << parent_ref.count << ", name: " << parent_ref.name
-                << ", idx: " << parent_ref.idx << std::endl;
-      assert(false && "invalid parent count");
+  for (const auto& known_nci : combo.known_nci_list) {
+    if (known_nci.nc.count <= 0) {
+      std::cerr << "ERROR: collect_primary_name_src_list: invalid count: "
+                << known_nci.nc.count << ", name: " << known_nci.nc.name
+                << ", idx: " << known_nci.index << std::endl;
+      assert(false && "invalid known_nci count");
     }
-    if (parent_ref.count == 1) {
+    if (known_nci.nc.count == 1) {
       // Base case: primary source has full data
-      const auto& primary = get_primary_source_by_ref(parent_ref);
+      const auto& primary = get_primary_source_by_ref(known_nci);
       result.insert(result.end(), primary.primaryNameSrcList.begin(),
           primary.primaryNameSrcList.end());
     } else {
-      // Recurse into compound parents
-      const auto& parent_combo = get_combo_source_by_ref(parent_ref);
+      const auto& parent_combo = get_combo_source_by_ref(known_nci);
       collect_primary_name_src_list(parent_combo, result);
     }
   }
 }
 
-// Recursively collect nc_names from a SourceCombo
-void collect_nc_names(const SourceCombo& combo, std::set<std::string>& result) {
-  for (const auto& parent_ref : combo.parents) {
-    if (parent_ref.count == 1) {
+// Recursively collect nc_names from DeferredSourceData.
+void collect_nc_names(const DeferredSourceData& combo, std::set<std::string>& result) {
+  for (const auto& known_nci : combo.known_nci_list) {
+    if (known_nci.nc.count == 1) {
       // Base case: primary source has nc_names
-      const auto& primary = get_primary_source_by_ref(parent_ref);
+      const auto& primary = get_primary_source_by_ref(known_nci);
       result.insert(primary.nc_names.begin(), primary.nc_names.end());
     } else {
-      // Recurse into compound parents
-      const auto& parent_combo = get_combo_source_by_ref(parent_ref);
+      const auto& parent_combo = get_combo_source_by_ref(known_nci);
       collect_nc_names(parent_combo, result);
     }
   }
-  // Include this combo's clue name
+  // Include this deferred source's clue name.
   result.insert(combo.nc.name);
 }
 
@@ -129,9 +129,9 @@ void collect_nc_names(const SourceCombo& combo, std::set<std::string>& result) {
   return compat_crefs;
 }
 
-// THE RECONSTRUCTION POINT: Convert compact SourceCombo to full SourceData
-/*static*/ SourceData KnownSources::reconstruct(const SourceCombo& combo) {
-  // Build primaryNameSrcList by traversing parent tree
+// THE RECONSTRUCTION POINT: Convert compact DeferredSourceData to full SourceData
+/*static*/ SourceData KnownSources::reconstruct(const DeferredSourceData& combo) {
+  // Build primaryNameSrcList by traversing the reconstruction tree.
   NameCountList primaryNameSrcList;
   collect_primary_name_src_list(combo, primaryNameSrcList);
 
@@ -139,7 +139,7 @@ void collect_nc_names(const SourceCombo& combo, std::set<std::string>& result) {
   NameCountList ncList;
   ncList.emplace_back(combo.nc.name, combo.nc.count);
 
-  // Build nc_names by collecting all names from parents + this combo's name
+  // Build nc_names by collecting all names from known sources + this clue name.
   std::set<std::string> nc_names;
   collect_nc_names(combo, nc_names);
 
@@ -147,9 +147,10 @@ void collect_nc_names(const SourceCombo& combo, std::set<std::string>& result) {
       std::move(ncList), std::move(nc_names));
 }
 
-// Minimal reconstruction: only populates ncList from combo.nc
-// Skips all recursive parent tree traversal
-/*static*/ SourceData KnownSources::reconstruct_nclist(const SourceCombo& combo) {
+// Minimal reconstruction: only populates ncList from combo.nc.
+// Skips all recursive reconstruction tree traversal.
+/*static*/ SourceData KnownSources::reconstruct_nclist(
+    const DeferredSourceData& combo) {
   NameCountList ncList;
   ncList.emplace_back(combo.nc.name, combo.nc.count);
   return SourceData(combo.usedSources,
@@ -231,7 +232,7 @@ auto KnownSources::get_primary_entry(const std::string& key) const
 }
 
 void KnownSources::init_combo_entry(int count, const std::string& source,
-    SourceComboList&& src_combo_list) {
+    DeferredSourceDataList&& src_combo_list) {
   assert(count > 1 && "init_combo_entry: count must be > 1");
   auto& map = get_combo_map(count, true);  // true = create if doesn't exist
   auto [_, success] = map.emplace(source, ComboEntry{std::move(src_combo_list), {}});
@@ -348,11 +349,11 @@ void KnownSources::dump_memory() const {
     size_t map_combos{};
     for (const auto& [key, entry] : map) {
       map_size += key.capacity();
-      map_size += entry.src_combo_list.capacity() * sizeof(SourceCombo);
+      map_size += entry.src_combo_list.capacity() * sizeof(DeferredSourceData);
       for (const auto& combo : entry.src_combo_list) {
-        map_size += combo.parents.capacity() * sizeof(SourceParent);
-        for (const auto& parent : combo.parents) {
-          map_size += parent.name.capacity();
+        map_size += combo.known_nci_list.capacity() * sizeof(NameCountIndex);
+        for (const auto& known_nci : combo.known_nci_list) {
+          map_size += known_nci.nc.name.capacity();
         }
         map_size += combo.nc.name.capacity();
       }
