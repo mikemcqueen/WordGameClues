@@ -9,9 +9,9 @@
 #include <unordered_set>
 #include <vector>
 #include <napi.h>
-#include "combo-maker.h"
 #include "candidates.h"
 #include "known-sources.h"
+#include "source-core.h"
 //#include "clue-manager.h"
 
 namespace cm {

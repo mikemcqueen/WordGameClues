@@ -89,7 +89,7 @@ void init_primary_known_source_map(
       std::set<std::string> nc_names;
       nc_names.insert(name);
       UsedSources used_sources;
-      used_sources.addSource(int_src);
+      used_sources.addSource(PrimarySourceId{int_src});
       SourceList src_list;
       src_list.emplace_back(used_sources, std::move(primary_name_src_list),
           std::move(nc_list), std::move(nc_names));

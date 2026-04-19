@@ -3,7 +3,6 @@
 #include <type_traits>
 #include <cuda_runtime.h>
 #include <cooperative_groups.h>
-#include "combo-maker.h"
 #include "merge-filter-data.h"
 #include "or-filter.cuh"
 #include "mmebitset.h"

@@ -3,9 +3,9 @@
 
 #pragma once
 
-#include "combo-maker.h"
 #include "cuda-types.h"
 #include "source-index.h"
+#include "source-core.h"
 
 namespace cm {
 

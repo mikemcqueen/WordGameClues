@@ -2,10 +2,10 @@
 
 #include <cassert>
 #include <cub/block/block_scan.cuh>
-#include "combo-maker.h"
 #include "cuda-types.h"
 #include "filter-stream.h"
 #include "merge-filter-data.h"
+#include "source-compat.h"
 
 namespace cm {
 

@@ -45,6 +45,8 @@
       'index.cpp',
       'known-sources.cpp',
       'merge-support.cpp',
+      'name-count.cpp',
+      'source-core.cpp',
       'unique-variations.cpp',
       'unwrap.cpp',
       'validator.cpp',

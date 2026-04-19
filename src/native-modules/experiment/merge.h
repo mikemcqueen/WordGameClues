@@ -3,9 +3,9 @@
 
 #pragma once
 #include <vector>
-#include "combo-maker.h"
 #include "merge-filter-data.h"
 #include "merge-type.h"
+#include "source-core.h"
 
 namespace cm {
 

@@ -4,7 +4,7 @@
 #include <vector>
 #include <napi.h>
 #include "clue-manager.h"
-#include "combo-maker.h"
+#include "source-core.h"
 
 namespace cm {
 

@@ -9,7 +9,6 @@
 #include <unordered_map>
 #include "candidates.h"
 #include "clue-manager.h"
-#include "combo-maker.h"
 #include "known-sources.h"
 #include "merge-filter-data.h"
 #include "cm-hash.h"

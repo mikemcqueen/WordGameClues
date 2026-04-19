@@ -5,10 +5,10 @@
 #include <cub/device/device_reduce.cuh>
 #include <cub/device/device_select.cuh>
 #include <thrust/iterator/counting_iterator.h>
-#include "combo-maker.h"
 #include "cuda-device.h"
 #include "merge.cuh"
 #include "peco.h"
+#include "source-compat.h"
 
 namespace cm {
 

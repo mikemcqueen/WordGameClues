@@ -248,14 +248,10 @@ private:
 };  // class LogDuration
 
 inline auto pretty_bytes(size_t bytes) {
-  const char* suffixes[7];
-  suffixes[0] = "B";
-  suffixes[1] = "KB";
-  suffixes[2] = "MB";
-  suffixes[3] = "GB";
+  constexpr const char* suffixes[] = {"B", "KB", "MB", "GB", "TB", "PB", "EB"};
   int s = 0;  // which suffix to use
   auto count = double(bytes);
-  while (count >= 1024.0 && s < 4) {
+  while (count >= 1024.0 && s < 6) {
     s++;
     count /= 1024.0;
   }

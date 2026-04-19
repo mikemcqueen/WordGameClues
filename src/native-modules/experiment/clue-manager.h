@@ -9,8 +9,8 @@
 #include <set>
 #include <vector>
 #include "cuda-types.h"
-// not thrilled about this. it's really a header organization issue though
-#include "combo-maker.h"
+#include "name-count.h"
+#include "source-compat.h"
 
 namespace cm::clue_manager {
 

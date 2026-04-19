@@ -1,7 +1,7 @@
 #pragma once
 #include <functional>
-#include "combo-maker.h"
 #include "cuda-types.h"
+#include "source-compat.h"
 
 namespace cm {
 

@@ -8,8 +8,8 @@
 #include <string>
 #include <utility>
 #include <vector>
-#include "combo-maker.h"
 #include "cuda-types.h"
+#include "name-count.h"
 
 namespace cm {
 

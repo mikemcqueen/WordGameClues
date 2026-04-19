@@ -11,7 +11,6 @@
 #include <vector>
 #include "clue-manager.h"
 #include "cm-precompute.h"
-#include "combo-maker.h"
 #include "components.h"
 #include "known-sources.h"
 #include "merge.h"

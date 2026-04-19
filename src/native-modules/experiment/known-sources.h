@@ -6,8 +6,8 @@
 #include <unordered_map>
 #include <vector>
 #include "clue-manager.h"
-#include "combo-maker.h"
 #include "cuda-types.h"
+#include "source-core.h"
 #include "util.h"
 
 #if 1
