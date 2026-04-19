@@ -1,5 +1,4 @@
-#ifndef INCLUDE_CANDIDATES_H
-#define INCLUDE_CANDIDATES_H
+#pragma once
 
 #include <functional>
 #include <unordered_map>
@@ -52,5 +51,3 @@ void save_current_candidate_counts(int sum);
 auto get_candidate_counts(int sum) -> CandidateCounts;
 
 }  // namespace cm
-
-#endif // INCLUDE_CANDIDATES_H

@@ -1,6 +1,3 @@
-#ifndef INCLUDE_MERGE_FILTER_COMMON_H
-#define INCLUDE_MERGE_FILTER_COMMON_H
-
 #pragma once
 #include <vector>
 #include <cuda_runtime.h>
@@ -38,5 +35,3 @@ auto make_start_indices(const std::vector<T>& vecs) {
 }
   
 }  // namespace cm
-
-#endif // INCLUDE_MERGE_FILTER_COMMON_H

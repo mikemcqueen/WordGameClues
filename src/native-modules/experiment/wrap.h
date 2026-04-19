@@ -1,6 +1,3 @@
-#ifndef INCLUDE_WRAP_H
-#define INCLUDE_WRAP_H
-
 #pragma once
 #include <set>
 #include <string>
@@ -48,5 +45,3 @@ Napi::Array wrap(Napi::Env& env, const C<T>& container) {
 Napi::Array wrap(Napi::Env& env, const std::set<int>& values);
 
 }  // namespace cm
-
-#endif  // INCLUDE_WRAP_H

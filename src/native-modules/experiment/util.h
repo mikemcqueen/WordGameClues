@@ -1,6 +1,3 @@
-#ifndef INCLUDE_UTIL_H
-#define INCLUDE_UTIL_H
-
 #pragma once
 #include <algorithm>
 #include <array>
@@ -263,5 +260,3 @@ inline auto pretty_bytes(size_t bytes) {
 };
 
 }  // namespace cm::util
-
-#endif // INCLUDE_UTIL_H

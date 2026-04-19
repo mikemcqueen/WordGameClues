@@ -20,8 +20,6 @@
     DEALINGS IN THE SOFTWARE.
 
 *******************************************************************************/
-#ifndef _MMEBITSET_H
-#define _MMEBITSET_H 1
 
 #pragma once
 #ifndef assert
@@ -278,5 +276,3 @@ protected:
 };
 
 } // namespace mme
-
-#endif // _MMEBITSET_H

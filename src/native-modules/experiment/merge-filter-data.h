@@ -1,6 +1,3 @@
-#ifndef INCLUDE_MERGE_FILTER_DATA_H
-#define INCLUDE_MERGE_FILTER_DATA_H
-
 #pragma once
 
 #include "cuda-types.h"
@@ -162,5 +159,3 @@ struct FilterData {
 };  // struct FilterData
 
 }  // namespace cm
-
-#endif  // INCLUDE_MERGE_FILTER_DATA_H

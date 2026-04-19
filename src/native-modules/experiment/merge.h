@@ -1,6 +1,3 @@
-#ifndef INCLUDE_MERGE_H
-#define INCLUDE_MERGE_H
-
 #pragma once
 #include <vector>
 #include "merge-filter-data.h"
@@ -20,5 +17,3 @@ auto merge_xor_compatible_src_lists_minimal(
     const std::vector<SourceComboList>& combo_lists) -> SourceList;
 
 }  // namespace cm
-
-#endif  // INCLUDE_MERGE_H

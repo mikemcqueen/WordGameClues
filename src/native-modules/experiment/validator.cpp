@@ -55,7 +55,7 @@ auto validate_source_names_at_counts(const std::string& clue_name,
 
         SourceParentList parents{
             {src_names.at(0), count_list.at(0), idx0},
-            {src_names.at(1), count_list.at(1), idx1}  // fmt
+            {src_names.at(1), count_list.at(1), idx1}  //
         };
         combo_list.emplace_back(std::move(merged_compat), std::move(parents),
             std::string(clue_name), util::sum(count_list));
@@ -74,7 +74,7 @@ auto validate_sources(const std::string& clue_name,
     bool validate_all) -> SourceComboList {
   SourceComboList result;
   if (src_names.size() != 2) return result;
-  auto pred = [&clue_name](const std::string& src_name) {  //
+  auto pred = [&clue_name](const std::string& src_name) {  
     return src_name == clue_name;
   };
   // TODO: test returning same variable at multiple locations

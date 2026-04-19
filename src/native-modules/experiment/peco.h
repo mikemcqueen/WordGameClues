@@ -1,6 +1,3 @@
-#ifndef INCLUDE_PECO_H
-#define INCLUDE_PECO_H
-
 #pragma once
 #include <algorithm>
 #include <cassert>
@@ -143,5 +140,3 @@ private:
   std::vector<index_t> result_;
   bool done_;
 };
-
-#endif //  INCLUDE_PECO_H

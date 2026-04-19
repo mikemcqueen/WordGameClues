@@ -1,6 +1,3 @@
-#ifndef INCLUDE_LOG_H
-#define INCLUDE_LOG_H
-
 #pragma once
 
 namespace cm {
@@ -44,5 +41,3 @@ inline void set_log_options(const LogOptions& args) {
 }
 
 }  // namespace cm
-
-#endif // INCLUDE_LOG_H

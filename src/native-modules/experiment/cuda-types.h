@@ -1,6 +1,3 @@
-#ifndef INCLUDE_CUDA_TYPES_H // TODO: CUDA_COMMON
-#define INCLUDE_CUDA_TYPES_H
-
 #pragma once
 
 #include <bit>
@@ -227,5 +224,3 @@ private:
 };
 
 }  // namespace cm
-
-#endif //  INCLUDE_CUDA_TYPES_H

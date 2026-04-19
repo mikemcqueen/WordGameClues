@@ -1,5 +1,4 @@
-#ifndef include_dump_h
-#define include_dump_h
+#pragma once
 
 #include <unordered_map>
 #include <string>
@@ -85,5 +84,3 @@ inline void dump(const std::vector<cm::NCDataList>& lists) {
   }
   std::cout << ']' << std::endl;
 }
-
-#endif // include_dump_h

@@ -1,5 +1,4 @@
-#ifndef INCLUDE_CLUE_MANAGER_H
-#define INCLUDE_CLUE_MANAGER_H
+#pragma once
 
 #include <functional>
 #include <string>
@@ -77,5 +76,3 @@ void reset();
 void dump_memory(std::string_view header = "clue-manager memory:");
 
 }  // namespace cm::clue_manager
-
-#endif // INCLUDE_CLUE_MANAGER_H

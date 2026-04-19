@@ -1,5 +1,4 @@
-#ifndef INCLUDE_VALIDATOR_H
-#define INCLUDE_VALIDATOR_H
+#pragma once
 
 #include <optional>
 #include <string>
@@ -21,5 +20,3 @@ auto is_xor_compatible(const std::vector<std::string>& src_names,
 void show_validator_durations();
 
 };  // namespace cm::validator
-
-#endif  // INCLUDE_VALIDATOR_H

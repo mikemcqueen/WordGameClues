@@ -1,8 +1,5 @@
 // show-components.h
 
-#ifndef INCLUDE_SHOW_COMPONENTS_H
-#define INCLUDE_SHOW_COMPONENTS_H
-
 #pragma once
 #include <set>
 #include <string>
@@ -25,5 +22,3 @@ auto get_consistency_check_results()
     -> const std::unordered_map<std::string, NameCountList>&;
 
 }  // namespace cm::components
-
-#endif // INCLUDE_SHOW_COMPONENTS_H

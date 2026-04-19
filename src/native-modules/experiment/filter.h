@@ -1,6 +1,3 @@
-#ifndef INCLUDE_FILTER_H
-#define INCLUDE_FILTER_H
-
 #pragma once
 #include <optional>
 //#include <cuda_runtime.h> // cudaStream_t
@@ -21,5 +18,3 @@ void filter_init(FilterData& mfd);
 void filter_cleanup();
 
 }  // namespace cm
-
-#endif  // INCLUDE_FILTER_H
