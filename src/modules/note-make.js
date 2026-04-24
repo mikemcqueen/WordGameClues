@@ -19,9 +19,10 @@ const Readlines        = require('n-readlines');
 
 const Note = {
     point_size: function () { return Options.point_size || 14; },
-    open:       function () { return `<div><span><font style="font-size: ${Note.point_size()}pt;">`; },
+    open:       function (checkbox = '') { return `<div>${checkbox}<span><font style="font-size: ${Note.point_size()}pt;">`; },
     close:      '</font></span></div>',
-    emptyLine:  '<div><br/></div>'
+    emptyLine:  '<div><br/></div>',
+    checkbox:   '<en-todo checked="false"/>&nbsp;&nbsp;'
 };
 
 //
@@ -52,8 +53,9 @@ function writeUrl (dest, line, suffix) {
 
 //
 
-function writeText (dest, line) {
-    return `${dest}${Note.open()}${line}${Note.close}`;
+function writeText (dest, line, checkbox) {
+    const _cb = checkbox ? Note.checkbox : '';
+    return `${dest}${Note.open(_cb)}${line}${Note.close}`;
 }
 
 // this function is dumb anyway.  Fitler.parse => list -> makefromFilterList
@@ -78,7 +80,7 @@ async function makeFromFilterFile (filename, options = {}) {
         } else if (_.startsWith(line, 'http')) {
             dest = writeUrl(dest, line);
         } else {
-            dest = writeText(dest, line);
+            dest = writeText(dest, line, options.checkbox);
         }
     }
     dest = writeEmptyLine(dest);

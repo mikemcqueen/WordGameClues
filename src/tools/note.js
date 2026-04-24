@@ -39,6 +39,7 @@ const CmdLineOptions = Getopt.create(_.concat(Clues.Options, [
     ['', 'count=NAME',      'count sources/clues/urls in a note'],
     ['', 'create=FILE',     'create note from file (default: filter result file)'],
     ['', 'text',            '  create from text file'],
+    ['', 'checkbox',        '  add checkbox to each text line (use with --text)'],
     ['', 'point-size=SIZE', '  font point size'],
     ['', 'get=TITLE',       'get (display) a note'],
     ['', 'parse=TITLE',     'parse note, by default into filter file format'],
@@ -47,6 +48,7 @@ const CmdLineOptions = Getopt.create(_.concat(Clues.Options, [
     ['', 'old',             '  use old parse method (use with parse)'],
     ['', 'json',            '  output in json (use with parse, parse-file)'],
     ['', 'lines',           '  output raw lines of text'],
+    ['', 'type=TYPE',       '  filter by checkbox state: YES (checked) or NO (unchecked) (use with --lines)'],
     ['', 'update[=NOTE]',   'update all results in worksheet, or a specific NOTE if specified'],
 // TOOD: change PREFIX to REGEX
     ['', 'match=PREFIX',    '  update notes matching title PREFIX (used with --update)'],
@@ -95,7 +97,7 @@ async function count (options) {
 
 function createFromTextFile (options) {
     const title = options.title || Path.basename(options.create);
-    return NoteMaker.makeFromFilterFile(options.create, { outerDiv: true })
+    return NoteMaker.makeFromFilterFile(options.create, { outerDiv: true, checkbox: options.checkbox })
         .then(body => {
             Debug(`body: ${body}`);
             return Note.create(title, body, options);
@@ -144,7 +146,7 @@ async function getAndParseDom (noteName, options = {}) {
             if (!note) return undefined;
             return {
                 note,
-                lines: NoteParser.parseDom(note.content)
+                lines: NoteParser.parseDom(note.content, options)
             };
         });
 }
@@ -573,6 +575,13 @@ async function main () {
     if (options['point-size']) options.point_size = options['point-size'];
     if (options['yes-mode']) options.yes_mode = true;
     if (options['download-only']) options.download_only = true;
+    if (options.type) {
+        const ft = options.type.toUpperCase();
+        if (ft !== 'YES' && ft !== 'NO') {
+            usage('--type must be YES or NO');
+        }
+        options.filter_type = ft;
+    }
     if (options['dry-run']) {
         options.dry_run = true;
         if (!options.quiet) {

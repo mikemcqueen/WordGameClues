@@ -10,7 +10,7 @@
 #include "source-core.h"
 #include "util.h"
 
-#if 1
+#if 0
 #include <iostream>
 #include <unordered_set>
 #endif
@@ -156,9 +156,9 @@ public:
   static auto make_src_compat_cref_list(const std::string& name, int count)
       -> SourceCompatCRefList;
 
-  static const SourceData& get_primary_source(const NameCountIndex& ref);
+  static const SourceData& get_primary_source(const NameCountIndex& nci);
   static const DeferredSourceData& get_deferred_source(
-      const NameCountIndex& ref);
+      const NameCountIndex& nci);
 
   // TODO: i think this can be eliminated; check src/tools/todo
   static bool add_compound_clue(const NameCount& nc,
@@ -173,19 +173,12 @@ public:
   auto get_primary_entry(const std::string& key) -> PrimaryEntry&;
   auto get_primary_entry(const std::string& key) const -> const PrimaryEntry&;
 
-  // Combo entry methods (count > 1)
+  // Compound entry methods (count >= 2)
   void init_compound_entry(int count, const std::string& source,
-      DeferredSourceDataList&& src_combo_list);
+      DeferredSourceDataList&& dfer_list);
   auto get_compound_entry(int count, const std::string& source_csv) -> CompoundEntry&;
   auto get_compound_entry(int count, const std::string& source_csv) const
       -> const CompoundEntry&;
-
-#if 0
-  // Legacy compatibility: get_entry delegates to appropriate type
-  auto get_entry(int count, const std::string& source_csv) -> PrimaryEntry&;
-  auto get_entry(int count, const std::string& source_csv) const
-      -> const PrimaryEntry&;
-#endif
 
   // Helpers that work with both Entry (count==1) and CompoundEntry (count>1)
   const std::set<std::string>& get_entry_clue_names(int count,

@@ -1,19 +1,19 @@
 #!/bin/bash
 if [ $# -lt 1  ]
 then
-   echo 'usage: split.sh <filename> [chunks]'
-   echo '  chunks defaults to 3'
-   exit -1
+   echo 'usage: split.sh <filename> [lines-per-chunk]'
+   echo '  LPC defaults to 750'
+   exit 2
 fi
 
 _filename=$1  #filename
 shift
 echo "filename: $_filename"
 
-_chunks=3
+_lpc=750
 if [[ $# -gt 0 ]]
 then
-   _chunks=$1
+   _lpc=$1
    shift
 fi
 
@@ -27,8 +27,11 @@ fi
 _wcl=$(wc -l $_filename) # line count as ugly string
 _lines=$(echo $_wcl | sed -E 's/^[^[[:digit:]]*([[:digit:]]+).*$/\1/') # line count
 
-_lpc=$(($_lines / $_chunks)) # lines per chunk
+#_lpc=$(($_lines / $_chunks)) # lines per chunk
 
-echo "lines: $_lines, chunks: $_chunks, lpc: $_lpc"
+_chunks=$(($_lines / $_lpc)) # chunks
+_last=$(($_lines - $_chunks * $_lpc))
+
+echo "lines: $_lines, chunks: $_chunks, lpc: $_lpc, last chunk: $_last"
 
 split -l $_lpc $_filename $_prefix.

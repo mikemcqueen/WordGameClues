@@ -1,3 +1,17 @@
+* so now i'm finally seeing a possible use case for something like --generate-max.
+  if i run -t src1,src2 it only shows the PRESENT as entries for clues for which the
+  combination of src1 and src counts are <= load_max.  are sums > load_max being
+  filtered *after* the merge, or before?
+
+  but if i run -t src1,src2 -t src3, it shows results for all src1s and src2s which
+  have an *individual* count < load_max, that is, not the sum of their counts.
+
+  so no filtering is taking place, and merge is of course taking substantially longer
+  as a result, especially with many -t's. (it's a rare enough need to use it that the
+  extra execution time isn't a big factor honestly).
+
+  so which one is right? why is a single -t filtering on source count sum?
+
 ++ older stuff below
 
 * passing shared variable as param: xor_chunk_idx
@@ -55,7 +69,14 @@
       that compact_uv_indices_in_place may actually be working just fine, but the
       shared variations_indices and compat_indices buffer pointers (copied from MFD)
       might be messing it (and other things) up
-    
+  * couple of commits that fixed some non-determinism might have made this easier to
+    a) work with multiple stream
+    b) get compact_uv_indices_in place
+    c) TODO: (have AI) write tests for compact_uv_indices in isolation.
+    commits:
+      30ed368bfa75c20b3029b59fa8c64cd34f67b2d7
+      30b11928f3287300c622b8121f42c0c099609b28
+   
 * unique_sources branch implementation issues:
   * validation failures. possibly because hash/equal_to of SourceData is wrong (doesn't
     take into account ncList, maybe).
@@ -70,7 +91,8 @@
   is one example, but I think there is also opportunity for get_known_source_map_entries
   as indicated below.
 
-* I think there's something weird going on in Candidates.cpp. I *should* be generating
+* FIXED MAYBE.
+  I think there's something weird going on in Candidates.cpp. I *should* be generating
   word-pairs that have the *same* sources, because of synonyms, for example. And I had
   code in there with the opt_idx.value() that was presumably written to enable multiple
   combos with the same underlying sources to "share" those sources; effectively to be
@@ -114,7 +136,6 @@
          That means dedup at level 3 can't just compare indices — the indices would differ. You'd
          need to compare the actual SourceCompatibilityData objects.
 
-
 * move all the clock/count stuff to a separate file
 
 * refactor xor/or get_idx_incremental_uv into a single function
@@ -135,6 +156,8 @@
   * tried this. more memory, not faster (at least at 64-thread blocks.) maybe
     re-assess if/when I ever get to point of implementing block-size agnostic
     ExclusiveSum.
+
+* TODO: blocksize-agnostic ExclusiveSum
 
 * should look into using libcu++ for standard library such as std::array, std::copy in
   kernels. coz.. i might just be gettting lucky. and i'm not sure how to control which
@@ -485,6 +508,7 @@
    - calculated:
    - MC = max combos that can be done in GD: (CS * num_sm), (e.g. 200M for 10sm, 1B for 50sm)
    * I may also want to eventually divide MB by StreamCount and use multiple streams.
+
 * Optimizing merge/get_compat_combos. 200M combos currently, and no streams.
   Low reward atm, but eventually might make sense.
   * 200M kernel finishes in ~35ms, which DOES NOT give us enough time to do

@@ -11,18 +11,18 @@
 namespace cm {
 
 /*static*/ const SourceData& KnownSources::get_primary_source(
-    const NameCountIndex& ref) {
-  assert(ref.nc.count == 1 && "get_primary_source_by_ref: only count==1 supported");
+    const NameCountIndex& nci) {
+  assert(nci.nc.count == 1 && "get_primary_source: only count == 1 supported");
   const SourceData* result = nullptr;
-  KnownSources::for_each_primary_source(ref.nc.name,
+  KnownSources::for_each_primary_source(nci.nc.name,
       [&](const SourceData& src, index_t idx) {
-        if (idx == ref.index) {
+        if (idx == nci.index) {
           result = &src;
         }
       });
   if (!result) {
-    std::cerr << "ERROR: get_primary_source_by_ref source not found: "
-              << ref.nc.name << ":" << ref.nc.count << " idx " << ref.index
+    std::cerr << "ERROR: get_primary_source: source not found, "
+              << nci.nc.name << ":" << nci.nc.count << " idx " << nci.index
               << std::endl;
   }
   assert(result != nullptr);
@@ -30,23 +30,23 @@ namespace cm {
 }
 
 /*static*/ const DeferredSourceData& KnownSources::get_deferred_source(
-    const NameCountIndex& ref) {
-  if (ref.nc.count <= 1) {
-    std::cerr << "ERROR: get_combo_source_by_ref called with invalid count: "
-              << ref.nc.count << ", name: " << ref.nc.name << ", idx: "
-              << ref.index << std::endl;
+    const NameCountIndex& nci) {
+  if (nci.nc.count <= 1) {
+    std::cerr << "ERROR: get_deferred_source: invalid count, "
+              << nci.nc.count << ", name: " << nci.nc.name << ", idx: "
+              << nci.index << std::endl;
   }
-  assert(ref.nc.count > 1 && "get_combo_source_by_ref: only count>1 supported");
+  assert(nci.nc.count > 1 && "get_deferred_source: only count >= 2 supported");
   const DeferredSourceData* result = nullptr;
-  KnownSources::for_each_combo_source(ref.nc.name, ref.nc.count,
+  KnownSources::for_each_combo_source(nci.nc.name, nci.nc.count,
       [&](const DeferredSourceData& combo, index_t idx) {
-        if (idx == ref.index) {
+        if (idx == nci.index) {
           result = &combo;
         }
       });
   if (!result) {
-    std::cerr << "ERROR: get_combo_source_by_ref source not found: "
-              << ref.nc.name << ":" << ref.nc.count << " idx " << ref.index
+    std::cerr << "ERROR: get_deferred_source: source not found, "
+              << nci.nc.name << ":" << nci.nc.count << " idx " << nci.index
               << std::endl;
   }
   assert(result != nullptr);
@@ -188,21 +188,6 @@ auto KnownSources::get_compound_entry(int count, const std::string& source_csv) 
   assert(it != map.end());
   return it->second;
 }
-
-#if 0
-// Legacy compatibility: get_entry only works for count == 1 now
-auto KnownSources::get_entry(int count, const std::string& source_csv)
-    -> PrimaryEntry& {
-  assert(count == 1 && "get_entry: only count == 1 supported, use get_compound_entry for count > 1");
-  return get_primary_entry(source_csv);
-}
-
-auto KnownSources::get_entry(int count, const std::string& source_csv) const
-    -> const PrimaryEntry& {
-  assert(count == 1 && "get_entry: only count == 1 supported, use get_compound_entry for count > 1");
-  return get_primary_entry(source_csv);
-}
-#endif
 
 const std::set<std::string>& KnownSources::get_entry_clue_names(int count,
     const std::string& source_csv) const {

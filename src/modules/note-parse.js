@@ -18,10 +18,11 @@ const Stringify        = require('stringify-object');
 //
 
 const Tag = {
-    break: 'br',
-    div:   'div',
-    link:  'a',
-    text:  '#text'
+    break:    'br',
+    checkbox: 'en-todo',
+    div:      'div',
+    link:     'a',
+    text:     '#text'
 };
 
 //  div: defines a line 
@@ -94,6 +95,11 @@ function processLink (node, div, divQueue) {
     div.link = true;
 }
 
+function processCheckbox (node, div, queue) {
+    Expect(div).is.ok();
+    div.checked = node.getAttribute('checked') === 'true';
+}
+
 // br: break.
 //  cannot exist outside of a div
 //  only one per div?
@@ -123,10 +129,11 @@ function isDiv (node) {
 //
 
 const TagFnMap = {
-    [Tag.break]: processBreak,
-    [Tag.div]:   processDiv,
-    [Tag.link]:  processLink,
-    [Tag.text]:  processText
+    [Tag.break]:    processBreak,
+    [Tag.checkbox]: processCheckbox,
+    [Tag.div]:      processDiv,
+    [Tag.link]:     processLink,
+    [Tag.text]:     processText
 };
 
 // should use stream here
@@ -161,8 +168,14 @@ function parseDomLines (lines, node, queue, options) {
         Expect(div).is.ok();
         let text = div.text && div.text.trim();
         if (text && !_.isEmpty(text)) {
-            Debug(`line: ${text}`);
-            lines.push(text);
+            const ft = options && options.filter_type;
+            const include = !ft
+                || (ft === 'YES' && div.checked === true)
+                || (ft === 'NO'  && div.checked === false);
+            if (include) {
+                Debug(`line: ${text}`);
+                lines.push(text);
+            }
         } else if (!_.isEmpty(_.last(lines))) {
             Debug('empty line');
             lines.push('');
