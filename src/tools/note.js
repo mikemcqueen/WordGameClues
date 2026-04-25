@@ -34,7 +34,7 @@ const NoteValidator  = require('../modules/note-validate');
 
 //
 
-const Commands = { count, create, get, parse, update, validate };
+const Commands = { count, create, get, parse, 'parse-file': parseFile, update, validate };
 const CmdLineOptions = Getopt.create(_.concat(Clues.Options, [
     ['', 'count=NAME',      'count sources/clues/urls in a note'],
     ['', 'create=FILE',     'create note from file (default: filter result file)'],
@@ -43,7 +43,7 @@ const CmdLineOptions = Getopt.create(_.concat(Clues.Options, [
     ['', 'point-size=SIZE', '  font point size'],
     ['', 'get=TITLE',       'get (display) a note'],
     ['', 'parse=TITLE',     'parse note, by default into filter file format'],
-//    ['', 'parse-file=FILE','parse note file into filter file format'],
+    ['', 'parse-file=FILE', 'parse a note file from the filesystem'],
     ['', 'compare',         '  parse old + dom  and show differences'],
     ['', 'old',             '  use old parse method (use with parse)'],
     ['', 'json',            '  output in json (use with parse, parse-file)'],
@@ -254,6 +254,23 @@ async function parse (options) {
                     }
                 });
         }
+    }
+}
+
+//
+
+async function parseFile (options) {
+    const content = Fs.readFileSync(options.parse_file, 'utf8');
+    const lines = NoteParser.parseDom(content, options);
+    if (options.lines) {
+        if (_.isEmpty(lines)) return console.error('empty file');
+        lines.forEach(line => console.log(line));
+    } else {
+        const filterList = Filter.parseLines(lines);
+        if (_.isEmpty(filterList)) {
+            return console.log('no results');
+        }
+        return Filter.dumpList(filterList, { json: options.json, fd: process.stdout.fd });
     }
 }
 
@@ -570,6 +587,7 @@ async function main () {
         usage('--quiet and --verbose cannot both be specified');
     }
 
+    if (options['parse-file']) options.parse_file = options['parse-file'];
     if (options['from-fs']) options.from_fs = true;
     if (options['force-update']) options.force_update = true;
     if (options['point-size']) options.point_size = options['point-size'];
@@ -588,7 +606,9 @@ async function main () {
             options.verbose = true;
         }
     }
-    options.notebook = options.notebook || Note.getWorksheetName(Clues.getByOptions(options));
+    if (!options.parse_file) {
+        options.notebook = options.notebook || Note.getWorksheetName(Clues.getByOptions(options));
+    }
 
     let cmd;
     for (const key of _.keys(Commands)) {
@@ -601,7 +621,7 @@ async function main () {
         }
     }
     if (!cmd) usage(`missing command`);
-    if (_.includes(['get', 'parse'], cmd)) options.quiet = true;
+    if (_.includes(['get', 'parse', 'parse-file'], cmd)) options.quiet = true;
 
     // Other modules will see snapshot of options taken here.
     Options.set(options);

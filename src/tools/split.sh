@@ -1,7 +1,7 @@
 #!/bin/bash
 if [ $# -lt 1  ]
 then
-   echo 'usage: split.sh <filename> [lines-per-chunk]'
+   echo 'usage: split.sh <filename> [lines-per-chunk] [output-prefix]'
    echo '  LPC defaults to 750'
    exit 2
 fi

@@ -166,7 +166,9 @@ function parseDomLines (lines, node, queue, options) {
     if (isDiv(node)) {
         let div = queue.pop();
         Expect(div).is.ok();
-        let text = div.text && div.text.trim();
+        // let text = div.text && div.text.trim();
+        // &nbsp; filtered out too
+        let text = div.text && div.text.replace(/^[\s\u00a0]+|[\s\u00a0]+$/g, '')
         if (text && !_.isEmpty(text)) {
             const ft = options && options.filter_type;
             const include = !ft

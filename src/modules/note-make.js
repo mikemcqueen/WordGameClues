@@ -22,7 +22,7 @@ const Note = {
     open:       function (checkbox = '') { return `<div>${checkbox}<span><font style="font-size: ${Note.point_size()}pt;">`; },
     close:      '</font></span></div>',
     emptyLine:  '<div><br/></div>',
-    checkbox:   '<en-todo checked="false"/>&nbsp;&nbsp;'
+    checkbox:   '<en-todo checked="false"/>&#xA0;&#xA0;' // those are XML &nbsp; 
 };
 
 //
