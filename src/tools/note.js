@@ -264,7 +264,11 @@ async function parseFile (options) {
     const lines = NoteParser.parseDom(content, options);
     if (options.lines) {
         if (_.isEmpty(lines)) return console.error('empty file');
-        lines.forEach(line => console.log(line));
+        lines.forEach(line => {
+            if (!_.isEmpty(line)) {
+                console.log(line)
+            }
+        });
     } else {
         const filterList = Filter.parseLines(lines);
         if (_.isEmpty(filterList)) {
@@ -648,5 +652,5 @@ main()
     .then(result => process.exit(result))
     .catch(err => {
         console.error(err, err.stack);
-        console.log(err, err.stack);
+        process.exitCode = 1;
     });
