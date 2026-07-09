@@ -43,35 +43,35 @@ class Lettercount
 
     static
     {
-        letterFrequencyMap.put('a',     new BigDecimal(8.167, mc));
-        letterFrequencyMap.put('b',     new BigDecimal(1.492, mc));
-        letterFrequencyMap.put('c',     new BigDecimal(2.782, mc));
-        letterFrequencyMap.put('d',     new BigDecimal(4.253, mc));
-        letterFrequencyMap.put('e',     new BigDecimal(12.702, mc));
-        letterFrequencyMap.put('f',     new BigDecimal(2.228, mc));
-        letterFrequencyMap.put('g',     new BigDecimal(2.015, mc));
-        letterFrequencyMap.put('h',     new BigDecimal(6.094, mc));
-        letterFrequencyMap.put('i',     new BigDecimal(6.966, mc));
-        letterFrequencyMap.put('j',     new BigDecimal(0.153, mc));
-        letterFrequencyMap.put('k',     new BigDecimal(0.772, mc));
-        letterFrequencyMap.put('l',     new BigDecimal(4.025, mc));
-        letterFrequencyMap.put('m',     new BigDecimal(2.406, mc));
-        letterFrequencyMap.put('n',     new BigDecimal(6.749, mc));
-        letterFrequencyMap.put('o',     new BigDecimal(7.507, mc));
-        letterFrequencyMap.put('p',     new BigDecimal(1.929, mc));
-        letterFrequencyMap.put('q',     new BigDecimal(0.095, mc));
-        letterFrequencyMap.put('r',     new BigDecimal(5.987, mc));
-        letterFrequencyMap.put('s',     new BigDecimal(6.327, mc));
-        letterFrequencyMap.put('t',     new BigDecimal(9.056, mc));
-        letterFrequencyMap.put('u',     new BigDecimal(2.758, mc));
-        letterFrequencyMap.put('v',     new BigDecimal(0.978, mc));
-        letterFrequencyMap.put('w',     new BigDecimal(2.360, mc));
-        letterFrequencyMap.put('x',     new BigDecimal(0.150, mc));
-        letterFrequencyMap.put('y',     new BigDecimal(1.974, mc));
-        letterFrequencyMap.put('z',     new BigDecimal(0.074, mc));
+        letterFrequencyMap.put('a', new BigDecimal(8.167, mc));
+        letterFrequencyMap.put('b', new BigDecimal(1.492, mc));
+        letterFrequencyMap.put('c', new BigDecimal(2.782, mc));
+        letterFrequencyMap.put('d', new BigDecimal(4.253, mc));
+        letterFrequencyMap.put('e', new BigDecimal(12.702, mc));
+        letterFrequencyMap.put('f', new BigDecimal(2.228, mc));
+        letterFrequencyMap.put('g', new BigDecimal(2.015, mc));
+        letterFrequencyMap.put('h', new BigDecimal(6.094, mc));
+        letterFrequencyMap.put('i', new BigDecimal(6.966, mc));
+        letterFrequencyMap.put('j', new BigDecimal(0.153, mc));
+        letterFrequencyMap.put('k', new BigDecimal(0.772, mc));
+        letterFrequencyMap.put('l', new BigDecimal(4.025, mc));
+        letterFrequencyMap.put('m', new BigDecimal(2.406, mc));
+        letterFrequencyMap.put('n', new BigDecimal(6.749, mc));
+        letterFrequencyMap.put('o', new BigDecimal(7.507, mc));
+        letterFrequencyMap.put('p', new BigDecimal(1.929, mc));
+        letterFrequencyMap.put('q', new BigDecimal(0.095, mc));
+        letterFrequencyMap.put('r', new BigDecimal(5.987, mc));
+        letterFrequencyMap.put('s', new BigDecimal(6.327, mc));
+        letterFrequencyMap.put('t', new BigDecimal(9.056, mc));
+        letterFrequencyMap.put('u', new BigDecimal(2.758, mc));
+        letterFrequencyMap.put('v', new BigDecimal(0.978, mc));
+        letterFrequencyMap.put('w', new BigDecimal(2.360, mc));
+        letterFrequencyMap.put('x', new BigDecimal(0.150, mc));
+        letterFrequencyMap.put('y', new BigDecimal(1.974, mc));
+        letterFrequencyMap.put('z', new BigDecimal(0.074, mc));
     }
  
-    public static void main(String[] args) throws IOException {
+   public static void main(String[] args) throws IOException {
         if (args.length < 1) {
             System.out.println("Usage: java Lettercount [-r] <filename> [string1 ... stringN]");
             return;
@@ -209,10 +209,10 @@ class Lettercount
                 //factorString = "-" + factor.factor.toString();
             }
             boolean negative = factor.factor.compareTo(ONE) == -1;
-            String actual = negative ? "(" + df.format(factor.actual) + ")" : df.format(factor.actual);
+            String factor_actual = negative ? "(" + df.format(factor.actual) + ")" : df.format(factor.actual);
                 
             System.out.println("'" + entry.getKey() + "' : " + entry.getValue() + "  " +
-                               df.format(factor.expected) + "  " + actual + "  " + factorString);
+                               df.format(factor.expected) + "  " + factor_actual + "  " + factorString);
         }
     }
 

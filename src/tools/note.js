@@ -649,7 +649,11 @@ async function main () {
 //
     
 main()
-    .then(result => process.exit(result))
+    // Set exitCode rather than calling process.exit(), which can truncate
+    // buffered async stdout/stderr (e.g. a large `--get` note piped to another
+    // process) before it flushes. Letting the event loop drain naturally
+    // guarantees all output is written before the process exits.
+    .then(result => { process.exitCode = result || 0; })
     .catch(err => {
         console.error(err, err.stack);
         process.exitCode = 1;
