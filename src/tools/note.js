@@ -263,12 +263,14 @@ async function parseFile (options) {
     const content = Fs.readFileSync(options.parse_file, 'utf8');
     const lines = NoteParser.parseDom(content, options);
     if (options.lines) {
-        if (_.isEmpty(lines)) return console.error('empty file');
+        let count = 0;
         lines.forEach(line => {
             if (!_.isEmpty(line)) {
-                console.log(line)
+                console.log(line);
+                count += 1;
             }
         });
+        console.error(`${options.parse_file}: ${count} lines parsed`);
     } else {
         const filterList = Filter.parseLines(lines);
         if (_.isEmpty(filterList)) {
