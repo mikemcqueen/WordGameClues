@@ -36,6 +36,7 @@ class Freqsort
     private static boolean interleave = false;
     private static boolean wordsOnly = false;
     private static MatchType matchType = MatchType.ALL;
+    private static String sentenceFile = null;
 
     private static BigDecimal _value = BigDecimal.ONE;
     private static Comparator<StringFreq> sortFunc;
@@ -74,13 +75,13 @@ class Freqsort
     {
         if (args.length < 3)
         {
-            System.out.println("Usage: java Freqsort [-i] [-n|-p|-a] <value> <sentence-file> <dict-file> [ignore-string1 ... ignore-stringN]");
+            System.out.println("Usage: java Freqsort [-i] [-n|-p|-a] [-f <sentence-file>] <value> <sentence-text> <dict-file> [ignore-string1 ... ignore-stringN]");
             return;
 	}
 
 	int index = 0;
 	for (; index < args.length; ++index) {
-	    if ((args[index].charAt(0) == '-') && 
+	    if ((args[index].charAt(0) == '-') &&
 		(args[index].length() > 1))
 	    {
 		switch (args[index].charAt(1)) {
@@ -89,6 +90,7 @@ class Freqsort
 		case 'p': matchType = MatchType.PROPER;     break;
 		case 'a': matchType = MatchType.ALL;        break;
 		case 'w': wordsOnly = true; break;
+		case 'f': sentenceFile = args[++index];     break;
 		default : throw new IllegalArgumentException("-" + String.valueOf(args[index].charAt(1)));
 		}
 	    }
@@ -113,7 +115,9 @@ class Freqsort
 	    sortFunc = new StringFreq.ByLengthAndFreq();
         }
 
-        String sentence = loadSentence(args[index++]).toLowerCase();
+        String sentence = (sentenceFile != null) ?
+            loadSentence(sentenceFile).toLowerCase() :
+            args[index++].toLowerCase();
 
 	boolean anyIgnore = false;
 	boolean lastUppercase = false;

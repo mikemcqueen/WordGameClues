@@ -73,21 +73,29 @@ class Lettercount
  
    public static void main(String[] args) throws IOException {
         if (args.length < 1) {
-            System.out.println("Usage: java Lettercount [-r] <filename> [string1 ... stringN]");
+            System.out.println("Usage: java Lettercount [-r] [-f <filename>] <text> [string1 ... stringN]");
             return;
         }
-        
+
         boolean quiet = false;
         boolean remainOnly = false;
+        String sentenceFile = null;
         int argIndex = 0;
 
-        if (args[argIndex].equals("-r")) {
-            ++argIndex;
-            quiet = true;
-            remainOnly = true;
+        for (; argIndex < args.length; ++argIndex) {
+            if (args[argIndex].equals("-r")) {
+                quiet = true;
+                remainOnly = true;
+            } else if (args[argIndex].equals("-f")) {
+                sentenceFile = args[++argIndex];
+            } else {
+                break;
+            }
         }
 
-        String sentence = load(args[argIndex++]);
+        String sentence = (sentenceFile != null) ?
+            load(sentenceFile) :
+            args[argIndex++].toLowerCase();
         int totalChars = sentence.length();
         if (!quiet) {
             System.out.println("total: " + totalChars);
