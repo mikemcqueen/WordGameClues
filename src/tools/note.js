@@ -37,7 +37,7 @@ const NoteValidator  = require('../modules/note-validate');
 const Commands = { count, create, get, parse, 'parse-file': parseFile, update, validate };
 const CmdLineOptions = Getopt.create(_.concat(Clues.Options, [
     ['', 'count=NAME',      'count sources/clues/urls in a note'],
-    ['', 'create=FILE',     'create note from file (default: filter result file)'],
+    ['', 'create=FILE',     'create note from file (.enml used directly; default: filter result file)'],
     ['', 'text',            '  create from text file'],
     ['', 'checkbox',        '  add checkbox to each text line (use with --text)'],
     ['', 'point-size=SIZE', '  font point size'],
@@ -110,11 +110,27 @@ function createFromTextFile (options) {
 
 //
 
+function createFromEnmlFile (title, options) {
+    const body = Fs.readFileSync(options.create, 'utf8');
+    const createOptions = Object.assign({}, options, { content: true });
+    return Note.create(title, body, createOptions)
+        .then(note => {
+            if (!options.quiet) {
+                console.log(Stringify(note));
+            }
+        });
+}
+
+//
+
 async function create (options) {
     if (options.text) return createFromTextFile(options);
 
     const title = options.title;
     if (!title) usage('--title is required');
+    if (Path.extname(options.create).toLowerCase() === '.enml') {
+        return createFromEnmlFile(title, options);
+    }
     const list = Filter.parseFileSync(options.create, options);
     // NOTE: not passing cmd line options here
     const body = NoteMaker.makeFromFilterList(list, { outerDiv: true });

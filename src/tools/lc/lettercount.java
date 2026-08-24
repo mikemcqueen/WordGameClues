@@ -71,9 +71,36 @@ class Lettercount
         letterFrequencyMap.put('z', new BigDecimal(0.074, mc));
     }
  
+    private static void usage()
+    {
+        System.out.print("""
+            Usage: java Lettercount [-r] [-f <filename>] <text> [string1 ... stringN]
+
+            Counts the letters in <text>, subtracts the letters spelled by string1..stringN,
+            and reports how the letters that remain compare to standard English frequency.
+
+            Options:
+              -r             print only the remaining letters, nothing else
+              -f <filename>  read the text from <filename> rather than the command line
+
+            Columns, sorted by factor:
+              char      the letter
+              cnt       times it occurs in the remaining letters
+              expected  its frequency in English text, as a percent
+              actual    its frequency here, as a percent; parenthesized when below expected
+              factor    actual / expected -- how over- or under-used the letter is
+                          +++  over 2x its expected share
+                          ---  under half its expected share
+
+            The C/V ratio line compares consonants-per-vowel against an English average
+            of 1.59, marking its actual value +++ above 1.8 (consonant-heavy) or ---
+            below 1.4 (vowel-heavy).
+            """);
+    }
+
    public static void main(String[] args) throws IOException {
         if (args.length < 1) {
-            System.out.println("Usage: java Lettercount [-r] [-f <filename>] <text> [string1 ... stringN]");
+            usage();
             return;
         }
 
@@ -88,6 +115,9 @@ class Lettercount
                 remainOnly = true;
             } else if (args[argIndex].equals("-f")) {
                 sentenceFile = args[++argIndex];
+            } else if (args[argIndex].equals("-h") || args[argIndex].equals("--help")) {
+                usage();
+                return;
             } else {
                 break;
             }
@@ -200,10 +230,57 @@ class Lettercount
         return true;
     }
 
+    // Column headers and widths for the dump() table.
+    private static final String[] COL_HEADERS = { "char", "cnt", "expected", "actual", "factor" };
+    private static final int[] COL_WIDTHS = { 4, 4, 8, 8, 9 };
+
+    // Index of the first column covered by the "frequency" group header.
+    private static final int FREQ_FIRST_COL = 2;
+
+    private static String rowFormat()
+    {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < COL_WIDTHS.length; ++i)
+        {
+            if (i > 0)
+            {
+                sb.append(" ");
+            }
+            sb.append("%-").append(COL_WIDTHS[i]).append("s");
+        }
+        return sb.toString();
+    }
+
+    // A bracket spanning the frequency columns, e.g. "    ┌──── frequency ────┐".
+    // It ends over the last character of the final header rather than at the end
+    // of that column's padded field.
+    private static String groupHeader(String label)
+    {
+        int indent = 0;
+        for (int i = 0; i < FREQ_FIRST_COL; ++i)
+        {
+            indent += COL_WIDTHS[i] + 1;
+        }
+        int last = COL_WIDTHS.length - 1;
+        int span = COL_HEADERS[last].length();
+        for (int i = FREQ_FIRST_COL; i < last; ++i)
+        {
+            span += COL_WIDTHS[i] + 1;
+        }
+        String text = " " + label + " ";
+        int dashes = Math.max(0, span - text.length() - 2);
+        int left = dashes / 2;
+        return " ".repeat(indent) + "┌" + "─".repeat(left) + text +
+            "─".repeat(dashes - left) + "┐";
+    }
+
     private static void dump(Map<Character, Integer> map)
     {
+        String format = rowFormat();
         List<Map.Entry<Character, Integer>> entryList = new ArrayList<>(map.entrySet());
         java.util.Collections.sort(entryList, new ByFactor());
+        System.out.println(groupHeader("frequency"));
+        System.out.println(String.format(format, (Object[]) COL_HEADERS));
         for (Map.Entry<Character, Integer> entry : entryList) {
             Factor factor = getFactor(entry);
             
@@ -219,8 +296,10 @@ class Lettercount
             boolean negative = factor.factor.compareTo(ONE) == -1;
             String factor_actual = negative ? "(" + df.format(factor.actual) + ")" : df.format(factor.actual);
                 
-            System.out.println("'" + entry.getKey() + "' : " + entry.getValue() + "  " +
-                               df.format(factor.expected) + "  " + factor_actual + "  " + factorString);
+            String charField = "'" + entry.getKey() + "'";
+            System.out.println(String.format(format,
+                                              charField, entry.getValue(),
+                                              df.format(factor.expected), factor_actual, factorString));
         }
     }
 
