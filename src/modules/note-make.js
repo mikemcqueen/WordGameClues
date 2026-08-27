@@ -22,7 +22,7 @@ const Note = {
     open:       function (checkbox = '') { return `<div>${checkbox}<span><font style="font-size: ${Note.point_size()}pt;">`; },
     close:      '</font></span></div>',
     emptyLine:  '<div><br/></div>',
-    checkbox:   '<en-todo checked="false"/>&#xA0;&#xA0;' // those are XML &nbsp; 
+    checkbox:   function (checked) { return `<en-todo checked="${checked ? 'true' : 'false'}"/>&#xA0;&#xA0;`; }
 };
 
 //
@@ -53,9 +53,33 @@ function writeUrl (dest, line, suffix) {
 
 //
 
-function writeText (dest, line, checkbox) {
-    const _cb = checkbox ? Note.checkbox : '';
+function writeText (dest, line, checkbox, checked = false) {
+    const _cb = checkbox ? Note.checkbox(checked) : '';
     return `${dest}${Note.open(_cb)}${line}${Note.close}`;
+}
+
+//
+
+function loadYesPairs (filename) {
+    const pairs = new Set();
+    if (!filename) return pairs;
+
+    const readLines = new Readlines(filename);
+    while (true) {
+        const nextLine = readLines.next();
+        if (nextLine === false) break;
+
+        const pair = nextLine.toString().trim();
+        if (_.isEmpty(pair)) continue;
+
+        const names = pair.split(',');
+        if (names.length !== 2) {
+            throw new Error(`invalid pair in ${filename}: ${pair}`);
+        }
+        pairs.add(pair);
+        pairs.add(`${names[1]},${names[0]}`);
+    }
+    return pairs;
 }
 
 // this function is dumb anyway.  Fitler.parse => list -> makefromFilterList
@@ -67,6 +91,7 @@ async function makeFromFilterFile (filename, options = {}) {
     Debug(`filename: ${filename}`);
 
     let dest = '';
+    const yesPairs = options.checkbox ? loadYesPairs(options.yesPairsFile) : new Set();
     let readLines = new Readlines(filename);
     if (options.outerDiv) {
         dest += '<div>';
@@ -80,7 +105,7 @@ async function makeFromFilterFile (filename, options = {}) {
         } else if (_.startsWith(line, 'http')) {
             dest = writeUrl(dest, line);
         } else {
-            dest = writeText(dest, line, options.checkbox);
+            dest = writeText(dest, line, options.checkbox, yesPairs.has(line));
         }
     }
     dest = writeEmptyLine(dest);

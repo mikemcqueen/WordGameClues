@@ -40,6 +40,7 @@ const CmdLineOptions = Getopt.create(_.concat(Clues.Options, [
     ['', 'create=FILE',     'create note from file (.enml used directly; default: filter result file)'],
     ['', 'text',            '  create from text file'],
     ['', 'checkbox',        '  add checkbox to each text line (use with --text)'],
+    ['', 'yes-pairs=FILE',  '  check pairs listed in FILE (use with --text --checkbox)'],
     ['', 'point-size=SIZE', '  font point size'],
     ['', 'get=TITLE',       'get (display) a note'],
     ['', 'parse=TITLE',     'parse note, by default into filter file format'],
@@ -97,7 +98,11 @@ async function count (options) {
 
 function createFromTextFile (options) {
     const title = options.title || Path.basename(options.create);
-    return NoteMaker.makeFromFilterFile(options.create, { outerDiv: true, checkbox: options.checkbox })
+    return NoteMaker.makeFromFilterFile(options.create, {
+        outerDiv: true,
+        checkbox: options.checkbox,
+        yesPairsFile: options.yes_pairs
+    })
         .then(body => {
             Debug(`body: ${body}`);
             return Note.create(title, body, options);
@@ -613,6 +618,7 @@ async function main () {
     if (options['from-fs']) options.from_fs = true;
     if (options['force-update']) options.force_update = true;
     if (options['point-size']) options.point_size = options['point-size'];
+    if (options['yes-pairs']) options.yes_pairs = options['yes-pairs'];
     if (options['yes-mode']) options.yes_mode = true;
     if (options['download-only']) options.download_only = true;
     if (options.type) {
