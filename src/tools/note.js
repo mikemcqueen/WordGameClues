@@ -40,7 +40,7 @@ const CmdLineOptions = Getopt.create(_.concat(Clues.Options, [
     ['', 'create=FILE',     'create note from file (.enml used directly; default: filter result file)'],
     ['', 'text',            '  create from text file'],
     ['', 'checkbox',        '  add checkbox to each text line (use with --text)'],
-    ['', 'two-checkboxes',  '  add Y and N checkboxes to each text line (use with --text)'],
+    ['', 'two-checkboxes',  '  add Y/N checkboxes with --text; require two with --lines'],
     ['', 'yes-pairs=FILE',  '  check pairs listed in FILE (use with --text --checkbox or --two-checkboxes)'],
     ['', 'point-size=SIZE', '  font point size'],
     ['', 'get=TITLE',       'get (display) a note'],

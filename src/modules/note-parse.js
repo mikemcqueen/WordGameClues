@@ -115,9 +115,10 @@ function stripCheckboxLabels (text, checkboxes) {
 //  one checkbox:  YES = checked, NO/NONE = unchecked
 //  two checkboxes: YES = Y checked, NO = N checked, NONE = neither checked
 
-function includeLine (checkboxes, filterType) {
-    if (!filterType) return true;
+function includeLine (checkboxes, filterType, twoCheckboxes) {
     const count = _.size(checkboxes);
+    if (twoCheckboxes && count !== 2) return false;
+    if (!filterType) return true;
     if (count === 0) return false;
     if (count === 1) {
         return filterType === 'YES' ? checkboxes[0] : !checkboxes[0];
@@ -198,7 +199,8 @@ function parseDomLines (lines, node, queue, options) {
         let text = div.text && div.text.replace(/^[\s\u00a0]+|[\s\u00a0]+$/g, '')
         if (text) text = stripCheckboxLabels(text, div.checkboxes);
         if (text && !_.isEmpty(text)) {
-            if (includeLine(div.checkboxes, options && options.filter_type)) {
+            if (includeLine(div.checkboxes, options && options.filter_type,
+                            options && options.two_checkboxes)) {
                 Debug(`line: ${text}`);
                 lines.push(text);
             }
