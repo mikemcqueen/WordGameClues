@@ -40,7 +40,8 @@ const CmdLineOptions = Getopt.create(_.concat(Clues.Options, [
     ['', 'create=FILE',     'create note from file (.enml used directly; default: filter result file)'],
     ['', 'text',            '  create from text file'],
     ['', 'checkbox',        '  add checkbox to each text line (use with --text)'],
-    ['', 'yes-pairs=FILE',  '  check pairs listed in FILE (use with --text --checkbox)'],
+    ['', 'two-checkboxes',  '  add Y and N checkboxes to each text line (use with --text)'],
+    ['', 'yes-pairs=FILE',  '  check pairs listed in FILE (use with --text --checkbox or --two-checkboxes)'],
     ['', 'point-size=SIZE', '  font point size'],
     ['', 'get=TITLE',       'get (display) a note'],
     ['', 'parse=TITLE',     'parse note, by default into filter file format'],
@@ -49,7 +50,7 @@ const CmdLineOptions = Getopt.create(_.concat(Clues.Options, [
     ['', 'old',             '  use old parse method (use with parse)'],
     ['', 'json',            '  output in json (use with parse, parse-file)'],
     ['', 'lines',           '  output raw lines of text'],
-    ['', 'type=TYPE',       '  filter by checkbox state: YES (checked) or NO (unchecked) (use with --lines)'],
+    ['', 'type=TYPE',       '  filter by checkbox state: YES, NO or NONE (use with --lines)'],
     ['', 'update[=NOTE]',   'update all results in worksheet, or a specific NOTE if specified'],
 // TOOD: change PREFIX to REGEX
     ['', 'match=PREFIX',    '  update notes matching title PREFIX (used with --update)'],
@@ -101,6 +102,7 @@ function createFromTextFile (options) {
     return NoteMaker.makeFromFilterFile(options.create, {
         outerDiv: true,
         checkbox: options.checkbox,
+        twoCheckboxes: options.two_checkboxes,
         yesPairsFile: options.yes_pairs
     })
         .then(body => {
@@ -618,13 +620,17 @@ async function main () {
     if (options['from-fs']) options.from_fs = true;
     if (options['force-update']) options.force_update = true;
     if (options['point-size']) options.point_size = options['point-size'];
+    if (options['two-checkboxes']) options.two_checkboxes = true;
+    if (options.checkbox && options.two_checkboxes) {
+        usage('--checkbox and --two-checkboxes cannot both be specified');
+    }
     if (options['yes-pairs']) options.yes_pairs = options['yes-pairs'];
     if (options['yes-mode']) options.yes_mode = true;
     if (options['download-only']) options.download_only = true;
     if (options.type) {
         const ft = options.type.toUpperCase();
-        if (ft !== 'YES' && ft !== 'NO') {
-            usage('--type must be YES or NO');
+        if (!_.includes(['YES', 'NO', 'NONE'], ft)) {
+            usage('--type must be YES, NO or NONE');
         }
         options.filter_type = ft;
     }

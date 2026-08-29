@@ -22,7 +22,11 @@ const Note = {
     open:       function (checkbox = '') { return `<div>${checkbox}<span><font style="font-size: ${Note.point_size()}pt;">`; },
     close:      '</font></span></div>',
     emptyLine:  '<div><br/></div>',
-    checkbox:   function (checked) { return `<en-todo checked="${checked ? 'true' : 'false'}"/>&#xA0;&#xA0;`; }
+    checkbox:   function (checked) { return `<en-todo checked="${checked ? 'true' : 'false'}"/>&#xA0;&#xA0;`; },
+    twoCheckboxes: function (checked) {
+        const todo = c => `<en-todo checked="${c ? 'true' : 'false'}"/>`;
+        return `${todo(checked)}&#xA0;Y&#xA0;&#xA0;${todo(false)}&#xA0;N&#xA0;&#xA0;`;
+    }
 };
 
 //
@@ -53,8 +57,9 @@ function writeUrl (dest, line, suffix) {
 
 //
 
-function writeText (dest, line, checkbox, checked = false) {
-    const _cb = checkbox ? Note.checkbox(checked) : '';
+function writeText (dest, line, checkbox, checked = false, twoCheckboxes = false) {
+    const _cb = twoCheckboxes ? Note.twoCheckboxes(checked)
+        : checkbox ? Note.checkbox(checked) : '';
     return `${dest}${Note.open(_cb)}${line}${Note.close}`;
 }
 
@@ -91,7 +96,8 @@ async function makeFromFilterFile (filename, options = {}) {
     Debug(`filename: ${filename}`);
 
     let dest = '';
-    const yesPairs = options.checkbox ? loadYesPairs(options.yesPairsFile) : new Set();
+    const anyCheckbox = options.checkbox || options.twoCheckboxes;
+    const yesPairs = anyCheckbox ? loadYesPairs(options.yesPairsFile) : new Set();
     let readLines = new Readlines(filename);
     if (options.outerDiv) {
         dest += '<div>';
@@ -105,7 +111,8 @@ async function makeFromFilterFile (filename, options = {}) {
         } else if (_.startsWith(line, 'http')) {
             dest = writeUrl(dest, line);
         } else {
-            dest = writeText(dest, line, options.checkbox, yesPairs.has(line));
+            dest = writeText(dest, line, options.checkbox, yesPairs.has(line),
+                             options.twoCheckboxes);
         }
     }
     dest = writeEmptyLine(dest);

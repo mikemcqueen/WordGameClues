@@ -97,7 +97,34 @@ function processLink (node, div, divQueue) {
 
 function processCheckbox (node, div, queue) {
     Expect(div).is.ok();
-    div.checked = node.getAttribute('checked') === 'true';
+    if (!div.checkboxes) div.checkboxes = [];
+    div.checkboxes.push(node.getAttribute('checked') === 'true');
+}
+
+// A two-checkbox line looks like:
+//   <en-todo/>&nbsp;Y&nbsp;&nbsp;<en-todo/>&nbsp;N&nbsp;&nbsp;<text>
+// The Y/N labels are part of the div's text; strip them.
+
+function stripCheckboxLabels (text, checkboxes) {
+    if (_.size(checkboxes) !== 2) return text;
+    return text.replace(/^Y[\s\u00a0]*N[\s\u00a0]*/, '');
+}
+
+// filter_type: 'YES', 'NO', 'NONE' (or undefined, for no filtering)
+//
+//  one checkbox:  YES = checked, NO/NONE = unchecked
+//  two checkboxes: YES = Y checked, NO = N checked, NONE = neither checked
+
+function includeLine (checkboxes, filterType) {
+    if (!filterType) return true;
+    const count = _.size(checkboxes);
+    if (count === 0) return false;
+    if (count === 1) {
+        return filterType === 'YES' ? checkboxes[0] : !checkboxes[0];
+    }
+    if (filterType === 'YES') return checkboxes[0];
+    if (filterType === 'NO')  return checkboxes[1];
+    return !checkboxes[0] && !checkboxes[1]; // NONE
 }
 
 // br: break.
@@ -169,12 +196,9 @@ function parseDomLines (lines, node, queue, options) {
         // let text = div.text && div.text.trim();
         // &nbsp; filtered out too
         let text = div.text && div.text.replace(/^[\s\u00a0]+|[\s\u00a0]+$/g, '')
+        if (text) text = stripCheckboxLabels(text, div.checkboxes);
         if (text && !_.isEmpty(text)) {
-            const ft = options && options.filter_type;
-            const include = !ft
-                || (ft === 'YES' && div.checked === true)
-                || (ft === 'NO'  && div.checked === false);
-            if (include) {
+            if (includeLine(div.checkboxes, options && options.filter_type)) {
                 Debug(`line: ${text}`);
                 lines.push(text);
             }
